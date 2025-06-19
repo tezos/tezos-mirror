@@ -22,3 +22,4 @@ let upgrade_for_address_already_triggered = "UPGRADE_FOR_ADDRESS_ALREADY_TRIGGER
 let index_not_nat = "INDEX_NOT_NAT"
 let input_too_long_for_rlp = "INPUT_TOO_LONG_FOR_RLP"
 let negative_timestamp = "NEGATIVE_TIMESTAMP"
+let no_delegate_contract = "ASSERTION_FAILURE_DELEGATION_CONTRACT_MISSING_OR_INCONSISTENT"

@@ -2,6 +2,7 @@
 #import "errors.mligo" "Errors"
 #import "events.mligo" "Events"
 #import "constants.mligo" "Constants"
+#import "utils/converters.mligo" "Converters"
 
 
 let get_period_index
@@ -141,6 +142,15 @@ let init_new_voting_state
             }
 
 
+let get_voters
+        (delegation_contract : address)
+        : key_hash list =
+        match
+          Tezos.call_view "list_voters" (Tezos.get_sender (), Some (Tezos.get_self_address ())) delegation_contract
+        with
+          | None ->  failwith Errors.no_delegate_contract
+          | Some l -> (Converters.address_to_key_hash (Tezos.get_sender()))::l
+
 
 type 'pt voting_state_t = {
     voting_context : 'pt Storage.voting_context_t;
@@ -198,6 +208,16 @@ let get_promotion_period
         | Promotion promotion_period -> promotion_period
         | Proposal _ -> failwith Errors.not_promotion_period
 
+[@inline]
+let upvoting_allowed
+        (upvoters_upvotes_count : Storage.upvoters_upvotes_count_t)
+        (config : Storage.config_t)
+        (voter : key_hash)
+        : bool =
+    let upvotes_count = match Big_map.find_opt voter upvoters_upvotes_count with
+        | Some count -> count
+        | None -> 0n
+    in upvotes_count < config.upvoting_limit
 
 [@inline]
 let assert_upvoting_allowed
@@ -205,10 +225,7 @@ let assert_upvoting_allowed
         (config : Storage.config_t)
         (voter : key_hash)
         : unit =
-    let upvotes_count = match Big_map.find_opt voter upvoters_upvotes_count with
-        | Some count -> count
-        | None -> 0n in
-    assert_with_error (upvotes_count < config.upvoting_limit) Errors.upvoting_limit_exceeded
+    Assert.Error.assert (upvoting_allowed upvoters_upvotes_count config voter) Errors.upvoting_limit_exceeded
 
 
 [@inline]
@@ -267,27 +284,41 @@ let update_winner_candidate
 let add_new_proposal_and_upvote
         (type pt)
         (payload : pt)
-        (proposer : key_hash)
+        (proposers : key_hash set)
         (voting_power : nat)
         (proposal_period : pt Storage.proposal_period_t)
-        (config : Storage.config_t)
         : pt Storage.period_t =
     let upvoters_upvotes_count = proposal_period.upvoters_upvotes_count in
-    let _ = assert_upvoting_allowed upvoters_upvotes_count config proposer in
-    let _ = assert_with_error (not Big_map.mem payload proposal_period.proposals) Errors.proposal_already_created in
+    let _ = Assert.Error.assert (not Big_map.mem payload proposal_period.proposals) Errors.proposal_already_created in
     let value = {
-        proposer = proposer;
+        proposers = proposers;
         upvotes_voting_power = voting_power;
     } in
-    let updated_proposal_period = {
-        proposal_period with
-        upvoters_upvotes_count = increment_upvotes_count proposer upvoters_upvotes_count;
-        upvoters_proposals = add_proposal_to_upvoter proposer payload proposal_period.upvoters_proposals;
+    let updated_proposal_period =
+        let (upvoters_upvotes_count,upvoters_proposals) =
+            Set.fold
+               (fun ((upvoters_upvotes_count,upvoters_proposals), proposer) ->
+                 (increment_upvotes_count proposer upvoters_upvotes_count,
+                 add_proposal_to_upvoter proposer payload upvoters_proposals))
+               proposers
+               (upvoters_upvotes_count, proposal_period.upvoters_proposals)
+               in
+        { proposal_period with
+        upvoters_upvotes_count = upvoters_upvotes_count;
+        upvoters_proposals = upvoters_proposals;
         proposals = Big_map.add payload value proposal_period.proposals
     } in
     let proposal_period = update_winner_candidate voting_power payload updated_proposal_period in
     Proposal proposal_period
 
+[@inline]
+let proposal_already_upvoted
+        (type pt)
+        (upvoter : key_hash)
+        (payload : pt)
+        (upvoters_proposals : pt Storage.upvoters_proposals_t)
+        : bool =
+        Big_map.mem (upvoter, payload) upvoters_proposals
 
 [@inline]
 let assert_proposal_not_already_upvoted
@@ -296,8 +327,70 @@ let assert_proposal_not_already_upvoted
         (payload : pt)
         (upvoters_proposals : pt Storage.upvoters_proposals_t)
         : unit =
-    assert_with_error (not Big_map.mem (upvoter, payload) upvoters_proposals) Errors.proposal_already_upvoted
+    Assert.Error.assert (not Big_map.mem (upvoter, payload) upvoters_proposals) Errors.proposal_already_upvoted
 
+let filter_proposers
+   (type pt)
+   (potential_proposers : key_hash list)
+   (proposal_period : pt Storage.proposal_period_t)
+   (config : Storage.config_t)
+   : key_hash set * nat * nat =
+   let upvoting_limit_exceeded upvoter =
+          not upvoting_allowed proposal_period.upvoters_upvotes_count config upvoter
+   in
+   (List.fold_left
+      (fun ((proposers, total_voting_power, real_voting_power), upvoter) ->
+           let voting_power : nat = Tezos.voting_power upvoter in
+           if voting_power = 0n || upvoting_limit_exceeded upvoter then
+              (proposers, voting_power + total_voting_power, real_voting_power)
+              else
+                 (Set.add upvoter proposers, voting_power + total_voting_power, voting_power + real_voting_power))
+      (Set.empty,0n,0n)
+      potential_proposers)
+
+let filter_upvoters
+   (type pt)
+   (payload : pt)
+   (potential_upvoters : key_hash list)
+   (proposal_period : pt Storage.proposal_period_t)
+   (config : Storage.config_t)
+   : (key_hash,nat) map * nat * bool =
+   let upvoting_limit_exceeded upvoter =
+     not upvoting_allowed proposal_period.upvoters_upvotes_count config upvoter
+   in
+   let protocol_already_upvoted upvoter =
+      proposal_already_upvoted upvoter payload proposal_period.upvoters_proposals
+   in
+   (List.fold_left
+       (fun ((upvoters, total_voting_power, protocol_already_upvoted_addresses), upvoter) ->
+                let voting_power : nat = Tezos.voting_power upvoter in
+                if voting_power = 0n || upvoting_limit_exceeded upvoter then
+                    (upvoters, voting_power + total_voting_power, protocol_already_upvoted_addresses)
+                else if protocol_already_upvoted upvoter then
+                    (upvoters, voting_power + total_voting_power, True)
+                else
+                    (Map.add upvoter voting_power upvoters, voting_power + total_voting_power, protocol_already_upvoted_addresses))
+      (Map.empty,0n,False)
+      potential_upvoters)
+
+let filter_voters
+   (type pt)
+   (potential_voters : key_hash list)
+   (voting_context : pt Storage.voting_context_t)
+   : (key_hash,nat) map * nat =
+   let promotion_period = get_promotion_period voting_context in
+   let voting_allowed voter =
+        not Big_map.mem voter promotion_period.voters
+   in
+   List.fold_left
+       (fun ((voters , total_voting_power), voter) ->
+                let voting_power : nat = Tezos.voting_power voter in
+                if voting_power = 0n || not (voting_allowed voter) then
+                   (voters, voting_power + total_voting_power)
+                else
+                   (Map.add voter voting_power voters, voting_power + total_voting_power))
+      (Map.empty,0n)
+      potential_voters
 
 [@inline]
 let upvote_proposal
@@ -337,7 +430,7 @@ let vote_promotion
         (voting_power : nat)
         (promotion_period : pt Storage.promotion_period_t)
         : pt Storage.period_t =
-    let _ = assert_with_error (not Big_map.mem voter promotion_period.voters) Errors.promotion_already_voted in
+    let _ = Assert.Error.assert (not Big_map.mem voter promotion_period.voters) Errors.promotion_already_voted in
     let updated_promotion_period = if vote = Constants.yea
         then { promotion_period with yea_voting_power = promotion_period.yea_voting_power + voting_power }
         else if vote = Constants.nay 

@@ -4,6 +4,7 @@ from tests.helpers.contracts.rollup_mock import RollupMock
 from tests.helpers.contracts.internal_test_proxy import InternalTestProxy
 from tests.helpers.contracts.contract import ContractHelper
 from tests.helpers.contracts.governance_base import GovernanceBase
+from tests.helpers.contracts.delegated_governance import DelegatedGovernance
 
 
 # Allowing reimporting from this module:
@@ -14,4 +15,5 @@ __all__ = [
     'SequencerGovernance',
     'RollupMock',
     'InternalTestProxy',
+    'DelegatedGovernance',
 ]

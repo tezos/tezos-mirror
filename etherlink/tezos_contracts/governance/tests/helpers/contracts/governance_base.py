@@ -1,6 +1,7 @@
 from tests.helpers.contracts.contract import ContractHelper
 from typing import (
     Any,
+    Optional,
 )
 
 PROPOSAL_PERIOD = 'proposal'
@@ -22,6 +23,7 @@ class GovernanceBase(ContractHelper):
             'proposal_quorum': 80,
             'promotion_quorum': 80,
             'promotion_supermajority': 80,
+            'delegation_contract': 'tz1burnburnburnburnburnburnburjAYjjX',
         }
 
         if custom_config is not None:

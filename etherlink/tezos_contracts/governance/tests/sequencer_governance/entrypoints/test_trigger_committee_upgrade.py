@@ -13,6 +13,7 @@ import re
 class CommitteeGovernanceTriggerCommitteeUpgradeTestCase(BaseTestCase):
     def prepare_last_winner(self, sequencer_pk, pool_address):
         baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_sequencer_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -20,6 +21,7 @@ class CommitteeGovernanceTriggerCommitteeUpgradeTestCase(BaseTestCase):
             'proposal_quorum': 20,
             'promotion_quorum': 20,
             'promotion_supermajority': 20,
+            'delegation_contract': delegation.address
         })
 
         # Period index: 0. Block: 2 of 2

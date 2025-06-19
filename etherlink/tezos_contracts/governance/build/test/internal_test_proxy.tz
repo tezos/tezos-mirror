@@ -21,9 +21,10 @@
                   COMPARE ;
                   LT ;
                   IF {} { PUSH string "INPUT_TOO_LONG_FOR_RLP" ; FAILWITH } ;
+                  SWAP ;
                   PUSH nat 55 ;
                   DIG 3 ;
-                  DIG 2 ;
+                  DIG 3 ;
                   ADD ;
                   ADD ;
                   BYTES ;
@@ -120,12 +121,7 @@
                IF { DROP ; PUSH bytes 0x }
                   { PUSH nat 128 ; SWAP ; PAIR ; DUP 3 ; SWAP ; EXEC } ;
                CONCAT } ;
-         PUSH bytes 0x ;
-         SWAP ;
-         NIL bytes ;
-         SWAP ;
-         ITER { CONS } ;
-         ITER { CONCAT } ;
+         CONCAT ;
          PUSH nat 192 ;
          DUP 2 ;
          SIZE ;
@@ -156,9 +152,10 @@
                   COMPARE ;
                   LT ;
                   IF {} { PUSH string "INPUT_TOO_LONG_FOR_RLP" ; FAILWITH } ;
+                  SWAP ;
                   PUSH nat 55 ;
                   DIG 3 ;
-                  DIG 2 ;
+                  DIG 3 ;
                   ADD ;
                   ADD ;
                   BYTES ;
@@ -279,12 +276,7 @@
                IF { DROP ; PUSH bytes 0x }
                   { PUSH nat 128 ; SWAP ; PAIR ; DUP 3 ; SWAP ; EXEC } ;
                CONCAT } ;
-         PUSH bytes 0x ;
-         SWAP ;
-         NIL bytes ;
-         SWAP ;
-         ITER { CONS } ;
-         ITER { CONCAT } ;
+         CONCAT ;
          PUSH nat 192 ;
          DUP 2 ;
          SIZE ;
@@ -308,9 +300,8 @@
          COMPARE ;
          EQ ;
          IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
-         PUSH bytes 0x ;
          NIL bytes ;
-         DUP 3 ;
+         DUP 2 ;
          PUSH nat 21 ;
          PUSH nat 7 ;
          SLICE ;
@@ -318,16 +309,13 @@
          CONS ;
          PUSH bytes 0x00000015 ;
          CONS ;
-         DIG 2 ;
+         SWAP ;
          PUSH nat 2 ;
          PUSH nat 0 ;
          SLICE ;
          IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
          CONS ;
-         NIL bytes ;
-         SWAP ;
-         ITER { CONS } ;
-         ITER { CONCAT } ;
+         CONCAT ;
          UNPACK key_hash ;
          PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
          SWAP ;

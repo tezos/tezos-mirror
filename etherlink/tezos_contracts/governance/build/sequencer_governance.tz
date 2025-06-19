@@ -12,7 +12,8 @@
              (nat %scale)
              (nat %proposal_quorum)
              (nat %promotion_quorum)
-             (nat %promotion_supermajority))
+             (nat %promotion_supermajority)
+             (address %delegation_contract))
           (option %voting_context
              (pair (nat %period_index)
                    (or %period
@@ -23,7 +24,7 @@
                             unit)
                          (big_map %proposals
                             (pair (string %sequencer_pk) (bytes %pool_address))
-                            (pair (key_hash %proposer) (nat %upvotes_voting_power)))
+                            (pair (set %proposers key_hash) (nat %upvotes_voting_power)))
                          (option %max_upvotes_voting_power nat)
                          (option %winner_candidate (pair (string %sequencer_pk) (bytes %pool_address)))
                          (nat %total_voting_power))
@@ -39,52 +40,10 @@
                    (big_map %trigger_history address unit)))
           (big_map %metadata string bytes)) ;
   code { PUSH string "NOT_PROPOSAL_PERIOD" ;
-         LAMBDA
-           address
-           key_hash
-           { DUP ;
-             PACK ;
-             PUSH bytes 0x00 ;
-             DUP 2 ;
-             PUSH nat 1 ;
-             PUSH nat 6 ;
-             SLICE ;
-             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-             COMPARE ;
-             EQ ;
-             IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
-             PUSH bytes 0x ;
-             NIL bytes ;
-             DUP 3 ;
-             PUSH nat 21 ;
-             PUSH nat 7 ;
-             SLICE ;
-             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-             CONS ;
-             PUSH bytes 0x00000015 ;
-             CONS ;
-             DIG 2 ;
-             PUSH nat 2 ;
-             PUSH nat 0 ;
-             SLICE ;
-             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-             CONS ;
-             NIL bytes ;
-             SWAP ;
-             ITER { CONS } ;
-             ITER { CONCAT } ;
-             UNPACK key_hash ;
-             PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
-             SWAP ;
-             IF_NONE { FAILWITH } { SWAP ; DROP } ;
-             PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
-             DIG 2 ;
-             DUP 3 ;
-             IMPLICIT_ACCOUNT ;
-             ADDRESS ;
-             COMPARE ;
-             EQ ;
-             IF { DROP } { FAILWITH } } ;
+         PUSH string "NOT_PROMOTION_PERIOD" ;
+         PUSH string "UPVOTING_LIMIT_EXCEEDED" ;
+         PUSH string "PROPOSAL_ALREADY_UPVOTED" ;
+         PUSH string "PROMOTION_ALREADY_VOTED" ;
          LAMBDA
            (pair nat nat)
            bytes
@@ -102,9 +61,10 @@
                   COMPARE ;
                   LT ;
                   IF {} { PUSH string "INPUT_TOO_LONG_FOR_RLP" ; FAILWITH } ;
+                  SWAP ;
                   PUSH nat 55 ;
                   DIG 3 ;
-                  DIG 2 ;
+                  DIG 3 ;
                   ADD ;
                   ADD ;
                   BYTES ;
@@ -128,7 +88,7 @@
              GT ;
              IF { UNIT } { PUSH string "NO_VOTING_POWER" ; FAILWITH } } ;
          LAMBDA
-           (pair nat nat nat nat nat nat nat nat)
+           (pair nat nat nat nat nat nat nat nat address)
            nat
            { DUP ;
              CAR ;
@@ -143,13 +103,69 @@
                  EDIV ;
                  IF_NONE { PUSH string "DIV by 0" ; FAILWITH } {} ;
                  CAR } } ;
-         DIG 6 ;
+         LAMBDA
+           address
+           (list key_hash)
+           { SELF_ADDRESS ;
+             SOME ;
+             SENDER ;
+             PAIR ;
+             VIEW "list_voters" (list key_hash) ;
+             IF_NONE
+               { PUSH string "ASSERTION_FAILURE_DELEGATION_CONTRACT_MISSING_OR_INCONSISTENT" ;
+                 FAILWITH }
+               { SENDER ;
+                 DUP ;
+                 PACK ;
+                 PUSH bytes 0x00 ;
+                 DUP 2 ;
+                 PUSH nat 1 ;
+                 PUSH nat 6 ;
+                 SLICE ;
+                 IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+                 COMPARE ;
+                 EQ ;
+                 IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
+                 NIL bytes ;
+                 DUP 2 ;
+                 PUSH nat 21 ;
+                 PUSH nat 7 ;
+                 SLICE ;
+                 IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+                 CONS ;
+                 PUSH bytes 0x00000015 ;
+                 CONS ;
+                 SWAP ;
+                 PUSH nat 2 ;
+                 PUSH nat 0 ;
+                 SLICE ;
+                 IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+                 CONS ;
+                 CONCAT ;
+                 UNPACK key_hash ;
+                 PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
+                 SWAP ;
+                 IF_NONE { FAILWITH } { SWAP ; DROP } ;
+                 PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
+                 DIG 2 ;
+                 DUP 3 ;
+                 IMPLICIT_ACCOUNT ;
+                 ADDRESS ;
+                 COMPARE ;
+                 EQ ;
+                 IF { DROP } { FAILWITH } ;
+                 CONS } } ;
+         DIG 10 ;
          UNPAIR ;
          IF_LEFT
-           { DIG 3 ;
-             DIG 6 ;
+           { DIG 2 ;
+             DIG 4 ;
              DIG 7 ;
-             DROP 3 ;
+             DIG 8 ;
+             DIG 9 ;
+             DIG 10 ;
+             DIG 11 ;
+             DROP 7 ;
              UNIT ;
              DIG 4 ;
              SWAP ;
@@ -167,7 +183,7 @@
                  TOTAL_VOTING_POWER ;
                  NONE (pair string bytes) ;
                  NONE nat ;
-                 EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                 EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                  EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                  EMPTY_BIG_MAP key_hash nat ;
                  PAIR 6 ;
@@ -217,7 +233,7 @@
                               TOTAL_VOTING_POWER ;
                               NONE (pair string bytes) ;
                               NONE nat ;
-                              EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                              EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                               EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                               EMPTY_BIG_MAP key_hash nat ;
                               PAIR 6 ;
@@ -244,7 +260,7 @@
                                    RIGHT
                                      (pair (big_map key_hash nat)
                                            (big_map (pair key_hash string bytes) unit)
-                                           (big_map (pair string bytes) (pair key_hash nat))
+                                           (big_map (pair string bytes) (pair (set key_hash) nat))
                                            (option nat)
                                            (option (pair string bytes))
                                            nat) }
@@ -261,7 +277,7 @@
                                    TOTAL_VOTING_POWER ;
                                    NONE (pair string bytes) ;
                                    NONE nat ;
-                                   EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                   EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                    EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                    EMPTY_BIG_MAP key_hash nat ;
                                    PAIR 6 ;
@@ -287,7 +303,7 @@
                           ADD ;
                           DUP ;
                           DUP 6 ;
-                          GET 14 ;
+                          GET 15 ;
                           MUL ;
                           DIG 5 ;
                           GET 9 ;
@@ -315,7 +331,7 @@
                           TOTAL_VOTING_POWER ;
                           NONE (pair string bytes) ;
                           NONE nat ;
-                          EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                          EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                           EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                           EMPTY_BIG_MAP key_hash nat ;
                           PAIR 6 ;
@@ -448,12 +464,7 @@
                    IF { DROP ; PUSH bytes 0x }
                       { PUSH nat 128 ; SWAP ; PAIR ; DUP 9 ; SWAP ; EXEC } ;
                    CONCAT } ;
-             PUSH bytes 0x ;
-             SWAP ;
-             NIL bytes ;
-             SWAP ;
-             ITER { CONS } ;
-             ITER { CONCAT } ;
+             CONCAT ;
              PUSH nat 192 ;
              DUP 2 ;
              SIZE ;
@@ -495,14 +506,21 @@
              SWAP ;
              DIG 2 ;
              CONS }
-           { DIG 5 ;
+           { DIG 6 ;
              DROP ;
              IF_LEFT
-               { DIG 6 ;
+               { DIG 7 ;
+                 DIG 8 ;
+                 DIG 10 ;
+                 DROP 3 ;
+                 UNIT ;
+                 DIG 6 ;
+                 SWAP ;
+                 EXEC ;
                  DROP ;
                  DUP 2 ;
                  CAR ;
-                 DIG 3 ;
+                 DIG 4 ;
                  SWAP ;
                  EXEC ;
                  DUP 3 ;
@@ -512,7 +530,7 @@
                      TOTAL_VOTING_POWER ;
                      NONE (pair string bytes) ;
                      NONE nat ;
-                     EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                     EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                      EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                      EMPTY_BIG_MAP key_hash nat ;
                      PAIR 6 ;
@@ -562,7 +580,7 @@
                                   TOTAL_VOTING_POWER ;
                                   NONE (pair string bytes) ;
                                   NONE nat ;
-                                  EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                  EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                   EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                   EMPTY_BIG_MAP key_hash nat ;
                                   PAIR 6 ;
@@ -589,7 +607,7 @@
                                        RIGHT
                                          (pair (big_map key_hash nat)
                                                (big_map (pair key_hash string bytes) unit)
-                                               (big_map (pair string bytes) (pair key_hash nat))
+                                               (big_map (pair string bytes) (pair (set key_hash) nat))
                                                (option nat)
                                                (option (pair string bytes))
                                                nat) }
@@ -606,7 +624,7 @@
                                        TOTAL_VOTING_POWER ;
                                        NONE (pair string bytes) ;
                                        NONE nat ;
-                                       EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                       EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                        EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                        EMPTY_BIG_MAP key_hash nat ;
                                        PAIR 6 ;
@@ -632,7 +650,7 @@
                               ADD ;
                               DUP ;
                               DUP 6 ;
-                              GET 14 ;
+                              GET 15 ;
                               MUL ;
                               DIG 5 ;
                               GET 9 ;
@@ -660,7 +678,7 @@
                               TOTAL_VOTING_POWER ;
                               NONE (pair string bytes) ;
                               NONE nat ;
-                              EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                              EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                               EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                               EMPTY_BIG_MAP key_hash nat ;
                               PAIR 6 ;
@@ -669,69 +687,116 @@
                           PAIR } } ;
                  SWAP ;
                  DROP ;
-                 SENDER ;
-                 DIG 6 ;
-                 SWAP ;
-                 EXEC ;
-                 DUP ;
-                 VOTING_POWER ;
-                 UNIT ;
-                 DIG 7 ;
-                 SWAP ;
-                 EXEC ;
-                 DROP ;
-                 DUP ;
-                 DIG 6 ;
-                 SWAP ;
-                 EXEC ;
-                 DROP ;
                  DUP 3 ;
-                 CDR ;
-                 IF_LEFT { DROP ; PUSH string "NOT_PROMOTION_PERIOD" ; FAILWITH } {} ;
-                 DUP ;
                  CAR ;
-                 DUP 4 ;
-                 MEM ;
-                 NOT ;
-                 IF {} { PUSH string "PROMOTION_ALREADY_VOTED" ; FAILWITH } ;
-                 PUSH string "yea" ;
-                 DUP 6 ;
-                 COMPARE ;
-                 EQ ;
-                 IF { DUP ; DIG 2 ; DUP 3 ; GET 3 ; ADD ; UPDATE 3 }
-                    { PUSH string "nay" ;
-                      DUP 6 ;
-                      COMPARE ;
-                      EQ ;
-                      IF { DUP ; DIG 2 ; DUP 3 ; GET 5 ; ADD ; UPDATE 5 }
-                         { PUSH string "pass" ;
-                           DUP 6 ;
-                           COMPARE ;
-                           EQ ;
-                           IF { DUP ; DIG 2 ; DUP 3 ; GET 7 ; ADD ; UPDATE 7 }
-                              { SWAP ; DROP ; PUSH string "INCORRECT_VOTE_VALUE" ; FAILWITH } } } ;
-                 SWAP ;
-                 CAR ;
+                 GET 16 ;
                  DIG 4 ;
-                 SOME ;
-                 DIG 3 ;
-                 UPDATE ;
-                 UPDATE 1 ;
-                 RIGHT
-                   (pair (big_map key_hash nat)
-                         (big_map (pair key_hash string bytes) unit)
-                         (big_map (pair string bytes) (pair key_hash nat))
-                         (option nat)
-                         (option (pair string bytes))
-                         nat) ;
-                 UPDATE 2 ;
+                 SWAP ;
+                 EXEC ;
+                 DUP 2 ;
+                 CDR ;
+                 IF_LEFT { DROP ; DUP 7 ; FAILWITH } {} ;
+                 PUSH nat 0 ;
+                 EMPTY_MAP key_hash nat ;
+                 PAIR ;
+                 DIG 2 ;
+                 ITER { SWAP ;
+                        UNPAIR ;
+                        DUP 3 ;
+                        VOTING_POWER ;
+                        DUP 5 ;
+                        CAR ;
+                        DUP 5 ;
+                        MEM ;
+                        NOT ;
+                        NOT ;
+                        PUSH nat 0 ;
+                        DUP 3 ;
+                        COMPARE ;
+                        EQ ;
+                        OR ;
+                        IF { DIG 3 ; DROP ; DIG 2 ; ADD ; SWAP }
+                           { DIG 2 ; DUP 2 ; ADD ; DUG 2 ; SOME ; DIG 3 ; UPDATE } ;
+                        PAIR } ;
+                 SWAP ;
+                 DROP ;
+                 UNPAIR ;
+                 SWAP ;
+                 DIG 5 ;
+                 SWAP ;
+                 EXEC ;
+                 DROP ;
+                 PUSH nat 0 ;
+                 DUP 2 ;
+                 SIZE ;
+                 COMPARE ;
+                 GT ;
+                 IF {} { DUP 5 ; FAILWITH } ;
+                 DUP 2 ;
+                 SWAP ;
+                 ITER { UNPAIR ;
+                        DIG 2 ;
+                        CDR ;
+                        IF_LEFT { DROP ; DUP 7 ; FAILWITH } {} ;
+                        DUP ;
+                        CAR ;
+                        DUP 3 ;
+                        MEM ;
+                        NOT ;
+                        IF {} { DUP 7 ; FAILWITH } ;
+                        PUSH string "yea" ;
+                        DUP 6 ;
+                        COMPARE ;
+                        EQ ;
+                        IF { DUP ; DIG 3 ; DUP 3 ; GET 3 ; ADD ; UPDATE 3 }
+                           { PUSH string "nay" ;
+                             DUP 6 ;
+                             COMPARE ;
+                             EQ ;
+                             IF { DUP ; DIG 3 ; DUP 3 ; GET 5 ; ADD ; UPDATE 5 }
+                                { PUSH string "pass" ;
+                                  DUP 6 ;
+                                  COMPARE ;
+                                  EQ ;
+                                  IF { DUP ; DIG 3 ; DUP 3 ; GET 7 ; ADD ; UPDATE 7 }
+                                     { DIG 2 ; DROP ; PUSH string "INCORRECT_VOTE_VALUE" ; FAILWITH } } } ;
+                        SWAP ;
+                        CAR ;
+                        DUP 5 ;
+                        SOME ;
+                        DIG 3 ;
+                        UPDATE ;
+                        UPDATE 1 ;
+                        RIGHT
+                          (pair (big_map key_hash nat)
+                                (big_map (pair key_hash string bytes) unit)
+                                (big_map (pair string bytes) (pair (set key_hash) nat))
+                                (option nat)
+                                (option (pair string bytes))
+                                nat) ;
+                        DUP 2 ;
+                        SWAP ;
+                        UPDATE 2 } ;
+                 SWAP ;
+                 DIG 2 ;
+                 DIG 4 ;
+                 DIG 5 ;
+                 DROP 4 ;
                  SOME ;
                  UPDATE 3 ;
                  NIL operation }
-               { IF_LEFT
-                   { DUP 2 ;
+               { DIG 6 ;
+                 DIG 9 ;
+                 DROP 2 ;
+                 IF_LEFT
+                   { UNIT ;
+                     DIG 6 ;
+                     SWAP ;
+                     EXEC ;
+                     DROP ;
+                     DUP 2 ;
                      CAR ;
-                     DIG 3 ;
+                     DIG 4 ;
                      SWAP ;
                      EXEC ;
                      DUP 3 ;
@@ -741,7 +806,7 @@
                          TOTAL_VOTING_POWER ;
                          NONE (pair string bytes) ;
                          NONE nat ;
-                         EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                         EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                          EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                          EMPTY_BIG_MAP key_hash nat ;
                          PAIR 6 ;
@@ -791,7 +856,7 @@
                                       TOTAL_VOTING_POWER ;
                                       NONE (pair string bytes) ;
                                       NONE nat ;
-                                      EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                      EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                       EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                       EMPTY_BIG_MAP key_hash nat ;
                                       PAIR 6 ;
@@ -818,7 +883,7 @@
                                            RIGHT
                                              (pair (big_map key_hash nat)
                                                    (big_map (pair key_hash string bytes) unit)
-                                                   (big_map (pair string bytes) (pair key_hash nat))
+                                                   (big_map (pair string bytes) (pair (set key_hash) nat))
                                                    (option nat)
                                                    (option (pair string bytes))
                                                    nat) }
@@ -835,7 +900,7 @@
                                            TOTAL_VOTING_POWER ;
                                            NONE (pair string bytes) ;
                                            NONE nat ;
-                                           EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                           EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                            EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                            EMPTY_BIG_MAP key_hash nat ;
                                            PAIR 6 ;
@@ -861,7 +926,7 @@
                                   ADD ;
                                   DUP ;
                                   DUP 6 ;
-                                  GET 14 ;
+                                  GET 15 ;
                                   MUL ;
                                   DIG 5 ;
                                   GET 9 ;
@@ -889,7 +954,7 @@
                                   TOTAL_VOTING_POWER ;
                                   NONE (pair string bytes) ;
                                   NONE nat ;
-                                  EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                  EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                   EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                   EMPTY_BIG_MAP key_hash nat ;
                                   PAIR 6 ;
@@ -905,97 +970,146 @@
                            { DUP 4 ; GET 5 }
                            { EMPTY_BIG_MAP address unit ; SWAP ; PAIR ; SOME } } ;
                      DIG 2 ;
-                     SENDER ;
-                     DIG 8 ;
-                     SWAP ;
-                     EXEC ;
                      DUP ;
-                     VOTING_POWER ;
-                     UNIT ;
-                     DIG 9 ;
-                     SWAP ;
-                     EXEC ;
-                     DROP ;
-                     DUP ;
-                     DIG 8 ;
-                     SWAP ;
-                     EXEC ;
-                     DROP ;
-                     DUP 3 ;
                      CDR ;
-                     IF_LEFT { DIG 8 ; DROP } { DROP ; DIG 7 ; FAILWITH } ;
-                     DUP ;
-                     CAR ;
-                     DUP 9 ;
-                     CAR ;
-                     GET 7 ;
-                     DUP 2 ;
+                     IF_LEFT {} { DROP ; DUP 10 ; FAILWITH } ;
                      DUP 6 ;
-                     GET ;
-                     IF_NONE { PUSH nat 0 } {} ;
-                     COMPARE ;
-                     LT ;
-                     IF {} { PUSH string "UPVOTING_LIMIT_EXCEEDED" ; FAILWITH } ;
-                     DUP 2 ;
-                     GET 5 ;
-                     DUP 9 ;
-                     GET ;
-                     IF_NONE { PUSH string "PROPOSAL_NOT_FOUND" ; FAILWITH } {} ;
-                     DUP 3 ;
-                     GET 3 ;
-                     DUP ;
-                     DUP 11 ;
-                     DUP 8 ;
-                     PAIR ;
-                     MEM ;
-                     NOT ;
-                     IF {} { PUSH string "PROPOSAL_ALREADY_UPVOTED" ; FAILWITH } ;
-                     DIG 4 ;
-                     DUP 3 ;
-                     CDR ;
-                     ADD ;
-                     DUP 5 ;
-                     DUP 5 ;
-                     DUP 8 ;
-                     GET ;
-                     IF_NONE
-                       { DIG 4 ; PUSH nat 1 ; SOME ; DUP 8 ; UPDATE }
-                       { DIG 5 ; PUSH nat 1 ; DIG 2 ; ADD ; SOME ; DUP 8 ; UPDATE } ;
-                     UPDATE 1 ;
-                     DIG 2 ;
-                     UNIT ;
-                     SOME ;
-                     DUP 11 ;
+                     CAR ;
+                     GET 16 ;
                      DIG 7 ;
-                     PAIR ;
-                     UPDATE ;
-                     UPDATE 3 ;
-                     DIG 3 ;
-                     GET 5 ;
-                     DIG 3 ;
-                     DUP 4 ;
-                     UPDATE 2 ;
-                     SOME ;
-                     DUP 8 ;
-                     UPDATE ;
-                     UPDATE 5 ;
-                     DUP ;
-                     GET 7 ;
-                     IF_NONE
-                       { SWAP ; SOME ; UPDATE 7 ; DIG 4 ; SOME ; UPDATE 9 }
-                       { DUP ;
-                         DUP 4 ;
-                         COMPARE ;
-                         GT ;
-                         IF { DROP ; SWAP ; SOME ; UPDATE 7 ; DIG 4 ; SOME ; UPDATE 9 }
-                            { DIG 6 ;
-                              DROP ;
-                              DIG 2 ;
-                              COMPARE ;
-                              EQ ;
-                              IF { NONE (pair string bytes) ; UPDATE 9 } {} } } ;
-                     LEFT (pair (big_map key_hash string) nat nat nat nat (pair string bytes)) ;
-                     DIG 3 ;
+                     SWAP ;
+                     EXEC ;
+                     PUSH bool False ;
+                     PUSH nat 0 ;
+                     EMPTY_MAP key_hash nat ;
+                     PAIR 3 ;
+                     SWAP ;
+                     ITER { SWAP ;
+                            UNPAIR 3 ;
+                            DUP 4 ;
+                            VOTING_POWER ;
+                            DUP 11 ;
+                            CAR ;
+                            GET 7 ;
+                            DUP 7 ;
+                            CAR ;
+                            DUP 7 ;
+                            GET ;
+                            IF_NONE { PUSH nat 0 } {} ;
+                            COMPARE ;
+                            LT ;
+                            NOT ;
+                            PUSH nat 0 ;
+                            DUP 3 ;
+                            COMPARE ;
+                            EQ ;
+                            OR ;
+                            IF { DIG 4 ; DROP ; DIG 3 ; DIG 3 ; DIG 2 ; ADD ; DIG 2 }
+                               { DUP 6 ;
+                                 GET 3 ;
+                                 DUP 11 ;
+                                 DUP 7 ;
+                                 PAIR ;
+                                 MEM ;
+                                 IF { DIG 3 ; DIG 4 ; DROP 2 ; PUSH bool True ; DIG 3 ; DIG 2 ; ADD ; DIG 2 }
+                                    { DIG 3 ; DIG 3 ; DUP 3 ; ADD ; DIG 3 ; DIG 3 ; SOME ; DIG 4 ; UPDATE } } ;
+                            PAIR 3 } ;
+                     SWAP ;
+                     DROP ;
+                     UNPAIR 3 ;
+                     SWAP ;
+                     DIG 8 ;
+                     SWAP ;
+                     EXEC ;
+                     DROP ;
+                     PUSH nat 0 ;
+                     DUP 2 ;
+                     SIZE ;
+                     COMPARE ;
+                     GT ;
+                     IF { SWAP ; DROP } { SWAP ; IF { DUP 7 } { DUP 8 } ; FAILWITH } ;
+                     DUP 2 ;
+                     SWAP ;
+                     ITER { UNPAIR ;
+                            DIG 2 ;
+                            CDR ;
+                            IF_LEFT {} { DROP ; DUP 10 ; FAILWITH } ;
+                            DUP ;
+                            CAR ;
+                            DUP 9 ;
+                            CAR ;
+                            GET 7 ;
+                            DUP 2 ;
+                            DUP 5 ;
+                            GET ;
+                            IF_NONE { PUSH nat 0 } {} ;
+                            COMPARE ;
+                            LT ;
+                            IF {} { DUP 11 ; FAILWITH } ;
+                            DUP 2 ;
+                            GET 5 ;
+                            DUP 9 ;
+                            GET ;
+                            IF_NONE { PUSH string "PROPOSAL_NOT_FOUND" ; FAILWITH } {} ;
+                            DUP 3 ;
+                            GET 3 ;
+                            DUP ;
+                            DUP 11 ;
+                            DUP 7 ;
+                            PAIR ;
+                            MEM ;
+                            NOT ;
+                            IF {} { DUP 12 ; FAILWITH } ;
+                            DIG 5 ;
+                            DUP 3 ;
+                            CDR ;
+                            ADD ;
+                            DUP 5 ;
+                            DUP 5 ;
+                            DUP 8 ;
+                            GET ;
+                            IF_NONE
+                              { DIG 4 ; PUSH nat 1 ; SOME ; DUP 8 ; UPDATE }
+                              { DIG 5 ; PUSH nat 1 ; DIG 2 ; ADD ; SOME ; DUP 8 ; UPDATE } ;
+                            UPDATE 1 ;
+                            DIG 2 ;
+                            UNIT ;
+                            SOME ;
+                            DUP 11 ;
+                            DIG 7 ;
+                            PAIR ;
+                            UPDATE ;
+                            UPDATE 3 ;
+                            DIG 3 ;
+                            GET 5 ;
+                            DIG 3 ;
+                            DUP 4 ;
+                            UPDATE 2 ;
+                            SOME ;
+                            DUP 8 ;
+                            UPDATE ;
+                            UPDATE 5 ;
+                            DUP ;
+                            GET 7 ;
+                            IF_NONE
+                              { SWAP ; SOME ; UPDATE 7 ; DUP 5 ; SOME ; UPDATE 9 }
+                              { DUP ;
+                                DUP 4 ;
+                                COMPARE ;
+                                GT ;
+                                IF { DROP ; SWAP ; SOME ; UPDATE 7 ; DUP 5 ; SOME ; UPDATE 9 }
+                                   { DIG 2 ; COMPARE ; EQ ; IF { NONE (pair string bytes) ; UPDATE 9 } {} } } ;
+                            LEFT (pair (big_map key_hash string) nat nat nat nat (pair string bytes)) ;
+                            DUP 2 ;
+                            SWAP ;
+                            UPDATE 2 } ;
+                     SWAP ;
+                     DIG 4 ;
+                     DIG 6 ;
+                     DIG 7 ;
+                     DIG 8 ;
+                     DROP 5 ;
+                     DIG 2 ;
                      IF_NONE
                        { NIL operation }
                        { NIL operation ;
@@ -1006,15 +1120,15 @@
                                  (option %winner_proposal_payload
                                     (pair (string %sequencer_pk) (bytes %pool_address)))) ;
                          CONS } ;
-                     DIG 4 ;
                      DIG 3 ;
-                     DIG 3 ;
-                     UPDATE 2 ;
+                     DIG 2 ;
                      SOME ;
                      UPDATE 3 ;
                      DIG 2 ;
                      UPDATE 5 }
-                   { DUP ;
+                   { DIG 6 ;
+                     DROP ;
+                     DUP ;
                      UNPAIR ;
                      SIZE ;
                      PUSH nat 55 ;
@@ -1033,9 +1147,14 @@
                      COMPARE ;
                      EQ ;
                      IF {} { PUSH string "INCORRECT_POOL_ADDRESS_LENGTH" ; FAILWITH } ;
+                     UNIT ;
+                     DIG 6 ;
+                     SWAP ;
+                     EXEC ;
+                     DROP ;
                      DUP 2 ;
                      CAR ;
-                     DIG 3 ;
+                     DIG 4 ;
                      SWAP ;
                      EXEC ;
                      DUP 3 ;
@@ -1045,7 +1164,7 @@
                          TOTAL_VOTING_POWER ;
                          NONE (pair string bytes) ;
                          NONE nat ;
-                         EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                         EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                          EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                          EMPTY_BIG_MAP key_hash nat ;
                          PAIR 6 ;
@@ -1095,7 +1214,7 @@
                                       TOTAL_VOTING_POWER ;
                                       NONE (pair string bytes) ;
                                       NONE nat ;
-                                      EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                      EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                       EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                       EMPTY_BIG_MAP key_hash nat ;
                                       PAIR 6 ;
@@ -1122,7 +1241,7 @@
                                            RIGHT
                                              (pair (big_map key_hash nat)
                                                    (big_map (pair key_hash string bytes) unit)
-                                                   (big_map (pair string bytes) (pair key_hash nat))
+                                                   (big_map (pair string bytes) (pair (set key_hash) nat))
                                                    (option nat)
                                                    (option (pair string bytes))
                                                    nat) }
@@ -1139,7 +1258,7 @@
                                            TOTAL_VOTING_POWER ;
                                            NONE (pair string bytes) ;
                                            NONE nat ;
-                                           EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                           EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                            EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                            EMPTY_BIG_MAP key_hash nat ;
                                            PAIR 6 ;
@@ -1165,7 +1284,7 @@
                                   ADD ;
                                   DUP ;
                                   DUP 6 ;
-                                  GET 14 ;
+                                  GET 15 ;
                                   MUL ;
                                   DIG 5 ;
                                   GET 9 ;
@@ -1193,7 +1312,7 @@
                                   TOTAL_VOTING_POWER ;
                                   NONE (pair string bytes) ;
                                   NONE nat ;
-                                  EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                                  EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                   EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                   EMPTY_BIG_MAP key_hash nat ;
                                   PAIR 6 ;
@@ -1209,64 +1328,102 @@
                            { DUP 4 ; GET 5 }
                            { EMPTY_BIG_MAP address unit ; SWAP ; PAIR ; SOME } } ;
                      DIG 2 ;
-                     SENDER ;
-                     DIG 8 ;
+                     DUP ;
+                     CDR ;
+                     IF_LEFT { DIG 9 ; DROP } { DROP ; DIG 8 ; FAILWITH } ;
+                     DUP 6 ;
+                     CAR ;
+                     GET 16 ;
+                     DIG 7 ;
                      SWAP ;
                      EXEC ;
-                     DUP ;
-                     VOTING_POWER ;
-                     UNIT ;
+                     PUSH nat 0 ;
+                     PUSH nat 0 ;
+                     EMPTY_SET key_hash ;
+                     PAIR 3 ;
+                     SWAP ;
+                     ITER { SWAP ;
+                            UNPAIR 3 ;
+                            DUP 4 ;
+                            VOTING_POWER ;
+                            DUP 11 ;
+                            CAR ;
+                            GET 7 ;
+                            DUP 7 ;
+                            CAR ;
+                            DUP 7 ;
+                            GET ;
+                            IF_NONE { PUSH nat 0 } {} ;
+                            COMPARE ;
+                            LT ;
+                            NOT ;
+                            PUSH nat 0 ;
+                            DUP 3 ;
+                            COMPARE ;
+                            EQ ;
+                            OR ;
+                            IF { DIG 4 ; DROP ; DIG 3 ; DIG 3 ; DIG 2 ; ADD ; DIG 2 }
+                               { DIG 3 ;
+                                 DUP 2 ;
+                                 ADD ;
+                                 DIG 3 ;
+                                 DIG 2 ;
+                                 ADD ;
+                                 DIG 2 ;
+                                 PUSH bool True ;
+                                 DIG 4 ;
+                                 UPDATE } ;
+                            PAIR 3 } ;
+                     UNPAIR 3 ;
+                     SWAP ;
                      DIG 9 ;
                      SWAP ;
                      EXEC ;
                      DROP ;
-                     DUP ;
-                     DIG 8 ;
-                     SWAP ;
-                     EXEC ;
-                     DROP ;
-                     DUP 3 ;
-                     CDR ;
-                     IF_LEFT { DIG 8 ; DROP } { DROP ; DIG 7 ; FAILWITH } ;
-                     DUP ;
-                     CAR ;
-                     DUP 9 ;
-                     CAR ;
-                     GET 7 ;
+                     PUSH nat 0 ;
                      DUP 2 ;
-                     DUP 6 ;
-                     GET ;
-                     IF_NONE { PUSH nat 0 } {} ;
+                     SIZE ;
                      COMPARE ;
-                     LT ;
-                     IF {} { PUSH string "UPVOTING_LIMIT_EXCEEDED" ; FAILWITH } ;
-                     DUP 2 ;
+                     GT ;
+                     IF { DIG 8 ; DROP } { DIG 8 ; FAILWITH } ;
+                     DUP 3 ;
                      GET 5 ;
-                     DUP 9 ;
+                     DUP 8 ;
                      MEM ;
                      NOT ;
                      IF {} { PUSH string "PROPOSAL_ALREADY_CREATED" ; FAILWITH } ;
-                     DUP 2 ;
-                     DUP 2 ;
-                     DUP 6 ;
-                     GET ;
-                     IF_NONE
-                       { SWAP ; PUSH nat 1 ; SOME ; DUP 6 ; UPDATE }
-                       { DIG 2 ; PUSH nat 1 ; DIG 2 ; ADD ; SOME ; DUP 6 ; UPDATE } ;
-                     UPDATE 1 ;
-                     DUP 2 ;
-                     GET 3 ;
-                     UNIT ;
-                     SOME ;
-                     DUP 10 ;
-                     DUP 7 ;
-                     PAIR ;
-                     UPDATE ;
-                     UPDATE 3 ;
-                     SWAP ;
-                     GET 5 ;
                      DUP 3 ;
-                     DIG 4 ;
+                     GET 3 ;
+                     DUP 4 ;
+                     CAR ;
+                     PAIR ;
+                     DUP 2 ;
+                     ITER { SWAP ;
+                            UNPAIR ;
+                            SWAP ;
+                            UNIT ;
+                            SOME ;
+                            DUP 11 ;
+                            DUP 5 ;
+                            PAIR ;
+                            UPDATE ;
+                            DUP 2 ;
+                            DUP 4 ;
+                            GET ;
+                            IF_NONE
+                              { SWAP ; PUSH nat 1 ; SOME ; DIG 3 ; UPDATE }
+                              { DIG 2 ; PUSH nat 1 ; DIG 2 ; ADD ; SOME ; DIG 3 ; UPDATE } ;
+                            PAIR } ;
+                     UNPAIR ;
+                     DUP 5 ;
+                     SWAP ;
+                     UPDATE 1 ;
+                     SWAP ;
+                     UPDATE 3 ;
+                     DIG 3 ;
+                     GET 5 ;
+                     DUP 4 ;
+                     DIG 3 ;
                      PAIR ;
                      SOME ;
                      DUP 8 ;
@@ -1344,7 +1501,7 @@
              TOTAL_VOTING_POWER ;
              NONE (pair string bytes) ;
              NONE nat ;
-             EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+             EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
              EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
              EMPTY_BIG_MAP key_hash nat ;
              PAIR 6 ;
@@ -1394,7 +1551,7 @@
                           TOTAL_VOTING_POWER ;
                           NONE (pair string bytes) ;
                           NONE nat ;
-                          EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                          EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                           EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                           EMPTY_BIG_MAP key_hash nat ;
                           PAIR 6 ;
@@ -1421,7 +1578,7 @@
                                RIGHT
                                  (pair (big_map key_hash nat)
                                        (big_map (pair key_hash string bytes) unit)
-                                       (big_map (pair string bytes) (pair key_hash nat))
+                                       (big_map (pair string bytes) (pair (set key_hash) nat))
                                        (option nat)
                                        (option (pair string bytes))
                                        nat) }
@@ -1438,7 +1595,7 @@
                                TOTAL_VOTING_POWER ;
                                NONE (pair string bytes) ;
                                NONE nat ;
-                               EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                               EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                                EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                                EMPTY_BIG_MAP key_hash nat ;
                                PAIR 6 ;
@@ -1464,7 +1621,7 @@
                       ADD ;
                       DUP ;
                       DUP 6 ;
-                      GET 14 ;
+                      GET 15 ;
                       MUL ;
                       DIG 5 ;
                       GET 9 ;
@@ -1492,7 +1649,7 @@
                       TOTAL_VOTING_POWER ;
                       NONE (pair string bytes) ;
                       NONE nat ;
-                      EMPTY_BIG_MAP (pair string bytes) (pair key_hash nat) ;
+                      EMPTY_BIG_MAP (pair string bytes) (pair (set key_hash) nat) ;
                       EMPTY_BIG_MAP (pair key_hash string bytes) unit ;
                       EMPTY_BIG_MAP key_hash nat ;
                       PAIR 6 ;
