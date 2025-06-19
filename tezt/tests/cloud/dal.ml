@@ -524,6 +524,7 @@ type configuration = {
   disable_shard_validation : bool;
   ignore_pkhs : string list;
   ppx_profiling : bool;
+  ppx_profiling_backends : string list;
 }
 
 type bootstrap = {
@@ -3102,7 +3103,7 @@ let init_etherlink_dal_node
       network;
       snapshot;
       ppx_profiling;
-      ppx_profiler_backends;
+      ppx_profiling_backends;
       memtrace;
       _;
     } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
@@ -4135,6 +4136,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let external_rpc = Cli.node_external_rpc_server in
     let disable_shard_validation = Cli.disable_shard_validation in
     let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let t =
       {
         with_dal;
@@ -4163,6 +4165,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         disable_shard_validation;
         ignore_pkhs;
         ppx_profiling;
+        ppx_profiling_backends;
       }
     in
     (t, etherlink)

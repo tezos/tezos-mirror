@@ -91,6 +91,8 @@ module type Dal = sig
   val ignore_pkhs : string list
 
   val ppx_profiling : bool
+
+  val ppx_profiling_backends : string list
 end
 
 module Dal () : Dal = struct
@@ -480,6 +482,16 @@ module Dal () : Dal = struct
         "Enable PPX profiling on all components. The level of verbosity is by \
          default `Debug` and the format of the output is `txt`. "
       false
+
+  let ppx_profiling_backends =
+    Clap.list_string
+      ~section
+      ~long:"ppx-profiling-backends"
+      ~description:
+        "Select the backends used by the profiler, bypassing the defaults \
+         selection: always `txt` and `json`, and also `prometheus` if \
+         `--prometheus` and `opentelemetry` if `--opentelemetry`."
+      ()
 end
 
 module type Layer1 = sig
