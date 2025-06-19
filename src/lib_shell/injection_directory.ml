@@ -37,12 +37,13 @@ let read_chain_id validator chain =
 let inject_block validator ?force ?chain bytes operations =
   let open Lwt_result_syntax in
   let*! chain_id = read_chain_id validator chain in
-  let* hash, block =
+  let* (((hash, block) : Block_hash.t * unit tzresult Lwt.t) :
+         Block_hash.t * unit tzresult Lwt.t) =
     Validator.validate_block validator ?force ?chain_id bytes operations
   in
   return
     ( hash,
-      let* _ = block in
+      let* () = block in
       return_unit )
 
 let inject_operation validator ~force ?chain bytes =
@@ -51,7 +52,7 @@ let inject_operation validator ~force ?chain bytes =
   match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
   | None -> failwith "Can't parse the operation"
   | Some op ->
-      let t =
+      let (t : unit tzresult Lwt.t) =
         (Validator.inject_operation
            validator
            ~force
@@ -63,7 +64,6 @@ let inject_operation validator ~force ?chain bytes =
                 (`Operation op)
                 "inject_operation")])
       in
-
       let hash = Operation.hash op in
       return (hash, t)
 
@@ -106,14 +106,14 @@ let inject_operations validator ~force ?chain bytes_list =
       Result_syntax.fail
         (Injection_services.Injection_operations_error :: List.rev result)
   in
-  let t = Lwt.map join_results (Lwt.all promises) in
+  let (t : unit tzresult Lwt.t) = Lwt.map join_results (Lwt.all promises) in
   return (hashes, t)
 
 let inject_protocol store proto =
   let open Lwt_result_syntax in
   let proto_bytes = Data_encoding.Binary.to_bytes_exn Protocol.encoding proto in
   let hash = Protocol_hash.hash_bytes [proto_bytes] in
-  let validation =
+  let (validation : unit tzresult Lwt.t) =
     let*! b = Updater.compile hash proto in
     match b with
     | false -> failwith "Compilation failed (%a)" Protocol_hash.pp_short hash
