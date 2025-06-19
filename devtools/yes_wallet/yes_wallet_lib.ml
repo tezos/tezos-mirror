@@ -181,7 +181,8 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
       in
       loop ([], 0L) keys_list |> fst |> List.rev
 
-let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
+let get_delegates_and_accounts (module P : Sigs.PROTOCOL)
+    ?(override_with_consensus_key = true) context
     (header : Block_header.shell_header) active_bakers_only staking_share_opt
     accounts_pkh_lists =
   let open Lwt_result_syntax in
@@ -212,7 +213,10 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
       ~order:`Sorted
       ~init:(Ok ([], P.Tez.zero))
       ~f:(fun pkh acc ->
-        let* pk = P.Delegate.pubkey ctxt pkh in
+        let* pk =
+          if override_with_consensus_key then P.Delegate.consensus_key ctxt pkh
+          else P.Delegate.pubkey ctxt pkh
+        in
         let*? key_list_acc, staking_balance_acc = acc in
         let* staking_balance = P.Delegate.staking_balance ctxt pkh in
         let* frozen_deposits = P.Delegate.current_frozen_deposits ctxt pkh in
@@ -222,13 +226,21 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
         let*? updated_staking_balance_acc =
           P.Tez.(staking_balance_acc +? staking_balance)
         in
+        let exported_pkh =
+          if override_with_consensus_key then
+            (* Exported pkh is set to the pkh of the delegate's consensus
+               key. *)
+            Tezos_crypto.Signature.Public_key.hash
+              (P.Signature.To_latest.public_key pk)
+          else P.Signature.To_latest.public_key_hash pkh
+        in
         let staking_balance_info :
             Signature.public_key_hash
             * Signature.public_key
             * P.Tez.t
             * P.Tez.t
             * P.Tez.t =
-          ( P.Signature.To_latest.public_key_hash pkh,
+          ( exported_pkh,
             P.Signature.To_latest.public_key pk,
             staking_balance,
             frozen_deposits,
@@ -655,7 +667,7 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
 let build_yes_wallet ?staking_share_opt ?network_opt base_dir
     ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Lwt_result_syntax in
-  let+ mainnet_bakers, other_accounts =
+  let+ bakers, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
@@ -665,7 +677,5 @@ let build_yes_wallet ?staking_share_opt ?network_opt base_dir
       other_accounts_pkh
     (* get rid of stake *)
   in
-  List.map
-    (fun (alias, pkh, pk, _stake, _, _) -> (alias, pkh, pk))
-    mainnet_bakers
+  List.map (fun (alias, pkh, pk, _stake, _, _) -> (alias, pkh, pk)) bakers
   @ other_accounts
