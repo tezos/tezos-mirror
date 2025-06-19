@@ -4306,7 +4306,8 @@ let force_operation_injection =
     rex
       ~opts:[`Dotall]
       "Fatal error:\n\
-      \  Command failed: Error while validating injected operation.*:"
+      \  Command failed: Asynchronous injection failed with:\n\
+      \                  Error while validating injected operation.*"
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
