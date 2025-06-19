@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = (val Profiler.wrap Dal_profiler.dal_profiler)
+
 module Version = struct
   type t = int
 
@@ -186,12 +188,22 @@ module Shards = struct
       Seq.ES.iter
         (fun {Cryptobox.index; share} ->
           let* exists =
-            KVS.value_exists shards_store file_layout slot_id index
+            (KVS.value_exists
+               shards_store
+               file_layout
+               slot_id
+               index [@profiler.aggregate_s {verbosity = Notice} "value_exists"])
           in
           if exists then return_unit
           else
             let* () =
-              KVS.write_value shards_store file_layout slot_id index share
+              (KVS.write_value
+                 shards_store
+                 file_layout
+                 slot_id
+                 index
+                 share
+               [@profiler.aggregate_s {verbosity = Notice} "write_value"])
             in
             let () = Dal_metrics.shard_stored () in
             let*! () =
