@@ -35,7 +35,6 @@ mod database;
 mod storage_helpers;
 
 const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
-const MAX_GAS_PER_TRANSACTION: u64 = 30_000_000;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -179,7 +178,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     caller: Address,
     destination: Option<Address>,
     call_data: Bytes,
-    gas_limit: Option<u64>,
+    gas_limit: u64,
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
@@ -191,7 +190,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         world_state_handler,
         caller,
         destination,
-        gas_limit.unwrap_or(MAX_GAS_PER_TRANSACTION),
+        gas_limit,
         effective_gas_price,
         value,
         call_data,
