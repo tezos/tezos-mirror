@@ -1173,12 +1173,13 @@ let commands_rw () =
     command
       ~group
       ~desc:"Set the delegate of a contract."
-      (args5
+      (args6
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
-         fee_parameter_args)
+         fee_parameter_args
+         initial_stake_arg)
       (prefixes ["set"; "delegate"; "for"]
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ prefix "to"
@@ -1186,7 +1187,7 @@ let commands_rw () =
            ~name:"dlgt"
            ~desc:"new delegate of the contract"
       @@ stop)
-      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
+      (fun (fee, dry_run, verbose_signing, simulation, fee_parameter, amount)
            contract
            delegate
            (cctxt : Protocol_client_context.full) ->
@@ -1228,7 +1229,7 @@ let commands_rw () =
             return_unit
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let* (_ : _ Injection.result) =
+            let* _ =
               set_delegate
                 cctxt
                 ~chain:cctxt#chain
@@ -1239,6 +1240,7 @@ let commands_rw () =
                 ~simulation
                 ~fee_parameter
                 ?fee
+                ?amount
                 mgr
                 (Some delegate)
                 ~src_pk
@@ -1288,7 +1290,7 @@ let commands_rw () =
             return_unit
         | Implicit mgr ->
             let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
-            let*! (_ : _ Injection.result tzresult) =
+            let*! _ =
               set_delegate
                 cctxt
                 ~chain:cctxt#chain
@@ -2320,7 +2322,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Register the public key hash as a delegate."
-      (args8
+      (args9
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -2336,7 +2338,8 @@ let commands_rw () =
             ~doc:"Register the companion key for the delegate"
             ())
          consensus_key_pop_arg
-         companion_key_pop_arg)
+         companion_key_pop_arg
+         initial_stake_arg)
       (prefixes ["register"; "key"]
       @@ Public_key_hash.source_param ~name:"mgr" ~desc:"the delegate key"
       @@ prefixes ["as"; "delegate"]
@@ -2348,7 +2351,8 @@ let commands_rw () =
              consensus_key,
              companion_key,
              consensus_key_pop,
-             companion_key_pop )
+             companion_key_pop,
+             amount )
            src_pkh
            cctxt ->
         let open Lwt_result_syntax in
@@ -2414,6 +2418,7 @@ let commands_rw () =
             ~manager_sk:src_sk
             ?consensus_keys
             ?companion_keys
+            ?amount
             src_pk
         in
         match r with
