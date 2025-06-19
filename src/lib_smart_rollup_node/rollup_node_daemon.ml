@@ -331,6 +331,12 @@ let notify_synchronization (node_ctxt : _ Node_context.t) head_level =
    also processes any missing blocks that were not processed. *)
 let on_layer_1_head ({node_ctxt; _} as state) (head : Layer1.header) =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult "on_layer1_head" @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      [
+        ("rollup_node.block_hash", `String (Block_hash.to_b58check head.hash));
+        ("rollup_node.block_level", `Int (Int32.to_int head.level));
+      ]) ;
   let* old_head = Node_context.last_processed_head_opt node_ctxt in
   let old_head, old_level =
     match old_head with
