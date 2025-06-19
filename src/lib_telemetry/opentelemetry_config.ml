@@ -11,7 +11,7 @@ type t = {enable : bool; config : Opentelemetry_client_cohttp_lwt.Config.t}
 let default =
   {enable = false; config = Opentelemetry_client_cohttp_lwt.Config.make ()}
 
-let encoding =
+let detailed_encoding =
   let open Data_encoding in
   let open Opentelemetry_client_cohttp_lwt.Config in
   conv
@@ -38,7 +38,7 @@ let encoding =
       in
       {enable; config})
   @@ obj6
-       (dft "enable" ~description:"Enable opentelemetry profiling" bool false)
+       (dft "enable" ~description:"Enable opentelemetry profiling" bool true)
        (opt "debug" ~description:"Enable debug mode" bool)
        (opt "url_traces" ~description:"URL to send traces" string)
        (opt
@@ -51,3 +51,27 @@ let encoding =
           ~description:
             "Milliseconds after which we emit a batch, even incomplete"
           int31)
+
+let encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        ~title:"detailed_opentelemetry_config"
+        (Tag 0)
+        detailed_encoding
+        Option.some
+        Fun.id;
+      case
+        ~title:"opentelemetry_boolean"
+        (Tag 1)
+        bool
+        (Fun.const None)
+        (fun enable -> {default with enable});
+      case
+        ~title:"opentelemetry_null"
+        (Tag 2)
+        null
+        (Fun.const None)
+        (Fun.const default);
+    ]
