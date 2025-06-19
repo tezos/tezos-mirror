@@ -257,6 +257,37 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
         inc
         operation_with_incorrect_proof
     in
+    (* update_consensus_key with incorrect ciphersuite *)
+    let proof_incorrect_ciphersuite =
+      match (consensus_account.sk, consensus_account.pk) with
+      | Bls sk, Bls pk ->
+          let signature =
+            Signature.Bls.sign sk (Bls12_381_signature.MinPk.pk_to_bytes pk)
+          in
+          Some signature
+      | _ -> None
+    in
+    let* operation_with_incorrect_ciphersuite =
+      Op.update_consensus_key
+        ~forge_proof:proof_incorrect_ciphersuite
+        (B blk')
+        (Contract.Implicit delegate)
+        consensus_pk
+    in
+    let expect_apply_failure =
+      Error_helpers.expect_incorrect_bls_proof
+        ~loc:__LOC__
+        ~kind_pk:Consensus_pk
+        ~pk:consensus_pk
+    in
+    let* (_i : Incremental.t) =
+      Incremental.add_operation
+        ~expect_apply_failure
+        inc
+        operation_with_incorrect_ciphersuite
+    in
+
+    (* update_consensus_key with correct proof *)
     let* operation_with_correct_proof =
       Op.update_consensus_key
         ~proof_signer:(Contract.Implicit consensus_account.pkh)

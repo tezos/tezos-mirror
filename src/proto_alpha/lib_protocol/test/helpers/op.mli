@@ -694,6 +694,7 @@ val update_consensus_key :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?proof_signer:Contract.t ->
+  ?forge_proof:Signature.Bls.t option ->
   Context.t ->
   Contract.t ->
   public_key ->
@@ -706,6 +707,7 @@ val update_companion_key :
   ?gas_limit:gas_limit ->
   ?storage_limit:Z.t ->
   ?proof_signer:Contract.t ->
+  ?forge_proof:Signature.Bls.t option ->
   Context.t ->
   Contract.t ->
   public_key ->
