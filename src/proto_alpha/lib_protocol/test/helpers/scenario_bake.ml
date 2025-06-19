@@ -284,11 +284,20 @@ let check_ai_launch_cycle_is_zero ~loc block =
     Test.fail ~__LOC__:loc "AI launch cycle should always be zero" ;
   return_unit
 
-(** Bake a block, with the given baker and the given operations. *)
-let bake ?baker : t -> t tzresult Lwt.t =
+(** Apply all operations pending in the [state].
+    It is imperative that the list of pending operations in the state
+    is empty before finalizing the block, either manually, or by calling this function. *)
+let apply_all_pending_operations_ : t_incr -> t_incr tzresult Lwt.t =
+ fun (i, state) ->
+  let open Lwt_result_wrap_syntax in
+  let state, operations = State.pop_pending_operations state in
+  let* i = List.fold_left_es Incremental.add_operation i operations in
+  return (i, state)
+
+(** finalize the payload of the next block. Can start including preattestations. *)
+let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
  fun (block, state) ->
   let open Lwt_result_wrap_syntax in
-  let previous_block = block in
   let policy =
     match baker with
     | None -> state.baking_policy
@@ -308,7 +317,6 @@ let bake ?baker : t -> t tzresult Lwt.t =
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
   in
-  let current_cycle = Block.current_cycle block in
   let* level = Plugin.RPC.current_level Block.rpc_ctxt block in
   let* next_level =
     let* ctxt = Context.get_alpha_ctxt (B block) in
@@ -327,16 +335,17 @@ let bake ?baker : t -> t tzresult Lwt.t =
     else Per_block_vote_pass
   in
   let* () = check_issuance_rpc block in
-  let state, operations = State.pop_pending_operations state in
-  let* metadata, block, state =
-    let* block', metadata =
-      Block.bake_with_metadata ?policy ~adaptive_issuance_vote ~operations block
-    in
+  let* block' = Block.bake ?policy ~adaptive_issuance_vote block in
+  let* i =
+    Incremental.begin_construction
+      ?payload_round
+      ~payload:state.pending_operations
+      ?policy
+      ~adaptive_issuance_vote
+      block
+  in
+  let* i, state =
     if state.burn_rewards then
-      (* Incremental mode *)
-      let* i =
-        Incremental.begin_construction ?policy ~adaptive_issuance_vote block
-      in
       let* block_rewards = Context.get_issuance_per_minute (B block') in
       let ctxt = Incremental.alpha_ctxt i in
       let*@ context, _ =
@@ -347,20 +356,26 @@ let bake ?baker : t -> t tzresult Lwt.t =
           block_rewards
       in
       let i = Incremental.set_alpha_ctxt i context in
-      let* i, op_metadata =
-        List.fold_left_es
-          (fun (i, metadata) op ->
-            let* i, m = Incremental.add_operation_with_metadata i op in
-            return (i, m :: metadata))
-          (i, [])
-          operations
-      in
-      let* block, block_metadata = Incremental.finalize_block_with_metadata i in
       let state = State.apply_burn block_rewards baker_name state in
-      return ((block_metadata, List.rev op_metadata), block, state)
-    else return (metadata, block', state)
+      return (i, state)
+    else return (i, state)
   in
-  let baker_acc = State.find_account baker_name state in
+  apply_all_pending_operations_ (i, state)
+
+let finalize_payload ?payload_round ?baker () : (t, t_incr) scenarios =
+  exec (finalize_payload_ ?payload_round ?baker)
+
+let finalize_block_ : t_incr -> t tzresult Lwt.t =
+ fun (i, state) ->
+  let open Lwt_result_wrap_syntax in
+  assert (List.is_empty state.pending_operations) ;
+  let* block, block_metadata = Incremental.finalize_block_with_metadata i in
+  let ((_, op_metadata) as metadata) =
+    (block_metadata, List.rev (Incremental.rev_tickets i))
+  in
+  let previous_block = Incremental.predecessor i in
+  let baker = Incremental.delegate i in
+  let baker_name, baker_acc = State.find_account_from_pkh baker.pkh state in
   (* update baker and attesters activity *)
   let update_activity delegate_account =
     Account_helpers.update_activity
@@ -369,50 +384,23 @@ let bake ?baker : t -> t tzresult Lwt.t =
       (Block.current_cycle block)
   in
   let* attesters =
-    let open Tezos_raw_protocol_alpha.Alpha_context in
-    let* ctxt = Context.get_alpha_ctxt (B previous_block) in
     List.filter_map_es
-      (fun op ->
-        let ({protocol_data = Operation_data protocol_data; _}
-              : packed_operation) =
-          op
-        in
-        match protocol_data.contents with
-        | Single (Attestation {consensus_content; _})
-        | Single (Preattestation consensus_content) ->
-            let*@ _, owner =
-              Stake_distribution.slot_owner
-                ctxt
-                (Level.from_raw ctxt consensus_content.level)
-                consensus_content.slot
-            in
-            return_some [owner.delegate]
-        | Single (Attestations_aggregate {committee; consensus_content}) ->
-            let*@ owners =
-              List.map_es
-                (fun (slot, _) ->
-                  Stake_distribution.slot_owner
-                    ctxt
-                    (Level.from_raw ctxt consensus_content.level)
-                    slot)
-                committee
-            in
-            return_some
-              (List.map (fun (_, (o : Consensus_key.pk)) -> o.delegate) owners)
-        | Single (Preattestations_aggregate {committee; consensus_content}) ->
-            let*@ owners =
-              List.map_es
-                (fun slot ->
-                  Stake_distribution.slot_owner
-                    ctxt
-                    (Level.from_raw ctxt consensus_content.level)
-                    slot)
-                committee
-            in
-            return_some
-              (List.map (fun (_, (o : Consensus_key.pk)) -> o.delegate) owners)
-        | _ -> return_none)
-      operations
+      (function
+        | Protocol.Apply_results.No_operation_metadata -> return_none
+        | Operation_metadata {contents} -> (
+            match contents with
+            | Single_result (Attestation_result {delegate; _})
+            | Single_result (Preattestation_result {delegate; _}) ->
+                return_some [delegate]
+            | Single_result (Attestations_aggregate_result {committee; _})
+            | Single_result (Preattestations_aggregate_result {committee; _}) ->
+                return_some
+                  (List.map
+                     (fun ((ck : Protocol.Alpha_context.Consensus_key.t), _) ->
+                       ck.delegate)
+                     committee)
+            | _ -> return_none))
+      op_metadata
   in
   let attesters = List.flatten attesters in
   let state =
@@ -433,6 +421,7 @@ let bake ?baker : t -> t tzresult Lwt.t =
   in
   let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
+  let current_cycle = Block.current_cycle previous_block in
   let new_future_current_cycle = Cycle.succ (Block.current_cycle block) in
   (* Dawn of a new cycle: apply cycle end operations *)
   let* state =
@@ -476,6 +465,14 @@ let bake ?baker : t -> t tzresult Lwt.t =
     }
   in
   return (block, state)
+
+let finalize_block : (t_incr, t) scenarios = exec finalize_block_
+
+(** Bake a block, with the given baker and the given operations. *)
+let bake ?baker : t -> t tzresult Lwt.t =
+ fun input ->
+  let ( |=> ) = Lwt_result.bind in
+  finalize_payload_ ?baker input |=> finalize_block_
 
 let rec repeat n f acc =
   let open Lwt_result_syntax in

@@ -14,9 +14,13 @@ open State
 open Scenario_dsl
 open Log_helpers
 
-(** Usual threaded state for the tests. Contains the current block, pending operations
+(** Usual threaded state for the tests. Contains the current block
     and the known [State.t] *)
 type t = Block.t * State.t
+
+(** Threaded state when constructing a block step by step in incremental mode.
+    The operation metadata list is built as operations are getting applied. *)
+type t_incr = Incremental.t * State.t
 
 let log ?(level = Cli.Logs.Info) ?color format =
   Format.kasprintf
