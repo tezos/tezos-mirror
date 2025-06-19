@@ -24,6 +24,11 @@ let build_debian_packages_image =
    we delcare it once, but we use it in two different contexts *)
 let systemd_test_debian_packages_image = build_debian_packages_image
 
+let tag_amd64 ~ramfs =
+  if ramfs then "gcp_very_high_cpu_ramfs" else "gcp_very_high_cpu"
+
+let tag_arm64 = "gcp_arm64"
+
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job
     [job_build_debian_package]. A dependency image will be built once
@@ -31,13 +36,13 @@ let systemd_test_debian_packages_image = build_debian_packages_image
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let debian_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp_very_high_cpu"])]]
+let debian_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["unstable"; "bookworm"]);
-          ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
         ];
       ]
 
@@ -48,13 +53,13 @@ let debian_package_release_matrix = function
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let ubuntu_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp_very_high_cpu"])]]
+let ubuntu_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
       [
         [
           ("RELEASE", ["noble"; "jammy"]);
-          ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
         ];
       ]
 
@@ -234,7 +239,7 @@ let jobs pipeline_type =
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(debian_package_release_matrix pipeline_type)
+      ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
       ()
   in
   let job_build_ubuntu_package : tezos_job =
@@ -244,7 +249,7 @@ let jobs pipeline_type =
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
       ()
   in
 

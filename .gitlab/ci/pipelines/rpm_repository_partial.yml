@@ -129,7 +129,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_ramfs
 
 oc.build-rockylinux-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}

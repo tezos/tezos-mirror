@@ -131,7 +131,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 oc.build-rockylinux-data:
@@ -316,7 +316,7 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp_very_high_cpu
+      - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 oc.build-fedora-data:

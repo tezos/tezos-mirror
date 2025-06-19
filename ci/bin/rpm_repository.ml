@@ -20,6 +20,11 @@ let generic_packages_image =
   Image.mk_external
     ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
+let tag_amd64 ~ramfs =
+  if ramfs then "gcp_very_high_cpu_ramfs" else "gcp_very_high_cpu"
+
+let tag_arm64 = "gcp_arm64"
+
 (** These are the set of Rocky Linux release-architecture combinations for
     which we build rpm packages in the job
     [job_build_rockylinux_package]. A dependency image will be built once
@@ -27,10 +32,10 @@ let generic_packages_image =
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let rockylinux_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp_very_high_cpu"])]]
+let rockylinux_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["9.3"]); ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])]]
+      [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (** These are the set of Fedora release-architecture combinations for
     which we build rpm packages in the job
@@ -39,12 +44,10 @@ let rockylinux_package_release_matrix = function
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let fedora_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["39"]); ("TAGS", ["gcp_very_high_cpu"])]]
+let fedora_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["39"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [
-        [("RELEASE", ["39"; "42"]); ("TAGS", ["gcp_very_high_cpu"; "gcp_arm64"])];
-      ]
+      [[("RELEASE", ["39"; "42"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
 let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
@@ -151,7 +154,7 @@ let jobs pipeline_type =
       ~name:"oc.build-rockylinux"
       ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(rockylinux_package_release_matrix pipeline_type)
+      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
       ~variables:(variables [("DISTRIBUTION", "rockylinux")])
       ~image:generic_packages_image
   in
@@ -161,7 +164,7 @@ let jobs pipeline_type =
       ~name:"oc.build-fedora"
       ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(fedora_package_release_matrix pipeline_type)
+      ~matrix:(fedora_package_release_matrix ~ramfs:true pipeline_type)
       ~variables:(variables [("DISTRIBUTION", "fedora")])
       ~image:generic_packages_image
   in
