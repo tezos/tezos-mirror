@@ -1025,6 +1025,23 @@ let register_wallet ?password_filename ~wallet_dir () =
   in
   wallet_ctxt
 
+let get_key_or_generate wallet_ctxt key =
+  let open Lwt_result_syntax in
+  match key with
+  | Some key ->
+      let* sk_uri =
+        Client_keys.Secret_key.parse_source_string wallet_ctxt key
+      in
+      let* pk_uri = Client_keys.neuterize sk_uri in
+      let* pk = Client_keys.public_key pk_uri in
+      return (pk, sk_uri)
+  | None ->
+      let _pkh, pk, sk =
+        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
+      in
+      let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
+      return (pk, sk_uri)
+
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
   match configuration.kernel_execution.native_execution_policy with
@@ -1082,9 +1099,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
     match sandbox_config with
-    | Some Evm_node_lib_dev.Sequencer.{secret_key = sk; _} ->
-        let*? sk = Tezos_signer_backends.Unencrypted.make_sk sk in
-        return_some sk
+    | Some Evm_node_lib_dev.Sequencer.{secret_key; _} -> return_some secret_key
     | None ->
         Option.map_es
           (Client_keys.Secret_key.parse_source_string wallet_ctxt)
@@ -1512,13 +1527,13 @@ let make_sequencer_upgrade_command =
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
     (fun wallet_dir pool_address activation_timestamp sequencer_str () ->
       let wallet_ctxt = register_wallet ~wallet_dir () in
-      let* _pk_uri, sequencer_sk_opt =
+      let* _pk_uri, sequencer_pk_opt =
         Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
       in
       let*? sequencer =
         Option.to_result
           ~none:[error_of_fmt "invalid format or unknown public key."]
-          sequencer_sk_opt
+          sequencer_pk_opt
       in
       let* payload =
         let open Evm_node_lib_dev_encoding.Evm_events in
@@ -2367,13 +2382,14 @@ let fund_arg =
   Tezos_clic.multiple_arg ~long ~doc ~placeholder:"0x..." Params.eth_address
 
 let sandbox_config_args =
-  Tezos_clic.args12
+  Tezos_clic.args13
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
     time_between_blocks_arg
     max_number_of_chunks_arg
     private_rpc_port_arg
+    sequencer_key_arg
     genesis_timestamp_arg
     (kernel_arg ())
     wallet_dir_arg
@@ -2512,6 +2528,7 @@ let sandbox_command =
                time_between_blocks,
                max_number_of_chunks,
                private_rpc_port,
+               sequencer_str,
                genesis_timestamp,
                kernel,
                wallet_dir,
@@ -2524,9 +2541,8 @@ let sandbox_command =
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
-      let _pkh, pk, sk =
-        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
-      in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+      let* pk, sk = get_key_or_generate wallet_ctxt sequencer_str in
       let rollup_node_endpoint =
         Option.value ~default:Uri.empty rollup_node_endpoint
       in
@@ -2633,6 +2649,7 @@ let tezlink_sandbox_command =
              time_between_blocks,
              max_number_of_chunks,
              private_rpc_port,
+             sequencer_str,
              genesis_timestamp,
              kernel,
              wallet_dir,
@@ -2647,9 +2664,8 @@ let tezlink_sandbox_command =
       let rollup_node_endpoint =
         Option.value ~default:Uri.empty rollup_node_endpoint
       in
-      let _pkh, pk, sk =
-        Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
-      in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+      let* pk, sk = get_key_or_generate wallet_ctxt sequencer_str in
       let sandbox_config =
         Evm_node_lib_dev.Sequencer.
           {

@@ -8,7 +8,7 @@
 
 type sandbox_config = {
   public_key : Signature.public_key;
-  secret_key : Signature.secret_key;
+  secret_key : Client_keys.sk_uri;
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
   funded_addresses : Ethereum_types.address list;

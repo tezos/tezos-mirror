@@ -6,6 +6,9 @@
 
 ### Configuration changes
 
+- Sandbox mode can either generates automatically the used sequencer
+  key, or uses the one given in argument. (!18385)
+
 ### RPCs changes
 
 ### Metrics changes
