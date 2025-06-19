@@ -31,7 +31,7 @@ let default_protocol : t -> Protocol.t = function
   | `Ghostnet -> R022
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
-  | `Nextnet _ -> failwith "Next is not active"
+  | `Nextnet _ -> S023
   | `Rionet -> R022
 
 let public_rpc_endpoint testnet =
