@@ -296,7 +296,7 @@ let wait_for_ready agnostic_baker =
       let promise, resolver = Lwt.task () in
       agnostic_baker.persistent_state.pending_ready <-
         resolver :: agnostic_baker.persistent_state.pending_ready ;
-      check_event agnostic_baker "agnostic baker started" promise
+      check_event agnostic_baker "starting baker daemon" promise
 
 let init ?env ?runner ?(path = Uses.path Constant.octez_agnostic_baker) ?name
     ?color ?event_level ?event_pipe ?event_sections_levels ?(delegates = [])

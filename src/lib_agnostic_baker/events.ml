@@ -50,7 +50,7 @@ let starting_daemon =
     ~alternative_color
     ~level:Notice
     ~name:"starting_daemon"
-    ~msg:"agnostic {agent} started"
+    ~msg:"starting {agent} daemon"
     ("agent", string)
 
 let stopping_daemon =
@@ -58,7 +58,7 @@ let stopping_daemon =
     ~section
     ~level:Notice
     ~name:"stopping_daemon"
-    ~msg:"stopping agnostic {agent} daemon"
+    ~msg:"stopping {agent} daemon"
     ("agent", string)
 
 let protocol_encountered =
