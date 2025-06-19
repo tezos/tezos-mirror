@@ -2,6 +2,7 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
+- start
 - images
 - build
 - publish
@@ -51,6 +52,21 @@ oc.docker:ci:arm64:
     max: 1
     when:
     - runner_system_failure
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}

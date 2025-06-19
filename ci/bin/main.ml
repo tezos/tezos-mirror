@@ -247,7 +247,8 @@ let () =
   register
     "teztale_release_tag_test"
     If.(not_on_tezos_namespace && push && has_tag_match teztale_release_tag_re)
-    ~jobs:(Teztale.Release.jobs ~test:true ())
+    ~jobs:
+      (Common.job_datadog_pipeline_trace :: Teztale.Release.jobs ~test:true ())
     ~description:
       "Test release pipeline for Teztale.\n\n\
        This pipeline checks that 'teztale_release_tag' pipelines work as \
