@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type launch_mode = Socket | Local | Http
+
 (** A signer instance *)
 type t
 
@@ -55,6 +57,7 @@ val init :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?base_dir:string ->
+  ?launch_mode:launch_mode ->
   ?uri:Uri.t ->
   ?runner:Runner.t ->
   ?keys:Account.key list ->

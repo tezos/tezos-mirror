@@ -641,8 +641,12 @@ let spawn_import_signer_key ?endpoint ?(force = false) ?signer ~public_key_hash
     ~alias client =
   let key =
     match signer with
-    | Some signer_uri ->
-        Uri.with_path signer_uri public_key_hash |> Uri.to_string
+    | Some signer_uri -> (
+        match Uri.scheme signer_uri with
+        | Some "unix" ->
+            Uri.add_query_param signer_uri ("pkh", [public_key_hash])
+            |> Uri.to_string
+        | _ -> Uri.with_path signer_uri public_key_hash |> Uri.to_string)
     | None -> "remote:" ^ public_key_hash
   in
   spawn_command
