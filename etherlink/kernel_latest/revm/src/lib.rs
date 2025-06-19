@@ -34,7 +34,6 @@ mod code_storage;
 mod database;
 mod storage_helpers;
 
-const ETHERLINK_CHAIN_ID: u64 = 42793;
 const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
 const MAX_GAS_PER_TRANSACTION: u64 = 30_000_000;
 
@@ -98,6 +97,7 @@ fn tx_env<'a, Host: Runtime>(
     value: U256,
     data: Bytes,
     access_list: AccessList,
+    chain_id: u64,
 ) -> Result<TxEnv, Error> {
     let kind = match destination {
         Some(address) => TxKind::Call(address),
@@ -110,7 +110,10 @@ fn tx_env<'a, Host: Runtime>(
     let nonce = storage_account.nonce(host)?;
 
     Ok(TxEnv {
-        tx_type: 2,
+        // Setting the transaction type from scratch seems irrelevant
+        // in the execution. We just set it to legacy be default as
+        // it's the other parameters that matter here.
+        tx_type: 0,
         caller,
         gas_limit,
         gas_price,
@@ -118,7 +121,7 @@ fn tx_env<'a, Host: Runtime>(
         value,
         data,
         nonce,
-        chain_id: Some(ETHERLINK_CHAIN_ID),
+        chain_id: Some(chain_id),
         access_list,
         gas_priority_fee: None,
         blob_hashes: vec![],
@@ -142,9 +145,10 @@ fn evm<'a, Host: Runtime>(
     block: &'a BlockEnv,
     tx: &'a TxEnv,
     precompiles: EtherlinkPrecompiles,
+    chain_id: u64,
 ) -> EvmContext<'a, Host> {
     let cfg = CfgEnv::new()
-        .with_chain_id(ETHERLINK_CHAIN_ID)
+        .with_chain_id(chain_id)
         .with_spec(DEFAULT_SPEC_ID);
 
     let context: Context<
@@ -192,6 +196,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         value,
         call_data,
         access_list,
+        block_constants.chain_id.as_u64(),
     )?;
 
     let db = EtherlinkVMDB::new(
@@ -201,7 +206,13 @@ pub fn run_transaction<'a, Host: Runtime>(
         &mut commit_status,
     );
 
-    let mut evm = evm(db, &block_env, &tx, precompiles);
+    let mut evm = evm(
+        db,
+        &block_env,
+        &tx,
+        precompiles,
+        block_constants.chain_id.as_u64(),
+    );
 
     evm.db_mut().initialize_storage()?;
 
@@ -262,7 +273,9 @@ mod test {
             interpreter::interpreter::EthInterpreter,
         };
 
-        use crate::{DEFAULT_SPEC_ID, ETHERLINK_CHAIN_ID};
+        use crate::DEFAULT_SPEC_ID;
+
+        const ETHERLINK_CHAIN_ID: u64 = 42793;
 
         use super::*;
 
