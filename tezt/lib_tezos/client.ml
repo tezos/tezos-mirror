@@ -1264,7 +1264,8 @@ let get_delegate ?endpoint ~src client =
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
 let spawn_set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ?(simulation = false) ~src ~delegate client =
+    ?(force_low_fee = false) ?(simulation = false) ?amount ~src ~delegate client
+    =
   spawn_command
     ?endpoint
     client
@@ -1272,11 +1273,12 @@ let spawn_set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
     @ ["set"; "delegate"; "for"; src; "to"; delegate]
     @ optional_arg "fee" Tez.to_string fee
     @ optional_arg "fee-cap" Tez.to_string fee_cap
+    @ optional_arg "initial-stake" Tez.to_string amount
     @ (if simulation then ["--simulation"] else [])
     @ if force_low_fee then ["--force-low-fee"] else [])
 
 let set_delegate ?endpoint ?wait ?fee ?fee_cap ?force_low_fee ?expect_failure
-    ?simulation ~src ~delegate client =
+    ?simulation ?amount ~src ~delegate client =
   spawn_set_delegate
     ?endpoint
     ?wait
@@ -1284,6 +1286,7 @@ let set_delegate ?endpoint ?wait ?fee ?fee_cap ?force_low_fee ?expect_failure
     ?fee_cap
     ?force_low_fee
     ?simulation
+    ?amount
     ~src
     ~delegate
     client
@@ -3204,11 +3207,12 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key ?hooks ?consensus ?companion owner client =
+let spawn_register_key ?hooks ?consensus ?companion ?amount owner client =
   spawn_command
     ?hooks
     client
     (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    @ optional_arg "initial-stake" Tez.to_string amount
     @
     match (consensus, companion) with
     | None, None -> []
@@ -3216,8 +3220,9 @@ let spawn_register_key ?hooks ?consensus ?companion owner client =
     | None, Some pk -> ["--companion-key"; pk]
     | Some pk1, Some pk2 -> ["--consensus-key"; pk1; "--companion-key"; pk2])
 
-let register_key ?hooks ?expect_failure ?consensus ?companion owner client =
-  spawn_register_key ?hooks ?consensus ?companion owner client
+let register_key ?hooks ?expect_failure ?consensus ?companion ?amount owner
+    client =
+  spawn_register_key ?hooks ?consensus ?companion ?amount owner client
   |> Process.check ?expect_failure
 
 let contract_storage ?hooks ?unparsing_mode ?endpoint address client =

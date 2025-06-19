@@ -307,3 +307,5 @@ val consensus_key_pop_arg :
 
 val companion_key_pop_arg :
   (Bls12_381_signature.MinPk.signature option, full) Tezos_clic.arg
+
+val initial_stake_arg : (Tez.t option, full) Tezos_clic.arg

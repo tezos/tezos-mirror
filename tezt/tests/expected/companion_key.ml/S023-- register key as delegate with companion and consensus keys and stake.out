@@ -1,0 +1,96 @@
+
+./octez-client --wait none register key delegate as delegate --initial-stake 900000 --consensus-key consensus_key --companion-key companion_key
+Node is bootstrapped.
+Estimated gas: 184.813 units (will add 0 for safety)
+Estimated storage: no bytes added
+Estimated gas: 100 units (will add 0 for safety)
+Estimated storage: no bytes added
+Estimated gas: 1671.680 units (will add 100 for safety)
+Estimated storage: no bytes added
+Estimated gas: 1671.680 units (will add 100 for safety)
+Estimated storage: no bytes added
+Estimated gas: 3560.040 units (will add 0 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  octez-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000277
+    Expected counter: 2
+    Gas limit: 185
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000277
+      payload fees(the block proposer) ....... +ꜩ0.000277
+    Revelation of manager public key:
+      Contract: [PUBLIC_KEY_HASH]
+      Key: [PUBLIC_KEY]
+      This revelation was successfully applied
+      Consumed gas: 184.449
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000159
+    Expected counter: 3
+    Gas limit: 100
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000159
+      payload fees(the block proposer) ....... +ꜩ0.000159
+    Delegation:
+      Contract: [PUBLIC_KEY_HASH]
+      To: [PUBLIC_KEY_HASH]
+      This delegation was successfully applied
+      Consumed gas: 100
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000456
+    Expected counter: 4
+    Gas limit: 1772
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000456
+      payload fees(the block proposer) ....... +ꜩ0.000456
+    Update_consensus_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This consensus key update was successfully applied
+      Consumed gas: 1671.680
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000456
+    Expected counter: 5
+    Gas limit: 1772
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000456
+      payload fees(the block proposer) ....... +ꜩ0.000456
+    Update_companion_key:
+      Public key hash: [PUBLIC_KEY_HASH]
+      Proof of possession: [BLS_SIGNATURE]
+      This companion key update was successfully applied
+      Consumed gas: 1671.680
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000521
+    Expected counter: 6
+    Gas limit: 3561
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000521
+      payload fees(the block proposer) ....... +ꜩ0.000521
+    Transaction:
+      Amount: ꜩ900000
+      From: [PUBLIC_KEY_HASH]
+      To: [PUBLIC_KEY_HASH]
+      Entrypoint: stake
+      This transaction was successfully applied
+      Consumed gas: 3560.040
+      Balance updates:
+        [PUBLIC_KEY_HASH] ............. -ꜩ900000
+        deposits([PUBLIC_KEY_HASH]) ... +ꜩ900000
+

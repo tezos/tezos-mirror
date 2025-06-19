@@ -367,8 +367,85 @@ let test_update_companion_key_with_external_pop =
   in
   unit
 
+let test_register_keys_and_stake =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:
+      "register key as delegate with companion and consensus keys and stake"
+    ~tags:[team; "companion_key"; "consensus_key"; "stake"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* _node, client = init_node_and_client ~protocol in
+  let* delegate = Client.gen_and_show_keys ~alias:"delegate" client in
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 1_000_000)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:delegate.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* consensus_key_bls =
+    Client.gen_and_show_keys ~alias:"consensus_key" ~sig_alg:"bls" client
+  in
+  let* companion_key_bls =
+    Client.gen_and_show_keys ~alias:"companion_key" ~sig_alg:"bls" client
+  in
+  let amount = Tez.of_int 900_000 in
+  let* () =
+    Client.register_key
+      ~hooks
+      ~consensus:consensus_key_bls.alias
+      ~companion:companion_key_bls.alias
+      ~amount
+      delegate.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+  let* staked_balance =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_contract_staked_balance
+         delegate.public_key_hash
+  in
+  Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+    ~error_msg:"Expected staked balance %R to be equal to %L" ;
+
+  Log.info "Waiting for consensus and companion keys activation" ;
+  let* () = bake_n_cycles (consensus_rights_delay + 1) client in
+
+  Log.info "Checking keys are activated" ;
+  let* () =
+    Consensus_key.check_consensus_key
+      ~__LOC__
+      delegate
+      ~expected_active:consensus_key_bls
+      client
+  in
+  let* () =
+    check_companion_key
+      ~__LOC__
+      delegate
+      ~expected_active:companion_key_bls
+      client
+  in
+  let* () =
+    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+  in
+  let* current_level = get_current_level client in
+  let* () =
+    check_validators_companion_key
+      ~__LOC__
+      ~level:(current_level.level + 1)
+      delegate
+      ~expected:(Some companion_key_bls.public_key_hash)
+      client
+  in
+  unit
+
 let register ~protocols =
   test_update_companion_key protocols ;
   test_update_companion_key_for_non_tz4_delegate protocols ;
   test_update_companion_key_for_tz4_delegate protocols ;
-  test_update_companion_key_with_external_pop protocols
+  test_update_companion_key_with_external_pop protocols ;
+  test_register_keys_and_stake protocols

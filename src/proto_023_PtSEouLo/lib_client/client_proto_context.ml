@@ -266,13 +266,32 @@ let build_delegate_operation ?fee ?gas_limit ?storage_limit delegate_opt =
 
 let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ?simulation ~source ~src_pk ~src_sk ?fee ~fee_parameter
-    delegate_opt =
+    ?amount delegate_opt =
   let open Lwt_result_syntax in
-  let operation =
-    Annotated_manager_operation.Single_manager
-      (build_delegate_operation ?fee delegate_opt)
+  let delegate_op =
+    let op = build_delegate_operation ?fee delegate_opt in
+    Annotated_manager_operation.Annotated_manager_operation op
   in
-  let* oph, _, op, result =
+  let* stake_op =
+    Option.map_es
+      (fun amount ->
+        let+ parameters = parse_arg_transfer None in
+        let op =
+          build_transaction_operation
+            ?fee
+            ~amount
+            ~parameters
+            ~entrypoint:Entrypoint.stake
+            (Contract.Implicit source)
+        in
+        Annotated_manager_operation.Annotated_manager_operation op)
+      amount
+  in
+  let ops = delegate_op :: List.filter_map Fun.id [stake_op] in
+  let (Annotated_manager_operation.Manager_list contents) =
+    Annotated_manager_operation.manager_of_list ops
+  in
+  let* oph, _, ops, results =
     Injection.inject_manager_operation
       cctxt
       ~chain
@@ -289,11 +308,10 @@ let delegate_contract cctxt ~chain ~block ?branch ?confirmations ?dry_run
       ~src_pk
       ~src_sk
       ~fee_parameter
-      operation
+      contents
   in
-  match Apply_results.pack_contents_list op result with
-  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-      return (oph, op, result)
+  let result = Apply_results.to_list (Contents_result_list results) in
+  return (oph, Contents_list ops, result)
 
 let list_contract_labels cctxt ~chain ~block =
   let open Lwt_result_syntax in
@@ -331,7 +349,8 @@ let message_added_contract (cctxt : #full) name =
   cctxt#message "Contract memorized as %s." name
 
 let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
-    ?simulation ?fee contract ~src_pk ~manager_sk ~fee_parameter opt_delegate =
+    ?simulation ?fee ?amount contract ~src_pk ~manager_sk ~fee_parameter
+    opt_delegate =
   delegate_contract
     cctxt
     ~chain
@@ -340,6 +359,7 @@ let set_delegate cctxt ~chain ~block ?confirmations ?dry_run ?verbose_signing
     ?dry_run
     ?verbose_signing
     ?simulation
+    ?amount
     ~source:contract
     ~src_pk
     ~src_sk:manager_sk
@@ -368,136 +388,82 @@ let build_update_consensus_key cctxt ?fee ?gas_limit ?storage_limit
 
 let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?fee ~manager_sk ~fee_parameter ?consensus_keys
-    ?companion_keys src_pk =
+    ?companion_keys ?amount src_pk =
   let open Lwt_result_syntax in
   let source = Signature.Public_key.hash src_pk in
-  let delegate_op = build_delegate_operation ?fee (Some source) in
-  match (consensus_keys, companion_keys) with
-  | None, None -> (
-      let operation = Annotated_manager_operation.Single_manager delegate_op in
-      let* oph, _, op, result =
-        Injection.inject_manager_operation
-          cctxt
-          ~chain
-          ~block
-          ?confirmations
-          ?dry_run
-          ?verbose_signing
-          ~source
-          ~fee:(Limit.of_option fee)
-          ~gas_limit:Limit.unknown
-          ~storage_limit:Limit.unknown
-          ~src_pk
-          ~src_sk:manager_sk
-          ~fee_parameter
-          operation
-      in
-      match Apply_results.pack_contents_list op result with
-      | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
-          return ((oph, op, result), []))
-  | Some (public_key, pop_material), None | None, Some (public_key, pop_material)
-    -> (
-      let* operation =
-        let kind =
-          if Option.is_some consensus_keys then Operation_repr.Consensus
-          else Companion
-        in
-        let+ operation_content =
-          build_update_consensus_key cctxt ~kind ?fee ?pop_material public_key
-        in
-        Annotated_manager_operation.Cons_manager
-          ( delegate_op,
-            Annotated_manager_operation.Single_manager operation_content )
-      in
-      let* oph, _, op, result =
-        Injection.inject_manager_operation
-          cctxt
-          ~chain
-          ~block
-          ?confirmations
-          ?dry_run
-          ?verbose_signing
-          ~successor_level:true
-          ~source
-          ~fee:(Limit.of_option fee)
-          ~gas_limit:Limit.unknown
-          ~storage_limit:Limit.unknown
-          ~src_pk
-          ~src_sk:manager_sk
-          ~fee_parameter
-          operation
-      in
-      match Apply_results.pack_contents_list op result with
-      | Apply_results.Single_and_result
-          (Manager_operation _, Manager_operation_result _) ->
-          .
-      | Apply_results.Cons_and_result
-          ( (Manager_operation _ as op1),
-            res1,
-            Single_and_result ((Manager_operation _ as op2), res2) ) ->
-          return ((oph, op1, res1), [(op2, res2)]))
-  | ( Some (public_key_consensus, consensus_pop_material),
-      Some (public_key_companion, companion_pop_material) ) -> (
-      let* operation =
-        let* operation_consensus =
+  let delegate_op =
+    let op = build_delegate_operation ?fee (Some source) in
+    Annotated_manager_operation.Annotated_manager_operation op
+  in
+  let* consensus_op =
+    Option.map_es
+      (fun (public_key, pop_material) ->
+        let+ op =
           build_update_consensus_key
             cctxt
             ~kind:Consensus
             ?fee
-            ?pop_material:consensus_pop_material
-            public_key_consensus
+            ?pop_material
+            public_key
         in
-        let* operation_companion =
+        Annotated_manager_operation.Annotated_manager_operation op)
+      consensus_keys
+  in
+  let* companion_op =
+    Option.map_es
+      (fun (public_key, pop_material) ->
+        let+ op =
           build_update_consensus_key
             cctxt
             ~kind:Companion
             ?fee
-            ?pop_material:companion_pop_material
-            public_key_companion
+            ?pop_material
+            public_key
         in
-        return
-        @@ Annotated_manager_operation.(
-             Cons_manager
-               ( delegate_op,
-                 Cons_manager
-                   (operation_consensus, Single_manager operation_companion) ))
-      in
-      let* oph, _, op, result =
-        Injection.inject_manager_operation
-          cctxt
-          ~chain
-          ~block
-          ?confirmations
-          ?dry_run
-          ?verbose_signing
-          ~successor_level:true
-          ~source
-          ~fee:(Limit.of_option fee)
-          ~gas_limit:Limit.unknown
-          ~storage_limit:Limit.unknown
-          ~src_pk
-          ~src_sk:manager_sk
-          ~fee_parameter
-          operation
-      in
-      match Apply_results.pack_contents_list op result with
-      | Apply_results.Single_and_result
-          (Manager_operation _, Manager_operation_result _) ->
-          .
-      | Apply_results.Cons_and_result
-          ( Manager_operation _,
-            Manager_operation_result _,
-            Single_and_result (Manager_operation _, Manager_operation_result _)
-          ) ->
-          .
-      | Apply_results.Cons_and_result
-          ( (Manager_operation _ as op1),
-            res1,
-            Cons_and_result
-              ( (Manager_operation _ as op2),
-                res2,
-                Single_and_result ((Manager_operation _ as op3), res3) ) ) ->
-          return ((oph, op1, res1), [(op2, res2); (op3, res3)]))
+        Annotated_manager_operation.Annotated_manager_operation op)
+      companion_keys
+  in
+  let* stake_op =
+    Option.map_es
+      (fun amount ->
+        let+ parameters = parse_arg_transfer None in
+        let op =
+          build_transaction_operation
+            ?fee
+            ~amount
+            ~parameters
+            ~entrypoint:Entrypoint.stake
+            (Contract.Implicit source)
+        in
+        Annotated_manager_operation.Annotated_manager_operation op)
+      amount
+  in
+  let ops =
+    delegate_op :: List.filter_map Fun.id [consensus_op; companion_op; stake_op]
+  in
+  let (Annotated_manager_operation.Manager_list contents) =
+    Annotated_manager_operation.manager_of_list ops
+  in
+  let* oph, _, ops, results =
+    Injection.inject_manager_operation
+      cctxt
+      ~chain
+      ~block
+      ?confirmations
+      ?dry_run
+      ?verbose_signing
+      ~successor_level:true
+      ~source
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      ~src_pk
+      ~src_sk:manager_sk
+      ~fee_parameter
+      contents
+  in
+  let result = Apply_results.to_list (Contents_result_list results) in
+  return (oph, Contents_list ops, result)
 
 let update_consensus_or_companion_key ~kind cctxt ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?pop_material ~public_key

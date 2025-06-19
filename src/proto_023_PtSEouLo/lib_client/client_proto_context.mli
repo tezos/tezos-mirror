@@ -193,12 +193,17 @@ val set_delegate :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.t ->
+  ?amount:Tez.t ->
   public_key_hash ->
   src_pk:public_key ->
   manager_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   public_key_hash option ->
-  Kind.delegation Kind.manager Injection.result tzresult Lwt.t
+  (Operation_hash.t
+  * packed_contents_list
+  * Apply_results.packed_contents_result list)
+  tzresult
+  Lwt.t
 
 val update_consensus_key :
   #Protocol_client_context.full ->
@@ -308,11 +313,11 @@ val register_as_delegate :
   ?companion_keys:
     public_key
     * (Bls12_381_signature.MinPk.signature, Client_keys.sk_uri) Either.t option ->
+  ?amount:Tez.t ->
   public_key ->
-  (Kind.delegation Kind.manager Injection.result
-  * (Kind.update_consensus_key Kind.manager contents
-    * Kind.update_consensus_key Kind.manager Apply_results.contents_result)
-    list)
+  (Operation_hash.t
+  * packed_contents_list
+  * Apply_results.packed_contents_result list)
   tzresult
   Lwt.t
 
