@@ -35,7 +35,7 @@ let ci_lib_tezos_ci =
     ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"]
     ~release_status:Unreleased
 
-let _ci_lib_cacio =
+let ci_lib_cacio =
   private_lib
     "cacio"
     ~opam:""
@@ -50,7 +50,8 @@ let ci_grafazos =
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let ci_teztale =

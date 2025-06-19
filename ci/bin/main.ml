@@ -101,6 +101,11 @@ let variables : variables =
    - how;
    - and by whom it is triggered (a developer? a release manager? some automated system?). *)
 
+(** {3 Components} *)
+
+(* This must be done before registering shared pipelines. *)
+let () = Grafazos.register ()
+
 (** {3 General pipelines} *)
 
 let () =
