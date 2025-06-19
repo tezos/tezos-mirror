@@ -2,7 +2,6 @@
 # Edit file ci/bin/main.ml instead.
 
 stages:
-- start
 - images
 - build
 - publish
@@ -53,22 +52,7 @@ oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-datadog_pipeline_trace:
-  image: datadog/ci:v2.44.0
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  script:
-  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
-  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
-    --tags mr_number:$CI_MERGE_REQUEST_IID
-
-oc.build:static-arm64-linux-binaries:
+build:static-arm64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -100,8 +84,6 @@ oc.build:static-arm64-linux-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
@@ -113,7 +95,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+build:static-x86_64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -145,8 +127,6 @@ oc.build:static-x86_64-linux-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
-    VERSION_EXECUTABLE: octez-smart-rollup-node
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
@@ -158,13 +138,12 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.docker:amd64:
+docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -176,17 +155,15 @@ oc.docker:amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
-oc.docker:arm64:
+docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
-  dependencies:
-  - oc.docker:ci:arm64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -198,7 +175,6 @@ oc.docker:arm64:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
-    DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
@@ -208,8 +184,8 @@ docker:merge_manifests:
   tags:
   - gcp
   needs:
-  - oc.docker:amd64
-  - oc.docker:arm64
+  - docker:amd64
+  - docker:arm64
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -229,11 +205,11 @@ gitlab:octez-smart-rollup-node-release:
   tags:
   - gcp
   needs:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - build:static-x86_64-binaries
+  - build:static-arm64-binaries
   dependencies:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - build:static-x86_64-binaries
+  - build:static-arm64-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
