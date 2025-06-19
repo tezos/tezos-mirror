@@ -27,6 +27,7 @@ depends: [
   "uuidm" { >= "0.9.9" }
   "octez-protocol-022-PsRiotum-libs"
   "tezos-protocol-022-PsRiotum"
+  "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
   "dream" { >= "1.0.0~alpha7" }

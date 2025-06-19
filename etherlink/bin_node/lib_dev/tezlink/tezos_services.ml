@@ -7,6 +7,78 @@
 
 include Tezlink_imports
 
+(** We add to Imported_protocol the mocked protocol data used in headers *)
+module Imported_protocol = struct
+  include Imported_protocol
+
+  let contents : Block_header_repr.contents =
+    {
+      payload_hash = Block_payload_hash.zero;
+      payload_round = Round_repr.zero;
+      seed_nonce_hash = None;
+      proof_of_work_nonce =
+        Bytes.make Constants_repr.proof_of_work_nonce_size '\000';
+      per_block_votes =
+        {
+          liquidity_baking_vote = Per_block_vote_pass;
+          adaptive_issuance_vote = Per_block_vote_pass;
+        };
+    }
+
+  let signature : Alpha_context.signature =
+    Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
+
+  let mock_protocol_data : Block_header_repr.protocol_data =
+    {contents; signature}
+end
+
+module Block_services = struct
+  include
+    Tezos_shell_services.Block_services.Make
+      (Imported_protocol)
+      (Imported_protocol)
+
+  let mock_block_header_data : Proto.block_header_data tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_data"
+      ~dst:Proto.block_header_data_encoding
+      ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
+      Imported_protocol.mock_protocol_data
+end
+
+module Zero_block_services = struct
+  include
+    Tezos_shell_services.Block_services.Make (Zero_protocol) (Genesis_protocol)
+
+  let mock_block_header_data : Proto.block_header_data tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_data"
+      ~dst:Proto.block_header_data_encoding
+      ~src:Data_encoding.empty
+      ()
+end
+
+module Genesis_block_services = struct
+  include
+    Tezos_shell_services.Block_services.Make
+      (Genesis_protocol)
+      (Imported_protocol)
+
+  let mock_block_header_data : Proto.block_header_data tzresult =
+    Result_syntax.return
+      Genesis_protocol.
+        {
+          command =
+            Genesis_protocol.Data.Command.Activate
+              {
+                protocol = Imported_protocol.hash;
+                fitness = [];
+                protocol_parameters = Bytes.empty;
+              };
+          signature = Signature.V0.zero;
+        }
+end
+
 type level = Tezos_types.level
 
 (* Provides mock values necessary for constructing L1 types that contain fields
@@ -28,28 +100,6 @@ module Mock = struct
      When blocks are populated, this mock value will be unnecessary,
      being replaced by actual data. *)
   let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
-
-  let contents : Imported_protocol.Block_header_repr.contents =
-    {
-      payload_hash = Imported_protocol.Block_payload_hash.zero;
-      payload_round = Imported_protocol.Round_repr.zero;
-      seed_nonce_hash = None;
-      proof_of_work_nonce =
-        Bytes.make
-          Imported_protocol.Constants_repr.proof_of_work_nonce_size
-          '\000';
-      per_block_votes =
-        {
-          liquidity_baking_vote = Per_block_vote_pass;
-          adaptive_issuance_vote = Per_block_vote_pass;
-        };
-    }
-
-  let signature : Imported_protocol.Alpha_context.signature =
-    Unknown (Bytes.make Tezos_crypto.Signature.Ed25519.size '\000')
-
-  let protocol_data : Imported_protocol.Block_header_repr.protocol_data =
-    {contents; signature}
 
   module Operation_metadata = struct
     open Imported_protocol.Apply_results
@@ -157,19 +207,30 @@ module Protocol_types = struct
     l2_chain_id |> Z.to_int32 |> Bytes.set_int32_be bytes 0 ;
     Chain_id.of_bytes bytes
 
-  module Protocol_data = struct
-    let get_mock_protocol_data =
-      Tezos_types.convert_using_serialization
-        ~name:"protocol_data"
-        ~dst:Tezlink_imports.Imported_protocol.block_header_data_encoding
-        ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
-        Mock.protocol_data
-  end
-
   let ethereum_to_tezos_block_hash hash =
     hash |> Ethereum_types.block_hash_to_bytes |> Block_hash.of_string
 
-  module Block_header = struct
+  module type HEADER = sig
+    module Block_services : BLOCK_SERVICES
+
+    val tezlink_block_to_shell_header :
+      L2_types.Tezos_block.t -> Block_header.shell_header tzresult
+
+    val tezlink_block_to_block_header :
+      l2_chain_id:L2_types.chain_id ->
+      L2_types.Tezos_block.t * 'b ->
+      Block_services.block_header tzresult
+
+    val tezlink_block_to_block_info :
+      l2_chain_id:L2_types.chain_id ->
+      'a * L2_types.Tezos_block.t * 'b ->
+      ('a * Block_services.block_info) tzresult
+  end
+
+  module Make_block_header (Block_services : BLOCK_SERVICES) :
+    HEADER with module Block_services = Block_services = struct
+    module Block_services = Block_services
+
     let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
         Block_header.shell_header tzresult =
       let open Result_syntax in
@@ -193,7 +254,7 @@ module Protocol_types = struct
         Block_services.block_header tzresult =
       let open Result_syntax in
       let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-      let* protocol_data = Protocol_data.get_mock_protocol_data in
+      let* protocol_data = Block_services.mock_block_header_data in
       let* hash = ethereum_to_tezos_block_hash block.hash in
       let* shell = tezlink_block_to_shell_header block in
       let block_header : Block_services.block_header =
@@ -203,22 +264,20 @@ module Protocol_types = struct
 
     let tezlink_block_to_raw_block_header block =
       let open Result_syntax in
-      let* protocol_data = Protocol_data.get_mock_protocol_data in
+      let* protocol_data = Block_services.mock_block_header_data in
       let* shell = tezlink_block_to_shell_header block in
       let raw_block_header : Block_services.raw_block_header =
         {shell; protocol_data}
       in
       return raw_block_header
-  end
 
-  module Block = struct
     let tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
       let open Result_syntax in
       let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
       let* hash =
         ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash
       in
-      let* header = Block_header.tezlink_block_to_raw_block_header block in
+      let* header = tezlink_block_to_raw_block_header block in
       let block_info : Block_services.block_info =
         {chain_id; hash; header; metadata = None; operations = []}
       in
@@ -291,6 +350,11 @@ module Protocol_types = struct
         }
   end
 end
+
+module Current_block_header = Protocol_types.Make_block_header (Block_services)
+module Zero_block_header = Protocol_types.Make_block_header (Zero_block_services)
+module Genesis_block_header =
+  Protocol_types.Make_block_header (Genesis_block_services)
 
 (** [wrap conversion service_implementation] changes the output type
     of [service_implementation] using [conversion]. *)
@@ -620,18 +684,6 @@ module Imported_services = struct
       Tezos_rpc.Service.t =
     Tezos_shell_services.Monitor_services.S.heads
 
-  let block_info :
-      ( [`GET],
-        tezlink_rpc_context,
-        tezlink_rpc_context,
-        < force_metadata : bool
-        ; metadata : [`Always | `Never] option
-        ; version : Tezlink_protocols.Shell_impl.version >,
-        unit,
-        Tezlink_protocols.Shell_impl.version * Block_services.block_info )
-      Tezos_rpc.Service.t =
-    import_service Block_services.S.info
-
   let get_storage_normalized :
       ( [`POST],
         tezlink_rpc_context,
@@ -775,8 +827,7 @@ let build_block_static_directory ~l2_chain_id
          let* tezlink_block = Backend.block chain block in
          Lwt_result_syntax.return (tezlink_block, chain))
        ~convert_output:
-         (Protocol_types.Block_header.tezlink_block_to_block_header
-            ~l2_chain_id)
+         (Current_block_header.tezlink_block_to_block_header ~l2_chain_id)
   |> opt_register_with_conversion
        ~service:Imported_services.hash
        ~impl:(fun {block; chain} () () ->
@@ -807,6 +858,19 @@ let build_block_static_directory ~l2_chain_id
          let*? mock_result = Mock.Operation_metadata.operation_metadata op in
          return (op, mock_result))
 
+let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
+    (module Block_header : Protocol_types.HEADER) base_dir =
+  let open Lwt_result_syntax in
+  base_dir
+  |> register_with_conversion
+       ~service:(import_service Block_header.Block_services.S.info)
+       ~impl:(fun {block; chain} q () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* tezlink_block = Backend.block chain block in
+         Lwt_result_syntax.return (q#version, tezlink_block, chain))
+       ~convert_output:(Block_header.tezlink_block_to_block_info ~l2_chain_id)
+
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
     block headers and block metadata at these levels to indicate the hashes of the genesis protocols.
@@ -815,31 +879,53 @@ let build_block_static_directory ~l2_chain_id
     for which a special treatment of early blocks is needed are registered dynamically. *)
 let register_dynamic_block_services ~l2_chain_id
     (module Backend : Tezlink_backend_sig.S) base_dir =
-  let open Lwt_result_syntax in
   let static_dir = build_block_static_directory ~l2_chain_id (module Backend) in
   let dynamic_dir_current_proto =
     static_dir
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
     (* RPCs at directory level doesn't appear properly in the describe RPC *)
-    |> register_with_conversion
-         ~service:Imported_services.block_info
-         ~impl:(fun {block; chain} q () ->
-           let*? chain = check_chain chain in
-           let*? block = check_block block in
-           let* tezlink_block = Backend.block chain block in
-           Lwt_result_syntax.return (q#version, tezlink_block, chain))
-         ~convert_output:
-           (Protocol_types.Block.tezlink_block_to_block_info ~l2_chain_id)
+    |> register_block_info
+         ~l2_chain_id
+         (module Backend)
+         (module Current_block_header)
+    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
+           make_env chain block)
   in
+  let dynamic_dir_zero_proto =
+    static_dir
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
+    (* RPCs at directory level doesn't appear properly in the describe RPC *)
+    |> register_block_info
+         ~l2_chain_id
+         (module Backend)
+         (module Zero_block_header)
+    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
+           make_env chain block)
+  in
+  let dynamic_dir_genesis_proto =
+    static_dir
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7993 *)
+    (* RPCs at directory level doesn't appear properly in the describe RPC *)
+    |> register_block_info
+         ~l2_chain_id
+         (module Backend)
+         (module Genesis_block_header)
+    |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
+           make_env chain block)
+  in
+
   let dynamic_dir =
     register_dynamic
       ~root_dir:Tezos_rpc.Directory.empty
       ~path:block_directory_path
-      (fun (((), _chain), _block) ->
-        Lwt.return
-        @@ Tezos_rpc.Directory.map
-             (fun (((), chain), block) -> make_env chain block)
-             dynamic_dir_current_proto)
+      (fun (((), _chain), block) ->
+        match block with
+        (* Trying to access the first blocks info using `Head offset will lead
+           to incoherent results. If it becomes a pb we will need to ignore
+           potential errors from Backend.current_level. *)
+        | `Genesis | `Level 0l -> Lwt.return dynamic_dir_zero_proto
+        | `Level 1l -> Lwt.return dynamic_dir_genesis_proto
+        | _ -> Lwt.return dynamic_dir_current_proto)
   in
   Tezos_rpc.Directory.merge base_dir dynamic_dir
 
@@ -874,7 +960,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
         | None -> return_none
         | Some block -> (
             match
-              ( Protocol_types.Block_header.tezlink_block_to_shell_header block,
+              ( Current_block_header.tezlink_block_to_shell_header block,
                 Protocol_types.ethereum_to_tezos_block_hash block.hash )
             with
             | Ok shell, Ok hash ->
@@ -886,7 +972,7 @@ let register_monitor_heads (module Backend : Tezlink_backend_sig.S) dir =
                          Data_encoding.Binary.to_bytes_exn
                            Imported_protocol.Block_header_repr
                            .protocol_data_encoding
-                           Mock.protocol_data;
+                           Imported_protocol.mock_protocol_data;
                      }
                       : Block_header.t) )
             | Error _, _ | _, Error _ -> return_none)

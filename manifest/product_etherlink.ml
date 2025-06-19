@@ -259,6 +259,15 @@ let evm_node_lib_dev_tezlink =
     | Some target -> target
     | None -> (* unreachable *) assert false
   in
+  let tezlink_genesis_proto =
+    List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
+  in
+  let tezlink_genesis_protocol_plugin =
+    match Protocol.client tezlink_genesis_proto with
+    | Some genesis -> genesis
+    | None -> (* unreachable *) assert false
+  in
+
   octez_evm_node_lib
     "evm_node_lib_dev_tezlink"
     ~path:"etherlink/bin_node/lib_dev/tezlink"
@@ -268,6 +277,7 @@ let evm_node_lib_dev_tezlink =
         evm_node_lib_dev_encoding |> open_;
         tezlink_protocol_plugin;
         tezlink_protocol_parameters;
+        tezlink_genesis_protocol_plugin;
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
         octez_version;
