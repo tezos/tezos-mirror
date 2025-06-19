@@ -37,11 +37,11 @@ open Tezos_rpc.Context
 
    - If injecting the operation [oph] failed with [err], we use
    [Injection_operation_error_case oph] followed by [err].  *)
-type Error_monad.error += Injection_operations_error
-
-type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
-
-type Error_monad.error += Injection_operation_error_case of Operation_hash.t
+type error +=
+  | Injection_operations_error
+  | Injection_operation_succeed_case of Operation_hash.t
+  | Injection_operation_error_case of Operation_hash.t
+  | Async_injection_failed
 
 (** [block cctxt ?async ?force raw_block] tries to inject
     [raw_block] inside the node. If [?async] is [true], [raw_block]

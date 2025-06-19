@@ -23,11 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type Error_monad.error += Injection_operations_error
-
-type Error_monad.error += Injection_operation_succeed_case of Operation_hash.t
-
-type Error_monad.error += Injection_operation_error_case of Operation_hash.t
+type error +=
+  | Injection_operations_error
+  | Injection_operation_succeed_case of Operation_hash.t
+  | Injection_operation_error_case of Operation_hash.t
+  | Async_injection_failed
 
 let () =
   let open Data_encoding in
@@ -73,7 +73,16 @@ let () =
         oph)
     (obj1 (req "oph" Operation_hash.encoding))
     (function Injection_operation_error_case oph -> Some oph | _ -> None)
-    (function oph -> Injection_operation_error_case oph)
+    (function oph -> Injection_operation_error_case oph) ;
+  register_error_kind
+    `Permanent
+    ~id:"async_injection_failed"
+    ~title:"Asynchronous injection failed"
+    ~description:"The asynchronous injection failed."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Asynchronous injection failed with:")
+    unit
+    (function Async_injection_failed -> Some () | _ -> None)
+    (function () -> Async_injection_failed)
 
 module S = struct
   open Data_encoding

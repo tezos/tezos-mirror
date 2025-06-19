@@ -24,6 +24,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Event = struct
+  include Internal_event.Simple
+
+  let section = ["node"; "injection_directory"]
+
+  let warn_injection_failure =
+    declare_2
+      ~section
+      ~level:Warning
+      ~name:"injection_failure"
+      ~msg:"Failed to inject {kind}: {errors}"
+      ("kind", Data_encoding.string)
+      ("errors", Error_monad.trace_encoding)
+      ~pp2:Error_monad.pp_print_top_error_of_trace
+end
+
 let read_chain_id validator chain =
   let open Lwt_syntax in
   let distributed_db = Validator.distributed_db validator in
@@ -34,6 +50,17 @@ let read_chain_id validator chain =
       let* v = Chain_directory.get_chain_id store chain in
       Lwt.return_some v
 
+(* Wrapper for asynchronous RPC results that matches the potentially returned
+   error, avoiding dropping it silently. *)
+let wrap_async_rpc_result ~kind v =
+  let open Lwt_result_syntax in
+  let*! v in
+  match v with
+  | Ok res -> return res
+  | Error errs ->
+      let*! () = Event.(emit warn_injection_failure) (kind, errs) in
+      fail (Injection_services.Async_injection_failed :: errs)
+
 let inject_block validator ?force ?chain bytes operations =
   let open Lwt_result_syntax in
   let*! chain_id = read_chain_id validator chain in
@@ -41,10 +68,7 @@ let inject_block validator ?force ?chain bytes operations =
          Block_hash.t * unit tzresult Lwt.t) =
     Validator.validate_block validator ?force ?chain_id bytes operations
   in
-  return
-    ( hash,
-      let* () = block in
-      return_unit )
+  return (hash, wrap_async_rpc_result ~kind:"block" block)
 
 let inject_operation validator ~force ?chain bytes =
   let open Lwt_result_syntax in
@@ -65,7 +89,7 @@ let inject_operation validator ~force ?chain bytes =
                 "inject_operation")])
       in
       let hash = Operation.hash op in
-      return (hash, t)
+      return (hash, wrap_async_rpc_result ~kind:"operation" t)
 
 let inject_operations validator ~force ?chain bytes_list =
   let open Lwt_result_syntax in
@@ -107,7 +131,7 @@ let inject_operations validator ~force ?chain bytes_list =
         (Injection_services.Injection_operations_error :: List.rev result)
   in
   let (t : unit tzresult Lwt.t) = Lwt.map join_results (Lwt.all promises) in
-  return (hashes, t)
+  return (hashes, wrap_async_rpc_result ~kind:"operations" t)
 
 let inject_protocol store proto =
   let open Lwt_result_syntax in
@@ -127,7 +151,7 @@ let inject_protocol store proto =
               hash
         | Some _ -> return_unit)
   in
-  Lwt.return (hash, validation)
+  Lwt.return (hash, wrap_async_rpc_result ~kind:"protocol" validation)
 
 let build_rpc_directory validator =
   let open Lwt_result_syntax in
