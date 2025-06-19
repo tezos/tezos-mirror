@@ -61,6 +61,9 @@ let injector_context (cctxt : #Client_context.full) : Client_context.full =
       Format.ksprintf Stdlib.failwith "Injector client wants to exit %d" code
   end
 
+(** Service name for Opentelemetry traces. *)
+let service_name = "Injector"
+
 module Make (Parameters : PARAMETERS) = struct
   module Tags = Injector_tags.Make (Parameters.Tag)
   module Tags_table = Hashtbl.Make (Parameters.Tag)
@@ -238,6 +241,11 @@ module Make (Parameters : PARAMETERS) = struct
         head
     in
     state.last_seen_head <- Some head
+
+  let tags_attribute tags =
+    ("injector.tags", `String (Format.asprintf "%a" Tags.pp tags))
+
+  let signer_attribute signer = ("injector.signer", `String signer.alias)
 
   let init_injector cctxt l1_ctxt ~head_protocols ~data_dir state
       ~retention_period ~allowed_attempts ~injection_ttl ~signers strategy tags
@@ -554,7 +562,7 @@ module Make (Parameters : PARAMETERS) = struct
     let module Proto_client = (val state.proto_client) in
     let*! simulation_result =
       Octez_telemetry.Trace.with_result
-        ~service_name:"Injector"
+        ~service_name
         "Proto_client.simulate_operations"
         ~message_on_error:(function `TzError trace | `Exceeds_quotas trace ->
           Format.asprintf "%a" Error_monad.pp_print_trace trace)
@@ -658,8 +666,7 @@ module Make (Parameters : PARAMETERS) = struct
       (operations : Inj_operation.t list) =
     let open Lwt_result_syntax in
     let*! simulation_result =
-      Octez_telemetry.Trace.with_tzresult ~service_name:"Injector" "simulate"
-      @@ fun _ ->
+      Octez_telemetry.Trace.with_tzresult ~service_name "simulate" @@ fun _ ->
       trace (Step_failed "simulation")
       @@ simulate_operations state signer operations
     in
@@ -781,6 +788,20 @@ module Make (Parameters : PARAMETERS) = struct
         in
         `Ignored operations_to_drop
 
+  let link_batches_scope scope batches =
+    Opentelemetry.Scope.add_links scope @@ fun () ->
+    let scope_link = Opentelemetry.Scope.to_span_link scope in
+    List.fold_left
+      (List.fold_left (fun acc op ->
+           match op.Inj_operation.scope with
+           | None -> acc
+           | Some op_scope ->
+               Opentelemetry.Scope.add_links op_scope (fun () -> [scope_link]) ;
+               Opentelemetry.Scope.to_span_link op_scope :: acc))
+      []
+      batches
+    |> List.rev
+
   (** [inject_pending_operations_round state ?size_limit signer]
       injects operations from the pending heap [state.pending], whose
       total size does not exceed [size_limit] using [signer]. Upon
@@ -788,6 +809,11 @@ module Make (Parameters : PARAMETERS) = struct
       and marked as injected. *)
   let inject_pending_operations_round state signer operations_to_inject =
     let open Lwt_result_syntax in
+    Octez_telemetry.Trace.with_tzresult ~service_name "inject_round"
+    @@ fun scope ->
+    Opentelemetry.Scope.add_attrs scope (fun () ->
+        [tags_attribute state.tags; signer_attribute signer]) ;
+    link_batches_scope scope [operations_to_inject] ;
     (* Retrieve and remove operations from pending *)
     let*! () =
       Event.(emit1 ~signers:[signer] considered_operations_info)
@@ -873,12 +899,13 @@ module Make (Parameters : PARAMETERS) = struct
         let module Proto_client = (val state.proto_client) in
         Proto_client.max_operation_data_length) () =
     let open Lwt_result_syntax in
-    Octez_telemetry.Trace.with_tzresult ~service_name:"Injector" "inject"
-    @@ fun _ ->
+    Octez_telemetry.Trace.with_tzresult ~service_name "inject" @@ fun scope ->
     let signers = available_signers state in
     let* ops_batch =
       get_n_ops_batch_from_queue ~size_limit state (List.length signers)
     in
+    Opentelemetry.Scope.add_attrs scope (fun () -> [tags_attribute state.tags]) ;
+    link_batches_scope scope ops_batch ;
     let signers_and_ops = List.combine_drop signers ops_batch in
     let*! res_list =
       List.map_p
@@ -1159,10 +1186,14 @@ module Make (Parameters : PARAMETERS) = struct
   let on_new_tezos_head state
       ({block_hash = head_hash; level = head_level} as head) =
     let open Lwt_result_syntax in
-    Octez_telemetry.Trace.with_tzresult
-      ~service_name:"Injector"
-      "on_new_tezos_head"
-    @@ fun _ ->
+    Octez_telemetry.Trace.with_tzresult ~service_name "on_new_tezos_head"
+    @@ fun scope ->
+    Opentelemetry.Scope.add_attrs scope (fun () ->
+        [
+          tags_attribute state.tags;
+          ("rollup_node.block_hash", `String (Block_hash.to_b58check head_hash));
+          ("rollup_node.block_level", `Int (Int32.to_int head_level));
+        ]) ;
     let*! () = Event.(emit1 new_tezos_head) state head_hash in
     let () = metrics_get_signers_balance state head.level in
     set_metrics state ;
@@ -1620,9 +1651,19 @@ module Make (Parameters : PARAMETERS) = struct
 
   let add_pending_operation ?order op =
     let open Lwt_result_syntax in
-    let operation = Inj_operation.make ?order op in
+    Octez_telemetry.Trace.with_tzresult ~service_name "add_pending_operation"
+    @@ fun scope ->
+    let operation = Inj_operation.make ?order ~scope op in
     let*? w = worker_of_tag (Parameters.operation_tag op) in
-    let* () = add_pending_operation (Worker.state w) operation in
+    let state = Worker.state w in
+    Opentelemetry.Scope.add_attrs scope (fun () ->
+        let op_str = Format.asprintf "%a" POperation.pp op in
+        [
+          tags_attribute state.tags;
+          ("injector.operation.id", `String (Id.to_b58check operation.id));
+          ("injector.operation", `String op_str);
+        ]) ;
+    let* () = add_pending_operation state operation in
     return operation.id
 
   let shutdown () =

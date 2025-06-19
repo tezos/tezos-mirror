@@ -796,13 +796,8 @@ let () =
         let rops =
           List.rev_map
             (fun Injector.Inj_operation.
-                   {
-                     operation = op;
-                     errors = {count; last_error};
-                     id = _;
-                     order = _;
-                     counter = _;
-                   } -> Rollup_node_services.{op; errors = count; last_error})
+                   {operation = op; errors = {count; last_error}; _} ->
+              Rollup_node_services.{op; errors = count; last_error})
             ops
         in
         (tags, List.rev rops))
