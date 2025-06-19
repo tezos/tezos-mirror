@@ -26,9 +26,7 @@ receivers:
       http:
         endpoint: "0.0.0.0:55681"
 
-exporters:
-
-%s
+exporters:%s
 
 processors:
   batch:  # Batch processor to optimize telemetry processing
@@ -41,16 +39,12 @@ service:
       processors: [batch]
       exporters: [otlp/jaeger]
 
-  telemetry:
-    metrics:
-      address: "0.0.0.0:8888"  # Optional: Expose metrics for the collector itself (Prometheus scrapeable)
-
   extensions:
     - health_check
 
 extensions:
   health_check:
-    endpoint: "localhost:13133"
+    endpoint: "0.0.0.0:13133"
 |}
     jaeger
 
@@ -87,14 +81,7 @@ let run ~jaeger =
   let run () =
     Process.spawn
       "curl"
-      [
-        "-s";
-        "-o";
-        "/dev/null";
-        "-w";
-        "%{http_code}";
-        "http://localhost:13133/healthz";
-      ]
+      ["-s"; "-o"; "/dev/null"; "-w"; "%{http_code}"; "http://localhost:13133"]
   in
   let* _ = Env.wait_process ~is_ready ~run () in
   Lwt.return ()
