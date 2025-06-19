@@ -718,7 +718,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?(tez_bootstrap_accounts = Evm_node.tez_default_bootstrap_accounts)
     ?sequencer ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?enable_revm
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?threshold_encryption
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
@@ -765,6 +765,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?maximum_allowed_ticks
       ?max_blueprint_lookahead_in_seconds
       ?enable_fa_bridge
+      ?enable_revm
       ?enable_fast_withdrawal
       ?enable_fast_fa_withdrawal
       ?blueprints_publisher_order_enabled

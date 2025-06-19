@@ -183,7 +183,8 @@ pub const ENABLE_FA_BRIDGE: RefPath =
     RefPath::assert_from(b"/evm/feature_flags/enable_fa_bridge");
 
 // If this path contains a value, REVM will be used for evm executions.
-pub const ENABLE_REVM: RefPath = RefPath::assert_from(b"/evm/feature_flags/enable_revm");
+pub const ENABLE_REVM: RefPath =
+    RefPath::assert_from(b"/evm/world_state/feature_flags/enable_revm");
 
 // If the flag is set, the kernel consider that this is local evm node execution.
 const EVM_NODE_FLAG: RefPath = RefPath::assert_from(b"/__evm_node");

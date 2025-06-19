@@ -310,7 +310,9 @@ let make ~mainnet_compat ~eth_bootstrap_balance ?l2_chain_ids
     @ eth_bootstrap_accounts @ set_account_code
     @ make_instr remove_whitelist
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_fa_bridge
-    @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_revm
+    @ make_instr
+        ~path_prefix:["evm"; "world_state"; "feature_flags"]
+        enable_revm
     @ make_instr ~path_prefix:["evm"; "feature_flags"] enable_dal
     @ make_instr
         ~path_prefix:["evm"; "world_state"; "feature_flags"]
