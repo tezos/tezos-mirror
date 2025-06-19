@@ -65,7 +65,7 @@ let check_import_invariants ~test_descr ~rolling
       let expected_present, expected_absent =
         List.partition
           (fun b ->
-            Compare.Int32.(Store.Block.level b <= snd checkpoint)
+            Compare.Int32.(Store.Block.level b <= Store.Block.level head)
             && Compare.Int32.(Store.Block.level b >= snd caboose))
           previously_baked_blocks
       in
@@ -79,18 +79,26 @@ let check_import_invariants ~test_descr ~rolling
       (* Check that the descriptors are consistent *)
       let* expected_caboose_level =
         if rolling then
+          let* head_pred =
+            Store.Block.read_predecessor imported_chain_store head
+          in
           (* In rolling: we expected to have at least the max_op_ttl
-                blocks from the head *)
+                blocks from the predecessor of the head *)
           let* metadata =
-            Store.Block.get_block_metadata imported_chain_store head
+            Store.Block.get_block_metadata imported_chain_store head_pred
           in
           let max_op_ttl = Store.Block.max_operations_ttl metadata in
-          return Int32.(sub (Store.Block.level head) (of_int max_op_ttl))
+          return Int32.(sub (Store.Block.level head_pred) (of_int max_op_ttl))
         else return 0l
+      in
+      (* As the savepoint and checkpoint are targeting the predecessor of the
+         snapshot's target, we rely on the target's predecessor. *)
+      let exported_block_predecessor_level =
+        Int32.sub (Store.Block.level exported_block) 1l
       in
       Assert.equal
         ~msg:("savepoint consistency: " ^ test_descr)
-        (Store.Block.level exported_block)
+        exported_block_predecessor_level
         (snd savepoint) ;
       Assert.equal
         ~msg:("checkpoint consistency: " ^ test_descr)
