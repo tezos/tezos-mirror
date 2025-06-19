@@ -1273,7 +1273,7 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-build_grafazos_dashboards:
+grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:

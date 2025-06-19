@@ -6,20 +6,7 @@
 (*****************************************************************************)
 
 open Tezos_ci
-
-let job_datadog_pipeline_trace : tezos_job =
-  job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Images.datadog_ci
-    ~before_script:[". ./scripts/ci/datadog_send_job_info.sh"]
-    ~stage:Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
+open Common
 
 let job_gitlab_release =
   job
@@ -27,7 +14,7 @@ let job_gitlab_release =
     ~image:Images.ci_release
     ~stage:Stages.publish
     ~interruptible:false
-    ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
+    ~dependencies:(Dependent [Artifacts (Common.job_build ())])
     ~name:"gitlab:release"
     ["./grafazos/scripts/releases/create_gitlab_release.sh"]
 
@@ -44,7 +31,7 @@ let job_release_page ~test () =
        accordingly."
     ~name:"publish:release-page"
     ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
-    ~dependencies:(Dependent [Artifacts (Common.job_build_grafazos ())])
+    ~dependencies:(Dependent [Artifacts (Common.job_build ())])
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
@@ -68,7 +55,4 @@ let job_release_page ~test () =
     ["./grafazos/scripts/releases/publish_release_page.sh"]
 
 let jobs ~test () =
-  (if test then [] else [job_datadog_pipeline_trace])
-  @ [
-      Common.job_build_grafazos (); job_gitlab_release; job_release_page ~test ();
-    ]
+  [Common.job_build (); job_gitlab_release; job_release_page ~test ()]
