@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 (** This module is largely inspired from {!module:Tezos_protocol_environment.Environement_context} *)
-open Store_sigs
 
 open Context_sigs
 
@@ -78,7 +77,7 @@ type hash = Hash.t
 val load :
   ('repo, 'tree) pvm_context_impl ->
   cache_size:int ->
-  ([< `Read | `Write > `Read] as 'a) mode ->
+  ([< `Read | `Write > `Read] as 'a) Access_mode.t ->
   string ->
   'a t tzresult Lwt.t
 

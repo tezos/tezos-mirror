@@ -25,7 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
 open Context_sigs
 module Context_encoding = Tezos_context_encoding.Context_binary
 module Event = Irmin_context_events
@@ -106,7 +105,8 @@ let context_hash_of_hash h =
 let hash_of_context_hash h =
   Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
-let load : type a. cache_size:int -> a mode -> string -> a raw_index Lwt.t =
+let load :
+    type a. cache_size:int -> a Access_mode.t -> string -> a raw_index Lwt.t =
  fun ~cache_size mode path ->
   let open Lwt_syntax in
   let readonly = match mode with Read_only -> true | Read_write -> false in

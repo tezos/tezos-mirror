@@ -307,11 +307,11 @@ let extra_sqlite_files = [sqlite_file_name ^ "-wal"; sqlite_file_name ^ "-shm"]
 
 type 'a t = Sqlite.t
 
-type rw = Store_sigs.rw t
+type rw = Access_mode.rw t
 
-type ro = Store_sigs.ro t
+type ro = Access_mode.ro t
 
-let init (type m) (mode : m Store_sigs.mode) ~data_dir : m t tzresult Lwt.t =
+let init (type m) (mode : m Access_mode.t) ~data_dir : m t tzresult Lwt.t =
   let open Lwt_result_syntax in
   let path = Filename.concat data_dir sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
@@ -359,7 +359,7 @@ let init (type m) (mode : m Store_sigs.mode) ~data_dir : m t tzresult Lwt.t =
 
 let close store = Sqlite.close store
 
-let readonly (store : Store_sigs.rw t) : Store_sigs.ro t = store
+let readonly (store : Access_mode.rw t) : Access_mode.ro t = store
 
 module Commitments = struct
   module Q = struct

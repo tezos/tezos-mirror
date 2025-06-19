@@ -39,7 +39,7 @@ module Node_store = struct
 
   let init = Store.init
 
-  let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
+  let check_and_set_history_mode (type a) (mode : a Access_mode.t)
       (store : a Store.t) (history_mode : Configuration.history_mode option) =
     let open Lwt_result_syntax in
     let* stored_history_mode =

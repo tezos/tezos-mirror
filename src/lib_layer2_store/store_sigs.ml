@@ -31,12 +31,6 @@ type path = string list
 (** Keys in Map-like storage functors are represented as strings. *)
 type key_path_representation = string
 
-type rw = [`Read | `Write]
-
-type ro = [`Read]
-
-type _ mode = Read_only : ro mode | Read_write : rw mode
-
 (** [BACKEND] is the module type defining the backend for persisting data to
     disk. It is used by the functors in [Store_utils] to create Storage
     modules that persist data structures on disk. *)
@@ -54,7 +48,7 @@ module type BACKEND = sig
   val make_key_path : path -> key_path_representation -> path
 
   (** [load location] loads the backend storage from [location]. *)
-  val load : 'a mode -> string -> 'a t tzresult Lwt.t
+  val load : 'a Access_mode.t -> string -> 'a t tzresult Lwt.t
 
   (** [flush location] flushes to disk a sequence of changes to the data stored
       at [location]. *)
@@ -193,7 +187,7 @@ module type Append_only_map = sig
   (** [add store key value] adds a binding from [key] to [value] to the map, and
       persists it to disk. If [key] already exists in the store, it must be
       bound to [value]. *)
-  val add : rw store -> key -> value -> unit tzresult Lwt.t
+  val add : Access_mode.rw store -> key -> value -> unit tzresult Lwt.t
 end
 
 (** [Nested_map] is a map where values are indexed by both a primary and
@@ -276,7 +270,7 @@ module type Nested_map = sig
       disk. The value is bound to the [primary_key] and [secondary_key].
   *)
   val add :
-    rw store ->
+    Access_mode.rw store ->
     primary_key:primary_key ->
     secondary_key:secondary_key ->
     value ->
