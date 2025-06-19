@@ -666,6 +666,39 @@ let test_tezlink_counter =
     JSON.(invalid_res |> as_int = 1) int ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_contract_info_on_liquidity_baking =
+  register_tezlink_test
+    ~title:"Test of the contract info rpc on liquidity baking addresses"
+    ~tags:["rpc"; "contract"; "info"; "liquidity_baking"]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the balance rpc and check the result *)
+  let verify_account_info_rpc address =
+    let path =
+      Format.sprintf
+        "/tezlink/chains/main/blocks/head/context/contracts/%s"
+        address
+    in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"curl_protocols" res in
+    (* Verify that the script field exists*)
+    let script = JSON.(json |-> "script") in
+    return
+      Check.(
+        (is_false @@ JSON.is_null script)
+          ~error_msg:"Expected script but found nothing")
+  in
+  let cpmm_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" in
+  let lqt_address = "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo" in
+  let lq_fallback_token = "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN" in
+
+  let* () = verify_account_info_rpc cpmm_address in
+  let* () = verify_account_info_rpc lqt_address in
+  let* () = verify_account_info_rpc lq_fallback_token in
+  unit
+
 let test_tezlink_version =
   register_tezlink_test
     ~title:"Test of the version rpc"
@@ -14023,6 +14056,7 @@ let () =
   test_tezlink_contract_info [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_manager_key [Alpha] ;
+  test_tezlink_contract_info_on_liquidity_baking [Alpha] ;
   test_tezlink_counter [Alpha] ;
   test_tezlink_protocols [Alpha] ;
   test_tezlink_genesis_block_arg [Alpha] ;
