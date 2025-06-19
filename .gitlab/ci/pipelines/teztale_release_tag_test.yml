@@ -134,7 +134,7 @@ teztale.build:static-arm64:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
 
-gitlab:release:
+teztale.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
@@ -152,7 +152,7 @@ gitlab:release:
   script:
   - ./teztale/scripts/releases/create_gitlab_release.sh
 
-publish:release-page:
+teztale.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:

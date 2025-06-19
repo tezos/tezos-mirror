@@ -9,6 +9,11 @@ open Gitlab_ci.Util
 open Tezos_ci
 module String_set = Set.Make (String)
 
+(** Prefix used for the jobs name. *)
+let prefix = "teztale"
+
+let job ~name = job ~name:(prefix ^ "." ^ name)
+
 (** Set of Teztale files *)
 let changeset = Changeset.(make ["teztale/**/*"])
 
@@ -21,7 +26,7 @@ let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ?cpu
     ~arch
     ?cpu
     ?storage
-    ~name:("teztale.build:static-" ^ arch_string)
+    ~name:("build:static-" ^ arch_string)
     ~image:Images.CI.build
     ~stage:Stages.build
     ?rules
