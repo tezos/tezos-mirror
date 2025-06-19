@@ -319,7 +319,7 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
       ~time_between_blocks
       ~evm_node_endpoint:relay_endpoint
       ~next_blueprint_number
-      (fun number blueprint ->
+      ~on_new_blueprint:(fun number blueprint ->
         let*! () = Floodgate_events.received_blueprint number in
         let* () =
           match Blueprint_decoder.transaction_hashes blueprint with
@@ -329,6 +329,9 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
           | Error _ -> return_unit
         in
         return `Continue)
+      ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
+        return_unit)
+      ()
   and* () = Tx_queue.beacon ~tick_interval
   and* () =
     let* token, gas_limit =

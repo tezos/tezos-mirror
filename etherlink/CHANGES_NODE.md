@@ -11,6 +11,10 @@
 
 ### RPCs changes
 
+- Observers not tracking a rollup node now receive finalized L2 block
+  levels through the EVM endpoint, enabling `eth_getBlockByNumber`
+  with the `"finalized"` parameter to be handled correctly (!18355).
+
 ### Metrics changes
 
 ### Execution changes

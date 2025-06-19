@@ -96,6 +96,13 @@ let on_new_blueprint
     in
     return (`Restart_from next_blueprint_number)
 
+let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
+    ~end_l2_level =
+  let open Lwt_result_syntax in
+  if not rollup_node_tracking then
+    Evm_context.apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level
+  else return_unit
+
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
     finalizer_public_server finalizer_private_server finalizer_rpc_process =
@@ -362,7 +369,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
-        (on_new_blueprint tx_container evm_node_endpoint)
+        ~on_new_blueprint:(on_new_blueprint tx_container evm_node_endpoint)
+        ~on_finalized_levels:(on_finalized_levels ~rollup_node_tracking)
+        ()
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =

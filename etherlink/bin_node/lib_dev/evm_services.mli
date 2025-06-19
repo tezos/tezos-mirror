@@ -41,3 +41,8 @@ val monitor_blueprints :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
   Blueprint_types.with_events Lwt_stream.t tzresult Lwt.t
+
+val monitor_messages :
+  evm_node_endpoint:Uri.t ->
+  Ethereum_types.quantity ->
+  Broadcast.message Lwt_stream.t tzresult Lwt.t

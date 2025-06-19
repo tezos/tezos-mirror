@@ -94,6 +94,25 @@ val apply_blueprint :
   Evm_events.Delayed_transaction.t list ->
   Ethereum_types.hash Seq.t tzresult Lwt.t
 
+(** [apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level]
+    stores the finalization relationship between L1 level [l1_level]
+    and the L2 level range from [start_l2_level] to [end_l2_level]. It
+    updates the L1-L2 level mappings, records the finalized level
+    ranges, updates metrics, and broadcasts notifications to
+    subscribers about the finalization event.
+
+    It is only used for observers not tracking a rollup node (i.e not
+    sequencer, observers tracking a rollup-node) since all actions
+    described above are already performed by calling the
+    [apply_evm_events] function when receiving events from the rollup
+    node.
+*)
+val apply_finalized_levels :
+  l1_level:int32 ->
+  start_l2_level:Ethereum_types.quantity ->
+  end_l2_level:Ethereum_types.quantity ->
+  unit tzresult Lwt.t
+
 val head_info : unit -> head Lwt.t
 
 val next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t

@@ -36,6 +36,12 @@ module Request = struct
         blueprint_with_events : Blueprint_types.with_events;
       }
         -> (Ethereum_types.quantity option, tztrace) t
+    | Finalized_levels : {
+        l1_level : int32;
+        start_l2_level : Ethereum_types.quantity;
+        end_l2_level : Ethereum_types.quantity;
+      }
+        -> (unit, tztrace) t
 
   let name (type a b) (t : (a, b) t) =
     match t with
@@ -46,6 +52,7 @@ module Request = struct
     | Patch_state _ -> "Patch_state"
     | Wasm_pvm_version -> "Wasm_pvm_version"
     | Potential_observer_reorg _ -> "Potential_observer_reorg"
+    | Finalized_levels _ -> "Finalized_levels"
 
   type view = View : _ t -> view
 
@@ -143,6 +150,21 @@ module Request = struct
                    evm_node_endpoint = Uri.of_string evm_node_endpoint;
                    blueprint_with_events;
                  }));
+        case
+          (Tag 7)
+          ~title:"Finalized_levels"
+          (obj4
+             (req "request" (constant "finalized_levels"))
+             (req "l1_level" int32)
+             (req "start_l2_level" Ethereum_types.quantity_encoding)
+             (req "end_l2_level" Ethereum_types.quantity_encoding))
+          (function
+            | View (Finalized_levels {l1_level; start_l2_level; end_l2_level})
+              ->
+                Some ((), l1_level, start_l2_level, end_l2_level)
+            | _ -> None)
+          (fun ((), l1_level, start_l2_level, end_l2_level) ->
+            View (Finalized_levels {l1_level; start_l2_level; end_l2_level}));
       ]
 
   let pp ppf view =

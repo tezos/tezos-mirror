@@ -680,7 +680,12 @@ evm_context_request_failed:
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
-                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } },
+                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } }
+            || { /* Finalized_levels */
+                 "request": "finalized_levels",
+                 "l1_level": integer ∈ [-2^31-1, 2^31],
+                 "start_l2_level": $unistring,
+                 "end_l2_level": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
@@ -2388,7 +2393,12 @@ evm_context_request_failed:
                      "blueprint":
                        { "number": $positive_bignum,
                          "timestamp": $timestamp.protocol,
-                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } },
+                         "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ] } } }
+            || { /* Finalized_levels */
+                 "request": "finalized_levels",
+                 "l1_level": integer ∈ [-2^31-1, 2^31],
+                 "start_l2_level": $unistring,
+                 "end_l2_level": $unistring },
           "errors": any } }
     $Signature.Public_key:
       /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */

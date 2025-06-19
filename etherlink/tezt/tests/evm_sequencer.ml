@@ -10042,6 +10042,53 @@ let test_patch_kernel =
   in
   unit
 
+let test_observer_finalized_view =
+  register_all
+    ~kernels:[Latest]
+    ~tags:["evm"; "observer"; "finalized"; "dont_track_rollup_node"]
+    ~title:
+      "observer has finalized block parameter without tracking the rollup node"
+    ~time_between_blocks:Nothing
+    ~use_dal:
+      (* The logic tested here is orthogonal with the DAL, and the test itself is written with constants
+         for the case DAL is not enabled. *)
+      Register_without_feature
+  @@ fun {sc_rollup_node; observer; client; sequencer; proxy; _} _protocol ->
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  (* Create blueprints for level 1 and 2 *)
+  let* _ = produce_block sequencer in
+  let* _ = produce_block sequencer in
+
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  let target_finalized = 2l in
+
+  (* Ensure blueprints are finalized by baking two more blocks *)
+  let* _l1_lvl =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  (* Check the finalized blueprint is indeed the expected one *)
+  let*@ sequencer_finalized_head =
+    Rpc.get_block_by_number ~block:"finalized" sequencer
+  in
+  Check.(
+    (sequencer_finalized_head.number = target_finalized)
+      int32
+      ~error_msg:"Expected sequencer finalized level %R, got %L") ;
+
+  (* Check the finalized blueprint is the same for the observer and
+     the sequencer. *)
+  let* () =
+    check_block_consistency ~block:`Finalized ~left:sequencer ~right:observer ()
+  in
+  unit
+
 let test_finalized_persistent =
   register_all
     ~kernels:[Latest]
@@ -13702,6 +13749,7 @@ let () =
   test_trace_block protocols ;
   test_trace_block_struct_logger protocols ;
   test_patch_kernel protocols ;
+  test_observer_finalized_view protocols ;
   test_finalized_persistent protocols ;
   test_finalized_view protocols ;
   test_finalized_view_forward_txn protocols ;

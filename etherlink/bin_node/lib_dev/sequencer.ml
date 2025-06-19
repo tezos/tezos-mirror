@@ -52,43 +52,50 @@ let loop_sequencer multichain backend
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number:head.next_blueprint_number
-      @@ fun (Qty number) blueprint ->
-      let*! {next_blueprint_number = Qty expected_number; _} =
-        Evm_context.head_info ()
-      in
-      if Compare.Z.(number = expected_number) then
-        let events =
-          Evm_events.of_parts
-            blueprint.delayed_transactions
-            blueprint.kernel_upgrade
-        in
-        let* () = Evm_context.apply_evm_events events in
-        let*? all_txns =
-          Blueprint_decoder.transactions blueprint.blueprint.payload
-        in
-        let txns = List.filter_map snd all_txns in
-        let* () =
-          List.iter_es
-            (fun raw_tx ->
-              let* res = Validate.is_tx_valid backend ~mode:Minimal raw_tx in
-              match res with
-              | Ok (next_nonce, txn_obj) ->
-                  let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-                  let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
-                  return_unit
-              | Error reason ->
-                  let hash = Ethereum_types.hash_raw_tx raw_tx in
-                  let*! () = Events.replicate_transaction_dropped hash reason in
-                  return_unit)
-            txns
-        in
-        let* _ =
-          Block_producer.produce_block
-            ~force:true
-            ~timestamp:blueprint.blueprint.timestamp
-        in
-        return `Continue
-      else return (`Restart_from (Ethereum_types.Qty expected_number))
+        ~on_new_blueprint:(fun (Qty number) blueprint ->
+          let*! {next_blueprint_number = Qty expected_number; _} =
+            Evm_context.head_info ()
+          in
+          if Compare.Z.(number = expected_number) then
+            let events =
+              Evm_events.of_parts
+                blueprint.delayed_transactions
+                blueprint.kernel_upgrade
+            in
+            let* () = Evm_context.apply_evm_events events in
+            let*? all_txns =
+              Blueprint_decoder.transactions blueprint.blueprint.payload
+            in
+            let txns = List.filter_map snd all_txns in
+            let* () =
+              List.iter_es
+                (fun raw_tx ->
+                  let* res =
+                    Validate.is_tx_valid backend ~mode:Minimal raw_tx
+                  in
+                  match res with
+                  | Ok (next_nonce, txn_obj) ->
+                      let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
+                      let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
+                      return_unit
+                  | Error reason ->
+                      let hash = Ethereum_types.hash_raw_tx raw_tx in
+                      let*! () =
+                        Events.replicate_transaction_dropped hash reason
+                      in
+                      return_unit)
+                txns
+            in
+            let* _ =
+              Block_producer.produce_block
+                ~force:true
+                ~timestamp:blueprint.blueprint.timestamp
+            in
+            return `Continue
+          else return (`Restart_from (Ethereum_types.Qty expected_number)))
+        ~on_finalized_levels:(fun
+            ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ -> return_unit)
+        ()
   | _ -> (
       match time_between_blocks with
       | Configuration.Nothing ->
