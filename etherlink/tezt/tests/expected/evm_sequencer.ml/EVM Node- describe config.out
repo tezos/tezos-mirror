@@ -328,7 +328,8 @@
         integer ∈ [-2^30, 2^30]
         /* Maximum number of times a connection can be reused */ },
   "opentelemetry"?:
-    { /* Enable or disable opentelemetry profiling */
+    /* Enable or disable opentelemetry profiling */
+    { /* detailed_opentelemetry_config */
       "enable"?: boolean /* Enable opentelemetry profiling */,
       "debug"?: boolean /* Enable debug mode */,
       "url_traces"?: $unistring /* URL to send traces */,
@@ -340,7 +341,11 @@
         integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "batch_timeout_ms"?:
         integer ∈ [-2^30, 2^30]
-        /* Milliseconds after which we emit a batch, even incomplete */ } }
+        /* Milliseconds after which we emit a batch, even incomplete */ }
+    || boolean
+    /* opentelemetry_boolean */
+    || null
+    /* opentelemetry_null */ }
 $bignum:
   /* Big number
      Decimal representation of a big number */
