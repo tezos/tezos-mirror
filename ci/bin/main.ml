@@ -160,19 +160,31 @@ let () =
   let open Pipeline in
   (* Matches either Octez release tags or Octez beta release tags,
      e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
-  let has_any_octez_release_tag =
-    If.(
-      has_tag_match octez_major_release_tag_re
-      || has_tag_match octez_minor_release_tag_re
-      || has_tag_match octez_beta_release_tag_re)
+  let octez_release_tags =
+    [
+      octez_major_release_tag_re;
+      octez_minor_release_tag_re;
+      octez_beta_release_tag_re;
+    ]
+  in
+  let has_any_tag tags =
+    match List.map Rules.has_tag_match tags with
+    | [] ->
+        (* We could return [Rules.never], but this looks like a programming mistake. *)
+        invalid_arg "has_any_tag: empty list"
+    | [tag] -> tag
+    | head :: tail -> List.fold_left If.( || ) head tail
   in
   let has_non_release_tag =
-    If.(
-      Predefined_vars.ci_commit_tag != null
-      && (not has_any_octez_release_tag)
-      && (not (has_tag_match octez_evm_node_release_tag_re))
-      && (not (has_tag_match grafazos_release_tag_re))
-      && not (has_tag_match teztale_release_tag_re))
+    let release_tags =
+      octez_release_tags
+      @ [
+          octez_evm_node_release_tag_re;
+          grafazos_release_tag_re;
+          teztale_release_tag_re;
+        ]
+    in
+    If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
   in
   let release_description =
     "\n\n\
