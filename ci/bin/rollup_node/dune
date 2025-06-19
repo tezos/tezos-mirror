@@ -1,17 +1,11 @@
 ; This file was automatically generated, do not edit.
 ; Edit file manifest/main.ml instead.
 
-(executable
- (name main)
+(library
+ (name rollup_node)
  (libraries
   gitlab_ci
-  tezos_ci
-  grafazos_ci
-  teztale
-  rollup_node
-  yaml
-  unix
-  tezt.core)
+  tezos_ci)
  (flags
   (:standard)
   -open Gitlab_ci.Base))

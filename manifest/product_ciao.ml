@@ -53,6 +53,15 @@ let ci_teztale =
     ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
+let ci_rollup_node =
+  private_lib
+    "rollup_node"
+    ~opam:""
+    ~path:"ci/bin/rollup_node"
+    ~bisect_ppx:No
+    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~release_status:Unreleased
+
 let _ci_bin_main =
   private_exe
     "main"
@@ -65,6 +74,7 @@ let _ci_bin_main =
         ci_lib_tezos_ci;
         ci_grafazos;
         ci_teztale;
+        ci_rollup_node;
         yaml;
         unix;
         tezt_core_lib;
