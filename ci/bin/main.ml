@@ -337,6 +337,15 @@ let () =
        'master'.\n\n\
        This scheduled pipeline exercices the full tezt tests suites." ;
   register
+    "schedule_extended_dal_use_baker"
+    schedule_extended_dal_use_baker
+    ~jobs:
+      (Custom_extended_test_pipeline.jobs |> List.map (with_interruptible false))
+    ~description:
+      "Scheduled run of all tezt tests with dal using baker commands weekly on \
+       'master'.\n\n\
+       This scheduled pipeline exercices the full tezt tests suites." ;
+  register
     "schedule_master_test_release"
     schedule_test_release
     ~jobs:(Release_tag.octez_jobs ~test:true Schedule_test)

@@ -64,6 +64,12 @@ let check_error ?exit_code ?msg dal_node =
       Test.fail "DAL node %s is not running, it has no stderr" (name dal_node)
   | Running {process; _} -> Process.check_error ?exit_code ?msg process
 
+let use_baker_to_start_dal_node =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_DAL_USE_BAKER" -> Some true
+  | Some _ -> Some false
+  | _ -> None
+
 let wait dal_node =
   match dal_node.status with
   | Not_running ->
@@ -122,21 +128,21 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
     ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
     ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
-  spawn_command dal_node
-  @@ [
-       "config";
-       "init";
-       "--data-dir";
-       data_dir dal_node;
-       "--rpc-addr";
-       Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
-       "--net-addr";
-       listen_addr dal_node;
-       "--metrics-addr";
-       metrics_addr dal_node;
-       "--expected-pow";
-       string_of_float expected_pow;
-     ]
+  spawn_command dal_node @@ ["config"]
+  @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+  @ [
+      "init";
+      "--data-dir";
+      data_dir dal_node;
+      "--rpc-addr";
+      Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
+      "--net-addr";
+      listen_addr dal_node;
+      "--metrics-addr";
+      metrics_addr dal_node;
+      "--expected-pow";
+      string_of_float expected_pow;
+    ]
   @ (match public_addr dal_node with
     | None -> []
     | Some addr -> ["--public-addr"; addr])
@@ -312,11 +318,10 @@ let wait_for_disconnection node ~peer_id =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
-    ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
-    ?rpc_port ?listen_addr ?public_addr ?metrics_addr
-    ?(disable_shard_validation = false) ?(disable_amplification = false)
-    ?ignore_pkhs ~l1_node_endpoint () =
+let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ?(disable_shard_validation = false)
+    ?(disable_amplification = false) ?ignore_pkhs ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -333,6 +338,14 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     match metrics_addr with
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
+  in
+  let path =
+    Option.value
+      path
+      ~default:
+        (if use_baker_to_start_dal_node = Some true then
+           Uses.path Constant.octez_agnostic_baker
+         else Uses.path Constant.octez_dal_node)
   in
   let dal_node =
     create
@@ -360,13 +373,13 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
-    ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ?disable_shard_validation
-    ?disable_amplification ?ignore_pkhs ~node () =
+let create ?runner ?path ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ~node () =
   create_from_endpoint
     ?runner
-    ~path
+    ?path
     ?name
     ?color
     ?data_dir
@@ -439,7 +452,9 @@ let run ?env ?event_level node =
     ?env
     ?event_level
     node
-    ["run"; "--verbose"; "--data-dir"; node.persistent_state.data_dir]
+    (["run"]
+    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
 
 let run ?(wait_ready = true) ?env ?event_level node =
   let* () = run ?env ?event_level node in
@@ -492,9 +507,20 @@ let load_last_finalized_processed_level dal_node =
   let* v_res = aux () in
   match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
 
-let debug_print_store_schemas ?(path = Uses.path Constant.octez_dal_node) ?hooks
-    () =
-  let args = ["debug"; "print"; "store"; "schemas"] in
+let debug_print_store_schemas ?path ?hooks () =
+  let args =
+    ["debug"]
+    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["print"; "store"; "schemas"]
+  in
+  let path =
+    Option.value
+      path
+      ~default:
+        (if use_baker_to_start_dal_node = Some true then
+           Uses.path Constant.octez_agnostic_baker
+         else Uses.path Constant.octez_dal_node)
+  in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 

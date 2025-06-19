@@ -95,6 +95,10 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_extended_baker_remote_mode_test
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_DAL_USE_BAKER"
+    variables:
+      PIPELINE_TYPE: schedule_extended_dal_use_baker
+    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "TEST_RELEASE"
     variables:
       PIPELINE_TYPE: schedule_master_test_release
@@ -258,6 +262,10 @@ include:
 - local: .gitlab/ci/pipelines/schedule_extended_baker_remote_mode_test.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_BAKER_REMOTE_MODE_TESTS"
+    when: always
+- local: .gitlab/ci/pipelines/schedule_extended_dal_use_baker.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_DAL_USE_BAKER"
     when: always
 - local: .gitlab/ci/pipelines/schedule_master_test_release.yml
   rules:

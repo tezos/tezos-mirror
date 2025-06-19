@@ -59,6 +59,8 @@ module Uses = struct
 
   let octez_agnostic_baker = make ~tag:"agnostic_baker" ~path:"./octez-baker" ()
 
+  let octez_dal_node = make ~tag:"dal_node" ~path:"./octez-dal-node" ()
+
   let register_meta_test () =
     Regression.register
       ~__FILE__
@@ -78,6 +80,12 @@ let error mode =
   | Warn -> Log.warn "%s" message
   | Fail -> Test.fail "%s" message
 
+let use_baker_to_start_dal_node =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_DAL_USE_BAKER" -> Some true
+  | Some _ -> Some false
+  | _ -> None
+
 (* Prepare parameters of a [Test.register]-like function. *)
 let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
     ?(uses_client = true) ?(uses_admin_client = true) ~run_test () =
@@ -86,6 +94,14 @@ let wrap ~file ~title ~tags ?(uses = []) ?(uses_node = true)
   let uses = if uses_client then Uses.octez_client :: uses else uses in
   let uses =
     if uses_admin_client then Uses.octez_admin_client :: uses else uses
+  in
+  let uses =
+    if
+      List.mem Uses.octez_dal_node uses
+      && (not (List.mem Uses.octez_agnostic_baker uses))
+      && use_baker_to_start_dal_node = Some true
+    then Uses.octez_agnostic_baker :: uses
+    else uses
   in
   (* Add [uses] into [tags]. *)
   let uses_tags =

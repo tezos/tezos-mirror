@@ -63,6 +63,9 @@ let schedule_extended_validation_tests =
 let schedule_extended_baker_remote_mode_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_BAKER_REMOTE_MODE_TESTS"
 
+let schedule_extended_dal_use_baker =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_DAL_USE_BAKER"
+
 let schedule_test_release =
   scheduled && var "TZ_SCHEDULE_KIND" == str "TEST_RELEASE"
 
