@@ -44,7 +44,7 @@ Of course, all these commits will be reviewed before being integrated.
 The current edition of the typo train MR can be found in meta-issue :gl:`#2329`.
 
 If you don't have enough permissions to push to the branch above, you can still make commits in your own fork of the Octez repository, and ask for them to be cherry-picked on the typo/train on the ``#documentation`` channel on the Tezos Dev Slack space.
-Alternatively, you may of course create your own MRs on the tezos/tezos repository for submitting documentations changes without using the Typo Train. In that case, Doc owners might contact you on the MR to suggest changes, including integrating these in a current open train. 
+Alternatively, you may of course create your own MRs on the tezos/tezos repository for submitting documentations changes without using the Typo Train. In that case, Doc owners might contact you on the MR to suggest changes, including integrating these in a current open train.
 
 Reporting issues
 ~~~~~~~~~~~~~~~~
@@ -453,9 +453,6 @@ The assignee will thus often be one of the reviewers (if they needs to review
 or respond to a comment) or one of the merge request authors (if they need
 to update the code or respond to a comment).
 
-If a merge request has no assignee, it is implicitly the role of the
-:ref:`merge coordinator <merge_coordinator>` to assign it to someone.
-
 Even though merge requests could require action from several people
 to be merged, we avoid assigning more than one to avoid diluting responsibility.
 
@@ -476,8 +473,6 @@ To find reviewers, either:
   consists of a link to the MR and a one sentence summary.
 - Look at authors of the code you are modifying using
   `git blame <https://git-scm.com/docs/git-blame>`_.
-- Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-  by asking them on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/user/permissions/>`_
 you may or may not be able to use the *Reviewers* field for specifying
