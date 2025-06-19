@@ -77,9 +77,12 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
         gas_limit: block_constants.gas_limit,
         basefee,
         difficulty: U256::ZERO,
-        prevrandao: block_constants
-            .prevrandao
-            .map(|prevrandao| FixedBytes(prevrandao.0)),
+        prevrandao: Some(
+            block_constants
+                .prevrandao
+                .map(|prevrandao| FixedBytes(prevrandao.0))
+                .unwrap_or_default(),
+        ),
         blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
     })
 }
