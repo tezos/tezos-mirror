@@ -1185,7 +1185,9 @@ module Monitoring_app = struct
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/mainnet.png"
     | `Ghostnet ->
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
-    | `Sandbox | `Weeklynet _ | `Nextnet _ -> "no_image_yet"
+    | `Nextnet _ ->
+        "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/seoulnet.png"
+    | `Sandbox | `Weeklynet _ -> "no_image_yet"
 
   module Format_app = struct
     (* Helper for Slack App message format block-kit
