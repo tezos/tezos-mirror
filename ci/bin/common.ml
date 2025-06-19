@@ -139,29 +139,6 @@ let enable_kernels =
 
 (* Common GitLab CI caches *)
 
-(** Enable caching of Cargo's target folder which stores files which
-    can speed up subsequent compilation passes.
-
-    All folders are stored in a single cacheable directory to work
-    around GitLab's restriction on the number caches a job may have. *)
-let enable_cargo_target_caches ?key job =
-  let key =
-    Option.value
-      ~default:
-        ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  let cache_dir = "$CI_PROJECT_DIR" // "_target" in
-  job
-  |> append_variables
-       [
-         ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
-         ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
-         ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
-           cache_dir // "etherlink_wasm_runtime" );
-       ]
-  |> append_cache (cache ~key [cache_dir])
-
 (** Add variable enabling dune cache.
 
     This function can be applied to jobs that run dune.
