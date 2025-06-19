@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
 use revm::context::result::EVMError;
@@ -15,7 +16,7 @@ use revm::{
     handler::{instructions::EthInstructions, EthPrecompiles},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
-    Context, ExecuteCommitEvm, InspectEvm, Journal, MainBuilder,
+    Context, ExecuteCommitEvm, Journal, MainBuilder,
 };
 use storage_helpers::u256_to_le_bytes;
 use tezos_ethereum::block::BlockConstants;
@@ -24,15 +25,14 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 use world_state_handler::{account_path, WorldStateHandler};
 
-use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
+pub mod precompile_provider;
+pub mod send_outbox_message;
+pub mod world_state_handler;
 
 mod block_storage;
 mod code_storage;
 mod database;
-mod precompile_provider;
-mod send_outbox_message;
 mod storage_helpers;
-mod world_state_handler;
 
 const ETHERLINK_CHAIN_ID: u64 = 42793;
 const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
@@ -172,11 +172,8 @@ pub fn run_transaction<'a, Host: Runtime>(
     gas_limit: Option<u64>,
     effective_gas_price: u128,
     value: U256,
-    tracer: Option<impl InspectEvm>,
     access_list: AccessList,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
-    let _ignore_tracer = tracer;
-
     let mut commit_status = true;
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
