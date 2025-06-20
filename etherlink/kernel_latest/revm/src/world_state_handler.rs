@@ -155,7 +155,7 @@ impl StorageAccount {
         } else {
             let code_hash = match code {
                 None => KECCAK_EMPTY,
-                Some(code) => CodeStorage::add(host, code.bytes_slice())?,
+                Some(code) => CodeStorage::add(host, code.original_byte_slice())?,
             };
             let code_hash_bytes: [u8; 32] = code_hash.into();
             let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;

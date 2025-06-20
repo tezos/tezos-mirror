@@ -350,7 +350,7 @@ fn revm_run_transaction<Host: Runtime>(
         revm::primitives::Address::from_slice(&caller.0),
         to.map(|to| revm::primitives::Address::from_slice(&to.0)),
         revm::primitives::Bytes::from(call_data),
-        Some(gas_limit),
+        gas_limit,
         u128::from_le_bytes(if effective_gas_price.bits() < 128 {
             effective_gas_price.low_u128().to_le_bytes()
         } else {
