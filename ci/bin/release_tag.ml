@@ -51,7 +51,7 @@ let monitoring_child_pipeline =
     ~jobs:
       [
         job_datadog_pipeline_trace;
-        Grafazos_ci.Common.job_build ();
+        Grafazos.Common.job_build ();
         job_build_layer1_profiling ~expire_in:Never ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ();
@@ -281,7 +281,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_trigger_monitoring;
   ]
   @ jobs_debian_repository @ jobs_dnf_repository
-  @ Grafazos_ci.Release.jobs ~test ()
+  @ Grafazos.Release.jobs ~test ()
   @ Teztale.Release.jobs ~test ()
   @
   match (test, release_tag_pipeline_type) with

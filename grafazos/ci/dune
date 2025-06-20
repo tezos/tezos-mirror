@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name grafazos_ci)
+ (name grafazos)
  (libraries
   gitlab_ci
   tezos_ci)

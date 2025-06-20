@@ -37,7 +37,7 @@ let ci_lib_tezos_ci =
 
 let ci_grafazos =
   private_lib
-    "grafazos_ci"
+    "grafazos"
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No
