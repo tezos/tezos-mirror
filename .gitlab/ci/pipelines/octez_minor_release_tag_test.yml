@@ -184,10 +184,10 @@ oc.docker:amd64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
-    EXECUTABLE_FILES: script-inputs/released-executables
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -208,10 +208,10 @@ oc.docker:arm64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
-    EXECUTABLE_FILES: script-inputs/released-executables
+    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
 
 oc.install-release-homebrew:
   image: debian:bookworm
@@ -255,7 +255,7 @@ docker:merge_manifests:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
 
 gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -912,6 +912,26 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
+docker:promote_to_latest:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - docker:merge_manifests
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_promote_to_latest.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+
 opam:release:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: publish
@@ -924,7 +944,7 @@ opam:release:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
-  - ./scripts/ci/opam-release.sh
+  - ./scripts/ci/opam-release.sh --dry-run
 
 publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -946,10 +966,10 @@ publish:release-page:
   script:
   - ./scripts/releases/publish_release_page.sh
   variables:
-    S3_BUCKET: site-prod.octez.tezos.com
-    BUCKET_PATH: /releases
-    URL: octez.tezos.com
-    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
   artifacts:
     expire_in: 1 day
     paths:

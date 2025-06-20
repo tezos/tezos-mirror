@@ -99,8 +99,11 @@ let job_release_page ~test ?dependencies () =
     built of the [Test] type and are published to the GitLab registry
     instead of Docker hub.
 
+    If [major] is false (default is [true]), then components jobs are
+    excluded from the Octez jobs.
+
     On release pipelines these jobs can start immediately *)
-let octez_jobs ?(test = false) release_tag_pipeline_type =
+let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let variables =
     match release_tag_pipeline_type with
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
@@ -281,8 +284,10 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_trigger_monitoring;
   ]
   @ jobs_debian_repository @ jobs_dnf_repository
-  @ Grafazos.Release.jobs ~test ()
-  @ Teztale.Release.jobs ~test ()
+  (* Include components release jobs only if this is a major release. *)
+  @ (if major then
+       Grafazos.Release.jobs ~test () @ Teztale.Release.jobs ~test ()
+     else [])
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release

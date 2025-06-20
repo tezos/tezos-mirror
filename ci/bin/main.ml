@@ -138,8 +138,10 @@ let () =
 (** {3 Release pipelines} *)
 
 let () =
-  (* Matches Octez release tags, e.g. [octez-v1.2] or [octez-v1.2-rc4]. *)
-  let octez_release_tag_re = "/^octez-v\\d+\\.\\d+(?:\\-rc\\d+)?$/" in
+  (* Matches Octez major release tags, e.g. [octez-v1.0] or [octez-v2.0-rc4]. *)
+  let octez_major_release_tag_re = "/^octez-v\\d+\\.0(?:\\-rc\\d+)?$/" in
+  (* Matches Octez minor release tags, e.g. [octez-v1.2]. *)
+  let octez_minor_release_tag_re = "/^octez-v\\d+\\.[1-9][0-9]*$/" in
   (* Matches Octez beta release tags, e.g. [octez-v1.2-beta5]. *)
   let octez_beta_release_tag_re = "/^octez-v\\d+\\.\\d+\\-beta\\d*$/" in
   (* Matches Etherlink release tags, e.g. [etherlink-v1.2] or [etherlink-v1.2-rc4]. *)
@@ -156,7 +158,8 @@ let () =
      e.g. [octez-v1.2], [octez-v1.2-rc4] or [octez-v1.2-beta5]. *)
   let has_any_octez_release_tag =
     If.(
-      has_tag_match octez_release_tag_re
+      has_tag_match octez_major_release_tag_re
+      || has_tag_match octez_minor_release_tag_re
       || has_tag_match octez_beta_release_tag_re)
   in
   let has_non_release_tag =
@@ -201,8 +204,11 @@ let () =
   (* TODO: simplify dry run pipelines by having them all be on tezos/tezos? *)
   register
     "octez_release_tag"
-    If.(on_tezos_namespace && push && has_tag_match octez_release_tag_re)
-    ~jobs:(Release_tag.octez_jobs Release_tag)
+    If.(
+      on_tezos_namespace && push
+      && (has_tag_match octez_major_release_tag_re
+         || has_tag_match octez_minor_release_tag_re))
+    ~jobs:(Release_tag.octez_jobs ~major:false Release_tag)
     ~description:
       ("Release tag pipelines for Octez.\n\n\
         This pipeline is created when the release manager pushes a tag in the \
@@ -221,12 +227,24 @@ let () =
         format octez-vX.Y(-betaN). It is as Octez release tag pipelines, but \
         does not publish to opam." ^ release_description) ;
   register
-    "octez_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_any_octez_release_tag)
-    ~jobs:(Release_tag.octez_jobs ~test:true Release_tag)
+    "octez_major_release_tag_test"
+    If.(
+      not_on_tezos_namespace && push && has_tag_match octez_major_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~major:true ~test:true Release_tag)
     ~description:
-      "Dry-run pipeline for 'octez_release_tag'.\n\n\
-       This pipeline checks that 'octez_release_tag' pipelines work as \
+      "Dry-run pipeline for 'octez_major_release_tag'.\n\n\
+       This pipeline checks that 'octez_major_release_tag' pipelines work as \
+       intended, without publishing any release. Developers or release \
+       managers can create this pipeline by pushing a tag to a fork of \
+       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
+  register
+    "octez_minor_release_tag_test"
+    If.(
+      not_on_tezos_namespace && push && has_tag_match octez_minor_release_tag_re)
+    ~jobs:(Release_tag.octez_jobs ~major:false ~test:true Release_tag)
+    ~description:
+      "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
+       This pipeline checks that 'octez_minor_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
