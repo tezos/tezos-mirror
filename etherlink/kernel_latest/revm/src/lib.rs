@@ -242,8 +242,9 @@ mod test {
     use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
         context::{
-            result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv,
-            ContextTr, LocalContext, TxEnv,
+            result::{ExecutionResult, Output},
+            transaction::AccessList,
+            BlockEnv, CfgEnv, ContextTr, LocalContext, TxEnv,
         },
         context_interface::block::BlobExcessGasAndPrice,
         inspector::inspectors::GasInspector,
@@ -253,12 +254,15 @@ mod test {
     };
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use utilities::{block_env, etherlink_vm_db, evm, tx_env};
+    use utilities::{block_env, dummy_block_constants, etherlink_vm_db, evm, tx_env};
 
     use crate::{
         database::{EtherlinkVMDB, PrecompileDatabase},
         precompile_provider::EtherlinkPrecompiles,
+        run_transaction,
         send_outbox_message::SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+        world_state_handler::account_path,
+        ExecutionOutcome,
     };
     use crate::{
         send_outbox_message::SendWithdrawalInput,
@@ -334,6 +338,16 @@ mod test {
                 ),
                 block_env.gas_limit,
                 PH160::from(block_env.beneficiary.into_array()),
+            )
+        }
+
+        pub(crate) fn dummy_block_constants() -> BlockConstants {
+            BlockConstants::first_block(
+                PU256::from(1),
+                PU256::from(1),
+                BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
+                30_000_000,
+                PH160::zero(),
             )
         }
 
@@ -576,5 +590,77 @@ mod test {
         // Check that the storage slot at 0x01 was updated with 0x42
         let storage_slot_value = evm.db().storage_slot(contract, U256::from(1));
         assert_eq!(storage_slot_value, U256::from(66));
+    }
+
+    #[test]
+    fn test_contract_deployment() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let precompiles = EtherlinkPrecompiles::new();
+        let block_constants = dummy_block_constants();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut storage_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller))
+            .unwrap();
+
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        let result = run_transaction(
+            &mut host,
+            &block_constants,
+            &mut world_state_handler,
+            precompiles,
+            caller,
+            None,
+            // # Deployment code for:
+            //
+            // pragma solidity ^0.8.0;
+            //
+            // contract StorageAccess {
+            //    uint256 public value = 1;
+            //
+            //    function setValue(uint256 newValue) public {
+            //        value = newValue;
+            //    }
+            // }
+            Bytes::from_hex("6080604052600160005534801561001557600080fd5b50610133806100256000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c80633fa4f24514603757806355241077146051575b600080fd5b603d6069565b604051604891906090565b60405180910390f35b606760048036038101906063919060d5565b606f565b005b60005481565b8060008190555050565b6000819050919050565b608a816079565b82525050565b600060208201905060a360008301846083565b92915050565b600080fd5b60b5816079565b811460bf57600080fd5b50565b60008135905060cf8160ae565b92915050565b60006020828403121560e85760e760a9565b5b600060f48482850160c2565b9150509291505056fea26469706673582212202dba9d4631e2c42eb5a90449e79df9c7031f4e73f695987b580809d987c057c864736f6c63430008120033").unwrap(),
+            30_000_000,
+            1,
+            U256::ZERO,
+            AccessList(vec![]),
+        );
+
+        match result {
+            Ok(ExecutionOutcome {
+                result:
+                    ExecutionResult::Success {
+                        output: Output::Create(bytecode, Some(address)),
+                        ..
+                    },
+                ..
+            }) => {
+                let contract_account = world_state_handler
+                    .get_or_create(&host, &account_path(&address))
+                    .unwrap();
+                assert_eq!(
+                    bytecode,
+                    contract_account
+                        .code(&host)
+                        .unwrap()
+                        .unwrap()
+                        .original_bytes()
+                )
+            }
+            other => panic!("ERROR: ended up in {other:?}"),
+        }
     }
 }
