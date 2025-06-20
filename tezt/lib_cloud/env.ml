@@ -28,8 +28,9 @@ let mode =
         | None -> Test.fail "No valid hostname specified: %s" endpoint
         | Some host -> host
       in
+      let user = Option.value ~default:(Sys.getenv "USER") (Uri.user uri) in
       let port = Option.value ~default:22 (Uri.port uri) in
-      `Ssh_host (host, port)
+      `Ssh_host (user, host, port)
 
 let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
   home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud

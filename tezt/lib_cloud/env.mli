@@ -30,7 +30,7 @@ val ssh_public_key_filename : ?home:string -> unit -> string
   - [`Remote_orchestrator_local_agents]: The orchestrator is run on a VM. The
   scenario is executed locally on the proxy VM.
 
-  - [`Ssh_host (host, port)]: This mode is similar to the
+  - [`Ssh_host (user, host, port)]: This mode is similar to the
   [`Remote_orchestrator_local_agents] mode, but on a non-GCP VM. Its purpose is
   to make an initial provisioning of docker if it is not setup.
 
@@ -42,7 +42,7 @@ val mode :
   | `Local_orchestrator_remote_agents (* default; aka Cloud mode *)
   | `Remote_orchestrator_local_agents (* aka Orchestrator mode *)
   | `Remote_orchestrator_remote_agents (* aka Host mode *)
-  | `Ssh_host of string * int ]
+  | `Ssh_host of string * string * int (* Ssh_host of (user, host, port) *) ]
 
 (** Equivalent to [Cli.prometheus]. *)
 val prometheus : bool

@@ -794,7 +794,7 @@ let deploy ~configurations =
       let* remote = Remote.deploy ~proxy:true ~configurations in
       Lwt.return (Remote remote)
   | `Remote_orchestrator_local_agents -> assert false
-  | `Ssh_host (host, port) ->
+  | `Ssh_host (user, host, port) ->
       let* host =
         Ssh_host.deploy ~user:(Sys.getenv "USER") ~host ~port ~configurations ()
       in
