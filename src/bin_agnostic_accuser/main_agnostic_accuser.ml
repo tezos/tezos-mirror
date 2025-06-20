@@ -12,7 +12,7 @@ let () =
          let* retcode =
            Lwt_exit.wrap_and_exit
            @@ Client_main_run.lwt_run
-                ~disable_logging:true
+                ~disable_logging:false
                 (module Agnostic_baker_config)
                 ~select_commands:(fun _ _ ->
                   Lwt_result_syntax.return @@ Commands.accuser_commands)
