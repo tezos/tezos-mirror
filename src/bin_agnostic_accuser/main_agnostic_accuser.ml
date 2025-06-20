@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Agnostic_accuser_config = struct
+  include Agnostic_baker_config
+
+  let default_daily_logs_path = Some "octez-accuser"
+end
+
 let () =
   Stdlib.exit
     (Tezos_base_unix.Event_loop.main_run ~process_name:"accuser" (fun () ->
@@ -13,7 +19,7 @@ let () =
            Lwt_exit.wrap_and_exit
            @@ Client_main_run.lwt_run
                 ~disable_logging:false
-                (module Agnostic_baker_config)
+                (module Agnostic_accuser_config)
                 ~select_commands:(fun _ _ ->
                   Lwt_result_syntax.return @@ Commands.accuser_commands)
                 ()

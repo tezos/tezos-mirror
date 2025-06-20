@@ -194,8 +194,8 @@ Accuser
 - Can now denounce double consensus operations where one or both
   involved operations are aggregates. (MR :gl:`!18091`)
 
-- Enables daily logs, located by default under
-  ``<base-dir>/logs/octez-accuser-<proto>``. (MR :gl:`!18429`)
+- Enables daily logs by default, located under
+  ``<base-dir>/logs/octez-accuser-<proto>/``. (MR :gl:`!18429`)
 
 Agnostic Accuser
 ----------------
@@ -203,6 +203,9 @@ Agnostic Accuser
 - Add ``octez-accuser`` agnostic accuser binary. This behaves in a similar way
   to the agnostic baker binary, automatically switching the underlying accuser
   process at protocol migration. (MR :gl:`!17738`)
+
+- Enables daily logs by default, located under
+  ``<base-dir>/logs/octez-accuser/``. (MR :gl:`!18429`)
 
 Proxy Server
 ------------
