@@ -284,7 +284,9 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir
     ~configuration_override () =
   let open Lwt_result_syntax in
   let*! () =
-    let log_cfg = Tezos_base_unix.Logs_simple_config.default_cfg in
+    let log_cfg =
+      Tezos_base_unix.Logs_simple_config.create_cfg ~advertise_levels:true ()
+    in
     let internal_events =
       Tezos_base_unix.Internal_event_unix.make_with_defaults
         ~enable_default_daily_logs_at:Filename.Infix.(data_dir // "daily_logs")
