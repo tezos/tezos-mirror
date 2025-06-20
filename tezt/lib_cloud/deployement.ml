@@ -311,14 +311,12 @@ module Ssh_host = struct
        - a physical machine.
      All that is required is that the host can be contacted either via root
      account or a sudo enabled account. *)
-  let initial_host_provisionning user host port =
+  let initial_host_provisionning user host ?ssh_id port =
+    let ssh_id =
+      Option.value ~default:(Env.ssh_private_key_filename ()) ssh_id
+    in
     let runner =
-      Runner.create
-        ~ssh_user:user
-        ~ssh_port:port
-        ~address:host
-        ~ssh_id:(Env.ssh_private_key_filename ())
-        ()
+      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ~ssh_id ()
     in
     let* () =
       (* Allows direct connections as root on debian, using key authentication.
@@ -535,11 +533,15 @@ module Ssh_host = struct
     in
     Lwt.return agent
 
-  let deploy ~user ~host ~port ~(configurations : Agent.Configuration.t list) ()
-      =
-    let* () = initial_host_provisionning user host port in
+  let deploy ~user ?ssh_id ~host ~port
+      ~(configurations : Agent.Configuration.t list) () =
+    let* () = initial_host_provisionning user ?ssh_id host port in
+    (* At this time, we only support deploying with root user.
+       The initial provisionning provide ssh root access by keypair.
+       TODO: support deploying using sudo and remove the "root" user requirement *)
+    let user = "root" in
     let proxy_runner =
-      Runner.create ~ssh_user:"root" ~ssh_port:port ~address:host ()
+      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
     in
     (* Deploys the proxy *)
     let* proxy = deploy_proxy proxy_runner in
@@ -788,9 +790,7 @@ let deploy ~configurations =
       Lwt.return (Remote remote)
   | `Remote_orchestrator_local_agents -> assert false
   | `Ssh_host (user, host, port) ->
-      let* host =
-        Ssh_host.deploy ~user:(Sys.getenv "USER") ~host ~port ~configurations ()
-      in
+      let* host = Ssh_host.deploy ~user ~host ~port ~configurations () in
       Lwt.return (Ssh_host host)
 
 let agents t =
