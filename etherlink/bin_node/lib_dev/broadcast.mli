@@ -9,7 +9,7 @@
     notified when a new blueprint is being successfully applied on top of the
     local state. *)
 val create_blueprint_stream :
-  unit -> Blueprint_types.with_events Lwt_stream.t * Lwt_watcher.stopper
+  unit -> Blueprint_types.Legacy.with_events Lwt_stream.t * Lwt_watcher.stopper
 
 (** Type of messages that are broadcasted to all evm nodes. *)
 type message =

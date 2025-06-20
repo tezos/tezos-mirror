@@ -146,7 +146,7 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
 
     let block_stream =
       Lwt_stream.filter_map_s
-        (fun (bp_with_events : Blueprint_types.with_events) ->
+        (fun (bp_with_events : Blueprint_types.Legacy.with_events) ->
           (* Extract the level from the blueprint. *)
           let (Ethereum_types.Qty level) = bp_with_events.blueprint.number in
           fetch_block level retry_delays_ms)

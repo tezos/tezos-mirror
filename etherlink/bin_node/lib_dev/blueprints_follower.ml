@@ -106,7 +106,7 @@ module Blueprints_sequence = struct
         if is_too_old then
           let* blueprint =
             (* See {Note keep_alive} *)
-            Evm_services.get_blueprint
+            Evm_services.get_blueprint_with_events
               ~keep_alive:true
               ~evm_node_endpoint
               next_blueprint_number
@@ -132,7 +132,7 @@ module Blueprints_sequence = struct
     if is_too_old then
       let*! blueprints =
         (* See {Note keep_alive} *)
-        Evm_services.get_blueprints
+        Evm_services.get_blueprints_with_events
           ~keep_alive:true
           ~evm_node_endpoint
           ~count:500L

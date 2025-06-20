@@ -1044,6 +1044,8 @@ module State = struct
         | _ -> None
       in
 
+      let sequencer_upgrade = (* fixme *) None in
+
       let* current_block =
         match current_block with
         | Eth block ->
@@ -1065,6 +1067,7 @@ module State = struct
           {
             delayed_transactions;
             kernel_upgrade;
+            sequencer_upgrade;
             blueprint =
               {number = ctxt.session.next_blueprint_number; timestamp; payload};
           }
@@ -1239,6 +1242,7 @@ module State = struct
         conn
         before_flushed_level
     in
+    let lost_sequencer_upgrade = (* fixme *) None in
     (* The kernel has produced a block for level [flushed_level]. The first thing
        to do is go back to an EVM state before this flushed blueprint. *)
     let* (_ : Evm_state.t) =
@@ -1255,7 +1259,12 @@ module State = struct
     (* Clean unreliable delayed inbox *)
     let* () = clear_head_delayed_inbox ctxt in
     (* Prepare an event list to be reapplied on current head *)
-    let events = Evm_events.of_parts delayed_transactions lost_upgrade in
+    let events =
+      Evm_events.of_parts
+        ~delayed_transactions
+        ~kernel_upgrade:lost_upgrade
+        ~sequencer_upgrade:lost_sequencer_upgrade
+    in
     (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
     let (Ex_chain_family chain_family) =
       Configuration.retrieve_chain_family
@@ -1832,7 +1841,7 @@ module State = struct
                 (* Reorganization started on an older block, we
                    traverse the chain backward. *)
                 let* blueprint_pred =
-                  Evm_services.get_blueprint
+                  Evm_services.get_blueprint_with_events
                     ~keep_alive:true
                     ~evm_node_endpoint
                     (Qty pred_number)

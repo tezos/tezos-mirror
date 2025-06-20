@@ -15,12 +15,6 @@ type t = {
   payload : payload;
 }
 
-type with_events = {
-  delayed_transactions : Evm_events.Delayed_transaction.t list;
-  kernel_upgrade : Evm_events.Upgrade.t option;
-  blueprint : t;
-}
-
 let payload_encoding =
   let open Data_encoding in
   list
@@ -39,18 +33,26 @@ let encoding =
        (req "timestamp" Time.Protocol.encoding)
        (req "payload" payload_encoding))
 
+type with_events = {
+  delayed_transactions : Evm_events.Delayed_transaction.t list;
+  kernel_upgrade : Evm_events.Upgrade.t option;
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
+  blueprint : t;
+}
+
 let with_events_encoding =
   let open Data_encoding in
   conv
-    (fun {delayed_transactions; kernel_upgrade; blueprint} ->
-      (delayed_transactions, kernel_upgrade, blueprint))
-    (fun (delayed_transactions, kernel_upgrade, blueprint) ->
-      {delayed_transactions; kernel_upgrade; blueprint})
-    (obj3
+    (fun {delayed_transactions; kernel_upgrade; sequencer_upgrade; blueprint} ->
+      (delayed_transactions, kernel_upgrade, sequencer_upgrade, blueprint))
+    (fun (delayed_transactions, kernel_upgrade, sequencer_upgrade, blueprint) ->
+      {delayed_transactions; kernel_upgrade; sequencer_upgrade; blueprint})
+    (obj4
        (req
           "delayed_transactions"
           (list Evm_events.Delayed_transaction.encoding))
        (opt "kernel_upgrade" Evm_events.Upgrade.encoding)
+       (opt "sequencer_upgrade" Evm_events.Sequencer_upgrade.encoding)
        (req "blueprint" encoding))
 
 let with_events_equal x y =
@@ -62,5 +64,33 @@ let with_events_equal x y =
 
 let events_of_blueprint_with_events with_events =
   Evm_events.of_parts
-    with_events.delayed_transactions
-    with_events.kernel_upgrade
+    ~delayed_transactions:with_events.delayed_transactions
+    ~kernel_upgrade:with_events.kernel_upgrade
+    ~sequencer_upgrade:with_events.sequencer_upgrade
+
+module Legacy = struct
+  type with_events = {
+    delayed_transactions : Evm_events.Delayed_transaction.t list;
+    kernel_upgrade : Evm_events.Upgrade.t option;
+    blueprint : t;
+  }
+
+  let with_events_encoding =
+    let open Data_encoding in
+    conv
+      (fun {delayed_transactions; kernel_upgrade; blueprint} ->
+        (delayed_transactions, kernel_upgrade, blueprint))
+      (fun (delayed_transactions, kernel_upgrade, blueprint) ->
+        {delayed_transactions; kernel_upgrade; blueprint})
+      (obj3
+         (req
+            "delayed_transactions"
+            (list Evm_events.Delayed_transaction.encoding))
+         (opt "kernel_upgrade" Evm_events.Upgrade.encoding)
+         (req "blueprint" encoding))
+end
+
+let make_legacy
+    ({delayed_transactions; kernel_upgrade; blueprint; sequencer_upgrade = _} :
+      with_events) : Legacy.with_events =
+  {delayed_transactions; kernel_upgrade; blueprint}
