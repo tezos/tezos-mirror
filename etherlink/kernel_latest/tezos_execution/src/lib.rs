@@ -377,10 +377,10 @@ pub fn apply_operation<Host: Runtime>(
         OperationContent::Transfer(TransferContent {
             amount,
             destination,
-            parameter,
+            parameters,
         }) => {
             let transfer_result =
-                transfer(host, context, &source, &amount, &destination, &parameter)?;
+                transfer(host, context, &source, &amount, &destination, &parameters)?;
             let manager_result = produce_operation_result(transfer_result);
             OperationResultSum::Transfer(manager_result)
         }
@@ -471,7 +471,7 @@ mod tests {
         source: PublicKeyHash,
         amount: Narith,
         destination: Contract,
-        parameter: Option<Parameter>,
+        parameters: Option<Parameter>,
     ) -> Operation {
         make_operation(
             fee,
@@ -482,7 +482,7 @@ mod tests {
             OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
-                parameter,
+                parameters,
             }),
         )
     }

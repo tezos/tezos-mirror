@@ -40,7 +40,7 @@ pub struct RevealContent {
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameter: Option<Parameter>,
+    pub parameters: Option<Parameter>,
 }
 
 pub enum OperationContent {
@@ -388,7 +388,7 @@ mod tests {
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
-                    parameter: None,
+                    parameters: None,
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
@@ -466,7 +466,7 @@ mod tests {
                         "KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv",
                     )
                     .unwrap(),
-                    parameter: Some(Parameter {
+                    parameters: Some(Parameter {
                         entrypoint: entrypoint::Entrypoint::try_from("B").unwrap(),
                         value: vec![
                             0x01, 0x00, 0x00, 0x00, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f,

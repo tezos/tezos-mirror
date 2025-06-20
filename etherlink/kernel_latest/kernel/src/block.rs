@@ -700,7 +700,7 @@ mod tests {
         source: PublicKeyHash,
         amount: Narith,
         destination: Contract,
-        parameter: Option<Parameter>,
+        parameters: Option<Parameter>,
     ) -> Operation {
         make_operation(
             fee,
@@ -711,7 +711,7 @@ mod tests {
             OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
-                parameter,
+                parameters,
             }),
         )
     }
@@ -1107,7 +1107,7 @@ mod tests {
 
         bootstrap1
             .set_balance(&mut host, &50_u64.into())
-            .expect("Set balance should have suceed");
+            .expect("Set balance should have succeed");
 
         // Drop the mutable access to bootstrap1
         let bootstrap1 = bootstrap1;
