@@ -882,10 +882,6 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         spawn_rpc;
       }
   in
-  on_event evm_node (handle_is_ready_event evm_node) ;
-  on_event evm_node (handle_blueprint_injected_event evm_node) ;
-  on_event evm_node (handle_blueprint_applied_event evm_node) ;
-  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   evm_node
 
 let name evm_node = evm_node.name
@@ -965,6 +961,10 @@ let run_args evm_node =
   mode_args @ shared_args
 
 let run ?(wait = true) ?(extra_arguments = []) evm_node =
+  on_event evm_node (handle_is_ready_event evm_node) ;
+  on_event evm_node (handle_blueprint_injected_event evm_node) ;
+  on_event evm_node (handle_blueprint_applied_event evm_node) ;
+  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   let on_terminate _status =
     (* Cancel all event listeners. *)
     trigger_ready evm_node None ;
@@ -984,6 +984,14 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (fun _ pending_list ->
         List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
       pending_blueprint_applied ;
+    let pending_blueprint_finalized =
+      evm_node.persistent_state.pending_blueprint_finalized
+    in
+    evm_node.persistent_state.pending_blueprint_finalized <- Per_level_map.empty ;
+    Per_level_map.iter
+      (fun _ pending_list ->
+        List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
+      pending_blueprint_finalized ;
     unit
   in
   let env =
@@ -1470,8 +1478,8 @@ let patch_config_gc ?history_mode json =
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
-    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets rollup_node
-    =
+    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets
+    ?extra_arguments rollup_node =
   let evm_node =
     create
       ?name
@@ -1493,7 +1501,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
   in
-  let* () = run evm_node in
+  let* () = run ?extra_arguments evm_node in
   return evm_node
 
 let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
@@ -2001,3 +2009,28 @@ let switch_history_mode evm_node history =
   in
   let process = spawn_command evm_node args in
   {Runnable.value = process; run}
+
+let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
+  let initial_kernel, preimages_dir, private_rpc_port =
+    match mode old_sequencer with
+    | Sequencer {initial_kernel; preimage_dir; private_rpc_port; _} ->
+        (initial_kernel, preimage_dir, private_rpc_port)
+    | _ -> invalid_arg "Evm_node is not a sequencer"
+  in
+  {
+    old_sequencer with
+    name = "observer_sequencer_" ^ fresh_name ();
+    persistent_state =
+      {
+        old_sequencer.persistent_state with
+        mode =
+          Observer
+            {
+              initial_kernel;
+              preimages_dir;
+              private_rpc_port;
+              rollup_node_endpoint = old_sequencer.persistent_state.endpoint;
+            };
+        endpoint = endpoint new_sequencer;
+      };
+  }

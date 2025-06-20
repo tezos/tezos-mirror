@@ -92,6 +92,11 @@ type pending_kernel_upgrade = {
   injected_before : Ethereum_types.quantity;
 }
 
+type pending_sequencer_upgrade = {
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
 module Kernel_upgrades : sig
   val store :
     conn ->
@@ -113,6 +118,30 @@ module Kernel_upgrades : sig
     conn ->
     Ethereum_types.quantity ->
     Evm_events.Upgrade.t option tzresult Lwt.t
+end
+
+module Sequencer_upgrades : sig
+  val store :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Sequencer_upgrade.t ->
+    unit tzresult Lwt.t
+
+  val activation_levels : conn -> Ethereum_types.quantity list tzresult Lwt.t
+
+  val find_latest_pending :
+    conn -> pending_sequencer_upgrade option tzresult Lwt.t
+
+  val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [find_latest_injecter_after n] returns the latest sequencer
+      upgrade injected after the blueprint [n] was applied. *)
+  val find_latest_injected_after :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Sequencer_upgrade.t option tzresult Lwt.t
 end
 
 module Delayed_transactions : sig

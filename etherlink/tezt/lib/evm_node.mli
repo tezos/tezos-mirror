@@ -384,6 +384,7 @@ val init :
   ?history_mode:history_mode ->
   ?spawn_rpc:int ->
   ?websockets:bool ->
+  ?extra_arguments:string list ->
   string ->
   t Lwt.t
 
@@ -724,3 +725,5 @@ val list_events :
 
 (** Switch history mode of an EVM node with command switch history. *)
 val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
+
+val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t

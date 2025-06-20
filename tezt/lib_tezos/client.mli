@@ -43,6 +43,9 @@ val string_of_endpoint : ?hostname:bool -> endpoint -> string
 (** Values that can be passed to the client's [--media-type] argument *)
 type media_type = Json | Binary | Any
 
+(* Default delay used for the activation of a protocol *)
+val default_protocol_activation_delay : Ptime.span
+
 (** Values that can be passed to the client's [--timestamp] argument *)
 type timestamp = Now | Ago of Time.Span.t | At of Time.t
 

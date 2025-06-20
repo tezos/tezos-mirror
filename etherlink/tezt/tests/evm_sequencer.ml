@@ -6586,17 +6586,43 @@ let test_timestamp_from_the_future =
   unit
 
 (** This tests the situation where the kernel has an upgrade and the
-    sequencer upgrade by following the event of the kernel. *)
+    sequencer upgrade by following the event of the kernel. Observer
+    must upgrade as well, even the one that is not connected to a
+    rollup node. *)
 let test_sequencer_upgrade =
+  let check_sequencer ~evm_node ~expected_sequencer =
+    let*@! current_sequencer =
+      Rpc.state_value evm_node Durable_storage_path.sequencer
+    in
+    Check.(
+      (Hex.to_string (`Hex current_sequencer) = expected_sequencer)
+        ~__LOC__
+        string
+        ~error_msg:"Sequencer in state is %L but expected %R") ;
+    return ()
+  in
+
+  let genesis_timestamp =
+    "2020-01-01T00:00:00Z"
+    (* timestamp used for the genesis of the l1 and the l2 *)
+  in
+  (* 30 sec later. *)
+  let activation_timestamp = "2020-01-01T00:00:30Z" in
+
+  let sequencer_key = Constant.bootstrap1 in
+  let new_sequencer_key = Constant.bootstrap2 in
+
   register_all
-    ~sequencer:Constant.bootstrap1
+    ~sequencer:sequencer_key
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"; Tag.flaky]
+    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
     ~title:
       "Rollup-node sequencer upgrade is applied to the sequencer local state."
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+    ~use_threshold_encryption:Register_without_feature
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -6605,46 +6631,95 @@ let test_sequencer_upgrade =
            sequencer;
            proxy;
            observer;
-           enable_dal;
            _;
          }
              _protocol ->
-  (* produce an initial block *)
-  let*@ _lvl = produce_block sequencer in
+  let* observer_dont_track_rollup =
+    match Evm_node.mode observer with
+    | Observer mode ->
+        Evm_node.init
+          ~extra_arguments:["--dont-track-rollup-node"]
+          ~mode:
+            (Observer
+               {
+                 mode with
+                 private_rpc_port = Some (Port.fresh ());
+                 rollup_node_endpoint = "";
+               })
+          (Evm_node.endpoint sequencer)
+    | _ -> Test.fail "impossible, it's an observer"
+  in
+
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+
   let* () =
     check_head_consistency
       ~left:proxy
       ~right:sequencer
       ~error_msg:
-        "The head should be the same before the upgrade: sequencer is %%L \
-         while proxy is %%R"
+        "The head should be the same before the upgrade: sequencer is %R while \
+         proxy is %L"
       ()
   in
-  let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  (* Sends the upgrade to L1. *)
+
+  (* dummy check, upgrade is not submitted yet *)
+  let* () =
+    check_sequencer
+      ~evm_node:sequencer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+  let* () =
+    check_sequencer
+      ~evm_node:observer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
-  let new_sequencer_key = Constant.bootstrap2.alias in
-  let* _upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
-  and* _upgrade_info_observer =
+
+  let* () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:Constant.bootstrap2.alias
+      ~sequencer_governance_contract:l1_contracts.sequencer_governance
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp
+  in
+
+  Log.info
+    "Baking 2 block to make the event final in the l1 so the upgrade is seen \
+     by EVM node following a rollup node." ;
+  let upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
+  and upgrade_info_observer =
     Evm_node.wait_for_evm_event Sequencer_upgrade observer
-  and* () =
-    let* () =
-      sequencer_upgrade
-        ~sc_rollup_address
-        ~sequencer_admin:Constant.bootstrap2.alias
-        ~sequencer_governance_contract:l1_contracts.sequencer_governance
-        ~pool_address:Eth_account.bootstrap_accounts.(0).address
-        ~client
-        ~upgrade_to:new_sequencer_key
-        ~activation_timestamp:"0"
-    in
-    (* 2 block so the sequencer sees the event from the rollup
-       node. *)
+  in
+  let* () =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
+  and* _upgrade_info = upgrade_info
+  and* _upgrade_info_observer = upgrade_info_observer in
+
+  Log.info
+    "Producing a block from the current sequencer so the event is propagated \
+     to observer not following a rollup node." ;
+  let upgrade_info_observer_no_rollup_node =
+    Evm_node.wait_for_evm_event Sequencer_upgrade observer_dont_track_rollup
   in
+  let* () =
+    let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+    unit
+  and* _upgrade_info_observer_no_rollup_node =
+    upgrade_info_observer_no_rollup_node
+  in
+
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+
+  Log.info
+    "The upgrade is not yet triggered, head should be equivalent with the \
+     block just produced" ;
   let* () =
     check_head_consistency
       ~left:proxy
@@ -6654,32 +6729,59 @@ let test_sequencer_upgrade =
          proxy is %%R"
       ()
   in
-  let nb_block = 4l in
-  (* apply the upgrade in the kernel  *)
-  let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-  (* produce_block fails because sequencer changed *)
-  let* () =
-    match Evm_node.mode sequencer with
-    | Sequencer _ ->
-        let*@? _err = Rpc.produce_block sequencer in
-        unit
-    | Threshold_encryption_sequencer _ ->
-        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
-        let* _ntx = Rpc.produce_proposal sequencer and* () = wait_for_invalid in
-        unit
-    | _ -> assert false (* impossible case as it's a sequencer. *)
+
+  let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+
+  Log.info "Baking until the sequencer upgrade is triggered in the l1" ;
+  let has_sequencer_changed () =
+    let* current_sequencer_in_rollup_hex =
+      Sc_rollup_node.RPC.call
+        sc_rollup_node
+        ~rpc_hooks:Tezos_regression.rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:Durable_storage_path.sequencer
+           ()
+    in
+    let current_sequencer_in_rollup =
+      match current_sequencer_in_rollup_hex with
+      | Some s -> Hex.to_string (`Hex s)
+      | None -> Test.fail "missing sequencer"
+    in
+    if String.equal current_sequencer_in_rollup new_sequencer_key.public_key
+    then return (Some ())
+    else return None
   in
   let* () =
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
+    bake_until
+      ~__LOC__
+      ~timeout_in_blocks:100
+      ~timeout:60.
+      ~bake:(fun () -> next_rollup_node_level ~client ~sc_rollup_node)
+      ~result_f:has_sequencer_changed
+      ()
   in
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((previous_proxy_head.hash = proxy_head.hash) string)
-    ~error_msg:
-      "The proxy should not have progressed because no block have been \
-       produced by the current sequencer." ;
-  (* Check that even the evm-node sequencer itself refuses the blocks as they do
+
+  (* upgrade is not triggered until a blueprint with a superior
+     timestamp is applied *)
+  let* () =
+    check_sequencer
+      ~evm_node:sequencer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+  let* () =
+    check_sequencer
+      ~evm_node:observer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+
+  Log.info
+    "Sequencer fails to produce a block because blueprint timestamp is above \
+     the activation timestamp." ;
+  let*@? _ = produce_block ~timestamp:activation_timestamp sequencer in
+
+  (* Check that the evm-node sequencer refuses the blocks as they do
      not respect the sequencer's signature. *)
   let* () =
     check_head_consistency
@@ -6690,64 +6792,161 @@ let test_sequencer_upgrade =
          blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
       ()
   in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:observer
+      ~error_msg:
+        "The head should be the same after the sequencer tried to produce \
+         blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
+      ()
+  in
+
+  Log.info
+    "Baking couple of blocks to check the block is not propagated nor accepted \
+     by the rollup node." ;
+  (* maybe unnecessary check here, we already not the block production failed. *)
+  let* () =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  in
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  Check.((previous_proxy_head.hash = proxy_head.hash) string)
+    ~error_msg:
+      "The proxy should not have progressed because no block have been \
+       produced by the current sequencer." ;
+
   Log.info
     "Stopping current sequencer and starting a new one with new sequencer key" ;
-  let new_sequencer =
+  let* () = Evm_node.terminate sequencer
+  and* () = Evm_node.wait_termination sequencer in
+  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+
+  let* new_sequencer =
     let mode =
       match Evm_node.mode sequencer with
       | Sequencer config ->
           Evm_node.Sequencer
             {
               config with
-              sequencer = new_sequencer_key;
-              private_rpc_port = Some (Port.fresh ());
-            }
-      | Threshold_encryption_sequencer config ->
-          Evm_node.Threshold_encryption_sequencer
-            {
-              config with
-              sequencer = new_sequencer_key;
+              sequencer = new_sequencer_key.alias;
               private_rpc_port = Some (Port.fresh ());
             }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-
-  let* _ = Evm_node.wait_for_shutdown_event sequencer
-  and* () =
+    let new_sequencer =
+      Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    in
+    let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
-      Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+      Runnable.run @@ Evm_node.import_snapshot new_sequencer ~snapshot_file
     in
     let* () = Evm_node.run new_sequencer in
-    let* () =
-      repeat (Int32.to_int nb_block) (fun () ->
-          let* _ = produce_block new_sequencer in
-          unit)
-    in
-    let* () =
-      let number_of_blocks = if enable_dal then 20 else 5 in
-      repeat number_of_blocks (fun () ->
-          let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-          unit)
-    in
-    let previous_proxy_head = proxy_head in
-    let* () =
-      check_head_consistency
-        ~left:proxy
-        ~right:new_sequencer
-        ~error_msg:
-          "The head should be the same after blocks produced by the new \
-           sequencer: sequencer is %%R while proxy is %%L"
-        ()
-    in
-    let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-    Check.(
-      (Int32.add previous_proxy_head.number nb_block = proxy_head.number) int32)
+    return new_sequencer
+  in
+
+  Log.info "Producing a block with the new sequencer." ;
+  let*@ _ = produce_block ~timestamp:activation_timestamp new_sequencer in
+  Log.info "Baking to check the block is accepted by the rollup node." ;
+  let* () =
+    bake_until_sync ~sequencer:new_sequencer ~proxy ~sc_rollup_node ~client ()
+  in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:new_sequencer
       ~error_msg:
-        "The block number should have incremented (previous: %L, current: %R)" ;
-    unit
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %R while proxy is %L"
+      ()
+  in
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let current_head_number = proxy_head.number in
+  Check.((Int32.add previous_proxy_head.number 1l = current_head_number) int32)
+    ~error_msg:
+      "The block number should have incremented (previous: %L, current: %R)" ;
+
+  Log.info
+    "Transforming the old sequencer to a observer so it should receive and \
+     apply the blueprint. The connected observers should also receive it." ;
+  let* observer_sequencer =
+    let observer_sequencer =
+      Evm_node.switch_sequencer_to_observer
+        ~old_sequencer:sequencer
+        ~new_sequencer
+    in
+    let* () =
+      Process.check
+      @@ Evm_node.spawn_init_config
+           ~extra_arguments:["--force"]
+           observer_sequencer
+    in
+    let* () = Evm_node.run observer_sequencer in
+    return observer_sequencer
+  in
+  let current_head_number = Int32.to_int proxy_head.number in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer_sequencer current_head_number
+  in
+  let* () = Evm_node.wait_for_blueprint_applied observer current_head_number in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_sequencer
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer_sequencer is %R"
+      ()
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer is %R"
+      ()
+  in
+
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      observer_dont_track_rollup
+      current_head_number
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_dont_track_rollup
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer is %R"
+      ()
+  in
+
+  Log.info
+    "Bootstrapping an observer to make sure it applied the sequencer upgrade \
+     as well." ;
+  let* observer_bootstrap =
+    match Evm_node.mode observer with
+    | Observer mode ->
+        Evm_node.init
+          ~mode:(Observer {mode with private_rpc_port = Some (Port.fresh ())})
+          (Evm_node.endpoint sequencer)
+    | _ -> Test.fail "impossible, it's an observer"
+  in
+  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade observer_bootstrap in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer_bootstrap current_head_number
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_bootstrap
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer_bootstrap is %R"
+      ()
   in
   unit
 

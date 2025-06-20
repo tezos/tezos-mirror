@@ -11,15 +11,20 @@ type t = Irmin_context.PVMState.value
     expect the directory to exist.*)
 val kernel_logs_directory : data_dir:string -> string
 
-(** [execute ?simulation ~data_dir ?log_file ~wasm_entrypoint ~config
-    evm_state messages] executes the [wasm_entrypoint] function
-    (default to [kernel_run]) with [messages] within the inbox of
-    [evm_state].
+(** [execute ?execution_timestamp ?simulation ~data_dir ?log_file
+    ~wasm_entrypoint ~config evm_state messages] executes the
+    [wasm_entrypoint] function (default to [kernel_run]) with
+    [messages] within the inbox of [evm_state].
 
     Kernel logs are stored under the {!kernel_logs_directory} in [log_file].
     [simulation] adds a prefix to the event to differenciate the logs.
+
+    When [execution_timestamp] is provided it's used as the l1
+    timestamp of in the Info_per_level message of the inbox, default
+    value is `epoch`.
 *)
 val execute :
+  ?execution_timestamp:Time.Protocol.t ->
   ?wasm_pvm_fallback:bool ->
   ?profile:Configuration.profile_mode ->
   ?kind:Events.kernel_log_kind ->
@@ -72,7 +77,7 @@ val execute_and_inspect :
   t ->
   bytes option list tzresult Lwt.t
 
-(** [current_block_height ~root evm_state] returns the height of the latest 
+(** [current_block_height ~root evm_state] returns the height of the latest
     block produced by the kernel at [root]. *)
 val current_block_height :
   root:Durable_storage_path.path -> t -> Ethereum_types.quantity Lwt.t

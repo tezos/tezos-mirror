@@ -1,5 +1,27 @@
 
 ./octez-evm-node list events --json
+applied_sequencer_upgrade:
+  description: sequencer successfully upgraded to {sequencer} before blueprint {level}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* applied_sequencer_upgrade version 0 */
+      "applied_sequencer_upgrade.v0":
+        { "sequencer": $Signature.Public_key,
+          "level": $positive_bignum } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 applied_upgrade:
   description: kernel successfully upgraded to {root_hash} with blueprint {level}
   level: notice
@@ -998,6 +1020,30 @@ exporting_snapshot:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+failed_sequencer_upgrade:
+  description: sequencer failed to upgrade to {new_sequencer} before blueprint {level}. Current sequencer is {current_sequencer}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* failed_sequencer_upgrade version 0 */
+      "failed_sequencer_upgrade.v0":
+        { "new_sequencer": $Signature.Public_key,
+          "current_sequencer":
+            $Signature.Public_key /* Some */ || null /* None */,
+          "level": $positive_bignum } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $positive_bignum:
+      /* Positive big number
+         Decimal representation of a positive big number */
+      string
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 failed_upgrade:
   description: kernel failed to upgrade to {root_hash} with blueprint {level}
   level: warning
@@ -1331,6 +1377,29 @@ patched_state:
     { /* patched_state version 0 */
       "patched_state.v0": { "key": $unistring,
                             "level": $unistring } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+pending_sequencer_upgrade:
+  description: pending sequencer upgrade to sequencer {sequencer} and pool address {pool_address} expected to activate at {timestamp}
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* pending_sequencer_upgrade version 0 */
+      "pending_sequencer_upgrade.v0":
+        { "sequencer": $Signature.Public_key,
+          "pool_address": $unistring,
+          "timestamp": $timestamp.protocol } }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $timestamp.protocol:
+      /* A timestamp as seen by the protocol: second-level precision, epoch
+         based. */
+      $unistring
     $unistring:
       /* Universal string representation
          Either a plain UTF8 string, or a sequence of bytes for strings that
