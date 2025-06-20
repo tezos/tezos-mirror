@@ -194,6 +194,9 @@ Accuser
 - Can now denounce double consensus operations where one or both
   involved operations are aggregates. (MR :gl:`!18091`)
 
+- Enables daily logs, located by default under
+  ``<base-dir>/logs/octez-accuser-<proto>``. (MR :gl:`!18429`)
+
 Agnostic Accuser
 ----------------
 
