@@ -215,7 +215,7 @@ module Dal = struct
               ignore_topics
           in
           match options with
-          | Ok options -> Cli.run ~disable_logging:true cmd options
+          | Ok options -> Cli.run cmd options
           | Error (_, msg) -> failwith "%s" msg)
     in
 

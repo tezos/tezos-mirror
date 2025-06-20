@@ -184,7 +184,7 @@ val cli_options_to_options :
   Signature.public_key_hash list ->
   (options, bool * string) result
 
-val run : ?disable_logging:bool -> t -> options -> unit tzresult Lwt.t
+val run : t -> options -> unit tzresult Lwt.t
 
 (** Subcommands of the DAL node *)
 val commands : unit Cmdliner.Cmd.t
