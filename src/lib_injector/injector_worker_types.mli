@@ -48,7 +48,7 @@ module Request (Tag : TAG) (L1_operation : INJECTOR_OPERATION) : sig
   type view = View : _ t -> view
 
   include
-    Worker_intf.REQUEST
+    Octez_telemetry.Worker.REQUEST
       with type ('a, 'request_error) t := ('a, 'request_error) t
        and type view := view
 end

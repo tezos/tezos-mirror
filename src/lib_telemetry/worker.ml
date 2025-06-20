@@ -102,28 +102,39 @@ struct
       on_completion self (Request_with_hook.request request) result status
   end
 
-  module Instrumented_queue = struct
-    let with_ request =
-      Opentelemetry_lwt.Trace.with_
-        ~service_name
-        ~attrs:[("worker.request_name", `String (Request.name request))]
-        Format.(sprintf "%s/call" (Request.name request))
+  let with_ request f =
+    Opentelemetry_lwt.Trace.with_
+      ~service_name
+      ~attrs:[("worker.request_name", `String (Request.name request))]
+      Format.(sprintf "%s/call" (Request.name request))
+    @@ fun scope -> f (Request_with_hook.make ~parent_scope:scope request)
 
+  let with_no_lwt request f =
+    Opentelemetry.Trace.with_
+      ~service_name
+      ~attrs:[("worker.request_name", `String (Request.name request))]
+      Format.(sprintf "%s/call" (Request.name request))
+    @@ fun scope -> f (Request_with_hook.make ~parent_scope:scope request)
+
+  module Instrumented_queue = struct
     let push_request_and_wait worker request =
-      with_ request @@ fun scope ->
-      Worker.Queue.push_request_and_wait
-        worker
-        (Request_with_hook.make ~parent_scope:scope request)
+      with_ request @@ Worker.Queue.push_request_and_wait worker
 
     let push_request worker request =
-      with_ request @@ fun scope ->
-      Worker.Queue.push_request
-        worker
-        (Request_with_hook.make ~parent_scope:scope request)
+      with_ request @@ Worker.Queue.push_request worker
+  end
+
+  module Instrumented_dropbox = struct
+    let put_request worker request =
+      with_no_lwt request @@ Worker.Dropbox.put_request worker
+
+    let put_request_and_wait worker request =
+      with_ request @@ Worker.Dropbox.put_request_and_wait worker
   end
 
   include Worker
   module Queue = Instrumented_queue
+  module Dropbox = Instrumented_dropbox
 
   let launch (type kind launch_error) table i parameters
       (module Handlers : Raw_worker.HANDLERS

@@ -135,7 +135,8 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
          num_messages;
          num_ticks;
        } =
-    Opentelemetry_lwt.Trace.with_ ~service_name:"Pvm" "eval_block" @@ fun _ ->
+    Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_block"
+    @@ fun _ ->
     Plugin.Pvm.Fueled.Free.eval_block_inbox
       ~fuel:(Fuel.Free.of_ticks 0L)
       node_ctxt
@@ -208,7 +209,7 @@ let run_to_tick (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt
     Z.sub tick start_state.Pvm_plugin_sig.tick |> Z.to_int64
   in
   let+ eval_result =
-    Opentelemetry_lwt.Trace.with_ ~service_name:"Pvm" "eval_messages"
+    Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_messages"
     @@ fun _ ->
     Plugin.Pvm.Fueled.Accounted.eval_messages
       node_ctxt

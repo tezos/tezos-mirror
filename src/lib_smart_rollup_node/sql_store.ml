@@ -1164,7 +1164,7 @@ module State = struct
            N.name
 
     let get_level =
-      (unit ->? level)
+      (unit ->? level) ~name:(String.concat "." [__FUNCTION__; N.name]) ~table
       @@ Format.sprintf
            {sql|SELECT level from rollup_node_state WHERE name = %S|sql}
            N.name

@@ -39,6 +39,15 @@ module MakeSingle : functor
     val push_request : 'a queue t -> ('b, 'c) Raw_request.t -> bool Lwt.t
   end
 
+  (** Instrumented dropbox tracing a request handling from the moment it is being
+      pushed to a worker’s pending queue. *)
+  module Dropbox : sig
+    val put_request : dropbox t -> ('b, 'c) Raw_request.t -> unit
+
+    val put_request_and_wait :
+      dropbox t -> ('b, 'c) Raw_request.t -> ('b, 'c message_error) result Lwt.t
+  end
+
   (** [launch] starts an instrumented worker based on handlers implemented for
       the “raw” (non-instrumented) requests. *)
   val launch :

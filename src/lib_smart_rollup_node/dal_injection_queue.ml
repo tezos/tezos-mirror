@@ -77,6 +77,11 @@ module Dal_worker_types = struct
                ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
                (fun fmt id -> Format.fprintf fmt "%d" id))
             idx
+
+    let name : type a b. (a, b) t -> string = function
+      | Register _ -> "Register"
+      | Produce_dal_slots _ -> "Produce_dal_slots"
+      | Set_dal_slot_indices _ -> "Set_dal_slot_indices"
   end
 end
 
@@ -477,7 +482,7 @@ module Types = struct
   }
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

@@ -14,7 +14,6 @@ depends: [
   "logs"
   "octez-shell-libs" { = version }
   "octez-crawler" { = version }
-  "opentelemetry-lwt"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

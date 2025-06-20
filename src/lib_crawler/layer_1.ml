@@ -570,7 +570,7 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           'o tzresult Lwt.t =
       fun service params query body ->
         let trace_name = trace_name service in
-        Opentelemetry_lwt.Trace.with_
+        Octez_telemetry.Trace.with_tzresult
           ~service_name:"L1_rpc_client"
           ~kind:Span_kind_client
           trace_name
@@ -592,7 +592,7 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
           (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
         let trace_name = trace_name service in
-        Opentelemetry_lwt.Trace.with_
+        Octez_telemetry.Trace.with_tzresult
           ~service_name:"L1_rpc_client"
           ~kind:Span_kind_client
           trace_name
@@ -618,7 +618,7 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
       let trace_name =
         String.concat " " [Tezos_rpc.Service.string_of_meth meth; Uri.path uri]
       in
-      Opentelemetry_lwt.Trace.with_
+      Octez_telemetry.Trace.with_tzresult
         ~service_name:"L1_rpc_client"
         ~kind:Span_kind_client
         trace_name
