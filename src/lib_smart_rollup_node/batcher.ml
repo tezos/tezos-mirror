@@ -49,8 +49,27 @@ let message_size s =
   (* Encoded as length of s on 4 bytes + s *)
   4 + String.length s
 
+let link_batch_scope scope batch =
+  Opentelemetry.Scope.add_links scope @@ fun () ->
+  let scope_link = Opentelemetry.Scope.to_span_link scope in
+  List.filter_map
+    (fun msg ->
+      match L2_message.scope msg with
+      | None -> None
+      | Some msg_scope ->
+          Opentelemetry.Scope.add_links msg_scope (fun () -> [scope_link]) ;
+          Some (Opentelemetry.Scope.to_span_link msg_scope))
+    batch
+
 let inject_batch ?order state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Batcher" "inject_batch"
+  @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      match order with
+      | None -> []
+      | Some order -> [("rollup_node.batcher.order", `Int (Z.to_int order))]) ;
+  link_batch_scope scope l2_messages ;
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
   let* l1_id =
@@ -137,6 +156,8 @@ let get_batches state ~only_full =
 
 let produce_batches state ~only_full =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Batcher" "produce_batches"
+  @@ fun _ ->
   let start_timestamp = Time.System.now () in
   let batches = get_batches state ~only_full in
   let get_timestamp = Time.System.now () in
@@ -192,11 +213,12 @@ let make_l2_messages ?order ~unique state (messages : string list) =
      + 4 (* We add 4 because [message_size] adds 4. *))
       (max_batch_size state)
   in
+  let scope = Opentelemetry.Scope.get_ambient_scope () in
   List.mapi_e
     (fun i message ->
       if message_size message > max_size_msg then
         error_with "Message %d is too large (max size is %d)" i max_size_msg
-      else Ok (L2_message.make ?order ~unique message))
+      else Ok (L2_message.make ?order ?scope ~unique message))
     messages
 
 type error += Heap_insertion_failed of string
@@ -447,10 +469,6 @@ let produce_batches () =
       return_unit
   | Error e -> fail e
   | Ok w ->
-      Octez_telemetry.Trace.with_tzresult
-        ~service_name:"Batcher"
-        "produce_batches"
-      @@ fun _ ->
       Worker.Queue.push_request_and_wait w Request.Produce_batches
       |> handle_request_error
 

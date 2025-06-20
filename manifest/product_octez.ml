@@ -5483,6 +5483,7 @@ let octez_smart_rollup_lib =
         octez_layer2_store |> open_;
         octez_crypto_dal;
         yaml;
+        opentelemetry;
       ]
 
 let rollup_node_sqlite_migrations =
