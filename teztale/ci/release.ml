@@ -6,20 +6,7 @@
 (*****************************************************************************)
 
 open Tezos_ci
-
-let job_datadog_pipeline_trace : tezos_job =
-  job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Images.datadog_ci
-    ~before_script:[". ./scripts/ci/datadog_send_job_info.sh"]
-    ~stage:Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
+open Common
 
 let job_build_amd64 ?expire_in () =
   Common.job_build ?expire_in ~arch:Amd64 ~cpu:Very_high ()
@@ -82,10 +69,9 @@ let job_release_page ~test () =
     ["./teztale/scripts/releases/publish_release_page.sh"]
 
 let jobs ~test () =
-  (if test then [] else [job_datadog_pipeline_trace])
-  @ [
-      job_build_amd64 ~expire_in:Never ();
-      job_build_arm64 ~expire_in:Never ();
-      job_gitlab_release;
-      job_release_page ~test ();
-    ]
+  [
+    job_build_amd64 ~expire_in:Never ();
+    job_build_arm64 ~expire_in:Never ();
+    job_gitlab_release;
+    job_release_page ~test ();
+  ]
