@@ -572,14 +572,7 @@ module Ssh_host = struct
               ~network:"host"
               ~name:configuration.name
               docker_image
-              [
-                "--entrypoint";
-                "/usr/bin/sshd";
-                "-D";
-                "-p";
-                string_of_int ssh_port;
-                "-e";
-              ]
+              ["-D"; "-p"; string_of_int ssh_port]
             |> Process.check
           in
           let () =
