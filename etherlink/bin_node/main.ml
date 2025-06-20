@@ -832,8 +832,19 @@ let history_arg =
     ~placeholder:"archive | rolling:n | full:n"
     Params.history_param
 
+let profiling_arg =
+  Tezos_clic.arg_or_switch
+    ~long:"profiling"
+    ~placeholder:"BOOL"
+    ~doc:"Enable or disable profiling with opentelemetry"
+    ~default:"true"
+  @@ Tezos_clic.parameter (fun () -> function
+       | "true" -> Lwt_result_syntax.return_true
+       | "false" -> Lwt_result_syntax.return_false
+       | s -> failwith "Invalid value %S for --profiling" s)
+
 let common_config_args =
-  Tezos_clic.args21
+  Tezos_clic.args22
     data_dir_arg
     config_path_arg
     rpc_addr_arg
@@ -855,6 +866,7 @@ let common_config_args =
     blacklisted_rpcs_arg
     whitelisted_rpcs_arg
     finalized_view_arg
+    profiling_arg
 
 let compress_on_the_fly_arg : (bool, unit) Tezos_clic.arg =
   Tezos_clic.switch
@@ -966,7 +978,7 @@ let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
     ?rollup_node_endpoint ?evm_node_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?restricted_rpcs ~verbose
-    ~read_only ~finalized_view ~ignore_block_param () =
+    ?profiling ~read_only ~finalized_view ~ignore_block_param () =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -990,6 +1002,7 @@ let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
       ~finalized_view
       ~proxy_ignore_block_param:ignore_block_param
       ~verbose
+      ?profiling
       (config_filename ~data_dir config_file)
   in
   (* We patch [config] to take into account the proxy-specific argument
@@ -1088,13 +1101,13 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
 let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
-    ~keep_alive ?rollup_node_endpoint ~verbose ?preimages ?preimages_endpoint
-    ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
-    ?private_rpc_port ?sequencer_str ?max_blueprints_lag ?max_blueprints_ahead
-    ?max_blueprints_catchup ?catchup_cooldown ?log_filter_max_nb_blocks
-    ?log_filter_max_nb_logs ?log_filter_chunk_size ?genesis_timestamp
-    ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config ~finalized_view
-    config_file =
+    ~keep_alive ?rollup_node_endpoint ~verbose ?profiling ?preimages
+    ?preimages_endpoint ?native_execution_policy ?time_between_blocks
+    ?max_number_of_chunks ?private_rpc_port ?sequencer_str ?max_blueprints_lag
+    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+    ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+    ?genesis_timestamp ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config
+    ~finalized_view config_file =
   let open Lwt_result_syntax in
   let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
   let* sequencer_key =
@@ -1120,6 +1133,7 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ~keep_alive
       ?rollup_node_endpoint
       ~verbose
+      ?profiling
       ?preimages
       ?preimages_endpoint
       ?native_execution_policy
@@ -1206,7 +1220,8 @@ let rpc_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( evm_node_endpoint,
              evm_node_private_endpoint,
              preimages,
@@ -1271,6 +1286,7 @@ let rpc_command =
           ?rpc_batch_limit
           ?enable_websocket
           ~verbose
+          ?profiling
           ?preimages
           ?preimages_endpoint
           ?native_execution_policy
@@ -1300,7 +1316,7 @@ let rpc_command =
 
 let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?private_rpc_port ?cors_origins ?cors_headers ?enable_websocket ~verbose
-    ?preimages ?preimages_endpoint ?native_execution_policy
+    ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
     ?rollup_node_endpoint ~dont_track_rollup_node ?evm_node_endpoint
     ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
     ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
@@ -1326,6 +1342,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
            the config value by passing [None]. *)
         (if dont_track_rollup_node then Some true else None)
       ~verbose
+      ?profiling
       ?preimages
       ?preimages_endpoint
       ?native_execution_policy
@@ -1874,7 +1891,8 @@ let init_config_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( preimages,
              preimages_endpoint,
              native_execution_policy,
@@ -1946,6 +1964,7 @@ let init_config_command =
           ?catchup_cooldown
           ?restricted_rpcs
           ~verbose
+          ?profiling
           ?dal_slots
           ~finalized_view
           ?network
@@ -2323,7 +2342,8 @@ let proxy_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            (read_only, ignore_block_param, evm_node_endpoint) )
          () ->
       let open Lwt_result_syntax in
@@ -2350,6 +2370,7 @@ let proxy_command =
         ?tx_pool_tx_per_addr_limit
         ?restricted_rpcs
         ~verbose
+        ?profiling
         ~read_only
         ~finalized_view
         ~ignore_block_param
@@ -2431,7 +2452,8 @@ let sequencer_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( preimages,
              preimages_endpoint,
              time_between_blocks,
@@ -2469,6 +2491,7 @@ let sequencer_command =
         ~keep_alive
         ?rollup_node_endpoint
         ~verbose
+        ?profiling
         ?preimages
         ?preimages_endpoint
         ?time_between_blocks
@@ -2521,7 +2544,8 @@ let sandbox_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( ( preimages,
                preimages_endpoint,
                native_execution_policy,
@@ -2590,6 +2614,7 @@ let sandbox_command =
         ~keep_alive
         ~rollup_node_endpoint
         ~verbose
+        ?profiling
         ?preimages
         ?preimages_endpoint
         ?native_execution_policy
@@ -2642,7 +2667,8 @@ let tezlink_sandbox_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( preimages,
              preimages_endpoint,
              native_execution_policy,
@@ -2697,6 +2723,7 @@ let tezlink_sandbox_command =
         ~keep_alive
         ~rollup_node_endpoint
         ~verbose
+        ?profiling
         ?preimages
         ?preimages_endpoint
         ?native_execution_policy
@@ -2762,7 +2789,8 @@ let observer_command =
              restricted_rpcs,
              blacklisted_rpcs,
              whitelisted_rpcs,
-             finalized_view ),
+             finalized_view,
+             profiling ),
            ( private_rpc_port,
              evm_node_endpoint,
              threshold_encryption_bundler_endpoint,
@@ -2793,6 +2821,7 @@ let observer_command =
         ?enable_websocket
         ?private_rpc_port
         ~verbose
+        ?profiling
         ?preimages
         ?preimages_endpoint
         ?native_execution_policy

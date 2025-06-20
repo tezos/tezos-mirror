@@ -8,6 +8,11 @@
 
 - Sandbox mode can either generates automatically the used sequencer
   key, or uses the one given in argument. (!18385)
+- Opentelemetry profiling is now enabled by default when then `"opentelemetry"`
+  field of the config is present. `"opentelemetry" : true` also now enables
+  Opentelemetry profiling with the default parameters. (!18411)
+- New CLI argument/switch `--profiling` to enable or disable opentelemetry
+  profiling. (!18411)
 
 ### RPCs changes
 

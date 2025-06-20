@@ -39,7 +39,7 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -93,6 +93,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -148,7 +151,7 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -201,6 +204,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -236,8 +242,9 @@ Run commands:
       [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view] [--read-only]
-      [--ignore-block-param] [--evm-node-endpoint <url>]
+      [--whitelisted-rpcs <whitelist>] [--finalized-view]
+      [--profiling [BOOL]] [--read-only] [--ignore-block-param]
+      [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
@@ -281,6 +288,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --read-only: If the flag is set, the node refuses transactions.
     --ignore-block-param: If the flag is set, the node in proxy mode ignores
       the block parameter submitted by the client and defaults to the latest
@@ -296,7 +306,7 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
@@ -349,6 +359,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -390,8 +403,8 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--private-rpc-port <PORT>] [--evm-node-endpoint <url>]
-      [--bundler-node-endpoint <url>]
+      [--profiling [BOOL]] [--private-rpc-port <PORT>]
+      [--evm-node-endpoint <url>] [--bundler-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
@@ -440,6 +453,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --bundler-node-endpoint <url>: The address of a service which encrypts
@@ -485,7 +501,8 @@ Run commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--evm-node-endpoint <url>] [--evm-node-private-endpoint <url>]
+      [--profiling [BOOL]] [--evm-node-endpoint <url>]
+      [--evm-node-private-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
     Start the EVM node in rpc mode.
@@ -531,6 +548,9 @@ Run commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
     --evm-node-private-endpoint <url>: The address of an EVM node and its
       private endpoint.
@@ -569,7 +589,7 @@ Configuration commands:
       [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--preimages-dir <_evm_installer_preimages>]
+      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -628,6 +648,9 @@ Configuration commands:
       --blacklisted-rpcs.
     --finalized-view: If the flag is set, the node will use the latest final
       state of the rollup, not its current HEAD, for any read-only operation.
+    --profiling [BOOL]: Enable or disable profiling with
+      opentelemetry
+      Defaults to `true`.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
