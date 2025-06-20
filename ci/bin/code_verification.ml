@@ -1778,18 +1778,6 @@ let jobs pipeline_type =
               riscv_ci_flags;
           ]
       in
-      let job_test_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          [
-            Format.asprintf
-              "make -C src/riscv EXTRA_FLAGS='%s' test"
-              riscv_ci_flags;
-          ]
-      in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
           ~__POS__
@@ -1812,7 +1800,6 @@ let jobs pipeline_type =
         job_test_etherlink_firehose;
         job_audit_riscv_deps;
         job_check_riscv_kernels;
-        job_test_riscv_kernels;
         job_test_evm_compatibility;
       ]
     in
