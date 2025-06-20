@@ -3562,11 +3562,7 @@ let register_end_to_end_tests ~protocols =
       in
       let slot_index = 5 in
       let operator_profiles = [slot_index] in
-      let tags =
-        ["e2e"; network]
-        @ (match constants with Constants_mainnet -> [Tag.slow] | _ -> [])
-        @ tags
-      in
+      let tags = ["e2e"; network; Tag.extra; Tag.slow] @ tags in
       scenario_with_all_nodes
         ~operator_profiles
         ~custom_constants:constants
@@ -10848,7 +10844,7 @@ let register ~protocols =
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["http"; "backup"; "retrievability"]
+    ~tags:["http"; "backup"; "retrievability"; Tag.extra]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom Node.Archive)
     ~history_mode:Full
