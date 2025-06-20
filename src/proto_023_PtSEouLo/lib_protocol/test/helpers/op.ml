@@ -1232,7 +1232,8 @@ let zk_rollup_origination ?force_reveal ?counter ?fee ?gas_limit ?storage_limit
   return (op, addr)
 
 let update_consensus_or_companion ~kind ?force_reveal ?counter ?fee ?gas_limit
-    ?storage_limit ?proof_signer ctxt (src : Contract.t) public_key =
+    ?storage_limit ?proof_signer ?forge_proof ctxt (src : Contract.t) public_key
+    =
   let open Lwt_result_syntax in
   let* proof =
     match proof_signer with
@@ -1248,6 +1249,7 @@ let update_consensus_or_companion ~kind ?force_reveal ?counter ?fee ?gas_limit
               "Can't forge an Update_consensus_key with a non-BLS proof of \
                possession.")
   in
+  let proof = match forge_proof with Some proof -> proof | None -> proof in
   let* to_sign_op =
     manager_operation
       ?force_reveal

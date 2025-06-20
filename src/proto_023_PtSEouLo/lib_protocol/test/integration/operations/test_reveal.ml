@@ -790,6 +790,45 @@ let test_reveal_tz4 () =
         failwith "Unexpected contract revelation: reveal was expected to fail")
   in
 
+  (* reveal with incorrect ciphersuite *)
+  let proof_incorrect_ciphersuite =
+    match (new_bls_c.sk, new_bls_c.pk) with
+    | Bls sk, Bls pk ->
+        let signature =
+          Signature.Bls.sign sk (Bls12_381_signature.MinPk.pk_to_bytes pk)
+        in
+        Some signature
+    | _ -> None
+  in
+  let* reveal_with_incorrect_ciphersuite =
+    Op.revelation
+      ~forge_proof:proof_incorrect_ciphersuite
+      ~fee:Tez.zero
+      (I inc)
+      new_bls_c.pk
+  in
+  let expect_apply_failure =
+    Error_helpers.expect_incorrect_bls_proof
+      ~loc:__LOC__
+      ~kind_pk:Manager_pk
+      ~pk:new_bls_c.pk
+  in
+  let* (i_incorrect_ciphersuite : Incremental.t) =
+    Incremental.add_operation
+      ~expect_apply_failure
+      inc
+      reveal_with_incorrect_ciphersuite
+  in
+  let* () =
+    let* revealead =
+      Context.Contract.is_manager_key_revealed
+        (I i_incorrect_ciphersuite)
+        new_bls_contract
+    in
+    when_ revealead (fun () ->
+        failwith "Unexpected contract revelation: reveal was expected to fail")
+  in
+
   (* missing bls proof *)
   let* reveal_with_missing_bls_proof =
     Op.revelation ~forge_proof:None ~fee:Tez.zero (I inc) new_bls_c.pk
