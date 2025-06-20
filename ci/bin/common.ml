@@ -1216,6 +1216,8 @@ module Documentation = struct
       [
         "export OPAMFETCH='wget'";
         "opam remote add default https://opam.ocaml.org/";
+        "opam repo add archive \
+         git+https://github.com/ocaml/opam-repository-archive";
         "opam update";
         "opam install --yes odoc.2.4.4";
         "make -C docs " ^ target;
