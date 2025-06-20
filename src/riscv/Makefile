@@ -16,17 +16,17 @@ endif
 # We don't want to check all features in CI, so we provide this varible to configure it.
 CHECK_FLAGS ?= --all-features
 
-# CI needs the ability to toggle some features 
+# CI needs the ability to toggle some features
 EXTRA_FLAGS ?=
 
 # Mechanism to allow enabling additional features - for example JIT
-SANDBOX_ENABLE_FEATURES ?= 
+SANDBOX_ENABLE_FEATURES ?=
 
 # The version of nightly that we use for anything that requires it
 NIGHTLY_VERSION = nightly-2025-01-30
 
 .PHONY: build
-build: 
+build:
 	@cargo build --release --workspace $(NATIVE_OPT) $(EXTRA_FLAGS)
 
 # Update checked-in binaries
@@ -35,12 +35,12 @@ update-assets: assets/riscv-dummy.elf assets/jstz
 
 # Update the compiled dummy kernel used in CI tests
 assets/riscv-dummy.elf assets/riscv-dummy.elf.checksum::
-	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets riscv-dummy 
+	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets riscv-dummy
 	@mv assets/bin/riscv-dummy $@
 	@sha256sum $@ > $@.checksum
 
 assets/jstz assets/jstz.checksum::
-	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets jstz 
+	@cargo install --config .cargo/config.toml --locked --git https://github.com/tezos/riscv-pvm.git --branch ole/github --target riscv64gc-unknown-linux-musl --root assets jstz
 	@mv assets/bin/jstz $@
 	@sha256sum $@ > $@.checksum
 
@@ -59,15 +59,11 @@ endif
 	@rustup toolchain install $(NIGHTLY_VERSION) -c rustfmt miri rust-src
 
 	# Iterate through all the toolchains. 'rustup show' (before Rustup 1.28) and
-	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain. 
+	# 'rustup toolchain install' (Rustup 1.28+) will install the toolchain.
 	@find . -iname 'rust-toolchain*' -execdir sh -c "rustup show active-toolchain || rustup toolchain install" \; 2>/dev/null
 
 	# Coverage deps
 	@./scripts/isa-suite-coverage.sh -d
-
-.PHONY: test
-test: build
-	@cargo test --workspace $(EXTRA_FLAGS)
 
 .PHONY: check
 check:
