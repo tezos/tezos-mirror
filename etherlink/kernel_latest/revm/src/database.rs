@@ -19,10 +19,7 @@ use revm::{
     Database, DatabaseCommit,
 };
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{
-    log,
-    Level::{Debug, Error as LogError},
-};
+use tezos_evm_logging::{log, Level::Error as LogError};
 use tezos_evm_runtime::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
@@ -186,14 +183,18 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
             },
         ) in changes
         {
-            match status {
-                // The account is marked as touched, the changes should be commited
-                // to the database.
-                AccountStatus::Touched => match self.get_or_create_account(address) {
+            // The account is marked as touched, the changes should be commited
+            // to the database.
+            if status.contains(AccountStatus::Touched) {
+                match self.get_or_create_account(address) {
                     Ok(mut storage_account) => {
                         if let Err(err) = storage_account.set_info(self.host, info) {
                             self.abort();
-                            log!(self.host, LogError, "DatabaseCommit `set_info` error: {err:?}");
+                            log!(
+                                self.host,
+                                LogError,
+                                "DatabaseCommit `set_info` error: {err:?}"
+                            );
                         }
 
                         for (key, EvmStorageSlot { present_value, .. }) in storage {
@@ -203,29 +204,23 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                                 &present_value,
                             ) {
                                 self.abort();
-                                log!(self.host, LogError, "DatabaseCommit `set_storage` error: {err:?}");
+                                log!(
+                                    self.host,
+                                    LogError,
+                                    "DatabaseCommit `set_storage` error: {err:?}"
+                                );
                             }
                         }
                     }
                     Err(err) => {
                         self.abort();
-                        log!(self.host, LogError, "DatabaseCommit `get_or_create_account` error: {err:?}")
-                    },
-                },
-                AccountStatus::Created
-                | AccountStatus::CreatedLocal
-                | AccountStatus::SelfDestructed
-                | AccountStatus::SelfDestructedLocal
-                | AccountStatus::LoadedAsNotExisting
-                | AccountStatus::Cold => {
-                    // Local changes only, nothing is commited
-                    // TODO: Double check for [Created] case.
+                        log!(
+                            self.host,
+                            LogError,
+                            "DatabaseCommit `get_or_create_account` error: {err:?}"
+                        )
+                    }
                 }
-                undefined_account_status => log!(
-                    self.host,
-                    Debug,
-                    "DatabaseCommit debug: undefined account status {undefined_account_status:?}"
-                ),
             }
         }
     }
