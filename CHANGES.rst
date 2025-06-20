@@ -121,6 +121,9 @@ Signer
   returns ``Request to prove possession is not allowed`` otherwise.
   (MR :gl:`!18137`)
 
+- Enables daily logs by default, located under
+  ``<base-dir>/logs/octez-signer/``. (MR :gl:`!18429`)
+
 Baker
 -----
 
