@@ -781,7 +781,14 @@ val get_chain_block_helper_current_level :
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_attestation_rights :
-  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?level:int ->
+  ?cycle:int ->
+  ?delegate:string ->
+  ?consensus_key:string ->
+  unit ->
+  JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/validators]
 

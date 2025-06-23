@@ -575,7 +575,23 @@ type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
-type dal_status = With_DAL of Z.t | Without_DAL | Out_of_committee
+(* "Status" of an attester at some level.
+   There are 5 cases:
+   - The attester is in the DAL committee and sent a dal_attestation -> With_DAL
+   - The attester is in the DAL committee and sent an attestation without DAL -> Without_DAL
+   - The attester is in the DAL committee and sent no attestation -> Expected_to_DAL_attest
+   - The attester is out of the DAL committee (but in the Tenderbake committee) and
+     sent an attestation -> Out_of_committee
+   - The attester is out of the DAL committee and did not send an attestation
+     (this case can happen either because they are out of the Tenderbake committee or
+     because their baker had an issue at this level) -> Those bakers will not be in the
+     `attestations` field of the `per_level_infos` crafted at the current level.
+*)
+type dal_status =
+  | With_DAL of Z.t
+  | Without_DAL
+  | Out_of_committee
+  | Expected_to_DAL_attest
 
 type per_level_info = {
   level : int;
@@ -1071,13 +1087,15 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
         |> Seq.map (fun (public_key_hash, status) ->
                ( public_key_hash,
                  match status with
-                 | With_DAL z ->
+                 (* The baker is in the DAL committee and sent an attestation_with_dal. *)
+                 | With_DAL attestation_bitset ->
                      {
                        published_slots;
-                       attested_slots = Z.popcount z;
+                       attested_slots = Z.popcount attestation_bitset;
                        in_committee = true;
                        attestation_with_dal = true;
                      }
+                 (* The baker is out of the DAL committee and sent an attestation_with_dal. *)
                  | Out_of_committee ->
                      {
                        published_slots;
@@ -1085,7 +1103,8 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                        in_committee = false;
                        attestation_with_dal = false;
                      }
-                 | Without_DAL ->
+                 (* The baker is in the DAL committee but sent either an attestation without DAL, or no attestations. *)
+                 | Without_DAL | Expected_to_DAL_attest ->
                      {
                        published_slots;
                        attested_slots = 0;
@@ -2076,7 +2095,7 @@ let get_infos_per_level t ~level ~metadata =
             With_DAL
               JSON.(contents |-> "dal_attestation" |> as_string |> Z.of_string)
         in
-        [(pkh, dal)]
+        [(PKH pkh, dal)]
     | "attestations_aggregate" ->
         let metadata_committee =
           JSON.(contents |-> "metadata" |-> "committee" |> as_list)
@@ -2093,18 +2112,35 @@ let get_infos_per_level t ~level ~metadata =
                 else With_DAL (json |> JSON.as_string |> Z.of_string)
             in
             let pkh = JSON.(committee_meta |-> "delegate" |> as_string) in
-            (pkh, dal))
+            (PKH pkh, dal))
           committee_info
           metadata_committee
     | _ -> []
   in
+  let* attestation_rights =
+    RPC_core.call endpoint
+    @@ RPC.get_chain_block_helper_attestation_rights ~level ()
+  in
+  (* We fill the [attestations] table with [Expected_to_DAL_attest] when a baker is in the DAL committee. *)
   let attestations =
-    consensus_operations |> List.to_seq
-    |> Seq.flat_map (fun operation ->
-           get_dal_attestations operation
-           |> List.to_seq
-           |> Seq.map (fun (pkh, dal) -> (PKH pkh, dal)))
+    JSON.(attestation_rights |-> "delegates" |> as_list |> List.to_seq)
+    |> Seq.filter_map (fun delegate ->
+           let slot = JSON.(delegate |-> "first_slot" |> as_int) in
+           if slot < 512 then
+             let pkh = PKH JSON.(delegate |-> "delegate" |> as_string) in
+             Some (pkh, Expected_to_DAL_attest)
+           else None)
     |> Hashtbl.of_seq
+  in
+  (* And then update the [attestations] table with the attestations actually received. *)
+  let () =
+    consensus_operations
+    |> List.iter (fun operation ->
+           let dal_attestations = get_dal_attestations operation in
+           List.iter
+             (fun (pkh, dal_status) ->
+               Hashtbl.replace attestations pkh dal_status)
+             dal_attestations)
   in
   let* etherlink_operator_balance_sum =
     List.fold_left

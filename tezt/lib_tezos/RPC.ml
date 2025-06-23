@@ -862,8 +862,13 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
   {level; level_position; cycle; cycle_position; expected_commitment}
 
 let get_chain_block_helper_attestation_rights ?(chain = "main")
-    ?(block = "head") ?delegate () =
-  let query_string = Query_arg.opt "delegate" Fun.id delegate in
+    ?(block = "head") ?level ?cycle ?delegate ?consensus_key () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "consensus_key" Fun.id consensus_key
+    @ Query_arg.opt "level" string_of_int level
+    @ Query_arg.opt "cycle" string_of_int cycle
+  in
   make
     ~query_string
     GET
