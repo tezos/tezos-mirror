@@ -257,14 +257,13 @@ oc.misc_checks:
   - ./src/lib_dal_node/scripts/check_dal_store_migrations.sh check
 
 check_jsonnet:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  image: ${jsonnet_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:jsonnet:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -277,14 +276,13 @@ check_jsonnet:
   - scripts/lint.sh --check-jsonnet-lint
 
 check_rust_fmt:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2366,14 +2364,13 @@ test_etherlink_firehose:
     SCCACHE_CACHE_SIZE: 5G
 
 audit_riscv_deps:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG

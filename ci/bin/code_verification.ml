@@ -490,7 +490,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_jsonnet"
-        ~image:Images.jsonnet
+        ~image:Images.jsonnet_master
         ~stage
         ~dependencies
         ~rules:
@@ -513,7 +513,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_rust_fmt"
-        ~image:Images.rust_toolchain
+        ~image:Images.rust_toolchain_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
@@ -524,6 +524,7 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"documentation:rst-check"
         ~image:Images.CI.test_master
+        ~dependencies
         ~stage
         ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
         ~before_script:(before_script ~init_python_venv:true [])
@@ -1717,13 +1718,13 @@ let jobs pipeline_type =
       [job_test_sdk_bindings]
     in
     let jobs_kernels : tezos_job list =
-      let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
-          ~changes script =
+      let make_job_kernel ?dependencies ?(image = Images.rust_toolchain)
+          ?(stage = Stages.test) ~__POS__ ~name ~changes script =
         job
           ?dependencies
           ~__POS__
           ~name
-          ~image:Images.rust_toolchain
+          ~image
           ~stage
           ~rules:(make_rules ~dependent:true ~changes ())
           script
@@ -1756,6 +1757,7 @@ let jobs pipeline_type =
       let job_audit_riscv_deps : tezos_job =
         make_job_kernel
           ~stage:Stages.sanity
+          ~image:Images.rust_toolchain_master
           ~__POS__
           ~name:"audit_riscv_deps"
           ~changes:changeset_riscv_kernels
