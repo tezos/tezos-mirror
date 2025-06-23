@@ -367,7 +367,7 @@ let jobs pipeline_type =
     let dependencies =
       make_dependencies
         ~before_merging:(fun job_start -> Dependent [Job job_start])
-        ~schedule_extended_test:(fun () -> Staged [])
+        ~schedule_extended_test:(fun () -> Dependent [])
     in
     let job_sanity_ci : tezos_job =
       (* Quick, CI-related sanity checks.
