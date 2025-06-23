@@ -208,6 +208,13 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
           init_from_snapshot
     | None -> Result.return_none
   in
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7859
+     For now we assume that there is a single L2 chain. We should
+     iterate when multichain *)
+  let (Ex_chain_family chain_family) =
+    Configuration.retrieve_chain_family
+      ~l2_chains:configuration.experimental_features.l2_chains
+  in
   (* The Tx_pool parameters are ignored by the start function when a
      Tx_queue is configured.
 
@@ -216,7 +223,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     let open Result_syntax in
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
+        let start, tx_container = Tx_queue.tx_container ~chain_family in
         return
           ( (fun ~tx_pool_parameters:_ ->
               start
@@ -225,7 +232,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
                 ()),
             tx_container )
     | None ->
-        let* tx_container = Tx_pool.tx_container ~chain_family:EVM in
+        let* tx_container = Tx_pool.tx_container ~chain_family in
         return (Tx_pool.start, tx_container)
   in
   let (module Tx_container) =
@@ -342,11 +349,6 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* () =
     if status = Created then
-      (* TODO: We should iterate when multichain https://gitlab.com/tezos/tezos/-/issues/7859 *)
-      let (Ex_chain_family chain_family) =
-        Configuration.retrieve_chain_family
-          ~l2_chains:configuration.experimental_features.l2_chains
-      in
       (* Create the first empty block. *)
       let* genesis_chunks =
         Sequencer_blueprint.prepare
@@ -375,7 +377,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
 
   let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* l2_chain_id, Ex_chain_family chain_family =
+  let* l2_chain_id, _chain_family =
     let (module Backend) = backend in
     Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
   in
@@ -433,7 +435,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server EVM)
+         else Rpc_types.Single_chain_node_rpc_server chain_family)
       (* When the tx_queue is enabled the validation is done in the
          block_producer instead of in the RPC. This allows for a more
          accurate validation as it's delayed up to when the block is
@@ -447,7 +449,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Rpc_server.start_private_server
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
-         else Rpc_types.Single_chain_node_rpc_server EVM)
+         else Rpc_types.Single_chain_node_rpc_server chain_family)
       ~block_production:`Single_node
       configuration
       tx_container
