@@ -369,8 +369,8 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
-    ?tez_bootstrap_contracts scenario protocols =
+let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
+    scenario protocols =
   register_all
     ~kernels:[Kernel.Latest]
     ~title
@@ -380,8 +380,8 @@ let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
         {
           (Evm_node.default_l2_setup ~l2_chain_id:12) with
           l2_chain_family = "Michelson";
-          tez_bootstrap_accounts;
-          tez_bootstrap_contracts;
+          tez_bootstrap_accounts = bootstrap_accounts;
+          tez_bootstrap_contracts = bootstrap_contracts;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -562,7 +562,7 @@ let test_tezlink_balance =
   register_tezlink_test
     ~title:"Test of the balance rpc"
     ~tags:["rpc"; "balance"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   (* call the balance rpc and parse the result *)
   let endpoint =
@@ -591,7 +591,7 @@ let test_tezlink_storage =
   register_tezlink_test
     ~title:"Test of the storage rpc"
     ~tags:["rpc"; "storage"]
-    ~tez_bootstrap_contracts:[contract]
+    ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -623,7 +623,7 @@ let test_tezlink_contract_info =
   register_tezlink_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   (* call the balance rpc and check the result *)
   let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
@@ -638,7 +638,7 @@ let test_tezlink_manager_key =
   register_tezlink_test
     ~title:"Test of the manager_key rpc"
     ~tags:["rpc"; "manager_key"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   let* valid_res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
   Check.(
@@ -656,7 +656,7 @@ let test_tezlink_counter =
   register_tezlink_test
     ~title:"Test of the counter rpc"
     ~tags:["evm"; "rpc"; "counter"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   let* valid_res = account_rpc sequencer Constant.bootstrap1 "counter" in
   Check.(JSON.(valid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
