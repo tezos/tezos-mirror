@@ -65,3 +65,37 @@ module Eth_transaction_object :
 
   let make_txpool ~pending ~queued = {pending; queued}
 end
+
+module Tezlink_operation :
+  L2_transaction
+    with type t = Tezos_types.Operation.t
+     and type legacy = Tezos_types.Operation.t = struct
+  open Ethereum_types
+
+  type t = Tezos_types.Operation.t
+
+  type legacy = Tezos_types.Operation.t
+
+  type address = Signature.V1.public_key_hash
+
+  let address_encoding = Signature.V1.Public_key_hash.encoding
+
+  let hash_of_tx_object = Tezos_types.Operation.hash_operation
+
+  let address_to_string = Signature.V1.Public_key_hash.to_string
+
+  let from_address_of_tx_object (op : Tezos_types.Operation.t) = op.source
+
+  let nonce_of_tx_object (op : Tezos_types.Operation.t) =
+    Ethereum_types.Qty op.counter
+
+  let transaction_object_from_legacy op = op
+
+  module AddressMap = Map.Make (Signature.V1.Public_key_hash)
+
+  let make_txpool ~pending:_ ~queued:_ =
+    {
+      pending = Ethereum_types.AddressMap.empty;
+      queued = Ethereum_types.AddressMap.empty;
+    }
+end

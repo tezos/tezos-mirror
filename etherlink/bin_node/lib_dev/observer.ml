@@ -206,18 +206,22 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       init_from_snapshot
   in
 
-  let tx_container, ping_tx_pool =
+  let start_tx_container, tx_container, ping_tx_pool =
     match config.experimental_features.enable_tx_queue with
-    | Some _tx_queue_config -> (Tx_queue.tx_container, false)
+    | Some tx_queue_config ->
+        let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
+        ( (fun ~tx_pool_parameters:_ ->
+            start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
+          tx_container,
+          false )
     | None ->
         if config.finalized_view then
-          let tx_container =
+          ( (fun ~tx_pool_parameters:_ -> return_unit),
             container_forward_tx
               ~keep_alive:config.keep_alive
-              ~evm_node_endpoint
-          in
-          (tx_container, false)
-        else (Tx_pool.tx_container, true)
+              ~evm_node_endpoint,
+            false )
+        else (Tx_pool.start, Tx_pool.tx_container, true)
   in
 
   let* _loaded =
@@ -253,25 +257,20 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   in
 
   let* () =
-    match config.experimental_features.enable_tx_queue with
-    | Some tx_queue_config ->
-        Tx_queue.start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
-    | None ->
-        if config.finalized_view then return_unit
-        else
-          Tx_pool.start
-            {
-              backend = observer_backend;
-              smart_rollup_address =
-                Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                  smart_rollup_address;
-              mode = Relay;
-              tx_timeout_limit = config.tx_pool_timeout_limit;
-              tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit =
-                Int64.to_int config.tx_pool_tx_per_addr_limit;
-              chain_family = Ex_chain_family chain_family;
-            }
+    start_tx_container
+      ~tx_pool_parameters:
+        {
+          backend = observer_backend;
+          smart_rollup_address =
+            Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+              smart_rollup_address;
+          mode = Relay;
+          tx_timeout_limit = config.tx_pool_timeout_limit;
+          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
+          tx_pool_tx_per_addr_limit =
+            Int64.to_int config.tx_pool_tx_per_addr_limit;
+          chain_family = Ex_chain_family chain_family;
+        }
   in
 
   Metrics.init

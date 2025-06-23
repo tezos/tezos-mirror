@@ -38,3 +38,6 @@ module Eth_transaction_object :
      and type legacy = Ethereum_types.legacy_transaction_object
      and type address = Ethereum_types.address
      and module AddressMap = Ethereum_types.AddressMap
+
+module Tezlink_operation :
+  L2_transaction with type legacy = Tezos_types.Operation.t

@@ -1429,9 +1429,8 @@ let dispatch_websocket_private (type f)
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory (type f) ~rpc_server_family ?delegate_health_check_to rpc
-    validation config (tx_container : f Services_backend_sig.tx_container)
-    backend dir =
+let directory ~rpc_server_family ?delegate_health_check_to rpc validation config
+    (tx_container : _ Services_backend_sig.tx_container) backend dir =
   dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
@@ -1449,8 +1448,8 @@ let directory (type f) ~rpc_server_family ?delegate_health_check_to rpc
        tx_container
        backend
 
-let private_directory (type f) ~rpc_server_family rpc config
-    (tx_container : f Services_backend_sig.tx_container) backend
+let private_directory ~rpc_server_family rpc config
+    (tx_container : _ Services_backend_sig.tx_container) backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version

@@ -803,9 +803,9 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let start parameters =
+let start ~tx_pool_parameters =
   let open Lwt_result_syntax in
-  let+ worker = Worker.launch table () parameters (module Handlers) in
+  let+ worker = Worker.launch table () tx_pool_parameters (module Handlers) in
   Lwt.wakeup worker_waker worker
 
 let add transaction_object raw_tx =

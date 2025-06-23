@@ -24,7 +24,7 @@ type parameters = {
 }
 
 (** [start parameters] starts the tx-pool *)
-val start : parameters -> unit tzresult Lwt.t
+val start : tx_pool_parameters:parameters -> unit tzresult Lwt.t
 
 (** [pop_transactions chain_family maximum_cumulative_size] pops as much
     valid transactions as possible from the pool, until their cumulative
