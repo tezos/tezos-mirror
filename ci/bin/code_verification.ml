@@ -318,6 +318,35 @@ let jobs pipeline_type =
          ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
 
+  (* Define the [start] job.
+
+     The purpose of this job is to implement a manual trigger
+     for [Before_merging] pipelines, instead of running it on
+     each update to the merge request. *)
+  let job_start =
+    job
+      ~__POS__
+      ~image:Images.datadog_ci
+      ~stage:Stages.start
+      ~rules:
+        [
+          job_rule
+            ~if_:(If.not Rules.is_final_pipeline)
+            ~allow_failure:No
+            ~when_:Manual
+            ();
+          job_rule ~when_:Always ();
+        ]
+      ~timeout:(Minutes 10)
+      ~name:"trigger"
+      [
+        "echo 'Trigger pipeline!'";
+        "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+        "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+         pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+      ]
+  in
+
   (* Stages *)
   let start_stage, make_dependencies =
     match pipeline_type with
@@ -327,35 +356,6 @@ let jobs pipeline_type =
         in
         ([job_datadog_pipeline_trace], make_dependencies)
     | Before_merging | Merge_train ->
-        (* Define the [start] job.
-
-           The purpose of this job is to implement a manual trigger
-           for [Before_merging] pipelines, instead of running it on
-           each update to the merge request. *)
-        let job_start =
-          job
-            ~__POS__
-            ~image:Images.datadog_ci
-            ~stage:Stages.start
-            ~rules:
-              [
-                job_rule
-                  ~if_:(If.not Rules.is_final_pipeline)
-                  ~allow_failure:No
-                  ~when_:Manual
-                  ();
-                job_rule ~when_:Always ();
-              ]
-            ~timeout:(Minutes 10)
-            ~name:"trigger"
-            [
-              "echo 'Trigger pipeline!'";
-              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-              "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline \
-               --tags pipeline_type:$PIPELINE_TYPE --tags \
-               mr_number:$CI_MERGE_REQUEST_IID";
-            ]
-        in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
           before_merging job_start
         in
@@ -1758,6 +1758,7 @@ let jobs pipeline_type =
         make_job_kernel
           ~stage:Stages.sanity
           ~image:Images.rust_toolchain_master
+          ~dependencies:(Dependent [Optional job_start])
           ~__POS__
           ~name:"audit_riscv_deps"
           ~changes:changeset_riscv_kernels

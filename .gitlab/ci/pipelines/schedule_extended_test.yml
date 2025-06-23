@@ -304,6 +304,7 @@ documentation:rst-check:
   - gcp
   rules:
   - when: always
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: false
@@ -2377,6 +2378,9 @@ audit_riscv_deps:
   - gcp
   rules:
   - when: on_success
+  needs:
+  - job: trigger
+    optional: true
   dependencies: []
   timeout: 60 minutes
   cache:

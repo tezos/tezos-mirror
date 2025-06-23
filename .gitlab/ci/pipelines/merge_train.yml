@@ -2316,6 +2316,9 @@ audit_riscv_deps:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
+  needs:
+  - job: trigger
+    optional: true
   dependencies: []
   timeout: 60 minutes
   cache:
