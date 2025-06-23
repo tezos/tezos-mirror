@@ -1034,6 +1034,7 @@ module Replay = struct
         ~apply_unsafe_patches:false
         ~bail_on_disagree:false
         ~profiling
+        ~force_etherlink:false
     in
     let*! () = setup_opentelemetry ~data_dir configuration in
     Node_context_loader.init

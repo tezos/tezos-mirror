@@ -69,6 +69,7 @@ type outbox_message_filter =
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  etherlink : bool;
   boot_sector_file : string option;
   operators : Purpose.operators;
   rpc_addr : string;
@@ -508,6 +509,7 @@ let encoding default_display : t Data_encoding.t =
   conv
     (fun {
            sc_rollup_address;
+           etherlink;
            boot_sector_file;
            operators;
            rpc_addr;
@@ -543,6 +545,7 @@ let encoding default_display : t Data_encoding.t =
            opentelemetry;
          } ->
       ( ( ( sc_rollup_address,
+            Some etherlink,
             boot_sector_file,
             operators,
             rpc_addr,
@@ -577,6 +580,7 @@ let encoding default_display : t Data_encoding.t =
               bail_on_disagree,
               opentelemetry ) ) ) ))
     (fun ( ( ( sc_rollup_address,
+               etherlink,
                boot_sector_file,
                operators,
                rpc_addr,
@@ -612,6 +616,10 @@ let encoding default_display : t Data_encoding.t =
                  opentelemetry ) ) ) ) ->
       {
         sc_rollup_address;
+        etherlink =
+          (match etherlink with
+          | Some b -> b
+          | None -> Address.is_etherlink sc_rollup_address);
         boot_sector_file;
         operators;
         rpc_addr;
@@ -648,11 +656,17 @@ let encoding default_display : t Data_encoding.t =
       })
     (merge_objs
        (merge_objs
-          (obj6
+          (obj7
              (req
                 "smart-rollup-address"
                 ~description:"Smart rollup address"
                 Tezos_crypto.Hashed.Smart_rollup_address.encoding)
+             (opt
+                "etherlink"
+                ~description:
+                  "Whether the rollup is an Etherlink rollup. Defaults to \
+                   identification based on known Etherlink addresses."
+                bool)
              (opt "boot-sector" ~description:"Boot sector" string)
              (dft
                 "smart-rollup-node-operator"
@@ -872,7 +886,8 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -890,6 +905,7 @@ module Cli = struct
     return
       {
         sc_rollup_address;
+        etherlink = force_etherlink || Address.is_etherlink sc_rollup_address;
         boot_sector_file;
         operators;
         rpc_addr;
@@ -955,7 +971,8 @@ module Cli = struct
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -986,6 +1003,7 @@ module Cli = struct
           Option.value
             ~default:configuration.sc_rollup_address
             sc_rollup_address;
+        etherlink = force_etherlink || configuration.etherlink;
         boot_sector_file =
           Option.either boot_sector_file configuration.boot_sector_file;
         operators;
@@ -1066,7 +1084,8 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
@@ -1104,6 +1123,7 @@ module Cli = struct
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
           ~profiling
+          ~force_etherlink
       in
       return configuration
     else
@@ -1156,6 +1176,7 @@ module Cli = struct
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
           ~profiling
+          ~force_etherlink
       in
       return config
 end

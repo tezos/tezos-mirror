@@ -67,12 +67,13 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args5
+       (args6
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
           unsafe_disable_wasm_kernel_checks_switch
-          profiling_arg))
+          profiling_arg
+          etherlink_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -105,7 +106,8 @@ let config_init_command =
              allowed_headers,
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
-             profiling ) )
+             profiling,
+             force_etherlink ) )
          mode
          sc_rollup_address
          operators
@@ -147,6 +149,7 @@ let config_init_command =
           ~apply_unsafe_patches:false
           ~bail_on_disagree
           ~profiling
+          ~force_etherlink
       in
       let config_file = Configuration.config_filename ~data_dir config_file in
       let* () = Configuration.save ~force ~config_file config in
@@ -165,11 +168,12 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args10
+       (args11
           data_dir_arg
           config_file_arg
           mode_arg
           sc_rollup_address_arg
+          etherlink_switch
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
@@ -203,6 +207,7 @@ let legacy_run_command =
              config_file,
              mode,
              sc_rollup_address,
+             force_etherlink,
              rpc_addr,
              rpc_port,
              acl_override,
@@ -270,6 +275,7 @@ let legacy_run_command =
           ~apply_unsafe_patches
           ~bail_on_disagree
           ~profiling
+          ~force_etherlink
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -288,12 +294,13 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args12
+       (args13
           data_dir_arg
           config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
+          etherlink_switch
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg
@@ -328,6 +335,7 @@ let run_command =
              rpc_addr,
              rpc_port,
              acl_override,
+             force_etherlink,
              metrics_addr,
              enable_performance_metrics,
              disable_performance_metrics,
@@ -395,6 +403,7 @@ let run_command =
           ~apply_unsafe_patches
           ~bail_on_disagree
           ~profiling
+          ~force_etherlink
       in
       Rollup_node_daemon.run
         ~data_dir

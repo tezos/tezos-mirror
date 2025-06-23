@@ -636,3 +636,9 @@ let profiling_arg : (bool option, Client_context.full) Tezos_clic.arg =
        | "true" -> Lwt_result_syntax.return_true
        | "false" -> Lwt_result_syntax.return_false
        | s -> failwith "Invalid value %S for --profiling" s)
+
+let etherlink_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"etherlink"
+    ~doc:"Force this rollup to be detected as an Etherlink rollup"
+    ()
