@@ -10876,6 +10876,7 @@ let test_describe_endpoint =
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())
+      ~time_between_blocks:Nothing
       protocol
   in
   let hooks = Tezos_regression.hooks in
