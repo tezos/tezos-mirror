@@ -6,15 +6,16 @@
 (*****************************************************************************)
 
 (** This module handles the on-disk storage of the DAL node. We rely
-    on the [Key_value_store] module from lib_stdlib_unix. *)
+    on the [Key_value_store] module from lib_stdlib_unix. For shards storage, we
+    rely on a cache mechanism in the case of non-prover profiles. *)
 
 open Cryptobox
 
 module Shards : sig
-  (** A shard of some slot id consist in a shard index (a number
+  (** A shard of some slot id consist of a shard index (a number
       between 0 and the number_of_shards protocol parameter) and a
       share. The shard store is a mapping associating 0 or 1 share to
-      each (slot_id, shard index) pair.  *)
+      each (slot_id, shard index) pair. *)
 
   type t
 
@@ -24,8 +25,8 @@ module Shards : sig
   val number_of_shards_available :
     t -> Types.slot_id -> int list -> int tzresult Lwt.t
 
-  (** [write_all store slot_id shards] adds to the shard store all the given
-      shards of the given slot id. *)
+  (** [write_all store slot_id shards] adds to the shard store all the
+      given shards of the given slot id. *)
   val write_all :
     t -> Types.slot_id -> shard Seq.t -> (unit, [> Errors.other]) result Lwt.t
 
@@ -49,7 +50,7 @@ module Shards : sig
   val count_values : t -> Types.slot_id -> int tzresult Lwt.t
 
   (** [remove store slot_id] removes the shards associated to the given
-      slot id from the store *)
+      slot id from the store. *)
   val remove : t -> Types.slot_id -> unit tzresult Lwt.t
 end
 
@@ -211,7 +212,13 @@ val cache_entry :
   Cryptobox.shard_proof array ->
   unit
 
-val init : Configuration_file.t -> t tzresult Lwt.t
+(** [init config profile_ctxt proto_parameters] inits the store on the filesystem using the
+    given [config], [profile_ctxt] and [proto_parameters]. *)
+val init :
+  Configuration_file.t ->
+  Profile_manager.t ->
+  Types.proto_parameters ->
+  t tzresult Lwt.t
 
 (** [add_slot_headers ~number_of_slots ~block_level slot_headers store]
     processes the [slot_headers] published at [block_level]. Concretely, for

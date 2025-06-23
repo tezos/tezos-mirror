@@ -139,7 +139,7 @@ module Stores_dirs = struct
   let skip_list_cells = "skip_list_store"
 end
 
-module Shards = struct
+module Shards_disk = struct
   type nonrec t = (Types.slot_id, int, Cryptobox.share) KVS.t
 
   let file_layout ~root_dir (slot_id : Types.slot_id) =
@@ -250,6 +250,150 @@ module Shards = struct
   let init node_store_dir shard_store_dir =
     let root_dir = Filename.concat node_store_dir shard_store_dir in
     KVS.init ~lru_size:Constants.shards_store_lru_size ~root_dir
+end
+
+module Shards_cache = struct
+  (** Underlying FIFO-keyed map from slot_id -> map from shard index to share. This is
+      used as the alternative to the on-disk storage [Shards_disk] for shards. *)
+  module Slot_map =
+    Aches.Vache.Map (Aches.Vache.FIFO_Precise) (Aches.Vache.Strong)
+      (struct
+        type t = Types.Slot_id.t
+
+        let equal = Types.Slot_id.equal
+
+        let hash = Types.Slot_id.hash
+      end)
+
+  module Int_map = Map.Make (Int)
+
+  type t = Cryptobox.share Int_map.t Slot_map.t
+
+  let init = Slot_map.create
+
+  let number_of_shards_available cache slot_id shard_indexes =
+    Lwt_result_syntax.return
+    @@
+    match Slot_map.find_opt cache slot_id with
+    | None -> 0
+    | Some shards ->
+        List.fold_left
+          (fun count shard_index ->
+            if Int_map.mem shard_index shards then count + 1 else count)
+          0
+          shard_indexes
+
+  let write_all cache slot_id shards =
+    let open Lwt_result_syntax in
+    let cached_shards =
+      match
+        Slot_map.find_opt
+          cache
+          slot_id [@profiler.aggregate_f {verbosity = Notice} "find_opt"]
+      with
+      | None -> Int_map.empty
+      | Some shards -> shards
+    in
+    (let* new_shards =
+       Seq.ES.fold_left
+         (fun shards_map {Cryptobox.index; share} ->
+           if Int_map.mem index shards_map then return shards_map
+           else
+             let shards_map =
+               (Int_map.add
+                  index
+                  share
+                  shards_map
+                [@profiler.aggregate_f {verbosity = Notice} "add shard"])
+             in
+             let*! () =
+               Event.emit_stored_slot_shard
+                 ~published_level:slot_id.slot_level
+                 ~slot_index:slot_id.slot_index
+                 ~shard_index:index
+             in
+             return shards_map)
+         cached_shards
+         shards
+     in
+     Slot_map.replace cache slot_id new_shards ;
+     return_unit)
+    |> Errors.other_lwt_result
+
+  let read_all cache slot_id =
+    (match Slot_map.find_opt cache slot_id with
+    | None -> Seq.empty
+    | Some shards ->
+        Int_map.bindings shards |> List.to_seq
+        |> Seq.map (fun (i, share) -> (slot_id, i, Ok share)))
+    |> Seq_s.of_seq
+
+  let read cache slot_id shard_id =
+    let open Lwt_result_syntax in
+    match Slot_map.find_opt cache slot_id with
+    | Some shards -> (
+        match Int_map.find_opt shard_id shards with
+        | Some share -> return {Cryptobox.share; index = shard_id}
+        | None -> fail Errors.not_found)
+    | None -> fail Errors.not_found
+
+  let count_values cache slot_id =
+    Lwt_result_syntax.return
+    @@
+    match Slot_map.find_opt cache slot_id with
+    | None -> 0
+    | Some shards -> Int_map.cardinal shards
+
+  let remove cache slot_id =
+    Lwt_result_syntax.return @@ Slot_map.remove cache slot_id
+end
+
+module Shards = struct
+  module Disk = Shards_disk
+  module Cache = Shards_cache
+
+  type t = Disk of Disk.t | Cache of Cache.t
+
+  let init ~profile_ctxt ~proto_parameters node_store_dir shard_store_dir =
+    let open Lwt_result_syntax in
+    if Profile_manager.is_attester_only_profile profile_ctxt then
+      let storage_period =
+        Profile_manager.get_attested_data_default_store_period
+          profile_ctxt
+          proto_parameters
+      in
+      let cache_size = storage_period * proto_parameters.number_of_slots in
+      let cache = Cache.init cache_size in
+      return (Cache cache)
+    else
+      let* store = Disk.init node_store_dir shard_store_dir in
+      return (Disk store)
+
+  let number_of_shards_available = function
+    | Disk store -> Disk.number_of_shards_available store
+    | Cache cache -> Cache.number_of_shards_available cache
+
+  let write_all t slot_id shards =
+    match t with
+    | Disk store -> Disk.write_all store slot_id shards
+    | Cache cache -> Cache.write_all cache slot_id shards
+
+  let read_all t slot_id ~number_of_shards =
+    match t with
+    | Disk store -> Disk.read_all store slot_id ~number_of_shards
+    | Cache cache -> Cache.read_all cache slot_id
+
+  let read = function
+    | Disk store -> Disk.read store
+    | Cache cache -> Cache.read cache
+
+  let count_values = function
+    | Disk store -> Disk.count_values store
+    | Cache cache -> Cache.count_values cache
+
+  let remove = function
+    | Disk store -> Disk.remove store
+    | Cache cache -> Cache.remove cache
 end
 
 module Slots = struct
@@ -702,14 +846,14 @@ let check_version_and_may_upgrade base_dir =
       (Version.Invalid_data_dir_version
          {actual = version; expected = Version.current_version})
 
-(** [init config] inits the store on the filesystem using the
-    given [config]. *)
-let init config =
+let init config profile_ctxt proto_parameters =
   let open Lwt_result_syntax in
   let base_dir = Configuration_file.store_path config in
   let* () = check_version_and_may_upgrade base_dir in
   let* slot_header_statuses = Statuses.init base_dir Stores_dirs.status in
-  let* shards = Shards.init base_dir Stores_dirs.shard in
+  let* shards =
+    Shards.init ~profile_ctxt ~proto_parameters base_dir Stores_dirs.shard
+  in
   let* slots = Slots.init base_dir Stores_dirs.slot in
   let* () = Version.write_version_file ~base_dir in
   let traps = Traps.create ~capacity:Constants.traps_cache_size in

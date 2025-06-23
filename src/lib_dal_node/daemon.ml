@@ -462,7 +462,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir
         Gossipsub.Transport_layer.shutdown transport_layer)
   in
   (* Initialize store *)
-  let* store = Store.init config in
+  let* store = Store.init config profile_ctxt proto_parameters in
   let* last_processed_level =
     let last_processed_level_store = Store.last_processed_level store in
     Store.Last_processed_level.load last_processed_level_store
