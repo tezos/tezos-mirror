@@ -270,7 +270,7 @@ module Plugin = struct
                        (Attestations_aggregate_result {committee; _}) ->
                        List.map2
                          ~when_different_lengths:[Aggregation_result_size_error]
-                         (fun (tb_slot, dal_attestation) consensus_key ->
+                         (fun (tb_slot, dal_attestation) (consensus_key, _) ->
                            ( tb_slot,
                              Some consensus_key.Consensus_key.delegate,
                              packed_operation,
