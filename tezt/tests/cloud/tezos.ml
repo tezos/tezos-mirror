@@ -170,11 +170,7 @@ module Node = struct
          A proper solution might be to split the web module into a backend
          that serves the metrics and a frontend (not a web frontend), that
          show information about the different tezt-cloud components *)
-      let metric_name =
-        Format.asprintf
-          "service_manager_process_%s_is_alive"
-          (Str.global_substitute (Str.regexp_string "-") (fun _ -> "_") name)
-      in
+      let metric_name = "service_manager_process_alive" in
       let alert =
         Alert.make
           ~description:
@@ -196,7 +192,13 @@ module Node = struct
           ~help:(Format.asprintf "'Process %s is alive'" name)
           ~typ:`Gauge
           ~name:metric_name
-          ~labels:[("kind", "alive")]
+          ~labels:
+            [
+              ("agent", Agent.name agent);
+              ("name", name);
+              ("executable", executable);
+              ("kind", "alive");
+            ]
           (if alive then 1.0 else 0.0)
       in
       Cloud.service_register ~name ~executable ~on_alive_callback agent ;
@@ -348,7 +350,13 @@ module Dal_node = struct
           ~help:(Format.asprintf "Process %s is alive" name)
           ~typ:`Gauge
           ~name:metric_name
-          ~labels:[("kind", "alive")]
+          ~labels:
+            [
+              ("agent", Agent.name agent);
+              ("name", name);
+              ("executable", executable);
+              ("kind", "alive");
+            ]
           (if alive then 1.0 else 0.0)
       in
       let alert =
