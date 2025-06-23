@@ -3096,8 +3096,16 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
-    ~otel ~memtrace ~rpc_external ~cloud =
+let init_etherlink_dal_node
+    {
+      external_rpc;
+      network;
+      snapshot;
+      ppx_profiling;
+      ppx_profiler_backends;
+      memtrace;
+      _;
+    } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -3114,7 +3122,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
-          ~rpc_external
+          ~rpc_external:external_rpc
           network
           ~snapshot
           cloud
@@ -3128,7 +3136,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
       in
-      let* () = Dal_node.Agent.run ?otel dal_node in
+      let* () = Dal_node.Agent.run ?otel ~ppx_profiling dal_node in
       some dal_node
   | _ :: _ :: _ ->
       (* On several slot indices, we launch one observer DAL node per
@@ -3150,7 +3158,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
-          ~rpc_external
+          ~rpc_external:external_rpc
           network
           ~snapshot
           cloud
@@ -3179,7 +3187,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
                        Peer bootstrap.node_p2p_endpoint;
                        History_mode (Rolling (Some 79));
                      ]
-                   ~rpc_external
+                   ~rpc_external:external_rpc
                    network
                    ~snapshot
                    cloud
@@ -3270,14 +3278,11 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
     init_etherlink_dal_node
+      configuration
       ~bootstrap
       ~next_agent
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
-      ~network:configuration.network
-      ~snapshot:configuration.snapshot
-      ~rpc_external:configuration.external_rpc
       ~otel
-      ~memtrace:configuration.memtrace
       ~cloud
   in
   let operators =
