@@ -376,7 +376,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"sanity_ci"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -423,7 +423,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
@@ -459,7 +459,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.misc_checks"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_lint_files ())
@@ -523,7 +523,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"documentation:rst-check"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
         ~stage
         ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
         ~before_script:(before_script ~init_python_venv:true [])
@@ -536,7 +536,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"commit_titles"
-        ~image:Images.CI.prebuild
+        ~image:Images.CI.prebuild_master
         ~stage
         ~dependencies
         (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
