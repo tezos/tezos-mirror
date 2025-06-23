@@ -94,7 +94,14 @@ module Mock = struct
   let operations_hash =
     Operation_list_list_hash.of_bytes_exn (Bytes.make 32 '\000')
 
-  let fitness = [Bytes.make 32 '\255']
+  let fitness =
+    [
+      Bytes.make 4 '\255';
+      Bytes.make 4 '\255';
+      Bytes.make 4 '\255';
+      Bytes.make 4 '\255';
+      Bytes.make 4 '\255';
+    ]
 
   (* TODO #7866
      When blocks are populated, this mock value will be unnecessary,
@@ -181,6 +188,82 @@ module Mock = struct
       let open Result_syntax in
       let* contents = contents_list_result op.contents in
       return (Operation_metadata {contents})
+  end
+
+  (* When indexing Tezlink, Tzkt requires Liquidity baking contracts. *)
+  module Liquidity_baking = struct
+    let cpmm_address = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
+
+    let lqt_address = "KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
+
+    let lq_fallback_token = "KT1VqarPDicMFn1ejmQqqshUkUXTCTXwmkCN"
+
+    let cpmm_script : Alpha_context.Script.t =
+      let cpmm_storage =
+        let open Imported_protocol in
+        Script_repr.lazy_expr
+          (Imported_env.Micheline.strip_locations
+             (Prim
+                ( 0,
+                  Michelson_v1_primitives.D_Pair,
+                  [
+                    Int (1, Z.one);
+                    Int (2, Z.of_int 100);
+                    Int (3, Z.of_int 100);
+                    String (4, lq_fallback_token);
+                    String (5, lqt_address);
+                  ],
+                  [] )))
+      in
+      {
+        code =
+          Imported_protocol.(Script_repr.lazy_expr Liquidity_baking_cpmm.script);
+        storage = cpmm_storage;
+      }
+
+    let token_script : Alpha_context.Script.t =
+      let open Imported_protocol in
+      let lqt_storage =
+        Script_repr.lazy_expr
+          (Imported_env.Micheline.strip_locations
+             (Prim
+                ( 0,
+                  Michelson_v1_primitives.D_Pair,
+                  [
+                    Int (1, Z.of_int 2);
+                    Int (2, Z.of_int 3);
+                    String (3, cpmm_address);
+                    Int (4, Z.of_int 100);
+                  ],
+                  [] )))
+      in
+      {
+        code =
+          Imported_protocol.(Script_repr.lazy_expr Liquidity_baking_lqt.script);
+        storage = lqt_storage;
+      }
+
+    let fallback_script : Alpha_context.Script.t =
+      let open Imported_protocol in
+      let fallback_token_storage =
+        Script_repr.lazy_expr
+          (Imported_env.Micheline.strip_locations
+             (Prim
+                ( 0,
+                  Michelson_v1_primitives.D_Pair,
+                  [
+                    Int (1, Z.of_int 0);
+                    Int (2, Z.of_int 1);
+                    String (3, "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx");
+                    Int (4, Z.of_int 10_000);
+                  ],
+                  [] )))
+      in
+      {
+        code =
+          Imported_protocol.(Script_repr.lazy_expr Liquidity_baking_lqt.script);
+        storage = fallback_token_storage;
+      }
   end
 end
 
@@ -336,17 +419,32 @@ module Protocol_types = struct
         ~src:Data_encoding.z
   end
 
+  (* When indexing Tezlink, Tzkt requires Liquidity baking contracts.
+     Instead of really storing it, in the durable_storage, we mock the
+     rpc contract as this is the only RPC needed by tzkt for
+     Liquidity baking. *)
+  let mocked_script (contract : Alpha_context.Contract.t) =
+    let address = Alpha_context.Contract.to_b58check contract in
+    if address = Mock.Liquidity_baking.cpmm_address then
+      Some Mock.Liquidity_baking.cpmm_script
+    else if address = Mock.Liquidity_baking.lqt_address then
+      Some Mock.Liquidity_baking.token_script
+    else if address = Mock.Liquidity_baking.lq_fallback_token then
+      Some Mock.Liquidity_baking.fallback_script
+    else None
+
   module Contract = struct
-    let make_info (contract_balance, counter_z) =
+    let make_info (contract, contract_balance, counter_z) =
       let open Result_syntax in
       let open Imported_protocol_plugin.Contract_services in
       let* counter = Counter.of_z counter_z in
+      let script = mocked_script contract in
       return
         {
           balance = contract_balance;
           delegate = None;
           counter = Some counter;
-          script = None;
+          script;
         }
   end
 end
@@ -784,7 +882,7 @@ let build_block_static_directory ~l2_chain_id
          let*? block = check_block block in
          let* balance = Backend.balance chain block contract in
          let* counter = Backend.counter chain block contract in
-         return (balance, counter))
+         return (contract, balance, counter))
        ~convert_output:Protocol_types.Contract.make_info
   |> register
        ~service:Imported_services.balance
