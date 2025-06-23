@@ -30,6 +30,7 @@ packages() {
 }
 
 zcash() {
+  eval "$(opam env)"
   # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
     md5sum --status -c script-inputs/sapling-params.md5
