@@ -49,7 +49,7 @@ depends: [
   "dream" { >= "1.0.0~alpha7" }
   "dune-configurator"
   "eio"
-  "eio_posix"
+  "eio_main"
   "eqaf"
   "ezgzip"
   "ezjsonm" { >= "1.3.0" }

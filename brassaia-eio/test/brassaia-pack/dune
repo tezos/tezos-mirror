@@ -17,7 +17,7 @@
   octez-libs.test-helpers
   octez-alcotezt
   fpath
-  eio_posix
+  eio_main
   tezt)
  (preprocess (pps octez-libs.ppx_brassaia_eio.internal))
  (library_flags (:standard -linkall))

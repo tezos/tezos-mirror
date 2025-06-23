@@ -94,7 +94,7 @@ depends: [
   "duration" {= "0.2.1"}
   "dyn" {= "3.19.0"}
   "eio" {= "1.2"}
-  "eio_posix" {= "1.2"}
+  "eio_main" {= "1.2"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.10"}
   "ezgzip" {= "0.2.3"}

@@ -19,7 +19,7 @@
   lwt-exit
   terminal
   eio
-  eio_posix
+  eio_main
   lwt_eio)
  (inline_tests
   (flags -verbose)

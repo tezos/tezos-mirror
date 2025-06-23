@@ -125,7 +125,7 @@ let dynlink = external_lib "dynlink" V.True ~opam:""
 
 let eio = external_lib "eio" V.True
 
-let eio_posix = external_lib "eio_posix" V.True
+let eio_main = external_lib "eio_main" V.True
 
 let lwt_eio = external_lib "lwt_eio" V.True
 
