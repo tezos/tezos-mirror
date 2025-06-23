@@ -19,9 +19,6 @@ type head = {
   pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
 }
 
-type ex_tx_container =
-  | Ex_tx_container : _ Services_backend_sig.tx_container -> ex_tx_container
-
 type parameters = {
   configuration : Configuration.t;
   kernel_path : Wasm_debugger.kernel option;
@@ -30,7 +27,7 @@ type parameters = {
   store_perm : Sqlite.perm;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   snapshot_url : string option;
-  tx_container : ex_tx_container;
+  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 type session_state = {
@@ -55,7 +52,7 @@ type t = {
   session : session_state;
   sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
   legacy_block_storage : bool;
-  tx_container : ex_tx_container;
+  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 let is_sequencer t = Option.is_some t.sequencer_wallet

@@ -320,3 +320,5 @@ let tx_container_module (type f) (tx_container : f tx_container) =
   match tx_container with
   | Evm_tx_container m -> (m :> (module Tx_container))
   | Michelson_tx_container m -> (m :> (module Tx_container))
+
+type ex_tx_container = Ex_tx_container : _ tx_container -> ex_tx_container
