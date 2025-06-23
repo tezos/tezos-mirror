@@ -1438,21 +1438,36 @@ let test_tezlink_produceBlock =
 let test_tezlink_hash_rpc =
   register_tezlink_test ~title:"Test Tezlink hash rpc" ~tags:["rpc"; "hash"]
   @@ fun {sequencer; _} _protocol ->
-  let path_head = "/tezlink/chains/main/blocks/head/hash" in
-  let rpc_hash () =
+  let path block = sf "/tezlink/chains/main/blocks/%s/hash" block in
+  let rpc_hash block =
     let* res =
-      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path_head)
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path block)
       |> Runnable.run
     in
-    return @@ JSON.parse ~origin:"curl_hash" res
+    return @@ JSON.(parse ~origin:"curl_hash" res |> as_string)
   in
-  let* hash_old_head = rpc_hash () in
+  let* hash_old_head = rpc_hash "head" in
   let*@ _ = produce_block sequencer in
-  let* hash_current_head = rpc_hash () in
+  let* hash_current_head = rpc_hash "head" in
   Check.(
-    JSON.(hash_current_head |> as_string <> (hash_old_head |> as_string))
+    (hash_current_head <> hash_old_head)
       string
       ~error_msg:"Block hash should be different") ;
+  let* hash_old_hash = rpc_hash hash_old_head in
+  Check.(
+    (hash_old_hash = hash_old_head)
+      string
+      ~error_msg:"Block hash should be equal") ;
+  let* hash_current_hash = rpc_hash hash_current_head in
+  Check.(
+    (hash_current_hash = hash_current_head)
+      string
+      ~error_msg:"Block hash should be equal") ;
+  let* hash_previous_hash = rpc_hash (hash_current_head ^ "~1") in
+  Check.(
+    (hash_previous_hash = hash_old_head)
+      string
+      ~error_msg:"Block hash should be equal") ;
   unit
 
 let test_tezlink_raw_json_cycle =
