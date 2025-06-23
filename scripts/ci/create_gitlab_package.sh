@@ -71,6 +71,21 @@ gitlab_upload() {
 # GPG Signatures
 echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import --
 
+# create the apt repository root directory and copy the public key
+mkdir -p public
+cp "$GPG_PUBLIC_KEY" "public/octez.asc"
+
+# If it's a protected branch the value of $BUCKET will
+# be set accordingly by the CI.
+BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
+
+GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+export GOOGLE_OAUTH_ACCESS_TOKEN
+
+echo "Push to $BUCKET"
+
+gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+
 # Loop over architectures
 for architecture in ${architectures}; do
   echo "Upload raw binaries (${architecture})"
