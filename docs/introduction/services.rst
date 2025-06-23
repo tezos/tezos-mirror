@@ -4,9 +4,13 @@ Setting up Octez Services
 The Octez suite consists of :ref:`several executables <tezos_binaries>`, some to be run interactively, while others are to be run as daemons.
 
 Previous tutorials in this section showed how to :doc:`get started with the different executables <./howtouse>`, and different :doc:`options for participating to Tezos <./howtorun>` such as delegating, staking, and baking.
-However, in these tutorials, daemons are just run in background or left in another terminal.
+However, in these tutorials, daemons are just run in background or left running in another terminal.
 
 This page shows how Octez daemons can be safely run from the official binary packages, as Unix services, which can ensure that they are started automatically and restarted in case of failures.
+
+This is a intermediate-level baking howto assuming some familiarity with the previous tutorials mentioned above, on installing, on setting up Octez, and on the notion of baking.
+For a more accessible and detailed step-by-step tutorial on running an Octez baker, including the complete set up of a baking account and thorough manual verifications upon each step, see 
+`Run a Tezos node in 5 steps <https://docs.tezos.com/tutorials/join-dal-baker>`__.
 
 Installing Octez
 ----------------
@@ -70,12 +74,26 @@ directory of the ``tezos`` user with the command ``usermod -m -d /custom tezos``
 and then configure the ``DATADIR`` variable in ``/etc/default/octez-node``
 accordingly.
 
-Configuring the signer
+Setting up baking keys
 ----------------------
 
-Because of the sensitive nature of the private keys needed by the baker to
-function, we suggest a slightly involved configuration procedure using the
-Octez signer.
+The most important preliminary step for running a baker is setting up a baker account having enough :doc:`baking power <../active/baking_power>` (typically, possessing more than 6000 tez).
+We cover here only the creation of such an account in case you don't have it already, but not how it can be funded (from a faucet, if using a testnet).
+Also, we don't cover here the optional set up of an associated :ref:`consensus key <consensus_key_details>` and/or :ref:`companion key <companion_key>`.
+
+If you intend to bake on a testnet, you can simply create a key with the following command::
+
+   $ sudo su tezos -c "octez-client gen keys alice"
+
+and the baker will use it automatically. Indeed, the baker bakes for all the keys for which it has the private key. If you want to avoid this behavior, you can specify a specific baking key by editing the file /etc/default/octez-baker and assigning a value to variable BAKER_KEY.
+
+When baking on a testnet, you may skip the following section on configuring the signer, and directly start the baker.
+
+Configuring the signer
+~~~~~~~~~~~~~~~~~~~~~~
+
+If you intend to bake on mainnet, we highly recommend using the Octez signer, because of the sensitive nature of the private keys needed by the baker to function.
+You may of course use the signer on a testnet, too, although this is less crucial.
 
 To configure the octez-signer, first, logged as the user chosen to run the
 signer, we must create a set of keys. These are the private keys that will be
@@ -83,7 +101,7 @@ entrusted to the signer to actually sign operations on behalf of the baker. The
 signer will run in a different process (possibly on a separate host), and
 ideally using a hardware enclave such as a :ref:`hardware ledger <ledger>`. For
 the sake of brevity, in this example, the keys will be simply stored on the
-disk, but this is not a recommended setting for a production baker.
+disk, but **this is not a recommended setting for a production baker**.
 
 We create an authentication key that is going to be used to authenticate
 the baker with the signer, and a signing key to sign the operations.
@@ -131,22 +149,7 @@ scenarios.
 
 For more advanced configurations, see the :ref:`signer guide <signer>`.
 
-Configuring and using the octez-signer is recommended but not essential to
-configure the baker. For testing, you can also simple create a key with the
-following command:
-
-.. code:: shell
-
-    $ sudo su tezos -c "octez-client gen keys alice"
-
-and the baker will use it automatically.
-Indeed, the baker bakes for all the keys for which it has the private key.
-If you want to avoid this behavior, you can specify a specific baking key by editing the file ``/etc/default/octez-baker`` and assigning a value to variable ``BAKER_KEY``.
-
-Configuring the baker
----------------------
-
-Now that the signer is running, we need to configure the baker.
+Now that the signer is running, we need to configure the baker for using the signer.
 Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap
 the configuration command below:
 
@@ -160,6 +163,9 @@ the configuration command below:
    # Configure the baker to use the remote signer
    sudo su tezos -c "octez-client -R tcp://localhost:7732 \
       import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+
+Starting the baker
+------------------
 
 Now that everything is in place, we can start the Octez baker.
 
