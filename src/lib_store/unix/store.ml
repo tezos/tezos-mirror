@@ -3743,12 +3743,16 @@ module Unsafe = struct
   let restore_from_snapshot ?(notify = fun () -> Lwt.return_unit) store_dir
       ~genesis ~genesis_context_hash ~floating_blocks_stream
       ~new_head_with_metadata ~new_head_resulting_context_hash
-      ~predecessor_header ~protocol_levels ~history_mode =
+      ~predecessor_header ~protocol_levels ~history_mode ~is_v8_import =
     let open Lwt_result_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let chain_dir = Naming.chain_dir store_dir chain_id in
     let genesis_block =
       Block_repr.create_genesis_block ~genesis genesis_context_hash
+    in
+    let new_head_descr =
+      ( Block_repr.hash new_head_with_metadata,
+        Block_repr.level new_head_with_metadata )
     in
     (* Write consistent stored data *)
     let* () =
@@ -3762,10 +3766,12 @@ module Unsafe = struct
         (Block.descriptor new_head_with_metadata)
     in
     (* Checkpoint is the predecessor of the target block as we have both the
-       associated context and the block's metadada. *)
+       associated context and the block's metadata. *)
     let new_checkpoint =
-      ( Block_header.hash predecessor_header,
-        predecessor_header.Block_header.shell.level )
+      if is_v8_import then new_head_descr
+      else
+        ( Block_header.hash predecessor_header,
+          predecessor_header.Block_header.shell.level )
     in
     let* () =
       Stored_data.write_file (Naming.checkpoint_file chain_dir) new_checkpoint
@@ -3778,10 +3784,12 @@ module Unsafe = struct
     in
     let* () = Stored_data.write_file (Naming.target_file chain_dir) None in
     (* Savepoint is the predecessor of the target block as we have both the
-       associated context and the block's metadada. *)
+       associated context and the block's metadata. *)
     let new_savepoint =
-      ( Block_header.hash predecessor_header,
-        predecessor_header.Block_header.shell.level )
+      if is_v8_import then new_head_descr
+      else
+        ( Block_header.hash predecessor_header,
+          predecessor_header.Block_header.shell.level )
     in
     let* () =
       Stored_data.write_file (Naming.savepoint_file chain_dir) new_savepoint

@@ -632,8 +632,10 @@ module Version = struct
    * - 9: export target predecessor contains metadata
    *)
 
+  let v8_version = 8
+
   (* Used for old snapshot format versions *)
-  let legacy_version = 8
+  let legacy_version = v8_version
 
   let current_version = 9
 
@@ -4236,6 +4238,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Rolling _ -> return (Rolling None)
       | Full _ -> return (Full None)
     in
+    (* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/8005
+       remove the v8 import backward compatibility as soon as v9
+       (and v23) are mandatory.*)
+    let is_v8_import = snapshot_version = Version.v8_version in
     let*! () = Event.(emit restoring_floating_blocks) () in
     let* () =
       Animation.display_progress
@@ -4255,7 +4261,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               validation_store.resulting_context_hash
             ~predecessor_header:block_data.predecessor_header
             ~protocol_levels
-            ~history_mode)
+            ~history_mode
+            ~is_v8_import)
     in
     let* () = reading_thread in
     let*! () = Event.(emit floating_blocks_restored) () in

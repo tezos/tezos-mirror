@@ -1133,12 +1133,12 @@ module Unsafe : sig
     locked_f:(chain_store -> 'a tzresult Lwt.t) ->
     'a tzresult Lwt.t
 
-  (** [restore_from_snapshot ?notify ~store_dir ~context_index
-      ~genesis ~genesis_context_hash ~floating_blocks_stream
-      ~new_head_with_metadata ~new_head_resulting_context_hash
-      ~predecessor_header ~protocol_levels ~history_mode] initialises
-      a coherent store in [store_dir] with all the given info
-      retrieved from a snapshot. *)
+  (** [restore_from_snapshot ?notify ~store_dir ~context_index ~genesis
+      ~genesis_context_hash ~floating_blocks_stream ~new_head_with_metadata
+      ~new_head_resulting_context_hash ~predecessor_header ~protocol_levels
+      ~history_mode ~is_legacy_import] initialises a coherent store in
+      [store_dir] with all the given info retrieved from a snapshot.
+      [is_v8_import] allows backward compatibility with v8 snapshot. *)
   val restore_from_snapshot :
     ?notify:(unit -> unit Lwt.t) ->
     [`Store_dir] Naming.directory ->
@@ -1150,5 +1150,6 @@ module Unsafe : sig
     predecessor_header:Block_header.t ->
     protocol_levels:Protocol_levels.protocol_info Protocol_levels.t ->
     history_mode:History_mode.t ->
+    is_v8_import:bool ->
     unit tzresult Lwt.t
 end
