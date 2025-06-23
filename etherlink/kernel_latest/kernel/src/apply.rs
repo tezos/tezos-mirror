@@ -309,7 +309,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
 }
 
 #[allow(clippy::too_many_arguments)]
-fn revm_run_transaction<Host: Runtime>(
+pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     caller: H160,

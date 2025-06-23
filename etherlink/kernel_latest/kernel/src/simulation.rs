@@ -10,12 +10,14 @@
 
 use std::borrow::Cow;
 
+use crate::apply::revm_run_transaction;
 use crate::block_storage;
 use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
-    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
+    is_revm_enabled, read_last_info_per_level_timestamp, read_sequencer_pool_address,
+    read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
@@ -474,45 +476,95 @@ impl Evaluation {
             constants.block_fees.base_fee_per_gas()
         };
 
-        match run_transaction(
-            host,
-            &constants,
-            &mut evm_account_storage,
-            &precompiles,
-            evm_configuration,
-            self.to,
-            from,
-            self.data.clone(),
-            self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
-                Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
-            }),
-            gas_price,
-            self.value.unwrap_or_default(),
-            false,
-            tracer_input,
-            // TODO: Replace this by the decoded access lists if any.
-            empty_access_list(),
-        ) {
-            Ok(Some(outcome)) if !self.with_da_fees => {
-                let result: SimulationResult<CallResult, String> =
-                    Result::Ok(Some(outcome)).into();
+        if let Ok(true) = is_revm_enabled(host) {
+            match revm_run_transaction(
+                host,
+                &constants,
+                from,
+                self.to,
+                self.value.unwrap_or_default(),
+                self.gas
+                    .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT)),
+                self.data.clone(),
+                gas_price,
+                // TODO: Replace this by the decoded access lists if any.
+                empty_access_list(),
+            ) {
+                Ok(Some(outcome)) if !self.with_da_fees => {
+                    let result: SimulationResult<CallResult, String> =
+                        Result::Ok(Some(outcome)).into();
 
-                Ok(result)
+                    Ok(result)
+                }
+                Ok(Some(outcome)) => {
+                    let outcome = simulation_add_gas_for_fees(
+                        outcome,
+                        &constants.block_fees,
+                        &self.data,
+                    )
+                    .map_err(Error::Simulation)?;
+
+                    let result: SimulationResult<CallResult, String> =
+                        Result::Ok(Some(outcome)).into();
+
+                    Ok(result)
+                }
+                Ok(None) => {
+                    let result: SimulationResult<CallResult, String> =
+                        Result::Ok(None).into();
+
+                    Ok(result)
+                }
+                Err(err) => {
+                    let result: SimulationResult<CallResult, String> = Result::Err(
+                        EthereumError::WrappedError(Cow::Owned(err.to_string())),
+                    )
+                    .into();
+
+                    Ok(result)
+                }
             }
-            Ok(Some(outcome)) => {
-                let outcome = simulation_add_gas_for_fees(
-                    outcome,
-                    &constants.block_fees,
-                    &self.data,
-                )
-                .map_err(Error::Simulation)?;
+        } else {
+            match run_transaction(
+                host,
+                &constants,
+                &mut evm_account_storage,
+                &precompiles,
+                evm_configuration,
+                self.to,
+                from,
+                self.data.clone(),
+                self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
+                    Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
+                }),
+                gas_price,
+                self.value.unwrap_or_default(),
+                false,
+                tracer_input,
+                // TODO: Replace this by the decoded access lists if any.
+                empty_access_list(),
+            ) {
+                Ok(Some(outcome)) if !self.with_da_fees => {
+                    let result: SimulationResult<CallResult, String> =
+                        Result::Ok(Some(outcome)).into();
 
-                let result: SimulationResult<CallResult, String> =
-                    Result::Ok(Some(outcome)).into();
+                    Ok(result)
+                }
+                Ok(Some(outcome)) => {
+                    let outcome = simulation_add_gas_for_fees(
+                        outcome,
+                        &constants.block_fees,
+                        &self.data,
+                    )
+                    .map_err(Error::Simulation)?;
 
-                Ok(result)
+                    let result: SimulationResult<CallResult, String> =
+                        Result::Ok(Some(outcome)).into();
+
+                    Ok(result)
+                }
+                result => Ok(result.into()),
             }
-            result => Ok(result.into()),
         }
     }
 }
