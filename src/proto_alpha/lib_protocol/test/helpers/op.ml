@@ -188,7 +188,7 @@ let raw_aggregate attestations =
 let aggregate attestations =
   Option.map Operation.pack (raw_aggregate attestations)
 
-let aggregate_preattestations preattestations =
+let raw_aggregate_preattestations preattestations =
   let aggregate_content =
     List.fold_left
       (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
@@ -217,10 +217,11 @@ let aggregate_preattestations preattestations =
          (* Reverse committee to preserve [preattestations] order *)
          {consensus_content; committee = List.rev committee})
   in
-  let protocol_data =
-    Operation_data {contents; signature = Some (Bls signature)}
-  in
-  {shell; protocol_data}
+  let protocol_data = {contents; signature = Some (Bls signature)} in
+  ({shell; protocol_data} : Kind.preattestations_aggregate operation)
+
+let aggregate_preattestations preattestations =
+  Option.map Operation.pack (raw_aggregate_preattestations preattestations)
 
 let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
     ?branch attested_block =
@@ -306,7 +307,7 @@ let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
   in
   return (Operation.pack op)
 
-let preattestations_aggregate ?committee ?level ?round ?block_payload_hash
+let raw_preattestations_aggregate ?committee ?level ?round ?block_payload_hash
     ?branch attested_block =
   let open Lwt_result_syntax in
   let* committee =
@@ -334,9 +335,23 @@ let preattestations_aggregate ?committee ?level ?round ?block_payload_hash
           attested_block)
       committee
   in
-  match aggregate_preattestations preattestations with
+  match raw_aggregate_preattestations preattestations with
   | Some preattestations_aggregate -> return preattestations_aggregate
   | None -> failwith "no Bls delegate found"
+
+let preattestations_aggregate ?committee ?level ?round ?block_payload_hash
+    ?branch attested_block =
+  let open Lwt_result_syntax in
+  let* op =
+    raw_preattestations_aggregate
+      ?committee
+      ?level
+      ?round
+      ?block_payload_hash
+      ?branch
+      attested_block
+  in
+  return (Operation.pack op)
 
 let sign ?watermark ctxt sk branch (Contents_list contents) =
   let open Lwt_result_syntax in
