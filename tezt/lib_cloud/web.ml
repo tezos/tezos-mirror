@@ -15,6 +15,7 @@ type t = {
   dir : string;
   monitoring : bool;
   prometheus : bool;
+  opentelemetry : bool;
   mutable services : service list;
 }
 
@@ -146,6 +147,12 @@ let jingoo_template t agents =
         (if Env.monitoring then
            List.map (monitoring_jingo_template agents) agents
          else []) );
+    ( "opentelemetry",
+      Tobj
+        [
+          ("activated", Tbool Env.open_telemetry);
+          ("uri", Tstr (Format.asprintf "http://%s:16686" (domain agents)));
+        ] );
     ("agents", Tlist (List.map agent_jingo_template agents));
     ("services", Tlist (List.map service_jingo_template t.services));
   ]
@@ -180,6 +187,7 @@ let run () =
   let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
+  let opentelemetry = Env.open_telemetry in
   let stop, to_stop = Lwt.task () in
   let logger next_handler request =
     let meth = Dream.method_to_string (Dream.method_ request) in
@@ -230,7 +238,16 @@ let run () =
                Dream.html content);
          ]
   in
-  Lwt.return {process; to_stop; dir; monitoring; prometheus; services = []}
+  Lwt.return
+    {
+      process;
+      to_stop;
+      dir;
+      monitoring;
+      prometheus;
+      opentelemetry;
+      services = [];
+    }
 
 let start ~agents =
   let* t = run () in
