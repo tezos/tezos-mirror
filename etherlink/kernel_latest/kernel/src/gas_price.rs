@@ -11,14 +11,12 @@ use softfloat::F64;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-// A reasonable ERC20 transaction cost is gas unit
-const ERC20_GAS: u64 = 40_000;
-// 50 TPS of ERC20 transfers should be sustained without increasing price.
-const SPEED_LIMIT: u64 = 50 * ERC20_GAS;
-const TOLERANCE: u64 = 10 * SPEED_LIMIT;
+const CAPACITY: u64 = 4_000_000;
+const TARGET: u64 = CAPACITY / 2;
+const TOLERANCE: u64 = 10 * TARGET;
 
 // chosen so that gas price will decrease ~7/8 if there's no usage for ~10 seconds.
-// ALPHA = -ln(7/8)/(SPEED_LIMIT * 10)
+// ALPHA = -ln(7/8)/(TARGET * 10)
 const ALPHA: F64 = softfloat::f64!(0.000_000_007);
 
 /// Register a completed block into the tick backlog
@@ -67,7 +65,7 @@ fn backlog_with_time_elapsed(
 ) -> u64 {
     let diff = current_timestamp
         .saturating_sub(last_timestamp)
-        .saturating_mul(SPEED_LIMIT);
+        .saturating_mul(TARGET);
 
     crate::storage::read_backlog(host)
         .unwrap_or_default()
