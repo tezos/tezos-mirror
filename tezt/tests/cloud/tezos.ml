@@ -192,14 +192,14 @@ module Node = struct
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let alert =
         Alert.make
+          ~name:"ServiceManagerProcessDown"
           ~description:
             {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
           ~summary:
             (Format.asprintf
-               "'[%s.Service_manager] the process [%s] is down'"
+               "'[%s.service_manager] the process [%s] is down'"
                (Agent.name agent)
                executable)
-          ~name
           ~route:(Alert.route receiver)
           ~severity:Alert.Critical
           ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
@@ -367,7 +367,7 @@ module Dal_node = struct
       let on_alive_callback ~alive =
         Cloud.push_metric
           cloud
-          ~help:(Format.asprintf "Process %s is alive" name)
+          ~help:(Format.asprintf "'Process %s is alive'" name)
           ~typ:`Gauge
           ~name:metric_name
           ~labels:
@@ -381,9 +381,14 @@ module Dal_node = struct
       in
       let alert =
         Alert.make
+          ~name:"ServiceManagerProcessDown"
           ~description:
-            (Format.asprintf "Process '%s' seems to have crashed" name)
-          ~name
+            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+          ~summary:
+            (Format.asprintf
+               "'[%s.service_manager] the process [%s] is down'"
+               (Agent.name agent)
+               executable)
           ~route:(Alert.route receiver)
           ~severity:Alert.Critical
           ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
