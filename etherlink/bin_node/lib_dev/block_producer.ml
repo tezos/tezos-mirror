@@ -234,39 +234,48 @@ let pop_valid_tx (type f) ~(chain_family : f L2_types.chain_family)
         ~validate_tx:(fun () _ _ -> return (`Keep ()))
         ~initial_validation_state
   | EVM ->
-      let read = Evm_state.read head_info.evm_state in
-      let* minimum_base_fee_per_gas =
-        Etherlink_durable_storage.minimum_base_fee_per_gas read
-      in
-      let* base_fee_per_gas = Etherlink_durable_storage.base_fee_per_gas read in
-      let* maximum_gas_limit =
-        Etherlink_durable_storage.maximum_gas_per_transaction read
-      in
-      let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
-      let config =
-        Validate.
-          {
-            minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
-            base_fee_per_gas;
-            maximum_gas_limit;
-            da_fee_per_byte;
-            next_nonce = (fun addr -> Etherlink_durable_storage.nonce read addr);
-            balance = (fun addr -> Etherlink_durable_storage.balance read addr);
-          }
-      in
-      let initial_validation_state =
-        ( 0,
+      (* Low key optimization to avoid even checking the txpool if there is not
+         enough space for the smallest transaction. *)
+      if maximum_cumulative_size <= minimum_ethereum_transaction_size then
+        return []
+      else
+        let read = Evm_state.read head_info.evm_state in
+        let* minimum_base_fee_per_gas =
+          Etherlink_durable_storage.minimum_base_fee_per_gas read
+        in
+        let* base_fee_per_gas =
+          Etherlink_durable_storage.base_fee_per_gas read
+        in
+        let* maximum_gas_limit =
+          Etherlink_durable_storage.maximum_gas_per_transaction read
+        in
+        let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
+        let config =
           Validate.
             {
-              config;
-              addr_balance = String.Map.empty;
-              addr_nonce = String.Map.empty;
-            } )
-      in
-      Tx_container.pop_transactions
-        ~maximum_cumulative_size
-        ~validate_tx:(validate_tx ~maximum_cumulative_size)
-        ~initial_validation_state
+              minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
+              base_fee_per_gas;
+              maximum_gas_limit;
+              da_fee_per_byte;
+              next_nonce =
+                (fun addr -> Etherlink_durable_storage.nonce read addr);
+              balance =
+                (fun addr -> Etherlink_durable_storage.balance read addr);
+            }
+        in
+        let initial_validation_state =
+          ( 0,
+            Validate.
+              {
+                config;
+                addr_balance = String.Map.empty;
+                addr_nonce = String.Map.empty;
+              } )
+        in
+        Tx_container.pop_transactions
+          ~maximum_cumulative_size
+          ~validate_tx:(validate_tx ~maximum_cumulative_size)
+          ~initial_validation_state
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
@@ -277,16 +286,11 @@ let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
   let open Lwt_result_syntax in
   let (Evm_tx_container (module Tx_container)) = tx_container in
   let* transactions_and_objects =
-    (* Low key optimization to avoid even checking the txpool if there is not
-       enough space for the smallest transaction. *)
-    if remaining_cumulative_size <= minimum_ethereum_transaction_size then
-      return []
-    else
-      pop_valid_tx
-        ~chain_family
-        ~tx_container
-        head_info
-        ~maximum_cumulative_size:remaining_cumulative_size
+    pop_valid_tx
+      ~chain_family
+      ~tx_container
+      head_info
+      ~maximum_cumulative_size:remaining_cumulative_size
   in
   let n = List.length transactions_and_objects + List.length delayed_hashes in
   if force || n > 0 then
