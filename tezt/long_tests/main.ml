@@ -72,6 +72,7 @@ let () =
     () ;
   Tenderbake.register ~executors:default_executors () ;
   Logging.register ~executors:default_executors () ;
+  Mempool_benchmarks.register ~executors:default_executors () ;
   Pipelining.register ~executors:default_executors () ;
   Tezt_load_time.register ~executors:default_executors () ;
   Executable_size.register ~executors:default_executors () ;

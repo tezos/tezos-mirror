@@ -1,0 +1,94 @@
+diff --git a/src/lib_bees/task_worker.ml b/src/lib_bees/task_worker.ml
+index 2b360ba3d94..94888c66785 100644
+--- a/src/lib_bees/task_worker.ml
++++ b/src/lib_bees/task_worker.ml
+@@ -77,7 +77,12 @@ type 'a message_error = 'a Worker.message_error =
+
+ (* This is a conservative limit that aims to fit all machines, without
+    overloading it.*)
+-let default_max_domains = max (min (Domain.recommended_domain_count () / 2) 8) 1
++let default_max_domains =
++  match Sys.getenv_opt "TEZOS_DOMAINS" with
++  | None -> max (min (Domain.recommended_domain_count () / 2) 8) 1
++  | Some x ->
++      Format.eprintf "Will use %s domains@." x ;
++      int_of_string x
+
+ let number_of_domains = default_max_domains
+
+diff --git a/src/lib_shell/prevalidation.ml b/src/lib_shell/prevalidation.ml
+index 312a79daea2..d20fdbf4cc7 100644
+--- a/src/lib_shell/prevalidation.ml
++++ b/src/lib_shell/prevalidation.ml
+@@ -239,8 +239,8 @@ module MakeAbstract
+   (** Wrapper around [Proto.Mempool.add_operation]. *)
+   let proto_add_operation ~conflict_handler state (op : valid_operation) :
+       (Proto.Mempool.t * Proto.Mempool.add_result) tzresult Lwt.t =
+-    Proto.Mempool.add_operation
+-      ~check_signature:(not op.signature_checked)
++    Proto.Mempool.add_operation (* Force check signature *)
++      ~check_signature:true (*not op.signature_checked*)
+       ~conflict_handler
+       state.validation_info
+       state.mempool
+@@ -408,10 +408,12 @@ module MakeAbstract
+     return (state, record_successful_signature_check op, classification, todo)
+
+   let partial_op_validation state op : partially_validated_operation Lwt.t =
++    (* Force check signature *)
++    let check_signature = true (* not op.signature_checked *) in
+     Lwt_result.map
+       (fun checks -> (op, checks))
+       (Proto.Mempool.partial_op_validation
+-         ~check_signature:(not op.signature_checked)
++         ~check_signature
+          state.validation_info
+          op.protocol)
+
+diff --git a/src/lib_shell/prevalidator.ml b/src/lib_shell/prevalidator.ml
+index 4906c82867b..99a5816db7e 100644
+--- a/src/lib_shell/prevalidator.ml
++++ b/src/lib_shell/prevalidator.ml
+@@ -779,10 +779,13 @@ module Make_s
+     Lwt.return (state, advertisable_mempool, validated_mempool)
+
+   let classify_pending_operations =
+-    if Protocol.compare_version Proto.environment_version V15 < 0 then
+-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7985 *)
+-      legacy_classify_pending_operations
+-    else new_classify_pending_operations
++    match Sys.getenv_opt "TEZOS_USE_NEW_CLASSIFY" with
++    | None -> legacy_classify_pending_operations
++    | Some _ ->
++        if Protocol.compare_version Proto.environment_version V15 < 0 then
++          (* TODO: https://gitlab.com/tezos/tezos/-/issues/7985 *)
++          legacy_classify_pending_operations
++        else new_classify_pending_operations
+
+   let update_advertised_mempool_fields pv_shell advertisable_mempool
+       validated_mempool =
+diff --git a/src/lib_shell_services/shell_limits.ml b/src/lib_shell_services/shell_limits.ml
+index 52335d0f8d2..9c012351c6a 100644
+--- a/src/lib_shell_services/shell_limits.ml
++++ b/src/lib_shell_services/shell_limits.ml
+@@ -93,10 +93,17 @@ type prevalidator_limits = {
+ }
+
+ let default_prevalidator_limits =
++  let custom_operations_batch_size =
++    match Sys.getenv_opt "TEZOS_OPERATION_BATCH_SIZE" with
++    | None -> 50
++    | Some v ->
++        Format.eprintf "Will use operation_batch_size = %s@." v ;
++        int_of_string v
++  in
+   {
+     operation_timeout = Time.System.Span.of_seconds_exn 10.;
+     max_refused_operations = 1000;
+-    operations_batch_size = 50;
++    operations_batch_size = custom_operations_batch_size;
+   }
+
+ let prevalidator_limits_encoding =
+--
+2.47.2
