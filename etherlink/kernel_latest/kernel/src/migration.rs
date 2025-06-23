@@ -372,6 +372,11 @@ fn migrate_to<Host: Runtime>(
             // validation in the EVM node
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V36 => {
+            // Dummy migration allowing the node to decide what gas target to use when trying to
+            // predict the gas price
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

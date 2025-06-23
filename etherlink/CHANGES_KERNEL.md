@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 35.
+Its storage version is 36.
 
 ### Features
 
@@ -15,6 +15,8 @@ Its storage version is 35.
   with over-estimated gas limits exceeding the maximum threshold will
   be disabled. During execution, any gas limit above the maximum will
   be automatically capped at the maximum permitted value. (!18179)
+- Bump the capacity of Etherlink to 8MGas/s (meaning a target per second to
+  4MGas/s). (!18452)
 
 ### Bug fixes
 
