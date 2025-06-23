@@ -1652,6 +1652,11 @@ module Images = struct
         ~image_path
         ()
 
+    (* To use static images from the protected registry. *)
+    let mk_ci_image_master name =
+      Image.mk_external
+        ~image_path:("${ci_image_name_protected}/" ^ name ^ ":amd64--master")
+
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
 
@@ -1672,6 +1677,13 @@ module Images = struct
 
     let e2etest =
       mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
+
+    (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
+    let prebuild_master = mk_ci_image_master "prebuild"
+
+    let build_master = mk_ci_image_master "build"
+
+    let test_master = mk_ci_image_master "test"
   end
 end
 

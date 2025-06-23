@@ -669,9 +669,15 @@ module Images : sig
 
     val prebuild : Image.t
 
+    val prebuild_master : Image.t
+
     val build : Image.t
 
+    val build_master : Image.t
+
     val test : Image.t
+
+    val test_master : Image.t
 
     val e2etest : Image.t
   end
