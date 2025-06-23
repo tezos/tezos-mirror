@@ -4,6 +4,7 @@
 
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 
+use mir::ast::michelson_address::entrypoint;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use nom::combinator::map;
 use nom::error::{ErrorKind, ParseError};
@@ -20,6 +21,13 @@ use tezos_data_encoding::{
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct Parameter {
+    pub entrypoint: entrypoint::Entrypoint,
+    #[encoding(dynamic, bytes)]
+    pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
     pub pk: PublicKey,
 }
@@ -32,7 +40,7 @@ pub struct RevealContent {
 pub struct TransferContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameter: Option<()>,
+    pub parameters: Option<Parameter>,
 }
 
 pub enum OperationContent {
@@ -77,7 +85,7 @@ impl Operation {
 
 impl Operation {
     // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
-    // return a result. To avoid unwraping and risk a panic we're not implementing
+    // return a result. To avoid unwrapping and risk a panic we're not implementing
     // the trait exactly, but we expose a serialization function.
     pub fn rlp_append(&self, s: &mut rlp::RlpStream) -> Result<(), BinError> {
         let bytes = self.to_bytes()?;
@@ -345,7 +353,7 @@ mod tests {
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86b00ba3bed311a5d7b06dc4daf3c94c5c406927e4bcf920202a90100009d05b06ea36a6ad464d94dc07a38b77b80b577c1ae51bbd8d20105cd5aed496c1da02ac8f6e1541c363874bcde7e90e1f959c8f28ab52ec3fdbbf7d54b1dad4004f2b70da27ce35de18d77ea9efee413b5fb2b2a858be4d95e45acfe47a73b0d").unwrap();
 
         let operation = Operation::try_from_bytes(&operation_bytes)
-            .expect("Decoding operation should have succeded");
+            .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
     }
@@ -380,7 +388,7 @@ mod tests {
                         "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                     )
                     .unwrap(),
-                    parameter: None,
+                    parameters: None,
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
@@ -392,7 +400,90 @@ mod tests {
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c00e7670f32038107a59a2b9cfefae36ea21f5aa63c8b0201a90100c0843d000002298c03ed7d454a101eb7022bc95f7e5f41ac780026d58f30f5f8caf70878ad4efc82d71cff01b76e584958411e5a89ea2a8908e37ffc28f0af92fa651c32f6cc7362d9c735344d590360864fbf0b156c3443b108").unwrap();
 
         let operation = Operation::try_from_bytes(&operation_bytes)
-            .expect("Decoding operation should have succeded");
+            .expect("Decoding operation should have succeeded");
+
+        assert_eq!(operation, expected_operation);
+
+        // Also test the encoding
+        let kernel_bytes = expected_operation
+            .to_bytes()
+            .expect("Operation encoding should have succeed");
+
+        assert_eq!(operation_bytes, kernel_bytes)
+    }
+
+    #[test]
+    fn tezos_compatibility_for_smart_contract_address() {
+        // This test checks that deserialization of contract addresses is compatible with
+        // Tezos. The tested address is "KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d" and was
+        // serialized using the following command:
+        // $ octez-client normalize data '"KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d"' of type address --unparsing-mode Optimized
+        let address_bytes =
+            hex::decode("01a9845b61ac052cdd0428af72a35bf75151dc754800").unwrap();
+        let expected_address =
+            Contract::from_b58check("KT1Q36KWPSba7dHsH5E4ZsQHehrChc51e19d").unwrap();
+
+        let (_, address) = Contract::nom_read(&address_bytes)
+            .expect("Decoding operation should have succeeded");
+
+        assert_eq!(address, expected_address);
+    }
+
+    // The operation below is the transfer to a smart contract using the mockup mode of octez-client as follows:
+    //  $ alias mockup-client='./octez-client --mode mockup --base-dir /tmp/mockup --protocol PsRiotuma'
+    //  $ rm -rf /tmp/mockup
+    //  $ mockup-client create mockup
+    //  $ mockup-client originate contract my-counter transferring 0 from 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx' running michelson_test_scripts/entrypoints/simple_entrypoints.tz --burn-cap 0.1 --force
+    //  # Contract created on KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv
+    //  $ TRANSFER_HEX=$(mockup-client transfer 1 from 'tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx' to 'KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv'
+    // --entrypoint 'B' --arg '"Hello"' --burn-cap 0.1 --dry-run | grep Operation: | cut -d x -f 2)
+    // Tezos address added: tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx
+    //  $ octez-codec decode 022-PsRiotum.operation from "$TRANSFER_HEX"
+    //  $ mockup-client convert data '"Hello"' from michelson to binary
+    #[test]
+    fn tezos_compatibility_for_smart_contract_transfer() {
+        let branch_vec = HashType::b58check_to_hash(
+            &HashType::BlockHash,
+            "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU",
+        )
+        .unwrap();
+
+        let branch = BlockHash::from(H256::from_slice(&branch_vec));
+        let signature = UnknownSignature::from_base58_check("sigWG2yRsgHD3gFcD4HiXuTFckRQsLxyAedcsDW3aryutXBhWZ3ek3AbyrRHh3Zt8ZZxkEAtVUKzCRqTjMfj6xvP9HtVskuk").unwrap();
+
+        let expected_operation = Operation {
+            branch,
+            content: ManagerOperationContent::Transfer(ManagerOperation {
+                source: PublicKeyHash::from_b58check(
+                    "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                )
+                .unwrap(),
+                fee: 405_u64.into(),
+                counter: 2_u64.into(),
+                operation: TransferContent {
+                    amount: 1_000_000_u64.into(),
+                    destination: Contract::from_b58check(
+                        "KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv",
+                    )
+                    .unwrap(),
+                    parameters: Some(Parameter {
+                        entrypoint: entrypoint::Entrypoint::try_from("B").unwrap(),
+                        value: vec![
+                            0x01, 0x00, 0x00, 0x00, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f,
+                        ],
+                    }),
+                },
+                gas_limit: 1380_u64.into(),
+                storage_limit: 0_u64.into(),
+            }),
+            signature,
+        };
+
+        // This bytes sequence comes from the command just above the test
+        let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c0002298c03ed7d454a101eb7022bc95f7e5f41ac78950302e40a00c0843d014151d57ddff98da8cd49f0f2cbf89465bcf267a400ffff01420000000a010000000548656c6c6f3f391b739b8583427a69f0879cc5c5fd30bced4fcfc680fc37a39960e82dec2efbba8feae60b24f7fb4fdb4e553d9d9a34ac9c93b9e966da21b37ece0d63b00c").unwrap();
+
+        let operation = Operation::try_from_bytes(&operation_bytes)
+            .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
 

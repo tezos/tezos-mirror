@@ -78,7 +78,7 @@ pub enum EncodingError {
     Entrypoint(EntrypointError),
     #[error("Invalid serialization")]
     Bin(BinError),
-    // BinWriter error comes from the storage crate wich need to
+    // BinWriter error comes from the storage crate which need to
     // implement PartialEq + Display which is why we're keeping a
     // String instead of a BinError
     #[error("Storage error: Failed to encode a value with BinWriter: {0}")]
@@ -116,6 +116,10 @@ pub enum Error {
     Reboot,
     #[error(transparent)]
     Encoding(EncodingError),
+    #[error("Tried casting an Implicit account into an Originated account")]
+    ImplicitToOriginated,
+    #[error("Tried casting an Originated account into an Implicit account")]
+    OriginatedToImplicit,
 }
 
 impl From<PathError> for StorageError {
@@ -222,6 +226,8 @@ impl From<IndexableStorageError> for Error {
                 Error::Encoding(EncodingError::BinWriterError(msg))
             }
             IndexableStorageError::NomReadError(msg) => Error::NomReadError(msg),
+            IndexableStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
+            IndexableStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
         }
     }
 }
@@ -240,6 +246,8 @@ impl From<GenStorageError> for Error {
                 Error::Encoding(EncodingError::BinWriterError(msg))
             }
             GenStorageError::NomReadError(msg) => Error::NomReadError(msg),
+            GenStorageError::ImplicitToOriginated => Error::ImplicitToOriginated,
+            GenStorageError::OriginatedToImplicit => Error::OriginatedToImplicit,
         }
     }
 }

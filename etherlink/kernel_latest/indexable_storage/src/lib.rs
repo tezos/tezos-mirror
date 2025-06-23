@@ -43,6 +43,10 @@ pub enum IndexableStorageError {
     BinWriteError(String),
     #[error("Storage error: Failed to decode a value with NomReader: {0}")]
     NomReadError(String),
+    #[error("Tried casting an Implicit account into an Originated account")]
+    ImplicitToOriginated,
+    #[error("Tried casting an Originated account into an Implicit account")]
+    OriginatedToImplicit,
 }
 
 impl From<GenStorageError> for IndexableStorageError {
@@ -62,6 +66,12 @@ impl From<GenStorageError> for IndexableStorageError {
             }
             GenStorageError::BinWriteError(msg) => {
                 IndexableStorageError::BinWriteError(msg)
+            }
+            GenStorageError::ImplicitToOriginated => {
+                IndexableStorageError::ImplicitToOriginated
+            }
+            GenStorageError::OriginatedToImplicit => {
+                IndexableStorageError::OriginatedToImplicit
             }
         }
     }

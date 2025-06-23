@@ -585,6 +585,9 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_execution::account_storage::TezlinkAccount;
+    use tezos_tezlink::operation::Parameter;
+
     use crate::block_storage;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
@@ -688,6 +691,7 @@ mod tests {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn make_transaction_operation(
         fee: u64,
         counter: u64,
@@ -696,6 +700,7 @@ mod tests {
         source: PublicKeyHash,
         amount: Narith,
         destination: Contract,
+        parameters: Option<Parameter>,
     ) -> Operation {
         make_operation(
             fee,
@@ -706,7 +711,7 @@ mod tests {
             OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
-                parameter: None,
+                parameters,
             }),
         )
     }
@@ -1102,7 +1107,7 @@ mod tests {
 
         bootstrap1
             .set_balance(&mut host, &50_u64.into())
-            .expect("Set balance should have suceed");
+            .expect("Set balance should have succeed");
 
         // Drop the mutable access to bootstrap1
         let bootstrap1 = bootstrap1;
@@ -1148,6 +1153,7 @@ mod tests {
             src.clone(),
             35_u64.into(),
             bootstrap2_contract,
+            None,
         );
 
         // Bootstrap 1 reveals its manager and then

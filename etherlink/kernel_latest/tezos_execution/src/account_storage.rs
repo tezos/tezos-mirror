@@ -15,17 +15,6 @@ use tezos_smart_rollup::{
 use tezos_smart_rollup_host::path::{concat, OwnedPath, RefPath};
 use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 
-#[derive(Debug, PartialEq)]
-pub struct TezlinkImplicitAccount {
-    path: OwnedPath,
-}
-
-impl From<OwnedPath> for TezlinkImplicitAccount {
-    fn from(path: OwnedPath) -> Self {
-        Self { path }
-    }
-}
-
 // This enum is inspired of `src/proto_alpha/lib_protocol/manager_repr.ml`
 // A manager can be:
 //  - a public key, it means that the account is revealed
@@ -46,6 +35,10 @@ const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
 
 const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
 
+const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
+
+const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
+
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
     // see `octez-codec describe alpha.contract binary schema`
@@ -58,15 +51,61 @@ fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::
     Ok(OwnedPath::try_from(path_string)?)
 }
 
+pub trait TezlinkAccount {
+    fn path(&self) -> &OwnedPath;
+
+    /// Get the **balance** of an account in Mutez held by the account.
+    fn balance(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        let path = concat(self.path(), &BALANCE_PATH)?;
+        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
+    }
+
+    /// Set the **balance** of an account in Mutez held by the account.
+    fn set_balance(
+        &mut self,
+        host: &mut impl Runtime,
+        balance: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &BALANCE_PATH)?;
+        store_bin(balance, host, &path)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TezlinkImplicitAccount {
+    path: OwnedPath,
+}
+
+impl From<OwnedPath> for TezlinkImplicitAccount {
+    fn from(path: OwnedPath) -> Self {
+        Self { path }
+    }
+}
+
+impl TezlinkAccount for TezlinkImplicitAccount {
+    #[inline]
+    fn path(&self) -> &OwnedPath {
+        &self.path
+    }
+}
+
 impl TezlinkImplicitAccount {
     // We must provide the context object to get the full path in the durable storage
     pub fn from_contract(
         context: &context::Context,
         contract: &Contract,
     ) -> Result<Self, tezos_storage::error::Error> {
-        let index = context::contracts::index(context)?;
-        let path = concat(&index, &account_path(contract)?)?;
-        Ok(path.into())
+        match contract {
+            Contract::Implicit(_) => {
+                let index = context::contracts::index(context)?;
+                let path = concat(&index, &account_path(contract)?)?;
+                Ok(path.into())
+            }
+            _ => Err(tezos_storage::error::Error::OriginatedToImplicit),
+        }
     }
 
     pub fn from_public_key_hash(
@@ -85,7 +124,7 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
     ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(&self.path, &COUNTER_PATH)?;
+        let path = concat(self.path(), &COUNTER_PATH)?;
         Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
     }
 
@@ -95,34 +134,15 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         counter: &Narith,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &COUNTER_PATH)?;
+        let path = concat(self.path(), &COUNTER_PATH)?;
         store_bin(counter, host, &path)
-    }
-
-    /// Get the **balance** of an account in Mutez held by the account.
-    pub fn balance(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<Narith, tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        Ok(read_optional_nom_value(host, &path)?.unwrap_or(0_u64.into()))
-    }
-
-    /// Set the **balance** of an account in Mutez held by the account.
-    pub fn set_balance(
-        &mut self,
-        host: &mut impl Runtime,
-        balance: &Narith,
-    ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        store_bin(balance, host, &path)
     }
 
     pub fn manager(
         &self,
         host: &impl Runtime,
     ) -> Result<Manager, tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         let manager: Manager = read_nom_value(host, &path)?;
         Ok(manager)
     }
@@ -135,7 +155,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key_hash: &PublicKeyHash,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         // The tag for public key hash is 0 (see the Manager enum above)
         let mut buffer = vec![0_u8];
         public_key_hash
@@ -153,7 +173,7 @@ impl TezlinkImplicitAccount {
         host: &mut impl Runtime,
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
-        let path = concat(&self.path, &MANAGER_PATH)?;
+        let path = concat(self.path(), &MANAGER_PATH)?;
         // The tag for public key hash is 1 (see the Manager enum above)
         let mut buffer = vec![1_u8];
         public_key
@@ -191,6 +211,66 @@ impl TezlinkImplicitAccount {
             account.set_manager_public_key_hash(host, pkh)?;
         }
         Ok(false)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct TezlinkOriginatedAccount {
+    path: OwnedPath,
+}
+
+impl From<OwnedPath> for TezlinkOriginatedAccount {
+    fn from(path: OwnedPath) -> Self {
+        Self { path }
+    }
+}
+
+impl TezlinkAccount for TezlinkOriginatedAccount {
+    #[inline]
+    fn path(&self) -> &OwnedPath {
+        &self.path
+    }
+}
+
+impl TezlinkOriginatedAccount {
+    pub fn from_contract(
+        context: &context::Context,
+        contract: &Contract,
+    ) -> Result<Self, tezos_storage::error::Error> {
+        match contract {
+            Contract::Originated(_) => {
+                let index = context::contracts::index(context)?;
+                let path = concat(&index, &account_path(contract)?)?;
+                Ok(path.into())
+            }
+            _ => Err(tezos_storage::error::Error::ImplicitToOriginated),
+        }
+    }
+
+    pub fn code(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+        let path = concat(self.path(), &CODE_PATH)?;
+        Ok(host.store_read_all(&path)?)
+    }
+
+    pub fn storage(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Vec<u8>, tezos_storage::error::Error> {
+        let path = concat(self.path(), &STORAGE_PATH)?;
+        Ok(host.store_read_all(&path)?)
+    }
+
+    pub fn set_storage(
+        &self,
+        host: &mut impl Runtime,
+        data: &[u8],
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &STORAGE_PATH)?;
+        host.store_write_all(&path, data)?;
+        Ok(())
     }
 }
 
@@ -248,7 +328,7 @@ mod test {
             &balance_array,
         );
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -274,7 +354,7 @@ mod test {
         counter.bin_write(&mut bytes).unwrap();
         set_bootstrap1_key(&mut host, &RefPath::assert_from(b"/counter"), &bytes);
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -296,7 +376,7 @@ mod test {
 
         let balance = 4579_u64.into();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -322,7 +402,7 @@ mod test {
 
         let counter: Narith = 6u64.into();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -354,7 +434,7 @@ mod test {
             &public_key_hexa,
         );
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         let contract = Contract::from_b58check(BOOTSTRAP1_PKH)
@@ -380,7 +460,7 @@ mod test {
     fn test_set_read_manager_public_key() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1
@@ -394,7 +474,7 @@ mod test {
 
         let () = account
             .set_manager_public_key(&mut host, &public_key)
-            .expect("set_manager_public_key shoud have succeeded");
+            .expect("set_manager_public_key should have succeeded");
 
         let manager = Manager::Revealed(public_key);
 
@@ -409,7 +489,7 @@ mod test {
     fn test_set_read_manager_public_key_hash() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1
@@ -425,7 +505,7 @@ mod test {
 
         let () = account
             .set_manager_public_key_hash(&mut host, &pkh)
-            .expect("set_manager_public_key_hash shoud have succeeded");
+            .expect("set_manager_public_key_hash should have succeeded");
 
         let manager = Manager::NotRevealed(pkh);
 
@@ -440,7 +520,7 @@ mod test {
     fn test_account_initialization() {
         let mut host = MockKernelHost::default();
 
-        // Initalize path for Tezlink context at /tezlink/context
+        // Initialize path for Tezlink context at /tezlink/context
         let context = context::Context::init_context();
 
         // Create an account for bootstrap1

@@ -175,7 +175,7 @@ impl NomReader<'_> for Empty {
 
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
-    pub storage: Option<Empty>,
+    pub storage: Option<Vec<u8>>,
     pub lazy_storage_diff: Option<Empty>,
     pub balance_updates: Vec<BalanceUpdate>,
     pub ticket_receipt: Vec<Empty>,
