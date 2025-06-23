@@ -105,6 +105,24 @@ let create_dir ?runner dir =
   let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
   Lwt.return_unit
 
+(* See the FIXME below: this should belong to service_manager but
+   requires splitting web in order to avoid dependency cycle *)
+let service_manager_receiver notifier =
+  let open Types in
+  match notifier with
+  | Notifier_null -> Alert.null_receiver
+  | Notifier_slack {name; slack_bot_token; slack_channel_id} ->
+      Alert.slack_bottoken_receiver
+        ~name:(Format.asprintf "%s_service_manager" name)
+        ~channel:slack_channel_id
+        ~bot_token:slack_bot_token
+        ~title:"service_manager: process crashed"
+        ~text:
+          {|{{ range .Alerts }}service_manager: process crashed: {{ .Labels.name }} on agent {{ .Labels.agent }}
+            {{ .Annotations.summary }}
+      {{ end }}|}
+        ()
+
 module Node = struct
   include Tezt_tezos.Node
 
@@ -171,6 +189,7 @@ module Node = struct
          that serves the metrics and a frontend (not a web frontend), that
          show information about the different tezt-cloud components *)
       let metric_name = "service_manager_process_alive" in
+      let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let alert =
         Alert.make
           ~description:
@@ -181,6 +200,7 @@ module Node = struct
                (Agent.name agent)
                executable)
           ~name
+          ~route:(Alert.route receiver)
           ~severity:Alert.Critical
           ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
           ()
