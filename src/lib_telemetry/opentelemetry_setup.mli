@@ -8,4 +8,9 @@
 
 (** Set Opentelemetry global options and registers the Lwt compatible ambient
     context. *)
-val setup : service_name:string -> Opentelemetry_config.t -> unit
+val setup :
+  data_dir:string ->
+  service_namespace:string ->
+  service_name:string ->
+  Opentelemetry_config.t ->
+  unit Lwt.t

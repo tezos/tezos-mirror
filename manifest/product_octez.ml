@@ -4536,6 +4536,7 @@ let octez_telemetry =
         octez_rpc_http_client_unix;
         opentelemetry_ambient_context_lwt;
         octez_workers;
+        octez_stdlib_unix |> open_;
       ]
 
 let _bip39_generator =
