@@ -1571,6 +1571,11 @@ module Images = struct
       ~image_path
       ()
 
+  (** The rust toolchain image (static tag [master]) *)
+  let rust_toolchain_master =
+    let image_path = "${rust_toolchain_image_name_protected}:master" in
+    Image.mk_external ~image_path
+
   (** The image containing all dependencies required for Rust SDK bindings *)
   let rust_sdk_bindings =
     (* The job that builds the rust-sdk-bindings image.
@@ -1616,6 +1621,11 @@ module Images = struct
     in
     let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
     Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
+
+  (** The jsonnet image (static tag [master]) *)
+  let jsonnet_master =
+    let image_path = "${jsonnet_image_name_protected}:master" in
+    Image.mk_external ~image_path
 
   module CI = struct
     (* The job that builds the CI images.

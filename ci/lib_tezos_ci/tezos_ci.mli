@@ -654,11 +654,15 @@ module Images : sig
 
   val rust_toolchain : Image.t
 
+  val rust_toolchain_master : Image.t
+
   val rust_sdk_bindings : Image.t
 
   val trivy : Image.t
 
   val jsonnet : Image.t
+
+  val jsonnet_master : Image.t
 
   module CI : sig
     val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
