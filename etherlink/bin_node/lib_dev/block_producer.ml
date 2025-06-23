@@ -10,8 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
-  chain_family : L2_types.ex_chain_family;
-  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
+  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -136,12 +135,12 @@ let take_delayed_transactions maximum_number_of_chunks =
   return (delayed_transactions, remaining_cumulative_size)
 
 let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
-    ~smart_rollup_address ~transactions_and_objects ~delayed_hashes head_info =
+    ~smart_rollup_address ~transactions_and_objects ~delayed_hashes
+    ~hash_of_tx_object head_info =
   let open Lwt_result_syntax in
   let transactions, tx_hashes =
     List.to_seq transactions_and_objects
-    |> Seq.map (fun (raw, (obj : Ethereum_types.legacy_transaction_object)) ->
-           (raw, obj.hash))
+    |> Seq.map (fun (raw, obj) -> (raw, hash_of_tx_object obj))
     |> Seq.split
     |> fun (l, r) -> (List.of_seq l, List.of_seq r)
   in
@@ -192,6 +191,38 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
   in
   return confirmed_txs
 
+type _ transaction_object_list =
+  | Evm_tx_objects :
+      (string * Ethereum_types.legacy_transaction_object) list
+      -> L2_types.evm_chain_family transaction_object_list
+  | Michelson_tx_objects :
+      (string * Tezos_types.Operation.t) list
+      -> L2_types.michelson_chain_family transaction_object_list
+
+let produce_block_with_transactions (type f)
+    ~(transactions_and_objects : f transaction_object_list option)
+    ~(tx_container : f Services_backend_sig.tx_container) =
+  match tx_container with
+  | Evm_tx_container (module Tx_container) ->
+      let transactions_and_objects =
+        match transactions_and_objects with
+        | None -> []
+        | Some (Evm_tx_objects l) -> l
+      in
+      produce_block_with_transactions
+        ~transactions_and_objects
+        ~hash_of_tx_object:
+          Tx_queue_types.Eth_transaction_object.hash_of_tx_object
+  | Michelson_tx_container (module Tx_container) ->
+      let transactions_and_objects =
+        match transactions_and_objects with
+        | None -> []
+        | Some (Michelson_tx_objects l) -> l
+      in
+      produce_block_with_transactions
+        ~transactions_and_objects
+        ~hash_of_tx_object:Tx_queue_types.Tezlink_operation.hash_of_tx_object
+
 let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
     (tx_object : Ethereum_types.legacy_transaction_object) =
   let open Lwt_result_syntax in
@@ -219,25 +250,26 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
         in
         return `Drop
 
-let pop_valid_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~(tx_container :
-       L2_types.evm_chain_family Services_backend_sig.tx_container)
-    (head_info : Evm_context.head) ~maximum_cumulative_size =
+let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
+    (head_info : Evm_context.head) ~maximum_cumulative_size :
+    f transaction_object_list tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
   (* Skip validation if chain_family is Michelson. *)
-  match chain_family with
-  | L2_types.Michelson ->
+  match tx_container with
+  | Michelson_tx_container (module Tx_container) ->
       let initial_validation_state = () in
-      Tx_container.pop_transactions
-        ~maximum_cumulative_size
-        ~validate_tx:(fun () _ _ -> return (`Keep ()))
-        ~initial_validation_state
-  | EVM ->
+      let* l =
+        Tx_container.pop_transactions
+          ~maximum_cumulative_size
+          ~validate_tx:(fun () _ _ -> return (`Keep ()))
+          ~initial_validation_state
+      in
+      return (Michelson_tx_objects l)
+  | Evm_tx_container (module Tx_container) ->
       (* Low key optimization to avoid even checking the txpool if there is not
          enough space for the smallest transaction. *)
       if maximum_cumulative_size <= minimum_ethereum_transaction_size then
-        return []
+        return (Evm_tx_objects [])
       else
         let read = Evm_state.read head_info.evm_state in
         let* minimum_base_fee_per_gas =
@@ -272,27 +304,32 @@ let pop_valid_tx (type f) ~(chain_family : f L2_types.chain_family)
                 addr_nonce = String.Map.empty;
               } )
         in
-        Tx_container.pop_transactions
-          ~maximum_cumulative_size
-          ~validate_tx:(validate_tx ~maximum_cumulative_size)
-          ~initial_validation_state
+        let* l =
+          Tx_container.pop_transactions
+            ~maximum_cumulative_size
+            ~validate_tx:(validate_tx ~maximum_cumulative_size)
+            ~initial_validation_state
+        in
+        return (Evm_tx_objects l)
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
-    ~sequencer_key ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
-    ~(tx_container :
-       L2_types.evm_chain_family Services_backend_sig.tx_container) head_info =
+let produce_block_if_needed (type f) ~cctxt ~smart_rollup_address ~sequencer_key
+    ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
+    ~(tx_container : f Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
   let* transactions_and_objects =
     pop_valid_tx
-      ~chain_family
       ~tx_container
       head_info
       ~maximum_cumulative_size:remaining_cumulative_size
   in
-  let n = List.length transactions_and_objects + List.length delayed_hashes in
+  let n_txs =
+    match transactions_and_objects with
+    | Evm_tx_objects l -> List.length l
+    | Michelson_tx_objects l -> List.length l
+  in
+  let n = n_txs + List.length delayed_hashes in
   if force || n > 0 then
     let* confirmed_txs =
       produce_block_with_transactions
@@ -300,9 +337,13 @@ let produce_block_if_needed ~cctxt ~chain_family ~smart_rollup_address
         ~cctxt
         ~timestamp
         ~smart_rollup_address
-        ~transactions_and_objects
+        ~transactions_and_objects:(Some transactions_and_objects)
         ~delayed_hashes
+        ~tx_container
         head_info
+    in
+    let (module Tx_container) =
+      Services_backend_sig.tx_container_module tx_container
     in
     let* () =
       Tx_container.confirm_transactions
@@ -330,9 +371,9 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block ~chain_family ~cctxt ~smart_rollup_address ~sequencer_key
-    ~force ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
-    ~tx_container =
+let produce_block (type f) ~cctxt ~smart_rollup_address ~sequencer_key ~force
+    ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
+    ~(tx_container : f Services_backend_sig.tx_container) =
   let open Lwt_result_syntax in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
@@ -360,16 +401,16 @@ let produce_block ~chain_family ~cctxt ~smart_rollup_address ~sequencer_key
           ~cctxt
           ~timestamp
           ~smart_rollup_address
-          ~transactions_and_objects:[]
+          ~transactions_and_objects:None
           ~delayed_hashes:[]
+          ~tx_container
           head_info
       in
-      (* Is always be zero, only to be "future" proof *)
+      (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
       return (`Block_produced (Seq.length hashes))
     else
       produce_block_if_needed
         ~cctxt
-        ~chain_family
         ~sequencer_key
         ~timestamp
         ~smart_rollup_address
@@ -396,13 +437,11 @@ module Handlers = struct
           smart_rollup_address;
           sequencer_key;
           maximum_number_of_chunks;
-          chain_family = Ex_chain_family chain_family;
-          tx_container;
+          tx_container = Ex_tx_container tx_container;
         } =
           state
         in
         produce_block
-          ~chain_family
           ~cctxt
           ~smart_rollup_address
           ~sequencer_key

@@ -404,8 +404,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         smart_rollup_address = smart_rollup_address_b58;
         sequencer_key = sequencer_config.sequencer;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
-        chain_family = Ex_chain_family chain_family;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
   in
   let* () =
