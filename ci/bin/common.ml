@@ -1005,6 +1005,8 @@ module Tezt = struct
         "layer1";
         "tezos2";
         "etherlink";
+        (* Tags that change alert thresholds. *)
+        "memory_hungry";
       ]
     in
     let junit_tags =
