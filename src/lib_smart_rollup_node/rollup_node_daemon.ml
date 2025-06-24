@@ -124,6 +124,12 @@ let register_outbox_messages (module Plugin : Protocol_plugin_sig.S) node_ctxt
   let indexes = List.map fst outbox_messages in
   Node_context.register_outbox_messages node_ctxt ~outbox_level:level ~indexes
 
+let etherlink_current_block pvm_plugin node_ctxt ctxt =
+  let open Lwt_syntax in
+  if node_ctxt.Node_context.config.etherlink then
+    Etherlink_specific.current_level pvm_plugin ctxt
+  else return_none
+
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
@@ -140,6 +146,9 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let* () = handle_protocol_migration ~catching_up state head in
   let* rollup_ctxt = previous_context node_ctxt ~predecessor in
   let module Plugin = (val state.plugin) in
+  let*! etherlink_start_block =
+    etherlink_current_block (module Plugin.Pvm) node_ctxt rollup_ctxt
+  in
   let start_timestamp = Time.System.now () in
   let* inbox_hash, inbox, inbox_witness, messages =
     Plugin.Inbox.process_head node_ctxt ~predecessor head
@@ -167,6 +176,9 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
       ~predecessor:(Layer1.head_of_header predecessor)
       (Layer1.head_of_header head)
       (inbox, messages)
+  in
+  let*! etherlink_end_block =
+    etherlink_current_block (module Plugin.Pvm) node_ctxt ctxt
   in
   let*! context_hash = Context.commit ctxt in
   let* commitment_hash =
@@ -211,9 +223,17 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   in
   let* () = Node_context.save_l2_block node_ctxt l2_block in
   let end_timestamp = Time.System.now () in
+  let total_time = Ptime.diff end_timestamp start_timestamp in
+  let process_time = Ptime.diff end_timestamp fetch_timestamp in
+  let*! () =
+    Daemon_event.etherlink_blocks_processed
+      ~etherlink_start_block
+      ~etherlink_end_block
+      process_time
+  in
   Metrics.wrap (fun () ->
-      Metrics.Inbox.set_process_time @@ Ptime.diff end_timestamp fetch_timestamp ;
-      Metrics.Inbox.set_total_time @@ Ptime.diff end_timestamp start_timestamp) ;
+      Metrics.Inbox.set_process_time process_time ;
+      Metrics.Inbox.set_total_time total_time) ;
   return l2_block
 
 let rec process_l1_block ({node_ctxt; _} as state) ~catching_up
