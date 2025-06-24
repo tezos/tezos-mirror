@@ -61,6 +61,30 @@ let link_batch_scope scope batch =
           Some (Opentelemetry.Scope.to_span_link msg_scope))
     batch
 
+let add_etherlink_attrs ?scope state order =
+  if state.node_ctxt.config.etherlink then
+    match (order, Opentelemetry.Scope.get_ambient_scope ?scope ()) with
+    | None, _ | _, None -> ()
+    | Some order, Some scope ->
+        Opentelemetry.Scope.add_attrs scope @@ fun () ->
+        (* The sequencer sets the order as the etherlink block number for
+           them to be injected on L1 in order, so we reuse that for the
+           trace here. *)
+        [("etherlink.block.number", `Int (Z.to_int order))]
+
+let add_etherlink_events name state scope msgs =
+  if state.node_ctxt.config.etherlink then
+    List.iter
+      (fun msg ->
+        match L2_message.order msg with
+        | Some order ->
+            Opentelemetry.Scope.add_event scope @@ fun () ->
+            Opentelemetry_lwt.Event.make
+              ~attrs:[("etherlink.block.number", `Int (Z.to_int order))]
+              name
+        | _ -> ())
+      msgs
+
 let inject_batch ?order state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult ~service_name:"Batcher" "inject_batch"
@@ -68,8 +92,15 @@ let inject_batch ?order state (l2_messages : L2_message.t list) =
   Opentelemetry.Scope.add_attrs scope (fun () ->
       match order with
       | None -> []
-      | Some order -> [("rollup_node.batcher.order", `Int (Z.to_int order))]) ;
+      | Some order ->
+          [("rollup_node.batcher.inject.order", `Int (Z.to_int order))]) ;
+  add_etherlink_attrs ~scope state order ;
   link_batch_scope scope l2_messages ;
+  add_etherlink_events
+    "rollup_node.batcher.inject_etherlink_block"
+    state
+    scope
+    l2_messages ;
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
   let* l1_id =
@@ -255,6 +286,7 @@ let add_messages_into_heap ~drop_duplicate state =
 let on_register ?order ~drop_duplicate state (messages : string list) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
+  add_etherlink_attrs state order ;
   let*? messages =
     make_l2_messages ?order ~unique:(not drop_duplicate) state messages
   in
