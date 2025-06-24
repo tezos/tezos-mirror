@@ -27,6 +27,9 @@
 
 type net_config
 
+val load_config_from_url :
+  Uri.t -> Config_file.blockchain_network tzresult Lwt.t
+
 (* NOTE: Some fields are not documented.
  *       Please help complete it if you can. *)
 
