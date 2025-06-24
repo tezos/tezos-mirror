@@ -115,6 +115,12 @@ module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm" ()
 
+  let dal_echo_kernel_bandwidth =
+    Uses.make
+      ~tag:"dal_echo_kernel_bandwidth"
+      ~path:"dal_echo_kernel_bandwidth.wasm"
+      ()
+
   let debug_kernel =
     Uses.make
       ~tag:"debug_kernel"

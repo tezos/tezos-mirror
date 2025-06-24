@@ -4,7 +4,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm
+KERNELS=tx_kernel.wasm tx_kernel_dal.wasm dal_echo_kernel.wasm dal_echo_kernel_bandwidth.wasm
 SDK_DIR=src/kernel_sdk
 DEMO_DIR=src/kernel_tx_demo
 
@@ -39,6 +39,10 @@ dal_echo_kernel.wasm:
 	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel.wasm $@
 	@wasm-strip $@
 
+dal_echo_kernel_bandwidth.wasm:
+	@make -C src/kernel_dal_echo dal_echo_kernel_bandwidth
+	@cp src/kernel_dal_echo/target/wasm32-unknown-unknown/release/dal_echo_kernel_bandwidth.wasm $@
+	@wasm-strip $@
 
 .PHONY: build
 build: ${KERNELS} kernel_sdk

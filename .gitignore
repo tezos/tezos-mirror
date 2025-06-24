@@ -127,6 +127,7 @@ tx_kernel.wasm
 tx_kernel_dal.wasm
 tx-demo-collector
 dal_echo_kernel.wasm
+dal_echo_kernel_bandwidth.wasm
 sequencer.wasm
 evm_benchmark_kernel.wasm
 evm_unstripped_installer.wasm
