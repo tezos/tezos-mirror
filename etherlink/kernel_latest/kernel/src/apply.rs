@@ -309,7 +309,7 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
 }
 
 #[allow(clippy::too_many_arguments)]
-fn revm_run_transaction<Host: Runtime>(
+pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
     caller: H160,
@@ -548,7 +548,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     log_transaction_type(host, to, &call_data);
     let value = transaction.value;
     let execution_outcome = if is_revm_enabled(host)? {
-        revm_run_transaction(
+        match revm_run_transaction(
             host,
             block_constants,
             caller,
@@ -558,7 +558,17 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             call_data,
             effective_gas_price,
             transaction.access_list.clone(),
-        )?
+        ) {
+            Ok(outcome) => outcome,
+            Err(err) => {
+                return Err(Error::InvalidRunTransaction(
+                    evm_execution::EthereumError::WrappedError(Cow::Owned(
+                        err.to_string(),
+                    )),
+                )
+                .into());
+            }
+        }
     } else {
         match run_transaction(
             host,
