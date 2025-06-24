@@ -182,8 +182,7 @@ let level_opt_name = "--level"
 
 let other_accounts_opt_name = "--other-accounts"
 
-let supported_network =
-  List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
+let supported_networks = List.map fst Yes_wallet_lib.supported_networks
 
 let force = ref false
 
@@ -231,7 +230,7 @@ let usage () =
       pp_print_list
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
-    supported_network
+    supported_networks
     active_bakers_only_opt_name
     staking_share_opt_name
     network_opt_name
@@ -239,7 +238,7 @@ let usage () =
       pp_print_list
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
-    supported_network
+    supported_networks
     other_accounts_opt_name
     alias_file_opt_name
     force_opt_name
@@ -330,7 +329,7 @@ let () =
         (* FIME this is an uggly hack, but hey -lets' force alias files
            to have a .json extension.*)
         || String.ends_with ~suffix:alias_file_extension arg
-        || List.mem (String.lowercase_ascii arg) supported_network)
+        || List.mem (String.lowercase_ascii arg) supported_networks)
       argv
   in
   let active_bakers_only =
@@ -357,7 +356,7 @@ let () =
           filter t
       | opt :: net :: t
         when opt = network_opt_name
-             && List.mem (String.lowercase_ascii net) supported_network ->
+             && List.mem (String.lowercase_ascii net) supported_networks ->
           filter t
       | h :: t -> h :: filter t
     in
