@@ -239,259 +239,63 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
-    use primitive_types::{H160 as PH160, U256 as PU256};
     use revm::{
         context::{
             result::{ExecutionResult, Output},
             transaction::AccessList,
-            BlockEnv, CfgEnv, ContextTr, LocalContext, TxEnv,
         },
-        context_interface::block::BlobExcessGasAndPrice,
-        primitives::{hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256},
+        primitives::{hex::FromHex, Address, Bytes, U256},
         state::{AccountInfo, Bytecode},
-        Context, Database, ExecuteCommitEvm, Journal, MainBuilder,
     };
     use serde_json::Value;
-    use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use utilities::{block_env, dummy_block_constants, etherlink_vm_db, evm, tx_env};
+    use utilities::{block_constants_with_fees, block_constants_with_no_fees};
 
+    use crate::world_state_handler::new_world_state_handler;
     use crate::{
-        database::EtherlinkVMDB, precompile_provider::EtherlinkPrecompiles,
-        run_transaction, world_state_handler::account_path, ExecutionOutcome,
-    };
-    use crate::{
-        test::utilities::empty_fees, world_state_handler::new_world_state_handler,
+        precompile_provider::EtherlinkPrecompiles, run_transaction,
+        world_state_handler::account_path, ExecutionOutcome,
     };
 
     mod utilities {
-        use revm::{
-            context::Evm,
-            handler::{instructions::EthInstructions, EthPrecompiles},
-            interpreter::interpreter::EthInterpreter,
-        };
-
-        use crate::DEFAULT_SPEC_ID;
-
+        use primitive_types::{H160 as PH160, U256 as PU256};
+        use tezos_ethereum::block::{BlockConstants, BlockFees};
         const ETHERLINK_CHAIN_ID: u64 = 42793;
 
-        use super::*;
-
-        pub(crate) fn block_env(number: Option<U256>, gas_limit: u64) -> BlockEnv {
-            BlockEnv {
-                number: number.unwrap_or(U256::from(1)),
-                beneficiary: Address::ZERO,
-                timestamp: U256::from(0),
-                gas_limit,
-                basefee: 0,
-                difficulty: U256::ZERO,
-                prevrandao: Some(FixedBytes::new([0; 32])),
-                blob_excess_gas_and_price: Some(BlobExcessGasAndPrice::new(0, 1)),
-            }
-        }
-
-        pub(crate) fn tx_env(
-            caller: Address,
-            destination: Option<Address>,
-            gas_limit: u64,
-            gas_price: u128,
-            value: U256,
-            data: Bytes,
-            nonce: Option<u64>,
-        ) -> TxEnv {
-            let kind = match destination {
-                Some(address) => TxKind::Call(address),
-                None => TxKind::Create,
-            };
-
-            TxEnv {
-                tx_type: 2,
-                caller,
-                gas_limit,
-                gas_price,
-                kind,
-                value,
-                data,
-                nonce: nonce.unwrap_or_default(),
-                chain_id: Some(ETHERLINK_CHAIN_ID),
-                access_list: AccessList(vec![]),
-                gas_priority_fee: None,
-                blob_hashes: vec![],
-                max_fee_per_blob_gas: 0,
-                authorization_list: vec![],
-            }
-        }
-
-        pub(crate) fn block_constants(block_env: &BlockEnv) -> BlockConstants {
-            BlockConstants::first_block(
-                PU256::from_little_endian(block_env.number.as_le_slice()),
-                PU256::from(1),
-                BlockFees::new(
-                    PU256::from(1),
-                    PU256::from(block_env.basefee),
-                    PU256::from(1),
-                ),
-                block_env.gas_limit,
-                PH160::from(block_env.beneficiary.into_array()),
-            )
-        }
-
-        pub(crate) fn dummy_block_constants() -> BlockConstants {
+        pub(crate) fn block_constants_with_fees() -> BlockConstants {
             BlockConstants::first_block(
                 PU256::from(1),
-                PU256::from(1),
+                PU256::from(ETHERLINK_CHAIN_ID),
                 BlockFees::new(PU256::from(1), PU256::from(1), PU256::from(1)),
                 30_000_000,
                 PH160::zero(),
             )
         }
 
-        pub(crate) fn empty_fees() -> BlockConstants {
+        pub(crate) fn block_constants_with_no_fees() -> BlockConstants {
             BlockConstants::first_block(
                 PU256::from(1),
-                PU256::from(1),
+                PU256::from(ETHERLINK_CHAIN_ID),
                 BlockFees::new(PU256::zero(), PU256::zero(), PU256::zero()),
                 30_000_000,
                 PH160::zero(),
             )
         }
-
-        pub(crate) fn etherlink_vm_db<'a>(
-            commit_status: Option<bool>,
-            block_env: &BlockEnv,
-        ) -> EtherlinkVMDB<'a, MockKernelHost> {
-            let commit_status = Box::leak(Box::new(commit_status.unwrap_or(true)));
-            let host = Box::leak(Box::new(MockKernelHost::default()));
-            let world_state_handler =
-                Box::leak(Box::new(new_world_state_handler().unwrap()));
-            let block_constants = Box::leak(Box::new(block_constants(block_env)));
-
-            EtherlinkVMDB::new(host, block_constants, world_state_handler, commit_status)
-        }
-
-        type EvmContext<'a> = Evm<
-            Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, MockKernelHost>>,
-            (),
-            EthInstructions<
-                EthInterpreter,
-                Context<
-                    &'a BlockEnv,
-                    &'a TxEnv,
-                    CfgEnv,
-                    EtherlinkVMDB<'a, MockKernelHost>,
-                >,
-            >,
-            EthPrecompiles,
-        >;
-
-        pub(crate) fn evm<'a>(
-            db: EtherlinkVMDB<'a, MockKernelHost>,
-            block: &'a BlockEnv,
-            tx: &'a TxEnv,
-        ) -> EvmContext<'a> {
-            let cfg = CfgEnv::new()
-                .with_chain_id(ETHERLINK_CHAIN_ID)
-                .with_spec(DEFAULT_SPEC_ID);
-
-            let context: Context<
-                BlockEnv,
-                TxEnv,
-                CfgEnv,
-                EtherlinkVMDB<'a, MockKernelHost>,
-                Journal<EtherlinkVMDB<'a, MockKernelHost>>,
-                (),
-                LocalContext,
-            > = Context::new(db, DEFAULT_SPEC_ID);
-
-            context
-                .with_block(block)
-                .with_tx(tx)
-                .with_cfg(cfg)
-                .build_mainnet()
-        }
     }
 
     #[test]
     fn test_simple_transfer() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let precompiles = EtherlinkPrecompiles::new();
+        let block_constants = block_constants_with_no_fees();
+
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let destination =
             Address::from_hex("2222222222222222222222222222222222222222").unwrap();
-        let value = U256::from(5);
 
-        let block = block_env(None, 1_000_000);
-        let tx = tx_env(
-            caller,
-            Some(destination),
-            block.gas_limit,
-            0,
-            value,
-            Bytes::new(),
-            None,
-        );
-
-        let mut db = etherlink_vm_db(None, &block);
-
-        let account_info = AccountInfo {
-            balance: U256::MAX,
-            nonce: 0,
-            code_hash: Default::default(),
-            code: None,
-        };
-
-        db.insert_account_info(caller, account_info);
-
-        let mut evm = evm(db, &block, &tx);
-
-        let account_caller_pre_tx = evm.db_mut().basic(caller).unwrap().unwrap();
-        let account_destination_pre_tx =
-            evm.db_mut().basic(destination).unwrap().unwrap();
-
-        // Check balances before executing the transfer
-        assert_eq!(account_caller_pre_tx.balance, U256::MAX);
-        assert_eq!(account_destination_pre_tx.balance, U256::ZERO);
-
-        let execution_result = evm.transact_commit(&tx).unwrap();
-
-        // Check the outcome of the transaction
-        match execution_result {
-            ExecutionResult::Success { .. } => (),
-            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
-                panic!("Simple transfer should have succeeded")
-            }
-        }
-
-        // Check balances after executing the transfer
-        let account_caller_post_tx = evm.db_mut().basic(caller).unwrap().unwrap();
-        let account_destination_post_tx =
-            evm.db_mut().basic(destination).unwrap().unwrap();
-
-        assert_eq!(
-            account_caller_post_tx.balance,
-            U256::MAX.checked_sub(value).unwrap()
-        );
-        assert_eq!(account_destination_post_tx.balance, value);
-    }
-
-    #[test]
-    fn test_contract_call_sload_sstore() {
-        let caller =
-            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
-        let contract =
-            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
-
-        let block = block_env(None, 10_000_000);
-        let tx = tx_env(
-            caller,
-            Some(contract),
-            block.gas_limit,
-            10,
-            U256::from(0),
-            Bytes::new(),
-            None,
-        );
-
-        let mut db = etherlink_vm_db(None, &block);
+        let value_sent = U256::from(5);
 
         let caller_info = AccountInfo {
             balance: U256::MAX,
@@ -499,6 +303,81 @@ mod test {
             code_hash: Default::default(),
             code: None,
         };
+
+        let mut caller_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller))
+            .unwrap();
+
+        let destination_account = world_state_handler
+            .get_or_create(&host, &account_path(&destination))
+            .unwrap();
+
+        caller_account.set_info(&mut host, caller_info).unwrap();
+
+        // Check balances before executing the transfer
+        assert_eq!(caller_account.balance(&host).unwrap(), U256::MAX);
+        assert_eq!(destination_account.balance(&host).unwrap(), U256::ZERO);
+
+        let execution_result = run_transaction(
+            &mut host,
+            &block_constants,
+            &mut world_state_handler,
+            precompiles,
+            caller,
+            Some(destination),
+            Bytes::new(),
+            30_000_000,
+            0,
+            value_sent,
+            AccessList(vec![]),
+        )
+        .unwrap();
+
+        // Check the outcome of the transaction
+        match execution_result.result {
+            ExecutionResult::Success { .. } => (),
+            ExecutionResult::Revert { .. } | ExecutionResult::Halt { .. } => {
+                panic!("Simple transfer should have succeeded")
+            }
+        }
+
+        assert_eq!(
+            caller_account.balance(&host).unwrap(),
+            U256::MAX.checked_sub(value_sent).unwrap()
+        );
+        assert_eq!(destination_account.balance(&host).unwrap(), value_sent);
+    }
+
+    #[test]
+    fn test_contract_call_sload_sstore() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let precompiles = EtherlinkPrecompiles::new();
+        let block_constants = block_constants_with_fees();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let contract =
+            Address::from_hex("2222222222222222222222222222222222222222").unwrap();
+
+        let value_sent = U256::from(5);
+
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut caller_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller))
+            .unwrap();
+
+        caller_account.set_info(&mut host, caller_info).unwrap();
+
+        let mut contract_account = world_state_handler
+            .get_or_create(&host, &account_path(&contract))
+            .unwrap();
 
         let contract_info = AccountInfo {
             balance: U256::ZERO,
@@ -516,15 +395,25 @@ mod test {
             )),
         };
 
-        db.insert_account_info(caller, caller_info);
-        db.insert_account_info(contract, contract_info);
+        contract_account.set_info(&mut host, contract_info).unwrap();
 
-        let mut evm = evm(db, &block, &tx);
-
-        let execution_result = evm.transact_commit(&tx).unwrap();
+        let execution_result = run_transaction(
+            &mut host,
+            &block_constants,
+            &mut world_state_handler,
+            precompiles,
+            caller,
+            Some(contract),
+            Bytes::new(),
+            30_000_000,
+            1,
+            value_sent,
+            AccessList(vec![]),
+        )
+        .unwrap();
 
         // Check the outcome of the transaction
-        match execution_result {
+        match execution_result.result {
             ExecutionResult::Success { gas_used, .. } => {
                 assert!(gas_used > 0);
             }
@@ -534,7 +423,9 @@ mod test {
         }
 
         // Check that the storage slot at 0x01 was updated with 0x42
-        let storage_slot_value = evm.db().storage_slot(contract, U256::from(1));
+        let storage_slot_value =
+            contract_account.get_storage(&host, &U256::from(1)).unwrap();
+
         assert_eq!(storage_slot_value, U256::from(66));
     }
 
@@ -543,7 +434,7 @@ mod test {
         let mut host = MockKernelHost::default();
         let mut world_state_handler = new_world_state_handler().unwrap();
         let precompiles = EtherlinkPrecompiles::new();
-        let block_constants = dummy_block_constants();
+        let block_constants = block_constants_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
@@ -614,7 +505,7 @@ mod test {
     fn test_withdrawal_contract() {
         let mut host = MockKernelHost::default();
         let mut world_state_handler = new_world_state_handler().unwrap();
-        let block_constants = empty_fees();
+        let block_constants = block_constants_with_no_fees();
 
         // TODO: use foundry-compilers here when kernel rust version is bumped to 1.87
         // For the moment if you need to rebuild you can run:
@@ -714,7 +605,7 @@ mod test {
     fn test_call_mint_erc20() {
         let mut host = MockKernelHost::default();
         let mut world_state_handler = new_world_state_handler().unwrap();
-        let block_constants = dummy_block_constants();
+        let block_constants = block_constants_with_fees();
 
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();

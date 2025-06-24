@@ -65,24 +65,6 @@ pub trait PrecompileDatabase: Database {
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
-    #[cfg(test)]
-    pub fn insert_account_info(&mut self, address: Address, info: AccountInfo) {
-        let mut storage_account = self.get_or_create_account(address).unwrap();
-        storage_account.set_info(self.host, info).unwrap()
-    }
-
-    #[cfg(test)]
-    pub fn storage_slot(
-        &self,
-        address: Address,
-        storage_key: StorageKey,
-    ) -> StorageValue {
-        let storage_account = self.get_or_create_account(address).unwrap();
-        storage_account
-            .get_storage(self.host, &storage_key)
-            .unwrap()
-    }
-
     pub fn abort(&mut self) {
         *self.commit_status = false;
     }
