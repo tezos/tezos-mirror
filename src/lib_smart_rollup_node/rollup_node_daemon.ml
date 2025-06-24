@@ -823,11 +823,10 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
-let setup_opentelemetry Configuration.{opentelemetry = {enable; config}; _} =
-  Opentelemetry.Globals.service_name := "rollup_node" ;
-  Opentelemetry_ambient_context.set_storage_provider
-    (Opentelemetry_ambient_context_lwt.storage ()) ;
-  Opentelemetry_client_cohttp_lwt.setup ~enable ~config ()
+let setup_opentelemetry config =
+  Octez_telemetry.Opentelemetry_setup.setup
+    ~service_name:"rollup_node"
+    config.Configuration.opentelemetry
 
 let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =

@@ -13,6 +13,7 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-libs.rpc-http-client-unix
+  opentelemetry.ambient-context.lwt
   octez-libs.tezos-workers)
  (flags
   (:standard)

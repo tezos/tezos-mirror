@@ -4534,6 +4534,7 @@ let octez_telemetry =
         octez_rpc_http;
         octez_rpc_http_server;
         octez_rpc_http_client_unix;
+        opentelemetry_ambient_context_lwt;
         octez_workers;
       ]
 
@@ -5572,8 +5573,6 @@ let octez_smart_rollup_node_lib =
         octez_smart_rollup_lib |> open_;
         octez_scoru_wasm_fast;
         opentelemetry_lwt;
-        opentelemetry_client_cohttp_lwt;
-        opentelemetry_ambient_context_lwt;
         octez_telemetry;
       ]
 

@@ -39,8 +39,6 @@
   octez-evm-node-libs.evm_node_supported_installers
   octez-evm-node-libs.evm_node_wasm_runtime
   octez-performance-metrics
-  octez-libs.opentelemetry-client-cohttp-lwt
-  opentelemetry.ambient-context.lwt
   opentelemetry-lwt
   octez-libs.octez-telemetry)
  (flags

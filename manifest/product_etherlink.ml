@@ -12,7 +12,6 @@ open Manifest
 open Externals
 open Internals
 open Product_cohttp
-open Product_opentelemetry
 open Product_octez
 open Product_prometheus
 open Product_websocket
@@ -343,8 +342,6 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
-        opentelemetry_client_cohttp_lwt;
-        opentelemetry_ambient_context_lwt;
         opentelemetry_lwt;
         octez_telemetry;
       ]
