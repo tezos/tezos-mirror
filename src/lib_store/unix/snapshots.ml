@@ -629,12 +629,15 @@ module Version = struct
    * - 6: new context representation introduced by irmin 3.7.2
    * - 7: fix tar snapshots corrupted generation
    * - 8: change cemented files offset format to 64 bits
+   * - 9: export target predecessor contains metadata
    *)
 
-  (* Used for old snapshot format versions *)
-  let legacy_version = 7
+  let v8_version = 8
 
-  let current_version = 8
+  (* Used for old snapshot format versions *)
+  let legacy_version = v8_version
+
+  let current_version = 9
 
   (* List of versions that are supported *)
   let supported_versions =
@@ -2144,6 +2147,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            (export_block_descr, (Block_repr.hash first_block, first_block_level)))
     else
       let exception Done in
+      let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
       let f block =
         (* FIXME: we also write potential branches, it will eventually
            be GCed *)
@@ -2151,7 +2155,11 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           if Block_hash.equal limit_hash (Block_repr.hash block) then raise Done
           else return_unit
         else
-          let block = (* Prune everything  *) {block with metadata = None} in
+          let block =
+            (* Prune everything but the predecessor's metadata *)
+            if Block_repr.level block = export_pred_level then block
+            else {block with metadata = None}
+          in
           let*! () = bpush#push block in
           return_unit
       in
@@ -2254,7 +2262,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
      - the target_block is not the genesis
      - the target_block and its predecessor are known
      - the context of the predecessor of the target_block must be known
-     - at least max_op_ttl(target_block) headers must be available
+     - at least max_op_ttl(target_block) headers must be available for the
+       predecessor of the target
   *)
   let check_export_block_validity chain_store block =
     let open Lwt_result_syntax in
@@ -2306,8 +2315,8 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           savepoint_level > Int32.pred block_level && not pred_context_exists)
         (Invalid_export_block {block = Some block_hash; reason = `Pruned_pred})
     in
-    let* block_metadata =
-      let*! o = Store.Block.get_block_metadata_opt chain_store block in
+    let* pred_block_metadata =
+      let*! o = Store.Block.get_block_metadata_opt chain_store pred_block in
       match o with
       | None ->
           tzfail
@@ -2316,13 +2325,15 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let*! _, caboose_level = Store.Chain.caboose chain_store in
     (* We will need the following blocks
-       [ (target_block - max_op_ttl(target_block)) ; ... ; target_block ] *)
-    let block_max_op_ttl = Store.Block.max_operations_ttl block_metadata in
+       [ (pred(target_block) - max_op_ttl(target_block)) ; ... ; pred(target_block) ] *)
+    let block_max_op_ttl = Store.Block.max_operations_ttl pred_block_metadata in
     let*! genesis_block = Store.Chain.genesis_block chain_store in
     let genesis_level = Store.Block.level genesis_block in
     let minimum_level_needed =
       Compare.Int32.(
-        max genesis_level Int32.(sub block_level (of_int block_max_op_ttl)))
+        max
+          genesis_level
+          Int32.(sub (sub block_level 1l) (of_int block_max_op_ttl)))
     in
     let* () =
       fail_when
@@ -2540,10 +2551,13 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       in
       (* Prune all blocks except for the export_block's predecessor *)
       let floating_block_stream =
+        let export_pred_level = Int32.sub (Store.Block.level export_block) 1l in
         Lwt_stream.of_list
           (List.filter_map
              (fun b ->
-               Some {(Store.Unsafe.repr_of_block b) with metadata = None})
+               if Store.Block.level b = export_pred_level then
+                 Some (Store.Unsafe.repr_of_block b)
+               else Some {(Store.Unsafe.repr_of_block b) with metadata = None})
              floating_blocks)
       in
       (* Protocols *)
@@ -4224,6 +4238,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Rolling _ -> return (Rolling None)
       | Full _ -> return (Full None)
     in
+    (* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/8005
+       remove the v8 import backward compatibility as soon as v9
+       (and v23) are mandatory.*)
+    let is_v8_import = snapshot_version = Version.v8_version in
     let*! () = Event.(emit restoring_floating_blocks) () in
     let* () =
       Animation.display_progress
@@ -4243,7 +4261,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               validation_store.resulting_context_hash
             ~predecessor_header:block_data.predecessor_header
             ~protocol_levels
-            ~history_mode)
+            ~history_mode
+            ~is_v8_import)
     in
     let* () = reading_thread in
     let*! () = Event.(emit floating_blocks_restored) () in
@@ -4252,9 +4271,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     return_unit
 end
 
-(* [snapshot_file_kind ~snapshot_path] returns the kind of a
-   snapshot. We assume that a snapshot is valid if the medata can be
-   read. *)
+(* [snapshot_file_kind ~snapshot_path] returns the kind of a snapshot. We assume
+   that a snapshot is valid if the metadata can be read. *)
 let snapshot_file_kind ~snapshot_path =
   let open Lwt_result_syntax in
   let is_valid_uncompressed_snapshot file =

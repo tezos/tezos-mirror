@@ -27,7 +27,7 @@
     _______
 
     Component: Store
-    Invocation: dune exec src/lib_store/unix/test/main.exe --file test.ml
+    Invocation: dune exec src/lib_store/unix/test/main.exe -- --file test.ml
     Subject: Store tests ( snapshots, reconstruct, history_mode_switch )
 *)
 
