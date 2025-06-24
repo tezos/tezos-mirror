@@ -246,7 +246,14 @@ module Helpers = struct
   let gen_value = string ~size:(return 1) ()
 
   type write_payload = {key : key; override : bool; default : bool}
-  [@@deriving gen, hash]
+  [@@deriving hash]
+
+  let gen_write_payload =
+    let open Bam.Std in
+    let* key = gen_key in
+    let* override = bool () in
+    let* default = bool () in
+    return {key; override; default}
 
   let pp_write_payload fmt {key = file, key; override; default} =
     Format.fprintf
@@ -268,8 +275,32 @@ module Helpers = struct
     | Read_value of key
     | Write_value of write_payload
     | Remove_file of filename
-    | Read_values of key list [@max 5]
-  [@@deriving gen, hash]
+    | Read_values of key list
+  [@@deriving hash]
+
+  let gen_action =
+    let open Bam.Std in
+    let count_values =
+      let* filename = gen_filename in
+      return (Count_values filename)
+    in
+    let read_value =
+      let* key = gen_key in
+      return (Read_value key)
+    in
+    let write_value =
+      let* write_payload = gen_write_payload in
+      return (Write_value write_payload)
+    in
+    let remove_file =
+      let* filename = gen_filename in
+      return (Remove_file filename)
+    in
+    let read_values =
+      let* keys = list ~size:(int ~max:5 ()) gen_key in
+      return (Read_values keys)
+    in
+    oneofg [count_values; read_value; write_value; remove_file; read_values]
 
   let pp_action fmt = function
     | Write_value payload -> Format.fprintf fmt "W%a" pp_write_payload payload
@@ -286,7 +317,11 @@ module Helpers = struct
     | Remove_file file -> Format.fprintf fmt "REMOVE[file=%s]" file
     | Count_values file -> Format.fprintf fmt "COUNT[file=%s]" file
 
-  type bind = Sequential | Parallel [@@deriving gen, hash]
+  type bind = Sequential | Parallel [@@deriving hash]
+
+  let gen_bind =
+    let open Bam.Std in
+    oneofl [Sequential; Parallel]
 
   type parameters = {
     number_of_files : int;
