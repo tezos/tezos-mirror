@@ -185,6 +185,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~stage:Stages.publish
       ~interruptible:false
       ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
+      ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:release"
       ?variables
       [
