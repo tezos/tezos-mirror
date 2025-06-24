@@ -24,6 +24,7 @@ use evm_execution::trace::{
     get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput, TracerInput,
 };
 use primitive_types::{H160, H256, U256};
+use revm::primitives::hardfork::SpecId;
 use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::BlockConstants;
@@ -304,6 +305,17 @@ fn log_transaction_type<Host: Runtime>(host: &Host, to: Option<H160>, data: &[u8
     }
 }
 
+fn config_to_revm_specid(config: &Config) -> revm::primitives::hardfork::SpecId {
+    // This is a hack-ish way to derive the spec id from Sputnik's
+    // configuration. The last case is the very first EVM version
+    // that we supported (:= Shanghai).
+    if config.selfdestruct_deprecated {
+        SpecId::CANCUN
+    } else {
+        SpecId::SHANGHAI
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
@@ -315,6 +327,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     call_data: Vec<u8>,
     effective_gas_price: U256,
     access_list: AccessList,
+    config: &Config,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -344,6 +357,7 @@ pub fn revm_run_transaction<Host: Runtime>(
         };
     match revm_etherlink::run_transaction(
         host,
+        config_to_revm_specid(config),
         block_constants,
         &mut world_state_handler,
         revm_etherlink::precompile_provider::EtherlinkPrecompiles::new(),
@@ -554,6 +568,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             call_data,
             effective_gas_price,
             transaction.access_list.clone(),
+            evm_configuration,
         ) {
             Ok(outcome) => outcome,
             Err(err) => {

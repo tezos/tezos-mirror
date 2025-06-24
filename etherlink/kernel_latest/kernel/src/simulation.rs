@@ -489,6 +489,7 @@ impl Evaluation {
                 gas_price,
                 // TODO: Replace this by the decoded access lists if any.
                 empty_access_list(),
+                evm_configuration,
             ) {
                 Ok(Some(outcome)) if !self.with_da_fees => {
                     let result: SimulationResult<CallResult, String> =
