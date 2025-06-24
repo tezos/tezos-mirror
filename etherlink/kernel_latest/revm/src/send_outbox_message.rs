@@ -34,6 +34,16 @@ sol! {
     );
 }
 
+sol! {
+    event SendFAWithdrawalInput (
+        bytes22 target,
+        bytes22 ticketer,
+        bytes22 proxy,
+        uint256 amount,
+        bytes   content,
+    );
+}
+
 /// Withdrawal interface of the ticketer contract
 pub type RouterInterface = MichelsonPair<MichelsonContract, FA2_1Ticket>;
 
@@ -76,25 +86,25 @@ fn revert() -> InterpreterResult {
     }
 }
 
-fn prepare_message(target: Contract, ticketer: Contract, amount: BigInt) -> Withdrawal {
-    let ticket = FA2_1Ticket::new(
-        ticketer.clone(),
-        MichelsonPair(0.into(), MichelsonOption(None)),
-        amount,
-    )
-    .unwrap();
+fn prepare_standard_message(
+    target: Contract,
+    ticketer: Contract,
+    content: MichelsonPair<MichelsonNat, MichelsonOption<MichelsonBytes>>,
+    amount: BigInt,
+    entrypoint: Entrypoint,
+    destination: Contract,
+) -> Withdrawal {
+    let ticket = FA2_1Ticket::new(ticketer, content, amount).unwrap();
 
     let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
-        MichelsonContract(target.clone()),
+        MichelsonContract(target),
         ticket,
     );
-
-    let entrypoint = Entrypoint::try_from(String::from("burn")).unwrap();
 
     let message = OutboxMessageTransaction {
         parameters,
         entrypoint,
-        destination: ticketer,
+        destination,
     };
 
     Withdrawal::Standard(OutboxMessage::AtomicTransactionBatch(vec![message].into()))
@@ -135,7 +145,60 @@ where
             );
 
             // Build
-            let withdrawal = prepare_message(target, ticketer, amount);
+            let content = MichelsonPair(0.into(), MichelsonOption(None));
+            let entrypoint = Entrypoint::try_from(String::from("burn")).unwrap();
+            let destination = ticketer.clone();
+            let withdrawal = prepare_standard_message(
+                target,
+                ticketer,
+                content,
+                amount,
+                entrypoint,
+                destination,
+            );
+
+            // Push
+            context.db_mut().push_withdrawal(withdrawal);
+
+            let result = InterpreterResult {
+                result: InstructionResult::Return,
+                gas: Gas::new(0),
+                output: Bytes::new(),
+            };
+            Ok(result)
+        }
+        // "0x0cd79fc7" is the function selector for `push_fa_withdrawal_to_outbox(bytes22,bytes22,bytes22,uint256,bytes)`
+        [0x0c, 0xd7, 0x9f, 0xc7, input_data @ ..] => {
+            // Decode
+            let (target, ticketer, proxy, amount, content) =
+                SendFAWithdrawalInput::abi_decode_data(input_data, true)
+                    .map_err(|e| e.to_string())?;
+            let (_, target) =
+                Contract::nom_read(target.as_slice()).map_err(|e| e.to_string())?;
+            let (_, ticketer) =
+                Contract::nom_read(ticketer.as_slice()).map_err(|e| e.to_string())?;
+            let (_, destination) =
+                Contract::nom_read(proxy.as_slice()).map_err(|e| e.to_string())?;
+            let amount = BigInt::from_bytes_be(
+                Sign::Plus,
+                &amount.to_be_bytes::<{ U256::BYTES }>(),
+            );
+            let (_, content) = MichelsonPair::<
+                MichelsonNat,
+                MichelsonOption<MichelsonBytes>,
+            >::nom_read(&content)
+            .map_err(|e| e.to_string())?;
+
+            // Build
+            let entrypoint = Entrypoint::try_from(String::from("withdraw")).unwrap();
+            let withdrawal = prepare_standard_message(
+                target,
+                ticketer,
+                content,
+                amount,
+                entrypoint,
+                destination,
+            );
 
             // Push
             context.db_mut().push_withdrawal(withdrawal);
