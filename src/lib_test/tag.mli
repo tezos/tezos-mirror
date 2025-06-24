@@ -105,6 +105,16 @@ val unix : string
     This tag should be used for tests that take more than 2 minutes in the CI. *)
 val slow : string
 
-(** ["extra"]: Tag for tests that are not run on every merge request (MR) due to their
-    proximity to other similar tests that are already included. These tests will only run in the scheduled pipeline. *)
+(** ["extra"]: tag for tests that add extra safety but that should not always run.
+
+    This tag causes tests to no longer run in [before_merging] pipelines.
+    The tests still run in the scheduled pipeline.
+
+    A typical use case is sets of costly tests such that if one fails,
+    the others are also likely to fail.
+    One of those tests can run in [before_merging] pipelines,
+    while the others can be tagged as [extra].
+    For instance, if a test has parameters (such as which protocol to run),
+    maybe testing only one combination of parameters in [before_merging] pipelines
+    is enough, and other variations can be tagged as [extra]. *)
 val extra : string
