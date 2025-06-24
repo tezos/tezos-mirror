@@ -318,6 +318,35 @@ let jobs pipeline_type =
          ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
   in
 
+  (* Define the [start] job.
+
+     The purpose of this job is to implement a manual trigger
+     for [Before_merging] pipelines, instead of running it on
+     each update to the merge request. *)
+  let job_start =
+    job
+      ~__POS__
+      ~image:Images.datadog_ci
+      ~stage:Stages.start
+      ~rules:
+        [
+          job_rule
+            ~if_:(If.not Rules.is_final_pipeline)
+            ~allow_failure:No
+            ~when_:Manual
+            ();
+          job_rule ~when_:Always ();
+        ]
+      ~timeout:(Minutes 10)
+      ~name:"trigger"
+      [
+        "echo 'Trigger pipeline!'";
+        "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+        "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+         pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+      ]
+  in
+
   (* Stages *)
   let start_stage, make_dependencies =
     match pipeline_type with
@@ -327,35 +356,6 @@ let jobs pipeline_type =
         in
         ([job_datadog_pipeline_trace], make_dependencies)
     | Before_merging | Merge_train ->
-        (* Define the [start] job.
-
-           The purpose of this job is to implement a manual trigger
-           for [Before_merging] pipelines, instead of running it on
-           each update to the merge request. *)
-        let job_start =
-          job
-            ~__POS__
-            ~image:Images.datadog_ci
-            ~stage:Stages.start
-            ~rules:
-              [
-                job_rule
-                  ~if_:(If.not Rules.is_final_pipeline)
-                  ~allow_failure:No
-                  ~when_:Manual
-                  ();
-                job_rule ~when_:Always ();
-              ]
-            ~timeout:(Minutes 10)
-            ~name:"trigger"
-            [
-              "echo 'Trigger pipeline!'";
-              "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-              "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline \
-               --tags pipeline_type:$PIPELINE_TYPE --tags \
-               mr_number:$CI_MERGE_REQUEST_IID";
-            ]
-        in
         let make_dependencies ~before_merging ~schedule_extended_test:_ =
           before_merging job_start
         in
@@ -367,7 +367,7 @@ let jobs pipeline_type =
     let dependencies =
       make_dependencies
         ~before_merging:(fun job_start -> Dependent [Job job_start])
-        ~schedule_extended_test:(fun () -> Staged [])
+        ~schedule_extended_test:(fun () -> Dependent [])
     in
     let job_sanity_ci : tezos_job =
       (* Quick, CI-related sanity checks.
@@ -376,7 +376,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"sanity_ci"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -423,7 +423,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
@@ -459,7 +459,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.misc_checks"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_lint_files ())
@@ -490,7 +490,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_jsonnet"
-        ~image:Images.jsonnet
+        ~image:Images.jsonnet_master
         ~stage
         ~dependencies
         ~rules:
@@ -513,7 +513,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_rust_fmt"
-        ~image:Images.rust_toolchain
+        ~image:Images.rust_toolchain_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
@@ -523,7 +523,8 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"documentation:rst-check"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
+        ~dependencies
         ~stage
         ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
         ~before_script:(before_script ~init_python_venv:true [])
@@ -536,7 +537,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"commit_titles"
-        ~image:Images.CI.prebuild
+        ~image:Images.CI.prebuild_master
         ~stage
         ~dependencies
         (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
@@ -1717,13 +1718,13 @@ let jobs pipeline_type =
       [job_test_sdk_bindings]
     in
     let jobs_kernels : tezos_job list =
-      let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
-          ~changes script =
+      let make_job_kernel ?dependencies ?(image = Images.rust_toolchain)
+          ?(stage = Stages.test) ~__POS__ ~name ~changes script =
         job
           ?dependencies
           ~__POS__
           ~name
-          ~image:Images.rust_toolchain
+          ~image
           ~stage
           ~rules:(make_rules ~dependent:true ~changes ())
           script
@@ -1756,6 +1757,8 @@ let jobs pipeline_type =
       let job_audit_riscv_deps : tezos_job =
         make_job_kernel
           ~stage:Stages.sanity
+          ~image:Images.rust_toolchain_master
+          ~dependencies:(Dependent [Optional job_start])
           ~__POS__
           ~name:"audit_riscv_deps"
           ~changes:changeset_riscv_kernels

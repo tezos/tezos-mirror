@@ -654,11 +654,15 @@ module Images : sig
 
   val rust_toolchain : Image.t
 
+  val rust_toolchain_master : Image.t
+
   val rust_sdk_bindings : Image.t
 
   val trivy : Image.t
 
   val jsonnet : Image.t
+
+  val jsonnet_master : Image.t
 
   module CI : sig
     val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
@@ -669,9 +673,15 @@ module Images : sig
 
     val prebuild : Image.t
 
+    val prebuild_master : Image.t
+
     val build : Image.t
 
+    val build_master : Image.t
+
     val test : Image.t
+
+    val test_master : Image.t
 
     val e2etest : Image.t
   end

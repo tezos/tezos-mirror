@@ -160,15 +160,13 @@ trigger:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 sanity_ci:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - trigger
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -199,7 +197,7 @@ docker:hadolint:
   - hadolint Dockerfile
 
 oc.ocaml_fmt:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -212,10 +210,8 @@ oc.ocaml_fmt:
     - .gitlab/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
   - trigger
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: dune_cache-$CI_JOB_NAME_SLUG
@@ -264,7 +260,7 @@ oc.semgrep:
   - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 oc.misc_checks:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -282,10 +278,8 @@ oc.misc_checks:
     - tezt/**/*
     when: on_success
   needs:
-  - oc.docker:ci:amd64
   - trigger
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -302,7 +296,7 @@ oc.misc_checks:
   - ./scripts/ci/lint_check_licenses.sh
 
 check_jsonnet:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  image: ${jsonnet_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
@@ -311,10 +305,8 @@ check_jsonnet:
     - '**/*.jsonnet'
     when: on_success
   needs:
-  - oc.docker:jsonnet:amd64
   - trigger
-  dependencies:
-  - oc.docker:jsonnet:amd64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -326,7 +318,7 @@ check_jsonnet:
   - scripts/lint.sh --check-jsonnet-lint
 
 check_rust_fmt:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
@@ -337,10 +329,8 @@ check_rust_fmt:
     - .gitlab/**/*
     when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
   - trigger
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -348,7 +338,7 @@ check_rust_fmt:
   - scripts/check-format-rust.sh
 
 documentation:rst-check:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
   - gcp
@@ -358,8 +348,9 @@ documentation:rst-check:
     - .gitlab-ci.yml
     - .gitlab/**/*
     when: on_success
-  dependencies:
-  - oc.docker:ci:amd64
+  needs:
+  - trigger
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -399,15 +390,13 @@ nix:
     when: on_failure
 
 commit_titles:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
+  image: ${ci_image_name_protected}/prebuild:amd64--master
   stage: sanity
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
   - trigger
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   allow_failure:
     exit_codes: 65
   timeout: 60 minutes
@@ -2315,7 +2304,7 @@ test_etherlink_firehose:
     SCCACHE_CACHE_SIZE: 5G
 
 audit_riscv_deps:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
@@ -2328,8 +2317,10 @@ audit_riscv_deps:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs:
+  - job: trigger
+    optional: true
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG

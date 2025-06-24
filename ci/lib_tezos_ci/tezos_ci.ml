@@ -1571,6 +1571,11 @@ module Images = struct
       ~image_path
       ()
 
+  (** The rust toolchain image (static tag [master]) *)
+  let rust_toolchain_master =
+    let image_path = "${rust_toolchain_image_name_protected}:master" in
+    Image.mk_external ~image_path
+
   (** The image containing all dependencies required for Rust SDK bindings *)
   let rust_sdk_bindings =
     (* The job that builds the rust-sdk-bindings image.
@@ -1617,6 +1622,11 @@ module Images = struct
     let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
     Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
 
+  (** The jsonnet image (static tag [master]) *)
+  let jsonnet_master =
+    let image_path = "${jsonnet_image_name_protected}:master" in
+    Image.mk_external ~image_path
+
   module CI = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
@@ -1652,6 +1662,11 @@ module Images = struct
         ~image_path
         ()
 
+    (* To use static images from the protected registry. *)
+    let mk_ci_image_master name =
+      Image.mk_external
+        ~image_path:("${ci_image_name_protected}/" ^ name ^ ":amd64--master")
+
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
 
@@ -1672,6 +1687,13 @@ module Images = struct
 
     let e2etest =
       mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
+
+    (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
+    let prebuild_master = mk_ci_image_master "prebuild"
+
+    let build_master = mk_ci_image_master "build"
+
+    let test_master = mk_ci_image_master "test"
   end
 end
 
