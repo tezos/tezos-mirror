@@ -21,7 +21,7 @@
   with the `"finalized"` parameter to be handled correctly (!18355).
 - Add new GET RPCs `/evm/v2/blueprint/`, `/evm/v2/blueprints/range`
   whose purpose is to fetch the contents of blueprints with a complete
-  list of events, and notably the sequencer upgrade event. (!18367)
+  list of events, and notably the sequencer upgrade event. (!18367, !18471)
 
 ### Metrics changes
 
