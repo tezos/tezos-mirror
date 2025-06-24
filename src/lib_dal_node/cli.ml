@@ -891,13 +891,18 @@ let wrap_with_error main_promise =
 
 let run subcommand cli_options =
   let open Lwt_result_syntax in
+  let data_dir =
+    Option.value
+      ~default:Configuration_file.default.data_dir
+      cli_options.data_dir
+  in
+  let config_file =
+    Option.value
+      cli_options.config_file
+      ~default:(Configuration_file.default_config_file data_dir)
+  in
   match subcommand with
   | Run ->
-      let data_dir =
-        Option.value
-          ~default:Configuration_file.default.data_dir
-          cli_options.data_dir
-      in
       let* () =
         if disable_shard_validation && not cli_options.disable_shard_validation
         then
@@ -933,18 +938,27 @@ let run subcommand cli_options =
         ~disable_shard_validation
         ~ignore_pkhs
         ~data_dir
+        ~config_file
         ~configuration_override:(merge cli_options)
         ()
   | Config_init ->
-      Configuration_file.save (merge cli_options Configuration_file.default)
+      Configuration_file.save
+        ~config_file
+        (merge cli_options Configuration_file.default)
   | Config_update ->
-      let data_dir =
+      let config_file =
         Option.value
-          ~default:Configuration_file.default.data_dir
-          cli_options.data_dir
+          cli_options.config_file
+          ~default:
+            (let data_dir =
+               Option.value
+                 ~default:Configuration_file.default.data_dir
+                 cli_options.data_dir
+             in
+             Filename.concat data_dir "config.json")
       in
-      let* configuration = Configuration_file.load ~data_dir in
-      Configuration_file.save (merge cli_options configuration)
+      let* configuration = Configuration_file.load ~config_file in
+      Configuration_file.save ~config_file (merge cli_options configuration)
   | Debug_print_store_schemas ->
       Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
       let* schemas = Store.Skip_list_cells.schemas data_dir in

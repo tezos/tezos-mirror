@@ -89,6 +89,8 @@ type t = {
 
 let default_data_dir = Filename.concat (Sys.getenv "HOME") ".tezos-dal-node"
 
+let default_config_file data_dir = Filename.concat data_dir "config.json"
+
 let store_path {data_dir; _} = Filename.concat data_dir "store"
 
 let default_rpc_addr = P2p_point.Id.of_string_exn ~default_port:10732 "0.0.0.0"
@@ -372,22 +374,19 @@ let () =
       | _ -> None)
     (fun path -> DAL_node_unable_to_write_configuration_file path)
 
-let filename ~data_dir = Filename.concat data_dir "config.json"
-
-let save config =
+let save ~config_file config =
   let open Lwt_syntax in
-  let file = filename ~data_dir:config.data_dir in
   protect @@ fun () ->
   let* v =
     let* () = Lwt_utils_unix.create_dir config.data_dir in
-    Lwt_utils_unix.with_atomic_open_out file @@ fun chan ->
+    Lwt_utils_unix.with_atomic_open_out config_file @@ fun chan ->
     let json = Data_encoding.Json.construct encoding config in
     let content = Data_encoding.Json.to_string json in
     Lwt_utils_unix.write_string chan content
   in
   Lwt.return
     (Result.map_error
-       (fun _ -> [DAL_node_unable_to_write_configuration_file file])
+       (fun _ -> [DAL_node_unable_to_write_configuration_file config_file])
        v)
 
 let load =
@@ -421,17 +420,16 @@ let load =
           if List.is_empty older_versions then tzfail (Exn e)
           else try_decode json older_versions)
   in
-  fun ~data_dir ->
+  fun ~config_file ->
     let* json =
-      let*! json = Lwt_utils_unix.Json.read_file (filename ~data_dir) in
+      let*! json = Lwt_utils_unix.Json.read_file config_file in
       match json with
       | Ok json -> return json
       | Error (Exn _ :: _ as e) | Error e -> fail e
     in
     let* config = try_decode json config_versions in
-    let config = {config with data_dir} in
     (* We save the config so that its format is that of the latest version. *)
-    let* () = save config in
+    let* () = save ~config_file config in
     return config
 
 let identity_file {data_dir; _} = Filename.concat data_dir "identity.json"

@@ -84,10 +84,14 @@ val default_metrics_port : int
 (** [store_path config] returns a path for the store *)
 val store_path : t -> string
 
-(** [save config] writes config file in [config.data_dir] *)
-val save : t -> unit tzresult Lwt.t
+(** [default_config_file data_dir] constructs a default configuration file path
+    from a data dir. *)
+val default_config_file : string -> string
 
-val load : data_dir:string -> t tzresult Lwt.t
+(** [save config] writes config file in [config.data_dir] *)
+val save : config_file:string -> t -> unit tzresult Lwt.t
+
+val load : config_file:string -> t tzresult Lwt.t
 
 (** [identity_file config] returns the absolute path to the
     "identity.json" file of the DAL node, based on the configuration
