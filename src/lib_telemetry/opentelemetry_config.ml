@@ -6,10 +6,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {enable : bool; config : Opentelemetry_client_cohttp_lwt.Config.t}
+type t = {
+  enable : bool;
+  instance_id : string option;
+  config : Opentelemetry_client_cohttp_lwt.Config.t;
+}
 
 let default =
-  {enable = false; config = Opentelemetry_client_cohttp_lwt.Config.make ()}
+  {
+    enable = false;
+    instance_id = None;
+    config = Opentelemetry_client_cohttp_lwt.Config.make ();
+  }
 
 let detailed_encoding =
   let open Data_encoding in
@@ -17,16 +25,24 @@ let detailed_encoding =
   conv
     (fun {
            enable;
+           instance_id;
            config =
              {debug; url_traces; headers; batch_traces; batch_timeout_ms; _};
          } ->
       ( enable,
+        instance_id,
         Some debug,
         Some url_traces,
         Some headers,
         Some batch_traces,
         Some batch_timeout_ms ))
-    (fun (enable, debug, url_traces, headers, batch_traces, batch_timeout_ms) ->
+    (fun ( enable,
+           instance_id,
+           debug,
+           url_traces,
+           headers,
+           batch_traces,
+           batch_timeout_ms ) ->
       let config =
         Opentelemetry_client_cohttp_lwt.Config.make
           ?debug
@@ -36,9 +52,15 @@ let detailed_encoding =
           ?batch_timeout_ms
           ()
       in
-      {enable; config})
-  @@ obj6
+      {enable; instance_id; config})
+  @@ obj7
        (dft "enable" ~description:"Enable opentelemetry profiling" bool true)
+       (opt
+          "instance_id"
+          ~description:
+            "Instance id to identify the node in Opentelemetry traces. Takes \
+             precedence over <data_dir>/telemetry_id."
+          string)
        (opt "debug" ~description:"Enable debug mode" bool)
        (opt "url_traces" ~description:"URL to send traces" string)
        (opt
