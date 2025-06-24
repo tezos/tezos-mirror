@@ -42,14 +42,6 @@ module Internal = struct
 
   type tree = {tree_1 : wrapped_tree; tree_2 : wrapped_tree}
 
-  type wrapped_repo =
-    | Irmin_disk_repo of Irmin_disk.Tree.repo
-    | Irmin_mem_repo of Irmin_mem.Tree.repo
-    | Brassaia_disk_repo of Brassaia_disk.Tree.repo
-    | Brassaia_mem_repo of Brassaia_mem.Tree.repo
-
-  type repo = {repo_1 : wrapped_repo; repo_2 : wrapped_repo}
-
   type wrapped_node_key =
     | Irmin_disk_nk of Irmin_disk.node_key
     | Irmin_mem_nk of Context_hash.t
@@ -102,8 +94,6 @@ module Abstract_types = struct
   type value = bytes
 
   type tree
-
-  type repo
 
   type node_key
 
@@ -176,8 +166,6 @@ module type CONTEXT = sig
     val of_raw : raw -> tree
 
     val unshallow : tree -> tree Lwt.t
-
-    val make_repo : unit -> repo Lwt.t
 
     val is_shallow : tree -> bool
 

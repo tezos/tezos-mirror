@@ -712,33 +712,6 @@ end = struct
       let* tree_2 = unshallow backend_2_name t.tree_2 in
       Lwt.return {tree_1; tree_2}
 
-    let irmin_disk_repo r = Irmin_disk_repo r
-
-    let irmin_mem_repo r = Irmin_mem_repo r
-
-    let brassaia_disk_repo r = Brassaia_disk_repo r
-
-    let brassaia_mem_repo r = Brassaia_mem_repo r
-
-    let make_repo : unit -> repo Lwt.t =
-     fun () ->
-      let make_repo = function
-        | Irmin_disk -> Lwt.map irmin_disk_repo (Irmin_disk.Tree.make_repo ())
-        | Irmin_mem -> Lwt.map irmin_mem_repo (Irmin_mem.Tree.make_repo ())
-        | Brassaia_disk ->
-            Lwt.map brassaia_disk_repo (Brassaia_disk.Tree.make_repo ())
-        | Brassaia_mem ->
-            Lwt.map brassaia_mem_repo (Brassaia_mem.Tree.make_repo ())
-      in
-      let make_repo _name b =
-        (make_repo
-           b
-         [@profiler.span_f {verbosity = Notice} [_name; "tree"; "make_repo"]])
-      in
-      let* repo_1 = make_repo backend_1_name backend_1 in
-      let* repo_2 = make_repo backend_2_name backend_2 in
-      Lwt.return {repo_1; repo_2}
-
     let is_shallow : tree -> bool =
      fun t ->
       let is_shallow = function
