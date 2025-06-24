@@ -576,7 +576,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           ->
             None
         | `Remote_orchestrator_remote_agents | `Remote_orchestrator_local_agents
-        | `Ssh_host (_, _) ->
+        | `Ssh_host _ ->
             (* In [Remote_orchestrator_remote_agents] mode, we want to run a
                deployment deploying the Proxy VM. In
                [Remote_orchestrator_local_agents] or in [Ssh_host] mode, there is
