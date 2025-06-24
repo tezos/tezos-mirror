@@ -1709,6 +1709,14 @@ let id_tokens =
     );
   ]
 
+module Hooks = struct
+  let before_merging = ref []
+
+  let master = ref []
+
+  let release_tags = ref []
+end
+
 let job_datadog_pipeline_trace : tezos_job =
   job
     ~__POS__

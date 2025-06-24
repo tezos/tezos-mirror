@@ -105,7 +105,7 @@ let () =
   register
     "before_merging"
     If.(on_tezos_namespace && merge_request && not merge_train)
-    ~jobs:(Code_verification.jobs Before_merging)
+    ~jobs:(Code_verification.jobs Before_merging @ !Hooks.before_merging)
     ~description:
       "Lints code in merge requests, checks that it compiles and runs tests.\n\n\
        This pipeline is created on each push to a branch with an associated \
@@ -116,7 +116,7 @@ let () =
     "merge_train"
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
     If.(on_tezos_namespace && merge_request && merge_train)
-    ~jobs:(Code_verification.jobs Merge_train)
+    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
     ~description:
       "A merge-train-specific version of 'before_merging'.\n\n\
        This pipeline contains the same set of jobs as 'before_merging' but \
@@ -183,6 +183,7 @@ let () =
           grafazos_release_tag_re;
           teztale_release_tag_re;
         ]
+      @ !Hooks.release_tags
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
   in
