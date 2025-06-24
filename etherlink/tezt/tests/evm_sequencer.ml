@@ -12226,6 +12226,7 @@ let test_rpc_getLogs_with_earliest_fail =
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
