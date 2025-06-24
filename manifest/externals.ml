@@ -42,8 +42,6 @@ let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
 let astring = external_lib "astring" V.True
 
-let bam_ppx = external_lib "bam-ppx" V.(at_least "0.3")
-
 let base64 = external_lib "base64" V.(at_least "3.3.0")
 
 let bheap = external_lib "bheap" V.(at_least "2.0.0")

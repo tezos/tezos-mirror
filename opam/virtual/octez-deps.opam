@@ -16,7 +16,6 @@ depends: [
   "ambient-context-lwt" { = "0.1.0" }
   "asetmap" { >= "0.8.1" }
   "astring"
-  "bam-ppx" { >= "0.3" }
   "base-unix"
   "base64" { >= "3.3.0" }
   "bheap" { >= "2.0.0" }

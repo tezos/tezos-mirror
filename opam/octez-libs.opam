@@ -88,7 +88,6 @@ depends: [
   "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
-  "bam-ppx" { with-test & >= "0.3" }
   "tezt-bam" { with-test & >= "0.3" }
 ]
 x-opam-monorepo-opam-provided: [
