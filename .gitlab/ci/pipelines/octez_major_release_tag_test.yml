@@ -299,6 +299,9 @@ gitlab:release:
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 trigger:octez_monitoring:
   stage: build
@@ -933,6 +936,22 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
+grafazos.gitlab:release:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - grafazos.build_dashboards
+  dependencies:
+  - grafazos.build_dashboards
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./grafazos/scripts/releases/create_gitlab_release.sh
+
 grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
@@ -953,22 +972,6 @@ grafazos.build_dashboards:
     paths:
     - grafazos/output/**/*.json
     when: on_success
-
-grafazos.gitlab:release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish
-  tags:
-  - gcp
-  needs:
-  - grafazos.build_dashboards
-  dependencies:
-  - grafazos.build_dashboards
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  script:
-  - ./grafazos/scripts/releases/create_gitlab_release.sh
 
 grafazos.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -997,6 +1000,24 @@ grafazos.publish:release-page:
     paths:
     - ./index.md
     - index.html
+
+teztale.gitlab:release:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - teztale.build:static-x86_64
+  - teztale.build:static-arm64
+  dependencies:
+  - teztale.build:static-x86_64
+  - teztale.build:static-arm64
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./teztale/scripts/releases/create_gitlab_release.sh
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1079,24 +1100,6 @@ teztale.build:static-arm64:
     paths:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
-
-teztale.gitlab:release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
-  stage: publish
-  tags:
-  - gcp
-  needs:
-  - teztale.build:static-x86_64
-  - teztale.build:static-arm64
-  dependencies:
-  - teztale.build:static-x86_64
-  - teztale.build:static-arm64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  script:
-  - ./teztale/scripts/releases/create_gitlab_release.sh
 
 teztale.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0

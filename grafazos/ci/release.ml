@@ -54,5 +54,7 @@ let job_release_page ~test () =
          ])
     ["./grafazos/scripts/releases/publish_release_page.sh"]
 
-let jobs ~test () =
-  [Common.job_build (); job_gitlab_release; job_release_page ~test ()]
+let jobs ~test ?(dry_run = false) () =
+  (* If the release is a dry run, we do not publish a gitlab release page. *)
+  (if dry_run then [] else [job_gitlab_release])
+  @ [Common.job_build (); job_release_page ~test ()]

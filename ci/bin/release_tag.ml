@@ -185,6 +185,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~stage:Stages.publish
       ~interruptible:false
       ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
+      ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:release"
       ?variables
       [
@@ -286,7 +287,9 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   @ jobs_debian_repository @ jobs_dnf_repository
   (* Include components release jobs only if this is a major release. *)
   @ (if major then
-       Grafazos.Release.jobs ~test () @ Teztale.Release.jobs ~test ()
+       let dry_run = test && release_tag_pipeline_type == Schedule_test in
+       Grafazos.Release.jobs ~test ~dry_run ()
+       @ Teztale.Release.jobs ~test ~dry_run ()
      else [])
   @
   match (test, release_tag_pipeline_type) with
