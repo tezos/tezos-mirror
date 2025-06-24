@@ -3966,7 +3966,7 @@ let on_new_block t ~level =
   let* () = if is_new_cycle then on_new_cycle t ~level else unit in
   on_new_level t level ~metadata
 
-let ensure_enough_funds t i =
+let ensure_enough_funds ~fee t i =
   let producer = List.nth t.producers i in
   match (t.configuration.network, t.configuration.producer_key) with
   | `Sandbox, _ -> (* Producer has enough money *) Lwt.return_unit
@@ -3979,7 +3979,7 @@ let ensure_enough_funds t i =
              ~id:producer.account.public_key_hash
              ()
       in
-      if balance < Tez.of_mutez_int 520 then
+      if balance < Tez.of_mutez_int fee then
         Lwt.fail_with
           "Producer key has not enough money anymore to publish slots"
       else Lwt.return_unit
@@ -4001,7 +4001,7 @@ let ensure_enough_funds t i =
             ~amount:10_000_000
             ~dest:producer.account
             ()
-          |> Operation.Manager.make ~source:fundraiser
+          |> Operation.Manager.make ~fee ~source:fundraiser
           |> Seq.return |> List.of_seq
           |> Fun.flip
                (Operation.Manager.inject ~dont_wait:true)
@@ -4013,7 +4013,8 @@ let ensure_enough_funds t i =
 let produce_slot t level i =
   if level mod t.configuration.producers_delay = 0 then (
     toplog "Producing a slot for level %d" level ;
-    let* () = ensure_enough_funds t i in
+    let fee = 800 in
+    let* () = ensure_enough_funds ~fee t i in
     toplog "Ensured enough funds are available" ;
     let producer = List.nth t.producers i in
     let index = producer.slot_index in
@@ -4025,11 +4026,15 @@ let produce_slot t level i =
     in
     let* _ = Node.wait_for_level producer.node level in
     let* _commitment =
-      (* A dry-run of the "publish dal commitment" command outputs fees of 516µtz and
-         1333 gas consumed. We added a (quite small) margin to it. *)
+      (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+         - tz1: fees of 513µtz and 1333 gas consumed
+         - tz2: fees of 514µtz and 1318 gas consumed
+         - tz3: fees of 543µtz and 1607 gas consumed
+         - tz4: fees of 700µtz and 2837 gas consumed
+         We added a (quite small) margin to it. *)
       Helpers.publish_and_store_slot
-        ~fee:520
-        ~gas_limit:1400
+        ~fee
+        ~gas_limit:3000
         ~dont_wait:true
         producer.client
         producer.dal_node
