@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -95,6 +96,14 @@ pub fn write_u64_le(
     value: u64,
 ) -> Result<(), RuntimeError> {
     host.store_write_all(path, value.to_le_bytes().as_slice())
+}
+
+pub fn write_u256_le(
+    host: &mut impl Runtime,
+    path: &impl Path,
+    value: U256,
+) -> Result<(), RuntimeError> {
+    host.store_write_all(path, &value.to_le_bytes::<{ U256::BYTES }>())
 }
 
 pub fn bytes_hash(bytes: &[u8]) -> B256 {

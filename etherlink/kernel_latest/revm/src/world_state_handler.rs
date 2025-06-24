@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2022-2023 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023,2025 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -18,7 +19,7 @@ use crate::{
     code_storage::CodeStorage,
     storage_helpers::{
         concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
-        read_u64_le_default,
+        read_u64_le_default, write_u256_le,
     },
     Error,
 };
@@ -56,6 +57,9 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// such 256 bit integer value in storage.
 const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
 
+/// Path where global ticket table is stored.
+const TICKET_STORAGE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
+
 /// If a contract tries to read a value from storage and it has previously not written
 /// anything to this location or if it wrote the default value, then it gets this
 /// value back.
@@ -75,6 +79,11 @@ pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
 pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
     let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
     OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
+}
+
+struct Ticket {
+    path: OwnedPath,
+    balance: U256,
 }
 
 pub struct StorageAccount {
@@ -229,6 +238,65 @@ impl StorageAccount {
         let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
         Ok(host.store_write_all(&path, &value_bytes)?)
+    }
+
+    fn read_ticket_balance(
+        &self,
+        host: &impl Runtime,
+        ticket_hash: &U256,
+        owner: &Address,
+    ) -> Result<Ticket, Error> {
+        let path = concat(
+            &self.path,
+            &concat(
+                &TICKET_STORAGE_PATH,
+                &concat(&path_from_u256(ticket_hash)?, &account_path(owner)?)?,
+            )?,
+        )?;
+        let balance = read_u256_le_default(host, &path, U256::ZERO)?;
+        Ok(Ticket { path, balance })
+    }
+
+    pub fn ticket_balance_add(
+        &mut self,
+        host: &mut impl Runtime,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error> {
+        if amount.is_zero() {
+            return Ok(false);
+        }
+
+        let Ticket { path, balance } =
+            self.read_ticket_balance(host, ticket_hash, owner)?;
+        if let Some(new_balance) = balance.checked_add(amount) {
+            write_u256_le(host, &path, new_balance)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn ticket_balance_remove(
+        &mut self,
+        host: &mut impl Runtime,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error> {
+        if amount.is_zero() {
+            return Ok(false);
+        }
+
+        let Ticket { path, balance } =
+            self.read_ticket_balance(host, ticket_hash, owner)?;
+        if let Some(new_balance) = balance.checked_sub(amount) {
+            write_u256_le(host, &path, new_balance)?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
     }
 }
 

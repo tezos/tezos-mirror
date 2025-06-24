@@ -35,6 +35,7 @@ mod code_storage;
 mod constants;
 mod database;
 mod storage_helpers;
+mod ticket_table;
 
 #[derive(Error, Debug)]
 pub enum Error {

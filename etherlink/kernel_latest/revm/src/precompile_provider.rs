@@ -6,39 +6,36 @@ use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
     interpreter::{CallInput, InputsImpl, InterpreterResult},
-    primitives::{hex::FromHex, Address},
+    primitives::Address,
 };
 
 use crate::{
-    database::PrecompileDatabase,
-    send_outbox_message::{
-        send_outbox_message_precompile, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
+    constants::{
+        CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TICKET_TABLE_PRECOMPILE_ADDRESS,
     },
+    database::PrecompileDatabase,
+    send_outbox_message::send_outbox_message_precompile,
+    ticket_table::ticket_table_precompile,
 };
 
 #[derive(Debug, Default)]
 pub struct EtherlinkPrecompiles {
-    customs: Vec<Address>,
     builtins: EthPrecompiles,
 }
 
 impl EtherlinkPrecompiles {
     pub fn new() -> Self {
         Self {
-            customs: vec![
-                // Send outbox message
-                Address::from_hex(SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS).unwrap(),
-            ],
             builtins: EthPrecompiles::default(),
         }
     }
 
     fn warm_addresses(&self) -> Box<impl Iterator<Item = Address>> {
-        Box::new(self.builtins.warm_addresses().chain(self.customs.clone()))
+        Box::new(self.builtins.warm_addresses().chain(CUSTOMS))
     }
 
     fn contains(&self, address: &Address) -> bool {
-        self.customs.contains(address) || self.builtins.contains(address)
+        CUSTOMS.contains(address) || self.builtins.contains(address)
     }
 
     fn run_custom_precompile<CTX>(
@@ -47,7 +44,7 @@ impl EtherlinkPrecompiles {
         address: &Address,
         inputs: &InputsImpl,
         is_static: bool,
-        _gas_limit: u64,
+        gas_limit: u64,
     ) -> Result<Option<InterpreterResult>, String>
     where
         CTX: ContextTr,
@@ -68,17 +65,29 @@ impl EtherlinkPrecompiles {
             CallInput::Bytes(bytes) => bytes.to_vec(),
         };
 
-        if address == self.customs.first().unwrap() {
-            let result = send_outbox_message_precompile(
-                &input_bytes,
-                context,
-                is_static,
-                inputs,
-                address,
-            )?;
-            Ok(Some(result))
-        } else {
-            Ok(None)
+        match *address {
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => {
+                let result = send_outbox_message_precompile(
+                    &input_bytes,
+                    context,
+                    is_static,
+                    inputs,
+                    address,
+                )?;
+                Ok(Some(result))
+            }
+            TICKET_TABLE_PRECOMPILE_ADDRESS => {
+                let result = ticket_table_precompile(
+                    &input_bytes,
+                    context,
+                    is_static,
+                    inputs,
+                    address,
+                    gas_limit,
+                )?;
+                Ok(Some(result))
+            }
+            _ => Ok(None),
         }
     }
 }

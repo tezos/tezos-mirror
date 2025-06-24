@@ -23,9 +23,6 @@ use tezos_smart_rollup_encoding::{
 
 use crate::{constants::WITHDRAWAL_SOL_ADDR, database::PrecompileDatabase};
 
-pub(crate) const SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS: &str =
-    "0xff00000000000000000000000000000000000003";
-
 sol! {
     event SendWithdrawalInput (
         string target,
@@ -76,7 +73,7 @@ pub enum Withdrawal {
     Fast(OutboxMessage<FastWithdrawalInterface>),
 }
 
-fn revert() -> InterpreterResult {
+pub(crate) fn revert() -> InterpreterResult {
     InterpreterResult {
         result: InstructionResult::Revert,
         gas: Gas::new(0),
@@ -149,7 +146,7 @@ where
         // "0x7bced8e4" is the function selector for `push_withdrawal_to_outbox(string,uint256)`
         [0x7b, 0xce, 0xd8, 0xe4, input_data @ ..] => {
             // Decode
-            let (target, amount) = SendWithdrawalInput::abi_decode_data(input_data, true)
+            let (target, amount) = SendWithdrawalInput::abi_decode_data(input_data)
                 .map_err(|e| e.to_string())?;
             let target = Contract::from_b58check(&target).unwrap();
             let amount = BigInt::from_bytes_be(
@@ -185,7 +182,7 @@ where
         [0xe9, 0xf5, 0x8a, 0x77, input_data @ ..] => {
             // Decode
             let (routing_info, amount, ticketer, content) =
-                SendFAWithdrawalInput::abi_decode_data(input_data, true)
+                SendFAWithdrawalInput::abi_decode_data(input_data)
                     .map_err(|e| e.to_string())?;
             let (target, destination) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) =

@@ -16,7 +16,7 @@ use crate::{
 };
 
 use revm::{
-    primitives::{Address, HashMap, StorageKey, StorageValue, B256},
+    primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, AccountStatus, Bytecode, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -66,6 +66,18 @@ pub trait PrecompileDatabase: Database {
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn push_withdrawal(&mut self, withdrawal: Withdrawal);
     fn take_withdrawals(&mut self) -> Vec<Withdrawal>;
+    fn ticket_balance_add(
+        &mut self,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error>;
+    fn ticket_balance_remove(
+        &mut self,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error>;
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
@@ -118,6 +130,26 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
 
     fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
         mem::take(&mut self.withdrawals)
+    }
+
+    fn ticket_balance_add(
+        &mut self,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error> {
+        let mut account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.ticket_balance_add(self.host, ticket_hash, owner, amount)
+    }
+
+    fn ticket_balance_remove(
+        &mut self,
+        ticket_hash: &U256,
+        owner: &Address,
+        amount: U256,
+    ) -> Result<bool, Error> {
+        let mut account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.ticket_balance_remove(self.host, ticket_hash, owner, amount)
     }
 }
 
