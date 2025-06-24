@@ -78,12 +78,11 @@ Setting up baking keys
 ----------------------
 
 The most important preliminary step for running a baker is setting up a baker account having enough :doc:`baking power <../active/baking_power>` (typically, possessing more than 6000 tez).
-We cover here only the creation of such an account in case you don't have it already, but not how it can be funded (from a faucet, if using a testnet).
-Also, we don't cover here the optional set up of an associated :ref:`consensus key <consensus_key_details>` and/or :ref:`companion key <companion_key>`.
+We don't cover here the optional set up of an associated :ref:`consensus key <consensus_key_details>` and/or :ref:`companion key <companion_key>`.
 
 If you intend to bake on a testnet, you can simply create a key with the following command::
 
-   $ sudo su tezos -c "octez-client gen keys alice"
+   $ sudo su tezos -c "octez-client gen keys mybaker"
 
 and the baker will use it automatically. Indeed, the baker bakes for all the keys for which it has the private key. If you want to avoid this behavior, you can specify a specific baking key by editing the file /etc/default/octez-baker and assigning a value to variable BAKER_KEY.
 
@@ -116,7 +115,7 @@ the auth key.
 .. code:: shell
 
    # create a signing key ( as current user )
-   $ octez-signer gen keys alice
+   $ octez-signer gen keys mybaker
 
    # create an authentication key for signer authorization
    $ sudo su tezos -c "octez-client gen keys auth"
@@ -156,16 +155,23 @@ the configuration command below:
 .. code:: shell
 
    # Get the tz1 address of our signing key
-   $ octez-signer show address alice
+   $ octez-signer show address mybaker
    Hash: tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs
    Public Key: edpkvGAz71r8SZomcvF7LGajXT3AnhYX9CrmK3JWgA2xk8rf8CudY8
 
    # Configure the baker to use the remote signer
    sudo su tezos -c "octez-client -R tcp://localhost:7732 \
-      import secret key alice remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+      import secret key mybaker remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
 Starting the baker
 ------------------
+
+Before starting the baker, we have to manually fund the address ``mybaker`` and register it as a delegate. Typically::
+
+   ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   sudo su tezos -c "octez-client register key mybaker as delegate"
+   sudo su tezos -c "octez-client stake 6000 for mybaker"
+   sudo su tezos -c "octez-dal-node config update --endpoint http://127.0.0.1:8732 --attester-profiles=tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
 Now that everything is in place, we can start the Octez baker.
 
