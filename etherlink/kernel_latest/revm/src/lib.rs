@@ -247,26 +247,21 @@ mod test {
             BlockEnv, CfgEnv, ContextTr, LocalContext, TxEnv,
         },
         context_interface::block::BlobExcessGasAndPrice,
-        inspector::inspectors::GasInspector,
         primitives::{hex::FromHex, Address, Bytes, FixedBytes, TxKind, U256},
         state::{AccountInfo, Bytecode},
-        Context, Database, ExecuteCommitEvm, ExecuteEvm, Journal, MainBuilder,
+        Context, Database, ExecuteCommitEvm, Journal, MainBuilder,
     };
+    use serde_json::Value;
     use tezos_ethereum::block::{BlockConstants, BlockFees};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use utilities::{block_env, dummy_block_constants, etherlink_vm_db, evm, tx_env};
 
     use crate::{
-        database::{EtherlinkVMDB, PrecompileDatabase},
-        precompile_provider::EtherlinkPrecompiles,
-        run_transaction,
-        send_outbox_message::SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
-        world_state_handler::account_path,
-        ExecutionOutcome,
+        database::EtherlinkVMDB, precompile_provider::EtherlinkPrecompiles,
+        run_transaction, world_state_handler::account_path, ExecutionOutcome,
     };
     use crate::{
-        send_outbox_message::SendWithdrawalInput,
-        world_state_handler::new_world_state_handler,
+        test::utilities::empty_fees, world_state_handler::new_world_state_handler,
     };
 
     mod utilities {
@@ -351,6 +346,16 @@ mod test {
             )
         }
 
+        pub(crate) fn empty_fees() -> BlockConstants {
+            BlockConstants::first_block(
+                PU256::from(1),
+                PU256::from(1),
+                BlockFees::new(PU256::zero(), PU256::zero(), PU256::zero()),
+                30_000_000,
+                PH160::zero(),
+            )
+        }
+
         pub(crate) fn etherlink_vm_db<'a>(
             commit_status: Option<bool>,
             block_env: &BlockEnv,
@@ -404,65 +409,6 @@ mod test {
                 .with_cfg(cfg)
                 .build_mainnet()
         }
-    }
-
-    #[test]
-    fn test_outbox_precompile_contract() {
-        // import reexported version to build `SendWithdrawalInput`
-        use alloy_sol_types::{sol_data::FixedBytes, SolEvent, SolType};
-
-        let caller =
-            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
-        let destination =
-            Address::from_hex(SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS).unwrap();
-        let value = U256::from(5);
-
-        let mut abi_data = [0u8; 32];
-        abi_data[0] = 0x01;
-        abi_data[1..21].fill(0x11);
-        abi_data[22] = 0x00;
-        let fixed = FixedBytes::<22>::abi_decode(&abi_data, true).unwrap();
-        let input = SendWithdrawalInput {
-            target: fixed,
-            ticketer: fixed,
-            amount: U256::from(42),
-        }
-        .encode_data();
-        let mut data = Vec::with_capacity(1 + input.len());
-        data.extend_from_slice(&[0x0c, 0x22, 0xd2, 0x8f]);
-        data.extend_from_slice(&input);
-
-        let block = block_env(None, 1_000_000);
-        let tx = tx_env(
-            caller,
-            Some(destination),
-            block.gas_limit,
-            0,
-            value,
-            Bytes::from(data),
-            None,
-        );
-
-        let mut db = etherlink_vm_db(None, &block);
-
-        let account_info = AccountInfo {
-            balance: U256::MAX,
-            nonce: 0,
-            code_hash: Default::default(),
-            code: None,
-        };
-
-        db.insert_account_info(caller, account_info);
-
-        let evm = evm(db, &block, &tx);
-        let tracer = GasInspector::default();
-        let precompiles = EtherlinkPrecompiles::new();
-        let mut evm = evm.with_inspector(tracer).with_precompiles(precompiles);
-        let execution_result: ExecutionResult = evm.transact(&tx).unwrap();
-        let withdrawals = evm.db_mut().take_withdrawals();
-
-        assert!(execution_result.is_success());
-        assert!(!withdrawals.is_empty());
     }
 
     #[test]
@@ -662,5 +608,105 @@ mod test {
             }
             other => panic!("ERROR: ended up in {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_withdrawal_contract() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = empty_fees();
+
+        // TODO: use foundry-compilers here when kernel rust version is bumped to 1.87
+        // For the moment if you need to rebuild you can run:
+        // $ forge build etherlink/kernel_latest/revm/contracts/withdrawal.sol --out etherlink/kernel_latest/revm/contracts/out
+
+        // Read compiled XTZWithdrawal
+        let file =
+            std::fs::read_to_string("contracts/out/withdrawal.sol/XTZWithdrawal.json")
+                .unwrap();
+        let json: Value = serde_json::from_str(&file).unwrap();
+        let hex = json["bytecode"]["object"].as_str().unwrap();
+        let deployed = Bytes::from_hex(hex).unwrap();
+
+        // Insert account information for caller of both transactions
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+        let mut storage_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller))
+            .unwrap();
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        // Deploy XTZWithdrawal
+        let ExecutionOutcome { result, .. } = run_transaction(
+            &mut host,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            None,
+            deployed,
+            10_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+        )
+        .unwrap();
+
+        assert!(result.is_success());
+
+        // Call the created address with data generated from:
+        // $ cast calldata "withdraw_base58(bytes22,bytes22)" 0x012c895aa0a61697411ffc877120556a6c2b83ca5100 0x0000ff017f06e07213afbc546091d39c68e4028e091a
+        //
+        // Hex encoded values can be retrieved from the following contracts:
+        // let ticketer = Contract::from_b58check("KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj");
+        // let target = Contract::from_b58check("tz1itNnzav2CCQPe1za8924GhtqgWjjNRG4G");
+
+        let calldata = "0x081952b3012c895aa0a61697411ffc877120556a6c2b83ca5100000000000000000000000000ff017f06e07213afbc546091d39c68e4028e091a00000000000000000000";
+        let addr = result.created_address();
+        let withdrawn_amount = U256::from(1_000_000_000_000u64);
+
+        let ExecutionOutcome {
+            result,
+            withdrawals,
+        } = run_transaction(
+            &mut host,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            addr,
+            Bytes::from_hex(calldata).unwrap(),
+            10_000_000,
+            0,
+            withdrawn_amount,
+            AccessList(vec![]),
+        )
+        .unwrap();
+
+        // Verify that:
+        //  - caller is deducted
+        //  - withdrawal contract burned the received amount
+        //  - zero address received the burned amound
+        //  - outbox message has been built and sent
+        assert!(result.is_success());
+        assert_eq!(
+            storage_account.balance(&host).unwrap(),
+            U256::MAX.saturating_sub(withdrawn_amount)
+        );
+        let created_account = world_state_handler
+            .get_or_create(&host, &account_path(&addr.unwrap()))
+            .unwrap();
+        assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
+        let zero_account = world_state_handler
+            .get_or_create(&host, &account_path(&Address::ZERO))
+            .unwrap();
+        assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
+        assert!(!withdrawals.is_empty());
     }
 }

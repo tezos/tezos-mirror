@@ -16,15 +16,10 @@ use crate::{
     },
 };
 
+#[derive(Debug, Default)]
 pub struct EtherlinkPrecompiles {
     customs: Vec<Address>,
     builtins: EthPrecompiles,
-}
-
-impl Default for EtherlinkPrecompiles {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl EtherlinkPrecompiles {
