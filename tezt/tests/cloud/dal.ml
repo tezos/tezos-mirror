@@ -524,6 +524,7 @@ type configuration = {
   disable_shard_validation : bool;
   ignore_pkhs : string list;
   ppx_profiling : bool;
+  ppx_profiling_backends : string list;
 }
 
 type bootstrap = {
@@ -2549,6 +2550,7 @@ let init_public_network cloud (configuration : configuration)
                 ~event_level:`Notice
                 ~disable_shard_validation
                 ~ppx_profiling:configuration.ppx_profiling
+                ~ppx_profiling_backends:configuration.ppx_profiling_backends
                 dal_node
             in
             Lwt.return_some dal_node
@@ -2764,6 +2766,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ~event_level:`Notice
           ~disable_shard_validation:configuration.disable_shard_validation
           ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_bootstrap_node
   in
   let* () =
@@ -2857,6 +2860,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           ~event_level:`Notice
           ~disable_shard_validation:configuration.disable_shard_validation
           ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
       Lwt.return_some dal_node
@@ -3008,6 +3012,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
       ~disable_shard_validation:configuration.disable_shard_validation
       ?ignore_pkhs
       ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       dal_node
   in
   let () = toplog "Init producer %s: DAL node is ready" name in
@@ -3081,6 +3086,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
       ~event_level:`Notice
       ~disable_shard_validation:configuration.disable_shard_validation
       ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       dal_node
   in
   let* () =
@@ -3096,8 +3102,16 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
-    ~otel ~memtrace ~rpc_external ~cloud =
+let init_etherlink_dal_node
+    {
+      external_rpc;
+      network;
+      snapshot;
+      ppx_profiling;
+      ppx_profiling_backends;
+      memtrace;
+      _;
+    } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -3114,7 +3128,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
-          ~rpc_external
+          ~rpc_external:external_rpc
           network
           ~snapshot
           cloud
@@ -3128,7 +3142,9 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           dal_node
       in
-      let* () = Dal_node.Agent.run ?otel dal_node in
+      let* () =
+        Dal_node.Agent.run ?otel ~ppx_profiling ~ppx_profiling_backends dal_node
+      in
       some dal_node
   | _ :: _ :: _ ->
       (* On several slot indices, we launch one observer DAL node per
@@ -3150,7 +3166,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~name
           ~arguments:
             [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
-          ~rpc_external
+          ~rpc_external:external_rpc
           network
           ~snapshot
           cloud
@@ -3163,7 +3179,14 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
           ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
           default_dal_node
       in
-      let* () = Dal_node.Agent.run ?otel ~memtrace default_dal_node in
+      let* () =
+        Dal_node.Agent.run
+          ?otel
+          ~memtrace
+          ~ppx_profiling
+          ~ppx_profiling_backends
+          default_dal_node
+      in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
 
       let* dal_slots_and_nodes =
@@ -3179,7 +3202,7 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
                        Peer bootstrap.node_p2p_endpoint;
                        History_mode (Rolling (Some 79));
                      ]
-                   ~rpc_external
+                   ~rpc_external:external_rpc
                    network
                    ~snapshot
                    cloud
@@ -3193,7 +3216,14 @@ let init_etherlink_dal_node ~bootstrap ~next_agent ~dal_slots ~network ~snapshot
                    ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
                    dal_node
                in
-               let* () = Dal_node.Agent.run ?otel ~memtrace dal_node in
+               let* () =
+                 Dal_node.Agent.run
+                   ?otel
+                   ~memtrace
+                   ~ppx_profiling
+                   ~ppx_profiling_backends
+                   dal_node
+               in
                return (slot_index, Dal_node.rpc_endpoint dal_node))
       in
       let* reverse_proxy_dal_node =
@@ -3270,14 +3300,11 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
     init_etherlink_dal_node
+      configuration
       ~bootstrap
       ~next_agent
       ~dal_slots:etherlink_configuration.etherlink_dal_slots
-      ~network:configuration.network
-      ~snapshot:configuration.snapshot
-      ~rpc_external:configuration.external_rpc
       ~otel
-      ~memtrace:configuration.memtrace
       ~cloud
   in
   let operators =
@@ -3858,6 +3885,7 @@ let on_new_level t level ~metadata =
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
                 ~ppx_profiling:t.configuration.ppx_profiling
+                ~ppx_profiling_backends:t.configuration.ppx_profiling_backends
                 dal_node)
         in
         Lwt.return {t with disconnection_state = Some disconnection_state}
@@ -4130,6 +4158,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let external_rpc = Cli.node_external_rpc_server in
     let disable_shard_validation = Cli.disable_shard_validation in
     let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let t =
       {
         with_dal;
@@ -4158,6 +4187,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         disable_shard_validation;
         ignore_pkhs;
         ppx_profiling;
+        ppx_profiling_backends;
       }
     in
     (t, etherlink)

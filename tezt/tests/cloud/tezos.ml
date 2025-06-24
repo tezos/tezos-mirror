@@ -38,38 +38,67 @@ module Env = struct
 
   let default_profiling_verbosity = "Debug"
 
-  let default_profiling_backends = ["txt"; "json"]
+  let txt_profiler_backend = "txt"
 
-  let ppx_profiler_env ?prometheus ?otel enable env =
+  let json_profiler_backed = "json"
+
+  let prometheus_profiler_backend = "prometheus"
+
+  let opentelemetry_profiler_backend = "opentelemetry"
+
+  let default_profiling_backends = [txt_profiler_backend; json_profiler_backed]
+
+  let ppx_profiling_backends ?prometheus ?otel backends =
     let cons_if b v l = if b then v :: l else l in
+    let is_selected backend = backends = [] || List.mem backend backends in
     let profiling_backends =
-      default_profiling_backends
-      |> cons_if (Option.is_some otel) "opentelemetry"
-      |> cons_if (Option.is_some prometheus) "prometheus"
+      []
+      |> cons_if
+           (Option.is_some otel && is_selected opentelemetry_profiler_backend)
+           opentelemetry_profiler_backend
+      |> cons_if
+           (Option.is_some prometheus && is_selected prometheus_profiler_backend)
+           prometheus_profiler_backend
+      |> cons_if (is_selected txt_profiler_backend) txt_profiler_backend
+      |> cons_if (is_selected json_profiler_backed) json_profiler_backed
+    in
+    "\"" ^ String.concat ";" profiling_backends ^ "\""
+
+  let ppx_profiler_env ?prometheus ?otel enable selected_backends env =
+    let profiling_backends =
+      ppx_profiling_backends ?prometheus ?otel selected_backends
     in
     env
     |> may_add enable "PROFILING" default_profiling_verbosity
-    |> may_add
-         enable
-         "PROFILING_BACKENDS"
-         (String.concat ";" profiling_backends)
+    |> may_add enable "PROFILING_BACKENDS" profiling_backends
 
   let initialize_env ~memtrace ~memtrace_output_filename
       ~disable_shard_validation ~prometheus ~otel_endpoint ~service_name
-      ~ignore_pkhs ~ppx_profiling =
+      ~ignore_pkhs ~ppx_profiling ~ppx_profiling_backends =
     empty
     |> memtrace_env memtrace memtrace_output_filename
     |> otel_env otel_endpoint service_name
     |> disable_shard_validation_env disable_shard_validation
     |> ignore_topics_env ignore_pkhs
-    |> ppx_profiler_env ?prometheus ?otel:otel_endpoint ppx_profiling
+    |> ppx_profiler_env
+         ?prometheus
+         ?otel:otel_endpoint
+         ppx_profiling
+         ppx_profiling_backends
 end
 
 let may_add_profiling_to_env ~ppx_profiling = function
   | None ->
-      if ppx_profiling then Some (Env.ppx_profiler_env ppx_profiling Env.empty)
+      if ppx_profiling then
+        Some
+          (Env.ppx_profiler_env
+             ppx_profiling
+             Env.default_profiling_backends
+             Env.empty)
       else None
-  | Some env -> Some (Env.ppx_profiler_env ppx_profiling env)
+  | Some env ->
+      Some
+        (Env.ppx_profiler_env ppx_profiling Env.default_profiling_backends env)
 
 let create_dir ?runner dir =
   let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
@@ -298,7 +327,7 @@ module Dal_node = struct
 
     let run ?prometheus ?otel ?(memtrace = false) ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
-        ?(ppx_profiling = false) dal_node =
+        ?(ppx_profiling = false) ?(ppx_profiling_backends = []) dal_node =
       let service_name = name dal_node in
       let memtrace_output_filename =
         Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir service_name
@@ -313,6 +342,7 @@ module Dal_node = struct
           ~service_name
           ~ignore_pkhs
           ~ppx_profiling
+          ~ppx_profiling_backends
       in
       let* () = run ~env ?event_level dal_node in
       (* Update the state in the service manager *)
