@@ -3941,6 +3941,28 @@ let waiter_successful_shards_app_notification l1_committee dal_node commitment
   | exception Not_found ->
       Test.fail "Should not happen as %s is part of the committee" pkh
 
+(* Create two promises for Grafts between [node1] and [node2] on topic
+   [(slot_index, pkh)], one in each direction. *)
+let check_grafts ~number_of_slots ~slot_index (node1, node1_peer_id)
+    (node2, node2_peer_id) pkh =
+  (* The connections have no reason to be grafted on other slot indices than
+     the one they are both subscribed to, so we instruct
+     [check_events_with_topic] to skip all events but the one for [index]. *)
+  let already_seen_slots =
+    Array.init number_of_slots (fun index -> slot_index <> index)
+  in
+  let check_graft on_node to_peer_id pkh =
+    check_events_with_topic
+      ~event_with_topic:(Graft to_peer_id)
+      on_node
+      ~num_slots:number_of_slots
+      ~already_seen_slots
+      pkh
+  in
+  let graft_from_node1 = check_graft node1 node2_peer_id pkh in
+  let graft_from_node2 = check_graft node2 node1_peer_id pkh in
+  [graft_from_node1; graft_from_node2]
+
 let test_dal_node_p2p_connection_and_disconnection _protocol _parameters
     _cryptobox node _client dal_node1 =
   let dal_node2 = Dal_node.create ~node () in
@@ -5165,7 +5187,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
   *)
   let index = 0 in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-  let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let attestation_lag = dal_parameters.Dal.Parameters.attestation_lag in
   let number_of_shards =
     dal_parameters.Dal.Parameters.cryptobox.number_of_shards
@@ -5208,34 +5230,16 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
 
   let client = Client.with_dal_node client ~dal_node:attester in
 
-  (* The connections between attesters and the slot producer have no
-     reason to be grafted on other slot indices than the one the slot
-     producer is subscribed to, so we instruct
-     [check_events_with_topic] to skip all events but the one for
-     [index]. *)
-  let already_seen_slots =
-    Array.init num_slots (fun slot_index -> slot_index <> index)
-  in
   (* Wait for a GRAFT message between the attester and the producer,
      in any direction. *)
   let check_graft pkh =
-    let graft_from_attester =
-      check_events_with_topic
-        ~event_with_topic:(Graft attester_peer_id)
-        producer
-        ~num_slots
-        ~already_seen_slots
-        pkh
-    in
-    let graft_from_producer =
-      check_events_with_topic
-        ~event_with_topic:(Graft producer_peer_id)
-        attester
-        ~num_slots
-        ~already_seen_slots
-        pkh
-    in
-    Lwt.pick [graft_from_attester; graft_from_producer]
+    Lwt.pick
+    @@ check_grafts
+         ~number_of_slots
+         ~slot_index:index
+         (attester, attester_peer_id)
+         (producer, producer_peer_id)
+         pkh
   in
   let check_graft_promises = List.map check_graft all_pkhs in
   Log.info "Waiting for grafting of the attester - producer connection" ;
@@ -5258,7 +5262,7 @@ let test_attestation_through_p2p _protocol dal_parameters _cryptobox node client
      - the producer on all topics with slot_index=index *)
   let* () =
     let expected topic_pkh =
-      Seq.ints 0 |> Seq.take num_slots
+      Seq.ints 0 |> Seq.take number_of_slots
       |> Seq.map (fun topic_slot_index ->
              ( {Dal_RPC.topic_slot_index; topic_pkh},
                bootstrap_peer_id
@@ -5863,31 +5867,17 @@ module Amplification = struct
        other slot indices than the one the slot producer is subscribed
        to, so we instruct [check_events_with_topic] to skip all events
        but the one for [slot_index]. *)
-    let already_seen_slots =
-      Array.init number_of_slots (fun index -> slot_index <> index)
-    in
     (* Wait for a GRAFT message between an attester and either an operator
        (legacy producer) or an observer, in any direction. *)
     let check_graft_promise (operator_or_observer, peer_id) attester =
-      let graft_from_attester_promise =
-        let* attester_peer_id = attester_peer_id attester in
-        check_events_with_topic
-          ~event_with_topic:(Graft attester_peer_id)
-          operator_or_observer
-          ~num_slots:number_of_slots
-          ~already_seen_slots
-          attester.pkh
-      in
-      let graft_from_operator_or_observer_promise =
-        check_events_with_topic
-          ~event_with_topic:(Graft peer_id)
-          attester.dal_node
-          ~num_slots:number_of_slots
-          ~already_seen_slots
-          attester.pkh
-      in
+      let* attester_peer_id = attester_peer_id attester in
       Lwt.pick
-        [graft_from_attester_promise; graft_from_operator_or_observer_promise]
+      @@ check_grafts
+           ~number_of_slots
+           ~slot_index
+           (operator_or_observer, peer_id)
+           (attester.dal_node, attester_peer_id)
+           attester.pkh
     in
     (* We don't care if the slot producer establishes full connections
        with the DAL nodes it is about to ban so we only wait for the
@@ -6135,7 +6125,7 @@ module Amplification = struct
        observer performs an amplification. *)
     let index = 0 in
     let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-    let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+    let number_of_slots = dal_parameters.number_of_slots in
     let peers = [Dal_node.listen_addr dal_bootstrap] in
     let peer_id dal_node = Dal_node.read_identity dal_node in
 
@@ -6176,36 +6166,18 @@ module Amplification = struct
       |> List.map (fun account -> account.Account.public_key_hash)
     in
 
-    (* The connections between the slot producer and the observer have
-       no reason to be grafted on other slot indices than the one they
-       are both subscribed to, so we instruct
-       [check_events_with_topic] to skip all events but the one for
-       [index]. *)
-    let already_seen_slots =
-      Array.init num_slots (fun slot_index -> slot_index <> index)
+    let check_graft_promises =
+      List.map
+        (fun pkh ->
+          Lwt.pick
+          @@ check_grafts
+               ~number_of_slots
+               ~slot_index:index
+               (observer, observer_peer_id)
+               (producer, producer_peer_id)
+               pkh)
+        all_pkhs
     in
-    (* Wait for a GRAFT message between the observer and the producer,
-       in any direction. *)
-    let check_graft pkh =
-      let graft_from_observer =
-        check_events_with_topic
-          ~event_with_topic:(Graft observer_peer_id)
-          producer
-          ~num_slots
-          ~already_seen_slots
-          pkh
-      in
-      let graft_from_producer =
-        check_events_with_topic
-          ~event_with_topic:(Graft producer_peer_id)
-          observer
-          ~num_slots
-          ~already_seen_slots
-          pkh
-      in
-      Lwt.pick [graft_from_observer; graft_from_producer]
-    in
-    let check_graft_promises = List.map check_graft all_pkhs in
     Log.info "Waiting for grafting of the observer - producer connection" ;
 
     (* We need to bake some blocks until the L1 node notifies the DAL
@@ -6476,26 +6448,18 @@ module Garbage_collection = struct
     Log.info "Attester DAL node is running" ;
 
     (* Now that all the DAL nodes are running, we need some of them to
-       establish grafted connections. The connections between the
-       attester and the slot producer have no reason to be grafted on
-       other slot indices than the one the slot producer is subscribed
-       to, so we instruct [check_events_with_topic] to skip all events
-       but the one for [slot_index]. *)
-    let already_seen_slots =
-      Array.init number_of_slots (fun index -> slot_index <> index)
-    in
+       establish grafted connections. *)
     (* Wait for a GRAFT message between all nodes. *)
     let check_graft node1 node2 attester_pkh =
-      let check_graft ~from:node1 node2 =
-        let* id1 = Dal_node.read_identity node1 in
-        check_events_with_topic
-          ~event_with_topic:(Graft id1)
-          node2
-          ~num_slots:number_of_slots
-          ~already_seen_slots
-          attester_pkh
-      in
-      Lwt.pick [check_graft ~from:node1 node2; check_graft ~from:node2 node1]
+      let* id1 = Dal_node.read_identity node1 in
+      let* id2 = Dal_node.read_identity node2 in
+      Lwt.pick
+      @@ check_grafts
+           ~number_of_slots
+           ~slot_index
+           (node1, id1)
+           (node2, id2)
+           attester_pkh
     in
     let check_graft_promises =
       List.map (check_graft slot_producer attester) bootstrap_pkhs
@@ -7387,7 +7351,7 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
      - a slot producer on slot 0,
      - an observer on slot 0. *)
   let index = 0 in
-  let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let peers = [Dal_node.listen_addr dal_bootstrap] in
   let peer_id dal_node = Dal_node.read_identity dal_node in
 
@@ -7426,34 +7390,16 @@ let test_rpc_get_connections _protocol dal_parameters _cryptobox node client
     |> List.map (fun account -> account.Account.public_key_hash)
   in
 
-  (* The connections between the slot producer and the observer have
-     no reason to be grafted on other slot indices than the one they
-     are both subscribed to, so we instruct
-     [check_events_with_topic] to skip all events but the one for
-     [index]. *)
-  let already_seen_slots =
-    Array.init num_slots (fun slot_index -> slot_index <> index)
-  in
   (* Wait for a GRAFT message between the observer and the producer,
      in any direction. *)
   let check_graft pkh =
-    let graft_from_observer =
-      check_events_with_topic
-        ~event_with_topic:(Graft observer_peer_id)
-        producer
-        ~num_slots
-        ~already_seen_slots
-        pkh
-    in
-    let graft_from_producer =
-      check_events_with_topic
-        ~event_with_topic:(Graft producer_peer_id)
-        observer
-        ~num_slots
-        ~already_seen_slots
-        pkh
-    in
-    Lwt.pick [graft_from_observer; graft_from_producer]
+    Lwt.pick
+    @@ check_grafts
+         ~number_of_slots
+         ~slot_index:index
+         (observer, observer_peer_id)
+         (producer, producer_peer_id)
+         pkh
   in
   let check_graft_promises = List.map check_graft all_pkhs in
   Log.info "Waiting for grafting of the observer - producer connection" ;
@@ -8444,7 +8390,7 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
     dal_bootstrap =
   let peer_id dal_node = Dal_node.read_identity dal_node in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-  let num_slots = dal_parameters.Dal.Parameters.number_of_slots in
+  let number_of_slots = dal_parameters.Dal.Parameters.number_of_slots in
   let slot_index = 0 in
   let* () = check_profiles ~__LOC__ dal_bootstrap ~expected:Dal_RPC.Bootstrap in
   Log.info "Bootstrap DAL node is running" ;
@@ -8550,27 +8496,14 @@ let test_new_attester_attests _protocol dal_parameters _cryptobox node client
 
   let* id_attester = peer_id attester in
   let* id_producer = peer_id producer in
-  let already_seen_slots =
-    Array.init num_slots (fun index -> slot_index <> index)
-  in
   let check_graft_promises =
-    let graft_from_attester =
-      check_events_with_topic
-        ~event_with_topic:(Graft id_attester)
-        producer
-        ~num_slots
-        ~already_seen_slots
-        new_account.public_key_hash
-    in
-    let graft_from_producer =
-      check_events_with_topic
-        ~event_with_topic:(Graft id_producer)
-        attester
-        ~num_slots
-        ~already_seen_slots
-        new_account.public_key_hash
-    in
-    Lwt.pick [graft_from_attester; graft_from_producer]
+    Lwt.pick
+    @@ check_grafts
+         ~number_of_slots
+         ~slot_index
+         (attester, id_attester)
+         (producer, id_producer)
+         new_account.public_key_hash
   in
   let* assigned_shard_indexes =
     Dal_RPC.(
