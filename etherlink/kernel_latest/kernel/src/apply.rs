@@ -267,10 +267,14 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         return Ok(Validity::InvalidPrePay);
     }
 
-    // The sender does not have code, see EIP3607.
-    if code_exists {
-        log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
-        return Ok(Validity::InvalidCode);
+    // TODO: Whenever the configuration/spec id of our EVM
+    // is properly propagated to REVM, re-adjust this condition.
+    if let Ok(false) = is_revm_enabled(host) {
+        // The sender does not have code, see EIP3607.
+        if code_exists {
+            log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
+            return Ok(Validity::InvalidCode);
+        }
     }
 
     // check that enough gas is provided to cover fees
