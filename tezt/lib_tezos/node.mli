@@ -403,8 +403,8 @@ module Config_file : sig
   val set_sandbox_network_with_user_activated_overrides :
     (string * string) list -> JSON.t -> JSON.t
 
-  (** Set the network config to a sandbox with the given dal config. *)
-  val set_sandbox_network_with_dal_config :
+  (** Updates the network config to add the given dal config. *)
+  val set_network_with_dal_config :
     Tezos_crypto_dal.Cryptobox.Config.t -> JSON.t -> JSON.t
 
   (** Update the network config with the given user
@@ -423,10 +423,19 @@ module Config_file : sig
   (** Set the peer_validator configuration in the given configuration. *)
   val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
 
+  (** Set the network config to a sandbox chain. *)
+  val set_sandbox_network : JSON.t -> JSON.t
+
   (** Set the network config to a sandbox with the same chain_id than Ghostnet.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_ghostnet_sandbox_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Ghostnet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_ghostnet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 end
 

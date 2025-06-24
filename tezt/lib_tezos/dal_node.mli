@@ -176,6 +176,7 @@ val init_config :
   unit Lwt.t
 
 val update_config :
+  ?expected_pow:float ->
   ?peers:string list ->
   ?attester_profiles:string list ->
   ?operator_profiles:int list ->

@@ -517,7 +517,7 @@ module Agnostic_baker = struct
   include Agnostic_baker
 
   module Agent = struct
-    let init ?(group = "L1") ?env ?name ~delegates
+    let init ?(group = "L1") ?env ?name ?event_sections_levels ~delegates
         ?(path = Uses.path Constant.octez_agnostic_baker) ~client
         ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
         ?(ppx_profiling = false) node cloud agent =
@@ -533,6 +533,7 @@ module Agnostic_baker = struct
       let runner = Agent.runner agent in
       init
         ?env:(may_add_profiling_to_env ~ppx_profiling env)
+        ?event_sections_levels
         ?name
         ~event_level:`Notice
         ?runner
