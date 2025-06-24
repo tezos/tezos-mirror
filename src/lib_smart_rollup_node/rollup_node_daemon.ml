@@ -130,6 +130,19 @@ let etherlink_current_block pvm_plugin node_ctxt ctxt =
     Etherlink_specific.current_level pvm_plugin ctxt
   else return_none
 
+let emit_etherlink_telemetry_events scope start_block end_block =
+  match (start_block, end_block) with
+  | Some start_block, Some end_block when end_block > start_block ->
+      let first_block = start_block + 1 in
+      List.iter
+        (fun block ->
+          Opentelemetry.Scope.add_event scope @@ fun () ->
+          Opentelemetry_lwt.Event.make
+            ~attrs:[("etherlink.block.number", `Int block)]
+            "rollup_node.processed_etherlink_block")
+        (first_block -- end_block)
+  | _ -> ()
+
 (* Process a L1 that we have never seen and for which we have processed the
    predecessor. *)
 let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
@@ -180,6 +193,10 @@ let process_unseen_head ({node_ctxt; _} as state) ~catching_up ~predecessor
   let*! etherlink_end_block =
     etherlink_current_block (module Plugin.Pvm) node_ctxt ctxt
   in
+  emit_etherlink_telemetry_events
+    scope
+    etherlink_start_block
+    etherlink_end_block ;
   let*! context_hash = Context.commit ctxt in
   let* commitment_hash =
     Publisher.process_head
