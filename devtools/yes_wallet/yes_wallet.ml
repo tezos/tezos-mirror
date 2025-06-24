@@ -182,8 +182,7 @@ let level_opt_name = "--level"
 
 let other_accounts_opt_name = "--other-accounts"
 
-let supported_network =
-  List.map fst Octez_node_config.Config_file.builtin_blockchain_networks
+let supported_networks = List.map fst Yes_wallet_lib.supported_networks
 
 let force = ref false
 
@@ -211,8 +210,8 @@ let usage () =
      if %s is used the deactivated bakers are filtered out@,\
      if %s <NUM> is used, the first largest bakers that have an accumulated \
      stake of at least <NUM> percent of the total stake are kept@,\
-     if %s <%a> is used the store is opened using the right genesis parameter \
-     (default is mainnet) @,\
+     if %s <%a|http://...> is used the store is opened using the right genesis \
+     parameter (default is mainnet) @,\
      if %s <pkh .. pkh> is used, the generated wallet will also contain the \
      addresses for the given list of space separated pkh. @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
@@ -231,7 +230,7 @@ let usage () =
       pp_print_list
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
-    supported_network
+    supported_networks
     active_bakers_only_opt_name
     staking_share_opt_name
     network_opt_name
@@ -239,7 +238,7 @@ let usage () =
       pp_print_list
         ~pp_sep:(fun ppf () -> pp_print_string ppf "|")
         pp_print_string)
-    supported_network
+    supported_networks
     other_accounts_opt_name
     alias_file_opt_name
     force_opt_name
@@ -305,6 +304,11 @@ let () =
     aux argv
   in
 
+  let is_supported_network net =
+    List.mem (String.lowercase_ascii net) supported_networks
+    || String.starts_with ~prefix:"http" net
+  in
+
   (* Take an alias file as input. *)
   let alias_file_opt =
     let rec aux argv =
@@ -330,7 +334,7 @@ let () =
         (* FIME this is an uggly hack, but hey -lets' force alias files
            to have a .json extension.*)
         || String.ends_with ~suffix:alias_file_extension arg
-        || List.mem (String.lowercase_ascii arg) supported_network)
+        || is_supported_network arg)
       argv
   in
   let active_bakers_only =
@@ -355,9 +359,8 @@ let () =
         when opt = alias_file_opt_name
              && String.ends_with ~suffix:alias_file_extension file ->
           filter t
-      | opt :: net :: t
-        when opt = network_opt_name
-             && List.mem (String.lowercase_ascii net) supported_network ->
+      | opt :: net :: t when opt = network_opt_name && is_supported_network net
+        ->
           filter t
       | h :: t -> h :: filter t
     in

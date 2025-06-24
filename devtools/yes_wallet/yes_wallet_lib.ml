@@ -449,28 +449,36 @@ let protocol_of_hash protocol_hash =
     (fun (module P : Sigs.PROTOCOL) -> Protocol_hash.equal P.hash protocol_hash)
     (Known_protocols.get_all ())
 
+let supported_networks =
+  List.map
+    (fun (alias, config) ->
+      (alias, config.Octez_node_config.Config_file.genesis))
+    Octez_node_config.Config_file.builtin_blockchain_networks
+
 (** load mainnet store from [base_dir]
 *)
 let genesis ~network =
-  (Option.value_f ~default:(fun () ->
-       Stdlib.failwith
-       @@ Format.asprintf
-            "@[Unkown network alias %s.@,Known networks are @[%a@]@]"
-            network
-            Format.(pp_print_list pp_print_string)
-            (List.map
-               (fun (alias, _) -> alias)
-               Octez_node_config.Config_file.builtin_blockchain_networks))
-  @@ List.assoc
-       ~equal:String.equal
-       network
-       Octez_node_config.Config_file.builtin_blockchain_networks)
-    .genesis
+  let open Lwt_result_syntax in
+  if String.starts_with ~prefix:"http" network then
+    let* {genesis; _} =
+      Octez_node_config.Shared_arg.load_config_from_url (Uri.of_string network)
+    in
+    return genesis
+  else
+    Option.value_f ~default:(fun () ->
+        Stdlib.failwith
+        @@ Format.asprintf
+             "@[Unkown network alias %s.@,Known networks are @[%a @]@]"
+             network
+             Format.(pp_print_list pp_print_string)
+             (List.map (fun (alias, _) -> alias) supported_networks))
+    @@ List.assoc ~equal:String.equal network supported_networks
+    |> return
 
 let get_context ?level ~network_opt base_dir =
   let open Lwt_result_syntax in
   let open Tezos_store in
-  let genesis = genesis ~network:network_opt in
+  let* genesis = genesis ~network:network_opt in
   let* store =
     Lwt.catch
       (fun () ->

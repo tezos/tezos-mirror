@@ -186,6 +186,8 @@ let load_net_config =
       let*? net_config = decode_net_config filename netconfig in
       return net_config
 
+let load_config_from_url url = load_net_config (Url url)
+
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
     advertised_net_port discovery_addr peers no_bootstrap_peers
