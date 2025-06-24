@@ -17,6 +17,7 @@ let tests =
            sandboxed RISC-V PVM",
           `Quick,
           Test_backend.test_jstz_proof_regression );
+        ("Proofs are immutable", `Quick, Test_backend.test_proof_immutability);
       ] );
     ( "Storage",
       [
