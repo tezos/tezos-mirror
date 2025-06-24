@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -25,6 +26,8 @@ let of_tag_use u =
   else raise (Invalid_argument "Kernel.of_use")
 
 let supports_dal = function Mainnet -> false | Latest -> true
+
+let supports_revm = function Mainnet -> false | Latest -> true
 
 (* Select the appropriate EVM version for the specified kernel.
 

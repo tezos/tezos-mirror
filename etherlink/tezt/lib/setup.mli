@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -104,7 +104,7 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
+  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -156,7 +156,7 @@ val register_multichain_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
+  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -210,7 +210,7 @@ val register_test_for_kernels :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
+  enable_revm:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   ?commitment_period:int ->
   ?challenge_window:int ->
@@ -263,7 +263,7 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  ?enable_revm:bool ->
+  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?threshold_encryption:bool ->
