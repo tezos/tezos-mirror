@@ -118,3 +118,17 @@ val slow : string
     maybe testing only one combination of parameters in [before_merging] pipelines
     is enough, and other variations can be tagged as [extra]. *)
 val extra : string
+
+(** ["memory_hungry"]: tag for tests that we know use too much memory.
+
+    This tag means: "I know this test uses too much memory, but the test is important
+    and it would be too complicated to reduce its memory usage."
+
+    The only effect this tag has is to raise the memory usage alert threshold.
+    You should only tag tests for which such alerts have been raised.
+
+    You should also consider tagging memory-hungry tests as {!extra}
+    to lower the pressure on CI resources.
+    If you do so, tag your test with both [extra] and [memory_hungry],
+    because memory usage alerts also apply to the scheduled pipeline. *)
+val memory_hungry : string
