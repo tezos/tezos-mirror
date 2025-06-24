@@ -68,10 +68,11 @@ let job_release_page ~test () =
          ])
     ["./teztale/scripts/releases/publish_release_page.sh"]
 
-let jobs ~test () =
-  [
-    job_build_amd64 ~expire_in:Never ();
-    job_build_arm64 ~expire_in:Never ();
-    job_gitlab_release;
-    job_release_page ~test ();
-  ]
+let jobs ~test ?(dry_run = false) () =
+  (* If the release is a dry run, we do not publish a gitlab release page. *)
+  (if dry_run then [] else [job_gitlab_release])
+  @ [
+      job_build_amd64 ~expire_in:Never ();
+      job_build_arm64 ~expire_in:Never ();
+      job_release_page ~test ();
+    ]
