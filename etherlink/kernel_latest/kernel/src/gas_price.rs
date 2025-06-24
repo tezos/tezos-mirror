@@ -11,13 +11,13 @@ use softfloat::F64;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
-const CAPACITY: u64 = 4_000_000;
+const CAPACITY: u64 = 8_000_000;
 const TARGET: u64 = CAPACITY / 2;
 const TOLERANCE: u64 = 10 * TARGET;
 
 // chosen so that gas price will decrease ~7/8 if there's no usage for ~10 seconds.
 // ALPHA = -ln(7/8)/(TARGET * 10)
-const ALPHA: F64 = softfloat::f64!(0.000_000_007);
+const ALPHA: F64 = softfloat::f64!(0.000_000_004);
 
 /// Register a completed block into the tick backlog
 pub fn register_block(
