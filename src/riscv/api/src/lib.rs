@@ -7,8 +7,6 @@ mod move_semantics;
 mod pointer_apply;
 
 use std::fs;
-use std::ops::Deref;
-use std::ops::DerefMut;
 use std::str;
 
 use arbitrary_int::u31;
@@ -25,7 +23,8 @@ use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
 use octez_riscv::state_backend::owned_backend::Owned;
-use octez_riscv::state_backend::proof_backend::proof;
+use octez_riscv::state_backend::proof_backend::proof::Proof as OctezRiscvProof;
+use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::storage;
 use octez_riscv::storage::StorageError;
@@ -34,6 +33,8 @@ use pointer_apply::apply_imm;
 use pointer_apply::apply_mut;
 use sha2::Digest;
 use sha2::Sha256;
+
+use crate::storage::Hash;
 
 type OcamlFallible<T> = Result<T, ocaml::Error>;
 
@@ -489,21 +490,19 @@ pub unsafe fn octez_riscv_storage_export_snapshot(
     })
 }
 
-/// Proofs
+/// Proof type used by both the protocol and the rollup node.
 #[ocaml::sig]
-pub struct Proof(proof::Proof);
-
-impl Deref for Proof {
-    type Target = proof::Proof;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
+struct Proof {
+    final_state_hash: Hash,
+    serialised_proof: Box<[u8]>,
 }
 
-impl DerefMut for Proof {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+impl From<OctezRiscvProof> for Proof {
+    fn from(proof: OctezRiscvProof) -> Self {
+        Proof {
+            final_state_hash: proof.final_state_hash(),
+            serialised_proof: serialise_proof(&proof).collect(),
+        }
     }
 }
 
@@ -511,14 +510,15 @@ ocaml::custom!(Proof);
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
-pub fn octez_riscv_proof_start_state(proof: Pointer<Proof>) -> [u8; 32] {
-    proof.as_ref().initial_state_hash().into()
+pub fn octez_riscv_proof_start_state(_proof: Pointer<Proof>) -> [u8; 32] {
+    // TODO: RV-690 Proof start state is not implemented yet
+    todo!()
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
 pub fn octez_riscv_proof_stop_state(proof: Pointer<Proof>) -> [u8; 32] {
-    proof.as_ref().final_state_hash().into()
+    proof.as_ref().final_state_hash.into()
 }
 
 #[ocaml::func]
@@ -529,7 +529,7 @@ pub fn octez_riscv_produce_proof(
 ) -> Option<Pointer<Proof>> {
     let input = input.map(|i| i.into());
     let proof = state.apply_ro(|pvm| NodePvm::produce_proof(pvm, input, &mut PvmHooks::default()));
-    proof.map(|p| Pointer::from(Proof(p)))
+    proof.map(|proof| Pointer::from(Proof::from(proof)))
 }
 
 #[ocaml::func]
@@ -543,26 +543,33 @@ pub fn octez_riscv_verify_proof(
     input: Option<Input>,
     proof: Pointer<Proof>,
 ) -> Option<Pointer<InputRequest>> {
-    let input = input.map(|i| i.into());
-    let input_request = NodePvm::verify_proof(proof.as_ref(), input, &mut PvmHooks::default());
-
     // TODO: RV-556: Return an `InputRequest`
     todo!()
 }
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
-pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> ocaml::Value {
+pub unsafe fn octez_riscv_serialise_proof(proof: Pointer<Proof>) -> BytesWrapper {
     // Safety: the function needs to return the same `ocaml::Value` as in the signature.
     // In this case, an OCaml bytes value has to be returned.
-    let serialisation: Vec<u8> = serialise_proof(proof.as_ref()).collect();
-    unsafe { ocaml::Value::bytes(serialisation) }
+    let bytes = proof.as_ref().serialised_proof.clone();
+    BytesWrapper(bytes)
 }
 
 #[ocaml::func]
 #[ocaml::sig("bytes -> (proof, string) Result.t")]
-pub fn octez_riscv_deserialise_proof(_bytes: &[u8]) -> Result<Pointer<Proof>, String> {
-    todo!("RV-555")
+pub fn octez_riscv_deserialise_proof(bytes: &[u8]) -> Result<Pointer<Proof>, String> {
+    let iter = bytes.iter().cloned();
+
+    // TODO: RV-612 Save the verifier returned from deserialisation in the returned Proof
+    // in order to be able to generate an input request at verification.
+    let (proof, _) = deserialise_proof(iter).map_err(|e| e.to_string())?;
+
+    Ok(Proof {
+        final_state_hash: proof.final_state_hash(),
+        serialised_proof: bytes.into(),
+    }
+    .into())
 }
 
 #[ocaml::func]

@@ -25,4 +25,4 @@ let read_riscv_jstz_kernel () =
     (project_root // "src/riscv/assets/jstz.checksum")
 
 let read_riscv_jstz_proof_first_step () =
-  read_file (project_root // "src/riscv/lib/tests/expected/jstz/proof_initial")
+  read_file (project_root // "src/riscv/assets/jstz_proof_initial")
