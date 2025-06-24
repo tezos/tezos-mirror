@@ -71,7 +71,8 @@ module Operation = struct
 
   type t = {
     source : Signature.public_key_hash;
-    counter : Z.t;
+    first_counter : Z.t;
+    length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
   }
@@ -87,8 +88,9 @@ module Operation = struct
       | None -> error_with "Can't parse the operation"
       | Some op -> return op
     in
-    let from_contents (type kind)
-        (contents : kind Tezlink_imports.Alpha_context.contents) : t tzresult =
+    let source_and_counter_from_contents (type kind)
+        (contents : kind Tezlink_imports.Alpha_context.contents) :
+        (Signature.public_key_hash * Z.t) tzresult =
       match contents with
       | Tezlink_imports.Alpha_context.Manager_operation {source; counter; _} ->
           let* counter =
@@ -99,30 +101,48 @@ module Operation = struct
                 Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
               counter
           in
-          return ({source; counter; op; raw} : t)
+          return (source, counter)
       | _ -> error_with "Not a manager operation"
     in
-    let (Operation_data op) = op.protocol_data in
-    match op.contents with
-    | Single contents -> from_contents contents
-    | Cons _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8008
-           support operation batches
-        *)
-        error_with "Unsupported feature: operation batch"
+    let source_and_first_counter_from_contents_list (type kind)
+        (contents_list : kind Tezlink_imports.Alpha_context.contents_list) :
+        (Signature.public_key_hash * Z.t) tzresult =
+      match contents_list with
+      | Single contents -> source_and_counter_from_contents contents
+      | Cons (first_contents, _) ->
+          source_and_counter_from_contents first_contents
+    in
+    let rec contents_list_length :
+        type kind.
+        kind Tezlink_imports.Alpha_context.contents_list -> int -> int =
+     fun contents_list acc ->
+      match contents_list with
+      | Single _ -> 1 + acc
+      | Cons (_, remaining) -> contents_list_length remaining (1 + acc)
+    in
+    let (Operation_data op_data) = op.protocol_data in
+    let l = op_data.contents in
+    let* source, first_counter =
+      source_and_first_counter_from_contents_list l
+    in
+    let length = contents_list_length l 0 in
+    return {source; first_counter; length; op; raw}
 
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv
-      (fun {source; counter; op; raw} -> (source, counter, op, raw))
-      (fun (source, counter, op, raw) -> {source; counter; op; raw})
-      (tup4
+      (fun {source; first_counter; length; op; raw} ->
+        (source, first_counter, length, op, raw))
+      (fun (source, first_counter, length, op, raw) ->
+        {source; first_counter; length; op; raw})
+      (tup5
          Signature.Public_key_hash.encoding
          z
+         int31
          (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
          bytes)
 
-  let hash_operation {source = _; counter = _; op; raw = _} =
+  let hash_operation {source = _; first_counter = _; length = _; op; raw = _} =
     let hash = ImportedOperation.hash_packed op in
     let (`Hex hex) = Operation_hash.to_hex hash in
     Ethereum_types.Hash (Ethereum_types.Hex hex)

@@ -51,7 +51,8 @@ end
 module Operation : sig
   type t = {
     source : Signature.public_key_hash;
-    counter : Z.t;
+    first_counter : Z.t;
+    length : int;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
   }

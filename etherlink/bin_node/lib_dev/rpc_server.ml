@@ -188,7 +188,7 @@ let start_public_server (type f) ~is_sequencer
              ~add_operation:(fun op raw ->
                (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
                   Validate the operation and use the resulting "next_nonce" *)
-               let next_nonce = Ethereum_types.Qty op.counter in
+               let next_nonce = Ethereum_types.Qty op.first_counter in
                let* hash_res =
                  Tx_container.add
                    ~next_nonce

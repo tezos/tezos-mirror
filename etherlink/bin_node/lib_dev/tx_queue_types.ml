@@ -125,7 +125,7 @@ module Tezlink_operation :
   let nonce_to_z_opt _nonce = None
 
   let nonce_of_tx_object (op : Tezos_types.Operation.t) =
-    {first = op.counter; length = 1}
+    {first = op.first_counter; length = op.length}
 
   let transaction_object_from_legacy op = op
 
