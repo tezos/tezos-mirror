@@ -431,10 +431,10 @@ open struct
       ~prefix_name_with_section:true
       ~name:"unexpected_slot_header_status"
       ~msg:
-        "Internal error: unexpected slot header status {got_status}, expected \
+        "Unexpected slot header status {got_status}, expected \
          {expected_status}, for level {published_level}, slot index \
-         {slot_index}"
-      ~level:Error
+         {slot_index}. The DAL node may be lagging."
+      ~level:Warning
       ("published_level", Data_encoding.int32)
       ("slot_index", Data_encoding.int31)
       ("expected_status", Types.header_status_encoding)

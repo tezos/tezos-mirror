@@ -345,6 +345,8 @@ module Profile_handlers = struct
                 | `Waiting_attestation ->
                     Lwt.return_some (`Not_ok (slot_index, num_stored))
                 | status ->
+                    (* Most probably the RPC was called/handled too late. This
+                       may mean that that DAL node is lagging. *)
                     let* () =
                       Event.emit_unexpected_slot_header_status
                         ~published_level
