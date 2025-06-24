@@ -156,6 +156,10 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             check_finalized_block_temp = [];
             previous_metadata = None;
             operation_mode = Bake;
+            (* The grandparent is only used to get the consensus key, so it is
+               fine to set it to Genesis here. If needed in the future, an option
+               type would be more appropriate. *)
+            grandparent = block;
           }
       in
       let* () = check_all_balances block state in
