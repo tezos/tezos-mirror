@@ -84,6 +84,7 @@
 (package (name octez-riscv-pvm-test)(allow_empty))
 (package (name octez-rpc-process))
 (package (name octez-rust-deps))
+(package (name octez-rust-tezos-context))
 (package (name octez-rustzcash-deps))
 (package (name octez-shell-libs))
 (package (name octez-shell-tests)(allow_empty))

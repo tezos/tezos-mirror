@@ -20,3 +20,6 @@ path = "../riscv/api"
 
 [dependencies.rust_igd_next]
 path = "./rust_igd_next"
+
+[dependencies.rust_tezos_context]
+path = "./rust_tezos_context"

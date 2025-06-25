@@ -85,6 +85,7 @@ depends: [
   "integers"
   "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
+  "octez-rust-tezos-context" { = version }
   "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}

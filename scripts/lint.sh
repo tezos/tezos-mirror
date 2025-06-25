@@ -52,6 +52,8 @@ etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
 src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
 src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.mli
+src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.ml
+src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.mli
 EOF
 )
 
