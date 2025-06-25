@@ -37,7 +37,7 @@ let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
   let* () = Signals_publisher.shutdown () in
   return_unit
 
-let validate_and_add_tx backend
+let validate_and_add_etherlink_tx backend
     ~(tx_container :
        L2_types.evm_chain_family Services_backend_sig.tx_container) raw_tx =
   let open Lwt_result_syntax in
@@ -53,10 +53,35 @@ let validate_and_add_tx backend
       let*! () = Events.replicate_transaction_dropped hash reason in
       return_unit
 
-let loop_sequencer multichain backend
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
+   Validate Tezlink operations before adding them to the queue. *)
+let validate_and_add_tezlink_operation
     ~(tx_container :
-       L2_types.evm_chain_family Services_backend_sig.tx_container)
-    ?sandbox_config time_between_blocks =
+       L2_types.michelson_chain_family Services_backend_sig.tx_container) raw_tx
+    =
+  let open Lwt_result_syntax in
+  let (Michelson_tx_container (module Tx_container)) = tx_container in
+  let*? (op : Tezos_types.Operation.t) =
+    raw_tx |> Bytes.of_string |> Tezos_types.Operation.decode
+  in
+  let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
+  let* _ =
+    Tx_container.add ~next_nonce:(Ethereum_types.Qty op.counter) op ~raw_tx
+  in
+  return_unit
+
+let validate_and_add_tx (type f) backend
+    ~(tx_container : f Services_backend_sig.tx_container) :
+    string -> unit tzresult Lwt.t =
+  match tx_container with
+  | Evm_tx_container _ as tx_container ->
+      validate_and_add_etherlink_tx backend ~tx_container
+  | Michelson_tx_container _ as tx_container ->
+      validate_and_add_tezlink_operation ~tx_container
+
+let loop_sequencer (type f) multichain backend
+    ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
+    time_between_blocks =
   let open Lwt_result_syntax in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
