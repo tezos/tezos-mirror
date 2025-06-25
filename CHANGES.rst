@@ -124,6 +124,10 @@ Signer
 - Enables daily logs by default, located under
   ``<base-dir>/logs/octez-signer/``. (MR :gl:`!18429`)
 
+- Rename the preendorsement_high_watermarks and endorsement_high_watermarks
+  files in preattestation_high_watermarks attestation_high_watermarks.
+  (MR :gl:`!18481`)
+
 Baker
 -----
 
