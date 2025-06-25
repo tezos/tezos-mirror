@@ -582,6 +582,7 @@ module Internal_for_tests : sig
   (** Given a slot, it returns the slot's commitment, its proof, and the shards
       and their proof. *)
   val get_commitment_and_shards_with_proofs :
+    ?precomputation:shards_proofs_precomputation ->
     t ->
     slot:bytes ->
     ( commitment * commitment_proof * (shard * shard_proof) Seq.t,

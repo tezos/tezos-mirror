@@ -101,6 +101,7 @@ module Helpers : sig
   val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
 
   val get_commitment_and_shards_with_proofs :
+    ?precomputation:Cryptobox.shards_proofs_precomputation ->
     Cryptobox.t ->
     slot:bytes ->
     Cryptobox.commitment
