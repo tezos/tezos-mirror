@@ -2,25 +2,25 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name octez_injector_PtSEouLo)
- (package tezos-injector-023-PtSEouLo)
+ (name octez_injector_PtSeouLo)
+ (package tezos-injector-023-PtSeouLo)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   octez-injector
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   octez-shell-libs.client-base
-  octez-protocol-023-PtSEouLo-libs.plugin)
+  octez-protocol-023-PtSeouLo-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Octez_injector
-  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
   -open Tezos_client_base
-  -open Tezos_protocol_plugin_023_PtSEouLo))
+  -open Tezos_protocol_plugin_023_PtSeouLo))
 
 (rule
  (targets client_keys.ml)

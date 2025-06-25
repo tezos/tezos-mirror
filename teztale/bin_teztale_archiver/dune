@@ -87,9 +87,9 @@
   (select PsRiotum_machine.ml from
    (octez-protocol-022-PsRiotum-libs.client -> PsRiotum_machine.real.ml)
    (-> PsRiotum_machine.no.ml))
-  (select PtSEouLo_machine.ml from
-   (octez-protocol-023-PtSEouLo-libs.client -> PtSEouLo_machine.real.ml)
-   (-> PtSEouLo_machine.no.ml))
+  (select PtSeouLo_machine.ml from
+   (octez-protocol-023-PtSeouLo-libs.client -> PtSeouLo_machine.real.ml)
+   (-> PtSeouLo_machine.no.ml))
   (select alpha_machine.ml from
    (octez-protocol-alpha-libs.client -> alpha_machine.real.ml)
    (-> alpha_machine.no.ml)))
@@ -109,18 +109,18 @@
   -open Lib_teztale_base))
 
 (rule
- (target PtSEouLo_machine.real.ml)
+ (target PtSeouLo_machine.real.ml)
  (mode fallback)
  (deps next_machine.real.ml)
  (action
   (progn
-   (copy next_machine.real.ml PtSEouLo_machine.real.ml)
+   (copy next_machine.real.ml PtSeouLo_machine.real.ml)
    (run
     sed
-    -i.bak -e s/Tezos_client_next/Tezos_client_PtSEouLo/g -e
-    s/Tezos_protocol_next/Tezos_protocol_PtSEouLo/g -e
-    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtSEouLo/g
-    PtSEouLo_machine.real.ml))))
+    -i.bak -e s/Tezos_client_next/Tezos_client_PtSeouLo/g -e
+    s/Tezos_protocol_next/Tezos_protocol_PtSeouLo/g -e
+    s/Tezos_protocol_plugin_next/Tezos_protocol_plugin_PtSeouLo/g
+    PtSeouLo_machine.real.ml))))
 
 (rule
  (target PsRiotum_machine.real.ml)
@@ -152,7 +152,7 @@
 
 (rule (action (write-file alpha_machine.no.ml "module M = struct end")))
 
-(rule (action (write-file PtSEouLo_machine.no.ml "module M = struct end")))
+(rule (action (write-file PtSeouLo_machine.no.ml "module M = struct end")))
 
 (rule (action (write-file PsRiotum_machine.no.ml "module M = struct end")))
 

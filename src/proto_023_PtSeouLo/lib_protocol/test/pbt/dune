@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_023_PtSEouLo_lib_protocol_test_pbt_tezt_lib)
+ (name src_proto_023_PtSeouLo_lib_protocol_test_pbt_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -17,8 +17,8 @@
   octez-alcotezt
   qcheck-alcotest
   tezos-benchmark
-  tezos-benchmark-023-PtSEouLo
-  tezos-benchmark-type-inference-023-PtSEouLo
+  tezos-benchmark-023-PtSeouLo
+  tezos-benchmark-type-inference-023-PtSeouLo
   octez-protocol-023-PtSeouLo-libs.smart-rollup
   octez-libs.crypto-dal
   octez-libs.base-test-helpers
@@ -30,14 +30,14 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_micheline
-  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
   -open Tezos_protocol_023_PtSeouLo
   -open Tezos_test_helpers
-  -open Tezos_023_PtSEouLo_test_helpers
+  -open Tezos_023_PtSeouLo_test_helpers
   -open Octez_alcotezt
-  -open Tezos_benchmark_023_PtSEouLo
-  -open Tezos_benchmark_type_inference_023_PtSEouLo
-  -open Tezos_smart_rollup_023_PtSEouLo
+  -open Tezos_benchmark_023_PtSeouLo
+  -open Tezos_benchmark_type_inference_023_PtSeouLo
+  -open Tezos_smart_rollup_023_PtSeouLo
   -open Tezos_crypto_dal
   -open Tezos_base_test_helpers
   -open Tezos_protocol_023_PtSeouLo_parameters)
@@ -67,7 +67,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_023_PtSEouLo_lib_protocol_test_pbt_tezt_lib
+  src_proto_023_PtSeouLo_lib_protocol_test_pbt_tezt_lib
   tezt)
  (link_flags
   (:standard)

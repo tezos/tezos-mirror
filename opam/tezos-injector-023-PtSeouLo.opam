@@ -11,12 +11,10 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-micheline-rewriting" { = version }
-  "tezos-protocol-023-PtSEouLo" { = version }
-  "hashcons"
-  "octez-rust-deps" { with-test & = version }
-  "bls12-381" { with-test & = version }
-  "octez-protocol-023-PtSEouLo-libs" { with-test & = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
+  "octez-injector" { = version }
+  "octez-protocol-023-PtSeouLo-libs" { = version }
+  "octez-shell-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -24,4 +22,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos: type inference for partial Michelson expressions"
+synopsis: "Tezos/Protocol: protocol-specific library for the injector binary"

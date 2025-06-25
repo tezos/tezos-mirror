@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_023_PtSEouLo_lib_delegate_test_tezt_lib)
+ (name src_proto_023_PtSeouLo_lib_delegate_test_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -10,12 +10,12 @@
   octez-libs.base
   octez-libs.test-helpers
   octez-libs.micheline
-  octez-protocol-023-PtSEouLo-libs.client
-  tezos-protocol-023-PtSEouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.client
+  tezos-protocol-023-PtSeouLo.protocol
   octez-libs.base-test-helpers
-  octez-protocol-023-PtSEouLo-libs.bakings.mockup-simulator
-  octez-protocol-023-PtSEouLo-libs.baking
-  tezos-protocol-023-PtSEouLo.parameters
+  octez-protocol-023-PtSeouLo-libs.bakings.mockup-simulator
+  octez-protocol-023-PtSeouLo-libs.baking
+  tezos-protocol-023-PtSeouLo.parameters
   octez-libs.crypto
   octez-libs.event-logging-test-helpers
   uri)
@@ -27,11 +27,11 @@
   -open Tezos_base.TzPervasives
   -open Tezos_test_helpers
   -open Tezos_micheline
-  -open Tezos_client_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Tezos_base_test_helpers
-  -open Tezos_023_PtSEouLo_mockup_simulator
-  -open Tezos_baking_023_PtSEouLo
+  -open Tezos_023_PtSeouLo_mockup_simulator
+  -open Tezos_baking_023_PtSeouLo
   -open Tezos_event_logging_test_helpers)
  (modules test_scenario))
 
@@ -40,7 +40,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_023_PtSEouLo_lib_delegate_test_tezt_lib
+  src_proto_023_PtSeouLo_lib_delegate_test_tezt_lib
   tezt)
  (link_flags
   (:standard)
@@ -49,7 +49,7 @@
 
 (rule
  (alias runtest)
- (package octez-protocol-023-PtSEouLo-libs)
+ (package octez-protocol-023-PtSeouLo-libs)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

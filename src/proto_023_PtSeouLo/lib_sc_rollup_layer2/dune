@@ -2,12 +2,12 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_smart_rollup_layer2_023_PtSEouLo)
- (public_name octez-protocol-023-PtSEouLo-libs.smart-rollup-layer2)
+ (name tezos_smart_rollup_layer2_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.smart-rollup-layer2)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   octez-injector
   octez-l2-libs.smart-rollup)
  (inline_tests
@@ -20,6 +20,6 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Octez_injector
   -open Octez_smart_rollup))

@@ -10,10 +10,11 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
+  "octez-rust-deps" { = version }
+  "bls12-381" { = version }
   "octez-libs" { = version }
-  "tezos-protocol-023-PtSEouLo" { = version }
-  "octez-injector" { = version }
-  "octez-protocol-023-PtSEouLo-libs" { = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
+  "octez-protocol-023-PtSeouLo-libs" { = version }
   "octez-shell-libs" { = version }
 ]
 build: [
@@ -22,4 +23,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: protocol-specific library for the injector binary"
+synopsis: "Tezos/Protocol: baker binary"

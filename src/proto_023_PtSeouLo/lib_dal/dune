@@ -2,8 +2,8 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_dal_023_PtSEouLo)
- (public_name octez-protocol-023-PtSEouLo-libs.dal)
+ (name tezos_dal_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.dal)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
@@ -11,11 +11,11 @@
   octez-libs.stdlib-unix
   octez-shell-libs.shell-services
   tezos-dal-node-lib
-  octez-protocol-023-PtSEouLo-libs.client
-  octez-protocol-023-PtSEouLo-libs.plugin
-  tezos-protocol-023-PtSEouLo.embedded-protocol
-  octez-protocol-023-PtSEouLo-libs.layer2-utils
-  tezos-protocol-023-PtSEouLo.protocol)
+  octez-protocol-023-PtSeouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.embedded-protocol
+  octez-protocol-023-PtSeouLo-libs.layer2-utils
+  tezos-protocol-023-PtSeouLo.protocol)
  (inline_tests
   (flags -verbose)
   (modes native)
@@ -30,11 +30,11 @@
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_dal_node_lib
-  -open Tezos_client_023_PtSEouLo
-  -open Tezos_protocol_plugin_023_PtSEouLo
-  -open Tezos_embedded_protocol_023_PtSEouLo
-  -open Tezos_layer2_utils_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo))
+  -open Tezos_client_023_PtSeouLo
+  -open Tezos_protocol_plugin_023_PtSeouLo
+  -open Tezos_embedded_protocol_023_PtSeouLo
+  -open Tezos_layer2_utils_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo))
 
 (rule
  (targets signature.ml)

@@ -13,11 +13,11 @@
   octez-libs.base
   octez-libs.micheline
   tezos-micheline-rewriting
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   tezos-benchmark
-  tezos-benchmark-type-inference-023-PtSEouLo
-  tezos-benchmark-023-PtSEouLo
-  octez-protocol-023-PtSEouLo-libs.test-helpers
+  tezos-benchmark-type-inference-023-PtSeouLo
+  tezos-benchmark-023-PtSeouLo
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-libs.error-monad
   prbnmcn-stats)
  (link_flags
@@ -26,11 +26,11 @@
  (flags
   (:standard)
   -open Tezos_micheline
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Tezos_benchmark
-  -open Tezos_benchmark_type_inference_023_PtSEouLo
-  -open Tezos_benchmark_023_PtSEouLo
-  -open Tezos_023_PtSEouLo_test_helpers))
+  -open Tezos_benchmark_type_inference_023_PtSeouLo
+  -open Tezos_benchmark_023_PtSeouLo
+  -open Tezos_023_PtSeouLo_test_helpers))
 
 (rule
  (alias runtest_micheline_rewriting_data)

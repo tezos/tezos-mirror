@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name src_proto_023_PtSEouLo_lib_protocol_test_integration_gas_tezt_lib)
+ (name src_proto_023_PtSeouLo_lib_protocol_test_integration_gas_tezt_lib)
  (instrumentation (backend bisect_ppx))
  (libraries
   tezt.core
@@ -20,7 +20,7 @@
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
   -open Tezos_protocol_023_PtSeouLo
-  -open Tezos_023_PtSEouLo_test_helpers
+  -open Tezos_023_PtSeouLo_test_helpers
   -open Tezos_base_test_helpers)
  (modules test_gas_costs test_gas_levels))
 
@@ -29,7 +29,7 @@
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
   octez-rust-deps
-  src_proto_023_PtSEouLo_lib_protocol_test_integration_gas_tezt_lib
+  src_proto_023_PtSeouLo_lib_protocol_test_integration_gas_tezt_lib
   tezt)
  (link_flags
   (:standard)

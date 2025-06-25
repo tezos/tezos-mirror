@@ -11,13 +11,23 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-protocol-023-PtSEouLo" { = version }
-  "tezos-benchmark" { = version }
-  "tezos-benchmark-023-PtSEouLo" { = version }
-  "tezos-benchmark-type-inference-023-PtSEouLo" { = version }
   "octez-shell-libs" { = version }
-  "octez-protocol-023-PtSEouLo-libs" { = version }
-  "octez-proto-libs" { = version }
+  "octez-protocol-023-PtSeouLo-libs" { = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
+  "tezos-dal-node-services" { = version }
+  "tezos-dal-node-lib" { = version }
+  "octez-l2-libs" { = version }
+  "octez-crawler" { = version }
+  "octez-internal-libs" { = version }
+  "aches" { >= "1.1.0" }
+  "aches-lwt" { >= "1.1.0" }
+  "octez-injector" { = version }
+  "octez-smart-rollup-node-lib" { = version }
+  "octez-riscv-pvm" { = version }
+  "octez-version" { = version }
+]
+conflicts: [
+  "checkseum" { = "0.5.0" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -25,4 +35,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: protocol benchmarks"
+synopsis: "Protocol specific (for 023-PtSeouLo) library for smart rollup node"

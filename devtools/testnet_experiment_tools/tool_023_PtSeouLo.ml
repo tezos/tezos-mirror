@@ -25,13 +25,13 @@
 
 open Lwt_result_syntax
 open Tezos_shell_services
-open Tezos_client_023_PtSEouLo
-open Tezos_baking_023_PtSEouLo
-open Tezos_protocol_023_PtSEouLo
+open Tezos_client_023_PtSeouLo
+open Tezos_baking_023_PtSeouLo
+open Tezos_protocol_023_PtSeouLo
 open Protocol
 open Alpha_context
 
-module Alpha_services = Tezos_protocol_plugin_023_PtSEouLo.Plugin.Alpha_services
+module Alpha_services = Tezos_protocol_plugin_023_PtSeouLo.Plugin.Alpha_services
 
 (** Sync node *)
 

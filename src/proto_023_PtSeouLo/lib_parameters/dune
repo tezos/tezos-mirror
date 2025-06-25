@@ -2,18 +2,18 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_023_PtSEouLo_parameters)
- (public_name tezos-protocol-023-PtSEouLo.parameters)
+ (name tezos_protocol_023_PtSeouLo_parameters)
+ (public_name tezos-protocol-023-PtSeouLo.parameters)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-proto-libs.protocol-environment
-  tezos-protocol-023-PtSEouLo.protocol)
+  tezos-protocol-023-PtSeouLo.protocol)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo)
+  -open Tezos_protocol_023_PtSeouLo)
  (modules (:standard \ gen)))
 
 (rule
@@ -29,8 +29,8 @@
   octez-rust-deps
   bls12-381.archive
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.parameters
-  tezos-protocol-023-PtSEouLo.protocol)
+  tezos-protocol-023-PtSeouLo.parameters
+  tezos-protocol-023-PtSeouLo.protocol)
  (link_flags
   (:standard)
   (:include %{workspace_root}/macos-link-flags.sexp)
@@ -38,8 +38,8 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo_parameters
-  -open Tezos_protocol_023_PtSEouLo)
+  -open Tezos_protocol_023_PtSeouLo_parameters
+  -open Tezos_protocol_023_PtSeouLo)
  (modules gen))
 
 (rule
@@ -63,7 +63,7 @@
  (action (run %{deps} --mainnet-with-chain-id)))
 
 (install
- (package tezos-protocol-023-PtSEouLo)
+ (package tezos-protocol-023-PtSeouLo)
  (section lib)
  (files
   sandbox-parameters.json test-parameters.json mainnet-parameters.json

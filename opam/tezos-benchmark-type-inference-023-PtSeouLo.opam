@@ -10,12 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-rust-deps" { = version }
-  "bls12-381" { = version }
   "octez-libs" { = version }
-  "tezos-protocol-023-PtSEouLo" { = version }
-  "octez-protocol-023-PtSEouLo-libs" { = version }
-  "octez-shell-libs" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
+  "hashcons"
+  "octez-rust-deps" { with-test & = version }
+  "bls12-381" { with-test & = version }
+  "octez-protocol-023-PtSeouLo-libs" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -23,4 +24,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: accuser binary"
+synopsis: "Tezos: type inference for partial Michelson expressions"

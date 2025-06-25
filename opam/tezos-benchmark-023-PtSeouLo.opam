@@ -10,11 +10,16 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-proto-libs" { = version }
-  "octez-shell-libs" { = version }
   "octez-libs" { = version }
-  "octez-rust-deps" { = version }
-  "bls12-381" { = version }
+  "tezos-micheline-rewriting" { = version }
+  "tezos-benchmark" { = version }
+  "tezos-benchmark-type-inference-023-PtSeouLo" { = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
+  "hashcons"
+  "octez-protocol-023-PtSeouLo-libs" { = version }
+  "prbnmcn-stats" { = "0.0.6" }
+  "octez-rust-deps" { with-test & = version }
+  "bls12-381" { with-test & = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -22,4 +27,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos protocol 023-PtSEouLo package"
+synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"

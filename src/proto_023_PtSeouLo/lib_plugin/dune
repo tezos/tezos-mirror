@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_protocol_plugin_023_PtSEouLo)
- (public_name octez-protocol-023-PtSEouLo-libs.plugin)
+ (name tezos_protocol_plugin_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.plugin)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
-  octez-protocol-023-PtSEouLo-libs.smart-rollup)
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.smart-rollup)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
-  -open Tezos_smart_rollup_023_PtSEouLo)
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_smart_rollup_023_PtSeouLo)
  (modules (:standard \ Plugin_registerer)))
 
-(documentation (package octez-protocol-023-PtSEouLo-libs))
+(documentation (package octez-protocol-023-PtSeouLo-libs))
 
 (rule
  (targets signature.ml)
@@ -26,18 +26,18 @@
    "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))
 
 (library
- (name tezos_protocol_plugin_023_PtSEouLo_registerer)
- (public_name octez-protocol-023-PtSEouLo-libs.plugin-registerer)
+ (name tezos_protocol_plugin_023_PtSeouLo_registerer)
+ (public_name octez-protocol-023-PtSeouLo-libs.plugin-registerer)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.embedded-protocol
-  octez-protocol-023-PtSEouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.embedded-protocol
+  octez-protocol-023-PtSeouLo-libs.plugin
   octez-shell-libs.validation)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_embedded_protocol_023_PtSEouLo
-  -open Tezos_protocol_plugin_023_PtSEouLo
+  -open Tezos_embedded_protocol_023_PtSeouLo
+  -open Tezos_protocol_plugin_023_PtSeouLo
   -open Tezos_validation)
  (modules Plugin_registerer))

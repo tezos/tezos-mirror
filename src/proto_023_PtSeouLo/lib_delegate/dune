@@ -2,21 +2,21 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_baking_023_PtSEouLo)
- (public_name octez-protocol-023-PtSEouLo-libs.baking)
+ (name tezos_baking_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.baking)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
   octez-libs.clic
   octez-version.value
-  tezos-protocol-023-PtSEouLo.protocol
-  tezos-protocol-023-PtSEouLo.protocol.lifted
-  octez-protocol-023-PtSEouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol.lifted
+  octez-protocol-023-PtSeouLo-libs.plugin
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-node-config
   octez-shell-libs.client-base
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   octez-shell-libs.client-commands
   octez-libs.stdlib
   octez-libs.stdlib-unix
@@ -39,12 +39,12 @@
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo_lifted
-  -open Tezos_protocol_plugin_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo_lifted
+  -open Tezos_protocol_plugin_023_PtSeouLo
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
   -open Tezos_client_commands
   -open Tezos_stdlib
   -open Tezos_stdlib_unix
@@ -68,60 +68,60 @@
  (action (write-file %{targets} "include Tezos_client_base.Client_keys_v2")))
 
 (library
- (name tezos_baking_023_PtSEouLo_commands)
- (public_name octez-protocol-023-PtSEouLo-libs.baking-commands)
+ (name tezos_baking_023_PtSeouLo_commands)
+ (public_name octez-protocol-023-PtSeouLo-libs.baking-commands)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
-  tezos-protocol-023-PtSEouLo.parameters
+  tezos-protocol-023-PtSeouLo.protocol
+  tezos-protocol-023-PtSeouLo.parameters
   octez-libs.stdlib-unix
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-023-PtSEouLo-libs.baking
+  octez-protocol-023-PtSeouLo-libs.baking
   octez-libs.rpc
   uri)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo_parameters
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo_parameters
   -open Tezos_stdlib_unix
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
   -open Tezos_client_commands
-  -open Tezos_baking_023_PtSEouLo)
+  -open Tezos_baking_023_PtSeouLo)
  (modules Baking_commands))
 
 (library
- (name tezos_baking_023_PtSEouLo_commands_registration)
- (public_name octez-protocol-023-PtSEouLo-libs.baking-commands.registration)
+ (name tezos_baking_023_PtSeouLo_commands_registration)
+ (public_name octez-protocol-023-PtSeouLo-libs.baking-commands.registration)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   octez-proto-libs.protocol-environment
   octez-shell-libs.shell-services
   octez-shell-libs.client-base
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   octez-shell-libs.client-commands
-  octez-protocol-023-PtSEouLo-libs.baking
-  octez-protocol-023-PtSEouLo-libs.baking-commands
+  octez-protocol-023-PtSeouLo-libs.baking
+  octez-protocol-023-PtSeouLo-libs.baking-commands
   octez-libs.rpc)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Tezos_shell_services
   -open Tezos_client_base
-  -open Tezos_client_023_PtSEouLo
+  -open Tezos_client_023_PtSeouLo
   -open Tezos_client_commands
-  -open Tezos_baking_023_PtSEouLo
-  -open Tezos_baking_023_PtSEouLo_commands)
+  -open Tezos_baking_023_PtSeouLo
+  -open Tezos_baking_023_PtSeouLo_commands)
  (modules Baking_commands_registration))

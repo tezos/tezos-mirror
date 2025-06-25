@@ -11,15 +11,13 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "tezos-micheline-rewriting" { = version }
+  "tezos-protocol-023-PtSeouLo" { = version }
   "tezos-benchmark" { = version }
-  "tezos-benchmark-type-inference-023-PtSEouLo" { = version }
-  "tezos-protocol-023-PtSEouLo" { = version }
-  "hashcons"
-  "octez-protocol-023-PtSEouLo-libs" { = version }
-  "prbnmcn-stats" { = "0.0.6" }
-  "octez-rust-deps" { with-test & = version }
-  "bls12-381" { with-test & = version }
+  "tezos-benchmark-023-PtSeouLo" { = version }
+  "tezos-benchmark-type-inference-023-PtSeouLo" { = version }
+  "octez-shell-libs" { = version }
+  "octez-protocol-023-PtSeouLo-libs" { = version }
+  "octez-proto-libs" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -27,4 +25,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Tezos/Protocol: library for writing benchmarks (protocol-specific part)"
+synopsis: "Tezos/Protocol: protocol benchmarks"

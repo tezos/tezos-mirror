@@ -14,12 +14,12 @@ depends: [
   "tezt" { with-test & >= "4.1.0" & < "5.0.0" }
   "bls12-381" {with-test}
   "octez-libs" {with-test}
-  "octez-protocol-023-PtSEouLo-libs" {with-test}
-  "tezos-protocol-023-PtSEouLo" {with-test}
+  "octez-protocol-023-PtSeouLo-libs" {with-test}
+  "tezos-protocol-023-PtSeouLo" {with-test}
   "octez-alcotezt" {with-test}
   "tezos-benchmark" {with-test}
-  "tezos-benchmark-023-PtSEouLo" {with-test}
-  "tezos-benchmark-type-inference-023-PtSEouLo" {with-test}
+  "tezos-benchmark-023-PtSeouLo" {with-test}
+  "tezos-benchmark-type-inference-023-PtSeouLo" {with-test}
   "qcheck-alcotest" { with-test & >= "0.20" }
   "tezt-tezos" {with-test}
   "octez-shell-libs" {with-test}
