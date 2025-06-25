@@ -232,10 +232,15 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
 
     def test_should_upvote_proposal_as_delegate(self) -> None:
         proposer = self.bootstrap_baker()
-        delegator = self.bootstrap_baker()
+        baker = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -244,11 +249,7 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
             'delegation_contract': delegation.address
         })
 
-        whitelist = {governance.address}
-        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-
-        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator), governance.address)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(baker), governance.address)
 
         kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         governance.using(proposer).new_proposal(kernel_root_hash).send()
@@ -260,15 +261,29 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == kernel_root_hash
         assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER * 2
-        assert governance.get_voting_state()['remaining_blocks'] == 2
+        assert governance.get_voting_state()['remaining_blocks'] == 3
     
     def test_should_upvote_proposal_as_delegate_for_multiple_bakers(self) -> None:
+        # Resetting sandbox
+        self.setUpClass()
+
         proposer = self.bootstrap_baker()
-        delegator1 = self.bootstrap_baker()
-        delegator2 = self.bootstrap_baker()
+        baker1 = self.bootstrap_baker()
+        baker2 = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker1).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker2)).send()
+        self.bake_block()
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(baker1), None)
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(baker2), None)
+
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -276,17 +291,6 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
             'upvoting_limit': 3,
             'delegation_contract': delegation.address
         })
-
-        whitelist = {governance.address}
-        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-
-        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator1), governance.address)
-
-        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-
-        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator2), governance.address)
 
         kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         governance.using(proposer).new_proposal(kernel_root_hash).send()
@@ -298,14 +302,20 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == kernel_root_hash
         assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER * 3
-        assert governance.get_voting_state()['remaining_blocks'] == 1
+        assert governance.get_voting_state()['remaining_blocks'] == 3
     
     def test_should_fail_to_upvote_as_delegate_if_baker_already_upvoted(self) -> None:
         proposer = self.bootstrap_baker()
-        delegator = self.bootstrap_baker()
+        baker = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+        assert delegation.is_voting_key_of(pkh(delegate), pkh(baker), None)
+
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -314,17 +324,11 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
             'delegation_contract': delegation.address
         })
 
-        whitelist = {governance.address}
-        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-
-        assert delegation.is_voting_key_of(pkh(delegate), pkh(delegator), governance.address)
-
         kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         governance.using(proposer).new_proposal(kernel_root_hash).send()
         self.bake_block()
 
-        governance.using(delegator).upvote_proposal(kernel_root_hash).send()
+        governance.using(baker).upvote_proposal(kernel_root_hash).send()
         self.bake_block()
 
         with self.raisesMichelsonError(PROPOSAL_ALREADY_UPVOTED):
@@ -333,24 +337,25 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == kernel_root_hash
         assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER * 2
-        assert governance.get_voting_state()['remaining_blocks'] == 2
+        assert governance.get_voting_state()['remaining_blocks'] == 3
 
     
     def test_delegate_upvote_should_fail_with_limit_exceeded_if_already_upvoted_and_limit_hit(self) -> None:
         proposer = self.bootstrap_baker()
-        delegator = self.bootstrap_baker()
+        baker = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+
         governance = self.deploy_kernel_governance(custom_config={
-            'period_length': 5,
+            'period_length': 6,
             'upvoting_limit': 2,
             'delegation_contract': delegation.address,
         })
-
-        whitelist = {governance.address}
-        delegation.using(delegator).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
 
         kernel_a = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         kernel_b = bytes.fromhex('020202020202020202020202020202020202020202020202020202020202020202')
@@ -360,9 +365,9 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
         governance.using(proposer).new_proposal(kernel_b).send()
         self.bake_block()
 
-        governance.using(delegator).upvote_proposal(kernel_a).send()
+        governance.using(baker).upvote_proposal(kernel_a).send()
         self.bake_block()
-        governance.using(delegator).upvote_proposal(kernel_b).send()
+        governance.using(baker).upvote_proposal(kernel_b).send()
         self.bake_block()
 
         with self.raisesMichelsonError(UPVOTING_LIMIT_EXCEEDED):
@@ -372,22 +377,25 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
     def test_delegate_upvote_should_fail_with_already_upvoted(self) -> None:
         proposer = self.bootstrap_baker()
         proposer2 = self.bootstrap_baker()
-        delegator1 = self.bootstrap_baker()
-        delegator2 = self.bootstrap_baker()
+        baker1 = self.bootstrap_baker()
+        baker2 = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker1).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker2)).send()
+        self.bake_block()
+
         governance = self.deploy_kernel_governance(custom_config={
-            'period_length': 13,
+            'period_length': 20,
             'upvoting_limit': 2,
             'delegation_contract': delegation.address,
         })
-
-        whitelist = {governance.address}
-        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
 
         kernel_a = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         kernel_b = bytes.fromhex('020202020202020202020202020202020202020202020202020202020202020202')
@@ -401,12 +409,12 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
         governance.using(proposer2).new_proposal(kernel_c).send()
         self.bake_block()
 
-        governance.using(delegator1).upvote_proposal(kernel_a).send()
+        governance.using(baker1).upvote_proposal(kernel_a).send()
         self.bake_block()
 
-        governance.using(delegator2).upvote_proposal(kernel_b).send()
+        governance.using(baker2).upvote_proposal(kernel_b).send()
         self.bake_block()
-        governance.using(delegator2).upvote_proposal(kernel_c).send()
+        governance.using(baker2).upvote_proposal(kernel_c).send()
         self.bake_block()
 
         with self.raisesMichelsonError(PROPOSAL_ALREADY_UPVOTED):
@@ -414,28 +422,31 @@ class KernelGovernanceUpvoteProposalTestCase(BaseTestCase):
 
     def test_delegate_upvote_should_only_apply_for_non_upvoted_baker(self) -> None:
         proposer = self.bootstrap_baker()
-        delegator1 = self.bootstrap_baker()
-        delegator2 = self.bootstrap_baker()
+        baker1 = self.bootstrap_baker()
+        baker2 = self.bootstrap_baker()
         delegate = self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker1).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker2)).send()
+        self.bake_block()
+
         governance = self.deploy_kernel_governance(custom_config={
-            'period_length': 6,
+            'period_length': 20,
             'upvoting_limit': 2,
             'delegation_contract': delegation.address,
         })
-
-        whitelist = {governance.address}
-        delegation.using(delegator1).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
-        delegation.using(delegator2).set_voting_key(pkh(delegate), True, whitelist).send()
-        self.bake_block()
 
         kernel_root_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
         governance.using(proposer).new_proposal(kernel_root_hash).send()
         self.bake_block()
 
-        governance.using(delegator1).upvote_proposal(kernel_root_hash).send()
+        governance.using(baker1).upvote_proposal(kernel_root_hash).send()
         self.bake_block()
 
         governance.using(delegate).upvote_proposal(kernel_root_hash).send()

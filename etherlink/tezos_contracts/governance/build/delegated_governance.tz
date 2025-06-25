@@ -1,82 +1,138 @@
-{ parameter (pair address bool (option (set address))) ;
-  storage (big_map address (map key_hash (pair bool (option (set address))))) ;
-  code { UNPAIR ;
-         UNPAIR 3 ;
-         PUSH string "TEZ_IN_TRANSACTION_DISALLOWED" ;
-         PUSH mutez 0 ;
-         AMOUNT ;
-         COMPARE ;
-         EQ ;
-         IF { DROP } { FAILWITH } ;
-         SENDER ;
-         DUP ;
-         PACK ;
-         PUSH bytes 0x00 ;
-         DUP 2 ;
-         PUSH nat 1 ;
-         PUSH nat 6 ;
-         SLICE ;
-         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-         COMPARE ;
-         EQ ;
-         IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
-         NIL bytes ;
-         DUP 2 ;
-         PUSH nat 21 ;
-         PUSH nat 7 ;
-         SLICE ;
-         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-         CONS ;
-         PUSH bytes 0x00000015 ;
-         CONS ;
+{ parameter
+    (or (key_hash %claim_voting_rights)
+        (pair %propose_voting_key address bool (option (set address)))) ;
+  storage
+    (pair (big_map %voting_delegations address (map key_hash (pair bool (option (set address)))))
+          (big_map %proposals (pair address key_hash) (pair bool (option (set address))))) ;
+  code { LAMBDA
+           unit
+           unit
+           { DROP ;
+             PUSH string "TEZ_IN_TRANSACTION_DISALLOWED" ;
+             PUSH mutez 0 ;
+             AMOUNT ;
+             COMPARE ;
+             EQ ;
+             IF { DROP ; UNIT } { FAILWITH } } ;
          SWAP ;
-         PUSH nat 2 ;
-         PUSH nat 0 ;
-         SLICE ;
-         IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
-         CONS ;
-         CONCAT ;
-         UNPACK key_hash ;
-         PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
-         SWAP ;
-         IF_NONE { FAILWITH } { SWAP ; DROP } ;
-         PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
-         DIG 2 ;
-         DUP 3 ;
-         IMPLICIT_ACCOUNT ;
-         ADDRESS ;
-         COMPARE ;
-         EQ ;
-         IF { DROP } { FAILWITH } ;
-         DUP ;
-         VOTING_POWER ;
-         PUSH nat 0 ;
-         SWAP ;
-         COMPARE ;
-         GT ;
-         IF {} { PUSH string "NO_VOTING_POWER" ; FAILWITH } ;
-         DUP 5 ;
-         DUP 3 ;
-         GET ;
-         IF_NONE { EMPTY_MAP key_hash (pair bool (option (set address))) } {} ;
-         DUP 5 ;
-         IF_NONE
-           { DUP 4 ;
-             IF { DIG 4 ; DIG 4 ; PAIR ; SOME }
-                { DIG 3 ; DIG 4 ; DROP 2 ; NONE (pair bool (option (set address))) } }
-           { DROP ; DIG 4 ; DIG 4 ; PAIR ; SOME } ;
-         DIG 2 ;
-         UPDATE ;
-         DIG 2 ;
-         PUSH nat 0 ;
-         DUP 3 ;
-         SIZE ;
-         COMPARE ;
-         EQ ;
-         IF { SWAP ; DROP ; NONE (map key_hash (pair bool (option (set address)))) }
-            { SWAP ; SOME } ;
-         DIG 2 ;
-         UPDATE ;
+         UNPAIR ;
+         IF_LEFT
+           { UNIT ;
+             DIG 3 ;
+             SWAP ;
+             EXEC ;
+             DROP ;
+             SENDER ;
+             DUP 3 ;
+             CDR ;
+             NONE (pair bool (option (set address))) ;
+             DUP 4 ;
+             DUP 4 ;
+             PAIR ;
+             GET_AND_UPDATE ;
+             DUP 5 ;
+             CAR ;
+             DUP 4 ;
+             GET ;
+             IF_NONE { EMPTY_MAP key_hash (pair bool (option (set address))) } {} ;
+             SWAP ;
+             DIG 4 ;
+             UPDATE ;
+             DUP 4 ;
+             DIG 4 ;
+             CAR ;
+             PUSH nat 0 ;
+             DUP 4 ;
+             SIZE ;
+             COMPARE ;
+             EQ ;
+             IF { DIG 2 ; DROP ; NONE (map key_hash (pair bool (option (set address)))) }
+                { DIG 2 ; SOME } ;
+             DIG 4 ;
+             UPDATE ;
+             UPDATE 1 ;
+             SWAP ;
+             UPDATE 2 }
+           { UNPAIR 3 ;
+             UNIT ;
+             DIG 5 ;
+             SWAP ;
+             EXEC ;
+             DROP ;
+             SENDER ;
+             DUP ;
+             PACK ;
+             PUSH bytes 0x00 ;
+             DUP 2 ;
+             PUSH nat 1 ;
+             PUSH nat 6 ;
+             SLICE ;
+             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+             COMPARE ;
+             EQ ;
+             IF {} { PUSH string "NOT_IMPLICIT_ADDRESS" ; FAILWITH } ;
+             NIL bytes ;
+             DUP 2 ;
+             PUSH nat 21 ;
+             PUSH nat 7 ;
+             SLICE ;
+             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+             CONS ;
+             PUSH bytes 0x00000015 ;
+             CONS ;
+             SWAP ;
+             PUSH nat 2 ;
+             PUSH nat 0 ;
+             SLICE ;
+             IF_NONE { PUSH string "SLICE" ; FAILWITH } {} ;
+             CONS ;
+             CONCAT ;
+             UNPACK key_hash ;
+             PUSH string "FAILED_TO_CAST_ADDRESS_TO_KEY_HASH" ;
+             SWAP ;
+             IF_NONE { FAILWITH } { SWAP ; DROP } ;
+             PUSH string "KEY_HASH_NOT_EQUAL_TO_SOURCE_ADDRESS" ;
+             DIG 2 ;
+             DUP 3 ;
+             IMPLICIT_ACCOUNT ;
+             ADDRESS ;
+             COMPARE ;
+             EQ ;
+             IF { DROP } { FAILWITH } ;
+             DUP 4 ;
+             IF_NONE
+               { DUP 3 ;
+                 IF { DIG 3 ; DIG 3 ; PAIR ; SOME }
+                    { DIG 2 ; DIG 3 ; DROP 2 ; NONE (pair bool (option (set address))) } }
+               { DROP ; DIG 3 ; DIG 3 ; PAIR ; SOME } ;
+             DUP 4 ;
+             CAR ;
+             DUP 4 ;
+             GET ;
+             IF_NONE
+               { NONE (map key_hash (pair bool (option (set address)))) }
+               { DUP ;
+                 DUP 4 ;
+                 MEM ;
+                 IF { SOME } { DROP ; NONE (map key_hash (pair bool (option (set address)))) } } ;
+             IF_NONE
+               { DUP 4 ; CDR ; SWAP ; DIG 2 ; DIG 3 ; PAIR ; UPDATE ; DUP 2 ; CAR }
+               { DUP 5 ;
+                 CDR ;
+                 DUP 6 ;
+                 CAR ;
+                 DIG 2 ;
+                 DIG 3 ;
+                 DIG 4 ;
+                 UPDATE ;
+                 SOME ;
+                 DIG 3 ;
+                 UPDATE } ;
+             DIG 2 ;
+             SWAP ;
+             UPDATE 1 ;
+             SWAP ;
+             UPDATE 2 } ;
          NIL operation ;
          PAIR } ;
   view "is_voting_key_of"
@@ -85,6 +141,7 @@
        { UNPAIR ;
          UNPAIR 3 ;
          DIG 3 ;
+         CAR ;
          SWAP ;
          GET ;
          IF_NONE
@@ -106,6 +163,7 @@
        { UNPAIR ;
          UNPAIR ;
          DIG 2 ;
+         CAR ;
          SWAP ;
          GET ;
          SWAP ;

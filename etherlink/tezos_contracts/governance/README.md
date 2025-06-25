@@ -56,16 +56,20 @@ By default, this contract operates as a one-for-all for all Etherlink governance
 
 ### Entrypoints
 
-#### set_voting_key
+#### propose_voting_key
 
-Set a voting key for a baker. It requires that the caller has non-zero voting power.
+Bakers can use this entrypoint to propose a voting key candidate or to withdraw one. The voting key cannot be used immediately, as bakers still have to claim voting rights using their voting key.
+
+Withdrawing a voting key takes immediate effect.
 
 The option set address allows specifying (according to the boolean) a whitelist or a blacklist of governance contracts as described earlier.
+
+If the voting key has already been claimed, updating its associated whitelist or blacklist takes immediate effect.
 
 ##### Client command
 
 ```bash
-octez-client transfer 0 from %YOUR_ADDRESS% to %CONTRACT_ADDRESS% --entrypoint "set_voting_key" --arg "%VOTING_KEY_CONFIG%"
+octez-client transfer 0 from %YOUR_ADDRESS% to %CONTRACT_ADDRESS% --entrypoint "propose_voting_key" --arg "%VOTING_KEY_CONFIG%"
 ```
 
 ##### Example
@@ -73,16 +77,32 @@ octez-client transfer 0 from %YOUR_ADDRESS% to %CONTRACT_ADDRESS% --entrypoint "
 To add a voting key:
 
 ```bash
-octez-client transfer 0 from tz1RfbwbXjE8UaRLLjZjUyxbj4KCxibTp9xN to KT1HfJb718fGszcgYguA4bfTjAqe1BEmFHkv --entrypoint "set_voting_key" --arg "(Pair \"tz1XCmmE9CKVJ6kDGFndDjfAt9f9ekBAD3uj\" (Pair True None))"
+octez-client transfer 0 from tz1RfbwbXjE8UaRLLjZjUyxbj4KCxibTp9xN to KT1HfJb718fGszcgYguA4bfTjAqe1BEmFHkv --entrypoint "propose_voting_key" --arg "(Pair \"tz1XCmmE9CKVJ6kDGFndDjfAt9f9ekBAD3uj\" (Pair True None))"
 ```
 
 To remove a voting key:
 
 ```bash
-octez-client transfer 0 from tz1RfbwbXjE8UaRLLjZjUyxbj4KCxibTp9xN to KT1HfJb718fGszcgYguA4bfTjAqe1BEmFHkv --entrypoint "set_voting_key" --arg "(Pair \"tz1XCmmE9CKVJ6kDGFndDjfAt9f9ekBAD3uj\" (Pair False None))"
+octez-client transfer 0 from tz1RfbwbXjE8UaRLLjZjUyxbj4KCxibTp9xN to KT1HfJb718fGszcgYguA4bfTjAqe1BEmFHkv --entrypoint "propose_voting_key" --arg "(Pair \"tz1XCmmE9CKVJ6kDGFndDjfAt9f9ekBAD3uj\" (Pair False None))"
 ```
 
 If the `option set` has some value, the entrypoint considers this as a voting key addition and the boolean argument becomes a flag to indicate if the set is a whitelist (`True`) or a blacklist (`False`).
+
+#### claim_voting_rights
+
+After setting up a voting key candidate, bakers must call this entrypoint using the voting key in order for the delegation of voting rights to take effect. The voting key can then be used without delay.
+
+##### Client command
+
+```bash
+octez-client transfer 0 from %YOUR_ADDRESS% to %CONTRACT_ADDRESS% --entrypoint "claim_voting_rights" --arg "%VOTING_KEY_CONFIG%"
+```
+
+##### Example
+
+```bash
+octez-client transfer 0 from tz1XCmmE9CKVJ6kDGFndDjfAt9f9ekBAD3uj to KT1HfJb718fGszcgYguA4bfTjAqe1BEmFHkv --entrypoint "claim_voting_rights" --arg "tz1RfbwbXjE8UaRLLjZjUyxbj4KCxibTp9xN"
+```
 
 ### Views
 
