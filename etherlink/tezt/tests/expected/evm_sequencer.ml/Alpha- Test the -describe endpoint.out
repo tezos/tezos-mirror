@@ -36,6 +36,17 @@ Available services:
         The chain unique identifier. 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
+    - POST /tezlink/injection/operation
+        Inject an operation in node and broadcast it. Returns the ID of the
+        operation. The `signedOperationContents` should be constructed using
+        contextual RPCs from the latest block and signed by the client. The
+        injection of the operation will apply it on the current mempool
+        context. This context may change at each operation injection or
+        operation reception from peers. By default, the RPC will wait for the
+        operation to be (pre-)validated before returning. However, if ?async
+        is true, the function returns immediately. The optional ?chain
+        parameter can be used to specify whether to inject on the test chain
+        or the main chain. 
     - GET /tezlink/monitor/bootstrapped
         Wait for the node to have synchronized its chain with a few peers
         (configured by the node's administrator), streaming head updates that
@@ -84,6 +95,17 @@ Available services:
   - /chains/<chain_id>/blocks/<block_id> <dynamic>
   - GET /chains/<chain_id>/chain_id
       The chain unique identifier. 
+  - POST /injection/operation
+      Inject an operation in node and broadcast it. Returns the ID of the
+      operation. The `signedOperationContents` should be constructed using
+      contextual RPCs from the latest block and signed by the client. The
+      injection of the operation will apply it on the current mempool
+      context. This context may change at each operation injection or
+      operation reception from peers. By default, the RPC will wait for the
+      operation to be (pre-)validated before returning. However, if ?async is
+      true, the function returns immediately. The optional ?chain parameter
+      can be used to specify whether to inject on the test chain or the main
+      chain. 
   - GET /monitor/bootstrapped
       Wait for the node to have synchronized its chain with a few peers
       (configured by the node's administrator), streaming head updates that

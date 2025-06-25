@@ -55,6 +55,8 @@ module Operation : sig
   val hash_operation : t -> Ethereum_types.hash
 
   val encoding : t Data_encoding.t
+
+  val decode : bytes -> t tzresult
 end
 
 module Tez : sig

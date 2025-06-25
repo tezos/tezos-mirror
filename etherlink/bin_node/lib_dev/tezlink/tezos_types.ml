@@ -69,6 +69,41 @@ module Operation = struct
     raw : bytes;
   }
 
+  let decode raw =
+    let open Result_syntax in
+    let* op =
+      match
+        Data_encoding.Binary.of_bytes_opt
+          Tezlink_imports.Alpha_context.Operation.encoding
+          raw
+      with
+      | None -> error_with "Can't parse the operation"
+      | Some op -> return op
+    in
+    let from_contents (type kind)
+        (contents : kind Tezlink_imports.Alpha_context.contents) : t tzresult =
+      match contents with
+      | Tezlink_imports.Alpha_context.Manager_operation {source; counter; _} ->
+          let* counter =
+            convert_using_serialization
+              ~name:"counter"
+              ~dst:Data_encoding.n
+              ~src:
+                Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+              counter
+          in
+          return ({source; counter; op; raw} : t)
+      | _ -> error_with "Not a manager operation"
+    in
+    let (Operation_data op) = op.protocol_data in
+    match op.contents with
+    | Single contents -> from_contents contents
+    | Cons _ ->
+        (* TODO: https://gitlab.com/tezos/tezos/-/issues/8008
+           support operation batches
+        *)
+        error_with "Unsupported feature: operation batch"
+
   let encoding : t Data_encoding.t =
     let open Data_encoding in
     conv

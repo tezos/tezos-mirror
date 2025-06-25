@@ -457,3 +457,13 @@ let get_storage_normalized :
     Tezos_rpc.Service.t =
   Tezos_rpc.Service.subst1
     Imported_protocol_plugin.RPC.Contract.S.get_storage_normalized
+
+let injection_operation :
+    ( [`POST],
+      unit,
+      unit,
+      < async : bool ; chain : chain option >,
+      bytes,
+      Operation_hash.t )
+    Tezos_rpc.Service.t =
+  Tezos_shell_services.Injection_services.S.operation
