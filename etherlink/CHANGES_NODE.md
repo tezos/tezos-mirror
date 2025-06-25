@@ -1,8 +1,14 @@
 # Changelog
 
-## Unreleased
+## Version 0.31 (2025-06-26)
 
-### Breaking changes
+This release of the EVM node allows the `finalized` block to be available on
+nodes which are not tracking a rollup node and adds new RPCs for future
+sequencer upgrades. It is also now easier to enable profiling on the CLI or in
+the configuration.
+
+The node will apply one migration to its internal store (version 21), meaning
+it is not possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -33,17 +39,6 @@
 
 - Node correctly applies an sequencer upgrade EVM event when it sees
   one. (!18286)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.30 (2025-06-18)
 
