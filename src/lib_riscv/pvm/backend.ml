@@ -70,8 +70,7 @@ let from_api_input_request : Api.input_request -> input_request =
   match input_request with
   | Api.No_input_required -> No_input_required
   | Api.Initial -> Initial
-  | Api.First_after (outbox_level, message_index) ->
-      First_after (outbox_level, message_index)
+  | Api.First_after {level; counter} -> First_after (level, counter)
   | Api.Needs_reveal raw_reveal -> Needs_reveal (String.of_bytes raw_reveal)
 
 (* The kernel debug logging function (`string -> unit Lwt.t`) passed by the node

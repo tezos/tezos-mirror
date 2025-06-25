@@ -151,11 +151,13 @@ impl<'a> From<Input<'a>> for PvmInput<'a> {
 
 /// Describes possible input requests the PVM may ask for during execution.
 #[derive(ocaml::ToValue)]
-#[ocaml::sig("No_input_required | Initial | First_after of int32 * int64 | Needs_reveal of bytes")]
+#[ocaml::sig(
+    "No_input_required | Initial | First_after of {level: int32; counter: int64} | Needs_reveal of bytes"
+)]
 pub enum InputRequest {
     NoInputRequired,
     Initial,
-    FirstAfter(u32, u64),
+    FirstAfter { level: u32, counter: u64 },
     NeedsReveal(BytesWrapper),
 }
 
