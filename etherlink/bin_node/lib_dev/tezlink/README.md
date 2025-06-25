@@ -18,9 +18,12 @@ inherited from the protocol contains values about the consensus, which are not
 useful for `Tezlink`, and we have no way to directly build values. So a new
 `Tezos_types.level` is defined, with only the useful fields, and `Tezos_services`
 is in charge of converting it to the protocol version of the `level` type.
-- `Tezos_services`: imports services, and exposes a way to produce a rpc
-directory in which those services are registered. It is used when starting the
-rpc server.
+- `Tezos_services`: imports services from the shell, plugin, or protocol
+- `Tezlink_mock`: holds mock values which either make no sense in the context of Tezlink
+(such as values related to the consensus algorithm for instance) or are returned by
+RPCs which not yet fully implemented.
+- `Tezlink_directory`: exposes a way to produce a RPC directory in which those
+services are registered. It is used when starting the RPC server.
 - `Tezlink_backend_sig`: interface of the backend, ie. the module used to read
 values from the durable storage or the store. Can be used in the registration
 of the services.
@@ -33,7 +36,10 @@ of the services.
 plugin, in the shell, etc. It might be necessary to make the declaration public.
 2. Import the service and the necessary types. Take care to simplify the type
 declared in `Tezos_types` and convert it in `Tezos_services` if appropriate.
-3. Implement the service, potentially by adding functions in the backend.
+3. (optional) Add values to `Tezlink_mock` if there's values that are nonsense
+for `Tezlink` but needed by the rpc.
+4. (optional) Add a function in the backend to retrieve the data needed by the rpc.
+4. Implement and register the service in `Tezlink_directory`
 
 ### (optional) Add a dependency to modules outside the l2 node
 
@@ -200,15 +206,20 @@ module Make (Backend : Backend) : Tezlink_backend_sig.S = struct
         }
 ```
 
-When all is in place we can register the service.
+When all is in place we can register the service in `tezlink_directory.ml`
+at the static_directory.
 ```
 (** Builds the directory registering services under `/chains/<main>/blocks/<head>/...`. *)
-let build_block_dir (module Backend : Tezlink_backend_sig.S) =
+```
+let build_block_static_directory ~l2_chain_id
+    (module Backend : Tezlink_backend_sig.S) =
   ...
   |> register_with_conversion
-       ~service:Imported_services.current_level
+       ~service:Tezos_services.current_level
        ~impl:(fun {block; chain} query () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
          Backend.current_level chain block ~offset:query.offset)
-       ~convert_output:Protocol_types.Level.convert
+       ~convert_output:Tezos_types.Level.convert
   ...
 ```

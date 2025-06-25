@@ -177,7 +177,7 @@ let start_public_server (type f)
           | None -> Backend.chain_id ()
         in
         return @@ Evm_directory.init_from_resto_directory
-        @@ Tezos_services.register_tezlink_services
+        @@ Tezlink_directory.register_tezlink_services
              ~l2_chain_id
              (module Backend.Tezlink)
     | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
