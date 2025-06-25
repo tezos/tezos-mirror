@@ -8,6 +8,12 @@
 include Tezlink_imports
 open Tezlink_mock
 
+module type BLOCK_SERVICES = sig
+  include Tezos_shell_services.Block_services.S
+
+  val mock_block_header_data : Proto.block_header_data tzresult
+end
+
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Imported_protocol = struct
   include Imported_protocol
