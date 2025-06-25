@@ -67,7 +67,7 @@ module High_watermark = struct
         "Failed to retrieve level and round of a Tenderbake block: %s"
         (Printexc.to_string exn)
 
-  let get_level_and_round_for_tenderbake_endorsement bytes =
+  let get_level_and_round_for_tenderbake_attestation bytes =
     (* <watermark(1)><chain_id(4)><branch(32)><kind(1)><slot(2)><level(4)><round(4)>... *)
     let open Lwt_result_syntax in
     try
@@ -77,8 +77,8 @@ module High_watermark = struct
       return (level, Some round)
     with exn ->
       failwith
-        "Failed to retrieve level and round of an endorsement or \
-         preendorsement (%s)"
+        "Failed to retrieve level and round of an attestation or \
+         preattestation (%s)"
         (Printexc.to_string exn)
 
   let check_mark name
@@ -153,7 +153,7 @@ module High_watermark = struct
           else return_none
         else return_none
 
-  let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes
+  let mark_if_block_or_attestation (cctxt : #Client_context.wallet) pkh bytes
       sign =
     let open Lwt_result_syntax in
     let mark art name get_level_and_round =
@@ -213,13 +213,13 @@ module High_watermark = struct
               (* tenderbake block *)
               get_level_and_round_for_tenderbake_block bytes)
       | 0x12 ->
-          (* tenderbake preendorsement *)
-          mark "a" "preendorsement" (fun () ->
-              get_level_and_round_for_tenderbake_endorsement bytes)
+          (* tenderbake preattestation *)
+          mark "a" "preattestation" (fun () ->
+              get_level_and_round_for_tenderbake_attestation bytes)
       | 0x13 ->
-          (* tenderbake endorsement *)
-          mark "a" "endorsement" (fun () ->
-              get_level_and_round_for_tenderbake_endorsement bytes)
+          (* tenderbake attestation *)
+          mark "an" "attestation" (fun () ->
+              get_level_and_round_for_tenderbake_attestation bytes)
       | _ -> sign bytes
 end
 
@@ -297,7 +297,7 @@ let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     | None -> Client_keys.V_latest.sign cctxt sk_uri bytes
   in
   if check_high_watermark then
-    High_watermark.mark_if_block_or_endorsement cctxt pkh data sign
+    High_watermark.mark_if_block_or_attestation cctxt pkh data sign
   else sign data
 
 let deterministic_nonce (cctxt : #Client_context.wallet)
