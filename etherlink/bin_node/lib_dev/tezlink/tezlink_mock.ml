@@ -26,7 +26,7 @@ let fitness =
     Bytes.make 4 '\255';
     Bytes.make 4 '\255';
     Bytes.make 4 '\255';
-    Bytes.make 4 '\255';
+    Bytes.make 4 '\000';
   ]
 
 (* TODO #7866
