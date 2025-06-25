@@ -481,6 +481,17 @@ let wasm_pvm_fallback =
     ~msg:"the node needs to fallback to the WASM PVM to execute a block"
     ()
 
+let rpc_call_fallback =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"rpc_call_fallback"
+    ~msg:"using fallback for unavailable RPC service {service} because {error}"
+    ("service", Data_encoding.string)
+    ("error", trace_encoding)
+    ~pp1:Format.pp_print_string
+    ~pp2:pp_print_trace
+
 let multichain_node_singlechain_kernel =
   Internal_event.Simple.declare_0
     ~level:Warning
@@ -579,6 +590,8 @@ let deprecation_note msg = emit event_deprecation_note msg
 let replay_csv_available msg = emit replay_csv_available msg
 
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
+
+let rpc_call_fallback name error = emit rpc_call_fallback (name, error)
 
 let missing_chain_id () = emit missing_chain_id ()
 

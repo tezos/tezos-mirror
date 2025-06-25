@@ -159,6 +159,10 @@ val replay_csv_available : string -> unit Lwt.t
     to execute a block, which is slow. *)
 val wasm_pvm_fallback : unit -> unit Lwt.t
 
+(** [rpc_call_fallback service_name error] advertises that the node has to
+    fallback to an alternative RPC because one is unavailable. *)
+val rpc_call_fallback : string -> tztrace -> unit Lwt.t
+
 (** [missing_chain_id ()] advertises that the node could not check the
     consistency of the stored chain id with the selected network. *)
 val missing_chain_id : unit -> unit Lwt.t

@@ -29,12 +29,23 @@ let message_encoding =
         (Tag 0)
         (obj2
            (req "kind" (constant "blueprint"))
+           (req "blueprint" Blueprint_types.Legacy.with_events_encoding))
+        (fun _ ->
+          (* We don't produce legacy blueprints anymore but we can still decode
+             them. *)
+          None)
+        (fun ((), bp) -> Blueprint (Blueprint_types.of_legacy bp));
+      case
+        ~title:"Blueprint.v2"
+        (Tag 1)
+        (obj2
+           (req "kind" (constant "blueprint_v2"))
            (req "blueprint" Blueprint_types.with_events_encoding))
         (function Blueprint bp -> Some ((), bp) | _ -> None)
         (fun ((), bp) -> Blueprint bp);
       case
         ~title:"Finalized_levels"
-        (Tag 1)
+        (Tag 2)
         (obj4
            (req "kind" (constant "finalized_levels"))
            (req "l1_level" int32)

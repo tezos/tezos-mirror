@@ -257,6 +257,32 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
       return res
   | Error trace, None -> fail trace
 
+let call_with_fallback name f always_fallback ~fallback ~map_fallback_result =
+  let open Lwt_result_syntax in
+  let fallback () =
+    let+ res = fallback () in
+    map_fallback_result res
+  in
+  if !always_fallback then
+    (* NOTE: we assume we are always calling [f] on the same endpoint so it's
+       safe to always fallback in the future. *)
+    fallback ()
+  else
+    let*! res = protect f in
+    match res with
+    | Ok res -> return res
+    | Error e ->
+        (match e with
+        | ( Tezos_rpc.Context.Not_found _ (* 404, Unsupported RPC. *)
+          | RPC_client_errors.Request_failed
+              {error = Unauthorized_uri | Forbidden; _}
+          (* 403, Forbidden RPC. *) )
+          :: _ ->
+            always_fallback := true
+        | _ -> ()) ;
+        let*! () = Events.rpc_call_fallback name e in
+        fallback ()
+
 let get_blueprint ~keep_alive ~evm_node_endpoint Ethereum_types.(Qty level) =
   Rollup_services.call_service
     ~keep_alive
@@ -289,6 +315,19 @@ let get_blueprint_with_events ~keep_alive ~evm_node_endpoint
     ()
     ()
 
+(* TODO: L2-133
+   Can be removed in a future release (0.32), after the RPCs have been properly
+   deprecated. *)
+let get_blueprint_with_events =
+  let always_fallback = ref false in
+  fun ~keep_alive ~evm_node_endpoint level ->
+    call_with_fallback
+      "get_blueprint_with_events"
+      (fun () -> get_blueprint_with_events ~keep_alive ~evm_node_endpoint level)
+      always_fallback
+      ~fallback:(fun () -> get_blueprint ~keep_alive ~evm_node_endpoint level)
+      ~map_fallback_result:Blueprint_types.of_legacy
+
 let get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count
     Ethereum_types.(Qty level) =
   Rollup_services.call_service
@@ -299,6 +338,21 @@ let get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count
     ()
     {from_level = Z.to_int64 level; count}
     ()
+
+(* TODO: L2-133
+   Can be removed in a future release (0.32), after the RPCs have been properly
+   deprecated. *)
+let get_blueprints_with_events =
+  let always_fallback = ref false in
+  fun ~keep_alive ~evm_node_endpoint ~count level ->
+    call_with_fallback
+      "get_blueprints_with_events"
+      (fun () ->
+        get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count level)
+      always_fallback
+      ~fallback:(fun () ->
+        get_blueprints ~keep_alive ~evm_node_endpoint ~count level)
+      ~map_fallback_result:(List.map Blueprint_types.of_legacy)
 
 let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
