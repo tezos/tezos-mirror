@@ -981,6 +981,9 @@ let pp_contents_and_result :
       Signature.Public_key_hash.pp
       rewarded_delegate
   in
+  let pp_committee ppf (delegate, voting_power) =
+    Format.fprintf ppf "(%a, %d)" Consensus_key.pp delegate voting_power
+  in
   fun ppf -> function
     | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
         Format.fprintf
@@ -1051,7 +1054,7 @@ let pp_contents_and_result :
           consensus_power
     | ( Preattestations_aggregate {consensus_content = {level; _}; _},
         Preattestations_aggregate_result
-          {balance_updates; committee; consensus_power} ) ->
+          {balance_updates; committee; total_consensus_power} ) ->
         Format.fprintf
           ppf
           "@[<v 2>Preattestations aggregate:@,\
@@ -1063,12 +1066,12 @@ let pp_contents_and_result :
           level
           pp_balance_updates
           balance_updates
-          (Format.pp_print_list Consensus_key.pp)
+          (Format.pp_print_list pp_committee)
           committee
-          consensus_power
+          total_consensus_power
     | ( Attestations_aggregate {consensus_content = {level; _}; _},
         Attestations_aggregate_result
-          {balance_updates; committee; consensus_power} ) ->
+          {balance_updates; committee; total_consensus_power} ) ->
         Format.fprintf
           ppf
           "@[<v 2>Attestations aggregate:@,\
@@ -1080,9 +1083,9 @@ let pp_contents_and_result :
           level
           pp_balance_updates
           balance_updates
-          (Format.pp_print_list Consensus_key.pp)
+          (Format.pp_print_list pp_committee)
           committee
-          consensus_power
+          total_consensus_power
     | ( Double_consensus_operation_evidence {slot; op1; op2},
         Double_consensus_operation_evidence_result double_signing_result ) ->
         Format.fprintf

@@ -2400,7 +2400,7 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
   match mode with
   | Application _ | Full_construction _ ->
       let slot_map = Consensus.allowed_attestations ctxt in
-      let*? ctxt, rev_committee, consensus_power =
+      let*? ctxt, rev_committee, total_consensus_power =
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
@@ -2412,7 +2412,8 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
             in
             let* ctxt = record_dal_content ctxt slot ~dal_power dal in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
-            return (ctxt, key :: consensus_keys, power + consensus_power))
+            return
+              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
           (ctxt, [], 0)
           committee
       in
@@ -2421,7 +2422,7 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
           {
             balance_updates = [];
             committee = List.rev rev_committee;
-            consensus_power;
+            total_consensus_power;
           }
       in
       return (ctxt, Single_result result)
@@ -2448,7 +2449,7 @@ let record_preattestations_aggregate ctxt (mode : mode)
       in
       let slot_map = Consensus.allowed_preattestations ctxt in
       (* Accumulate the list of delegates and the total attesting power *)
-      let*? ctxt, rev_committee, consensus_power =
+      let*? ctxt, rev_committee, total_consensus_power =
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) slot ->
@@ -2463,7 +2464,8 @@ let record_preattestations_aggregate ctxt (mode : mode)
                 round
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
-            return (ctxt, key :: consensus_keys, power + consensus_power))
+            return
+              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
           (ctxt, [], 0)
           committee
       in
@@ -2472,7 +2474,7 @@ let record_preattestations_aggregate ctxt (mode : mode)
           {
             balance_updates = [];
             committee = List.rev rev_committee;
-            consensus_power;
+            total_consensus_power;
           }
       in
       return (ctxt, Single_result result)
