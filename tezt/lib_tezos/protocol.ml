@@ -51,7 +51,7 @@ let number = function R022 -> 022 | S023 -> 023 | Alpha -> 024
 let directory = function
   | R022 -> "proto_022_PsRiotum"
   | Alpha -> "proto_alpha"
-  | S023 -> "proto_023_PtSEouLo"
+  | S023 -> "proto_023_PtSeouLo"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
@@ -59,7 +59,7 @@ let tag protocol = String.lowercase_ascii (name protocol)
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
   | R022 -> "PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7"
-  | S023 -> "PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY"
+  | S023 -> "PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh"
 (* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)
 
 let short_hash protocol_hash =
