@@ -7,7 +7,6 @@
 
 open Gitlab_ci.Types
 open Tezos_ci
-open Common
 
 let debian_matrix = [[("RELEASE", ["unstable"; "bookworm"])]]
 

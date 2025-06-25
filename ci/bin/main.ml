@@ -257,7 +257,8 @@ let () =
     "grafazos_release_tag_test"
     If.(not_on_tezos_namespace && push && has_tag_match grafazos_release_tag_re)
     ~jobs:
-      (Common.job_datadog_pipeline_trace :: Grafazos.Release.jobs ~test:true ())
+      (Tezos_ci.job_datadog_pipeline_trace
+      :: Grafazos.Release.jobs ~test:true ())
     ~description:
       "Test release pipeline for Grafazos.\n\n\
        This pipeline checks that 'grafazos_release_tag' pipelines work as \
@@ -269,7 +270,7 @@ let () =
     "teztale_release_tag_test"
     If.(not_on_tezos_namespace && push && has_tag_match teztale_release_tag_re)
     ~jobs:
-      (Common.job_datadog_pipeline_trace :: Teztale.Release.jobs ~test:true ())
+      (Tezos_ci.job_datadog_pipeline_trace :: Teztale.Release.jobs ~test:true ())
     ~description:
       "Test release pipeline for Teztale.\n\n\
        This pipeline checks that 'teztale_release_tag' pipelines work as \
@@ -413,7 +414,7 @@ let () =
     "schedule_documentation"
     schedule_documentation
     ~jobs:
-      (Common.job_datadog_pipeline_trace :: Master_branch.job_static_x86_64
+      (Tezos_ci.job_datadog_pipeline_trace :: Master_branch.job_static_x86_64
        :: Master_branch.jobs_documentation
       |> List.map (with_interruptible false))
     ~description:
@@ -444,7 +445,7 @@ let () =
     If.(api_release_page && on_tezos_namespace)
     ~jobs:
       [
-        Common.job_datadog_pipeline_trace;
+        Tezos_ci.job_datadog_pipeline_trace;
         Release_tag.job_release_page ~test:false ();
       ]
     ~description:"Pipeline that updates and publishes the release page."

@@ -1708,3 +1708,16 @@ let id_tokens =
         "https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}"
     );
   ]
+
+let job_datadog_pipeline_trace : tezos_job =
+  job
+    ~__POS__
+    ~allow_failure:Yes
+    ~name:"datadog_pipeline_trace"
+    ~image:Images.datadog_ci
+    ~stage:Stages.start
+    [
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+    ]

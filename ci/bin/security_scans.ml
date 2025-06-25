@@ -88,5 +88,5 @@ let jobs : tezos_job list =
        ])
   in
 
-  (Common.job_datadog_pipeline_trace :: job_list_container_scanning)
+  (Tezos_ci.job_datadog_pipeline_trace :: job_list_container_scanning)
   @ [job_container_scanning_merge_reports]

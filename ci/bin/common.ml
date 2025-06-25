@@ -888,19 +888,6 @@ let job_build_dsn_node ?rules () : tezos_job =
          ["octez-dsn-node"])
   |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
-let job_datadog_pipeline_trace : tezos_job =
-  job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Images.datadog_ci
-    ~stage:Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
-
 let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__
