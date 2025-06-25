@@ -178,7 +178,13 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let* header = tezlink_block_to_raw_block_header block in
     let* metadata = make_metadata ~level_info in
     let block_info : Block_services.block_info =
-      {chain_id; hash; header; metadata = Some metadata; operations = []}
+      {
+        chain_id;
+        hash;
+        header;
+        metadata = Some metadata;
+        operations = Block_services.operations;
+      }
     in
     return (version, block_info)
 end

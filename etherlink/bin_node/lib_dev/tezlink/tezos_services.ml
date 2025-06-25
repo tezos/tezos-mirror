@@ -15,6 +15,8 @@ module type BLOCK_SERVICES = sig
 
   val mock_block_header_metadata :
     Alpha_context.Level.t -> Proto.block_header_metadata tzresult
+
+  val operations : operation list list
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -88,6 +90,8 @@ module Block_services = struct
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
+
+  let operations = [[]; []; []; []]
 end
 
 module Zero_block_services = struct
@@ -107,6 +111,8 @@ module Zero_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
+
+  let operations = []
 end
 
 module Genesis_block_services = struct
@@ -135,6 +141,8 @@ module Genesis_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
+
+  let operations = []
 end
 
 (* Module importing, amending, and converting, protocol types. Those types

@@ -165,7 +165,7 @@ let block_info_to_header block_info =
   header
 
 let check_block_info ~previous_block_info ~current_block_info ~chain_id
-    ~current_timestamp =
+    ~current_timestamp ~expected_operations =
   let () =
     check_header
       ~previous_header:(block_info_to_header previous_block_info)
@@ -173,12 +173,16 @@ let check_block_info ~previous_block_info ~current_block_info ~chain_id
       ~chain_id
       ~current_timestamp
   in
-  (* For now operations are converted to dummy string as the list should be empty.
+  (* For now operations are converted to dummy string.
      We convert to string operations to use the Check module *)
   let operations =
-    JSON.(current_block_info |-> "operations" |> as_list |> List.map as_string)
+    JSON.(
+      current_block_info |-> "operations" |> as_list
+      |> List.map (fun operations ->
+             let ops = as_list operations in
+             List.map as_string ops))
   in
-  Check.((operations = []) (list string))
+  Check.((operations = expected_operations) (list (list string)))
     ~error_msg:"List of operations is expected to be empty for now"
 
 let next_evm_level ~evm_node ~sc_rollup_node ~client =

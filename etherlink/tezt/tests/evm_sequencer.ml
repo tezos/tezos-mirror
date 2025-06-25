@@ -865,6 +865,7 @@ let test_tezlink_block_info =
        ~current_block_info:block_2
        ~chain_id
        ~current_timestamp:(Some current_timestamp)
+       ~expected_operations:[[]; []; []; []]
 
 let test_tezlink_bootstrapped =
   register_tezlink_test
