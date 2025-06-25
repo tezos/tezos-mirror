@@ -207,6 +207,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~dependencies:(Dependent dependencies)
       ?before_script
       ?variables
+      ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:publish"
       [
         ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
