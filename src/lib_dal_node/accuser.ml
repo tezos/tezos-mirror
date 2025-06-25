@@ -82,7 +82,22 @@ let inject_entrapment_evidences
       | [] -> return_unit
       | traps ->
           let attestation_map = get_attestation_map attestations in
-          let traps_to_inject = filter_injectable_traps attestation_map traps in
+          let traps_to_inject =
+            filter_injectable_traps attestation_map traps
+            |> (* We do not emit two denunciations for the same level, delegate
+                  and slot index, even if 2 shards assigned to this delegate
+                  were traps *)
+            List.sort_uniq
+              (fun
+                (delegate1, slot_index1, _, _, _, _, _)
+                (delegate2, slot_index2, _, _, _, _, _)
+              ->
+                let deleg_comp =
+                  Signature.Public_key_hash.compare delegate1 delegate2
+                in
+                if deleg_comp = 0 then compare slot_index1 slot_index2
+                else deleg_comp)
+          in
           List.iter_es
             (fun ( delegate,
                    slot_index,
