@@ -37,12 +37,27 @@ let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
   let* () = Signals_publisher.shutdown () in
   return_unit
 
+let validate_and_add_tx backend
+    ~(tx_container :
+       L2_types.evm_chain_family Services_backend_sig.tx_container) raw_tx =
+  let open Lwt_result_syntax in
+  let (Evm_tx_container (module Tx_container)) = tx_container in
+  let* res = Validate.is_tx_valid backend ~mode:Minimal raw_tx in
+  match res with
+  | Ok (next_nonce, txn_obj) ->
+      let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
+      let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
+      return_unit
+  | Error reason ->
+      let hash = Ethereum_types.hash_raw_tx raw_tx in
+      let*! () = Events.replicate_transaction_dropped hash reason in
+      return_unit
+
 let loop_sequencer multichain backend
     ~(tx_container :
        L2_types.evm_chain_family Services_backend_sig.tx_container)
     ?sandbox_config time_between_blocks =
   let open Lwt_result_syntax in
-  let (Evm_tx_container (module Tx_container)) = tx_container in
   match sandbox_config with
   | Some {parent_chain = Some evm_node_endpoint; _} ->
       let*! head = Evm_context.head_info () in
@@ -69,23 +84,7 @@ let loop_sequencer multichain backend
             in
             let txns = List.filter_map snd all_txns in
             let* () =
-              List.iter_es
-                (fun raw_tx ->
-                  let* res =
-                    Validate.is_tx_valid backend ~mode:Minimal raw_tx
-                  in
-                  match res with
-                  | Ok (next_nonce, txn_obj) ->
-                      let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-                      let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
-                      return_unit
-                  | Error reason ->
-                      let hash = Ethereum_types.hash_raw_tx raw_tx in
-                      let*! () =
-                        Events.replicate_transaction_dropped hash reason
-                      in
-                      return_unit)
-                txns
+              List.iter_es (validate_and_add_tx backend ~tx_container) txns
             in
             let* _ =
               Block_producer.produce_block
