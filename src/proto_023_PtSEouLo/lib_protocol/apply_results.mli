@@ -81,14 +81,14 @@ and 'kind contents_result =
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : Consensus_key.t list;
-      consensus_power : int;
+      committee : (Consensus_key.t * int) list;
+      total_consensus_power : int;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : Consensus_key.t list;
-      consensus_power : int;
+      committee : (Consensus_key.t * int) list;
+      total_consensus_power : int;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :

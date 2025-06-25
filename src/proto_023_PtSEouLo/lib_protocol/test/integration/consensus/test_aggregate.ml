@@ -118,10 +118,18 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
   match (kind, result) with
   | ( Preattestation,
       Preattestations_aggregate_result
-        {balance_updates; committee = resulting_committee; consensus_power} )
+        {
+          balance_updates;
+          committee = resulting_committee;
+          total_consensus_power;
+        } )
   | ( Attestation,
       Attestations_aggregate_result
-        {balance_updates; committee = resulting_committee; consensus_power} ) ->
+        {
+          balance_updates;
+          committee = resulting_committee;
+          total_consensus_power;
+        } ) ->
       (* Check balance updates *)
       let* () =
         match balance_updates with
@@ -137,12 +145,12 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
             0
             committee
         in
-        if voting_power = consensus_power then return_unit
+        if voting_power = total_consensus_power then return_unit
         else
           Test.fail
             "Wrong voting power : expected %d, found %d"
             voting_power
-            consensus_power
+            total_consensus_power
       in
       (* Check committee *)
       let committee_pkhs =
@@ -152,7 +160,8 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~committee
       in
       let resulting_committee_pkhs =
         List.map
-          (fun (attester : Alpha_context.Consensus_key.t) -> attester.delegate)
+          (fun ((attester : Alpha_context.Consensus_key.t), _) ->
+            attester.delegate)
           resulting_committee
       in
       if
@@ -747,7 +756,7 @@ let test_metadata_committee_is_correctly_ordered () =
   let check_committees ~loc committee result_committee =
     let result_committee =
       List.map
-        (fun (key : Alpha_context.Consensus_key.t) -> key.consensus_pkh)
+        (fun ((key : Alpha_context.Consensus_key.t), _) -> key.consensus_pkh)
         result_committee
     in
     let* () =

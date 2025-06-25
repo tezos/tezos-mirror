@@ -900,14 +900,14 @@ type 'kind contents_result =
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : Consensus_key.t list;
-      consensus_power : int;
+      committee : (Consensus_key.t * int) list;
+      total_consensus_power : int;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : Consensus_key.t list;
-      consensus_power : int;
+      committee : (Consensus_key.t * int) list;
+      total_consensus_power : int;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
@@ -1042,8 +1042,13 @@ module Encoding = struct
     let open Data_encoding in
     obj3
       (dft "balance_updates" Receipt.balance_updates_encoding [])
-      (req "committee" (list Consensus_key.encoding))
-      (req "consensus_power" int31)
+      (req
+         "committee"
+         (list
+            (merge_objs
+               Consensus_key.encoding
+               (obj1 (req "consensus_power" int31)))))
+      (req "total_consensus_power" int31)
 
   type case =
     | Case : {
@@ -1158,12 +1163,12 @@ module Encoding = struct
         proj =
           (function
           | Attestations_aggregate_result
-              {balance_updates; committee; consensus_power} ->
-              (balance_updates, committee, consensus_power));
+              {balance_updates; committee; total_consensus_power} ->
+              (balance_updates, committee, total_consensus_power));
         inj =
-          (fun (balance_updates, committee, consensus_power) ->
+          (fun (balance_updates, committee, total_consensus_power) ->
             Attestations_aggregate_result
-              {balance_updates; committee; consensus_power});
+              {balance_updates; committee; total_consensus_power});
       }
 
   let preattestations_aggregate_case =
@@ -1184,12 +1189,12 @@ module Encoding = struct
         proj =
           (function
           | Preattestations_aggregate_result
-              {balance_updates; committee; consensus_power} ->
-              (balance_updates, committee, consensus_power));
+              {balance_updates; committee; total_consensus_power} ->
+              (balance_updates, committee, total_consensus_power));
         inj =
-          (fun (balance_updates, committee, consensus_power) ->
+          (fun (balance_updates, committee, total_consensus_power) ->
             Preattestations_aggregate_result
-              {balance_updates; committee; consensus_power});
+              {balance_updates; committee; total_consensus_power});
       }
 
   let seed_nonce_revelation_case =
