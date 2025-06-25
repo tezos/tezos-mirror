@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [run ?disable_logging ?disable_shard_validation ~ignore_pkhs ~data_dir
+(** [run ?disable_shard_validation ~ignore_pkhs ~data_dir
     ~configuration_override ()] starts a DAL node with the given data directory
     and function to generate an initial configuration.
 
@@ -36,7 +36,6 @@
     - Does not propagate message with topics related to the pkhs in [ignore_pkhs].
 *)
 val run :
-  ?disable_logging:bool ->
   ?disable_shard_validation:bool ->
   ignore_pkhs:Signature.public_key_hash list ->
   data_dir:string ->

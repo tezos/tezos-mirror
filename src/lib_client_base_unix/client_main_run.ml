@@ -491,6 +491,9 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let*! retcode =
     Lwt.catch
       (fun () ->
+        (* THIS MUST NOT BE MODIFIED, THIS CODE HAS TO BE COPIED PASTED IN THE
+           AGNOSTIC BAKER. IF YOU NEED TO MODIFY THIS, YOU NEED TO MODIFY
+           ACCORDINGLY THE COPIED CODE. *)
         let full =
           new unix_full
             ~chain:C.default_chain

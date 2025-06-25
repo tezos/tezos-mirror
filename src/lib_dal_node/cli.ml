@@ -876,7 +876,7 @@ let wrap_with_error main_promise =
       let* _ = Lwt_exit.exit_and_wait 1 in
       Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err)
 
-let run ?disable_logging subcommand cli_options =
+let run subcommand cli_options =
   let open Lwt_result_syntax in
   match subcommand with
   | Run ->
@@ -917,7 +917,6 @@ let run ?disable_logging subcommand cli_options =
         else return cli_options.ignore_topics
       in
       Daemon.run
-        ?disable_logging
         ~disable_shard_validation
         ~ignore_pkhs
         ~data_dir

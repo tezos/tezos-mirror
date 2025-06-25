@@ -215,7 +215,7 @@ module Dal = struct
               ignore_topics
           in
           match options with
-          | Ok options -> Cli.run ~disable_logging:true cmd options
+          | Ok options -> Cli.run cmd options
           | Error (_, msg) -> failwith "%s" msg)
     in
 
@@ -249,7 +249,35 @@ module Dal = struct
 end
 
 module Baker = struct
-  let commands =
+  let init_logging (module C : Client_main_run.M) ~base_dir =
+    let open Lwt_result_syntax in
+    let full =
+      new Client_context_unix.unix_full
+        ~chain:C.default_chain
+        ~block:C.default_block
+        ~confirmations:None
+        ~password_filename:None
+        ~base_dir:C.default_base_dir
+        ~rpc_config:Tezos_rpc_http_client_unix.RPC_client_unix.default_config
+        ~verbose_rpc_error_diagnostics:false
+    in
+    let* parsed, _remaining =
+      C.parse_config_args full (Array.to_list Sys.argv)
+    in
+    let parsed_config_file = parsed.Client_config.parsed_config_file in
+    let parsed_args = parsed.Client_config.parsed_args in
+    let*! () =
+      Client_main_run.init_logging
+        (module C)
+        ?parsed_args
+        ?parsed_config_file
+        ~base_dir
+        ()
+    in
+    return_unit
+
+  let commands client_config =
+    let open Lwt_result_syntax in
     let open Configuration in
     let open Tezos_clic in
     let group =
@@ -270,6 +298,7 @@ module Baker = struct
              directory_parameter
         @@ sources_param)
         (fun args data_dir sources cctxt ->
+          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
           let args = Configuration.create_config args in
           Daemon.Baker.run
             ~keep_alive:args.keep_alive
@@ -281,6 +310,7 @@ module Baker = struct
         baker_args
         (prefixes ["run"; "remotely"] @@ sources_param)
         (fun args sources cctxt ->
+          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
           let args = Configuration.create_config args in
           Daemon.Baker.run
             ~keep_alive:args.keep_alive
@@ -292,6 +322,7 @@ module Baker = struct
         (args2 pidfile_arg keep_alive_arg)
         (prefixes ["run"; "vdf"] @@ stop)
         (fun (pidfile, keep_alive) cctxt ->
+          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
           Daemon.Baker.run
             ~keep_alive
             ~command:(Daemon.Run_vdf {pidfile; keep_alive})
@@ -302,6 +333,15 @@ module Baker = struct
         (args3 pidfile_arg preserved_levels_arg keep_alive_arg)
         (prefixes ["run"; "accuser"] @@ stop)
         (fun (pidfile, preserved_levels, keep_alive) cctxt ->
+          let (module C) = client_config in
+          let client_config : (module Client_main_run.M) =
+            (module struct
+              include C
+
+              let default_daily_logs_path = Some "octez-accuser"
+            end)
+          in
+          let* () = init_logging client_config ~base_dir:cctxt#get_base_dir in
           Daemon.Baker.run
             ~keep_alive
             ~command:

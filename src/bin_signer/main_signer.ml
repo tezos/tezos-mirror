@@ -449,7 +449,7 @@ module Signer_config = struct
 
   let other_registrations = None
 
-  let default_daily_logs_path = None
+  let default_daily_logs_path = Some "octez-signer"
 
   let clic_commands ~base_dir ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth =
@@ -457,7 +457,7 @@ module Signer_config = struct
 
   let logger = Some (RPC_client_unix.full_logger Format.err_formatter)
 
-  let advertise_log_levels = None
+  let advertise_log_levels = Some true
 end
 
 let () =
