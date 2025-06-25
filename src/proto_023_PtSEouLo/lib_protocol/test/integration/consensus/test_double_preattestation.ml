@@ -432,6 +432,67 @@ end = struct
     in
     return_unit
 
+  let invalid_denunciation kind = function
+    | Validate_errors.Anonymous.Invalid_denunciation kind' ->
+        Misbehaviour.equal_kind kind kind'
+    | _ -> false
+
+  (** Check that a double preattestation operation fails if the same slot
+      is duplicated in the committee of one of the evidences. *)
+  let test_invalid_double_preattestation_duplicate_in_committee () =
+    let open Lwt_result_syntax in
+    let* _genesis, block =
+      Test_aggregate.init_genesis_with_some_bls_accounts
+        ~aggregate_attestation:true
+        ()
+    in
+    let* b = Block.bake_until_cycle_end block in
+    let* blk_1, blk_2 = block_fork b in
+    let* blk_a = Block.bake blk_1 in
+    let* blk_b = Block.bake blk_2 in
+    let* attesters = Context.get_attesters (B blk_a) in
+    let attester, slot =
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (Test_aggregate.find_attester_with_bls_key attesters)
+    in
+    let* op1 =
+      Op.raw_preattestation
+        ~delegate:attester.RPC.Validators.delegate
+        ~slot
+        blk_a
+    in
+    let* op2_standalone =
+      Op.raw_preattestation
+        ~delegate:attester.RPC.Validators.delegate
+        ~slot
+        blk_b
+    in
+    let op2 =
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (Op.raw_aggregate_preattestations [op2_standalone; op2_standalone])
+    in
+    let op =
+      let contents =
+        if Operation_hash.(Operation.hash op1 < Operation.hash op2) then
+          Single (Double_consensus_operation_evidence {slot; op1; op2})
+        else
+          Single
+            (Double_consensus_operation_evidence {slot; op1 = op2; op2 = op1})
+      in
+      let branch = Context.branch (B blk_a) in
+      {
+        shell = {branch};
+        protocol_data = Operation_data {contents; signature = None};
+      }
+    in
+    Op.check_validation_and_application_all_modes
+      ~loc:__LOC__
+      ~error:(invalid_denunciation Double_preattesting)
+      ~predecessor:blk_a
+      op
+
   let my_tztest title test =
     Tztest.tztest (Format.sprintf "%s: %s" name title) test
 
@@ -479,6 +540,11 @@ end = struct
         "different slots under feature flag"
         `Quick
         different_slots_under_feature_flag;
+      my_tztest
+        "ko: invalid double preattestation evidence: duplicate slot in \
+         committee"
+        `Quick
+        test_invalid_double_preattestation_duplicate_in_committee;
     ]
 end
 
