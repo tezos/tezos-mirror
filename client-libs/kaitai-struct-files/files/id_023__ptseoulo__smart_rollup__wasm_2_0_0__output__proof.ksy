@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__wasm_2_0_0__output__proof
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.wasm_2_0_0.output.proof'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.wasm_2_0_0.output.proof'
 types:
   args:
     seq:

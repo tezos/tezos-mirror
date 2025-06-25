@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__tez
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.tez'
+doc: ! 'Encoding id: 023-PtSeouLo.tez'
 types:
   id_023__ptseoulo__mutez:
     seq:

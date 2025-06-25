@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__gas__cost
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.gas.cost'
+doc: ! 'Encoding id: 023-PtSeouLo.gas.cost'
 types:
   n_chunk:
     seq:

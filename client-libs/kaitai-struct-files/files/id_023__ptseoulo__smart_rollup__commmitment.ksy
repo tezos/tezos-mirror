@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__commmitment
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.commmitment'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.commmitment'
 seq:
 - id: compressed_state
   size: 32

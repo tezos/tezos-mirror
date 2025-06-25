@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__inbox
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.inbox'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.inbox'
 types:
   back_pointers:
     seq:

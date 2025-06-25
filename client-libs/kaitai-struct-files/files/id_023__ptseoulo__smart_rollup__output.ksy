@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__output
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.output'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.output'
 types:
   args:
     seq:

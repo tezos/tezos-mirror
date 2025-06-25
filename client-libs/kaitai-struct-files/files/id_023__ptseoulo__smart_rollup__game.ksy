@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__game
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.game'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.game'
 types:
   agreed_start_chunk:
     seq:

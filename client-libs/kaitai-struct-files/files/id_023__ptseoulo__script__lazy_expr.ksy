@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__script__lazy_expr
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.script.lazy_expr'
+doc: ! 'Encoding id: 023-PtSeouLo.script.lazy_expr'
 types:
   bytes_dyn_uint30:
     seq:

@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__operation__internal
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.operation.internal'
+doc: ! 'Encoding id: 023-PtSeouLo.operation.internal'
 types:
   args:
     seq:

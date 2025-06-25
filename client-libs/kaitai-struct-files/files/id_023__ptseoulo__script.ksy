@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__script
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.script'
+doc: ! 'Encoding id: 023-PtSeouLo.script'
 types:
   bytes_dyn_uint30:
     seq:

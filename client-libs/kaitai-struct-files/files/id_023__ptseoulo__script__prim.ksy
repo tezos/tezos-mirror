@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__script__prim
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.script.prim'
+doc: ! 'Encoding id: 023-PtSeouLo.script.prim'
 types:
   id_023__ptseoulo__michelson__v1__primitives:
     seq:
