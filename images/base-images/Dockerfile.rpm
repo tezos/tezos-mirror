@@ -1,0 +1,20 @@
+ARG IMAGE=invalid
+# The image with proper version is set as ARG
+#hadolint ignore=DL3006
+FROM $IMAGE
+
+ENV TZ=Etc/UTC
+
+# Setup proxy
+ARG APT_PROXY
+ENV APT_PROXY=${APT_PROXY:-false}
+
+COPY images/scripts/configure_rpm_proxy.sh \
+     images/scripts/install_datadog_static.sh \
+     /tmp/
+
+#hadolint ignore=DL3041
+RUN /tmp/configure_rpm_proxy.sh && \
+    dnf -y update && \
+    dnf clean all && \
+    /tmp/install_datadog_static.sh

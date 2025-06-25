@@ -33,7 +33,7 @@ docker buildx build --push \
   --cache-from="type=registry,mode=max,compression=zstd,ref=${protected_gcp}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --secret "id=npm_token,src=/tmp/npm_token.txt" \
-  --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
+  --build-arg IMAGE="$IMAGE_PATH:$RELEASE" \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --build-arg NPM_REGISTRY_DOMAIN="${NPM_REGISTRY_DOMAIN:-}" \
   --build-arg NPM_REGISTRY="${NPM_REGISTRY:-}" \
