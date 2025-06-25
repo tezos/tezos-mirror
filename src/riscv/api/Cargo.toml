@@ -12,19 +12,9 @@ num_enum.workspace = true
 sha2.workspace = true
 strum.workspace = true
 ocaml.workspace = true
-
-[dependencies.octez-riscv]
-git = "https://github.com/tezos/riscv-pvm.git"
-
-[dependencies.ocaml-sys]
-# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
-version = "*"
-default-features = false
-
-[dependencies.ocaml-boxroot-sys]
-# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
-version = "*"
-default-features = false
+octez-riscv.workspace = true
+ocaml-sys.workspace = true
+ocaml-boxroot-sys.workspace = true
 
 [build-dependencies]
 ocaml-build.workspace = true

@@ -1,88 +1,39 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["api"]
-exclude = ["jstz", "dummy_kernel"]
 
 [workspace.lints.clippy]
 allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"
 private_intra_doc_links = "allow"
 
 [workspace.dependencies]
-bincode = "1.3.3"
-cfg-if = "1.0.0"
-comfy-table = "7.1.1"
-cranelift = "0.111.2"
-cranelift-jit = "0.111.2"
-cranelift-module = "0.111.2"
-cranelift-native = "0.111.2"
-derive_more = "0.99.17"
-ed25519-dalek = "2.1.0"
-elf = "0.7.4"
-enum-tag = "0.3.0"
-gdbstub = "0.7.3"
-gdbstub_arch = "0.3.1"
-ieee-apsqrt = "0.1.1"
-itertools = "0.12.1"
-lazy_static = "1.4.0"
-meansd = "2.1.0"
-num_enum = "0.7.2"
-numfmt = "1.1.1"
-ocaml-build = "1.0.0"
-paste = "1.0.14"
-proptest = "1.4.0"
-quanta = "0.12.3"
-rand = "0.8.5"
-rustc_apfloat = "0.2.0"
-serde_json = "1.0.115"
-sha2 = "0.10.9"
-tempfile = "3.10.1"
-tezos-smart-rollup-constants.path = "../kernel_sdk/constants"
-tezos-smart-rollup-encoding.path = "../kernel_sdk/encoding"
-tezos-smart-rollup-utils.path = "../kernel_sdk/utils"
-thiserror = "1.0.57"
-try-blocks = "0.1.4"
-vm-fdt = "0.3.0"
-goldenfile = "1.7.1"
 arbitrary-int = "1.2.7"
-range-collections = "0.4.5"
-
-[workspace.dependencies.tezos-smart-rollup]
-path = "../kernel_sdk/sdk"
-features = ["utils"]
-
-[workspace.dependencies.tezos_crypto_rs]
-path = "../../sdk/rust/crypto"
-default-features = false
+num_enum = "0.7.2"
+ocaml-build = "1.0.0"
+sha2 = "0.10.9"
 
 [workspace.dependencies.strum]
 version = "0.26.1"
 features = ["derive"]
 
-[workspace.dependencies.clap]
-version = "4.4.6"
-features = ["derive"]
-
-[workspace.dependencies.serde]
-version = "1.0.197"
-features = ["derive"]
-
-[workspace.dependencies.hex]
-version = "0.4.3"
-features = ["serde"]
+[workspace.dependencies.octez-riscv]
+# The locked version can be updated via `make update-riscv-pvm`
+git = "https://github.com/tezos/riscv-pvm.git"
 
 [workspace.dependencies.ocaml]
 version = "1.1.0"
 default-features = false
 
-# The dependency alias is used to make it obvious that it should not be used directly. Using it
-# directly may have a surprising impact on performance when logging and tracing are disabled.
-[workspace.dependencies.__tracing_do_not_use_directly]
-package = "tracing"
-version = "0.1.41"
+[workspace.dependencies.ocaml-sys]
+# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
+version = "*"
+default-features = false
 
-[workspace.dependencies.tracing-subscriber]
-version = "0.3.19"
-features = ["json"]
+[workspace.dependencies.ocaml-boxroot-sys]
+# We don't care about the version. Ideally this gets pinned to what `ocaml` needs.
+version = "*"
+default-features = false

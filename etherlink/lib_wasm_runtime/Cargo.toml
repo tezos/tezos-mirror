@@ -3,6 +3,7 @@ name = "octez-evm-node-wasm-runtime"
 version = "0.0.0-dev"
 authors = ["Etherlink Core Engineers <contact@tezos.com>"]
 edition = "2021"
+resolver = "3"
 
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]
