@@ -589,6 +589,7 @@ type configuration = {
   producer_machine_type : string option;
   (* The first argument is the deconnection frequency, the second is the
      reconnection delay *)
+  echo_rollup : bool;
   disconnect : (int * int) option;
   network : Network.t;
   simulate_network : Cli.network_simulation_config;
@@ -4219,6 +4220,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       bakers;
       producers;
       observers;
+      echo_rollup;
       etherlink;
       time_between_blocks;
       parameters;
@@ -4601,6 +4603,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let etherlink = Cli.etherlink in
     let etherlink_sequencer = Cli.etherlink_sequencer in
     let etherlink_producers = Cli.etherlink_producers in
+    let echo_rollup = Cli.echo_rollup in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
     let snapshot = parse_snapshot_arg Cli.snapshot in
@@ -4655,6 +4658,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         observer_pkhs;
         protocol;
         producer_machine_type;
+        echo_rollup;
         disconnect;
         network;
         simulate_network;

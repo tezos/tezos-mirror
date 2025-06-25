@@ -149,6 +149,8 @@ module type Dal = sig
 
   val etherlink_chain_id : int option
 
+  val echo_rollup : bool
+
   val disconnect : (int * int) option
 
   val etherlink_dal_slots : int list
@@ -481,6 +483,8 @@ module Dal () : Dal = struct
 
   let etherlink_chain_id =
     Clap.optional_int ~section ~long:"etherlink-chain-id" ()
+
+  let echo_rollup = Clap.flag ~section ~set_long:"echo-rollup" false
 
   let disconnect =
     let disconnect_typ =
