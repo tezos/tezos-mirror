@@ -4,6 +4,7 @@
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
 (*                                                                           *)
 (*****************************************************************************)
+let section = "Alert_manager"
 
 type receiver =
   | Slack of {
@@ -159,8 +160,24 @@ let jingoo_routes_template routes =
       ("routes", Tlist (List.map jingoo_route_template routes));
     ]
 
+let routes_of_alerts alerts =
+  alerts
+  |> List.filter_map (fun alert ->
+         Option.map (fun route -> (alert.alert, route)) alert.route)
+  |> List.sort_uniq compare
+
+let receivers_of_alerts alerts =
+  alerts
+  |> List.filter_map (fun alert -> alert.route)
+  |> List.map (fun route -> route.receiver)
+  |> List.sort_uniq compare
+
 let jingoo_configuration_template t =
-  let receivers = List.sort_uniq compare (null_receiver :: t.receivers) in
+  let receivers = null_receiver :: t.receivers in
+  let receivers =
+    receivers @ List.map (fun (_, route) -> route.receiver) t.routes
+  in
+  let receivers = List.sort_uniq compare receivers in
   let open Jingoo.Jg_types in
   [
     ("receivers", Tlist (List.map jingoo_receiver_template receivers));
@@ -180,18 +197,6 @@ let write_configuration t =
       Stdlib.seek_out oc 0 ;
       output_string oc content)
 
-let routes_of_alerts alerts =
-  alerts
-  |> List.filter_map (fun alert ->
-         Option.map (fun route -> (alert.alert, route)) alert.route)
-  |> List.sort_uniq compare
-
-let receivers_of_alerts alerts =
-  alerts
-  |> List.filter_map (fun alert -> alert.route)
-  |> List.map (fun route -> route.receiver)
-  |> List.sort_uniq compare
-
 let run ?(default_receiver = null_receiver) alerts =
   let alert_manager_configuration_directory = Path.tmp_dir // "alert_manager" in
   let* () = Process.run "mkdir" ["-p"; alert_manager_configuration_directory] in
@@ -200,47 +205,74 @@ let run ?(default_receiver = null_receiver) alerts =
   in
   Log.info "Alert_manager: run with configuration file %s" configuration_file ;
   let routes = routes_of_alerts alerts in
-  let receivers = receivers_of_alerts alerts in
+  let receivers =
+    List.sort_uniq compare (default_receiver :: receivers_of_alerts alerts)
+  in
   let t = {configuration_file; routes; default_receiver; receivers} in
   match receivers with
   | [Null] -> Lwt.return_none
   | _ ->
       write_configuration t ;
       let* () =
-        Process.run
-          "docker"
-          [
-            "run";
-            "-v";
-            "/tmp/alert_manager:/tmp/alert_manager";
-            "--rm";
-            "-d";
-            "--network";
-            "host";
-            "--name";
-            "alert-manager";
-            "-p";
-            "9093-9093";
-            "prom/alertmanager:latest";
-            "--config.file";
-            configuration_file;
-          ]
+        Lwt.catch
+          (fun () ->
+            Process.run
+              "docker"
+              [
+                "run";
+                "-v";
+                "/tmp/alert_manager:/tmp/alert_manager";
+                "--rm";
+                "-d";
+                "--network";
+                "host";
+                "--name";
+                "alert-manager";
+                "-p";
+                "9093-9093";
+                "prom/alertmanager:latest";
+                "--config.file";
+                configuration_file;
+              ])
+          (fun exn ->
+            Log.error "Alert_manager:%s" (Printexc.to_string exn) ;
+            Lwt.return_unit)
       in
       Lwt.return_some t
 
 let reload t =
-  Log.info "Alert_manager: reloading" ;
+  Log.info "%s: reloading" section ;
   write_configuration t ;
-  Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"]
+  Lwt.catch
+    (fun () ->
+      Process.run "curl" ["-X"; "POST"; "http://127.0.0.1:9093/-/reload"])
+    (fun exn ->
+      Log.error
+        "%s: Could not reload alert_manager, curl returned: %s"
+        section
+        (Printexc.to_string exn) ;
+      Lwt.return_unit)
 
 let shutdown () =
-  Log.info "Alert_manager: shutting down" ;
-  let* () = Docker.kill "alert-manager" |> Process.check in
+  Log.info "%s: shutting down" section ;
+  let* () =
+    Lwt.catch
+      (fun () -> Docker.kill "alert-manager" |> Process.check)
+      (fun exn ->
+        Log.error
+          "Could not shutdown alert_manager properly: %s"
+          (Printexc.to_string exn) ;
+        Lwt.return_unit)
+  in
   Lwt.return_unit
 
 let add_alert t ~alert =
-  Log.info "Alert_manager: adding alert" ;
   let {alert; route = route'} = alert in
   let route' = Option.value ~default:(route t.default_receiver) route' in
-  t.routes <- (alert, route') :: t.routes ;
+  let {receiver; _} = route' in
+  Log.info
+    "%s: adding alert with receiver: %s"
+    section
+    (name_of_receiver receiver) ;
+  t.routes <- List.sort_uniq compare ((alert, route') :: t.routes) ;
   reload t
