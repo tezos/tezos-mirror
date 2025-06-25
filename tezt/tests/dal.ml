@@ -8979,6 +8979,165 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
+let test_inject_accusation_aggregated_attestation protocol dal_parameters
+    _cryptobox node client dal_node =
+  let slot_index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
+  Log.info "Generate tz4 keys" ;
+  let* new_tz4_accounts =
+    Lwt_list.map_s
+      (fun index ->
+        Client.gen_and_show_keys
+          ~sig_alg:"bls"
+          ~alias:("bls_account_" ^ string_of_int (1 + index))
+          client)
+      (List.init 5 Fun.id)
+  in
+  let* () = bake_for client in
+  Log.info "We have the accounts, let's fund them" ;
+  let* _oph =
+    (* We give 500k tez to each account. *)
+    let amount = 500_000 * 1_000_000 in
+    let source = Constant.bootstrap1 in
+    let transfers =
+      List.map
+        (fun dest -> Operation.Manager.transfer ~dest ~amount ())
+        new_tz4_accounts
+    in
+    let* counter = Operation.Manager.get_next_counter ~source client in
+    let batch = Operation.Manager.make_batch ~source ~counter transfers in
+    Operation.Manager.inject batch client
+  in
+  let* () = bake_for client in
+  Log.info "All keys funded, let's set them as delegates" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun account ->
+        Client.set_delegate
+          ~src:account.Account.alias
+          ~delegate:account.Account.alias
+          client)
+      new_tz4_accounts
+  in
+  let* () = bake_for client in
+  Log.info "All keys are delegate, let's attach a companion key to them" ;
+  let* companions =
+    Lwt_list.map_s
+      (fun account ->
+        Client.update_fresh_companion_key ~algo:"bls" account client)
+      new_tz4_accounts
+  in
+  let* () = bake_for client in
+  Log.info "All keys have a companion, let's stake" ;
+  let* () =
+    Lwt_list.iter_s
+      (fun source ->
+        Client.stake ~staker:source.Account.alias Tez.(of_int 100_000) client)
+      new_tz4_accounts
+  in
+  let* RPC.{cycle; _} =
+    Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
+  in
+  Log.info "All keys have staked, let's wait for them to have rights" ;
+  let* () = Client.bake_until_cycle ~target_cycle:(cycle + 3) client in
+  Log.info "Enough waiting, let's publish a commitment" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      message
+  in
+  (* We need to bake exactly [lag] blocks so that we can inject an attestation
+     at the right level (that attests the published slot). *)
+  let* publication_level = Client.bake_for_and_wait_level client in
+  Log.info "Attestation lag should pass before sending an attestation" ;
+  let* () = bake_for ~count:(lag - 1) client in
+  Log.info "Inject an attestation" ;
+  let level = publication_level + lag - 1 in
+  (* BLS consensus keys are now activated *)
+  let* slots = Operation.Consensus.get_slots_by_consensus_key ~level client in
+  let* round = Baker_test.fetch_round client in
+  let* branch = Operation.Consensus.get_branch ~attested_level:level client in
+  let* block_payload_hash =
+    Operation.Consensus.get_block_payload_hash
+      ~block:(string_of_int level)
+      client
+  in
+  let dal_attestation = Array.init number_of_slots (fun i -> i = slot_index) in
+  let faulty_baker = List.hd new_tz4_accounts in
+  let first_slot = Operation.Consensus.first_slot ~slots faulty_baker in
+  let attestation =
+    Operation.Consensus.attestation
+      ~dal_attestation
+      ~slot:first_slot
+      ~level
+      ~round
+      ~block_payload_hash
+      ()
+  in
+  let* _op_hash =
+    Operation.Consensus.inject
+      ~protocol
+      ~branch
+      ~signer_companion:(List.hd companions)
+      ~signer:faulty_baker
+      attestation
+      client
+  in
+  Log.info "Attestation injected" ;
+  (* Since we manually injected the attestation for the faulty baker,
+     we have to prevent [bake_for] to inject another one in the mempool.
+  *)
+  let all_other_delegates =
+    List.tl new_tz4_accounts @ Constant.all_secret_keys
+  in
+  let* () =
+    bake_for
+      ~delegates:
+        (`For
+          (List.map
+             (fun account -> account.Account.public_key_hash)
+             all_other_delegates))
+      client
+  in
+  (* Let's wait 2 levels for the block to be finalized. *)
+  let* () = bake_for ~count:2 client in
+  (* Now we expect the DAL node to be crafting the denunciation,
+     hence it should be included in next block.
+  *)
+  let* () = bake_for client in
+  let* anonymous_ops =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass
+         ~block:"head"
+         ~validation_pass:2
+         ()
+  in
+  Check.(List.length (JSON.as_list anonymous_ops) = 1)
+    ~__LOC__
+    Check.int
+    ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+  let contents = JSON.(anonymous_ops |=> 0 |-> "contents" |=> 0) in
+  let kind = JSON.(contents |-> "kind" |> as_string) in
+  let attestation_kind =
+    JSON.(contents |-> "attestation" |-> "operations" |-> "kind" |> as_string)
+  in
+  Check.(
+    ((kind, attestation_kind)
+    = ("dal_entrapment_evidence", "attestations_aggregate"))
+      ~__LOC__
+      (tuple2 string string))
+    ~error_msg:
+      "Expected the anonymous operation to be the denunciation of attestation \
+       aggregation. Got: %L" ;
+  unit
+
 (* Publishing and attesting should work.
    A producer DAL node publishes "Hello world!" (produced with key [bootstrap1]) on a slot.
    An attestation, which attests the block is emitted with key [bootstrap2].
@@ -10573,6 +10732,12 @@ let register ~protocols =
     "inject accusation"
     test_inject_accusation
     (List.filter (fun p -> Protocol.number p >= 022) protocols) ;
+  scenario_with_layer1_and_dal_nodes
+    ~traps_fraction:Q.one
+    ~operator_profiles:[0]
+    "inject accusation of aggregated attestation"
+    test_inject_accusation_aggregated_attestation
+    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
     ~traps_fraction:Q.one
     "inject a duplicated denunciation at different steps"
