@@ -148,7 +148,7 @@ let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
     branch
     contents
 
-let aggregate attestations =
+let raw_aggregate attestations =
   let aggregate_content =
     List.fold_left
       (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
@@ -182,10 +182,11 @@ let aggregate attestations =
          (* Reverse committee to preserve [attestations] order *)
          {consensus_content; committee = List.rev committee})
   in
-  let protocol_data =
-    Operation_data {contents; signature = Some (Bls signature)}
-  in
-  {shell; protocol_data}
+  let protocol_data = {contents; signature = Some (Bls signature)} in
+  ({shell; protocol_data} : Kind.attestations_aggregate operation)
+
+let aggregate attestations =
+  Option.map Operation.pack (raw_aggregate attestations)
 
 let aggregate_preattestations preattestations =
   let aggregate_content =

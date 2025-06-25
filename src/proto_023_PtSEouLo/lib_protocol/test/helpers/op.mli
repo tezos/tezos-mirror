@@ -122,6 +122,11 @@ val attestations_aggregate :
     Attestations signed by non-bls delegates are ignored. Evaluates to {!None} if
     no bls-signed attestations are found or if signature_aggregation failed
     (due to unreadable signature representation). *)
+val raw_aggregate :
+  Kind.attestation_consensus_kind Kind.consensus operation trace ->
+  Kind.attestations_aggregate operation option
+
+(** Same as {!raw_aggregate} but returns the packed operation. *)
 val aggregate :
   Kind.attestation_consensus_kind Kind.consensus operation trace ->
   Operation.packed option
