@@ -371,3 +371,20 @@ let mock_voting_period_info () =
       {voting_period; position = 0l; remaining = 0l}
   in
   return voting_period_info
+
+let balance_udpdate_bootstrap ~amount ~bootstrap =
+  let open Alpha_context.Receipt in
+  let migration =
+    item
+      Bootstrap
+      (Debited (Alpha_context.Tez.of_mutez_exn amount))
+      Protocol_migration
+  in
+  let baker = frozen_baker bootstrap in
+  let deposit =
+    item
+      (Deposits baker)
+      (Credited (Alpha_context.Tez.of_mutez_exn amount))
+      Protocol_migration
+  in
+  [migration; deposit]

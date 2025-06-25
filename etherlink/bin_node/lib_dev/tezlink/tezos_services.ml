@@ -67,6 +67,16 @@ module Block_services = struct
           consensus_pkh = Tezlink_mock.public_key_hash;
         }
     in
+    let balance_updates =
+      if
+        Alpha_context.Raw_level.(
+          equal level_info.Alpha_context.Level.level (of_int32_exn 2l))
+      then
+        Tezlink_mock.balance_udpdate_bootstrap
+          ~amount:200_000_000_000L
+          ~bootstrap:Tezlink_mock.public_key_hash
+      else []
+    in
     let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
     return
       {
@@ -77,7 +87,7 @@ module Block_services = struct
         nonce_hash = None;
         consumed_gas = Alpha_context.Gas.Arith.zero;
         deactivated = [];
-        balance_updates = [];
+        balance_updates;
         liquidity_baking_toggle_ema =
           Imported_protocol.Alpha_context.Per_block_votes
           .Liquidity_baking_toggle_EMA
