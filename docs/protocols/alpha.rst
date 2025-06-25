@@ -37,6 +37,8 @@ RPC Changes
 Operation receipts
 ------------------
 
+- Aggregate operations receipts update. Return the consensus power for each delegate in the committee (MR :gl:`!18435`)
+
 
 Errors
 ------
