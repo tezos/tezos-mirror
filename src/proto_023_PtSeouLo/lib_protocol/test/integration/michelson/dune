@@ -10,16 +10,16 @@
   bls12-381.archive
   octez-alcotezt
   octez-libs.base
-  tezos-protocol-023-PtSEouLo.protocol
-  octez-protocol-023-PtSEouLo-libs.test-helpers
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   tezos-benchmark
   octez-libs.micheline
   tezos-benchmark-023-PtSEouLo
   tezos-benchmark-type-inference-023-PtSEouLo
-  octez-protocol-023-PtSEouLo-libs.plugin
-  tezos-protocol-023-PtSEouLo.parameters)
+  octez-protocol-023-PtSeouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.parameters)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -27,7 +27,7 @@
   -open Tezt_core.Base
   -open Octez_alcotezt
   -open Tezos_base.TzPervasives
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo
   -open Tezos_023_PtSEouLo_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_client_023_PtSEouLo
@@ -73,7 +73,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-023-PtSEouLo-tests)
+ (package tezos-protocol-023-PtSeouLo-tests)
  (deps
   (glob_files contracts/*)
   (glob_files patched_contracts/*)

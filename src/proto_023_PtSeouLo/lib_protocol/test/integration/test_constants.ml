@@ -206,7 +206,7 @@ let () =
 
 (* For the rational of VDF related constants, see the description of
    [vdf_difficulty] in
-   {!val:Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_mainnet}. *)
+   {!val:Tezos_protocol_023_PtSeouLo_parameters.Default_parameters.constants_mainnet}. *)
 
 (* Security factor ensures that even with the most powerful CPU in the market,
    you cannot compute the VDF result within the time granted for nonce

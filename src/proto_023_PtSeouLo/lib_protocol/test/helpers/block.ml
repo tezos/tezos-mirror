@@ -223,7 +223,7 @@ module Forge = struct
 
   let make_contents
       ?(proof_of_work_threshold =
-        Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_test
+        Tezos_protocol_023_PtSeouLo_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ~payload_hash ~payload_round
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
       ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
@@ -260,7 +260,7 @@ module Forge = struct
 
   let set_seed_nonce_hash
       ?(proof_of_work_threshold =
-        Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_test
+        Tezos_protocol_023_PtSeouLo_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) seed_nonce_hash
       {baker; consensus_key; shell; contents} =
     let open Lwt_result_syntax in
@@ -370,7 +370,7 @@ module Forge = struct
   (* compatibility only, needed by incremental *)
   let contents
       ?(proof_of_work_threshold =
-        Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_test
+        Tezos_protocol_023_PtSeouLo_parameters.Default_parameters.constants_test
           .proof_of_work_threshold) ?seed_nonce_hash
       ?(liquidity_baking_toggle_vote = Per_block_votes.Per_block_vote_pass)
       ?(adaptive_issuance_vote = Per_block_votes.Per_block_vote_pass)
@@ -416,7 +416,7 @@ let check_constants_consistency constants =
 let prepare_main_init_params ?bootstrap_contracts commitments constants
     bootstrap_accounts =
   let open Lwt_syntax in
-  let open Tezos_protocol_023_PtSEouLo_parameters in
+  let open Tezos_protocol_023_PtSeouLo_parameters in
   let parameters =
     Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -531,7 +531,7 @@ let genesis_with_parameters parameters =
       ~seed_nonce_hash:None
       shell
   in
-  let open Tezos_protocol_023_PtSEouLo_parameters in
+  let open Tezos_protocol_023_PtSeouLo_parameters in
   let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
@@ -583,7 +583,7 @@ let prepare_initial_context_params ?consensus_committee_size
     ?nonce_revelation_threshold ?dal ?adaptive_issuance ?consensus_rights_delay
     ?allow_tz4_delegate_enable ?aggregate_attestation () =
   let open Lwt_result_syntax in
-  let open Tezos_protocol_023_PtSEouLo_parameters in
+  let open Tezos_protocol_023_PtSeouLo_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
     Option.value ~default:constants.min_proposal_quorum min_proposal_quorum

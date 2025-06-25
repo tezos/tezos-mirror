@@ -9,12 +9,12 @@
   bls12-381.archive
   tezt
   octez-libs.base
-  octez-protocol-023-PtSEouLo-libs.client
-  tezos-protocol-023-PtSEouLo.protocol
-  tezos-protocol-023-PtSEouLo.parameters
-  octez-protocol-023-PtSEouLo-libs.test-helpers
+  octez-protocol-023-PtSeouLo-libs.client
+  tezos-protocol-023-PtSeouLo.protocol
+  tezos-protocol-023-PtSeouLo.parameters
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-libs.base-test-helpers
-  octez-protocol-023-PtSEouLo-libs.plugin)
+  octez-protocol-023-PtSeouLo-libs.plugin)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -22,8 +22,8 @@
   -open Tezt_core.Base
   -open Tezos_base.TzPervasives
   -open Tezos_client_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo_parameters
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo_parameters
   -open Tezos_023_PtSEouLo_test_helpers
   -open Tezos_base_test_helpers
   -open Tezos_protocol_plugin_023_PtSEouLo)
@@ -55,7 +55,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-023-PtSEouLo-tests)
+ (package tezos-protocol-023-PtSeouLo-tests)
  (deps (glob_files wasm_kernel/*.wasm))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))

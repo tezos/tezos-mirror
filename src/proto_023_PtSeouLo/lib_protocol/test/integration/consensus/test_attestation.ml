@@ -665,7 +665,7 @@ let test_attester_with_no_assigned_shards () =
   let n = 10 in
   let bootstrap_balances = bal_low :: Stdlib.List.init n (fun _ -> bal_high) in
   let dal =
-    Tezos_protocol_023_PtSEouLo_parameters.Default_parameters.constants_sandbox
+    Tezos_protocol_023_PtSeouLo_parameters.Default_parameters.constants_sandbox
       .dal
   in
   let dal =

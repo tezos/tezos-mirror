@@ -3,7 +3,7 @@
 
 (library
  (name tezos_protocol_environment_023_PtSEouLo)
- (public_name tezos-protocol-023-PtSEouLo.protocol.environment)
+ (public_name tezos-protocol-023-PtSeouLo.protocol.environment)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment)
@@ -18,11 +18,11 @@
    "module Name = struct let name = \"023-PtSEouLo\" end\ninclude Tezos_protocol_environment.V15.Make(Name)()\n")))
 
 (library
- (name tezos_raw_protocol_023_PtSEouLo)
- (public_name tezos-protocol-023-PtSEouLo.protocol.raw)
+ (name tezos_raw_protocol_023_PtSeouLo)
+ (public_name tezos-protocol-023-PtSeouLo.protocol.raw)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-023-PtSEouLo.protocol.environment)
+  tezos-protocol-023-PtSeouLo.protocol.environment)
  (library_flags (:standard -linkall))
  (flags
   (:standard)
@@ -286,20 +286,20 @@
   Main))
 
 (library
- (name tezos_protocol_023_PtSEouLo)
- (public_name tezos-protocol-023-PtSEouLo.protocol)
+ (name tezos_protocol_023_PtSeouLo)
+ (public_name tezos-protocol-023-PtSeouLo.protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-023-PtSEouLo.protocol.raw)
+  tezos-protocol-023-PtSeouLo.protocol.raw)
  (flags
   (:standard)
   -nopervasives)
- (modules Protocol Tezos_protocol_023_PtSEouLo))
+ (modules Protocol Tezos_protocol_023_PtSeouLo))
 
 (install
- (package tezos-protocol-023-PtSEouLo)
+ (package tezos-protocol-023-PtSeouLo)
  (section lib)
  (files (TEZOS_PROTOCOL as protocol/raw/TEZOS_PROTOCOL)))
 
@@ -308,10 +308,10 @@
  (action
   (write-file
    %{targets}
-   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY\"\nlet name = Tezos_protocol_environment_023_PtSEouLo.Name.name\ninclude Tezos_raw_protocol_023_PtSEouLo\ninclude Tezos_raw_protocol_023_PtSEouLo.Main\n")))
+   "\nlet hash = Tezos_crypto.Hashed.Protocol_hash.of_b58check_exn \"PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY\"\nlet name = Tezos_protocol_environment_023_PtSEouLo.Name.name\ninclude Tezos_raw_protocol_023_PtSeouLo\ninclude Tezos_raw_protocol_023_PtSEouLo.Main\n")))
 
 (rule
- (targets tezos_protocol_023_PtSEouLo.ml)
+ (targets tezos_protocol_023_PtSeouLo.ml)
  (action
   (write-file
    %{targets}
@@ -580,17 +580,17 @@
  (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
 
 (library
- (name tezos_protocol_023_PtSEouLo_lifted)
- (public_name tezos-protocol-023-PtSEouLo.protocol.lifted)
+ (name tezos_protocol_023_PtSeouLo_lifted)
+ (public_name tezos-protocol-023-PtSeouLo.protocol.lifted)
  (instrumentation (backend bisect_ppx))
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs
-  tezos-protocol-023-PtSEouLo.protocol)
+  tezos-protocol-023-PtSeouLo.protocol)
  (flags
   (:standard)
   -nopervasives
-  -open Tezos_protocol_023_PtSEouLo)
+  -open Tezos_protocol_023_PtSeouLo)
  (modules Lifted_protocol))
 
 (rule
@@ -601,7 +601,7 @@
    "\ninclude Environment.Lift (Protocol)\nlet hash = Protocol.hash\n")))
 
 (library
- (name tezos_protocol_023_PtSEouLo_functor)
+ (name tezos_protocol_023_PtSeouLo_functor)
  (libraries
   octez-proto-libs.protocol-environment
   octez-proto-libs.protocol-environment.sigs)
@@ -877,11 +877,11 @@
     (run %{bin:octez-protocol-compiler.octez-protocol-packer} %{src_dir})))))
 
 (library
- (name tezos_embedded_protocol_023_PtSEouLo)
- (public_name tezos-protocol-023-PtSEouLo.embedded-protocol)
+ (name tezos_embedded_protocol_023_PtSeouLo)
+ (public_name tezos-protocol-023-PtSeouLo.embedded-protocol)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))

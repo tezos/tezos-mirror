@@ -10,14 +10,14 @@
   octez-libs.base
   octez-libs.base-test-helpers
   octez-libs.micheline
-  octez-protocol-023-PtSEouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.client
   octez-shell-libs.client-base
-  tezos-protocol-023-PtSEouLo.parameters
+  tezos-protocol-023-PtSeouLo.parameters
   octez-proto-libs.protocol-environment
   octez-libs.stdlib-unix
-  tezos-protocol-023-PtSEouLo.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   octez-libs.test-helpers
-  octez-protocol-023-PtSEouLo-libs.test-helpers
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   octez-alcotezt
   octez-l2-libs.scoru-wasm-helpers
   octez-libs.stdlib
@@ -33,8 +33,8 @@
   -open Tezos_base_test_helpers
   -open Tezos_micheline
   -open Tezos_client_023_PtSEouLo
-  -open Tezos_protocol_023_PtSEouLo_parameters
-  -open Tezos_protocol_023_PtSEouLo
+  -open Tezos_protocol_023_PtSeouLo_parameters
+  -open Tezos_protocol_023_PtSeouLo
   -open Tezos_test_helpers
   -open Tezos_023_PtSEouLo_test_helpers
   -open Octez_alcotezt
@@ -94,7 +94,7 @@
 
 (rule
  (alias runtest)
- (package tezos-protocol-023-PtSEouLo-tests)
+ (package tezos-protocol-023-PtSeouLo-tests)
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 
