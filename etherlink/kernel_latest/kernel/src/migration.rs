@@ -360,6 +360,11 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        // ///////////////////////////////////////////////////////////////////////////////// //
+        // PREVIOUS MIGRATIONS SHOULD NOT BE CHANGED AS THEY HAVE BEEN DEPLOYED ON ETHERLINK //
+        //                                      MAINNET                                      //
+        //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
+        // ///////////////////////////////////////////////////////////////////////////////// //
         StorageVersion::V34 => {
             if is_revm_enabled(host)? {
                 // Add anything that's needed for the REVM migration, in particular
