@@ -2,7 +2,7 @@ Mempool
 =======
 
 The economic protocol provides a :package-api:`protocol-side mempool
-module<tezos-protocol-023-PtSEouLo/Tezos_raw_protocol_023_PtSEouLo/Mempool_validation/index.html>`
+module<tezos-protocol-023-PtSeouLo/Tezos_raw_protocol_023_PtSeouLo/Mempool_validation/index.html>`
 data structure intended for use by the shell prevalidator (see
 :doc:`../shell/prevalidation`) and by ``octez-baker`` to incrementally accumulate operations
 that can be safely used to bake a new block.
