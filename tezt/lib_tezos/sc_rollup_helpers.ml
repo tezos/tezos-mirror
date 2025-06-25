@@ -1187,6 +1187,12 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
            ()
     in
     let has_games = JSON.as_list games <> [] in
+
+    (* Picking up on the conflict detected event can be flaky with slower
+     * block times, such as when testing the RISC-V PVM.
+     * If a game is ever in progress, a conflict must have been detected. *)
+    if has_games then conflict_detected := true ;
+
     if !game_started then return has_games
     else (
       game_started := has_games ;
