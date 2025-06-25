@@ -817,7 +817,7 @@ function update_protocol_tests() {
     ocamlformat -i src/lib_scoru_wasm/test/test_protocol_migration.ml
 
     sed -e "s/let proto_${protocol_source}_name = .*/let proto_${label}_name = \"${label}_${version}\"/" -i.old src/lib_scoru_wasm/constants.ml
-    ocamlformat -i src/lib_scoru_wasm/constants.ml
+    ocamlformat -i src/lib_scoru_wasm/constant.ml
 
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.mli
@@ -1006,7 +1006,7 @@ function generate_regression_test() {
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                  *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -2086,6 +2086,21 @@ function hash() {
   ocamlformat -i src/bin_testnet_scenarios/*.ml
   commit_if_changes "tezt: fix testnets_scenarios"
 
+  # fix tezt/lib_tezos/constants.ml
+  # replace short hash in Uses.make ~tag:"baker_<uncapitalized short hash>" ~path:"./octez-baker-<short hash>" ()
+  echo "Adding new protocol baker"
+  # print all used variables for debug
+  echo "source_short_hash: ${source_short_hash}"
+  echo "short_hash: ${short_hash}"
+  echo "tezos_protocol_source: ${tezos_protocol_source}"
+  echo "new_tezos_protocol: ${new_tezos_protocol}"
+  sed -e "s/baker_${source_short_hash}/baker_${short_hash}/g" \
+    -e "s/octez-baker-${source_short_hash}/octez-baker-${short_hash}/g" \
+    -e "s/octez-baker-${tezos_protocol_source}/octez-baker-${new_tezos_protocol}/g" \
+    -i tezt/lib_tezos/constant.ml
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: replace baker in constant.ml"
+
   #fix other tests:
   sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
     -e "s/${previous_variant}/${new_variant}/g" -i tezt/tests/*.ml
@@ -2109,10 +2124,16 @@ function hash() {
     regression_source_name="${regression_source_name}-"
   done
 
+  search_name="*${regression_source_name}*.out"
+
+  echo "search_name: ${search_name}"
+
   # shellcheck disable=SC2001
-  find . -type f -name "*${alpha_regression}*.out" | while read -r FILE; do
-    ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
+  find . -type f -name "${search_name}" | while read -r FILE; do
+    ORIG_FILENAME=${FILE}
+    echo "Processing file: ${ORIG_FILENAME}"
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    echo "New filename: ${NEW_FILENAME}"
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -2127,6 +2148,8 @@ function hash() {
     orig_filename=$(dirname "${ORIG_FILENAME}")/"${orig_filename}".out
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
+    echo "Renaming ${orig_filename} to ${NEW_FILENAME}"
+
     if [[ "${orig_filename}" != "${NEW_FILENAME}" ]]; then
       ## if $FILE exists
       if [[ -f "${orig_filename}" ]]; then
@@ -2135,6 +2158,9 @@ function hash() {
       else
         echo "File ${orig_filename} does not exist"
       fi
+    else
+      echo "File ${orig_filename} already has the correct name"
+      update_files "${NEW_FILENAME}"
     fi
 
   done
@@ -2151,8 +2177,8 @@ function hash() {
 
     # if ${capitalized_label} exist in raw_context.ml, reset weeklynet regression test
     if grep -q "${capitalized_label}" src/proto_alpha/lib_protocol/raw_context.ml; then
-      log_blue "${capitalized_label} is an alph predecessor, reset weeklynet regression test"
-      dune exec tezt/tests/main.exe -- --file tezt/tests/protocol_migration.ml --title 'Alpha: weeklynet regression test' --reset-regressions
+      log_blue "${capitalized_label} is an alpha predecessor, reset weeklynet regression test"
+      dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
       commit_if_changes "tezt: reset weeklynet regression test"
     fi
   fi
