@@ -331,6 +331,10 @@
     /* Enable or disable opentelemetry profiling */
     { /* detailed_opentelemetry_config */
       "enable"?: boolean /* Enable opentelemetry profiling */,
+      "instance_id"?:
+        $unistring
+        /* Instance id to identify the node in Opentelemetry traces. Takes
+           precedence over <data_dir>/telemetry_id. */,
       "debug"?: boolean /* Enable debug mode */,
       "url_traces"?: $unistring /* URL to send traces */,
       "headers"?:
