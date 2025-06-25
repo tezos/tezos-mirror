@@ -371,8 +371,6 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
 let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
     ?tez_bootstrap_contracts scenario protocols =
   register_all
-    ~enable_tx_queue:Evm_node.(Enable false)
-      (*Tx queue is not yet compatible with tezlink *)
     ~kernels:[Kernel.Latest]
     ~title
     ~tags:("tezlink" :: tags)
@@ -748,8 +746,6 @@ let test_tezlink_constants =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
-      ~enable_tx_queue:(Enable false)
-        (* Tezlink is not yet compatible with the tx_queue *)
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())
@@ -10871,8 +10867,6 @@ let test_describe_endpoint =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
-      ~enable_tx_queue:(Enable false)
-        (* Tezlink is not yet compatible with the tx_queue *)
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())

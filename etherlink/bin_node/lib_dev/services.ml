@@ -488,7 +488,7 @@ let process_trace_result trace =
       rpc_error (Rpc_errors.internal_error msg)
 
 let dispatch_request (type f) ~websocket
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (validation : Validate.validation_mode)
     (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
@@ -1065,7 +1065,7 @@ let dispatch_request (type f) ~websocket
   Lwt.return JSONRPC.{value; id}
 
 let dispatch_private_request (type f) ~websocket
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc_server_family : f Rpc_types.rpc_server_family)
     (rpc : Configuration.rpc) (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production

@@ -288,7 +288,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     | Some private_endpoint, _ ->
         let forward_request =
           container_forward_request
-            ~chain_family:L2_types.EVM
+            ~chain_family
             ~keep_alive:config.keep_alive
             ~public_endpoint:evm_node_endpoint
             ~private_endpoint
@@ -296,15 +296,13 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
 
         return (false, forward_request)
     | None, Some tx_queue_config ->
-        let start, tx_container =
-          Tx_queue.tx_container ~chain_family:L2_types.EVM
-        in
+        let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
           start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
         in
         return (false, tx_container)
     | None, None ->
-        let tx_container = Tx_pool.tx_container in
+        let*? tx_container = Tx_pool.tx_container ~chain_family in
         let* () =
           Tx_pool.start
             ~tx_pool_parameters:

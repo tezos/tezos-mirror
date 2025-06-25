@@ -188,17 +188,21 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
      Tx_queue is configured.
 
      TODO: simplify start_tx_container when removing the Tx_pool. *)
-  let start_tx_container, tx_container =
+  let*? start_tx_container, tx_container =
+    let open Result_syntax in
     match configuration.experimental_features.enable_tx_queue with
     | Some tx_queue_config ->
         let start, tx_container = Tx_queue.tx_container ~chain_family:EVM in
-        ( (fun ~tx_pool_parameters:_ ->
-            start
-              ~config:tx_queue_config
-              ~keep_alive:configuration.keep_alive
-              ()),
-          tx_container )
-    | None -> (Tx_pool.start, Tx_pool.tx_container)
+        return
+          ( (fun ~tx_pool_parameters:_ ->
+              start
+                ~config:tx_queue_config
+                ~keep_alive:configuration.keep_alive
+                ()),
+            tx_container )
+    | None ->
+        let* tx_container = Tx_pool.tx_container ~chain_family:EVM in
+        return (Tx_pool.start, tx_container)
   in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
