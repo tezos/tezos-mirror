@@ -52,7 +52,7 @@ let validate_gas_limit ~storage_version
       ~gas_limit:transaction.gas_limit
       transaction.data
   in
-  if storage_version < 35 then
+  if storage_version < 34 then
     if Compare.Z.(execution_gas_limit <= maximum_gas_limit) then return (Ok ())
     else
       return

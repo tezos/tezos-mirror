@@ -16,7 +16,7 @@ let ticks_constants =
 
 let gas_constants version =
   let capacity, alpha =
-    if version < 36 (* Dionysus or before *) then (4_000_000, 0.000_000_007)
+    if version < 35 (* Dionysus or before *) then (4_000_000, 0.000_000_007)
     else (8_000_000, 0.000_000_004)
   in
   {target = Z.of_int (capacity / 2); alpha}
