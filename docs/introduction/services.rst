@@ -80,18 +80,26 @@ Setting up baking keys
 The most important preliminary step for running a baker is setting up a baker account having enough :doc:`baking power <../active/baking_power>` (typically, possessing more than 6000 tez).
 We don't cover here the optional set up of an associated :ref:`consensus key <consensus_key_details>` and/or :ref:`companion key <companion_key>`.
 
-If you intend to bake on a testnet, you can simply create a key with the following command::
+If you intend to bake on a testnet, you can simply create a key as follows, fund it, and configure the :doc:`DAL node <../shell/dal_node>` to use it::
 
    $ sudo su tezos -c "octez-client gen keys mybaker"
+   $ sudo su tezos -c "octez-client show address mybaker"
+   Hash: tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39
+   Public Key: edpkuGRKH8oZDP2PH2EULw9PGzJHdf5g2zCiHnaYG7tapeePUNAWeC
+   
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ sudo su tezos -c "octez-client register key mybaker as delegate"
+   $ sudo su tezos -c "octez-client stake 6000 for mybaker"
+   $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39"
 
-and the baker will use it automatically. Indeed, the baker bakes for all the keys for which it has the private key. If you want to avoid this behavior, you can specify a specific baking key by editing the file /etc/default/octez-baker and assigning a value to variable BAKER_KEY.
+The baker will use the baking key automatically. Indeed, the baker bakes for all the keys for which it has the private key. If you want to avoid this behavior, you can specify a specific baking key by editing the file /etc/default/octez-baker and assigning a value to variable BAKER_KEY.
 
 When baking on a testnet, you may skip the following section on configuring the signer, and directly start the baker.
 
 Configuring the signer
 ~~~~~~~~~~~~~~~~~~~~~~
 
-If you intend to bake on mainnet, we highly recommend using the Octez signer, because of the sensitive nature of the private keys needed by the baker to function.
+If you rather intend to bake on mainnet, we highly recommend using the Octez signer, because of the sensitive nature of the private keys needed by the baker to function.
 You may of course use the signer on a testnet, too, although this is less crucial.
 
 To configure the octez-signer, first, logged as the user chosen to run the
@@ -148,9 +156,9 @@ scenarios.
 
 For more advanced configurations, see the :ref:`signer guide <signer>`.
 
-Now that the signer is running, we need to configure the baker for using the signer.
+Now that the signer is running, we need to fund the baking address and configure the baker and the :doc:`DAL node <../shell/dal_node>` to use it.
 Since the baker runs as the user ``tezos``, we use ``sudo su tezos -c`` to wrap
-the configuration command below:
+the configuration commands below:
 
 .. code:: shell
 
@@ -160,18 +168,15 @@ the configuration command below:
    Public Key: edpkvGAz71r8SZomcvF7LGajXT3AnhYX9CrmK3JWgA2xk8rf8CudY8
 
    # Configure the baker to use the remote signer
-   sudo su tezos -c "octez-client -R tcp://localhost:7732 \
+   $ sudo su tezos -c "octez-client -R tcp://localhost:7732 \
       import secret key mybaker remote:tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
+   $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
+   $ sudo su tezos -c "octez-client -R tcp://localhost:7732 register key mybaker as delegate"
+   $ sudo su tezos -c "octez-client -R tcp://localhost:7732 stake 6000 for mybaker"
+   $ sudo su tezos -c "octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles=tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
 Starting the baker
 ------------------
-
-Before starting the baker, we have to manually fund the address ``mybaker`` and register it as a delegate. Typically::
-
-   ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
-   sudo su tezos -c "octez-client register key mybaker as delegate"
-   sudo su tezos -c "octez-client stake 6000 for mybaker"
-   sudo su tezos -c "octez-dal-node config update --endpoint http://127.0.0.1:8732 --attester-profiles=tz1V7TgBR52wAjjqsh24w8y9CymFGdegt9qs"
 
 Now that everything is in place, we can start the Octez baker.
 
@@ -181,7 +186,7 @@ Now that everything is in place, we can start the Octez baker.
 
 This service will automatically start all accusers and bakers for all protocols
 shipped with the package.
-It will also start a :doc:`DAL node <../shell/dal_node>` alongside the baker, which is the recommended setting for all bakers.
+It will also start the DAL node alongside the baker, which is the recommended setting for all bakers.
 The DAL node is run in a default configuration, that is, in controller mode without any profile; you may edit file ``/etc/default/octez-dal-node`` or use commands such as ``sudo su tezos -c "octez-dal-node config ..."`` to set up another configuration, refer to page :doc:`../shell/dal_node`.
 
 The logs of the baker are available in ``/var/log/tezos/baker-<protocol name>.log``.
