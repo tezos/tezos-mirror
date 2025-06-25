@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (d0769d42)"
+    "version": "Octez 21.0~rc3+dev (c249b2fa)"
   },
   "paths": {
     "/": {
@@ -18373,15 +18373,21 @@
                         },
                         "consensus_pkh": {
                           "$ref": "#/components/schemas/Signature.Public_key_hash"
+                        },
+                        "consensus_power": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
                         }
                       },
                       "required": [
                         "delegate",
-                        "consensus_pkh"
+                        "consensus_pkh",
+                        "consensus_power"
                       ]
                     }
                   },
-                  "consensus_power": {
+                  "total_consensus_power": {
                     "type": "integer",
                     "minimum": -1073741824,
                     "maximum": 1073741823
@@ -18389,7 +18395,7 @@
                 },
                 "required": [
                   "committee",
-                  "consensus_power"
+                  "total_consensus_power"
                 ]
               }
             },
@@ -18457,15 +18463,21 @@
                         },
                         "consensus_pkh": {
                           "$ref": "#/components/schemas/Signature.Public_key_hash"
+                        },
+                        "consensus_power": {
+                          "type": "integer",
+                          "minimum": -1073741824,
+                          "maximum": 1073741823
                         }
                       },
                       "required": [
                         "delegate",
-                        "consensus_pkh"
+                        "consensus_pkh",
+                        "consensus_power"
                       ]
                     }
                   },
-                  "consensus_power": {
+                  "total_consensus_power": {
                     "type": "integer",
                     "minimum": -1073741824,
                     "maximum": 1073741823
@@ -18473,7 +18485,7 @@
                 },
                 "required": [
                   "committee",
-                  "consensus_power"
+                  "total_consensus_power"
                 ]
               }
             },
