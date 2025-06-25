@@ -297,6 +297,9 @@ gitlab:publish:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 trigger:octez_monitoring:
   stage: build

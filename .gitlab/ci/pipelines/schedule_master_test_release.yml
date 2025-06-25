@@ -300,6 +300,9 @@ gitlab:publish:
   - ${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh --dry-run
   variables:
     CI_COMMIT_TAG: octez-v0.0
+  id_tokens:
+    GCP_ID_TOKEN:
+      aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 trigger:octez_monitoring:
   stage: build
