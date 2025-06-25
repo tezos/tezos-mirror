@@ -72,7 +72,7 @@ local graph = base.graph;
                                  + query.prometheus.withLegendFormat(receivedUnknown);
     local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_messages' + base.node_instance_query + '[1m])')
                       + query.prometheus.withLegendFormat(sent);
-    graph.new('Average sent & received app messages (1-minute interval)', [receivedValidQuery, receivedInvalidQuery, receivedUnknownQuery, sentQuery], h, w, x, y)
+    graph.new('Average sent & received app messages per second (over 1min)', [receivedValidQuery, receivedInvalidQuery, receivedUnknownQuery, sentQuery], h, w, x, y)
     + graph.withQueryColor([[receivedValid, 'green'], [receivedInvalid, 'red'], [receivedUnknown, 'orange'], [sent, 'blue']]),
 
   sentOtherMessagesDeriv(h, w, x, y):
@@ -88,7 +88,7 @@ local graph = base.graph;
                         + query.prometheus.withLegendFormat(ihaves);
     local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_sent_iwants' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(iwants);
-    graph.new('Average sent control & metadata messages (1-minute interval)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
+    graph.new('Average sent control & metadata messages per second (over 1min)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
     + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
 
   receivedOtherMessagesDeriv(h, w, x, y):
@@ -104,7 +104,7 @@ local graph = base.graph;
                         + query.prometheus.withLegendFormat(ihaves);
     local iwantsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_count_received_iwants' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(iwants);
-    graph.new('Average received control & metadata messages (1-minute interval)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
+    graph.new('Average received control & metadata messages per second (over 1min)', [graftsQuery, prunesQuery, ihavesQuery, iwantsQuery], h, w, x, y)
     + graph.withQueryColor([[grafts, 'blue'], [prunes, 'yellow'], [ihaves, 'purple'], [iwants, 'magenta']]),
 
   scoresOfPeers(h, w, x, y):

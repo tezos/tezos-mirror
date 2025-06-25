@@ -55,7 +55,7 @@ local graph = base.graph;
     local shards = 'Stored shards';
     local shardsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_number_of_stored_shards' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(shards);
-    graph.new('The shards stored by this node (1-minute interval)', [shardsQuery], h, w, x, y)
+    graph.new('The number of shards stored per second (over 1min)', [shardsQuery], h, w, x, y)
     + graph.withQueryColor([[shards, 'blue']]),
 
   slotsAttesatationSummary(h, w, x, y):
