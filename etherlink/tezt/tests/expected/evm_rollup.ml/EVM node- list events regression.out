@@ -1702,6 +1702,20 @@ rollup_node_follower_trying_reconnection:
     { /* rollup_node_follower_trying_reconnection version 0 */
       "rollup_node_follower_trying_reconnection.v0": number }
   
+rpc_call_fallback:
+  description: using fallback for unavailable RPC service {service} because {error}
+  level: warning
+  section: evm_node.dev
+  json format:
+    { /* rpc_call_fallback version 0 */
+      "rpc_call_fallback.v0": { "service": $unistring,
+                                "error": any } }
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 rpc_server_error:
   description: RPC server error: {exception}
   level: error
