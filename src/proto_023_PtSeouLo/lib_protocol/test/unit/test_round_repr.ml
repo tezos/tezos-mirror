@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_023_PtSeouLo/lib_protocol/test/unit/main.exe \
                   -- --file test_round_repr.ml
     Subject:      test the Round_repr module
 *)

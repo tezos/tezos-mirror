@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:  Protocol (quantities)
-    Invocation: dune exec src/proto_023_PtSEouLo/lib_protocol/test/unit/main.exe \
+    Invocation: dune exec src/proto_023_PtSeouLo/lib_protocol/test/unit/main.exe \
                   -- --file test_slashing_percentage.ml
     Subject:    On slashing double attestations.
 *)

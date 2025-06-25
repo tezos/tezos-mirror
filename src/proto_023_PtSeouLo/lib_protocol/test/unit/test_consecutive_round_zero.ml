@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/unit/main.exe \
+    Invocation:   dune exec src/proto_023_PtSeouLo/lib_protocol/test/unit/main.exe \
                   -- --file test_consecutive_round_zero.ml
     Subject:      test consecutive_round_zero which corresponds to the number
                   of blocks consecutively baked at round zero.

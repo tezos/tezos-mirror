@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/pbt/main.exe \
+    Invocation:   dune exec src/proto_023_PtSeouLo/lib_protocol/test/pbt/main.exe \
                   -- --file test_merkle_list.ml
     Subject:      Tx rollup l2 encoding
 *)

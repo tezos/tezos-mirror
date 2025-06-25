@@ -8,7 +8,7 @@
 (** Testing
     -------
     Component:    Protocol (double baking)
-    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/consensus/main.exe \
+    Invocation:   dune exec src/proto_023_PtSeouLo/lib_protocol/test/integration/consensus/main.exe \
                   -- --file test_dal_entrapment.ml
 
     Subject:      A DAL entrapment operation may be injected when it has been observed that

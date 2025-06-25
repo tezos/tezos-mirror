@@ -9,7 +9,7 @@
 (** Testing
     -------
     Component:    Tickets, direct spending from implicit accounts
-    Invocation:   dune exec src/proto_023_PtSEouLo/lib_protocol/test/integration/michelson/main.exe \
+    Invocation:   dune exec src/proto_023_PtSeouLo/lib_protocol/test/integration/michelson/main.exe \
                    -- --file test_ticket_direct_spending.ml
     Subject:      Test direct spending of tickets from implicit accounts
 *)
