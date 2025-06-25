@@ -7,7 +7,7 @@ architectures='x86_64 arm64'
 
 # Full octez release tag
 # octez-smart-rollup-node-vX.Y, octez-smart-rollup-node-vX.Y-rcZ or octez-smart-rollup-node-vX.Y-betaZ
-gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-smart-rollup-node-v([0-9]+)\.([0-9]+)$' || :)
+gitlab_release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^octez-smart-rollup-node-v[0-9]+(\.[0-9]+)?(-(rc|beta)([0-9]+))?$' || :)
 
 # Strips the leading 'octez-smart-rollup-node-v'
 # X.Y, X.Y-rcZ or X.Y-betaZ
@@ -18,27 +18,26 @@ gitlab_release_no_v=$(echo "${gitlab_release}" | sed -e 's/^octez-smart-rollup-n
 # shellcheck disable=SC2034
 gitlab_release_no_dot=$(echo "${gitlab_release_no_v}" | sed -e 's/\./-/g')
 
-# X
-gitlab_release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\1/p')
-# Y
-gitlab_release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\2/p')
-# Z
-gitlab_release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\4/p')
+# shellcheck disable=SC2034
+gitlab_release_tilda=$(echo "${gitlab_release_no_v}" | sed -e 's/-/~/g')
+
+# RC
+gitlab_release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v[0-9]+(\.[0-9]+)?(-rc)?([0-9]+)?$/\3/p')
 # Beta
-gitlab_release_beta_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v([0-9]+)\.([0-9]+)(-beta)?([0-9]+)?$/\4/p')
+gitlab_release_beta_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^octez-smart-rollup-node-v[0-9]+(\.[0-9]+)?(-beta)?([0-9]+)?$/\3/p')
 
 # Is this a release candidate?
 if [ -n "${gitlab_release_rc_version}" ]; then
   # Yes, release name: X.Y~rcZ
   # shellcheck disable=SC2034
-  gitlab_release_name="Octez Smart Rollup Node Release Candidate ${gitlab_release_major_version}.${gitlab_release_minor_version}~rc${gitlab_release_rc_version}"
+  gitlab_release_name="Octez Smart Rollup Node Release Candidate ${gitlab_release_tilda}"
 # Is this a beta ?
 elif [ -n "${gitlab_release_beta_version}" ]; then
-  gitlab_release_name="Octez Smart Rollup Node Beta ${gitlab_release_major_version}.${gitlab_release_minor_version}~beta${gitlab_release_beta_version}"
+  gitlab_release_name="Octez Smart Rollup Node Beta ${gitlab_release_tilda}"
 else
   # No, release name: Octez SMART-ROLLUP Node Release X.Y
   # shellcheck disable=SC2034
-  gitlab_release_name="Octez Smart Rollup Node Release ${gitlab_release_major_version}.${gitlab_release_minor_version}"
+  gitlab_release_name="Octez Smart Rollup Node Release ${gitlab_release_tilda}"
 fi
 
 ### Compute GitLab generic package names
