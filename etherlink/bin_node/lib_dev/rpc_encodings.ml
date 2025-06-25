@@ -843,6 +843,20 @@ module Inject_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Inject_tezlink_operation = struct
+  type input = Tezos_types.Operation.t * bytes
+
+  type output = Ethereum_types.hash
+
+  let input_encoding = Data_encoding.(tup2 Tezos_types.Operation.encoding bytes)
+
+  let output_encoding = Ethereum_types.hash_encoding
+
+  let method_ = "injectTezlinkOperation"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Durable_state_value = struct
   type input =
     Durable_storage_path.path * Ethereum_types.Block_parameter.extended
@@ -1181,6 +1195,7 @@ let multichain_sequencer_supported_methods : (module METHOD) list =
     (* Private RPCs *)
     (module Produce_block);
     (module Inject_transaction);
+    (module Inject_tezlink_operation);
     (module Durable_state_value);
     (module Durable_state_subkeys);
     (module Replay_block);

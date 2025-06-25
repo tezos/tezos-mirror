@@ -307,6 +307,11 @@ module Inject_transaction :
     with type input = Ethereum_types.legacy_transaction_object * string
      and type output = Ethereum_types.hash
 
+module Inject_tezlink_operation :
+  METHOD
+    with type input = Tezos_types.Operation.t * bytes
+     and type output = Ethereum_types.hash
+
 module Durable_state_value :
   METHOD
     with type input =

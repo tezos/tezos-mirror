@@ -1194,6 +1194,37 @@ let dispatch_private_request (type f) ~websocket
                   rpc_error (Rpc_errors.transaction_rejected reason None))
         in
         build_with_input ~f module_ parameters
+    | Method (Inject_tezlink_operation.Method, module_) ->
+        let open Lwt_result_syntax in
+        let f ((op : Tezos_types.Operation.t), raw_op) =
+          Octez_telemetry.Trace.(
+            add_attrs (fun () ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/8014
+                   Add an attribute for Tezlink operations (in base58)
+                   instead of reusing the Etherlink hexadecimal
+                   identifier. *)
+                Telemetry.Attributes.
+                  [Transaction.hash (Tezos_types.Operation.hash_operation op)])) ;
+          let* hash =
+            let* (module Tx_container) =
+              match tx_container with
+              | Evm_tx_container _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Etherlink: \
+                     injectTezlinkOperation"
+              | Michelson_tx_container m -> return m
+            in
+            Tx_container.add
+              ~next_nonce:(Ethereum_types.Qty op.counter)
+              op
+              ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
+          in
+          match hash with
+          | Ok hash -> rpc_ok hash
+          | Error reason ->
+              rpc_error (Rpc_errors.transaction_rejected reason None)
+        in
+        build_with_input ~f module_ parameters
     | Method (Durable_state_value.Method, module_) ->
         let f (path, block) =
           let open Lwt_result_syntax in

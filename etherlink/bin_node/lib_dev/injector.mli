@@ -22,6 +22,13 @@ val inject_transaction :
   raw_tx:string ->
   (Ethereum_types.hash, string) result tzresult Lwt.t
 
+val inject_tezlink_operation :
+  keep_alive:bool ->
+  base:Uri.t ->
+  op:Tezos_types.Operation.t ->
+  raw_op:bytes ->
+  (Ethereum_types.hash, string) result tzresult Lwt.t
+
 val get_transaction_count :
   keep_alive:bool ->
   base:Uri.t ->
