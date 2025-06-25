@@ -2042,6 +2042,36 @@ module Anonymous = struct
         | Attestations_aggregate {consensus_content; _} ) ->
         consensus_content
 
+  let check_no_duplicates_in_committee_preattestation committee
+      error_if_duplicate =
+    let open Result_syntax in
+    let* (_ : Slot.Set.t) =
+      List.fold_left_e
+        (fun seen_slots slot ->
+          let* () =
+            error_when (Slot.Set.mem slot seen_slots) error_if_duplicate
+          in
+          return (Slot.Set.add slot seen_slots))
+        Slot.Set.empty
+        committee
+    in
+    return_unit
+
+  let check_no_duplicates_in_committee_attestation committee error_if_duplicate
+      =
+    let open Result_syntax in
+    let* (_ : Slot.Set.t) =
+      List.fold_left_e
+        (fun seen_slots (slot, (_ : dal_content option)) ->
+          let* () =
+            error_when (Slot.Set.mem slot seen_slots) error_if_duplicate
+          in
+          return (Slot.Set.add slot seen_slots))
+        Slot.Set.empty
+        committee
+    in
+    return_unit
+
   let check_double_consensus_operation_evidence vi
       (operation : Kind.double_consensus_operation_evidence operation) =
     let open Lwt_result_syntax in
@@ -2070,7 +2100,8 @@ module Anonymous = struct
          they must be either a standalone (pre)attestation for [slot],
          or an aggregate whose committee includes [slot]. *)
       let open Result_syntax in
-      let check_slot (type a) (op : a Kind.consensus Operation.t) =
+      let check_slot_and_committee (type a) (op : a Kind.consensus Operation.t)
+          =
         match op.protocol_data.contents with
         | Single (Preattestation consensus_content)
         | Single (Attestation {consensus_content; _}) ->
@@ -2078,16 +2109,26 @@ module Anonymous = struct
               Slot.(consensus_content.slot = slot)
               (Invalid_denunciation kind)
         | Single (Preattestations_aggregate {committee; _}) ->
-            error_unless
-              (List.mem ~equal:Slot.equal slot committee)
+            let* () =
+              error_unless
+                (List.mem ~equal:Slot.equal slot committee)
+                (Invalid_denunciation kind)
+            in
+            check_no_duplicates_in_committee_preattestation
+              committee
               (Invalid_denunciation kind)
         | Single (Attestations_aggregate {committee; _}) ->
-            error_unless
-              (List.mem_assoc ~equal:Slot.equal slot committee)
+            let* () =
+              error_unless
+                (List.mem_assoc ~equal:Slot.equal slot committee)
+                (Invalid_denunciation kind)
+            in
+            check_no_duplicates_in_committee_attestation
+              committee
               (Invalid_denunciation kind)
       in
-      let* () = check_slot op1 in
-      check_slot op2
+      let* () = check_slot_and_committee op1 in
+      check_slot_and_committee op2
     in
     let*? () =
       (* For the double operations to be punishable, they must have at
