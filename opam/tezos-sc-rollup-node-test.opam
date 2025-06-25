@@ -18,9 +18,9 @@ depends: [
   "octez-protocol-022-PsRiotum-libs" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
   "octez-alcotezt" {with-test}
-  "tezos-protocol-023-PtSEouLo" {with-test}
-  "octez-protocol-023-PtSEouLo-libs" {with-test}
-  "octez-smart-rollup-node-PtSEouLo" {with-test}
+  "tezos-protocol-023-PtSeouLo" {with-test}
+  "octez-protocol-023-PtSeouLo-libs" {with-test}
+  "octez-smart-rollup-node-PtSeouLo" {with-test}
   "tezos-protocol-alpha" {with-test}
   "octez-protocol-alpha-libs" {with-test}
   "octez-smart-rollup-node-alpha" {with-test}

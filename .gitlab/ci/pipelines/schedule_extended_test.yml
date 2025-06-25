@@ -1391,9 +1391,9 @@ opam:all_1:
     matrix:
     - package:
       - octez-smart-rollup-node-alpha
-      - octez-smart-rollup-node-PtSEouLo
+      - octez-smart-rollup-node-PtSeouLo
       - octez-smart-rollup-node-PsRiotum
-      - octez-protocol-023-PtSEouLo-libs
+      - octez-protocol-023-PtSeouLo-libs
       - octez-protocol-022-PsRiotum-libs
 
 opam:all_3:
@@ -1652,10 +1652,10 @@ opam:exec_1:
       - octez-dal-node
       - octez-codec
       - octez-client
-      - octez-baker-PtSEouLo
+      - octez-baker-PtSeouLo
       - octez-baker-PsRiotum
       - octez-baker
-      - octez-accuser-PtSEouLo
+      - octez-accuser-PtSeouLo
       - octez-accuser-PsRiotum
       - octez-accuser
 
@@ -1713,7 +1713,7 @@ opam:all_5:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-023-PtSEouLo
+      - tezos-protocol-023-PtSeouLo
       - tezos-protocol-022-PsRiotum
       - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC

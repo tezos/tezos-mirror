@@ -3,9 +3,70 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (d0769d42)"
+    "version": "Octez 21.0~rc3+dev (c249b2fa)"
   },
   "paths": {
+    "/bls/aggregate_proofs": {
+      "post": {
+        "description": "Aggregate BLS proofs. Return null if the provided proofs cannot be aggregated, or if their aggregation is not a valid proof for the provided public key.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "proofs": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Bls12_381_signature"
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "proofs"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "nullable": true,
+                  "oneOf": [
+                    {
+                      "title": "Some",
+                      "oneOf": [
+                        {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "An error trace. The full list of errors is available with the global RPC `GET errors`"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/bls/aggregate_public_keys": {
       "post": {
         "description": "Aggregate BLS public keys after checking their BLS proofs",
@@ -77,15 +138,32 @@
     },
     "/bls/aggregate_signatures": {
       "post": {
-        "description": "Aggregate BLS signatures",
+        "description": "Aggregate BLS signatures. Return null if the signatures cannot be aggregated, or if their aggregation is not a valid signature for the provided public key and message.",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/Bls12_381_signature"
-                }
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
+                  },
+                  "message": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  },
+                  "signature_shares": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Bls12_381_signature"
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "message",
+                  "signature_shares"
+                ]
               }
             }
           }
@@ -179,24 +257,41 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "integer",
-                      "minimum": -128,
-                      "maximum": 127
-                    },
-                    "signature": {
-                      "$ref": "#/components/schemas/Bls12_381_signature"
-                    }
+                "type": "object",
+                "properties": {
+                  "public_key": {
+                    "$ref": "#/components/schemas/Bls12_381.Public_key"
                   },
-                  "required": [
-                    "id",
-                    "signature"
-                  ]
-                }
+                  "message": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  },
+                  "signature_shares": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": -128,
+                          "maximum": 127
+                        },
+                        "signature": {
+                          "$ref": "#/components/schemas/Bls12_381_signature"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "signature"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "public_key",
+                  "message",
+                  "signature_shares"
+                ]
               }
             }
           }
@@ -8558,10 +8653,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "description": "Registered backend.",
+                  "description": "Registered backends.",
                   "type": "object",
                   "properties": {
-                    "registered_backend": {
+                    "registered_backends": {
                       "type": "array",
                       "items": {
                         "oneOf": [
@@ -8605,7 +8700,7 @@
                     }
                   },
                   "required": [
-                    "registered_backend",
+                    "registered_backends",
                     "backends"
                   ]
                 }

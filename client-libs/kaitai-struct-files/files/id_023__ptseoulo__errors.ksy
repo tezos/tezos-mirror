@@ -2,7 +2,7 @@ meta:
   id: id_023__ptseoulo__errors
   endian: be
 doc: ! >-
-  Encoding id: 023-PtSEouLo.errors
+  Encoding id: 023-PtSeouLo.errors
 
   Description: The full list of RPC errors would be too long to include. It is
 

@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__receipt__balance_updates
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.receipt.balance_updates'
+doc: ! 'Encoding id: 023-PtSeouLo.receipt.balance_updates'
 types:
   commitments:
     seq:

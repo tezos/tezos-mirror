@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__contract
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.contract'
+doc: ! 'Encoding id: 023-PtSeouLo.contract'
 types:
   id_023__ptseoulo__contract_id:
     seq:

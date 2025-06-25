@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__script__expr
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.script.expr'
+doc: ! 'Encoding id: 023-PtSeouLo.script.expr'
 types:
   args:
     seq:

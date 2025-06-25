@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Mempool RPC",
     "description": "The RPC API for the mempool served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (d0769d42)"
+    "version": "Octez 21.0~rc3+dev (c249b2fa)"
   },
   "paths": {
     "/ban_operation": {

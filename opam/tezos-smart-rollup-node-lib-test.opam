@@ -22,7 +22,7 @@ depends: [
   "octez-alcotezt" {with-test}
   "octez-shell-libs" {with-test}
   "octez-smart-rollup-node-PsRiotum" {with-test}
-  "octez-smart-rollup-node-PtSEouLo" {with-test}
+  "octez-smart-rollup-node-PtSeouLo" {with-test}
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob" {with-test}

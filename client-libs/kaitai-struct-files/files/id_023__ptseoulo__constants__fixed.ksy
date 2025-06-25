@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__constants__fixed
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.constants.fixed'
+doc: ! 'Encoding id: 023-PtSeouLo.constants.fixed'
 types:
   int31:
     seq:

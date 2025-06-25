@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__frozen_staker
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.frozen_staker'
+doc: ! 'Encoding id: 023-PtSeouLo.frozen_staker'
 types:
   id_023__ptseoulo__contract_id:
     seq:

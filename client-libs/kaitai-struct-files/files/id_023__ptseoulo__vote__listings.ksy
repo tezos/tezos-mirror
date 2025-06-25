@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__vote__listings
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.vote.listings'
+doc: ! 'Encoding id: 023-PtSeouLo.vote.listings'
 types:
   id_023__ptseoulo__vote__listings:
     seq:

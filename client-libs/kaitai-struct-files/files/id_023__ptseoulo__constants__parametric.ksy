@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__constants__parametric
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.constants.parametric'
+doc: ! 'Encoding id: 023-PtSeouLo.constants.parametric'
 types:
   adaptive_rewards_params:
     seq:

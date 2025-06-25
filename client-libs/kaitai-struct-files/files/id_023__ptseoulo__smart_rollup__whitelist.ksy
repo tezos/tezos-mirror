@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__whitelist
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.whitelist'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.whitelist'
 types:
   id_023__ptseoulo__smart_rollup__whitelist:
     seq:

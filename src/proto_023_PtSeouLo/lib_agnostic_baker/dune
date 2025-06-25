@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_agnostic_baker_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.agnostic-baker)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-protocol-023-PtSeouLo-libs.client
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.baking
+  octez-protocol-023-PtSeouLo-libs.baking-commands
+  octez-baker-lib)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_client_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_baking_023_PtSeouLo
+  -open Tezos_baking_023_PtSeouLo_commands
+  -open Octez_agnostic_baker))

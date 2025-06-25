@@ -3,11 +3,11 @@ dal_node_migrations	all	6
 efunc_core	all	6
 octez-accuser	exec	1
 octez-accuser-PsRiotum	exec	1
-octez-accuser-PtSEouLo	exec	1
+octez-accuser-PtSeouLo	exec	1
 octez-alcotezt	all	7
 octez-baker	exec	1
 octez-baker-PsRiotum	exec	1
-octez-baker-PtSEouLo	exec	1
+octez-baker-PtSeouLo	exec	1
 octez-baker-lib	all	2
 octez-client	exec	1
 octez-codec	exec	1
@@ -49,7 +49,7 @@ octez-protocol-019-PtParisB-libs	all	2
 octez-protocol-020-PsParisC-libs	all	2
 octez-protocol-021-PsQuebec-libs	all	2
 octez-protocol-022-PsRiotum-libs	all	1
-octez-protocol-023-PtSEouLo-libs	all	1
+octez-protocol-023-PtSeouLo-libs	all	1
 octez-protocol-alpha-libs	all	2
 octez-protocol-compiler	exec	6
 octez-protocol-compiler-compat	all	7
@@ -67,7 +67,7 @@ octez-smart-rollup-node-PsQuebec	all	2
 octez-smart-rollup-node-PsRiotum	all	1
 octez-smart-rollup-node-PtNairob	all	2
 octez-smart-rollup-node-PtParisB	all	2
-octez-smart-rollup-node-PtSEouLo	all	1
+octez-smart-rollup-node-PtSeouLo	all	1
 octez-smart-rollup-node-alpha	all	1
 octez-smart-rollup-node-lib	all	2
 octez-version	exec	6
@@ -102,7 +102,7 @@ tezos-protocol-019-PtParisB	all	5
 tezos-protocol-020-PsParisC	all	5
 tezos-protocol-021-PsQuebec	all	5
 tezos-protocol-022-PsRiotum	all	5
-tezos-protocol-023-PtSEouLo	all	5
+tezos-protocol-023-PtSeouLo	all	5
 tezos-protocol-alpha	all	6
 tezos-protocol-demo-counter	all	6
 tezos-protocol-demo-noops	all	6

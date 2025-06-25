@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__fa1__2__token_transfer
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.fa1.2.token_transfer'
+doc: ! 'Encoding id: 023-PtSeouLo.fa1.2.token_transfer'
 types:
   bytes_dyn_uint30:
     seq:

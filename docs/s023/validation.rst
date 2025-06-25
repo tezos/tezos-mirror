@@ -71,7 +71,7 @@ specified by the :package-api:`Protocol
 module in the :doc:`protocol
 environment<../shell/protocol_environment>` ``V15``, and it is
 implemented by this protocol in the
-:package-api:`Main<tezos-protocol-023-PtSEouLo/Tezos_raw_protocol_023_PtSEouLo/Main/index.html>`
+:package-api:`Main<tezos-protocol-023-PtSeouLo/Tezos_raw_protocol_023_PtSeouLo/Main/index.html>`
 module.
 
 The rest of this document is organized as follows: we first describe

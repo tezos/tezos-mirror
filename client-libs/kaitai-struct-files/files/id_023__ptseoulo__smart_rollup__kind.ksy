@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__kind
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.kind'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.kind'
 enums:
   id_023__ptseoulo__smart_rollup__kind:
     0: arith

@@ -3,7 +3,7 @@ meta:
   endian: be
   imports:
   - block_header__shell
-doc: ! 'Encoding id: 023-PtSEouLo.block_header'
+doc: ! 'Encoding id: 023-PtSeouLo.block_header'
 types:
   id_023__ptseoulo__block_header__alpha__full_header:
     seq:

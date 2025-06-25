@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__block_header__contents
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.block_header.contents'
+doc: ! 'Encoding id: 023-PtSeouLo.block_header.contents'
 types:
   id_023__ptseoulo__block_header__alpha__unsigned_contents:
     seq:

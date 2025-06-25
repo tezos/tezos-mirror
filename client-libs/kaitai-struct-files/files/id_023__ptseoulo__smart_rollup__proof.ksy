@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__proof
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.proof'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.proof'
 types:
   bytes_dyn_uint30:
     seq:

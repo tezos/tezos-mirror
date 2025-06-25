@@ -1,0 +1,44 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_dal_023_PtSeouLo)
+ (public_name octez-protocol-023-PtSeouLo-libs.dal)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-protocol-compiler.registerer
+  octez-libs.stdlib-unix
+  octez-shell-libs.shell-services
+  tezos-dal-node-lib
+  octez-protocol-023-PtSeouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.plugin
+  tezos-protocol-023-PtSeouLo.embedded-protocol
+  octez-protocol-023-PtSeouLo-libs.layer2-utils
+  tezos-protocol-023-PtSeouLo.protocol)
+ (inline_tests
+  (flags -verbose)
+  (modes native)
+  (executable (link_flags -linkall -cclib -lblst -cclib -loctez_rust_deps))
+  (libraries bls12-381.archive octez-rust-deps))
+ (preprocess (pps ppx_expect))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_protocol_registerer
+  -open Tezos_stdlib_unix
+  -open Tezos_shell_services
+  -open Tezos_dal_node_lib
+  -open Tezos_client_023_PtSeouLo
+  -open Tezos_protocol_plugin_023_PtSeouLo
+  -open Tezos_embedded_protocol_023_PtSeouLo
+  -open Tezos_layer2_utils_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))

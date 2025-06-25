@@ -5,7 +5,7 @@ meta:
   - sapling__transaction__ciphertext
   - sapling__transaction__commitment
   - sapling__transaction__nullifier
-doc: ! 'Encoding id: 023-PtSEouLo.lazy_storage_diff'
+doc: ! 'Encoding id: 023-PtSeouLo.lazy_storage_diff'
 types:
   alloc:
     seq:

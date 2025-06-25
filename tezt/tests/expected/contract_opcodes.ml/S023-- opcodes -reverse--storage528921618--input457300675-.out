@@ -1,5 +1,5 @@
 
-./octez-client --protocol PtSEouLov7Fp6XoqXUBqd7XzggUpUarSMcSUsR5MarqspqiuQBY --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/reverse.tz on storage '{""}' and input '{}' --level 1 --trace-stack
+./octez-client --protocol PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh --mode mockup --no-base-dir-warnings run script michelson_test_scripts/opcodes/reverse.tz on storage '{""}' and input '{}' --level 1 --trace-stack
 storage
   {}
 emitted operations

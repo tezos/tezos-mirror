@@ -1,0 +1,51 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_benchmarks_proto_023_PtSeouLo)
+ (public_name tezos-benchmarks-proto-023-PtSeouLo)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  str
+  octez-libs.stdlib
+  octez-libs.base
+  octez-libs.error-monad
+  tezos-protocol-023-PtSeouLo.parameters
+  octez-libs.lazy-containers
+  tezos-benchmark
+  tezos-benchmark-023-PtSeouLo
+  tezos-benchmark-type-inference-023-PtSeouLo
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-libs.crypto
+  octez-shell-libs.shell-benchmarks
+  octez-libs.micheline
+  octez-protocol-023-PtSeouLo-libs.test-helpers
+  octez-libs.tezos-sapling
+  octez-protocol-023-PtSeouLo-libs.client
+  octez-protocol-023-PtSeouLo-libs.plugin
+  octez-proto-libs.protocol-environment)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezos_stdlib
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_error_monad
+  -open Tezos_protocol_023_PtSeouLo_parameters
+  -open Tezos_lazy_containers
+  -open Tezos_benchmark
+  -open Tezos_benchmark_023_PtSeouLo
+  -open Tezos_benchmark_type_inference_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo
+  -open Tezos_protocol_023_PtSeouLo.Protocol
+  -open Tezos_micheline
+  -open Tezos_023_PtSeouLo_test_helpers
+  -open Tezos_client_023_PtSeouLo
+  -open Tezos_protocol_plugin_023_PtSeouLo))
+
+(rule
+ (targets signature.ml)
+ (action
+  (write-file
+   %{targets}
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V2")))

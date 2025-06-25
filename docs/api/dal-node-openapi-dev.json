@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 21.0~rc3+dev (d0769d42)"
+    "version": "Octez 21.0~rc3+dev (c249b2fa)"
   },
   "paths": {
     "/health": {
@@ -2446,6 +2446,9 @@
                       "type": "integer",
                       "minimum": -2147483648,
                       "maximum": 2147483647
+                    },
+                    "minimal_block_delay": {
+                      "$ref": "#/components/schemas/int64"
                     }
                   },
                   "required": [
@@ -2459,7 +2462,8 @@
                     "sc_rollup_challenge_window_in_blocks",
                     "commitment_period_in_blocks",
                     "dal_attested_slots_validity_lag",
-                    "blocks_per_cycle"
+                    "blocks_per_cycle",
+                    "minimal_block_delay"
                   ]
                 }
               }

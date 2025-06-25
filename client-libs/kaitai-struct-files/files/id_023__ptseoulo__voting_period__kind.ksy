@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__voting_period__kind
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.voting_period.kind'
+doc: ! 'Encoding id: 023-PtSeouLo.voting_period.kind'
 enums:
   id_023__ptseoulo__voting_period__kind_tag:
     0: proposal

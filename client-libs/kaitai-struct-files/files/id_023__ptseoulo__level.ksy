@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__level
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.level'
+doc: ! 'Encoding id: 023-PtSeouLo.level'
 enums:
   bool:
     0: false

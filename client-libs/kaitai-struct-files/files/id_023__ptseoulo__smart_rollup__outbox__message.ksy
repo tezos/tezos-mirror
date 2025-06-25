@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__smart_rollup__outbox__message
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.smart_rollup.outbox.message'
+doc: ! 'Encoding id: 023-PtSeouLo.smart_rollup.outbox.message'
 types:
   args:
     seq:

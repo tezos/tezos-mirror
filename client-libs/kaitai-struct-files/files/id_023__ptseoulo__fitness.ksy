@@ -1,7 +1,7 @@
 meta:
   id: id_023__ptseoulo__fitness
   endian: be
-doc: ! 'Encoding id: 023-PtSEouLo.fitness'
+doc: ! 'Encoding id: 023-PtSeouLo.fitness'
 types:
   locked_round:
     seq:

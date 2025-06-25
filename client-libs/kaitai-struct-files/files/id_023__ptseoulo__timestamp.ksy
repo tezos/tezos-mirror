@@ -3,7 +3,7 @@ meta:
   endian: be
   imports:
   - timestamp__protocol
-doc: ! 'Encoding id: 023-PtSEouLo.timestamp'
+doc: ! 'Encoding id: 023-PtSeouLo.timestamp'
 seq:
 - id: id_023__ptseoulo__timestamp
   type: timestamp__protocol

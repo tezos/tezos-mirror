@@ -17,7 +17,7 @@ depends: [
   "octez-l2-libs" { = version }
   "octez-smart-rollup-node-lib" { = version }
   "octez-smart-rollup-node-PsRiotum" { = version }
-  "octez-smart-rollup-node-PtSEouLo" { = version }
+  "octez-smart-rollup-node-PtSeouLo" { = version }
 ]
 depopts: [
   "octez-smart-rollup-node-PtNairob"
