@@ -257,7 +257,7 @@ let get_time_between_blocks ?fallback ~evm_node_endpoint () =
       return res
   | Error trace, None -> fail trace
 
-let call_with_fallback f always_fallback ~fallback ~map_fallback_result =
+let call_with_fallback name f always_fallback ~fallback ~map_fallback_result =
   let open Lwt_result_syntax in
   let fallback () =
     let+ res = fallback () in
@@ -273,15 +273,14 @@ let call_with_fallback f always_fallback ~fallback ~map_fallback_result =
     | Ok res -> return res
     | Error e ->
         (match e with
-        | Tezos_rpc.Context.Not_found _ :: _ ->
-            (* 404, Unsupported RPC. *)
-            always_fallback := true
-        | RPC_client_errors.Request_failed
-            {error = Unauthorized_uri | Forbidden; _}
+        | ( Tezos_rpc.Context.Not_found _ (* 404, Unsupported RPC. *)
+          | RPC_client_errors.Request_failed
+              {error = Unauthorized_uri | Forbidden; _}
+          (* 403, Forbidden RPC. *) )
           :: _ ->
-            (* 403, Forbidden RPC. *)
             always_fallback := true
         | _ -> ()) ;
+        let*! () = Events.rpc_call_fallback name e in
         fallback ()
 
 let get_blueprint ~keep_alive ~evm_node_endpoint Ethereum_types.(Qty level) =
@@ -323,6 +322,7 @@ let get_blueprint_with_events =
   let always_fallback = ref false in
   fun ~keep_alive ~evm_node_endpoint level ->
     call_with_fallback
+      "get_blueprint_with_events"
       (fun () -> get_blueprint_with_events ~keep_alive ~evm_node_endpoint level)
       always_fallback
       ~fallback:(fun () -> get_blueprint ~keep_alive ~evm_node_endpoint level)
@@ -346,6 +346,7 @@ let get_blueprints_with_events =
   let always_fallback = ref false in
   fun ~keep_alive ~evm_node_endpoint ~count level ->
     call_with_fallback
+      "get_blueprints_with_events"
       (fun () ->
         get_blueprints_with_events ~keep_alive ~evm_node_endpoint ~count level)
       always_fallback
