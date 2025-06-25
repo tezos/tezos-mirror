@@ -363,7 +363,7 @@ let mock_voting_period =
       start_position = 0l;
     }
 
-let _mock_voting_period_info () =
+let mock_voting_period_info () =
   let open Result_syntax in
   let* voting_period = Voting_period.convert mock_voting_period in
   let voting_period_info =

@@ -12,6 +12,9 @@ module type BLOCK_SERVICES = sig
   include Tezos_shell_services.Block_services.S
 
   val mock_block_header_data : Proto.block_header_data tzresult
+
+  val mock_block_header_metadata :
+    Alpha_context.Level.t -> Proto.block_header_metadata tzresult
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -39,8 +42,6 @@ module Imported_protocol = struct
     {contents; signature}
 end
 
-type level = Tezos_types.level
-
 module Block_services = struct
   include
     Tezos_shell_services.Block_services.Make
@@ -53,6 +54,40 @@ module Block_services = struct
       ~dst:Proto.block_header_data_encoding
       ~src:Imported_protocol.Block_header_repr.protocol_data_encoding
       Imported_protocol.mock_protocol_data
+
+  let mock_block_header_metadata level_info =
+    let open Imported_protocol.Apply_results in
+    let open Result_syntax in
+    let proposer =
+      Imported_protocol.Alpha_context.Consensus_key.
+        {
+          delegate = Tezlink_mock.public_key_hash;
+          consensus_pkh = Tezlink_mock.public_key_hash;
+        }
+    in
+    let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
+    return
+      {
+        proposer;
+        baker = proposer;
+        level_info;
+        voting_period_info;
+        nonce_hash = None;
+        consumed_gas = Alpha_context.Gas.Arith.zero;
+        deactivated = [];
+        balance_updates = [];
+        liquidity_baking_toggle_ema =
+          Imported_protocol.Alpha_context.Per_block_votes
+          .Liquidity_baking_toggle_EMA
+          .zero;
+        adaptive_issuance_vote_ema =
+          Imported_protocol.Alpha_context.Per_block_votes
+          .Adaptive_issuance_launch_EMA
+          .zero;
+        adaptive_issuance_launch_cycle = None;
+        implicit_operations_results = [];
+        dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
+      }
 end
 
 module Zero_block_services = struct
@@ -63,6 +98,13 @@ module Zero_block_services = struct
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
       ~dst:Proto.block_header_data_encoding
+      ~src:Data_encoding.empty
+      ()
+
+  let mock_block_header_metadata _ : Proto.block_header_metadata tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_metadata"
+      ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
 end
@@ -86,6 +128,13 @@ module Genesis_block_services = struct
               };
           signature = Signature.V0.zero;
         }
+
+  let mock_block_header_metadata _ : Proto.block_header_metadata tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"block_header_metadata"
+      ~dst:Proto.block_header_metadata_encoding
+      ~src:Data_encoding.empty
+      ()
 end
 
 (* Module importing, amending, and converting, protocol types. Those types
