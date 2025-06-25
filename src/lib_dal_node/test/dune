@@ -14,7 +14,7 @@
   tezos-dal-node-lib
   octez-libs.test-helpers
   tezt-bam)
- (preprocess (pps ppx_hash bam-ppx))
+ (preprocess (pps ppx_hash))
  (library_flags (:standard -linkall))
  (flags
   (:standard)

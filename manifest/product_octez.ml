@@ -1544,7 +1544,7 @@ let _octez_stdlib_unix_test =
     ]
     ~path:"src/lib_stdlib_unix/test/"
     ~opam:"octez-libs"
-    ~preprocess:(ppses [ppx_hash; bam_ppx])
+    ~preprocess:(ppses [ppx_hash])
     ~deps:
       [
         octez_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
@@ -5356,7 +5356,7 @@ let _octez_dal_node_lib_test =
     ["test_storage"]
     ~path:"src/lib_dal_node/test/"
     ~opam:"tezos-dal-node-lib"
-    ~preprocess:(ppses [ppx_hash; bam_ppx])
+    ~preprocess:(ppses [ppx_hash])
     ~deps:
       [
         octez_stdlib |> open_;
