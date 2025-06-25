@@ -231,10 +231,16 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         }
 
     def test_should_should_be_able_to_propose_as_delegate(self) -> None:
-        delegator = self.bootstrap_baker()
+        baker = self.bootstrap_baker()
         proposer_delegate= self.bootstrap_no_baker()
 
         delegation = self.deploy_delegated_governance()
+        delegation.using(baker).propose_voting_key(pkh(proposer_delegate), True, None).send()
+        self.bake_block()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(baker)).send()
+        self.bake_block()
+        assert delegation.is_voting_key_of(pkh(proposer_delegate), pkh(baker), None)
+
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_sequencer_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -242,12 +248,6 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
             'upvoting_limit': 2,
             'delegation_contract': delegation.address
         })
-
-        whitelist = {governance.address}
-        delegation.using(delegator).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
-        self.bake_block()
-
-        assert delegation.is_voting_key_of(pkh(proposer_delegate), pkh(delegator), governance.address)
 
         payload = {
             'sequencer_pk': 'edpkurcgafZ2URyB6zsm5d1YqmLt9r1Lk89J81N6KpyMaUzXWEsv1X',
@@ -260,12 +260,12 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == pack_sequencer_payload(payload)
         assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER
-        assert governance.get_voting_state()['remaining_blocks'] == 3
+        assert governance.get_voting_state()['remaining_blocks'] == 4
     
     def test_delegate_should_propose_only_for_non_proposing_bakers(self) -> None:
         proposer_delegate = self.bootstrap_no_baker()
-        delegator1 = self.bootstrap_baker()
-        delegator2 = self.bootstrap_baker()
+        baker1 = self.bootstrap_baker()
+        baker2 = self.bootstrap_baker()
 
         delegation = self.deploy_delegated_governance()
         governance = self.deploy_sequencer_governance(custom_config={
@@ -274,23 +274,26 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
             'delegation_contract': delegation.address
         })
 
-        whitelist = {governance.address}
-        delegation.using(delegator1).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(baker1).propose_voting_key(pkh(proposer_delegate), True, None).send()
         self.bake_block()
-        delegation.using(delegator2).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(proposer_delegate), True, None).send()
+        self.bake_block()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(baker2)).send()
         self.bake_block()
 
         payload = {
             'sequencer_pk': 'edpkurcgafZ2URyB6zsm5d1YqmLt9r1Lk89J81N6KpyMaUzXWEsv1X',
             'pool_address': 'B7A97043983f24991398E5a82f63F4C58a417185'
         }
-        governance.using(delegator1).new_proposal(payload['sequencer_pk'], payload['pool_address']).send()
+        governance.using(baker1).new_proposal(payload['sequencer_pk'], payload['pool_address']).send()
         self.bake_block()
 
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == pack_sequencer_payload(payload)
 
-        # Delegate should still be able to propose on behalf of delegator2
+        # Delegate should still be able to propose on behalf of baker2
         payload2 = {
             'sequencer_pk': 'edpkurcgafZ2URyB6zsm5d1YqmLt9r1Lk89J81N6KpyMaUzXWEsv1X',
             'pool_address': 'B7A97043983f24991398E5a82f63F4C58a417186'
@@ -312,10 +315,13 @@ class CommitteeGovernanceNewProposalTestCase(BaseTestCase):
             'delegation_contract': delegation.address
         })
 
-        whitelist = {governance.address}
-        delegation.using(baker1).set_voting_key(pkh(delegate), True, whitelist).send()
+        delegation.using(baker1).propose_voting_key(pkh(delegate), True, None).send()
         self.bake_block()
-        delegation.using(baker2).set_voting_key(pkh(delegate), True, whitelist).send()
+        delegation.using(delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(delegate), True, None).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker2)).send()
         self.bake_block()
 
         payload1 = {

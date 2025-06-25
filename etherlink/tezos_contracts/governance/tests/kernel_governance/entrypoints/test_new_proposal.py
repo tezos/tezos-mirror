@@ -209,7 +209,9 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(delegator).propose_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        self.bake_block()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(delegator)).send()
         self.bake_block()
 
         assert delegation.is_voting_key_of(pkh(proposer_delegate), pkh(delegator), governance.address)
@@ -222,7 +224,7 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         storage = governance.contract.storage()
         assert storage['voting_context']['period']['proposal']['winner_candidate'] == kernel_root_hash
         assert storage['voting_context']['period']['proposal']['max_upvotes_voting_power'] == DEFAULT_VOTING_POWER
-        assert governance.get_voting_state()['remaining_blocks'] == 3
+        assert governance.get_voting_state()['remaining_blocks'] == 2
     
     def test_delegate_should_propose_only_for_non_proposing_bakers(self) -> None:
         proposer_delegate = self.bootstrap_no_baker()
@@ -237,9 +239,13 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(delegator1).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(delegator1).propose_voting_key(pkh(proposer_delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(delegator2).set_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(delegator1)).send()
+        self.bake_block()
+        delegation.using(delegator2).propose_voting_key(pkh(proposer_delegate), True, whitelist).send()
+        self.bake_block()
+        delegation.using(proposer_delegate).claim_voting_rights(pkh(delegator2)).send()
         self.bake_block()
 
         kernel_hash = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
@@ -269,9 +275,13 @@ class KernelGovernanceNewProposalTestCase(BaseTestCase):
         })
 
         whitelist = {governance.address}
-        delegation.using(baker1).set_voting_key(pkh(delegate), True, whitelist).send()
+        delegation.using(baker1).propose_voting_key(pkh(delegate), True, whitelist).send()
         self.bake_block()
-        delegation.using(baker2).set_voting_key(pkh(delegate), True, whitelist).send()
+        delegation.using(delegate).claim_voting_rights(pkh(baker1)).send()
+        self.bake_block()
+        delegation.using(baker2).propose_voting_key(pkh(delegate), True, whitelist).send()
+        self.bake_block()
+        delegation.using(delegate).claim_voting_rights(pkh(baker2)).send()
         self.bake_block()
 
         kernel1 = bytes.fromhex('010101010101010101010101010101010101010101010101010101010101010101')
