@@ -75,7 +75,11 @@ module Block_services = struct
         Tezlink_mock.balance_udpdate_bootstrap
           ~amount:200_000_000_000L
           ~bootstrap:Tezlink_mock.public_key_hash
-      else []
+      else
+        let amount = Alpha_context.Tez.of_mutez_exn 0L in
+        Tezlink_mock.balance_udpdate_rewards
+          ~baker:Tezlink_mock.public_key_hash
+          ~amount
     in
     let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
     return

@@ -388,3 +388,14 @@ let balance_udpdate_bootstrap ~amount ~bootstrap =
       Protocol_migration
   in
   [migration; deposit]
+
+let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
+  let open Alpha_context.Receipt in
+  let debited_rewards =
+    item Baking_rewards (Debited amount) Block_application
+  in
+  let baker = frozen_baker baker in
+  let credited_rewards =
+    item (Deposits baker) (Credited amount) Block_application
+  in
+  [debited_rewards; credited_rewards]
