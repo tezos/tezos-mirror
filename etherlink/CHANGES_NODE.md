@@ -25,6 +25,10 @@
 
 ### Metrics changes
 
+- Opentelemetry traces now have the namespace `emv_node` and include an instance
+  id which can either be user provided (in the `opentelemetry` configuration) or
+  is generated on the fly. (!18441)
+
 ### Execution changes
 
 - Node correctly applies an sequencer upgrade EVM event when it sees

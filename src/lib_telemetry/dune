@@ -13,8 +13,11 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   octez-libs.rpc-http-client-unix
-  octez-libs.tezos-workers)
+  opentelemetry.ambient-context.lwt
+  octez-libs.tezos-workers
+  octez-libs.stdlib-unix)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
-  -open Tezos_base))
+  -open Tezos_base
+  -open Tezos_stdlib_unix))

@@ -823,11 +823,12 @@ let plugin_of_first_block cctxt (block : Layer1.header) =
   let*? plugin = Protocol_plugins.proto_plugin_for_protocol current_protocol in
   return (current_protocol, plugin)
 
-let setup_opentelemetry Configuration.{opentelemetry = {enable; config}; _} =
-  Opentelemetry.Globals.service_name := "rollup_node" ;
-  Opentelemetry_ambient_context.set_storage_provider
-    (Opentelemetry_ambient_context_lwt.storage ()) ;
-  Opentelemetry_client_cohttp_lwt.setup ~enable ~config ()
+let setup_opentelemetry ~data_dir config =
+  Octez_telemetry.Opentelemetry_setup.setup
+    ~data_dir
+    ~service_namespace:"rollup_node"
+    ~service_name:"rollup_node"
+    config.Configuration.opentelemetry
 
 let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
     (configuration : Configuration.t) (cctxt : Client_context.full) =
@@ -858,7 +859,7 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
           operator_list)
       (Purpose.operators_bindings configuration.operators)
   in
-  setup_opentelemetry configuration ;
+  let*! () = setup_opentelemetry ~data_dir configuration in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -1034,7 +1035,7 @@ module Replay = struct
         ~bail_on_disagree:false
         ~profiling
     in
-    setup_opentelemetry configuration ;
+    let*! () = setup_opentelemetry ~data_dir configuration in
     Node_context_loader.init
       cctxt
       ~data_dir

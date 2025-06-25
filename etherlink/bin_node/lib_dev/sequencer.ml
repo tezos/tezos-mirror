@@ -150,10 +150,13 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
-  Otel.initialize_telemetry
-    ~service_name:"sequencer"
-    ~enable:configuration.opentelemetry.enable
-    configuration.opentelemetry.config ;
+  let*! () =
+    Octez_telemetry.Opentelemetry_setup.setup
+      ~data_dir
+      ~service_namespace:"evm_node"
+      ~service_name:"sequencer"
+      configuration.opentelemetry
+  in
   let is_sandbox = Option.is_some sandbox_config in
   let {rollup_node_endpoint; keep_alive; _} = configuration in
   let*? sequencer_config = Configuration.sequencer_config_exn configuration in

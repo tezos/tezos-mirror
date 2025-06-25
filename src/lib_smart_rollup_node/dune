@@ -49,8 +49,6 @@
   octez-l2-libs.smart-rollup
   octez-l2-libs.scoru-wasm-fast
   opentelemetry-lwt
-  octez-libs.opentelemetry-client-cohttp-lwt
-  opentelemetry.ambient-context.lwt
   octez-libs.octez-telemetry)
  (flags
   (:standard)
