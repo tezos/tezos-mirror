@@ -281,9 +281,7 @@ module Reconstruction_process_worker = struct
               (* Lwt_io.read_int could fail, in this case, there is an severe
                  issue: pipe issue between the processes, memory full ?
                  In this case, we give up *)
-              let msg =
-                Format.asprintf "CRITICAL: %s" (Printexc.to_string exn)
-              in
+              let msg = Printexc.to_string exn in
               let*! () = Event.emit_crypto_process_error ~msg in
               fail [error_of_exn exn])
     in
