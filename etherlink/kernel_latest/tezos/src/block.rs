@@ -183,7 +183,7 @@ mod tests {
     use primitive_types::{H256, U256};
     use tezos_smart_rollup::types::Timestamp;
 
-    use crate::operation_result::{OperationResult, OperationResultSum, RevealSuccess};
+    use crate::operation_result::{OperationResult, OperationResultSum, RevealSuccess, VecEmpty};
 
     use super::{AppliedOperation, TezBlock};
 
@@ -204,6 +204,7 @@ mod tests {
             result: crate::operation_result::ContentResult::Applied(RevealSuccess {
                 consumed_gas: 0u64.into(),
             }),
+            internal_operation_results: VecEmpty,
         });
         AppliedOperation {
             hash,

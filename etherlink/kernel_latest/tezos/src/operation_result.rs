@@ -158,6 +158,7 @@ pub struct RevealContent {
     pk: PublicKey,
 }
 
+// PlaceHolder Type for temporary unused fields
 #[derive(PartialEq, Debug, Clone)]
 pub struct Empty;
 
@@ -173,13 +174,32 @@ impl NomReader<'_> for Empty {
     }
 }
 
+// PlaceHolder Type for temporary unused fields that encode as vectors
+#[derive(PartialEq, Debug)]
+pub struct VecEmpty;
+
+impl BinWriter for VecEmpty {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        tezos_enc::u32(&0, output)
+    }
+}
+impl NomReader<'_> for VecEmpty {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        // We expect an empty vector, so we just consume the size of the vector
+        let (input, _) = tezos_nom::size(input)?;
+        Ok((input, Self))
+    }
+}
+
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     pub lazy_storage_diff: Option<Empty>,
     pub balance_updates: Vec<BalanceUpdate>,
-    pub ticket_receipt: Vec<Empty>,
-    pub originated_contracts: Vec<Empty>,
+    // TODO: Placeholder for ticket receipt issue : #8018
+    pub ticket_receipt: VecEmpty,
+    // TODO: Placeholder for originated contracts issue : #8018
+    pub originated_contracts: VecEmpty,
     pub consumed_gas: Narith,
     pub storage_size: Narith,
     pub paid_storage_size_diff: Narith,
@@ -235,8 +255,9 @@ pub struct BalanceUpdate {
 pub struct OperationResult<M: OperationKind> {
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
+    //TODO Placeholder for internal operations : #8018
+    pub internal_operation_results: VecEmpty,
 }
-
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
@@ -250,10 +271,12 @@ pub fn produce_operation_result<M: OperationKind>(
         Ok(success) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Applied(success),
+            internal_operation_results: VecEmpty,
         },
         Err(operation_error) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![operation_error]),
+            internal_operation_results: VecEmpty,
         },
     }
 }

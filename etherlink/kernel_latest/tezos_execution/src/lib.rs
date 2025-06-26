@@ -16,6 +16,7 @@ use tezos_data_encoding::types::{Narith, Zarith};
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_tezlink::operation_result::VecEmpty;
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -212,8 +213,8 @@ pub fn transfer<Host: Runtime>(
                 storage: None,
                 lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
+                ticket_receipt: VecEmpty,
+                originated_contracts: VecEmpty,
                 consumed_gas: 0_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
@@ -239,8 +240,8 @@ pub fn transfer<Host: Runtime>(
                 storage: Some(new_storage),
                 lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
+                ticket_receipt: VecEmpty,
+                originated_contracts: VecEmpty,
                 consumed_gas: 0_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
@@ -405,7 +406,7 @@ mod tests {
         },
         operation_result::{
             Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
-            RevealError, RevealSuccess, TransferError, TransferSuccess,
+            RevealError, RevealSuccess, TransferError, TransferSuccess, VecEmpty,
         },
     };
 
@@ -541,6 +542,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Validation(
                 ValidityError::EmptyImplicitContract,
             )]),
+            internal_operation_results: VecEmpty,
         });
 
         assert_eq!(receipt, expected_receipt);
@@ -576,6 +578,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Validation(
                 ValidityError::CantPayFees(50_u64.into()),
             )]),
+            internal_operation_results: VecEmpty,
         });
 
         assert_eq!(receipt, expected_receipt);
@@ -611,6 +614,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Validation(
                 ValidityError::InvalidCounter(0_u64.into()),
             )]),
+            internal_operation_results: VecEmpty,
         });
         assert_eq!(receipt, expected_receipt);
     }
@@ -652,6 +656,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::PreviouslyRevealedKey(pk).into(),
             )]),
+            internal_operation_results: VecEmpty,
         });
         assert_eq!(receipt, expected_receipt);
     }
@@ -695,6 +700,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::InconsistentHash(inconsistent_pkh).into(),
             )]),
+            internal_operation_results: VecEmpty,
         });
 
         assert_eq!(receipt, expected_receipt);
@@ -731,6 +737,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::InconsistentPublicKey(src).into(),
             )]),
+            internal_operation_results: VecEmpty,
         });
 
         assert_eq!(receipt, expected_receipt);
@@ -771,6 +778,7 @@ mod tests {
             result: ContentResult::Applied(RevealSuccess {
                 consumed_gas: 0_u64.into(),
             }),
+            internal_operation_results: VecEmpty,
         });
 
         assert_eq!(receipt, expected_receipt);
@@ -825,6 +833,7 @@ mod tests {
                 }
                 .into(),
             )]),
+            internal_operation_results: VecEmpty,
         });
 
         // Verify that source and destination balances are unchanged
@@ -892,13 +901,14 @@ mod tests {
                         )),
                     },
                 ],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
+                ticket_receipt: VecEmpty,
+                originated_contracts: VecEmpty,
                 consumed_gas: 0_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: true,
             }),
+            internal_operation_results: VecEmpty,
         });
 
         // Verify that source and destination balances changed
