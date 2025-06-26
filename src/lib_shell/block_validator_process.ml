@@ -216,16 +216,18 @@ module Internal_validator_process = struct
     mutable preapply_result :
       (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
       option;
-    headless : Tezos_profiler.Profiler.instance;
-    profiler_headless : Tezos_profiler.Profiler.instance;
+    environment_headless : Tezos_profiler.Profiler.instance;
+    context_headless : Tezos_profiler.Profiler.instance;
   }
 
   let[@warning "-32"] headless_reports validator =
-    let report = Tezos_profiler.Profiler.report validator.headless in
+    let report =
+      Tezos_profiler.Profiler.report validator.environment_headless
+    in
     (match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    let report = Tezos_profiler.Profiler.report validator.profiler_headless in
+    let report = Tezos_profiler.Profiler.report validator.context_headless in
     match report with
     | None -> ()
     | Some report -> ( try Context_ops_profiler.inc report with _ -> ())
@@ -239,21 +241,21 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     let open Lwt_syntax in
     let* () = Events.(emit init ()) in
-    let headless =
+    let environment_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
         Profiler.Info
     in
-    let profiler_headless =
+    let context_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
         Profiler.Info
     in
-    Tezos_profiler.Profiler.(plug main) headless ;
+    Tezos_profiler.Profiler.(plug main) environment_headless ;
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
-      headless ;
+      environment_headless ;
     Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
-      profiler_headless ;
+      context_headless ;
     return_ok
       {
         chain_store;
@@ -262,8 +264,8 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
         cache = None;
         preapply_result = None;
-        headless;
-        profiler_headless;
+        environment_headless;
+        context_headless;
       }
 
   let kind = Single_process
