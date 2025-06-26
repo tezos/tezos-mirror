@@ -216,6 +216,13 @@ let default_multichain_registration =
   Register_both
     {additional_tags_with = [Tag.extra]; additional_tags_without = []}
 
+(* By default REVM is completely disabled. *)
+let default_revm_registration = Register_without_feature
+
+(* Use this value to register a specific test in the CI. *)
+let activate_revm_registration =
+  Register_both {additional_tags_with = []; additional_tags_without = []}
+
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
     body =
@@ -254,34 +261,24 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?enable_revm ?rollup_history_mode ?commitment_period
-    ?challenge_window ?additional_uses ?rpc_server ?websockets
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
+    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
+    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
+    ?enable_fast_fa_withdrawal ?history_mode
     ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration) ?enable_tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
-  let dal_cases =
-    match use_dal with
+    ?(use_multichain = default_multichain_registration)
+    ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
+  let register_cases = function
     | Register_both {additional_tags_with; additional_tags_without} ->
         [(false, additional_tags_without); (true, additional_tags_with)]
     | Register_with_feature -> [(true, [])]
     | Register_without_feature -> [(false, [])]
   in
-  let threshold_encryption_cases =
-    match use_threshold_encryption with
-    | Register_both {additional_tags_with; additional_tags_without} ->
-        [(false, additional_tags_without); (true, additional_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  let multichain_cases =
-    match use_multichain with
-    | Register_both {additional_tags_with; additional_tags_without} ->
-        [(false, additional_tags_without); (true, additional_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
+  let dal_cases = register_cases use_dal in
+  let threshold_encryption_cases = register_cases use_threshold_encryption in
+  let multichain_cases = register_cases use_multichain in
+  let revm_cases = register_cases use_revm in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
      Also register the tests with and without FA bridge feature flag. *)
   List.iter
@@ -290,60 +287,64 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
         (fun (enable_dal, dal_tags) ->
           List.iter
             (fun (enable_multichain, multichain_tags) ->
-              (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
-                 we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
-              let spawn_rpc =
-                match spawn_rpc with
-                | None when enable_multichain -> Some (Port.fresh ())
-                | _ -> spawn_rpc
-              in
-              register_test_for_kernels
-                ~__FILE__
-                ?max_delayed_inbox_blueprint_length
-                ?sequencer_rpc_port
-                ?sequencer_private_rpc_port
-                ?commitment_period
-                ?challenge_window
-                ?genesis_timestamp
-                ?time_between_blocks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ?delayed_inbox_timeout
-                ?delayed_inbox_min_levels
-                ?max_number_of_chunks
-                ?eth_bootstrap_accounts
-                ?tez_bootstrap_accounts
-                ?sequencer
-                ?sequencer_pool_address
-                ~kernels
-                ?da_fee
-                ?minimum_base_fee_per_gas
-                ?preimages_dir
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?max_blueprint_lookahead_in_seconds
-                ?enable_fa_bridge
-                ?enable_revm
-                ?enable_fast_withdrawal
-                ?enable_fast_fa_withdrawal
-                ?additional_uses
-                ?rpc_server
-                ?websockets
-                ?history_mode
-                ~threshold_encryption
-                ?rollup_history_mode
-                ~enable_dal
-                ~enable_multichain
-                ?enable_tx_queue
-                ?spawn_rpc
-                ?periodic_snapshot_path
-                ?l2_setups
-                ~title
-                ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
-                body
-                protocols)
+              List.iter
+                (fun (enable_revm, revm_tags) ->
+                  (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
+                     we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
+                  let spawn_rpc =
+                    match spawn_rpc with
+                    | None when enable_multichain -> Some (Port.fresh ())
+                    | _ -> spawn_rpc
+                  in
+                  register_test_for_kernels
+                    ~__FILE__
+                    ?max_delayed_inbox_blueprint_length
+                    ?sequencer_rpc_port
+                    ?sequencer_private_rpc_port
+                    ?commitment_period
+                    ?challenge_window
+                    ?genesis_timestamp
+                    ?time_between_blocks
+                    ?max_blueprints_lag
+                    ?max_blueprints_ahead
+                    ?max_blueprints_catchup
+                    ?catchup_cooldown
+                    ?delayed_inbox_timeout
+                    ?delayed_inbox_min_levels
+                    ?max_number_of_chunks
+                    ?eth_bootstrap_accounts
+                    ?tez_bootstrap_accounts
+                    ?sequencer
+                    ?sequencer_pool_address
+                    ~kernels
+                    ?da_fee
+                    ?minimum_base_fee_per_gas
+                    ?preimages_dir
+                    ?maximum_allowed_ticks
+                    ?maximum_gas_per_transaction
+                    ?max_blueprint_lookahead_in_seconds
+                    ?enable_fa_bridge
+                    ~enable_revm
+                    ?enable_fast_withdrawal
+                    ?enable_fast_fa_withdrawal
+                    ?additional_uses
+                    ?rpc_server
+                    ?websockets
+                    ?history_mode
+                    ~threshold_encryption
+                    ?rollup_history_mode
+                    ~enable_dal
+                    ~enable_multichain
+                    ?enable_tx_queue
+                    ?spawn_rpc
+                    ?periodic_snapshot_path
+                    ?l2_setups
+                    ~title
+                    ~tags:
+                      (te_tags @ dal_tags @ multichain_tags @ revm_tags @ tags)
+                    body
+                    protocols)
+                revm_cases)
             multichain_cases)
         dal_cases)
     threshold_encryption_cases
@@ -746,6 +747,7 @@ let test_tezlink_constants =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
+      ~enable_revm:false
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())
@@ -1539,6 +1541,7 @@ let test_patch_state =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
+    ~enable_revm:false
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
@@ -10867,6 +10870,7 @@ let test_describe_endpoint =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
+      ~enable_revm:false
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())
@@ -11163,6 +11167,7 @@ let test_configuration_service =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
+      ~enable_revm:false
       protocol
   in
   let* proxy_config = Rpc.configuration proxy in
@@ -11873,6 +11878,7 @@ let test_node_correctly_uses_batcher_heap =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
+    ~enable_revm:false
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -12220,6 +12226,7 @@ let test_rpc_getLogs_with_earliest_fail =
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -13169,6 +13176,9 @@ let test_deposit_event =
       ~time_between_blocks:Nothing
       ~mainnet_compat:false
       ~enable_dal:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
       ~enable_multichain:false
       protocol
   in
@@ -13233,6 +13243,9 @@ let test_withdrawal_events =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
       ~enable_fast_withdrawal:true
       protocol
   in
@@ -13320,6 +13333,9 @@ let test_fa_deposit_and_withdrawals_events =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol

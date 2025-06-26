@@ -38,6 +38,7 @@ let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
     ?rollup_history_mode
     ~enable_dal:false
     ~enable_multichain:false
+    ~enable_revm:false
     ~threshold_encryption:false
     ~title
     ~tags
