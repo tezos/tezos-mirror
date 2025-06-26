@@ -3,6 +3,46 @@
 Changelog Smart Rollup Node
 '''''''''''''''''''''''''''
 
+Version 20250627 (2025-06-27)
+=============================
+
+- Add query parameter ``outbox_level`` for RPCs
+  ``/local/outbox/pending/executable`` and
+  ``/local/outbox/pending/unexecutable``. (MR :gl:`!16831`)
+
+- Add a new RPC ``/local/outbox/pending`` to fetch all known outbox messages
+  with their status. (MR :gl:`!16831`)
+
+- Add a CLI argument ``--config-file`` to allow specifying a configuration file
+  outside the data directory. (MR :gl:`!17225`)
+
+- Allow to provide a remote URL for downloading snapshots in commands ``snapshot
+  info`` and ``snapshot import``. (MRs :gl:`!17407`, :gl:`!17420`, :gl:`!17477`)
+
+- Display logging levels in logs by default. (MR :gl:`!17479`)
+
+- Allow to import snapshots from standard input with ``-``. (MR :gl:`!17463`)
+
+- Retire old store implementation. The rollup node cannot read stores produced
+  by versions < v21.0 anymore. (MR :gl:`!17933`)
+
+- Aggregate performance metrics for all child processes (including Irmin
+  GC). (MR :gl:`!17973`)
+
+- Add new commands ``replay block`` and ``replay blocks`` to replay one or
+  multiple L1 blocks. The results are compared with what the rollup node has
+  stored on disk. (MR :gl:`!18160`)
+
+- Produce Opentelemetry traces with ``--profiling``, configurable with a field
+  ``"opentelemetry"`` in the configuration. (MRs :gl:`!18274`, :gl:`!18290`,
+  :gl:`!18331`, :gl:`!18344`, :gl:`!18368`, :gl:`!18433`, :gl:`!18434`,
+  :gl:`!18441`, :gl:`!18466`)
+
+- The rollup node now identifies Etherlink rollups (the rollup can also be
+  forced to be identified as Etherlink with the CLI switch ``--etherlink``) and
+  emit events for processed Etherlink blocks in the logs and in the traces. (MR
+  :gl:`!18466`)
+
 Version 22.1 (2025-06-11)
 =========================
 
@@ -82,7 +122,6 @@ Version 21.3 (2025-01-23)
 
 - Fixed an issue in the background store migration which could make the rollup
   node send old heads in its stream at the end of the migration.  (MR :gl:`!15739`)
-
 
 Version 21.0 (2024-11-14)
 =========================
@@ -297,8 +336,6 @@ Version 19.0 (2024-01-22)
   :gl:`!10584`, MR :gl:`!10588`, MR :gl:`!10597`, MR :gl:`!10601`, MR
   :gl:`!10622`, MR :gl:`!10642`, MR :gl:`!10643`, MR :gl:`!10839`, MR
   :gl:`!10842`, MR :gl:`!10861`, MR :gl:`!11008` )
-
-
 
 Version 18.0 (2023-09-20)
 =========================
