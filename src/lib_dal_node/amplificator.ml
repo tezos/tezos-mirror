@@ -421,6 +421,7 @@ let reply_receiver_job {process; query_store; _} node_context =
       (* Unknown exception *)
       | exn ->
           let err = [error_of_exn exn] in
+          let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
           Lwt.return (Error err))
 
 let determine_amplification_delays node_ctxt =
