@@ -843,7 +843,7 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
-      job_build_teztale ~arch:Amd64 ~cpu:Very_high ();
+      job_build_teztale ~arch:Amd64 ~cpu:Very_high ~storage:Ramfs ();
       job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
