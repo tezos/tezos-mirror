@@ -64,6 +64,7 @@ Once the node is configured, we can use ``systemd`` to start the daemon:
 
 If configured to do so during package installation, this will automatically download a snapshot
 and import it before starting the ``octez-node`` service (starting with v22 packages).
+In this case, the command can take quite a few minutes to execute, for downloading and importing the snapshot.
 
 We can check the status of the daemon in the logs of the node that
 are stored by default in ``/var/log/tezos/node.log``. Logs are
