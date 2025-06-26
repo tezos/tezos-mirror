@@ -271,6 +271,8 @@ module Reconstruction_process_worker = struct
           in
           return_unit)
         (function
+          | Lwt.Canceled
+            (* if terminated by direct signal (normal termination) *)
           | End_of_file ->
               (* Buffer was closed by the parent (normal termination) *)
               return_unit
