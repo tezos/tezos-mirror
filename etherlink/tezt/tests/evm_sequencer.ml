@@ -430,7 +430,8 @@ let test_tezlink_current_level =
         ~error_msg:"Cycle: expected %R but got %L") ;
     Check.(
       JSON.(
-        res |-> "cycle_position" |> as_int = expected_level mod cycle_length)
+        res |-> "cycle_position" |> as_int
+        = (expected_level - 1) mod cycle_length)
         int
         ~error_msg:"Cycle_position: expected %R but got %L") ;
     Check.(

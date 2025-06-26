@@ -74,8 +74,10 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
       Tezos_types.
         {
           level;
-          cycle = Int32.div level constants.parametric.blocks_per_cycle;
-          cycle_position = Int32.rem level constants.parametric.blocks_per_cycle;
+          cycle =
+            Int32.(div (sub level 1l) constants.parametric.blocks_per_cycle);
+          cycle_position =
+            Int32.(rem (sub level 1l) constants.parametric.blocks_per_cycle);
         }
 
   let constants chain (_block : block_param) =
