@@ -18,7 +18,7 @@ val start :
   keep_alive:bool ->
   drop_duplicate:bool ->
   order_enabled:bool ->
-  tx_container:L2_types.evm_chain_family Services_backend_sig.tx_container ->
+  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   unit tzresult Lwt.t
 

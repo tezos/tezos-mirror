@@ -18,7 +18,7 @@ type parameters = {
   keep_alive : bool;
   drop_duplicate : bool;
   order_enabled : bool;
-  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
+  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 type state = {
@@ -39,7 +39,7 @@ type state = {
   mutable cooldown : int;
       (** Do not try to catch-up if [cooldown] is not equal to 0 *)
   enable_dal : bool;
-  tx_container : L2_types.evm_chain_family Services_backend_sig.tx_container;
+  tx_container : Services_backend_sig.ex_tx_container;
 }
 
 module Types = struct
@@ -169,8 +169,9 @@ module Worker = struct
     match rollup_is_lagging_behind self with
     | No_lag | Needs_republish -> return_unit
     | Needs_lock ->
+        let (Ex_tx_container tx_container) = tx_container self in
         let (module Tx_container) =
-          Services_backend_sig.tx_container_module (tx_container self)
+          Services_backend_sig.tx_container_module tx_container
         in
         Tx_container.lock_transactions ()
 
@@ -331,9 +332,9 @@ module Handlers = struct
             Worker.decrement_cooldown self ;
             (* If there is no lag or the worker just needs to republish we
                unlock the transaction pool in case it was locked. *)
+            let (Ex_tx_container tx_container) = Worker.tx_container self in
             let (module Tx_container) =
-              Services_backend_sig.tx_container_module
-                (Worker.tx_container self)
+              Services_backend_sig.tx_container_module tx_container
             in
             Tx_container.unlock_transactions ())
 
@@ -377,7 +378,7 @@ let start ~blueprints_range ~rollup_node_endpoint ~config ~latest_level_seen
         keep_alive;
         drop_duplicate;
         order_enabled;
-        tx_container;
+        tx_container = Ex_tx_container tx_container;
       }
       (module Handlers)
   in
