@@ -36,3 +36,7 @@ val octez_version : Tezos_version.Version.t
 (** Current version of the Octez EVM node.
     it uses either the git tag or a default version *)
 val octez_evm_node_version : Tezos_version.Version.t
+
+(** Current version of the Octez Smart Rollup node.
+    it uses either the git tag or a default version *)
+val octez_smart_rollup_node_version : Tezos_version.Version.t

@@ -130,6 +130,8 @@ module Daemon_config = struct
   let logger = None
 
   let advertise_log_levels = None
+
+  let version = None
 end
 
 let () = Client_main_run.run (module Daemon_config) ~select_commands

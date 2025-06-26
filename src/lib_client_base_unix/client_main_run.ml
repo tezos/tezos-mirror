@@ -84,6 +84,8 @@ module type M = sig
   val logger : RPC_client_unix.logger option
 
   val advertise_log_levels : bool option
+
+  val version : string option
 end
 
 let register_default_signer ?signing_version ?other_registrations ?logger
@@ -616,7 +618,9 @@ let main (module C : M) ~select_commands ?(disable_logging = false) () =
         | Ok () -> Lwt.return 0
         | Error [Tezos_clic.Version] ->
             let version =
-              Tezos_version_value.Bin_version.octez_version_string
+              Option.value
+                C.version
+                ~default:Tezos_version_value.Bin_version.octez_version_string
             in
             Format.printf "%s\n" version ;
             Lwt.return 0
