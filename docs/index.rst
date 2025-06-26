@@ -157,6 +157,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    introduction/tezos
    introduction/howtoget
+   introduction/howtobuild
    introduction/howtouse
    introduction/howtorun
    introduction/services
