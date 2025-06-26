@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type scope
+
+val root_scope : unit -> scope
+
 val register : unit -> unit
 
 val store_get_hash :

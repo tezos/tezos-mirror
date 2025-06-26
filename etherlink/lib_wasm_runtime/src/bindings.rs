@@ -5,7 +5,7 @@
 
 use log::trace;
 
-use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString};
+use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString, OpenTelemetryScope};
 use std::{
     error::Error,
     fmt::{Display, Formatter},
@@ -43,7 +43,7 @@ impl Error for BindingsError {}
 
 #[allow(non_snake_case)]
 mod ocaml_imports {
-    use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString};
+    use crate::types::{ContextHash, EvmTree, OCamlBytes, OCamlString, OpenTelemetryScope};
 
     ocaml::import! {
         pub fn fetch_preimage_from_remote(preimages_endpoint: &str, hash_hex: &str) -> OCamlString;
@@ -62,6 +62,9 @@ mod ocaml_imports {
         pub fn layer2_store__store_read(evm_tree: EvmTree, key: &str, offset: usize, num_bytes: usize) -> Result<OCamlBytes, isize>;
         pub fn layer2_store__store_write(evm_tree: EvmTree, key: &str, offset: usize, bytes: &[u8]) -> Result<(EvmTree, isize), isize>;
         pub fn layer2_store__store_write_all(evm_tree: EvmTree, key: &str, bytes: &[u8]) -> Result<EvmTree, isize>;
+
+        pub fn open_span(parent_scope: &OpenTelemetryScope, span_name: &str) -> OpenTelemetryScope;
+        pub fn close_span(scope: &OpenTelemetryScope) -> ();
     }
 }
 
@@ -277,4 +280,23 @@ where
     };
 
     res.map_err(|i| BindingsError::HostFuncError(i as i32))
+}
+
+pub fn open_span(
+    s: &OpenTelemetryScope,
+    top_span_name: &str,
+) -> Result<OpenTelemetryScope, BindingsError> {
+    let s = unsafe {
+        ocaml_imports::open_span(&gc(), s, top_span_name).map_err(BindingsError::OCamlError)?
+    };
+
+    Ok(s)
+}
+
+pub fn close_span(s: &OpenTelemetryScope) -> Result<(), BindingsError> {
+    unsafe {
+        ocaml_imports::close_span(&gc(), s).map_err(BindingsError::OCamlError)?;
+    }
+
+    Ok(())
 }
