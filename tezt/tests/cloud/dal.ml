@@ -51,6 +51,11 @@ let name_of = function
       Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
 
+type snapshot_config =
+  | Docker_embedded of string
+  | Local_file of string
+  | No_snapshot
+
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -136,6 +141,38 @@ module Node = struct
 
   include Node
 
+  let import_snapshot ?(delete_snapshot_file = false) ~name node
+      snapshot_file_path =
+    toplog "Importing the snapshot for %s" name ;
+    let* () =
+      try
+        let* () = Node.snapshot_import ~no_check:true node snapshot_file_path in
+        let () = toplog "Snapshot import succeeded for %s." name in
+        let* () =
+          if delete_snapshot_file then (
+            (* Delete the snapshot downloaded locally *)
+            toplog "Deleting downloaded snapshot (%s)" snapshot_file_path ;
+            let* (_ignored_exit_status : Unix.process_status) =
+              Process.wait (Process.spawn "rm" [snapshot_file_path])
+            in
+            Lwt.return_unit)
+          else Lwt.return_unit
+        in
+        Lwt.return_unit
+      with _ ->
+        (* Failing to import the snapshot could happen on a very young
+           Weeklynet, before the first snapshot is available. In this
+           case bootstrapping from the genesis block is OK. *)
+        let () =
+          toplog
+            "Snapshot import failed for %s, the node will be bootstrapped from \
+             genesis."
+            name
+        in
+        Lwt.return_unit
+    in
+    Lwt.return_unit
+
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ~rpc_external
       ~name network ~snapshot ?ppx_profiling cloud agent =
     toplog "Initializing an L1 node for %s" name ;
@@ -191,13 +228,23 @@ module Node = struct
             let* () = Node.config_init node [] in
             let* snapshot_file_path =
               match snapshot with
-              | Some snapshot_path ->
-                  toplog "Using locally stored snapshot file: %s" snapshot_path ;
-                  Tezt_cloud.Agent.copy
-                    agent
-                    ~destination:snapshot_path
-                    ~source:snapshot_path
-              | None ->
+              | Docker_embedded snapshot_path ->
+                  let () =
+                    toplog
+                      "Using locally stored snapshot file: %s"
+                      snapshot_path
+                  in
+                  Lwt.return snapshot_path
+              | Local_file snapshot_path ->
+                  let () = toplog "Copying snapshot to destination" in
+                  let* snapshot_path =
+                    Tezt_cloud.Agent.copy
+                      agent
+                      ~destination:snapshot_path
+                      ~source:snapshot_path
+                  in
+                  Lwt.return snapshot_path
+              | No_snapshot ->
                   toplog "Trying to download a rolling snapshot for %s" name ;
                   let downloaded_snapshot_file_path = "snapshot_file" in
                   let* exit_status =
@@ -232,40 +279,11 @@ module Node = struct
                   return downloaded_snapshot_file_path
             in
             let* () =
-              toplog "Importing the snapshot for %s" name ;
-              let* () =
-                try
-                  let* () =
-                    Node.snapshot_import ~no_check:true node snapshot_file_path
-                  in
-                  let () = toplog "Snapshot import succeeded for %s." name in
-                  let* () =
-                    match snapshot with
-                    | Some _ -> Lwt.return_unit
-                    | None ->
-                        (* Delete the snapshot downloaded locally *)
-                        toplog
-                          "Deleting downloaded snapshot (%s)"
-                          snapshot_file_path ;
-                        let* (_ignored_exit_status : Unix.process_status) =
-                          Process.wait (Process.spawn "rm" [snapshot_file_path])
-                        in
-                        Lwt.return_unit
-                  in
-                  Lwt.return_unit
-                with _ ->
-                  (* Failing to import the snapshot could happen on a very young
-                     Weeklynet, before the first snapshot is available. In this
-                     case bootstrapping from the genesis block is OK. *)
-                  let () =
-                    toplog
-                      "Snapshot import failed for %s, the node will be \
-                       bootstrapped from genesis."
-                      name
-                  in
-                  Lwt.return_unit
-              in
-              Lwt.return_unit
+              import_snapshot
+                ~delete_snapshot_file:(snapshot = No_snapshot)
+                ~name
+                node
+                snapshot_file_path
             in
             toplog "Launching the node %s." name ;
             let* () =
@@ -291,6 +309,26 @@ module Node = struct
               Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
             in
             let* () = Node.config_init node [Cors_origin "*"] in
+            let* snapshot_path =
+              match snapshot with
+              | Docker_embedded snapshot_path ->
+                  let () =
+                    toplog
+                      "Using locally stored snapshot file: %s"
+                      snapshot_path
+                  in
+                  Lwt.return_some snapshot_path
+              | Local_file snapshot_path ->
+                  let () = toplog "Copying snapshot to destination" in
+                  let* snapshot_path =
+                    Tezt_cloud.Agent.copy
+                      agent
+                      ~destination:snapshot_path
+                      ~source:snapshot_path
+                  in
+                  Lwt.return_some snapshot_path
+              | No_snapshot -> Lwt.return_none
+            in
             let* () =
               Node.Config_file.update
                 node
@@ -305,6 +343,11 @@ module Node = struct
                     (Node.Config_file.set_network_with_dal_config config)
             in
             let* () = may_copy_node_identity_file agent node identity_file in
+            let* () =
+              match snapshot_path with
+              | Some snapshot_path -> import_snapshot ~name node snapshot_path
+              | None -> Lwt.return_unit
+            in
             let* () =
               Node.Agent.run
                 ?ppx_profiling
@@ -509,7 +552,7 @@ type configuration = {
      reconnection delay *)
   disconnect : (int * int) option;
   network : Network.t;
-  snapshot : string option;
+  snapshot : snapshot_config;
   bootstrap : bool;
   teztale : bool;
   memtrace : bool;
@@ -4020,6 +4063,30 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
+let parse_snapshot_arg snapshot_arg =
+  let fail path =
+    Test.fail
+      "wrong snapshot argument (--snapshot) [%s].@.Use:@.- \
+       \"file:path/to/file\" to use a local file that will be uploaded to each \
+       agent,@.- \"docker\" to use the docker_embedded_snapshot_file, that \
+       must be located in the local path, to embed the snapshot file into the \
+       docker image."
+      path
+  in
+  match snapshot_arg with
+  | Some v -> (
+      match v with
+      | "docker" ->
+          (* This hardcoded path must be defined as the location path of the snapshot
+             embedded in the docker image. See the associated dockerfile. *)
+          Docker_embedded "/tmp/docker_embedded_snapshot_file"
+      | s when String.starts_with ~prefix:"file:" s -> (
+          match String.split_on_char ':' s with
+          | [_; path] -> Local_file path
+          | _ -> fail s)
+      | _ -> fail v)
+  | None -> No_snapshot
+
 let register (module Cli : Scenarios_cli.Dal) =
   let stake =
     let open Network in
@@ -4121,7 +4188,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let etherlink_producers = Cli.etherlink_producers in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
-    let snapshot = Cli.snapshot in
+    let snapshot = parse_snapshot_arg Cli.snapshot in
     let bootstrap = Cli.bootstrap in
     let etherlink_dal_slots = Cli.etherlink_dal_slots in
     let teztale = Cli.teztale in
