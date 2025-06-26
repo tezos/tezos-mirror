@@ -193,8 +193,6 @@ _`Delegate`
     A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
 
-    Note that ``tz4`` accounts cannot be delegates.
-
 _`Delegation`
     An operation_ in which an account_ designates a
     delegate_. The delegating account's balance increases the delegate_'s `baking power`_ and consequently
