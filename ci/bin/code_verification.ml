@@ -786,6 +786,7 @@ let jobs pipeline_type =
         ~stage
         ~image:Images.CI.build
         ~cpu:Very_high
+        ~storage:Ramfs
         ~rules:(make_rules ~manual:Yes ())
         ~before_script:
           (before_script
