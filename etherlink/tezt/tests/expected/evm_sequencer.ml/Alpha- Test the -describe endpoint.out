@@ -167,18 +167,22 @@ Available services:
         The block's hash, its unique identifier. 
     - GET /chains/main/blocks/head/header
         The whole block header. 
-    - GET /chains/main/blocks/head/helpers/current_level
-        Returns the level of the interrogated block, or the one of a block
-        located `offset` blocks after it in the chain. For instance, the next
-        block if `offset` is 1. The offset cannot be negative. 
-    - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
-        Simulate running an operation at some future moment (based on the
-        number of blocks given in the `latency` argument), and return the
-        operation application result. The result is the same as run_operation
-        except for the consumed gas, which depends on the contents of the
-        cache at that future moment. This RPC estimates future gas
-        consumption by trying to predict the state of the cache using some
-        heuristics. 
+    + helpers/
+      - GET /chains/main/blocks/head/helpers/current_level
+          Returns the level of the interrogated block, or the one of a block
+          located `offset` blocks after it in the chain. For instance, the
+          next block if `offset` is 1. The offset cannot be negative. 
+      - POST /chains/main/blocks/head/helpers/preapply/operations
+          Simulate the application of the operations with the context of the
+          given block and return the result of each operation application. 
+      - POST /chains/main/blocks/head/helpers/scripts/simulate_operation
+          Simulate running an operation at some future moment (based on the
+          number of blocks given in the `latency` argument), and return the
+          operation application result. The result is the same as
+          run_operation except for the consumed gas, which depends on the
+          contents of the cache at that future moment. This RPC estimates
+          future gas consumption by trying to predict the state of the cache
+          using some heuristics. 
     - GET /chains/main/blocks/head/protocols
         Current and next protocol. 
 

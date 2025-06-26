@@ -467,3 +467,16 @@ let injection_operation :
       Operation_hash.t )
     Tezos_rpc.Service.t =
   Tezos_shell_services.Injection_services.S.operation
+
+let preapply_operations :
+    ( [`POST],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      < version : Tezlink_protocols.Shell_impl.version >,
+      Protocol_types.Alpha_context.packed_operation list,
+      Tezlink_protocols.Shell_impl.version
+      * (Protocol_types.Alpha_context.packed_protocol_data
+        * Imported_protocol.operation_receipt)
+        list )
+    Tezos_rpc.Service.t =
+  import_service Block_services.S.Helpers.Preapply.operations
