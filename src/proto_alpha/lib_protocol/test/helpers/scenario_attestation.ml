@@ -19,6 +19,8 @@ let update_activity name block state : State.t =
        (Block.cycle_of_next_block block))
     state
 
+(** --- Attestations --- *)
+
 let check_attestation_metadata delegate_pkh consensus_key_pkh :
     Block.full_metadata -> t -> unit tzresult Lwt.t =
  fun (_block_header_metadata, op_metadata) (_block, _state) ->
@@ -296,3 +298,10 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
     return (block, state)
 
 let attest_with_all = exec attest_with_all_
+
+(** --- Preattestations --- *)
+
+let preattest_with_all_ : t_incr -> t_incr tzresult Lwt.t =
+ fun (incr, state) ->
+  let open Lwt_result_syntax in
+  (* TODO *) return (incr, state)

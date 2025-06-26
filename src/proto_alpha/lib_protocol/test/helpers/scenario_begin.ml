@@ -82,8 +82,8 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
-    ?(check_finalized_block_perm = []) delegates_name_list :
-    (constants, t) scenarios =
+    ?(force_preattest_all = false) ?(check_finalized_block_perm = [])
+    delegates_name_list : (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
       let bootstrap = "__bootstrap__" in
@@ -153,6 +153,7 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             pending_slashes = [];
             double_signings = [];
             force_attest_all;
+            force_preattest_all;
             check_finalized_block_perm;
             check_finalized_block_temp = [];
             previous_metadata = None;
