@@ -19,6 +19,7 @@ module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
+(** Converts a protocol input to a RISC-V PVM backend-specific input. *)
 let to_pvm_input (input : Sc_rollup.input) : Backend.input =
   match input with
   | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
@@ -30,9 +31,22 @@ let to_pvm_input (input : Sc_rollup.input) : Backend.input =
       let reveal_data_bytes = Sc_rollup.reveal_response_to_bytes reveal_data in
       Reveal (String.of_bytes reveal_data_bytes)
 
-let of_pvm_input_request (_input_request : Backend.input_request) :
-    Sc_rollup.input_request =
-  raise (Invalid_argument "input_request not implemented")
+(** Tries to convert a RISC-V PVM backend-specific input request to a protocol
+  * input request. Returns [None] in case of failure. *)
+let of_pvm_input_request (input_request : Backend.input_request) :
+    Sc_rollup.input_request option =
+  let open Option_syntax in
+  match input_request with
+  | Backend.No_input_required -> return Sc_rollup.No_input_required
+  | Backend.Initial -> return Sc_rollup.Initial
+  | Backend.First_after (level, index) ->
+      let+ raw_level = Option.of_result @@ Raw_level.of_int32 level in
+      Sc_rollup.First_after (raw_level, Z.of_int64 index)
+  | Backend.Needs_reveal raw_string ->
+      let+ reveal_data =
+        Data_encoding.Binary.of_string_opt Sc_rollup.reveal_encoding raw_string
+      in
+      Sc_rollup.Needs_reveal reveal_data
 
 let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
     (get_current_level : 'a -> int32 option Lwt.t)
@@ -117,9 +131,16 @@ module PVM :
 
   let verify_proof ~is_reveal_enabled:_ input_given proof =
     let open Environment.Error_monad.Lwt_result_syntax in
-    match Backend.verify_proof (Option.map to_pvm_input input_given) proof with
+    let* input_request =
+      match
+        Backend.verify_proof (Option.map to_pvm_input input_given) proof
+      with
+      | Some request -> return request
+      | None -> tzfail Sc_rollup_riscv.RISCV_proof_verification_failed
+    in
+    match of_pvm_input_request input_request with
+    | Some request -> return request
     | None -> tzfail Sc_rollup_riscv.RISCV_proof_verification_failed
-    | Some request -> return (of_pvm_input_request request)
 
   let produce_proof _context ~is_reveal_enabled:_ input_given state =
     let open Environment.Error_monad.Lwt_result_syntax in

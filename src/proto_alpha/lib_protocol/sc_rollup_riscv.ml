@@ -54,36 +54,31 @@ type proof = Riscv.proof
 let make_empty_state = Riscv.empty_state
 
 (** If [None] is returned, converting from raw data encoded strings / PVM raw data to Protocol types failed  *)
-let from_riscv_input_request (input_request : Riscv.input_request) :
+let of_riscv_input_request (input_request : Riscv.input_request) :
     PS.input_request option =
   let open Option_syntax in
   match input_request with
   | Riscv.No_input_required -> return PS.No_input_required
   | Riscv.Initial -> return PS.Initial
   | Riscv.First_after (level, index) ->
-      let* raw_level = Option.of_result @@ Raw_level_repr.of_int32 level in
-      return @@ PS.First_after (raw_level, Z.of_int64 index)
+      let+ raw_level = Option.of_result @@ Raw_level_repr.of_int32 level in
+      PS.First_after (raw_level, Z.of_int64 index)
   | Riscv.Needs_reveal raw_string ->
-      let* reveal_data =
+      let+ reveal_data =
         Data_encoding.Binary.of_string_opt PS.reveal_encoding raw_string
       in
-      return @@ PS.Needs_reveal reveal_data
+      PS.Needs_reveal reveal_data
 
-(** If [None] is returned, converting from raw data encoded strings / protocol raw data to Riscv types failed  *)
-let to_riscv_input (input : PS.input) : Riscv.input option =
-  let open Option_syntax in
+let to_riscv_input (input : PS.input) : Riscv.input =
   match input with
   | PS.Inbox_message {inbox_level; message_counter; payload} ->
-      return
-      @@ Riscv.Inbox_message
-           ( Raw_level_repr.to_int32 inbox_level,
-             Z.to_int64 message_counter,
-             Sc_rollup_inbox_message_repr.unsafe_to_string payload )
+      Riscv.Inbox_message
+        ( Raw_level_repr.to_int32 inbox_level,
+          Z.to_int64 message_counter,
+          Sc_rollup_inbox_message_repr.unsafe_to_string payload )
   | PS.Reveal reveal_data ->
-      let* raw_reveal_data =
-        Data_encoding.Binary.to_string_opt PS.reveal_data_encoding reveal_data
-      in
-      return @@ Riscv.Reveal raw_reveal_data
+      let reveal_data_bytes = PS.reveal_response_to_bytes reveal_data in
+      Riscv.Reveal (Bytes.to_string reveal_data_bytes)
 
 (** If [None] is returned, converting from raw data encoded strings / PVM raw data to Protocol types failed  *)
 let from_riscv_output (output : Riscv.output) : PS.output option =
@@ -139,15 +134,15 @@ module Protocol_implementation :
     Riscv.install_boot_sector state boot_sector
 
   let verify_proof ~is_reveal_enabled:_ input proof =
-    let input_request =
-      let open Option_syntax in
-      let* input = Option.map to_riscv_input input in
-      let* input_request = Riscv.verify_proof input proof in
-      from_riscv_input_request input_request
+    let open Lwt_result_syntax in
+    let* input_request =
+      match Riscv.verify_proof (Option.map to_riscv_input input) proof with
+      | Some request -> return request
+      | None -> tzfail RISCV_proof_verification_failed
     in
-    match input_request with
+    match of_riscv_input_request input_request with
+    | Some request -> return request
     | None -> tzfail RISCV_proof_verification_failed
-    | Some input_request -> return input_request
 
   let output_proof_encoding =
     let open Data_encoding in
