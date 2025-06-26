@@ -4012,11 +4012,15 @@ let ensure_enough_funds ~fee t i =
 
 let produce_slot t level i =
   if level mod t.configuration.producers_delay = 0 then (
-    toplog "Producing a slot for level %d" level ;
+    let all_start = Unix.gettimeofday () in
+    let producer = List.nth t.producers i in
+    toplog
+      "Producing a slot for index %d for level %d"
+      producer.slot_index
+      level ;
     let fee = 800 in
     let* () = ensure_enough_funds ~fee t i in
     toplog "Ensured enough funds are available" ;
-    let producer = List.nth t.producers i in
     let index = producer.slot_index in
     let content =
       Format.asprintf "%d:%d" level index
@@ -4025,6 +4029,7 @@ let produce_slot t level i =
            ~slot_size:t.parameters.cryptobox.slot_size
     in
     let* _ = Node.wait_for_level producer.node level in
+    let make_commitment_start = Unix.gettimeofday () in
     let* _commitment =
       (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
          - tz1: fees of 513µtz and 1333 gas consumed
@@ -4043,7 +4048,20 @@ let produce_slot t level i =
         ~index
         content
     in
-    Log.info "publish_commitment operation injected" ;
+    let make_commitment_end = Unix.gettimeofday () in
+    Log.info
+      "publish_commitment operation for index %d injected at level %d"
+      producer.slot_index
+      level ;
+    let all_end = Unix.gettimeofday () in
+    let all_duration = all_end -. all_start in
+    let commitment_duration = make_commitment_end -. make_commitment_start in
+    Log.info
+      "Produce slot (for index %d) duration:@.- publish_and_store_slot: %f \
+       s@.- overall (including wait for level): %f s@."
+      producer.slot_index
+      commitment_duration
+      all_duration ;
     Lwt.return_unit)
   else Lwt.return_unit
 
