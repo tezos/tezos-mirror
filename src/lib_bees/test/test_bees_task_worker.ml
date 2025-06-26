@@ -5,6 +5,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Testing
+    -------
+    Component:    Lib_bees task workers
+    Invocation:   dune exec src/lib_bees/test/main.exe \
+                  -- --file test_bees_task_worker.ml
+    Subject:      Unit tests for [Lib_bees] (task worker)
+*)
+
 (** Because our tests might be ran in the same process as other tests,
     we need to run our tests in a child process or next tests ran
     will fail if using [Unix.fork].
@@ -25,32 +33,10 @@ let tztest label fn =
       | Unix.WEXITED 0 -> return_unit
       | _ -> Lwt.return_error [])
 
-module Events = struct
-  let section = ["test_bees_task_worker"]
-
-  include Internal_event.Simple
-
-  let request_received =
-    declare_0
-      ~section
-      ~name:"request_received"
-      ~msg:"request received"
-      ~level:Notice
-      ()
-
-  let emit event param = Tezos_bees.Hive.async_lwt (fun () -> emit event param)
-end
-
-let emit = Events.(emit request_received)
-
 let tests_fibonacci =
   let test_fibonacci domains =
     let fib () =
       let rec fib n = if n <= 1 then n else fib (n - 1) + fib (n - 2) in
-      let fib n =
-        emit () ;
-        fib n
-      in
       let input = Stdlib.List.init 5 (fun i -> i + 10) in
       let expected = List.map fib input in
       let output =
@@ -72,23 +58,13 @@ let tests_reuse =
     let int_input = 0 in
     let int_expected = succ int_input in
     let int_output =
-      Tezos_bees.Task_worker.launch_task_and_wait
-        "succ(int)"
-        (fun i ->
-          emit () ;
-          succ i)
-        int_input
+      Tezos_bees.Task_worker.launch_task_and_wait "succ(int)" succ int_input
     in
     let str_input = "0" in
     let succ s = int_of_string s |> succ |> string_of_int in
     let str_expected = succ str_input in
     let str_output =
-      Tezos_bees.Task_worker.launch_task_and_wait
-        "succ(str)"
-        (fun i ->
-          emit () ;
-          succ i)
-        str_input
+      Tezos_bees.Task_worker.launch_task_and_wait "succ(str)" succ str_input
     in
     let int_output = Eio.Promise.await int_output in
     let str_output = Eio.Promise.await str_output in
@@ -102,7 +78,7 @@ let tests_on_completion_callback =
   let test =
     tztest "on_completion_handler" @@ fun () ->
     let r = ref 0 in
-    let noop () = emit () in
+    let noop () = () in
     let _ = Tezos_bees.Task_worker.launch_task_and_wait "callback" noop () in
     Assert.equal !r 0 ;
     let on_completion () = incr r in
