@@ -361,6 +361,27 @@ fn migrate_to<Host: Runtime>(
             // predict the gas price
             Ok(MigrationStatus::Done)
         }
+        StorageVersion::V36 => {
+            if is_etherlink_network(host, MAINNET_CHAIN_ID)? {
+                const REGULAR_GOVERNANCE_KT: &[u8] =
+                    b"KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r";
+                const SECURITY_GOVERNANCE_KT: &[u8] =
+                    b"KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R";
+                const SEQUENCER_GOVERNANCE_KT: &[u8] =
+                    b"KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf";
+
+                host.store_write_all(&KERNEL_GOVERNANCE, REGULAR_GOVERNANCE_KT)?;
+                host.store_write_all(
+                    &KERNEL_SECURITY_GOVERNANCE,
+                    SECURITY_GOVERNANCE_KT,
+                )?;
+                host.store_write_all(&SEQUENCER_GOVERNANCE, SEQUENCER_GOVERNANCE_KT)?;
+
+                Ok(MigrationStatus::Done)
+            } else {
+                Ok(MigrationStatus::None)
+            }
+        }
     }
 }
 

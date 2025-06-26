@@ -701,7 +701,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "evm_kernel_dionysus"
+name = "evm_kernel_dionysus_r1"
 version = "0.1.0"
 dependencies = [
  "alloy-primitives",
