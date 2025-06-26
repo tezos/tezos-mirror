@@ -25,10 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context_ops_profiler = struct
-  include (val Profiler.wrap Environment_profiler.context_ops_profiler)
-end
-
 module Profiler = struct
   include (val Profiler.wrap Shell_profiling.block_validator_profiler)
 end
@@ -126,7 +122,7 @@ let[@warning "-32"] handle_reports = function
       | Some report -> ( try Profiler.inc report with _ -> ())) ;
       match profiler_report with
       | None -> ()
-      | Some report -> ( try Context_ops_profiler.inc report with _ -> ()))
+      | Some report -> ( try Profiler.inc report with _ -> ()))
   | _ -> ()
 
 (** The standard block validation method *)
@@ -230,7 +226,7 @@ module Internal_validator_process = struct
     let report = Tezos_profiler.Profiler.report validator.context_headless in
     match report with
     | None -> ()
-    | Some report -> ( try Context_ops_profiler.inc report with _ -> ())
+    | Some report -> ( try Profiler.inc report with _ -> ())
 
   let init
       ({
@@ -252,6 +248,21 @@ module Internal_validator_process = struct
         Profiler.Info
     in
     Tezos_profiler.Profiler.(plug main) environment_headless ;
+
+    (* These profilers need to be plugged to a headless backend that can be
+       shared with external processes.
+
+       The reasoning behind this is the following:
+       - The main process has profilers that are plugged to proper backends
+       - When creating a child process to handle a request, its profilers are
+       not plugged to any backend so any profiler call will be a no-op
+       - Creating headless backends allows to share them between processes and
+       gather the results when the child process has finished
+       - The main process gathers the reports and writes them in the profilers
+       that are plugged to backends.
+
+       Another solution may be to plug the backends in the child processes.
+    *)
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
       environment_headless ;
     Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
