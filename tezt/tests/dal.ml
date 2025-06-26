@@ -7286,7 +7286,7 @@ module Tx_kernel_e2e = struct
         Check.(
           (String.length value = parameters.Dal.Parameters.cryptobox.slot_size)
             int
-            ~error_msg:"Expected a value of size %R. Got $L") ;
+            ~error_msg:"Expected a value of size %R. Got %L") ;
         if String.starts_with ~prefix:payload value then unit
         else
           let message =
@@ -7297,6 +7297,83 @@ module Tx_kernel_e2e = struct
               (String.sub value 0 (String.length payload))
           in
           Test.fail "%s" message
+
+  let test_manual_echo_kernel_for_bandwidth _protocol parameters dal_node
+      sc_rollup_node _sc_rollup_address node client pvm_name =
+    Log.info "Originate the echo kernel." ;
+    let config =
+      Sc_rollup_helpers.Installer_kernel_config.
+        [
+          Set
+            {
+              to_ = "/slots";
+              (* Only the slot 0 *)
+              value = Z.to_bits Z.one |> Hex.of_string |> Hex.show;
+            };
+        ]
+    in
+    let* {boot_sector; _} =
+      Sc_rollup_helpers.prepare_installer_kernel
+        ~config:(`Config config)
+        ~preimages_dir:
+          (Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) pvm_name)
+        Constant.WASM.dal_echo_kernel_bandwidth
+    in
+    let* sc_rollup_address =
+      Client.Sc_rollup.originate
+        ~burn_cap:Tez.(of_int 9999999)
+        ~alias:"dal_echo_kernel_bandwidth"
+        ~src:Constant.bootstrap1.public_key_hash
+        ~kind:pvm_name
+        ~boot_sector
+        ~parameters_ty:"unit"
+        client
+    in
+    let* () = bake_for client in
+    let* () =
+      Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+    in
+    let* current_level = Node.get_level node in
+    let target_level =
+      current_level + parameters.Dal.Parameters.attestation_lag + 1
+    in
+    let payload = "hello" in
+    let* () =
+      publish_store_and_attest_slot
+        client
+        node
+        dal_node
+        Constant.bootstrap1
+        ~index:0
+        ~content:
+          (Helpers.make_slot
+             ~slot_size:parameters.Dal.Parameters.cryptobox.slot_size
+             payload)
+        ~attestation_lag:parameters.attestation_lag
+        ~number_of_slots:parameters.number_of_slots
+    in
+    Log.info "Wait for the rollup node to catch up." ;
+    let* _level =
+      Sc_rollup_node.wait_for_level ~timeout:30. sc_rollup_node target_level
+    in
+    let key = "/output/slot-0" in
+    let* value_written =
+      Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:pvm_name
+           ~operation:Sc_rollup_rpc.Value
+           ~key
+           ()
+    in
+    match value_written with
+    | None -> Test.fail "Expected a value to be found. But none was found."
+    | Some value ->
+        let value = `Hex value |> Hex.to_string |> Z.of_bits in
+        Check.(
+          (Z.to_int value = parameters.cryptobox.slot_size)
+            int
+            ~error_msg:"Expected number of bytes length %R. Got %L") ;
+        unit
 end
 
 module Profiler = Tezos_profiler.Profiler
@@ -11065,6 +11142,21 @@ let register ~protocols =
     ~number_of_shards:64
     ~operator_profiles:[0]
     Tx_kernel_e2e.test_echo_kernel_e2e
+    protocols ;
+  (* This test only asserts the echo kernel used by tezt-cloud scenarios is
+     correct. It isn't meant to be ran by the CI. *)
+  scenario_with_all_nodes
+    "test echo_kernel_for_bandwidth"
+    ~uses:(fun _protocol ->
+      [Constant.smart_rollup_installer; Constant.WASM.dal_echo_kernel_bandwidth])
+    ~pvm_name:"wasm_2_0_0"
+    ~slot_size:2048
+    ~page_size:256
+    ~number_of_shards:64
+    ~operator_profiles:[0]
+    ~tags:[Tag.ci_disabled]
+    ~regression:false
+    Tx_kernel_e2e.test_manual_echo_kernel_for_bandwidth
     protocols ;
 
   (* Register tutorial test *)
