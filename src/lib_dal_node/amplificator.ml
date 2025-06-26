@@ -275,6 +275,7 @@ module Reconstruction_process_worker = struct
             (* if terminated by direct signal (normal termination) *)
           | End_of_file ->
               (* Buffer was closed by the parent (normal termination) *)
+              let*! () = Event.emit_crypto_process_stopped () in
               return_unit
           | exn ->
               (* Lwt_io.read_int could fail, in this case, there is an severe
