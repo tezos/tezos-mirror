@@ -26,7 +26,7 @@ let fitness =
     Bytes.make 4 '\255';
     Bytes.make 4 '\255';
     Bytes.make 4 '\255';
-    Bytes.make 4 '\255';
+    Bytes.make 4 '\000';
   ]
 
 (* TODO #7866
@@ -371,3 +371,31 @@ let mock_voting_period_info () =
       {voting_period; position = 0l; remaining = 0l}
   in
   return voting_period_info
+
+let balance_udpdate_bootstrap ~amount ~bootstrap =
+  let open Alpha_context.Receipt in
+  let migration =
+    item
+      Bootstrap
+      (Debited (Alpha_context.Tez.of_mutez_exn amount))
+      Protocol_migration
+  in
+  let baker = frozen_baker bootstrap in
+  let deposit =
+    item
+      (Deposits baker)
+      (Credited (Alpha_context.Tez.of_mutez_exn amount))
+      Protocol_migration
+  in
+  [migration; deposit]
+
+let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
+  let open Alpha_context.Receipt in
+  let debited_rewards =
+    item Baking_rewards (Debited amount) Block_application
+  in
+  let baker = frozen_baker baker in
+  let credited_rewards =
+    item (Deposits baker) (Credited amount) Block_application
+  in
+  [debited_rewards; credited_rewards]

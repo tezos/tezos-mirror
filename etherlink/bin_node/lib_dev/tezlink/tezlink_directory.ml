@@ -178,7 +178,13 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let* header = tezlink_block_to_raw_block_header block in
     let* metadata = make_metadata ~level_info in
     let block_info : Block_services.block_info =
-      {chain_id; hash; header; metadata = Some metadata; operations = []}
+      {
+        chain_id;
+        hash;
+        header;
+        metadata = Some metadata;
+        operations = Block_services.operations;
+      }
     in
     return (version, block_info)
 end
@@ -286,9 +292,11 @@ let build_block_static_directory ~l2_chain_id
        ~convert_output:ethereum_to_tezos_block_hash
   |> register
        ~service:Adaptive_issuance_services.expected_issuance
-       ~impl:(fun _ () () ->
-         (* The mock assumes we stay in cycle 0 for now *)
-         Lwt.return @@ Adaptive_issuance_services.dummy_rewards Int32.zero)
+       ~impl:(fun {block; chain} () () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let* level = Backend.current_level chain block ~offset:0l in
+         Lwt.return @@ Adaptive_issuance_services.dummy_rewards level.cycle)
   |> register
      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
      (* We need a proper implementation *)

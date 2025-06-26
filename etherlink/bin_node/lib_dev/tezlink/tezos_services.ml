@@ -15,6 +15,8 @@ module type BLOCK_SERVICES = sig
 
   val mock_block_header_metadata :
     Alpha_context.Level.t -> Proto.block_header_metadata tzresult
+
+  val operations : operation list list
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -65,6 +67,20 @@ module Block_services = struct
           consensus_pkh = Tezlink_mock.public_key_hash;
         }
     in
+    let balance_updates =
+      if
+        Alpha_context.Raw_level.(
+          equal level_info.Alpha_context.Level.level (of_int32_exn 2l))
+      then
+        Tezlink_mock.balance_udpdate_bootstrap
+          ~amount:200_000_000_000L
+          ~bootstrap:Tezlink_mock.public_key_hash
+      else
+        let amount = Alpha_context.Tez.of_mutez_exn 0L in
+        Tezlink_mock.balance_udpdate_rewards
+          ~baker:Tezlink_mock.public_key_hash
+          ~amount
+    in
     let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
     return
       {
@@ -75,7 +91,7 @@ module Block_services = struct
         nonce_hash = None;
         consumed_gas = Alpha_context.Gas.Arith.zero;
         deactivated = [];
-        balance_updates = [];
+        balance_updates;
         liquidity_baking_toggle_ema =
           Imported_protocol.Alpha_context.Per_block_votes
           .Liquidity_baking_toggle_EMA
@@ -88,6 +104,8 @@ module Block_services = struct
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
+
+  let operations = [[]; []; []; []]
 end
 
 module Zero_block_services = struct
@@ -107,6 +125,8 @@ module Zero_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
+
+  let operations = []
 end
 
 module Genesis_block_services = struct
@@ -135,6 +155,8 @@ module Genesis_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
+
+  let operations = []
 end
 
 (* Module importing, amending, and converting, protocol types. Those types
