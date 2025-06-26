@@ -163,12 +163,12 @@ Since ``Read_profiler`` is already plugged to ``read_instance``, calling
 We can now start monitoring our code.
 
 First, we need to plug our profilers to backends to gather results. Plugging a
-profiler to one or more backends is done with ``PROFILER_BACKENDS=<list of ;
+profiler to one or more backends is done with ``PROFILING_BACKENDS=<list of ;
 separated backends>``. For example, you could run a node with
 
 .. code-block::
 
-   PROFILING="*->Debug" PROFILER_BACKENDS="txt; json" octez-node run
+   PROFILING="*->Debug" PROFILING_BACKENDS="txt; json" octez-node run
 
 We can start with a simple change:
 
