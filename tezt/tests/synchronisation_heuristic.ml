@@ -503,7 +503,14 @@ let test_many_nodes_bootstrap =
   Protocol.register_test
     ~__FILE__
     ~title:"bootstrap: many nodes bootstrap"
-    ~tags:[team; "synchronisation_threshold"; "bootstrap"; "threshold"]
+    ~tags:
+      [
+        team;
+        "synchronisation_threshold";
+        "bootstrap";
+        "threshold";
+        Tag.memory_hungry;
+      ]
     ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
   @@ fun protocol ->
   let num_nodes = 8 in
