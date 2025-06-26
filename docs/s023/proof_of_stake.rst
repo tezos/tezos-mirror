@@ -31,8 +31,7 @@ Delegation and Staking
 A *delegate* is any :ref:`user account <def_user_account_s023>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
-operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
-as delegates.
+operation emitter (its signer).
 
 Any :ref:`account <def_account_s023>` (user account or smart contract) can specify a delegate
 through a delegation operation.  Any non-delegate account can change or revoke its delegate
