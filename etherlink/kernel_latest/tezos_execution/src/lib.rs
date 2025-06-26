@@ -214,6 +214,7 @@ pub fn transfer<Host: Runtime>(
 
             TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
+                lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
                 ticket_receipt: VecEmpty,
                 originated_contracts: VecEmpty,
@@ -240,6 +241,7 @@ pub fn transfer<Host: Runtime>(
 
             TransferTarget::ToContrat(TransferSuccess {
                 storage: Some(new_storage),
+                lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
                 ticket_receipt: VecEmpty,
                 originated_contracts: VecEmpty,
@@ -886,6 +888,7 @@ mod tests {
             balance_updates: vec![],
             result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
+                lazy_storage_diff: None,
                 balance_updates: vec![
                     BalanceUpdate {
                         balance: Balance::Account(

@@ -3323,6 +3323,7 @@ dependencies = [
  "mir",
  "nom",
  "num-bigint",
+ "pretty_assertions",
  "primitive-types",
  "rand 0.9.1",
  "rlp",
