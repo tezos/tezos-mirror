@@ -10,11 +10,10 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::sequence::preceded;
 use std::fmt::Debug;
-use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::enc::u8;
+use tezos_data_encoding::enc::{self as tezos_enc};
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::types::Narith;
-use tezos_data_encoding::types::Zarith;
 use tezos_enc::BinWriter;
 use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Contract;
@@ -241,11 +240,19 @@ pub enum Balance {
     Block,
 }
 
+/// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
+pub enum UpdateOrigin {
+    BlockApplication,
+}
+
 /// Depending of the sign of [changes], the balance is credited or debited
+/// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct BalanceUpdate {
     pub balance: Balance,
-    pub changes: Zarith,
+    pub changes: i64,
+    pub update_origin: UpdateOrigin,
 }
 
 // Inspired from `Manager_operation_result` case in 'kind contents_result type
