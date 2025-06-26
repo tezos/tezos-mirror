@@ -13,7 +13,7 @@ use crate::error::Error;
 use crate::error::StorageError;
 use crate::error::UpgradeProcessError;
 use crate::storage::{
-    is_revm_enabled, read_chain_id, read_storage_version, store_backlog, store_dal_slots,
+    read_chain_id, read_storage_version, store_backlog, store_dal_slots,
     store_storage_version, tweak_dal_activation, StorageVersion, DELAYED_BRIDGE,
     ENABLE_FA_BRIDGE, KERNEL_GOVERNANCE, KERNEL_SECURITY_GOVERNANCE,
     SEQUENCER_GOVERNANCE,
@@ -366,18 +366,11 @@ fn migrate_to<Host: Runtime>(
         //          REMEMBER TO MOVE THIS COMMENT ONCE NEW VERSIONS LAND ON MAINNET          //
         // ///////////////////////////////////////////////////////////////////////////////// //
         StorageVersion::V34 => {
-            if is_revm_enabled(host)? {
-                // Add anything that's needed for the REVM migration, in particular
-                // the new bytecodes for custom precompile contracts.
-            };
-            Ok(MigrationStatus::Done)
-        }
-        StorageVersion::V35 => {
             // Dummy migration allowing to version-gate the gas limit
             // validation in the EVM node
             Ok(MigrationStatus::Done)
         }
-        StorageVersion::V36 => {
+        StorageVersion::V35 => {
             // Dummy migration allowing the node to decide what gas target to use when trying to
             // predict the gas price
             Ok(MigrationStatus::Done)

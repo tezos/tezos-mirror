@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 36.
+Its storage version is 35.
 
 ### Features
 
