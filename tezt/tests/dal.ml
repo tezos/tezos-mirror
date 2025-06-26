@@ -9310,6 +9310,60 @@ let create_tz4_accounts_stake_and_wait ~funders ~client ~node nb_to_create =
        new_tz4_accounts
        companions
 
+let test_aggregation_required_to_pass_quorum _protocol dal_parameters _cryptobox
+    node client dal_node =
+  let slot_index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let lag = dal_parameters.attestation_lag in
+  let* _tz4_accounts =
+    create_tz4_accounts_stake_and_wait
+      ~funders:(Account.Bootstrap.keys |> Array.to_list)
+      ~node
+      ~client
+      25
+  in
+  Log.info "Enough waiting, let's publish a commitment" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      message
+  in
+  let* () = bake_for client in
+  let* _ =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
+  in
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
+  in
+  Log.info "Let's wait for the attestation of this publication to be sent." ;
+  let* () = bake_for ~count:lag client ~dal_node_endpoint in
+  let* _ =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+  in
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata () in
+  match metadata.dal_attestation with
+  | None ->
+      Test.fail
+        "Field dal_attestation in block headers is mandatory when DAL is \
+         activated"
+  | Some bitset ->
+      Check.((Array.length bitset = 1) ~__LOC__ int)
+        ~error_msg:
+          "There should be only one slot DAL attested at protocol level. Got \
+           %L." ;
+      Check.is_true
+        bitset.(slot_index)
+        ~__LOC__
+        ~error_msg:"Slot was supposed to be protocol attested." ;
+      unit
+
 let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
     dal_parameters _cryptobox node client dal_node =
   let slot_index = 0 in
@@ -9355,8 +9409,8 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
     Tezos_stdlib.TzList.split_n nb_attesting_tz4 tz4_accounts
   in
   let* () =
-    Lwt_list.iteri_s
-      (fun i {delegate_key; companion_key} ->
+    Lwt_list.iter_s
+      (fun {delegate_key; companion_key} ->
         let first_slot = Operation.Consensus.first_slot ~slots delegate_key in
         let attestation =
           Operation.Consensus.attestation
@@ -11017,6 +11071,11 @@ let register ~protocols =
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    "slot is protocol attested even if attestations are aggregated"
+    test_aggregation_required_to_pass_quorum
+    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
     ~traps_fraction:Q.one
     "inject accusation"
