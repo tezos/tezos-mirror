@@ -1454,6 +1454,33 @@ let test_tezlink_hash_rpc =
       ~error_msg:"Block hash should be different") ;
   unit
 
+let test_tezlink_raw_json_cycle =
+  register_tezlink_test
+    ~title:"Test Tezlink raw json cycle rpc"
+    ~tags:["rpc"; "cycle"; "raw"]
+  @@ fun {sequencer; _} _protocol ->
+  let path_head = "/tezlink/chains/main/blocks/head/" in
+  let rpc_raw_json_cycle () =
+    let* res =
+      Curl.get_raw
+        ~args:["-v"]
+        (Evm_node.endpoint sequencer ^ path_head ^ "context/raw/json/cycle/0")
+      |> Runnable.run
+    in
+    return @@ JSON.parse ~origin:"curl_hash" res
+  in
+  let*@ _ = produce_block sequencer in
+  let* cycle_0 = rpc_raw_json_cycle () in
+  (* 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8 is the mock value
+     used for the ranom seed and never changes *)
+  Check.(
+    JSON.(
+      cycle_0 |-> "random_seed" |> as_string
+      = "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8")
+      string
+      ~error_msg:"Unexpected random_seed field") ;
+  unit
+
 module Protocol = struct
   include Protocol
 
@@ -14078,6 +14105,7 @@ let () =
   test_tezlink_constants [Alpha] ;
   test_tezlink_produceBlock [Alpha] ;
   test_tezlink_hash_rpc [Alpha] ;
+  test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;

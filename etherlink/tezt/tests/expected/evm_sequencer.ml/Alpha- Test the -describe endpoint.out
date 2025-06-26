@@ -163,6 +163,10 @@ Available services:
       - GET /chains/main/blocks/head/context/issuance/expected_issuance
           Returns the expected issued tez for the provided block and the next
           'consensus_rights_delay' cycles (in mutez) 
+      - GET /chains/main/blocks/head/context/raw/json/cycle/<block_cycle>
+          Returns the cycle <i>. This RPC is a mock as there's no cycle
+          notion in Tezlink and doesn't represent what's in the context of a
+          block 
     - GET /chains/main/blocks/head/hash
         The block's hash, its unique identifier. 
     - GET /chains/main/blocks/head/header
@@ -189,6 +193,8 @@ Available services:
 
 Dynamic parameter description:
   
+  <block_cycle>
+      A cycle integer 
   <contract_id>
       A contract identifier encoded in b58check. 
 

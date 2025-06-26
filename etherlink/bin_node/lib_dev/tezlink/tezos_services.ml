@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 include Tezlink_imports
+open Tezlink_mock
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
 module Imported_protocol = struct
@@ -165,6 +166,11 @@ let wrap conv impl p q i =
     types in the signature of the service [s]. *)
 let import_service s = Tezos_rpc.Service.subst0 s
 
+(** [import_service_with_arg s] makes it possible to substitute new [prefix]
+    types in the signature of the service [s]. It also substitute the [param]
+    but keeps the last arg of the n-uplet intact. *)
+let import_service_with_arg s = Tezos_rpc.Service.subst1 s
+
 type block = Tezos_shell_services.Block_services.block
 
 type chain = Tezos_shell_services.Chain_services.chain
@@ -300,6 +306,25 @@ module Adaptive_issuance_services = struct
       expected_issuance_path
 end
 
+(* Raw services normally represents the context of the Tezos blockchain.
+   But because context in Tezlink is different, we need to mock some rpcs
+   to make Tzkt indexing works. *)
+module Raw_services = struct
+  let custom_root : tezlink_rpc_context Tezos_rpc.Path.context =
+    Tezos_rpc.Path.(open_root / "context" / "raw" / "json")
+
+  let cycle =
+    let open Tezos_rpc in
+    Service.get_service
+      ~description:
+        "Returns the cycle <i>. This RPC is a mock as there's no cycle notion \
+         in Tezlink and doesn't represent what's in the context of a block"
+      ~query:Query.empty
+      ~output:Storage_repr.Cycle.sampler_encoding
+      Imported_env.RPC_path.(
+        custom_root / "cycle" /: Imported_protocol.Cycle_repr.rpc_arg)
+end
+
 (* This is where we import service declarations from the protocol. *)
 module Protocol_plugin_services = Imported_protocol_plugin.RPC.S
 
@@ -344,7 +369,7 @@ let contract_info :
       unit,
       Imported_protocol_plugin.Contract_services.info )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst1 Imported_protocol_plugin.Contract_services.S.info
+  import_service_with_arg Imported_protocol_plugin.Contract_services.S.info
 
 let balance :
     ( [`GET],
@@ -354,7 +379,7 @@ let balance :
       unit,
       Tezos_types.Tez.t )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst1 Imported_protocol_plugin.Contract_services.S.balance
+  import_service_with_arg Imported_protocol_plugin.Contract_services.S.balance
 
 let manager_key :
     ( [`GET],
@@ -364,8 +389,8 @@ let manager_key :
       unit,
       Protocol_types.Alpha_context.public_key option )
     Tezos_rpc.Service.t =
-  let open Tezos_rpc in
-  Service.subst1 Imported_protocol_plugin.Contract_services.S.manager_key
+  import_service_with_arg
+    Imported_protocol_plugin.Contract_services.S.manager_key
 
 let counter :
     ( [`GET],
@@ -375,8 +400,7 @@ let counter :
       unit,
       Protocol_types.Counter.t )
     Tezos_rpc.Service.t =
-  let open Tezos_rpc in
-  Service.subst1 Imported_protocol_plugin.Contract_services.S.counter
+  import_service_with_arg Imported_protocol_plugin.Contract_services.S.counter
 
 let constants :
     ( [`GET],
@@ -455,7 +479,7 @@ let get_storage_normalized :
       Imported_protocol.Script_ir_unparser.unparsing_mode,
       Alpha_context.Script.expr option )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst1
+  import_service_with_arg
     Imported_protocol_plugin.RPC.Contract.S.get_storage_normalized
 
 let injection_operation :
@@ -480,3 +504,13 @@ let preapply_operations :
         list )
     Tezos_rpc.Service.t =
   import_service Block_services.S.Helpers.Preapply.operations
+
+let raw_json_cycle :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Imported_protocol.Cycle_repr.t,
+      unit,
+      unit,
+      Storage_repr.Cycle.storage_cycle )
+    Tezos_rpc.Service.t =
+  import_service_with_arg Raw_services.cycle
