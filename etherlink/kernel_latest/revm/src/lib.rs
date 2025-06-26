@@ -34,8 +34,6 @@ mod code_storage;
 mod database;
 mod storage_helpers;
 
-const DEFAULT_SPEC_ID: SpecId = SpecId::PRAGUE;
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Runtime error: {0}")]
@@ -145,10 +143,9 @@ fn evm<'a, Host: Runtime>(
     tx: &'a TxEnv,
     precompiles: EtherlinkPrecompiles,
     chain_id: u64,
+    spec_id: SpecId,
 ) -> EvmContext<'a, Host> {
-    let cfg = CfgEnv::new()
-        .with_chain_id(chain_id)
-        .with_spec(DEFAULT_SPEC_ID);
+    let cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
 
     let context: Context<
         BlockEnv,
@@ -158,7 +155,7 @@ fn evm<'a, Host: Runtime>(
         Journal<EtherlinkVMDB<'a, Host>>,
         (),
         LocalContext,
-    > = Context::new(db, DEFAULT_SPEC_ID);
+    > = Context::new(db, spec_id);
 
     let evm = context
         .with_block(block)
@@ -172,6 +169,7 @@ fn evm<'a, Host: Runtime>(
 #[allow(clippy::too_many_arguments)]
 pub fn run_transaction<'a, Host: Runtime>(
     host: &'a mut Host,
+    spec_id: SpecId,
     block_constants: &'a BlockConstants,
     world_state_handler: &'a mut WorldStateHandler,
     precompiles: EtherlinkPrecompiles,
@@ -211,6 +209,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         &tx,
         precompiles,
         block_constants.chain_id.as_u64(),
+        spec_id,
     );
 
     evm.db_mut().initialize_storage()?;
@@ -249,7 +248,9 @@ mod test {
     };
     use serde_json::Value;
     use tezos_evm_runtime::runtime::MockKernelHost;
-    use utilities::{block_constants_with_fees, block_constants_with_no_fees};
+    use utilities::{
+        block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
+    };
 
     use crate::world_state_handler::new_world_state_handler;
     use crate::{
@@ -259,7 +260,15 @@ mod test {
 
     mod utilities {
         use primitive_types::{H160 as PH160, U256 as PU256};
+        use revm::primitives::hardfork::SpecId;
         use tezos_ethereum::block::{BlockConstants, BlockFees};
+
+        // The default SpecId is set to Cancun.
+        // It isn't modular like it was in the previous evm execution.
+        // This value was normally retrived from the old execution storage. Once we fully
+        // make the switch to REVM this part will become modular again.
+        // For now we keep it at Cancun which is the latest EVM version Etherlink supports.
+        pub(crate) const DEFAULT_SPEC_ID: SpecId = SpecId::CANCUN;
         const ETHERLINK_CHAIN_ID: u64 = 42793;
 
         pub(crate) fn block_constants_with_fees() -> BlockConstants {
@@ -320,6 +329,7 @@ mod test {
 
         let execution_result = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             precompiles,
@@ -399,6 +409,7 @@ mod test {
 
         let execution_result = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             precompiles,
@@ -453,6 +464,7 @@ mod test {
 
         let result = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             precompiles,
@@ -536,6 +548,7 @@ mod test {
         // Deploy XTZWithdrawal
         let ExecutionOutcome { result, .. } = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             EtherlinkPrecompiles::new(),
@@ -567,6 +580,7 @@ mod test {
             withdrawals,
         } = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             EtherlinkPrecompiles::new(),
@@ -624,6 +638,7 @@ mod test {
 
         let result_create = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             EtherlinkPrecompiles::new(),
@@ -651,6 +666,7 @@ mod test {
 
         let result_call = run_transaction(
             &mut host,
+            DEFAULT_SPEC_ID,
             &block_constants,
             &mut world_state_handler,
             EtherlinkPrecompiles::new(),

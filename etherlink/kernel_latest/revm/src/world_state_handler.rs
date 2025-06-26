@@ -154,7 +154,14 @@ impl StorageAccount {
             Ok(())
         } else {
             let code_hash = match code {
-                None => KECCAK_EMPTY,
+                // There is nothing to store if there's no code or if the legacy analyzed
+                // bytecode is just the STOP instruction (0x00).
+                None => return Ok(()),
+                Some(Bytecode::LegacyAnalyzed(bytecode))
+                    if bytecode.bytecode() == &Bytes::from_static(&[0]) =>
+                {
+                    return Ok(())
+                }
                 Some(code) => CodeStorage::add(host, code.original_byte_slice())?,
             };
             let code_hash_bytes: [u8; 32] = code_hash.into();
