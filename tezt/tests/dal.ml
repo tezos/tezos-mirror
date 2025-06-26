@@ -9334,20 +9334,46 @@ let test_aggregation_required_to_pass_quorum _protocol dal_parameters _cryptobox
       message
   in
   let* () = bake_for client in
-  let* _ =
-    Node.RPC.call node
-    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:3 ()
-  in
   let dal_node_endpoint =
     Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
   in
   Log.info "Let's wait for the attestation of this publication to be sent." ;
   let* () = bake_for ~count:lag client ~dal_node_endpoint in
-  let* _ =
+  let* attestations =
     Node.RPC.call node
     @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
   in
+  let aggregated_attestation =
+    JSON.(
+      List.find
+        (fun attestation ->
+          attestation |-> "contents" |> as_list |> List.hd |-> "kind"
+          |> as_string = "attestations_aggregate")
+        (as_list attestations))
+  in
+  let aggregated_attestation_consensus_power =
+    JSON.(
+      aggregated_attestation |-> "contents" |> as_list |> List.hd |-> "metadata"
+      |-> "total_consensus_power" |> as_int)
+  in
+  let* constants =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_committee_size =
+    JSON.(constants |-> "consensus_committee_size" |> as_int)
+  in
   let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata () in
+  Check.(
+    aggregated_attestation_consensus_power
+    >= consensus_committee_size
+       * (100 - dal_parameters.attestation_threshold)
+       / 100)
+    ~__LOC__
+    Check.int
+    ~error_msg:
+      "The consensus power of the tz4 accounts is not sufficient to ensure \
+       that the ability to read inside the aggregated attestations is required \
+       for the slot to be protocol attested." ;
   match metadata.dal_attestation with
   | None ->
       Test.fail
