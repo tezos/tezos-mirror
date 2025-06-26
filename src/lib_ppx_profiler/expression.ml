@@ -21,6 +21,10 @@ let get_verbosity loc key =
   | Some lod -> lod
   | None -> Error.error loc (No_verbosity key)
 
+(** [get_verbosity _ key] will return the verbosity associated
+    to key or raise an error otherwise *)
+let get_cpu loc _key = [%expr true]
+
 (** [add_wrapping_function expr name _ key] will create
       {[
         Profiler.name
@@ -34,25 +38,26 @@ let add_wrapping_function expr fun_name loc key =
     with_metadata ~loc [%expr [%e Key.to_expression loc key]] key.Key.metadata
   in
   [%expr
-    [%e fun_name] [%e get_verbosity loc key] [%e key_expr] @@ fun () ->
-    [%e expr]]
+    [%e fun_name] ~cpu:true [%e get_verbosity loc key] [%e key_expr]
+    @@ fun () -> [%e expr]]
 
-(** [add_unit_function ~metadata ~verbosity expr name _ key] will create different
+(** [add_unit_function_cpu ~metadata ~verbosity expr name _ key] will create different
     code snippet depending on the options. The general shape is:
 
       {[
-        Profiler.name VERBOSITY KEY;
+        Profiler.name ~cpu:CPU VERBOSITY KEY;
         expr
       ]}
 
     [VERBOSITY] being present as [Notice | Info | Debug] only if [~verbosity] has
     been set to [true].
+    [CPU] is [true] (default) if [Sys.time] should be computed
     [KEY] being [(key, metadata)] if [~metadata] is set to [true] (which is
     default) or just [key] otherwise.
 
     Typically, [Profiler.stop ()] does not take metadata nor verbosity as argument,
     while [Profiler.stamp verbosity ("key", [])] does need [metadata] and [verbosity]. *)
-let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
+let add_unit_function_cpu ?(metadata = true) ~verbosity expr fun_name loc key =
   let key_expr =
     let e = [%expr [%e Key.to_expression loc key]] in
     if metadata then with_metadata ~loc e key.Key.metadata else e
@@ -60,12 +65,34 @@ let add_unit_function ?(metadata = true) ~verbosity expr fun_name loc key =
   match verbosity with
   | false ->
       [%expr
-        [%e fun_name] [%e key_expr] ;
+        [%e fun_name] ~cpu:[%e get_cpu loc key] [%e key_expr] ;
         [%e expr]]
   | true ->
       [%expr
-        [%e fun_name] [%e get_verbosity loc key] [%e key_expr] ;
+        [%e fun_name]
+          ~cpu:[%e get_cpu loc key]
+          [%e get_verbosity loc key]
+          [%e key_expr] ;
         [%e expr]]
+
+(** [add_unit_function_no_cpu ~metadata expr name _ key] will create different
+    code snippet depending on the options. The general shape is:
+
+      {[
+        Profiler.name KEY;
+        expr
+      ]}
+
+    [KEY] being [(key, metadata)] if [~metadata] is set to [true] (which is
+    default) or just [key] otherwise. *)
+let add_unit_function_no_cpu ?(metadata = true) expr fun_name loc key =
+  let key_expr =
+    let e = [%expr [%e Key.to_expression loc key]] in
+    if metadata then with_metadata ~loc e key.Key.metadata else e
+  in
+  [%expr
+    [%e fun_name] [%e get_verbosity loc key] [%e key_expr] ;
+    [%e expr]]
 
 (** [replace_expr_with _ key] will create
       {[
@@ -97,17 +124,22 @@ let rewrite rewriters t =
             loc
             rewriter.key
       (* Functions that have a ~verbosity parameter *)
-      | Rewriter.Aggregate | Rewriter.Mark | Rewriter.Record | Rewriter.Span
-      | Rewriter.Stamp ->
-          add_unit_function
+      | Rewriter.Aggregate | Rewriter.Record | Rewriter.Span | Rewriter.Stamp ->
+          add_unit_function_cpu
             ~verbosity:true
+            expr
+            (Rewriter.to_fully_qualified_lident_expr rewriter loc)
+            loc
+            rewriter.key
+      | Rewriter.Mark ->
+          add_unit_function_no_cpu
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
             loc
             rewriter.key
       (* Functions that don't have a ~verbosity parameter *)
       | Rewriter.Reset_block_section ->
-          add_unit_function
+          add_unit_function_cpu
             ~verbosity:false
             expr
             (Rewriter.to_fully_qualified_lident_expr rewriter loc)
@@ -115,7 +147,7 @@ let rewrite rewriters t =
             rewriter.key
       (* Functions that don't have a ~verbosity nor ~metadata parameter *)
       | Rewriter.Stop ->
-          add_unit_function
+          add_unit_function_cpu
             ~metadata:false
             ~verbosity:false
             expr

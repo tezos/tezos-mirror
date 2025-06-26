@@ -37,9 +37,11 @@
 *)
 val add_ansi_marking : Format.formatter -> unit -> unit
 
-val pp_centered : int -> Format.formatter -> string -> unit
+val pp_centered : ?char:char -> int -> Format.formatter -> string -> unit
 
-val pp_right_aligned : int -> Format.formatter -> string -> unit
+val pp_right_aligned : ?char:char -> int -> Format.formatter -> string -> unit
+
+val pp_left_aligned : ?char:char -> int -> Format.formatter -> string -> unit
 
 module Handled_tags : Set.S with type elt = string
 

@@ -13,4 +13,7 @@ val init : (name:string -> Profiler.instance option) -> unit
 
 (** Creates a function to reset the block section *)
 val create_reset_block_section :
-  Profiler.profiler -> Block_hash.t * Profiler.metadata -> unit
+  cpu:bool option ->
+  Profiler.profiler ->
+  Block_hash.t * Profiler.metadata ->
+  unit

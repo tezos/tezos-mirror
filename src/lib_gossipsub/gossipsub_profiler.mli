@@ -14,4 +14,5 @@ val gossipsub_profiler : profiler
 val init : (name:string -> instance option) -> unit
 
 (** Creates a function to reset the block section *)
-val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
+val create_reset_block_section :
+  cpu:bool option -> profiler -> Block_hash.t * metadata -> unit

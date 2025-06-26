@@ -248,9 +248,9 @@ module Processing = struct
                   } )
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue
           block_application_result
@@ -325,9 +325,9 @@ module Processing = struct
           | Error _ as err -> Lwt.return (err, None)
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue res cache cachable_result (Some (report, profiler_report))
     | External_validation.Validate
@@ -378,9 +378,9 @@ module Processing = struct
                 operations)
         in
         () [@profiler.stop] ;
-        let report = Tezos_profiler.Profiler.report headless in
+        let report = Tezos_profiler.Profiler.report ~cpu:None headless in
         let profiler_report =
-          Tezos_profiler.Profiler.report profiler_headless
+          Tezos_profiler.Profiler.report ~cpu:None profiler_headless
         in
         continue
           block_validate_result

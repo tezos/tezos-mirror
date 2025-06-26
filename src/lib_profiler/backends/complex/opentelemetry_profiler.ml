@@ -93,23 +93,23 @@ module Driver : Profiler.DRIVER with type config = config = struct
 
   let create _ = State
 
-  let time _ = Simple_profiler.time ()
+  let time ~cpu:_ _ = Simple_profiler.time ~cpu:None ()
 
-  let record _ _ _ = ()
+  let record ~cpu:_ _ _ _ = ()
 
-  let aggregate _ _ _ = ()
+  let aggregate ~cpu:_ _ _ _ = ()
 
   let stop _ = ()
 
-  let stamp _ _ _ = ()
+  let stamp ~cpu:_ _ _ _ = ()
 
   let mark _ _ _ = ()
 
-  let span _ _ _ _ = ()
+  let span ~cpu:_ _ _ _ _ = ()
 
   let inc _ _ = ()
 
-  let report _ = None
+  let report ~cpu:_ _ = None
 
   let close _ = ()
 end
