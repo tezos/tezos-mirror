@@ -314,3 +314,60 @@ module Storage_repr = struct
            (req "total_active_stake" empty))
   end
 end
+
+(* Voting period type t in `alpha_context.mli` is a private type so we need to create our own
+   and then do the conversion with the serialization. *)
+module Voting_period = struct
+  type t = {
+    index : int32;
+    kind : Alpha_context.Voting_period.kind;
+    start_position : int32;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {index; kind; start_position} -> (index, kind, start_position))
+      (fun (index, kind, start_position) -> {index; kind; start_position})
+      (obj3
+         (req
+            "index"
+            ~description:
+              "The voting period's index. Starts at 0 with the first block of \
+               the Alpha family of protocols."
+            int32)
+         (req
+            ~description:
+              "One of the several kinds of periods in the voting procedure."
+            "kind"
+            Alpha_context.Voting_period.kind_encoding)
+         (req
+            ~description:
+              "The relative position of the first level of the period with \
+               respect to the first level of the Alpha family of protocols."
+            "start_position"
+            int32))
+
+  let convert =
+    Tezos_types.convert_using_serialization
+      ~name:"voting_period_info"
+      ~src:encoding
+      ~dst:Alpha_context.Voting_period.encoding
+end
+
+let mock_voting_period =
+  Voting_period.
+    {
+      index = 0l;
+      kind = Alpha_context.Voting_period.Proposal;
+      start_position = 0l;
+    }
+
+let mock_voting_period_info () =
+  let open Result_syntax in
+  let* voting_period = Voting_period.convert mock_voting_period in
+  let voting_period_info =
+    Imported_protocol.Alpha_context.Voting_period.
+      {voting_period; position = 0l; remaining = 0l}
+  in
+  return voting_period_info

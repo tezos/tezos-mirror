@@ -102,8 +102,12 @@ module type HEADER = sig
 
   val tezlink_block_to_block_info :
     l2_chain_id:L2_types.chain_id ->
-    'a * L2_types.Tezos_block.t * 'b ->
-    ('a * Block_services.block_info) tzresult
+    Alpha_context.Level.t
+    * Tezos_shell_services.Block_services.version
+    * [`Main]
+    * L2_types.Tezos_block.t ->
+    (Tezos_shell_services.Block_services.version * Block_services.block_info)
+    tzresult
 end
 
 module Make_block_header (Block_services : BLOCK_SERVICES) :
@@ -150,13 +154,31 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     in
     return raw_block_header
 
-  let tezlink_block_to_block_info ~l2_chain_id (version, block, chain) =
+  let make_metadata ~level_info =
+    let open Result_syntax in
+    let* block_header_metadata =
+      Block_services.mock_block_header_metadata level_info
+    in
+    return
+      Block_services.
+        {
+          protocol_data = block_header_metadata;
+          test_chain_status = Test_chain_status.Not_running;
+          max_operations_ttl = 0;
+          max_operation_data_length = 0;
+          max_block_header_length = 0;
+          operation_list_quota = [];
+        }
+
+  let tezlink_block_to_block_info ~l2_chain_id
+      (level_info, version, chain, block) =
     let open Result_syntax in
     let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
     let* hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
     let* header = tezlink_block_to_raw_block_header block in
+    let* metadata = make_metadata ~level_info in
     let block_info : Block_services.block_info =
-      {chain_id; hash; header; metadata = None; operations = []}
+      {chain_id; hash; header; metadata = Some metadata; operations = []}
     in
     return (version, block_info)
 end
@@ -336,7 +358,9 @@ let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* tezlink_block = Backend.block chain block in
-         Lwt_result_syntax.return (q#version, tezlink_block, chain))
+         let* level = Backend.current_level chain block ~offset:0l in
+         let*? level_info = Protocol_types.Level.convert level in
+         Lwt_result_syntax.return (level_info, q#version, chain, tezlink_block))
        ~convert_output:(Block_header.tezlink_block_to_block_info ~l2_chain_id)
 
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
