@@ -726,6 +726,24 @@ open struct
       ~level:Notice
       ("pid", Data_encoding.int31)
 
+  let crypto_process_stopped =
+    declare_0
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"crypto_process_stopped"
+      ~msg:"cryptographic child process stopped gracefully"
+      ~level:Notice
+      ()
+
+  let crypto_process_fatal =
+    declare_1
+      ~section:(section @ ["crypto"])
+      ~prefix_name_with_section:true
+      ~name:"crypto_process_fatal"
+      ~msg:"cryptographic child process terminated unexpectedly: #{error}."
+      ~level:Error
+      ("error", Data_encoding.string)
+
   let crypto_process_error =
     declare_1
       ~section:(section @ ["crypto"])
@@ -1346,7 +1364,11 @@ let emit_store_upgrade_error () = emit store_upgrade_error ()
 
 let emit_crypto_process_started ~pid = emit crypto_process_started pid
 
+let emit_crypto_process_stopped () = emit crypto_process_stopped ()
+
 let emit_crypto_process_error ~msg = emit crypto_process_error msg
+
+let emit_crypto_process_fatal ~msg = emit crypto_process_fatal msg
 
 let emit_amplificator_uninitialized () = emit amplificator_uninitialized ()
 
