@@ -411,7 +411,9 @@ let reply_receiver_job {process; query_store; _} node_context =
         Dal_metrics.update_amplification_complete_duration duration ;
         Dal_metrics.reconstruction_done () ;
         loop ()
-    | _ -> fail [Amplification_reply_receiver_job "Unexpected message"]
+    | _ ->
+        let*! () = Event.emit_crypto_process_error ~msg:"Unexpected message" in
+        fail [Amplification_reply_receiver_job "Unexpected message"]
   in
   Lwt.catch loop (function
       (* Buffer was closed before proceeding an entire message (sigterm, etc.) *)
