@@ -5136,7 +5136,7 @@ let _octez_embedded_protocol_packer =
 
 let _octez_riscv_pvm_test =
   tezt
-    ["test_main"; "test_backend"; "test_storage"; "utils"]
+    ["test_main"; "test_backend"; "test_storage"; "test_rust_bindings"; "utils"]
     ~path:"src/lib_riscv/pvm/test"
     ~opam:"octez-riscv-pvm-test"
     ~synopsis:"Tests for RISC-V OCaml API"

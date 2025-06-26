@@ -21,7 +21,7 @@
   -open Tezos_stdlib_unix
   -open Tezos_base_test_helpers
   -open Octez_alcotezt)
- (modules test_main test_backend test_storage utils))
+ (modules test_main test_backend test_storage test_rust_bindings utils))
 
 (executable
  (name main)
