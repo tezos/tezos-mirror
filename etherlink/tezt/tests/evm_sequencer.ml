@@ -2201,6 +2201,7 @@ let test_send_transaction_to_delayed_inbox =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
+    ~use_revm:activate_revm_registration
   @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol
     ->
   let* raw_transfer =
@@ -2355,6 +2356,7 @@ let test_delayed_transfer_is_included =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2418,6 +2420,7 @@ let test_largest_delayed_transfer_is_included =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2813,6 +2816,7 @@ let test_invalid_delayed_transaction =
     ~enable_fa_bridge:false
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -3642,6 +3646,7 @@ let test_get_balance_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            sequencer;
            sc_rollup_node;
@@ -3840,6 +3845,7 @@ let test_extended_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
@@ -4034,8 +4040,9 @@ let test_sequencer_is_reimbursed =
     ~da_fee:Wei.one
     ~time_between_blocks:(Time_between_blocks tbb)
     ~sequencer_pool_address
-    ~tags:["evm"; "sequencer"; "transaction"]
+    ~tags:["evm"; "sequencer"; "transaction"; "reimbursed"]
     ~title:"Sequencer is reimbursed for DA fees"
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer = sequencer_node; _} _protocol ->
   let* balance =
     Eth_cli.balance
