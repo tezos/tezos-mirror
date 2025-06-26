@@ -11,7 +11,8 @@ open Tezlink_mock
 module type BLOCK_SERVICES = sig
   include Tezos_shell_services.Block_services.S
 
-  val mock_block_header_data : Proto.block_header_data tzresult
+  val mock_block_header_data :
+    chain_id:Chain_id.t -> Proto.block_header_data tzresult
 
   val mock_block_header_metadata :
     Alpha_context.Level.t -> Proto.block_header_metadata tzresult
@@ -50,7 +51,7 @@ module Block_services = struct
       (Imported_protocol)
       (Imported_protocol)
 
-  let mock_block_header_data : Proto.block_header_data tzresult =
+  let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
       ~dst:Proto.block_header_data_encoding
@@ -63,8 +64,8 @@ module Block_services = struct
     let proposer =
       Imported_protocol.Alpha_context.Consensus_key.
         {
-          delegate = Tezlink_mock.public_key_hash;
-          consensus_pkh = Tezlink_mock.public_key_hash;
+          delegate = Tezlink_mock.bootstrap_account.public_key_hash;
+          consensus_pkh = Tezlink_mock.bootstrap_account.public_key_hash;
         }
     in
     let balance_updates =
@@ -74,11 +75,11 @@ module Block_services = struct
       then
         Tezlink_mock.balance_udpdate_bootstrap
           ~amount:200_000_000_000L
-          ~bootstrap:Tezlink_mock.public_key_hash
+          ~bootstrap:Tezlink_mock.bootstrap_account.public_key_hash
       else
         let amount = Alpha_context.Tez.of_mutez_exn 0L in
         Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.public_key_hash
+          ~baker:Tezlink_mock.bootstrap_account.public_key_hash
           ~amount
     in
     let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
@@ -112,7 +113,7 @@ module Zero_block_services = struct
   include
     Tezos_shell_services.Block_services.Make (Zero_protocol) (Genesis_protocol)
 
-  let mock_block_header_data : Proto.block_header_data tzresult =
+  let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
       ~dst:Proto.block_header_data_encoding
@@ -135,7 +136,20 @@ module Genesis_block_services = struct
       (Genesis_protocol)
       (Imported_protocol)
 
-  let mock_block_header_data : Proto.block_header_data tzresult =
+  let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
+    let parameter =
+      Imported_protocol_parameters.Default_parameters.parameters_of_constants
+        ~bootstrap_accounts:[Tezlink_mock.bootstrap_account]
+        Tezlink_constants.all_constants.parametric
+    in
+    let parameter_format_json =
+      Imported_protocol_parameters.Default_parameters.json_of_parameters
+        ~chain_id
+        parameter
+    in
+    let protocol_parameters =
+      Data_encoding.Binary.to_bytes_exn Data_encoding.json parameter_format_json
+    in
     Result_syntax.return
       Genesis_protocol.
         {
@@ -144,7 +158,7 @@ module Genesis_block_services = struct
               {
                 protocol = Imported_protocol.hash;
                 fitness = [];
-                protocol_parameters = Bytes.empty;
+                protocol_parameters;
               };
           signature = Signature.V0.zero;
         }

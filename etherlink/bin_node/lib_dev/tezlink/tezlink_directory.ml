@@ -137,7 +137,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
       Block_services.block_header tzresult =
     let open Result_syntax in
     let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-    let* protocol_data = Block_services.mock_block_header_data in
+    let* protocol_data = Block_services.mock_block_header_data ~chain_id in
     let* hash = ethereum_to_tezos_block_hash block.hash in
     let* shell = tezlink_block_to_shell_header block in
     let block_header : Block_services.block_header =
@@ -145,9 +145,9 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     in
     return block_header
 
-  let tezlink_block_to_raw_block_header block =
+  let tezlink_block_to_raw_block_header ~chain_id block =
     let open Result_syntax in
-    let* protocol_data = Block_services.mock_block_header_data in
+    let* protocol_data = Block_services.mock_block_header_data ~chain_id in
     let* shell = tezlink_block_to_shell_header block in
     let raw_block_header : Block_services.raw_block_header =
       {shell; protocol_data}
@@ -175,7 +175,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let open Result_syntax in
     let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
     let* hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
-    let* header = tezlink_block_to_raw_block_header block in
+    let* header = tezlink_block_to_raw_block_header ~chain_id block in
     let* metadata = make_metadata ~level_info in
     let block_info : Block_services.block_info =
       {
@@ -339,12 +339,17 @@ let build_block_static_directory ~l2_chain_id
          let open Tezlink_mock in
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
+         let public_key =
+           match bootstrap_account.public_key with
+           | None -> (* Unreachable *) assert false
+           | Some public_key -> public_key
+         in
          let consensus_pk =
            Imported_protocol.Raw_context.
              {
-               delegate = public_key_hash;
+               delegate = bootstrap_account.public_key_hash;
                consensus_pk = public_key;
-               consensus_pkh = public_key_hash;
+               consensus_pkh = bootstrap_account.public_key_hash;
              }
          in
          let delegate_sampler_state =
