@@ -16,8 +16,7 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
-use tezos_tezlink::operation_result::UpdateOrigin;
-use tezos_tezlink::operation_result::VecEmpty;
+use tezos_tezlink::operation_result::{TransferTarget, UpdateOrigin, VecEmpty};
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -165,7 +164,7 @@ pub fn transfer<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
-) -> ExecutionResult<TransferSuccess> {
+) -> ExecutionResult<TransferTarget> {
     log!(
         host,
         Debug,
@@ -213,9 +212,8 @@ pub fn transfer<Host: Runtime>(
                 &amount.0,
             )?;
 
-            TransferSuccess {
+            TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
-                lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
                 ticket_receipt: VecEmpty,
                 originated_contracts: VecEmpty,
@@ -223,7 +221,7 @@ pub fn transfer<Host: Runtime>(
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: allocated,
-            }
+            })
         }
 
         Contract::Originated(_) => {
@@ -240,9 +238,8 @@ pub fn transfer<Host: Runtime>(
             let new_storage =
                 execute_smart_contract(host, &mut dest_contract, parameter)?;
 
-            TransferSuccess {
+            TransferTarget::ToContrat(TransferSuccess {
                 storage: Some(new_storage),
-                lazy_storage_diff: None,
                 balance_updates: vec![src_update, dest_update],
                 ticket_receipt: VecEmpty,
                 originated_contracts: VecEmpty,
@@ -250,7 +247,7 @@ pub fn transfer<Host: Runtime>(
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: false,
-            }
+            })
         }
     };
 
@@ -414,8 +411,8 @@ mod tests {
         },
         operation_result::{
             Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
-            RevealError, RevealSuccess, TransferError, TransferSuccess, UpdateOrigin,
-            VecEmpty,
+            RevealError, RevealSuccess, TransferError, TransferSuccess, TransferTarget,
+            UpdateOrigin, VecEmpty,
         },
     };
 
@@ -887,9 +884,8 @@ mod tests {
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Applied(TransferSuccess {
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
-                lazy_storage_diff: None,
                 balance_updates: vec![
                     BalanceUpdate {
                         balance: Balance::Account(
@@ -912,7 +908,7 @@ mod tests {
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
                 allocated_destination_contract: true,
-            }),
+            })),
             internal_operation_results: VecEmpty,
         });
 

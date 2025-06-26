@@ -139,8 +139,6 @@ impl From<ApplyOperationError> for OperationError {
 
 pub trait OperationKind {
     type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
-
-    fn kind() -> Self;
 }
 
 /// Empty struct to implement [OperationKind] trait for Reveal
@@ -190,10 +188,16 @@ impl NomReader<'_> for VecEmpty {
     }
 }
 
+
+// Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
+pub enum TransferTarget {
+    ToContrat(TransferSuccess),
+}
+
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
-    pub lazy_storage_diff: Option<Empty>,
     pub balance_updates: Vec<BalanceUpdate>,
     // TODO: Placeholder for ticket receipt issue : #8018
     pub ticket_receipt: VecEmpty,
@@ -210,19 +214,11 @@ pub struct TransferSuccess {
 pub struct Transfer;
 
 impl OperationKind for Transfer {
-    type Success = TransferSuccess;
-
-    fn kind() -> Self {
-        Self
-    }
+    type Success = TransferTarget;
 }
 
 impl OperationKind for Reveal {
     type Success = RevealSuccess;
-
-    fn kind() -> Self {
-        Self
-    }
 }
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
