@@ -279,12 +279,29 @@ module Storage_repr = struct
       Data_encoding.(
         Variable.list
           (obj2
-             (req "baker" Signature.Public_key_hash.encoding)
+             (req "baker" Imported_env.Signature.Public_key_hash.encoding)
              (req "active_stake" Imported_protocol.Stake_repr.encoding)))
+
+    let stake ~consensus_pk =
+      let lots =
+        Option.value ~default:Imported_protocol.Tez_repr.one
+        @@ Imported_protocol.Tez_repr.of_mutez 200000000000L
+      in
+      let selected_stake =
+        Imported_protocol.Stake_repr.make
+          ~frozen:lots
+          ~weighted_delegated:Imported_protocol.Tez_repr.zero
+      in
+      [
+        Imported_protocol.Raw_context.
+          (consensus_pk.consensus_pkh, selected_stake);
+      ]
 
     type storage_cycle = {
       selected_stake_distribution :
-        (Signature.public_key_hash * Imported_protocol.Stake_repr.t) list;
+        (Imported_env.Signature.public_key_hash
+        * Imported_protocol.Stake_repr.t)
+        list;
       delegate_sampler_state :
         Imported_protocol.Raw_context.consensus_pk Imported_protocol.Sampler.t;
     }
