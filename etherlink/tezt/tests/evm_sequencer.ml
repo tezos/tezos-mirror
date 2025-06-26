@@ -369,8 +369,8 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
-    ?tez_bootstrap_contracts scenario protocols =
+let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
+    scenario protocols =
   register_all
     ~kernels:[Kernel.Latest]
     ~title
@@ -380,8 +380,8 @@ let register_tezlink_test ~title ~tags ?tez_bootstrap_accounts
         {
           (Evm_node.default_l2_setup ~l2_chain_id:12) with
           l2_chain_family = "Michelson";
-          tez_bootstrap_accounts;
-          tez_bootstrap_contracts;
+          tez_bootstrap_accounts = bootstrap_accounts;
+          tez_bootstrap_contracts = bootstrap_contracts;
         };
       ]
     ~use_multichain:Register_with_feature
@@ -562,7 +562,7 @@ let test_tezlink_balance =
   register_tezlink_test
     ~title:"Test of the balance rpc"
     ~tags:["rpc"; "balance"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; client; _} _protocol ->
   (* call the balance rpc and parse the result *)
   let endpoint =
@@ -591,7 +591,7 @@ let test_tezlink_storage =
   register_tezlink_test
     ~title:"Test of the storage rpc"
     ~tags:["rpc"; "storage"]
-    ~tez_bootstrap_contracts:[contract]
+    ~bootstrap_contracts:[contract]
   @@ fun {sequencer; client; _} _protocol ->
   let endpoint =
     Client.(
@@ -623,7 +623,7 @@ let test_tezlink_contract_info =
   register_tezlink_test
     ~title:"Test of the contract info rpc"
     ~tags:["rpc"; "contract"; "info"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   (* call the balance rpc and check the result *)
   let* valid_info = account_rpc sequencer Constant.bootstrap1 "" in
@@ -638,7 +638,7 @@ let test_tezlink_manager_key =
   register_tezlink_test
     ~title:"Test of the manager_key rpc"
     ~tags:["rpc"; "manager_key"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   let* valid_res = account_rpc sequencer Constant.bootstrap1 "manager_key" in
   Check.(
@@ -656,7 +656,7 @@ let test_tezlink_counter =
   register_tezlink_test
     ~title:"Test of the counter rpc"
     ~tags:["evm"; "rpc"; "counter"]
-    ~tez_bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_accounts:[Constant.bootstrap1]
   @@ fun {sequencer; _} _protocol ->
   let* valid_res = account_rpc sequencer Constant.bootstrap1 "counter" in
   Check.(JSON.(valid_res |> as_int = 0) int ~error_msg:"Expected %R but got %L") ;
@@ -1479,6 +1479,82 @@ let test_tezlink_raw_json_cycle =
       = "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8")
       string
       ~error_msg:"Unexpected random_seed field") ;
+  unit
+
+let test_tezlink_transfer =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  register_tezlink_test
+    ~title:"Test Tezlink transfer"
+    ~tags:["kernel"; "transfer"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance1
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+  Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
+    ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
+  unit
+
+let test_tezlink_reveal =
+  register_tezlink_test
+    ~title:"Test Tezlink reveal"
+    ~tags:["kernel"; "reveal"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let amount = Tez.one in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = None)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
+  let*! () = Client.reveal ~endpoint ~src:Constant.bootstrap2.alias client in
+  let*@ _ = produce_block sequencer in
+  let* manager_key = account_rpc sequencer Constant.bootstrap2 "manager_key" in
+  Check.(
+    JSON.(manager_key |> as_string_opt = Some Constant.bootstrap2.public_key)
+      (option string)
+      ~error_msg:"Expected %R but got %L") ;
   unit
 
 module Protocol = struct
@@ -14108,6 +14184,8 @@ let () =
   test_tezlink_raw_json_cycle [Alpha] ;
   test_tezlink_chain_id [Alpha] ;
   test_tezlink_bootstrapped [Alpha] ;
+  test_tezlink_transfer [Alpha] ;
+  test_tezlink_reveal [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
