@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 35.
+Its storage version is 36.
 
 ### Features
 
@@ -17,6 +17,10 @@ Its storage version is 35.
   be automatically capped at the maximum permitted value. (!18179)
 - Bump the capacity of Etherlink to 8MGas/s (meaning a target per second to
   4MGas/s). (!18452)
+- Update the Layer 1 governance contracts to take into account alternative voting keys for bakers. (!18505)
+    - [`KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r`](https://better-call.dev/mainnet/KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r) for the slow upgrade governance
+    - [`KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R`](https://better-call.dev/mainnet/KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R) for the fast upgrade governance
+    - [`KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf`](https://better-call.dev/mainnet/KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf) for the sequencer governance
 
 ### Bug fixes
 
