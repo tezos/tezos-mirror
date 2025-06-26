@@ -1,45 +1,30 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022-2025 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
 (** Testing
     -------
-    Component:    Workers
+    Component:    Lib_bees workers
     Invocation:   dune exec src/lib_bees/test/main.exe \
                   -- --file test_bees_unit_eio.ml
-    Subject:      Unit tests for [Worker]
+    Subject:      Unit tests for [Lib_bees]
 *)
 
 module Assert = Assert
 open Mocked_worker
-
-module Events = struct
-  let section = ["test_bees_unit_eio"]
-
-  include Internal_event.Simple
-
-  let request_received =
-    declare_1
-      ~section
-      ~name:"request_received"
-      ~msg:"request {req} received"
-      ~level:Notice
-      ~pp1:Request.pp
-      ("req", Request.encoding)
-
-  let emit event param = Tezos_bees.Hive.async_lwt (fun () -> emit event param)
-end
-
-type error += TzCrashError
 
 exception RaisedExn
 
 let sleep d =
   let env = Tezos_base_unix.Event_loop.env_exn () in
   Eio.Time.sleep env#clock d
+
+let emit_event =
+  let emit_event = emit_event "test_bees_unit_eio" in
+  fun req -> Tezos_bees.Hive.async_lwt (fun () -> emit_event req)
 
 let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
@@ -50,7 +35,7 @@ let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
         self -> (r, request_error) Request.t -> (r, request_error) result =
      fun _w request ->
       let () = if slow then sleep 0.2 else () in
-      let () = Events.(emit request_received) (Request.view request) in
+      let () = emit_event (Request.view request) in
       match request with
       | Request.RqA _i -> (Ok () : (r, request_error) result)
       | Request.RqB -> Ok ()

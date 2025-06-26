@@ -1,25 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs. <contact@nomadic-labs.com>               *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2022-2025 Nomadic Labs. <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -106,3 +88,32 @@ module Types = struct
 end
 
 module Worker = Worker.MakeSingle (Name) (Request) (Types)
+
+let emit_event name =
+  let module E = struct
+    let section = [name]
+
+    include Internal_event.Simple
+
+    let request_received =
+      declare_1
+        ~section
+        ~name:"request_received"
+        ~msg:"request {req} received"
+        ~level:Notice
+        ~pp1:Request.pp
+        ("req", Request.encoding)
+  end in
+  E.emit E.request_received
+
+type error += TzCrashError
+
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"lib_bees.test.mocked_worker.TzCrashError"
+    ~title:"Worker request crash error"
+    ~description:"A request sent to the worker raised an unhandled error"
+    Data_encoding.(obj1 (req "error" (constant "TzCrashError")))
+    (function TzCrashError -> Some () | _ -> None)
+    (fun () -> TzCrashError)
