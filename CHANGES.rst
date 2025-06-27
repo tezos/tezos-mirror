@@ -109,6 +109,9 @@ Client
   registering a given key as a delegate or setting a delegate for a
   contract. (MR :gl:`!18282`)
 
+- Secret key URI is no longer printed if an alias conflict occurs during key
+  generation or import. (MR :gl:`!18509`)
+
 Signer
 ------
 
