@@ -123,20 +123,49 @@ module Block_services = struct
       (Imported_protocol)
       (Imported_protocol)
 
-  let voting_period =
+  let voting_period ~cycles_per_voting_period ~position ~level_info =
+    let open Tezos_types in
+    (* There's a certain amount of cycle in each period, to get the index
+       of the current, we just divide the current number of cycle by the
+       number of cycle for a period (floor div) *)
+    let index = Int32.div level_info.cycle cycles_per_voting_period in
+    (* The start_position can be determined based on the current position
+       given in parameter. *)
+    let start_position = Int32.(sub (sub level_info.level 1l) position) in
     Voting_period.
-      {
-        index = 0l;
-        kind = Alpha_context.Voting_period.Proposal;
-        start_position = 0l;
-      }
+      {index; kind = Alpha_context.Voting_period.Proposal; start_position}
 
-  let voting_period_info () =
+  let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
+      =
+    let open Tezos_types in
     let open Result_syntax in
-    let* voting_period = Voting_period.convert voting_period in
+    (* The number of cycles in the current period is the remainder of the
+       Euclidean division between the current cycle index the number of
+       cycles in a voting period. *)
+    let number_of_cycle_in_period =
+      Int32.rem level_info.cycle cycles_per_voting_period
+    in
+    (* During a voting period, the position parameter is the number of block
+       produced since the beginning of the period. We can deduce it based on
+       the number of cycles in the current period. *)
+    let position =
+      Int32.(
+        add
+          (mul number_of_cycle_in_period block_per_cycle)
+          level_info.cycle_position)
+    in
+    let* voting_period =
+      Voting_period.convert
+        (voting_period ~cycles_per_voting_period ~position ~level_info)
+    in
+    (* The number of block remaining is deducted from the current position
+       and the number of cycles needed to complete a period. *)
+    let remaining =
+      Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
+    in
     let voting_period_info =
       Imported_protocol.Alpha_context.Voting_period.
-        {voting_period; position = 0l; remaining = 0l}
+        {voting_period; position; remaining}
     in
     return voting_period_info
 
@@ -168,7 +197,14 @@ module Block_services = struct
           ~baker:Tezlink_mock.bootstrap_account.public_key_hash
           ~amount
     in
-    let* voting_period_info = voting_period_info () in
+
+    let constant = Tezlink_constants.all_constants.parametric in
+    let* voting_period_info =
+      voting_period_info
+        ~block_per_cycle:constant.blocks_per_cycle
+        ~cycles_per_voting_period:constant.cycles_per_voting_period
+        ~level_info
+    in
     let* level_info = Protocol_types.Level.convert level_info in
     return
       {
