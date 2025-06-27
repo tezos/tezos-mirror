@@ -477,6 +477,53 @@ impl Evaluation {
         };
 
         if let Ok(true) = is_revm_enabled(host) {
+            if from.is_zero() {
+                let mut simulation_caller =
+                    revm_etherlink::world_state_handler::StorageAccount::from_address(
+                        &revm::primitives::Address::from_slice(&from.0),
+                    )
+                    .map_err(|err| {
+                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                            err.to_string(),
+                        )))
+                    })?;
+                let gas = self
+                    .gas
+                    .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
+                let max_gas_to_pay = constants.base_fee_per_gas() * gas;
+                if let Some(value) = self.value {
+                    simulation_caller
+                        .set_balance(
+                            host,
+                            revm::primitives::U256::from_le_slice(
+                                &(evm_execution::utilities::u256_to_le_bytes(
+                                    value + max_gas_to_pay,
+                                )),
+                            ),
+                        )
+                        .map_err(|err| {
+                            Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                                err.to_string(),
+                            )))
+                        })?;
+                } else {
+                    simulation_caller
+                        .set_balance(
+                            host,
+                            revm::primitives::U256::from_le_slice(
+                                &(evm_execution::utilities::u256_to_le_bytes(
+                                    max_gas_to_pay,
+                                )),
+                            ),
+                        )
+                        .map_err(|err| {
+                            Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                                err.to_string(),
+                            )))
+                        })?;
+                }
+            }
+
             match revm_run_transaction(
                 host,
                 &constants,

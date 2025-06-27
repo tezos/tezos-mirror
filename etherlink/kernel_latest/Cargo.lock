@@ -2436,6 +2436,7 @@ version = "0.1.0"
 dependencies = [
  "alloy-sol-types",
  "format_no_std",
+ "hex",
  "num-bigint",
  "primitive-types",
  "revm",
