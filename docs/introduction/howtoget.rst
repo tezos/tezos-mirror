@@ -32,9 +32,9 @@ There are several options for getting the binaries, depending on how you plan to
   sources.
 
 
-These different options are described in the following sections.
+These different options are described in the following sections, except the last one, described in its own page.
 
-Some Octez binaries also require some parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is currently described in section :doc:`howtobuild`, but those instructions may be used for other installation types:
+Some Octez binaries also require certain parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is described in page :doc:`howtobuild`, but those instructions may be used for other installation types:
 
 - :ref:`setup_zcash_params`
 - :ref:`setup_dal_crypto_params`
