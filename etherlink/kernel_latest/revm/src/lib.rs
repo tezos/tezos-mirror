@@ -314,11 +314,11 @@ mod test {
         };
 
         let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller))
+            .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
         let destination_account = world_state_handler
-            .get_or_create(&host, &account_path(&destination))
+            .get_or_create(&host, &account_path(&destination).unwrap())
             .unwrap();
 
         caller_account.set_info(&mut host, caller_info).unwrap();
@@ -380,13 +380,13 @@ mod test {
         };
 
         let mut caller_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller))
+            .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
         caller_account.set_info(&mut host, caller_info).unwrap();
 
         let mut contract_account = world_state_handler
-            .get_or_create(&host, &account_path(&contract))
+            .get_or_create(&host, &account_path(&contract).unwrap())
             .unwrap();
 
         let contract_info = AccountInfo {
@@ -457,7 +457,7 @@ mod test {
         };
 
         let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller))
+            .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
         storage_account.set_info(&mut host, caller_info).unwrap();
@@ -498,7 +498,7 @@ mod test {
                 ..
             }) => {
                 let contract_account = world_state_handler
-                    .get_or_create(&host, &account_path(&address))
+                    .get_or_create(&host, &account_path(&address).unwrap())
                     .unwrap();
                 assert_eq!(
                     bytecode,
@@ -541,7 +541,7 @@ mod test {
             code: None,
         };
         let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller))
+            .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
         storage_account.set_info(&mut host, caller_info).unwrap();
 
@@ -605,11 +605,11 @@ mod test {
             U256::MAX.saturating_sub(withdrawn_amount)
         );
         let created_account = world_state_handler
-            .get_or_create(&host, &account_path(&addr.unwrap()))
+            .get_or_create(&host, &account_path(&addr.unwrap()).unwrap())
             .unwrap();
         assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
         let zero_account = world_state_handler
-            .get_or_create(&host, &account_path(&Address::ZERO))
+            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
             .unwrap();
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
         assert!(!withdrawals.is_empty());
@@ -631,7 +631,7 @@ mod test {
         };
 
         let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller))
+            .get_or_create(&host, &account_path(&caller).unwrap())
             .unwrap();
 
         storage_account.set_info(&mut host, caller_info).unwrap();
