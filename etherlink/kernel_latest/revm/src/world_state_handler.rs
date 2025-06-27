@@ -62,14 +62,14 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 /// Default nonce value for an account.
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
-pub fn account_path(address: &Address) -> OwnedPath {
+pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
     let path_string = format!("/{:x}", address);
-    OwnedPath::try_from(path_string).unwrap()
+    OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
 }
 
-pub fn path_from_u256(index: &U256) -> OwnedPath {
+pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
     let path_string = format!("/{}", index);
-    OwnedPath::try_from(path_string).unwrap()
+    OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
 }
 
 pub struct StorageAccount {
@@ -200,7 +200,7 @@ impl StorageAccount {
 
     pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, Error> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
-        let index_path = path_from_u256(index);
+        let index_path = path_from_u256(index)?;
         concat(&storage_path, &index_path)
     }
 

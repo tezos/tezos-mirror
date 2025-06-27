@@ -97,7 +97,7 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         // TODO: get_account function should be implemented whenever errors are
         // reintroduced
         self.world_state_handler
-            .get_or_create(self.host, &account_path(&address))
+            .get_or_create(self.host, &account_path(&address)?)
             .map_err(|err| Error::Custom(err.to_string()))
     }
 
