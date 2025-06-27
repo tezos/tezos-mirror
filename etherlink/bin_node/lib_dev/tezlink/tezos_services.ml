@@ -123,6 +123,23 @@ module Block_services = struct
       (Imported_protocol)
       (Imported_protocol)
 
+  let voting_period =
+    Voting_period.
+      {
+        index = 0l;
+        kind = Alpha_context.Voting_period.Proposal;
+        start_position = 0l;
+      }
+
+  let voting_period_info () =
+    let open Result_syntax in
+    let* voting_period = Voting_period.convert voting_period in
+    let voting_period_info =
+      Imported_protocol.Alpha_context.Voting_period.
+        {voting_period; position = 0l; remaining = 0l}
+    in
+    return voting_period_info
+
   let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
@@ -151,7 +168,7 @@ module Block_services = struct
           ~baker:Tezlink_mock.bootstrap_account.public_key_hash
           ~amount
     in
-    let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
+    let* voting_period_info = voting_period_info () in
     let* level_info = Protocol_types.Level.convert level_info in
     return
       {
