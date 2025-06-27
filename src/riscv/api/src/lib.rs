@@ -57,6 +57,8 @@ pub type MutState = MutableState<NodePvm<Owned>>;
 pub struct Id(storage::Hash);
 
 ocaml::custom!(Repo);
+ocaml::custom!(State);
+ocaml::custom!(MutState);
 ocaml::custom!(Id);
 
 #[derive(ocaml::FromValue, ocaml::ToValue, strum::EnumCount)]
