@@ -77,6 +77,11 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
+    pub fn from_address(address: &Address) -> Result<Self, Error> {
+        let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
+        Ok(path.into())
+    }
+
     pub fn balance(&self, host: &impl Runtime) -> Result<U256, Error> {
         let path = concat(&self.path, &BALANCE_PATH)?;
         Ok(read_u256_le_default(host, &path, BALANCE_DEFAULT_VALUE)?)
