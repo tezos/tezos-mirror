@@ -233,7 +233,11 @@ seq:
   type: u1
 - id: delegate_parameters_activation_delay
   type: u1
-- id: tolerated_inactivity_period
+- id: tolerated_inactivity_period_high
+  type: u1
+- id: tolerated_inactivity_period_low
+  type: u1
+- id: tolerated_inactivity_period_threshold
   type: u1
 - id: blocks_per_cycle
   type: s4be
