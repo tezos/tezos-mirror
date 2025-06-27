@@ -7,3 +7,5 @@ edition = "2021"
 tezos_data_encoding.workspace = true
 tezos_crypto_rs.workspace = true
 nom.workspace = true
+thiserror = "1.0"
+hex = "0.4"

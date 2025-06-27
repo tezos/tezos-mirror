@@ -3,3 +3,4 @@
 // SPDX-License-Identifier: MIT
 
 pub mod contract;
+pub mod entrypoint;
