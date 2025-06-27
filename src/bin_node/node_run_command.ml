@@ -726,14 +726,7 @@ let[@warning "-32"] may_start_profiler data_dir =
       List.iter
         (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
           let profiler_maker = instance_maker ~directory:data_dir in
-          Shell_profiling.activate_all ~profiler_maker ;
-          match profiler_maker ~name:"context" with
-          | Some instance ->
-              Tezos_protocol_environment.Environment_profiler
-              .Context_ops_profiler
-              .plug
-                instance
-          | None -> ())
+          Shell_profiling.activate_all ~profiler_maker)
         backends
   | None -> ()
 
