@@ -54,7 +54,7 @@ let monitoring_child_pipeline =
         Grafazos.Common.job_build ();
         job_build_layer1_profiling ~expire_in:Never ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
-        Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ();
+        Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ~cpu:Very_high ();
       ]
 
 let job_release_page ~test ?dependencies () =
