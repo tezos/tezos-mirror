@@ -275,6 +275,11 @@ Smart Rollup node
   emit events for processed Etherlink blocks in the logs and in the traces. (MR
   :gl:`!18466`)
 
+- The RPCs ``/global/block/{block_id}/dal/slot_headers`` and
+  ``/global/block/{block_id}/dal/processed_slots`` have been deleted, since they
+  are now obsolete, the DAL-related indexing logic having been moved out of the
+  rollup-node (MR :gl:`!17466`).
+
 Smart Rollup WASM Debugger
 --------------------------
 
