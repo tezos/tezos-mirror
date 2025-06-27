@@ -42,12 +42,13 @@ module Key : sig
     secret_key_uri:Client_keys.sk_uri ->
     t
 
-  val encoding : t Data_encoding.t
+  (** Partial encoding for {!t} that omits the secret key to avoid
+      leaking it in event logs (because {!Client_keys.sk_uri} contains
+      the plain secret key when the key is unencrypted).
 
-  (* Encodes the consensus_key but removes the [secret_key_uri] to avoid
-     leaking information.
-     Warning: this encoding was designed to encode, decoding will fail. *)
-  val consensus_key_without_sk_encoding__cannot_decode : t Data_encoding.t
+      Warning: As a consequence, decoding from this encoding will
+      always fail. *)
+  val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
 end
@@ -76,7 +77,13 @@ module Delegate : sig
     delegate_id : Delegate_id.t;
   }
 
-  val encoding : t Data_encoding.t
+  (** Partial encoding for {!t} that omits secret keys to avoid
+      leaking them in event logs; see
+      {!Key.encoding_for_logging__cannot_decode}.
+
+      Warning: As a consequence, decoding from this encoding will
+      always fail. *)
+  val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
 end
