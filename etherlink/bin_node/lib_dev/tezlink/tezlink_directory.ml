@@ -363,7 +363,9 @@ let build_block_static_directory ~l2_chain_id
            Storage_repr.Cycle.create_sample_state
              ~consensus_pks:[(consensus_pk, 200000000000L)]
          in
-         let selected_stake_distribution = [] in
+         let selected_stake_distribution =
+           Storage_repr.Cycle.stake ~consensus_pk
+         in
          Lwt_result.return
            Storage_repr.Cycle.
              {delegate_sampler_state; selected_stake_distribution})
