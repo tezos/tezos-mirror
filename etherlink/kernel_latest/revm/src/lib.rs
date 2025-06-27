@@ -102,7 +102,7 @@ fn tx_env<'a, Host: Runtime>(
     };
 
     let storage_account = world_state_handler
-        .get_or_create(host, &account_path(&caller))
+        .get_or_create(host, &account_path(&caller)?)
         .map_err(|err| Error::Custom(err.to_string()))?;
     let nonce = storage_account.nonce(host)?;
 
