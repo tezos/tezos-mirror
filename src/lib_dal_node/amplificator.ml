@@ -192,12 +192,28 @@ module Reconstruction_process_worker = struct
   let reconstruct_process_worker ic oc (cryptobox, shards_proofs_precomputation)
       =
     let open Lwt_result_syntax in
+    let reply_success ~oc ~query_id ~proved_shards_encoded =
+      (* Sends back the proved_shards_encoded to the main dal process *)
+      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
+      let*! () = Lwt_io.write_int oc query_id in
+      let*! _ = Process_worker.write_message oc (Bytes.of_string "OK") in
+      let*! _ = Process_worker.write_message oc proved_shards_encoded in
+      Lwt.return_unit
+    in
+    let reply_error_query ~oc ~query_id ~error =
+      (* Sends back the proved_shards_encoded to the main dal process *)
+      let*! () = Event.emit_crypto_process_sending_reply_error ~query_id in
+      let*! () = Lwt_io.write_int oc query_id in
+      let*! _ = Process_worker.write_message oc (Bytes.of_string "ERR") in
+      let bytes = Bytes.of_string error in
+      let*! _ = Process_worker.write_message oc bytes in
+      Lwt.return_unit
+    in
     (* Read init message from parent with parameters required to initialize
        cryptobox *)
     let* () = read_init_message_from_parent ic in
     let*! () = Event.emit_crypto_process_started ~pid:(Unix.getpid ()) in
-    let rec loop () =
-      let*! query_id = Lwt_io.read_int ic in
+    let process_query query_id =
       (* Read query from main dal process *)
       let* bytes_shards =
         let* r = Process_worker.read_message ic in
@@ -222,22 +238,55 @@ module Reconstruction_process_worker = struct
       let* proved_shards_encoded =
         reconstruct cryptobox shards_proofs_precomputation shards
       in
-
-      (* Sends back the proved_shards_encoded to the main dal process *)
-      let*! () = Event.emit_crypto_process_sending_reply ~query_id in
-      let len = Bytes.length proved_shards_encoded in
-      let*! () = Lwt_io.write_int oc query_id in
-      let*! () = Lwt_io.write_int oc len in
-      let*! () = Lwt_io.write_from_exactly oc proved_shards_encoded 0 len in
-      loop ()
+      return proved_shards_encoded
     in
-    Lwt.catch loop (function
-        | End_of_file ->
-            (* Buffer was closed by the parent (normal termination) *)
-            return_unit
-        | exn ->
-            let err = [error_of_exn exn] in
-            Lwt.return_error err)
+    let rec loop () =
+      Lwt.catch
+        (fun () ->
+          (* Note: this read_int is very unlikely to appear unless obvious issue *)
+          let*! query_id = Lwt_io.read_int ic in
+          let* () =
+            Lwt.catch
+              (fun () ->
+                let*! r = process_query query_id in
+                match r with
+                | Ok proved_shards_encoded ->
+                    let*! () =
+                      reply_success ~query_id ~proved_shards_encoded ~oc
+                    in
+                    loop ()
+                | Error err ->
+                    let err =
+                      Format.asprintf "%a" Error_monad.pp_print_trace err
+                    in
+                    (* send a reply with the error, and continue *)
+                    let*! () = reply_error_query ~oc ~query_id ~error:err in
+                    loop ())
+              (function
+                | End_of_file -> raise End_of_file
+                | exn ->
+                    let error = Printexc.to_string exn in
+                    let*! () = reply_error_query ~oc ~query_id ~error in
+                    return_unit)
+          in
+          return_unit)
+        (function
+          | Lwt.Canceled
+            (* if terminated by direct signal (normal termination) *)
+          | End_of_file ->
+              (* Buffer was closed by the parent (normal termination) *)
+              let*! () = Event.emit_crypto_process_stopped () in
+              return_unit
+          | exn ->
+              (* Lwt_io.read_int could fail, in this case, there is an severe
+                 issue: pipe issue between the processes, memory full ?
+                 In this case, we give up *)
+              let msg = Printexc.to_string exn in
+              let*! () = Event.emit_crypto_process_error ~msg in
+              fail [error_of_exn exn])
+    in
+    let* () = loop () in
+    return_unit
 end
 
 (* Serialize queries to crypto worker process while the query queue is not
@@ -290,6 +339,7 @@ let reply_receiver_job {process; query_store; _} node_context =
     Query_store.remove query_store id ;
     let length = Query_store.length query_store in
     let () = Dal_metrics.update_amplification_queue_length length in
+    (* The first message should be a OK | ERR *)
     let* msg =
       let* r = Process_worker.read_message ic in
       match r with
@@ -301,35 +351,69 @@ let reply_receiver_job {process; query_store; _} node_context =
             ]
       | `Message msg -> return msg
     in
-    let*! () = Event.emit_main_process_received_reply ~query_id:id in
-    let shards, shard_proofs =
-      Data_encoding.Binary.of_bytes_exn proved_shards_encoding msg
-    in
-    let shards = List.to_seq shards in
-    let* () =
-      Store.Shards.write_all (Store.shards node_store) slot_id shards
-      |> Errors.to_tzresult
-    in
-    let* () =
-      Slot_manager.publish_proved_shards
-        node_context
-        slot_id
-        ~level_committee:(Node_context.fetch_committee node_context)
-        proto_parameters
-        commitment
-        shards
-        shard_proofs
-        gs_worker
-    in
-    let*! () =
-      Event.emit_reconstruct_finished
-        ~level:slot_id.slot_level
-        ~slot_index:slot_id.slot_index
-    in
-    let duration = Unix.gettimeofday () -. reconstruction_start_time in
-    Dal_metrics.update_amplification_complete_duration duration ;
-    Dal_metrics.reconstruction_done () ;
-    loop ()
+    match Bytes.to_string msg with
+    | "ERR" ->
+        let* msg =
+          let* r = Process_worker.read_message ic in
+          match r with
+          | `End_of_file ->
+              fail
+                [
+                  Amplification_reply_receiver_job
+                    "Incomplete message received. Terminating";
+                ]
+          | `Message msg -> return msg
+        in
+        (* The error message *)
+        let msg = Bytes.to_string msg in
+        let*! () =
+          Event.emit_main_process_received_reply_error ~query_id:id ~msg
+        in
+        loop ()
+    | "OK" ->
+        let* msg =
+          let* r = Process_worker.read_message ic in
+          match r with
+          | `End_of_file ->
+              fail
+                [
+                  Amplification_reply_receiver_job
+                    "Incomplete message received. Terminating";
+                ]
+          | `Message msg -> return msg
+        in
+        let*! () = Event.emit_main_process_received_reply ~query_id:id in
+        let shards, shard_proofs =
+          Data_encoding.Binary.of_bytes_exn proved_shards_encoding msg
+        in
+        let shards = List.to_seq shards in
+        let* () =
+          Store.Shards.write_all (Store.shards node_store) slot_id shards
+          |> Errors.to_tzresult
+        in
+        let* () =
+          Slot_manager.publish_proved_shards
+            node_context
+            slot_id
+            ~level_committee:(Node_context.fetch_committee node_context)
+            proto_parameters
+            commitment
+            shards
+            shard_proofs
+            gs_worker
+        in
+        let*! () =
+          Event.emit_reconstruct_finished
+            ~level:slot_id.slot_level
+            ~slot_index:slot_id.slot_index
+        in
+        let duration = Unix.gettimeofday () -. reconstruction_start_time in
+        Dal_metrics.update_amplification_complete_duration duration ;
+        Dal_metrics.reconstruction_done () ;
+        loop ()
+    | _ ->
+        let*! () = Event.emit_crypto_process_error ~msg:"Unexpected message" in
+        fail [Amplification_reply_receiver_job "Unexpected message"]
   in
   Lwt.catch loop (function
       (* Buffer was closed before proceeding an entire message (sigterm, etc.) *)
@@ -337,6 +421,7 @@ let reply_receiver_job {process; query_store; _} node_context =
       (* Unknown exception *)
       | exn ->
           let err = [error_of_exn exn] in
+          let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
           Lwt.return (Error err))
 
 let determine_amplification_delays node_ctxt =
@@ -434,7 +519,7 @@ let make node_ctxt =
   in
   let* () =
     let oc = Process_worker.output_channel amplificator.process in
-    let* r = Process_worker.write_message oc (Bytes.of_string "0 Ready") in
+    let* r = Process_worker.write_message oc welcome in
     match r with
     | `End_of_file ->
         fail
@@ -570,9 +655,14 @@ let try_amplification commitment slot_metrics slot_id amplificator =
     in
     let t = Unix.gettimeofday () in
     let duration = t -. slot_metrics.Dal_metrics.time_first_shard in
-    (* If we have received all the shards while waiting the random
-       delay, there is no point in reconstructing anymore *)
-    if number_of_already_stored_shards = number_of_shards then (
+    (* There is no point trying a reconstruction if we have not received
+       enough shards.
+       If we have received all the shards while waiting the random
+       delay, there is no point in reconstructing either. *)
+    if
+      number_of_already_stored_shards < number_of_needed_shards
+      || number_of_already_stored_shards = number_of_shards
+    then (
       Dal_metrics.update_amplification_abort_reconstruction_duration duration ;
       let*! () =
         Event.emit_reconstruct_no_missing_shard
