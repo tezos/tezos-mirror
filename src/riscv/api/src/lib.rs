@@ -16,6 +16,7 @@ use num_enum::IntoPrimitive;
 use num_enum::TryFromPrimitive;
 use ocaml::Pointer;
 use ocaml::ToValue;
+use octez_riscv::pvm::InputRequest as PvmInputRequest;
 use octez_riscv::pvm::PvmHooks;
 use octez_riscv::pvm::PvmInput;
 use octez_riscv::pvm::PvmStatus;
@@ -24,7 +25,7 @@ use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
 use octez_riscv::state_backend::owned_backend::Owned;
 use octez_riscv::state_backend::proof_backend::proof::MerkleProof;
-use octez_riscv::state_backend::proof_backend::proof::Proof as OctezRiscvProof;
+use octez_riscv::state_backend::proof_backend::proof::Proof as PvmProof;
 use octez_riscv::state_backend::proof_backend::proof::deserialise_proof;
 use octez_riscv::state_backend::proof_backend::proof::serialise_proof;
 use octez_riscv::state_backend::verify_backend::Verifier;
@@ -158,17 +159,15 @@ pub enum InputRequest {
     NeedsReveal(BytesWrapper),
 }
 
-impl From<octez_riscv::pvm::InputRequest> for InputRequest {
-    fn from(request: octez_riscv::pvm::InputRequest) -> Self {
+impl From<PvmInputRequest> for InputRequest {
+    fn from(request: PvmInputRequest) -> Self {
         match request {
-            octez_riscv::pvm::InputRequest::NoInputRequired => InputRequest::NoInputRequired,
-            octez_riscv::pvm::InputRequest::Initial => InputRequest::Initial,
-            octez_riscv::pvm::InputRequest::FirstAfter { level, counter } => {
-                InputRequest::FirstAfter(level, counter)
+            PvmInputRequest::NoInputRequired => InputRequest::NoInputRequired,
+            PvmInputRequest::Initial => InputRequest::Initial,
+            PvmInputRequest::FirstAfter { level, counter } => {
+                InputRequest::FirstAfter { level, counter }
             }
-            octez_riscv::pvm::InputRequest::NeedsReveal(data) => {
-                InputRequest::NeedsReveal(BytesWrapper(data))
-            }
+            PvmInputRequest::NeedsReveal(data) => InputRequest::NeedsReveal(BytesWrapper(data)),
         }
     }
 }
@@ -512,8 +511,8 @@ struct Proof {
     verifier: Option<(NodePvm<Verifier>, MerkleProof)>,
 }
 
-impl From<OctezRiscvProof> for Proof {
-    fn from(proof: OctezRiscvProof) -> Self {
+impl From<PvmProof> for Proof {
+    fn from(proof: PvmProof) -> Self {
         Proof {
             final_state_hash: proof.final_state_hash(),
             serialised_proof: serialise_proof(&proof).collect(),
