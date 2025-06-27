@@ -17,7 +17,8 @@ use tezos_smart_rollup_storage::storage::Storage;
 use crate::{
     code_storage::CodeStorage,
     storage_helpers::{
-        concat, read_b256_be_default, read_u256_le_default, read_u64_le_default,
+        concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
+        read_u64_le_default,
     },
     Error,
 };
@@ -68,7 +69,7 @@ pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
 }
 
 pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
-    let path_string = format!("/{}", index);
+    let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
     OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
 }
 
@@ -211,7 +212,7 @@ impl StorageAccount {
 
     pub fn get_storage(&self, host: &impl Runtime, index: &U256) -> Result<U256, Error> {
         let path = self.storage_path(index)?;
-        Ok(read_u256_le_default(host, &path, STORAGE_DEFAULT_VALUE)?)
+        Ok(read_u256_be_default(host, &path, STORAGE_DEFAULT_VALUE)?)
     }
 
     pub fn set_storage(
@@ -221,7 +222,7 @@ impl StorageAccount {
         value: &U256,
     ) -> Result<(), Error> {
         let path = self.storage_path(index)?;
-        let value_bytes = value.to_le_bytes::<{ U256::BYTES }>();
+        let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
         Ok(host.store_write_all(&path, &value_bytes)?)
     }

@@ -55,6 +55,18 @@ pub fn read_u256_le_default(
     }
 }
 
+pub fn read_u256_be_default(
+    host: &impl Runtime,
+    path: &impl Path,
+    default: U256,
+) -> Result<U256, RuntimeError> {
+    match host.store_read_all(path) {
+        Ok(bytes) if bytes.len() == 32 => Ok(U256::from_be_slice(&bytes)),
+        Ok(_) | Err(RuntimeError::PathNotFound) => Ok(default),
+        Err(runtime_error) => Err(runtime_error),
+    }
+}
+
 pub fn read_b256_be_opt(
     host: &impl Runtime,
     path: &impl Path,
