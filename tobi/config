@@ -61,6 +61,7 @@ octez-baker-lib: src/lib_agnostic_baker
 octez-client: src/bin_client
 octez-codec: src/bin_codec
 octez-codec-kaitai: client-libs/bin_codec_kaitai
+octez-connpool: src/lib_connpool, src/lib_connpool/test
 octez-crawler: src/lib_crawler
 octez-dal-node: src/bin_dal_node
 octez-distributed-internal: src/lib_distributed_internal/src

@@ -13,6 +13,7 @@
   octez-evm-node-libs.websocket_lwt_unix
   octez-evm-node-libs.websocket_cohttp_lwt
   octez-libs.tezos-workers
+  octez-connpool
   octez-libs.rpc-http-client-unix
   octez-version.value
   octez-libs.stdlib-unix
