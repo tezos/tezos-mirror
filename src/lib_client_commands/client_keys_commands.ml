@@ -431,7 +431,9 @@ let commands network : Client_context.full Tezos_clic.command list =
           (args2 (Secret_key.force_switch ()) sig_algo_arg)
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo) name (cctxt : Client_context.full) ->
-            let* name = Secret_key.of_fresh cctxt force name in
+            let* name =
+              Secret_key.of_fresh ~show_existing_key:false cctxt force name
+            in
             let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
@@ -448,7 +450,9 @@ let commands network : Client_context.full Tezos_clic.command list =
              (encrypted_switch ()))
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
-            let* name = Secret_key.of_fresh cctxt force name in
+            let* name =
+              Secret_key.of_fresh ~show_existing_key:false cctxt force name
+            in
             let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
@@ -564,7 +568,9 @@ let commands network : Client_context.full Tezos_clic.command list =
       @@ prefixes ["secret"; "key"]
       @@ Secret_key.fresh_alias_param @@ Client_keys.sk_uri_param @@ stop)
       (fun force name sk_uri (cctxt : Client_context.full) ->
-        let* name = Secret_key.of_fresh cctxt force name in
+        let* name =
+          Secret_key.of_fresh ~show_existing_key:false cctxt force name
+        in
         let* pk_uri = Client_keys.neuterize sk_uri in
         let* () = fail_if_already_registered cctxt force pk_uri name in
         let* pkh, public_key =
@@ -591,7 +597,9 @@ let commands network : Client_context.full Tezos_clic.command list =
            @@ prefixes ["fundraiser"; "secret"; "key"]
            @@ Secret_key.fresh_alias_param @@ stop)
            (fun force name (cctxt : Client_context.full) ->
-             let* name = Secret_key.of_fresh cctxt force name in
+             let* name =
+               Secret_key.of_fresh ~show_existing_key:false cctxt force name
+             in
              let* sk = input_fundraiser_params cctxt in
              let* sk_uri =
                Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -803,7 +811,9 @@ let commands network : Client_context.full Tezos_clic.command list =
         @@ prefixes ["keys"; "from"; "mnemonic"]
         @@ Secret_key.fresh_alias_param @@ stop)
         (fun (force, encrypt) name (cctxt : Client_context.full) ->
-          let* name = Secret_key.of_fresh cctxt force name in
+          let* name =
+            Secret_key.of_fresh ~show_existing_key:false cctxt force name
+          in
           let* mnemonic = cctxt#prompt "Enter your mnemonic: " in
           let mnemonic = String.trim mnemonic |> String.split_on_char ' ' in
           match Bip39.of_words mnemonic with

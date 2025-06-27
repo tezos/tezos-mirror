@@ -114,7 +114,11 @@ module type Alias = sig
   val force_switch : unit -> (bool, _) Tezos_clic.arg
 
   val of_fresh :
-    #Client_context.wallet -> bool -> fresh_param -> string tzresult Lwt.t
+    #Client_context.wallet ->
+    ?show_existing_key:bool ->
+    bool ->
+    fresh_param ->
+    string tzresult Lwt.t
 
   val parse_source_string : #Client_context.wallet -> string -> t tzresult Lwt.t
 
@@ -357,7 +361,7 @@ module Alias (Entity : Entity) = struct
 
   type fresh_param = Fresh of string
 
-  let of_fresh (wallet : #wallet) force (Fresh s) =
+  let of_fresh (wallet : #wallet) ?(show_existing_key = true) force (Fresh s) =
     let open Lwt_result_syntax in
     let* list = load wallet in
     let* () =
@@ -369,11 +373,12 @@ module Alias (Entity : Entity) = struct
               let* value = Entity.to_source v in
               failwith
                 "@[<v 2>The %s alias %s already exists.@,\
-                 The current value is %s.@,\
-                 Use --force to update@]"
+                 %sUse --force to update@]"
                 Entity.name
                 n
-                value
+                (if show_existing_key then
+                   (Format.asprintf "The current value is %s.@,") value
+                 else "")
             else return_unit)
           list
     in

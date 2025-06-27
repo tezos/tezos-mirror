@@ -115,7 +115,11 @@ module type Alias = sig
   val force_switch : unit -> (bool, _) Tezos_clic.arg
 
   val of_fresh :
-    #Client_context.wallet -> bool -> fresh_param -> string tzresult Lwt.t
+    #Client_context.wallet ->
+    ?show_existing_key:bool ->
+    bool ->
+    fresh_param ->
+    string tzresult Lwt.t
 
   val parse_source_string : #Client_context.wallet -> string -> t tzresult Lwt.t
 
