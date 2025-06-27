@@ -272,12 +272,7 @@ automatically generated and published on `DockerHub
 way to run an always up-to-date ``octez-node``.
 
 From version 22.0 all Octez Docker images are signed using Cosign.
-You can verify if the images are correctly signed using the Cosign utility, as explained below:
-
-.. toctree::
-   :maxdepth: 2
-
-   cosign-verify
+You can verify if the images are correctly signed, :doc:`using Cosign <./cosign-verify>`.
 
 You can use the Docker images either directly or using Docker compose files, as explained next.
 In both cases, you need to have `Docker <https://www.docker.com>`__ installed and started (`Docker Desktop <https://www.docker.com/products/docker-desktop/>`__ would suffice for the instructions below).
@@ -629,4 +624,6 @@ Appendix
 .. toctree::
    :maxdepth: 2
 
+   howtobuild
+   cosign-verify
    get_troubleshooting
