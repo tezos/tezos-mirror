@@ -184,6 +184,11 @@ let () =
   register
   @@ def
        "operation"
+       ["data_and_metadata"]
+       Protocol.Apply_results.operation_data_and_metadata_encoding ;
+  register
+  @@ def
+       "operation"
        ["contents_list"]
        Protocol.Alpha_context.Operation.contents_list_encoding ;
   register
