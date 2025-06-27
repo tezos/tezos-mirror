@@ -179,18 +179,28 @@ impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
                             );
                         }
 
-                        for (key, EvmStorageSlot { present_value, .. }) in storage {
-                            if let Err(err) = storage_account.set_storage(
-                                self.host,
-                                &key,
-                                &present_value,
-                            ) {
-                                self.abort();
-                                log!(
+                        for (
+                            key,
+                            EvmStorageSlot {
+                                original_value,
+                                present_value,
+                                ..
+                            },
+                        ) in storage
+                        {
+                            if original_value != present_value {
+                                if let Err(err) = storage_account.set_storage(
                                     self.host,
-                                    LogError,
-                                    "DatabaseCommit `set_storage` error: {err:?}"
-                                );
+                                    &key,
+                                    &present_value,
+                                ) {
+                                    self.abort();
+                                    log!(
+                                        self.host,
+                                        LogError,
+                                        "DatabaseCommit `set_storage` error: {err:?}"
+                                    );
+                                }
                             }
                         }
                     }
