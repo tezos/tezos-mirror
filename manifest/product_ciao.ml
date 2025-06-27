@@ -44,6 +44,14 @@ let ci_lib_cacio =
     ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci]
     ~release_status:Unreleased
 
+let _release_page =
+  private_exe
+    "release_page"
+    ~opam:""
+    ~path:"ci/bin_release_page"
+    ~release_status:Unreleased
+    ~deps:[unix; clap; tezt_json_lib]
+
 let ci_grafazos =
   private_lib
     "grafazos"
