@@ -105,6 +105,7 @@ type outbox_message_filter =
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  etherlink : bool;
   boot_sector_file : string option;
   operators : Purpose.operators;
   rpc_addr : string;
@@ -320,6 +321,7 @@ module Cli : sig
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     profiling:bool option ->
+    force_etherlink:bool ->
     t tzresult Lwt.t
 
   val create_or_read_config :
@@ -355,5 +357,6 @@ module Cli : sig
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
     profiling:bool option ->
+    force_etherlink:bool ->
     t tzresult Lwt.t
 end

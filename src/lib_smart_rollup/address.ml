@@ -24,3 +24,14 @@
 (*****************************************************************************)
 
 include Tezos_crypto.Hashed.Smart_rollup_address
+
+let etherlink_mainnet_addr =
+  of_b58check_exn "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
+
+let etherlink_testnet_addr =
+  of_b58check_exn "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg"
+
+let etherlink_addresses = [etherlink_mainnet_addr; etherlink_testnet_addr]
+
+(** Returns [true] if the address is a known Etherlink rollup. *)
+let is_etherlink addr = List.mem ~equal addr etherlink_addresses

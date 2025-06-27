@@ -263,8 +263,14 @@ Smart Rollup node
   stored on disk. (MR :gl:`!18160`)
 
 - Produce Opentelemetry traces with ``--profiling``, configurable with a field
-  ``"opentelemetry"`` in the configuration. (MR :gl:`!18274`)
+  ``"opentelemetry"`` in the configuration. (MRs :gl:`!18274`, :gl:`!18290`,
+  :gl:`!18331`, :gl:`!18344`, :gl:`!18368`, :gl:`!18433`, :gl:`!18434`,
+  :gl:`!18441`, :gl:`!18466`)
 
+- The rollup node now identifies Etherlink rollups (the rollup can also be
+  forced to be identified as Etherlink with the CLI switch ``--etherlink``) and
+  emit events for processed Etherlink blocks in the logs and in the traces. (MR
+  :gl:`!18466`)
 
 Smart Rollup WASM Debugger
 --------------------------

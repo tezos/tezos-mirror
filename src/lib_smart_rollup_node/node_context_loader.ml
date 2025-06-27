@@ -214,6 +214,7 @@ module For_snapshots = struct
       Configuration.
         {
           sc_rollup_address = metadata.rollup_address;
+          etherlink = Address.is_etherlink metadata.rollup_address;
           boot_sector_file = None;
           operators;
           rpc_addr = Configuration.default_rpc_addr;
@@ -327,6 +328,7 @@ module Internal_for_tests = struct
       Configuration.
         {
           sc_rollup_address = rollup_address;
+          etherlink = Address.is_etherlink rollup_address;
           boot_sector_file = None;
           operators;
           rpc_addr = Configuration.default_rpc_addr;
