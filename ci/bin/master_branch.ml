@@ -42,22 +42,20 @@ let job_static_x86_64 =
     ()
 
 let jobs_documentation : tezos_job list =
-  let rules = [job_rule ~changes:(Changeset.encode changeset_octez_docs) ()] in
   let dependencies = Dependent [] in
-  let job_odoc = Documentation.job_odoc ~rules ~dependencies () in
+  let job_odoc = Documentation.job_odoc ~dependencies () in
   let job_manuals =
     Documentation.job_manuals
-      ~rules
       ~dependencies:(Dependent [Artifacts job_static_x86_64])
       ~use_static_executables:true
       ()
   in
-  let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
+  let job_docgen = Documentation.job_docgen ~dependencies () in
   let job_build_all =
-    Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ~rules ()
+    Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ()
   in
   let job_publish_documentation : tezos_job =
-    Documentation.job_publish_documentation ~job_build_all ~rules ()
+    Documentation.job_publish_documentation ~job_build_all ()
   in
   [job_odoc; job_manuals; job_docgen; job_build_all; job_publish_documentation]
 

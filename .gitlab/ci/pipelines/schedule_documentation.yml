@@ -100,25 +100,6 @@ documentation:odoc:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -163,25 +144,6 @@ documentation:manuals:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
   needs:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
@@ -209,25 +171,6 @@ documentation:docgen:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
   needs:
   - oc.docker:ci:amd64
   dependencies:
@@ -269,25 +212,6 @@ documentation:build_all:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
   needs:
   - oc.docker:ci:amd64
   - documentation:odoc
@@ -318,25 +242,6 @@ documentation:publish:
   stage: publish
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/**/*
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
-    when: on_success
   needs:
   - oc.docker:ci:amd64
   - documentation:build_all
