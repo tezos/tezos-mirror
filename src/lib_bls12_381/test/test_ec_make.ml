@@ -526,6 +526,115 @@ module MakeECProperties (G : Bls12_381.CURVE) = struct
     let xs = List.init n (fun _ -> G.random ()) in
     assert (G.(eq (List.fold_left G.add G.zero xs) (G.add_bulk xs)))
 
+  let test_affine_add_bulk_single () =
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p|] in
+    assert (G.(eq p (affine_add_bulk xs_affine)))
+
+  let test_affine_add_bulk_double () =
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p; p|] in
+    assert (G.(eq (double p) (affine_add_bulk xs_affine)))
+
+  let test_affine_add_bulk_add () =
+    let p1 = G.random () in
+    let p2 = G.random () in
+    let xs_affine = G.to_affine_array [|p1; p2|] in
+    assert (G.(eq (add p1 p2) (affine_add_bulk xs_affine)))
+
+  let test_affine_add_bulk_zero () =
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p; G.zero|] in
+    assert (G.(eq p (affine_add_bulk xs_affine)))
+
+  let test_affine_add_bulk_negate () =
+    let p1 = G.random () in
+    let p2 = G.negate p1 in
+    let xs_affine = G.to_affine_array [|p1; p2|] in
+    assert (G.(eq zero (affine_add_bulk xs_affine)))
+
+  let test_affine_add_bulk_commutativity () =
+    let p1 = G.random () in
+    let p2 = G.random () in
+    assert (
+      G.(
+        eq
+          (affine_add_bulk (to_affine_array [|p1; p2|]))
+          (affine_add_bulk (to_affine_array [|p2; p1|]))))
+
+  let test_pippenger_with_affine_array_single () =
+    let s = G.Scalar.random () in
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p|] in
+    let scalars = [|s|] in
+    assert (G.(eq (mul p s) (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_double () =
+    let s = G.Scalar.random () in
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p; p|] in
+    let scalars = [|s; s|] in
+    assert (
+      G.(eq (double (mul p s)) (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_double_diff_coeff () =
+    let s1 = G.Scalar.random () in
+    let s2 = G.Scalar.random () in
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p; p|] in
+    let scalars = [|s1; s2|] in
+    assert (
+      G.(
+        eq
+          (add (mul p s1) (mul p s2))
+          (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_add () =
+    let s1 = G.Scalar.random () in
+    let p1 = G.random () in
+    let s2 = G.Scalar.random () in
+    let p2 = G.random () in
+    let xs_affine = G.to_affine_array [|p1; p2|] in
+    let scalars = [|s1; s2|] in
+    assert (
+      G.(
+        eq
+          (add (mul p1 s1) (mul p2 s2))
+          (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_zero () =
+    let s = G.Scalar.random () in
+    let p = G.random () in
+    let xs_affine = G.to_affine_array [|p; G.zero|] in
+    let scalars = G.Scalar.[|s; one|] in
+    assert (G.(eq (mul p s) (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_negate () =
+    let p1 = G.random () in
+    let p2 = G.negate p1 in
+    let xs_affine = G.to_affine_array [|p1; p2|] in
+    let scalars = G.Scalar.[|one; one|] in
+    assert (G.(eq zero (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_coeff_zero () =
+    let s1 = G.Scalar.random () in
+    let p1 = G.random () in
+    let p2 = G.random () in
+    let xs_affine = G.to_affine_array [|p1; p2|] in
+    let scalars = [|s1; G.Scalar.zero|] in
+    assert (G.(eq (mul p1 s1) (pippenger_with_affine_array xs_affine scalars)))
+
+  let test_pippenger_with_affine_array_commutativity () =
+    let s1 = G.Scalar.random () in
+    let p1 = G.random () in
+    let s2 = G.Scalar.random () in
+    let p2 = G.random () in
+    assert (
+      G.(
+        eq
+          (pippenger_with_affine_array (to_affine_array [|p2; p1|]) [|s2; s1|])
+          (pippenger_with_affine_array (to_affine_array [|p1; p2|]) [|s1; s2|])))
+
   (** Returns the tests to be used with Alcotest *)
   let get_tests () =
     let open Alcotest in
@@ -535,6 +644,62 @@ module MakeECProperties (G : Bls12_381.CURVE) = struct
         test_case "check_bytes_zero" `Quick (repeat 1 check_bytes_zero);
         test_case "check_bytes_one" `Quick (repeat 1 check_bytes_one);
         test_case "bulk add" `Quick (repeat 100 test_bulk_add);
+        test_case
+          "affine add bulk with a single element"
+          `Quick
+          (repeat 100 test_affine_add_bulk_single);
+        test_case
+          "affine add bulk is double"
+          `Quick
+          (repeat 100 test_affine_add_bulk_double);
+        test_case
+          "affine add bulk is add"
+          `Quick
+          (repeat 100 test_affine_add_bulk_add);
+        test_case
+          "affine add bulk with zero"
+          `Quick
+          (repeat 100 test_affine_add_bulk_zero);
+        test_case
+          "affine add bulk is zero"
+          `Quick
+          (repeat 100 test_affine_add_bulk_negate);
+        test_case
+          "affine add bulk is commutative"
+          `Quick
+          (repeat 100 test_affine_add_bulk_commutativity);
+        test_case
+          "pippenger with a single element"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_single);
+        test_case
+          "pippenger is double"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_double);
+        test_case
+          "pippenger is double with different coefficients"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_double_diff_coeff);
+        test_case
+          "pippenger is add"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_add);
+        test_case
+          "pippenger with zero"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_zero);
+        test_case
+          "pippenger is zero"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_negate);
+        test_case
+          "pippenger with coefficient zero"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_coeff_zero);
+        test_case
+          "pippenger is commutative"
+          `Quick
+          (repeat 100 test_pippenger_with_affine_array_commutativity);
         test_case
           "check_bytes_random_double"
           `Quick
