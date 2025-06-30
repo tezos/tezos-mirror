@@ -633,15 +633,22 @@ struct
               let sk = Bls12_381_signature.generate_sk ikm in
               let expected_result = Hex.(to_bytes (`Hex expected_result_str)) in
               let res = Scheme.sign sk msg in
-              let res = SignatureM.signature_to_bytes res in
-              if not @@ Bytes.equal res expected_result then
+              let res_bytes = SignatureM.signature_to_bytes res in
+              if not @@ Bytes.equal res_bytes expected_result then
                 Alcotest.failf
                   "Expected result is %s on input %s with ikm %s, but computed \
                    %s"
                   Hex.(show (Hex.of_bytes expected_result))
                   msg_str
                   ikm_str
-                  Hex.(show (Hex.of_bytes res)))
+                  Hex.(show (Hex.of_bytes res_bytes)) ;
+              let pk = SignatureM.derive_pk sk in
+              if not @@ Scheme.verify pk msg res then
+                Alcotest.failf
+                  "Expected valid signature %s on input %s with ikm %s"
+                  Hex.(show (Hex.of_bytes res_bytes))
+                  msg_str
+                  ikm_str)
           contents
       in
       List.iter (fun filename -> aux filename) Scheme.test_vector_filenames
@@ -745,7 +752,13 @@ struct
                 "Expected result is %s with ikm %s, but computed %s"
                 exp_result_str
                 ikm_str
-                Hex.(show (Hex.of_bytes res)))
+                Hex.(show (Hex.of_bytes res)) ;
+            let pk = SignatureM.derive_pk sk in
+            if not @@ SignatureM.Pop.pop_verify pk res then
+              Alcotest.failf
+                "Expected valid proof %s with ikm %s"
+                Hex.(show (Hex.of_bytes res))
+                ikm_str)
         contents
     in
     List.iter (fun filename -> aux filename) MISC.pop_filenames
