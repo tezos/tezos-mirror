@@ -454,7 +454,9 @@ let () =
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
-    ~jobs:Master_branch.octez_distribution_docker_jobs
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+     :: Master_branch.octez_distribution_docker_jobs)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
@@ -469,7 +471,11 @@ let () =
   register
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
-    ~jobs:[Release_tag.job_release_page ~test:true ()]
+    ~jobs:
+      [
+        Tezos_ci.job_datadog_pipeline_trace;
+        Release_tag.job_release_page ~test:true ();
+      ]
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
