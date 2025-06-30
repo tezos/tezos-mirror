@@ -3899,46 +3899,46 @@ let init ~(configuration : configuration) etherlink_configuration cloud
             next_agent ~name)
           (List.init baker_count Fun.id)
     | Disabled ->
-        stake
-        |> List.mapi (fun i _stake ->
-               let name = name_of (Baker i) in
-               next_agent ~name)
-        |> Lwt.all
+        Lwt_list.mapi_s
+          (fun i _stake ->
+            let name = name_of (Baker i) in
+            next_agent ~name)
+          stake
   in
   let* bakers_agents =
-    (match configuration.simulate_network with
-    | Scatter (_selected_baker_count, baker_daemon_count)
-    | Map (_selected_baker_count, baker_daemon_count) ->
-        List.init baker_daemon_count string_of_int
-    | Disabled -> configuration.bakers)
-    |> List.mapi (fun i _stake ->
-           let name = name_of (Baker i) in
-           next_agent ~name)
-    |> Lwt.all
+    Lwt_list.mapi_s
+      (fun i _stake ->
+        let name = name_of (Baker i) in
+        next_agent ~name)
+      (match configuration.simulate_network with
+      | Scatter (_selected_baker_count, baker_daemon_count)
+      | Map (_selected_baker_count, baker_daemon_count) ->
+          List.init baker_daemon_count string_of_int
+      | Disabled -> configuration.bakers)
   in
   let* producers_agents =
-    configuration.dal_node_producers
-    |> List.map (fun slot_index ->
-           let name = name_of (Producer slot_index) in
-           let* agent = next_agent ~name in
-           return (agent, slot_index))
-    |> Lwt.all
+    Lwt_list.map_s
+      (fun slot_index ->
+        let name = name_of (Producer slot_index) in
+        let* agent = next_agent ~name in
+        return (agent, slot_index))
+      configuration.dal_node_producers
   in
   let* observers_slot_index_agents =
-    configuration.observer_slot_indices
-    |> List.map (fun slot_index ->
-           let name = name_of (Observer (`Index slot_index)) in
-           let* agent = next_agent ~name in
-           return (`Slot_index slot_index, agent))
-    |> Lwt.all
+    Lwt_list.map_s
+      (fun slot_index ->
+        let name = name_of (Observer (`Index slot_index)) in
+        let* agent = next_agent ~name in
+        return (`Slot_index slot_index, agent))
+      configuration.observer_slot_indices
   in
   let* observers_bakers_agents =
-    configuration.observer_pkhs
-    |> List.map (fun pkh ->
-           let name = name_of (Observer (`Pkh pkh)) in
-           let* agent = next_agent ~name in
-           return (`Pkh pkh, agent))
-    |> Lwt.all
+    Lwt_list.map_s
+      (fun pkh ->
+        let name = name_of (Observer (`Pkh pkh)) in
+        let* agent = next_agent ~name in
+        return (`Pkh pkh, agent))
+      configuration.observer_pkhs
   in
   let* teztale =
     match bootstrap_agent with
