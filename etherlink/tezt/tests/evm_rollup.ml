@@ -309,7 +309,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
     ?dal_slots ?(enable_multichain = false) ?websockets
-    ?(enable_fast_withdrawal = false) ?enable_tx_queue protocol =
+    ?(enable_fast_withdrawal = false) ?enable_tx_queue ?enable_revm protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -385,6 +385,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~enable_dal
         ~enable_multichain
         ~enable_fast_withdrawal
+        ?enable_revm
         ?dal_slots
         ?evm_version
         ()
@@ -527,8 +528,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
-    ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue f
-    protocols =
+    ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue
+    ?(enable_revm = false) f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -547,58 +548,64 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
         @ (if enable_dal then [Constant.octez_dal_node] else [])
         @ additional_uses
       in
-      Protocol.register_test
-        ~__FILE__
-        ~tags:
-          ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
-          @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
-             else [])
-          @ (kernel_tag :: extra_tag :: tags))
-        ~uses
-        ~title:
-          (sf
-             "%s (%s, %s, %s, %s)"
-             title
-             extra_tag
-             kernel_tag
-             (if enable_dal then "with dal" else "without dal")
-             (if enable_multichain then "multichain" else "single chain"))
-        (fun protocol ->
-          let* evm_setup =
-            setup_evm_kernel
-              ~kernel
-              ?additional_config
-              ?whitelist
-              ?commitment_period
-              ?challenge_window
-              ?eth_bootstrap_accounts
-              ?da_fee_per_byte
-              ?minimum_base_fee_per_gas
-              ?rollup_operator_key
-              ?maximum_allowed_ticks
-              ?maximum_gas_per_transaction
-              ?restricted_rpcs
-              ~admin
-              ~setup_mode
-              ~enable_dal
-              ?dal_slots
-              ~enable_multichain
-              ?websockets
-              ?enable_fast_withdrawal
-              ?evm_version
-              ?enable_tx_queue
-              protocol
-          in
-          f ~protocol ~evm_setup)
-        protocols)
+      if (not enable_revm) || Kernel.supports_revm kernel then
+        Protocol.register_test
+          ~__FILE__
+          ~tags:
+            ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
+            @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
+               else [])
+            @ (if enable_revm then ["revm"] (* Activate CI for REVM tests *)
+               else [])
+            @ (kernel_tag :: extra_tag :: tags))
+          ~uses
+          ~title:
+            (sf
+               "%s (%s, %s, %s, %s, %s)"
+               title
+               extra_tag
+               kernel_tag
+               (if enable_dal then "with dal" else "without dal")
+               (if enable_multichain then "multichain" else "single chain")
+               (if enable_revm then "with revm" else "without revm"))
+          (fun protocol ->
+            let* evm_setup =
+              setup_evm_kernel
+                ~kernel
+                ?additional_config
+                ?whitelist
+                ?commitment_period
+                ?challenge_window
+                ?eth_bootstrap_accounts
+                ?da_fee_per_byte
+                ?minimum_base_fee_per_gas
+                ?rollup_operator_key
+                ?maximum_allowed_ticks
+                ?maximum_gas_per_transaction
+                ?restricted_rpcs
+                ~admin
+                ~setup_mode
+                ~enable_dal
+                ?dal_slots
+                ~enable_multichain
+                ?websockets
+                ?enable_fast_withdrawal
+                ?evm_version
+                ?enable_tx_queue
+                ~enable_revm
+                protocol
+            in
+            f ~protocol ~evm_setup)
+          protocols)
     kernels
 
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
-    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
-  let register ~enable_dal ~enable_multichain : unit =
+    ?websockets ?enable_fast_withdrawal ?evm_version ?register_revm f protocols
+    =
+  let register ~enable_dal ~enable_multichain ~enable_revm : unit =
     register_test
       ~title
       ~tags
@@ -623,12 +630,15 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       protocols
       ~enable_dal
       ~enable_multichain
+      ~enable_revm
       ~setup_mode:Setup_proxy
   in
-  register ~enable_dal:false ~enable_multichain:false ;
-  register ~enable_dal:true ~enable_multichain:false ;
-  register ~enable_dal:false ~enable_multichain:true ;
-  register ~enable_dal:true ~enable_multichain:true
+  if register_revm = Some true then
+    register ~enable_dal:false ~enable_multichain:false ~enable_revm:true ;
+  register ~enable_dal:false ~enable_multichain:false ~enable_revm:false ;
+  register ~enable_dal:true ~enable_multichain:false ~enable_revm:false ;
+  register ~enable_dal:false ~enable_multichain:true ~enable_revm:false ;
+  register ~enable_dal:true ~enable_multichain:true ~enable_revm:false
 
 let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
@@ -2535,8 +2545,12 @@ let deposit ~amount_mutez ~bridge ~depositor ~receiver ~produce_block
 
 let call_withdraw ?expect_failure ~sender ~endpoint ~value ~produce_block
     ~receiver () =
+  let label = "withdraw" in
+  let* already_registered = Eth_cli.check_abi ~label () in
+  let abi = withdrawal_abi_path () in
   let* () =
-    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
+    if already_registered then Eth_cli.update_abi ~label ~abi ()
+    else Eth_cli.add_abi ~label ~abi ()
   in
   let call_withdraw =
     Eth_cli.contract_send
@@ -2594,6 +2608,7 @@ let test_deposit_and_withdraw =
     ~admin
     ~commitment_period
     ~challenge_window
+    ~register_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                {
@@ -2675,8 +2690,9 @@ let test_withdraw_amount =
      Replace by [Any] after the next upgrade *)
     ~kernels:[Latest]
     ~tags:["evm"; "withdraw"; "wei"; "mutez"]
-    ~title:"Minimum amout to withdraw"
+    ~title:"Minimum amount to withdraw"
     ~admin
+    ~register_revm:true
   @@ fun ~protocol:_ ~evm_setup:{endpoint; produce_block; _} ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Minimal amount of Wei fails with revert. *)

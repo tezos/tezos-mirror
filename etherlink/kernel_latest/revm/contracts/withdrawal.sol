@@ -47,7 +47,7 @@ contract XTZWithdrawal {
         emit StandardWithdrawalEvent(
             weiAmount,
             msg.sender,
-            // TODO: FIX THIS
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
             // target,
             withdrawalCounter
         );
