@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -38,12 +39,58 @@ let test_jstz_proof_regression () =
       in
       assert (proof_bytes = Hex.to_bytes_exn (`Hex expected_proof_bytes)) ;
 
-      (* TODO RV-698: Also check initial state hash *)
+      let initial_proof_hash = Backend.proof_start_state proof in
       let final_proof_hash = Backend.proof_stop_state proof in
+
+      let initial_hash = Backend.state_hash state in
       let* state = Backend.compute_step state in
       let final_hash = Backend.state_hash state in
       assert (final_hash = final_proof_hash) ;
+      assert (initial_hash = initial_proof_hash) ;
+      assert (final_hash = final_proof_hash) ;
 
-      (* TODO RV-698: Also check proof verification and input request *)
+      (* First step after installing boot sector should not require any input.
+         Similarly, the input request generated for the next step should be No_input_required.
+         We expect this to happen because right after installing the boot sector the internal PVM machinery
+         will spend some computation steps to prepare the execution environment for user kernel execution *)
+      let input_request = Backend.verify_proof None proof in
+      assert (input_request = Some Backend.No_input_required) ;
+
+      return_unit
+  | None -> Lwt.fail_with "Could not produce proof"
+
+let test_proof_immutability () =
+  let open Lwt_syntax in
+  let state = Storage.empty () in
+  let* kernel = Utils.read_riscv_jstz_kernel () in
+  let* state = Backend.install_boot_sector state kernel in
+
+  match Backend.produce_proof None state with
+  | Some proof ->
+      (* Unlike the jstz_proof_regression test, now we first call verify_proof
+         to check proof immutability between proof_start_state & verify_proof functions *)
+      let input_request = Backend.verify_proof None proof in
+      assert (input_request = Some Backend.No_input_required) ;
+
+      let initial_proof_hash = Backend.proof_start_state proof in
+      let final_proof_hash = Backend.proof_stop_state proof in
+
+      let initial_hash = Backend.state_hash state in
+      let* state = Backend.compute_step state in
+      let final_hash = Backend.state_hash state in
+      assert (final_hash = final_proof_hash) ;
+      assert (initial_hash = initial_proof_hash) ;
+      assert (final_hash = final_proof_hash) ;
+
+      (* Verify the proof again to test for immutability *)
+      let input_request = Backend.verify_proof None proof in
+      assert (input_request = Some Backend.No_input_required) ;
+
+      (* Check the initial and final hash again to test for immutability *)
+      let second_initial_proof_hash = Backend.proof_start_state proof in
+      let second_final_proof_hash = Backend.proof_stop_state proof in
+      assert (initial_proof_hash = second_initial_proof_hash) ;
+      assert (final_proof_hash = second_final_proof_hash) ;
+
       return_unit
   | None -> Lwt.fail_with "Could not produce proof"

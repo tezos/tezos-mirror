@@ -547,9 +547,25 @@ ocaml::custom!(Proof);
 
 #[ocaml::func]
 #[ocaml::sig("proof -> bytes")]
-pub fn octez_riscv_proof_start_state(_proof: Pointer<Proof>) -> [u8; 32] {
-    // TODO: RV-698 Proof start state is not implemented yet
-    todo!()
+pub fn octez_riscv_proof_start_state(mut proof: Pointer<Proof>) -> OcamlFallible<[u8; 32]> {
+    // Ensure that the proof has been deserialised and contains the verifier backend.
+    let (_, merkle_proof) = match proof.as_mut().get_or_create_verifier() {
+        Ok(verifier) => verifier,
+        Err(e) => {
+            return Err(ocaml::Error::Error(
+                format!("Error getting start state hash from proof: {e}").into(),
+            ));
+        }
+    };
+
+    match merkle_proof.root_hash() {
+        Ok(hash) => Ok(hash.into()),
+        Err(e) => {
+            return Err(ocaml::Error::Error(
+                format!("Error getting start state hash from proof: {e}").into(),
+            ));
+        }
+    }
 }
 
 #[ocaml::func]
