@@ -596,22 +596,6 @@ let evm_node_private_endpoint_arg =
     ~doc:"The address of an EVM node and its private endpoint."
     Params.evm_node_private_endpoint
 
-let bundler_node_endpoint_arg =
-  Tezos_clic.arg
-    ~long:"bundler-node-endpoint"
-    ~placeholder:"url"
-    ~doc:
-      "The address of a service which encrypts incoming transactions for the \
-       rollup."
-    Params.endpoint
-
-let sequencer_sidecar_endpoint_arg =
-  Tezos_clic.arg
-    ~long:"sequencer-sidecar-endpoint"
-    ~placeholder:"url"
-    ~doc:"The address of The sequencer sidecar to connect to."
-    Params.endpoint
-
 let time_between_blocks_arg =
   Tezos_clic.arg
     ~long:"time-between-blocks"
@@ -1318,11 +1302,10 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
     ?private_rpc_port ?cors_origins ?cors_headers ?enable_websocket ~verbose
     ?profiling ?preimages ?preimages_endpoint ?native_execution_policy
     ?rollup_node_endpoint ~dont_track_rollup_node ?evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint ?tx_pool_timeout_limit
-    ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?log_filter_chunk_size
-    ?log_filter_max_nb_logs ?log_filter_max_nb_blocks ?restricted_rpcs ?kernel
-    ~no_sync ~init_from_snapshot ?history_mode ~finalized_view ?network
-    config_file =
+    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?log_filter_chunk_size ?log_filter_max_nb_logs ?log_filter_max_nb_blocks
+    ?restricted_rpcs ?kernel ~no_sync ~init_from_snapshot ?history_mode
+    ~finalized_view ?network config_file =
   let open Lwt_result_syntax in
   let* config =
     Cli.create_or_read_config
@@ -1347,7 +1330,6 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?preimages_endpoint
       ?native_execution_policy
       ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint
       ?tx_pool_timeout_limit
       ?tx_pool_addr_limit
       ?tx_pool_tx_per_addr_limit
@@ -1840,12 +1822,11 @@ let init_config_command =
       "Create an initial config with default value.\n\
        If the <rollup-node-endpoint> is set then adds the configuration for \
        the proxy mode. If the  <sequencer-key> is set,then adds the \
-       configuration for the sequencer and threshold encryption sequencer \
-       modes. If the <evm-node-endpoint> is set then adds the configuration \
-       for the observer mode."
+       configuration for the sequencer mode. If the <evm-node-endpoint> is set \
+       then adds the configuration for the observer mode."
     (merge_options
        common_config_args
-       (args20
+       (args18
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1859,8 +1840,6 @@ let init_config_command =
           maximum_blueprints_catchup_arg
           catchup_cooldown_arg
           evm_node_endpoint_arg
-          bundler_node_endpoint_arg
-          sequencer_sidecar_endpoint_arg
           history_arg
           (* others option *)
           dont_track_rollup_node_arg
@@ -1911,8 +1890,6 @@ let init_config_command =
              max_blueprints_catchup,
              catchup_cooldown,
              evm_node_endpoint,
-             threshold_encryption_bundler_endpoint,
-             sequencer_sidecar_endpoint,
              history_mode,
              dont_track_rollup_node,
              wallet_dir,
@@ -1962,8 +1939,6 @@ let init_config_command =
           ?private_rpc_port
           ?sequencer_key
           ?evm_node_endpoint
-          ?threshold_encryption_bundler_endpoint
-          ?sequencer_sidecar_endpoint
           ?max_blueprints_lag
           ?max_blueprints_ahead
           ?max_blueprints_catchup
@@ -2751,10 +2726,9 @@ let tezlink_sandbox_command =
         config_file)
 
 let observer_run_args =
-  Tezos_clic.args12
+  Tezos_clic.args11
     private_rpc_port_arg
     evm_node_endpoint_arg
-    bundler_node_endpoint_arg
     preimages_arg
     preimages_endpoint_arg
     native_execution_policy_arg
@@ -2799,7 +2773,6 @@ let observer_command =
              profiling ),
            ( private_rpc_port,
              evm_node_endpoint,
-             threshold_encryption_bundler_endpoint,
              preimages,
              preimages_endpoint,
              native_execution_policy,
@@ -2834,7 +2807,6 @@ let observer_command =
         ?rollup_node_endpoint
         ~dont_track_rollup_node
         ?evm_node_endpoint
-        ?threshold_encryption_bundler_endpoint
         ?tx_pool_timeout_limit
         ?tx_pool_addr_limit
         ?tx_pool_tx_per_addr_limit

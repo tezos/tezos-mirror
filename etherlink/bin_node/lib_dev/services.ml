@@ -128,7 +128,6 @@ let configuration_handler config =
       rollup_node_endpoint = Uri.of_string hidden;
       kernel_execution;
       sequencer;
-      threshold_encryption_sequencer = None;
       proxy;
       observer;
       private_rpc = None;

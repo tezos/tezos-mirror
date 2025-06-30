@@ -139,24 +139,7 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type threshold_encryption_sequencer =
-  | Threshold_encryption_sequencer of {
-      time_between_blocks : time_between_blocks;
-          (** See {!type-time_between_blocks}. *)
-      max_number_of_chunks : int;
-          (** The maximum number of chunks per blueprints. *)
-      sequencer : Client_keys.sk_uri;
-          (** The key used to sign the blueprints. *)
-      blueprints_publisher_config : blueprints_publisher_config;
-      sidecar_endpoint : Uri.t;
-          (** Endpoint of the sequencer sidecar this sequencer connects to. *)
-    }
-
-type observer = {
-  evm_node_endpoint : Uri.t;
-  threshold_encryption_bundler_endpoint : Uri.t option;
-  rollup_node_tracking : bool;
-}
+type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
 
 type proxy = {
   finalized_view : bool option;
@@ -204,7 +187,6 @@ type t = {
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
-  threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   proxy : proxy;
   tx_pool_timeout_limit : int64;
@@ -264,11 +246,6 @@ val load :
     [config] or fails *)
 val sequencer_config_exn : t -> sequencer tzresult
 
-(** [threshold_encryption_sequencer_config_exn config] returns the threshold
-    encryption sequencer config of [config] or fails. *)
-val threshold_encryption_sequencer_config_exn :
-  t -> threshold_encryption_sequencer tzresult
-
 (** [observer_config_exn config] returns the observer config of
     [config] or fails *)
 val observer_config_exn : t -> observer tzresult
@@ -287,29 +264,10 @@ val sequencer_config_dft :
   unit ->
   sequencer
 
-(** [threshold_encryption_sequencer_config_dft ()] returns the default
-    threshold encryption sequencer config populated with given value. *)
-val threshold_encryption_sequencer_config_dft :
-  ?time_between_blocks:time_between_blocks ->
-  ?max_number_of_chunks:int ->
-  sequencer:Client_keys.sk_uri ->
-  ?sidecar_endpoint:Uri.t ->
-  ?max_blueprints_lag:int ->
-  ?max_blueprints_ahead:int ->
-  ?max_blueprints_catchup:int ->
-  ?catchup_cooldown:int ->
-  ?dal_slots:int list ->
-  unit ->
-  threshold_encryption_sequencer
-
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
-  evm_node_endpoint:Uri.t ->
-  ?threshold_encryption_bundler_endpoint:Uri.t ->
-  ?rollup_node_tracking:bool ->
-  unit ->
-  observer
+  evm_node_endpoint:Uri.t -> ?rollup_node_tracking:bool -> unit -> observer
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
@@ -350,7 +308,6 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
@@ -358,7 +315,6 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
@@ -391,7 +347,6 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
@@ -399,7 +354,6 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
@@ -432,7 +386,6 @@ module Cli : sig
     ?private_rpc_port:int ->
     ?sequencer_key:Client_keys.sk_uri ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
@@ -440,7 +393,6 @@ module Cli : sig
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->

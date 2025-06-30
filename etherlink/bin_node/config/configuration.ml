@@ -186,21 +186,7 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-(* Variant is needed to avoid type-checking errors. *)
-type threshold_encryption_sequencer =
-  | Threshold_encryption_sequencer of {
-      time_between_blocks : time_between_blocks;
-      max_number_of_chunks : int;
-      sequencer : Client_keys.sk_uri;
-      blueprints_publisher_config : blueprints_publisher_config;
-      sidecar_endpoint : Uri.t;
-    }
-
-type observer = {
-  evm_node_endpoint : Uri.t;
-  threshold_encryption_bundler_endpoint : Uri.t option;
-  rollup_node_tracking : bool;
-}
+type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
 
 type proxy = {
   finalized_view : bool option;
@@ -242,7 +228,6 @@ type t = {
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
   sequencer : sequencer option;
-  threshold_encryption_sequencer : threshold_encryption_sequencer option;
   observer : observer option;
   proxy : proxy;
   tx_pool_timeout_limit : int64;
@@ -330,8 +315,6 @@ let default_experimental_features =
 let default_rpc_addr = "127.0.0.1"
 
 let default_rpc_port = 8545
-
-let default_sequencer_sidecar_endpoint = Uri.of_string "127.0.0.1:5303"
 
 let default_keep_alive = false
 
@@ -551,59 +534,13 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ~sequencer
     blueprints_publisher_config;
   }
 
-let threshold_encryption_sequencer_config_dft ?time_between_blocks
-    ?max_number_of_chunks ~sequencer ?sidecar_endpoint ?max_blueprints_lag
-    ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown ?dal_slots
-    () =
-  let default_blueprints_publisher_config =
-    if Option.is_some dal_slots then
-      default_blueprints_publisher_config_with_dal
-    else default_blueprints_publisher_config_without_dal
-  in
-  let blueprints_publisher_config =
-    {
-      max_blueprints_lag =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_lag
-          max_blueprints_lag;
-      max_blueprints_ahead =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_ahead
-          max_blueprints_ahead;
-      max_blueprints_catchup =
-        Option.value
-          ~default:default_blueprints_publisher_config.max_blueprints_catchup
-          max_blueprints_catchup;
-      catchup_cooldown =
-        Option.value
-          ~default:default_blueprints_publisher_config.catchup_cooldown
-          catchup_cooldown;
-      dal_slots;
-    }
-  in
-  Threshold_encryption_sequencer
-    {
-      time_between_blocks =
-        Option.value ~default:default_time_between_blocks time_between_blocks;
-      max_number_of_chunks =
-        Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
-      sequencer;
-      blueprints_publisher_config;
-      sidecar_endpoint =
-        Option.value
-          ~default:default_sequencer_sidecar_endpoint
-          sidecar_endpoint;
-    }
-
 let observer_evm_node_endpoint = function
   | Mainnet -> "https://relay.mainnet.etherlink.com"
   | Testnet -> "https://relay.ghostnet.etherlink.com"
 
-let observer_config_dft ~evm_node_endpoint
-    ?threshold_encryption_bundler_endpoint ?rollup_node_tracking () =
+let observer_config_dft ~evm_node_endpoint ?rollup_node_tracking () =
   {
     evm_node_endpoint;
-    threshold_encryption_bundler_endpoint;
     rollup_node_tracking =
       Option.value ~default:default_rollup_node_tracking rollup_node_tracking;
   }
@@ -778,52 +715,6 @@ let sequencer_encoding =
           blueprints_publisher_config_encoding
           default_blueprints_publisher_config))
 
-let threshold_encryption_sequencer_encoding =
-  let open Data_encoding in
-  let default_blueprints_publisher_config =
-    default_blueprints_publisher_config_without_dal
-  in
-  conv
-    (function
-      | Threshold_encryption_sequencer
-          {
-            time_between_blocks;
-            max_number_of_chunks;
-            sequencer;
-            blueprints_publisher_config;
-            sidecar_endpoint;
-          } ->
-          ( time_between_blocks,
-            max_number_of_chunks,
-            Client_keys.string_of_sk_uri sequencer,
-            blueprints_publisher_config,
-            sidecar_endpoint ))
-    (fun ( time_between_blocks,
-           max_number_of_chunks,
-           sequencer,
-           blueprints_publisher_config,
-           sidecar_endpoint ) ->
-      Threshold_encryption_sequencer
-        {
-          time_between_blocks;
-          max_number_of_chunks;
-          sequencer = Client_keys.sk_uri_of_string sequencer;
-          blueprints_publisher_config;
-          sidecar_endpoint;
-        })
-    (obj5
-       time_between_blocks_field
-       (dft "max_number_of_chunks" int31 default_max_number_of_chunks)
-       sequencer_field
-       (dft
-          "blueprints_publisher_config"
-          blueprints_publisher_config_encoding
-          default_blueprints_publisher_config)
-       (dft
-          "sidecar_endpoint"
-          Tezos_rpc.Encoding.uri_encoding
-          default_sequencer_sidecar_endpoint))
-
 let observer_encoding ?network () =
   let open Data_encoding in
   let evm_node_endpoint_field ~description name encoding =
@@ -833,32 +724,20 @@ let observer_encoding ?network () =
     | None -> req ~description name encoding
   in
   conv
-    (fun {
-           evm_node_endpoint;
-           threshold_encryption_bundler_endpoint;
-           rollup_node_tracking;
-         } ->
-      ( Uri.to_string evm_node_endpoint,
-        threshold_encryption_bundler_endpoint,
-        rollup_node_tracking ))
-    (fun ( evm_node_endpoint,
-           threshold_encryption_bundler_endpoint,
-           rollup_node_tracking ) ->
+    (fun {evm_node_endpoint; rollup_node_tracking} ->
+      (Uri.to_string evm_node_endpoint, rollup_node_tracking))
+    (fun (evm_node_endpoint, rollup_node_tracking) ->
       {
         evm_node_endpoint = Uri.of_string evm_node_endpoint;
-        threshold_encryption_bundler_endpoint;
         rollup_node_tracking;
       })
-    (obj3
+    (obj2
        (evm_node_endpoint_field
           ~description:
             "Upstream EVM node endpoint used to fetch speculative blueprints \
              and forward incoming transactions."
           "evm_node_endpoint"
           (string' Plain))
-       (opt
-          "threshold_encryption_bundler_endpoint"
-          Tezos_rpc.Encoding.uri_encoding)
        (dft
           ~description:
             "Enable or disable monitoring a companion rollup node to verify \
@@ -1393,7 +1272,6 @@ let encoding ?network data_dir : t Data_encoding.t =
            websockets;
            log_filter;
            sequencer;
-           threshold_encryption_sequencer;
            observer;
            proxy;
            tx_pool_timeout_limit;
@@ -1410,7 +1288,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            db;
            opentelemetry;
          } ->
-      ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
+      ( (log_filter, sequencer, observer),
         ( ( tx_pool_timeout_limit,
             tx_pool_addr_limit,
             tx_pool_tx_per_addr_limit,
@@ -1428,7 +1306,7 @@ let encoding ?network data_dir : t Data_encoding.t =
             history_mode,
             db,
             opentelemetry ) ) ))
-    (fun ( (log_filter, sequencer, threshold_encryption_sequencer, observer),
+    (fun ( (log_filter, sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
                tx_pool_tx_per_addr_limit,
@@ -1452,7 +1330,6 @@ let encoding ?network data_dir : t Data_encoding.t =
         websockets;
         log_filter;
         sequencer;
-        threshold_encryption_sequencer;
         observer;
         proxy;
         tx_pool_timeout_limit;
@@ -1470,15 +1347,12 @@ let encoding ?network data_dir : t Data_encoding.t =
         opentelemetry;
       })
     (merge_objs
-       (obj4
+       (obj3
           (dft
              "log_filter"
              log_filter_config_encoding
              (default_filter_config ()))
           (opt "sequencer" sequencer_encoding)
-          (opt
-             "threshold_encryption_sequencer"
-             threshold_encryption_sequencer_encoding)
           (observer_field "observer" (observer_encoding ?network ())))
        (merge_objs
           (obj9
@@ -1722,12 +1596,6 @@ let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 let sequencer_config_exn {sequencer; _} =
   Option.to_result ~none:(error_missing_config ~name:"sequencer") sequencer
 
-let threshold_encryption_sequencer_config_exn
-    {threshold_encryption_sequencer; _} =
-  Option.to_result
-    ~none:(error_missing_config ~name:"threshold_encryption_sequencer")
-    threshold_encryption_sequencer
-
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
 
@@ -1758,7 +1626,6 @@ module Cli = struct
       log_filter = default_filter_config ();
       kernel_execution;
       sequencer = None;
-      threshold_encryption_sequencer = None;
       observer;
       proxy = default_proxy ();
       tx_pool_timeout_limit = default_tx_pool_timeout_limit;
@@ -1810,12 +1677,11 @@ module Cli = struct
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?finalized_view ?proxy_ignore_block_param ?history_mode ?dal_slots
-      configuration =
+      ?sequencer_key ?evm_node_endpoint ?log_filter_max_nb_blocks
+      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
+      ?dal_slots configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1906,80 +1772,6 @@ module Cli = struct
                 ())
             sequencer_key
     in
-    let threshold_encryption_sequencer =
-      let threshold_encryption_sequencer_config =
-        configuration.threshold_encryption_sequencer
-      in
-      match threshold_encryption_sequencer_config with
-      | Some
-          (Threshold_encryption_sequencer threshold_encryption_sequencer_config)
-        ->
-          let blueprints_publisher_config =
-            let blueprints_publisher_config =
-              threshold_encryption_sequencer_config.blueprints_publisher_config
-            in
-            {
-              max_blueprints_lag =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_lag
-                  max_blueprints_lag;
-              max_blueprints_ahead =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_ahead
-                  max_blueprints_ahead;
-              max_blueprints_catchup =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_catchup
-                  max_blueprints_catchup;
-              catchup_cooldown =
-                Option.value
-                  ~default:blueprints_publisher_config.catchup_cooldown
-                  catchup_cooldown;
-              dal_slots =
-                Option.either dal_slots blueprints_publisher_config.dal_slots;
-            }
-          in
-          Some
-            (Threshold_encryption_sequencer
-               {
-                 time_between_blocks =
-                   Option.value
-                     ~default:
-                       threshold_encryption_sequencer_config.time_between_blocks
-                     time_between_blocks;
-                 max_number_of_chunks =
-                   Option.value
-                     ~default:
-                       threshold_encryption_sequencer_config
-                         .max_number_of_chunks
-                     max_number_of_chunks;
-                 sequencer =
-                   Option.value
-                     ~default:threshold_encryption_sequencer_config.sequencer
-                     sequencer_key;
-                 blueprints_publisher_config;
-                 sidecar_endpoint =
-                   Option.value
-                     ~default:
-                       threshold_encryption_sequencer_config.sidecar_endpoint
-                     sequencer_sidecar_endpoint;
-               })
-      | None ->
-          Option.map
-            (fun sequencer ->
-              threshold_encryption_sequencer_config_dft
-                ?time_between_blocks
-                ?max_number_of_chunks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ~sequencer
-                ?sidecar_endpoint:sequencer_sidecar_endpoint
-                ?dal_slots
-                ())
-            sequencer_key
-    in
     let observer =
       match configuration.observer with
       | Some observer_config ->
@@ -1989,10 +1781,6 @@ module Cli = struct
                 Option.value
                   ~default:observer_config.evm_node_endpoint
                   evm_node_endpoint;
-              threshold_encryption_bundler_endpoint =
-                (match threshold_encryption_bundler_endpoint with
-                | None -> observer_config.threshold_encryption_bundler_endpoint
-                | endpoint -> endpoint);
               rollup_node_tracking =
                 Option.(
                   value
@@ -2004,7 +1792,6 @@ module Cli = struct
             (fun evm_node_endpoint ->
               observer_config_dft
                 ~evm_node_endpoint
-                ?threshold_encryption_bundler_endpoint
                 ?rollup_node_tracking:(Option.map not dont_track_rollup_node)
                 ())
             evm_node_endpoint
@@ -2064,7 +1851,6 @@ module Cli = struct
       log_filter;
       kernel_execution;
       sequencer;
-      threshold_encryption_sequencer;
       observer;
       proxy;
       tx_pool_timeout_limit =
@@ -2096,10 +1882,9 @@ module Cli = struct
       ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
-      ?threshold_encryption_bundler_endpoint ?log_filter_max_nb_blocks
-      ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
-      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
-      ?sequencer_sidecar_endpoint ?restricted_rpcs ?finalized_view
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
+      ?catchup_cooldown ?restricted_rpcs ?finalized_view
       ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
@@ -2125,7 +1910,6 @@ module Cli = struct
          ?private_rpc_port
          ?sequencer_key
          ?evm_node_endpoint
-         ?threshold_encryption_bundler_endpoint
          ?log_filter_max_nb_blocks
          ?log_filter_max_nb_logs
          ?log_filter_chunk_size
@@ -2133,7 +1917,6 @@ module Cli = struct
          ?max_blueprints_ahead
          ?max_blueprints_catchup
          ?catchup_cooldown
-         ?sequencer_sidecar_endpoint
          ?restricted_rpcs
          ?finalized_view
          ?proxy_ignore_block_param
@@ -2146,12 +1929,11 @@ module Cli = struct
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
-      ?sequencer_key ?evm_node_endpoint ?threshold_encryption_bundler_endpoint
-      ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-      ?catchup_cooldown ?log_filter_max_nb_blocks ?log_filter_max_nb_logs
-      ?log_filter_chunk_size ?sequencer_sidecar_endpoint ?restricted_rpcs
-      ?finalized_view ?proxy_ignore_block_param ?dal_slots ?network
-      ?history_mode config_file =
+      ?sequencer_key ?evm_node_endpoint ?max_blueprints_lag
+      ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
+      ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
+      ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
+      ?network ?history_mode config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2182,7 +1964,6 @@ module Cli = struct
           ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint
-          ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
           ?native_execution_policy
@@ -2203,7 +1984,6 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
-          ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?finalized_view
           ?proxy_ignore_block_param
@@ -2225,7 +2005,6 @@ module Cli = struct
           ?keep_alive
           ?sequencer_key
           ?evm_node_endpoint
-          ?threshold_encryption_bundler_endpoint
           ?preimages
           ?preimages_endpoint
           ?native_execution_policy
@@ -2246,7 +2025,6 @@ module Cli = struct
           ?log_filter_max_nb_blocks
           ?log_filter_max_nb_logs
           ?log_filter_chunk_size
-          ?sequencer_sidecar_endpoint
           ?restricted_rpcs
           ?finalized_view
           ?proxy_ignore_block_param

@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- Remove CLI arguments and configuration options related to the threshold
+  encryption mode. This mode was never used in production, so it should not
+  affect existing deployment as long as they have not configured in their
+  configuration file. You can run `check config` to make sure you are not
+  concerned by the breaking change. (!18535)
+
 ### Configuration changes
 
 ### RPCs changes
