@@ -139,29 +139,6 @@ let enable_kernels =
 
 (* Common GitLab CI caches *)
 
-(** Enable caching of Cargo's target folder which stores files which
-    can speed up subsequent compilation passes.
-
-    All folders are stored in a single cacheable directory to work
-    around GitLab's restriction on the number caches a job may have. *)
-let enable_cargo_target_caches ?key job =
-  let key =
-    Option.value
-      ~default:
-        ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  let cache_dir = "$CI_PROJECT_DIR" // "_target" in
-  job
-  |> append_variables
-       [
-         ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
-         ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
-         ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
-           cache_dir // "etherlink_wasm_runtime" );
-       ]
-  |> append_cache (cache ~key [cache_dir])
-
 (** Add variable enabling dune cache.
 
     This function can be applied to jobs that run dune.
@@ -654,7 +631,6 @@ type docker_build_type =
   | Experimental
   | Release
   | Octez_evm_node_release
-  | Octez_smart_rollup_node_distribution
   | Test
   | Test_manual
 
@@ -664,9 +640,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
-    | Release | Octez_evm_node_release | Octez_smart_rollup_node_distribution
-    | Experimental ->
-        true
+    | Release | Octez_evm_node_release | Experimental -> true
     | Test | Test_manual -> false
   in
   (* Whether to include evm artifacts.
@@ -698,8 +672,6 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
         match docker_build_type with
         | Release -> "script-inputs/released-executables"
         | Octez_evm_node_release -> "script-inputs/octez-evm-node-executable"
-        | Octez_smart_rollup_node_distribution ->
-            "script-inputs/smart-rollup-node-executable"
         | Test | Test_manual | Experimental ->
             "script-inputs/released-executables \
              script-inputs/experimental-executables" );
