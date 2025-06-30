@@ -454,7 +454,9 @@ let () =
   register
     "schedule_docker_build_pipeline"
     schedule_docker_build
-    ~jobs:Master_branch.octez_distribution_docker_jobs
+    ~jobs:
+      (Tezos_ci.job_datadog_pipeline_trace
+     :: Master_branch.octez_distribution_docker_jobs)
     ~variables:[("DOCKER_FORCE_BUILD", "true")]
     ~description:
       "Scheduled pipeline for forcing building fresh Docker image (skipping \
