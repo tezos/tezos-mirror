@@ -618,7 +618,7 @@ let vote_kind_encoding =
         (fun () -> Attestation);
     ]
 
-let unsigned_consensus_vote_encoding =
+let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
   let dal_content_encoding : dal_content encoding =
     conv
@@ -634,10 +634,10 @@ let unsigned_consensus_vote_encoding =
     (obj4
        (req "vote_kind" vote_kind_encoding)
        (req "vote_consensus_content" consensus_content_encoding)
-       (req "delegate" Delegate.encoding)
+       (req "delegate" Delegate.encoding_for_logging__cannot_decode)
        (opt "dal_content" dal_content_encoding))
 
-let signed_consensus_vote_encoding =
+let signed_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
   conv
     (fun {unsigned_consensus_vote; signed_operation} ->
@@ -645,7 +645,9 @@ let signed_consensus_vote_encoding =
     (fun (unsigned_consensus_vote, signed_operation) ->
       {unsigned_consensus_vote; signed_operation})
     (obj2
-       (req "unsigned_consensus_vote" unsigned_consensus_vote_encoding)
+       (req
+          "unsigned_consensus_vote"
+          unsigned_consensus_vote_encoding_for_logging__cannot_decode)
        (req "signed_operation" (dynamic_size Operation.encoding)))
 
 let manager_operations_infos_encoding =
@@ -657,7 +659,7 @@ let manager_operations_infos_encoding =
       {manager_operation_number; total_fees})
     (obj2 (req "manager_operation_number" int31) (req "total_fees" int64))
 
-let forge_event_encoding =
+let forge_event_encoding_for_logging__cannot_decode =
   let open Data_encoding in
   let prepared_block_encoding =
     conv
@@ -692,7 +694,7 @@ let forge_event_encoding =
       (obj6
          (req "header" (dynamic_size Block_header.encoding))
          (req "round" Round.encoding)
-         (req "delegate" Delegate.encoding)
+         (req "delegate" Delegate.encoding_for_logging__cannot_decode)
          (req
             "operations"
             (list (list (dynamic_size Tezos_base.Operation.encoding))))
@@ -711,7 +713,10 @@ let forge_event_encoding =
       case
         (Tag 1)
         ~title:"Preattestation_ready"
-        (obj1 (req "signed_preattestation" signed_consensus_vote_encoding))
+        (obj1
+           (req
+              "signed_preattestation"
+              signed_consensus_vote_encoding_for_logging__cannot_decode))
         (function
           | Preattestation_ready signed_preattestation ->
               Some signed_preattestation
@@ -721,14 +726,17 @@ let forge_event_encoding =
       case
         (Tag 2)
         ~title:"Attestation_ready"
-        (obj1 (req "signed_attestation" signed_consensus_vote_encoding))
+        (obj1
+           (req
+              "signed_attestation"
+              signed_consensus_vote_encoding_for_logging__cannot_decode))
         (function
           | Attestation_ready signed_attestation -> Some signed_attestation
           | _ -> None)
         (fun signed_attestation -> Attestation_ready signed_attestation);
     ]
 
-let event_encoding =
+let event_encoding_for_logging__cannot_decode =
   let open Data_encoding in
   union
     [
@@ -780,7 +788,9 @@ let event_encoding =
       case
         (Tag 5)
         ~title:"New_forge_event"
-        (tup2 (constant "New_forge_event") forge_event_encoding)
+        (tup2
+           (constant "New_forge_event")
+           forge_event_encoding_for_logging__cannot_decode)
         (function New_forge_event event -> Some ((), event) | _ -> None)
         (fun ((), event) -> New_forge_event event);
     ]

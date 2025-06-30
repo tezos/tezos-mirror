@@ -32,33 +32,17 @@ module Key = struct
   let make ~alias ~public_key ~public_key_hash ~secret_key_uri =
     {alias; public_key; id = public_key_hash; secret_key_uri}
 
-  let encoding =
+  let encoding_for_logging__cannot_decode =
     let open Data_encoding in
     conv
-      (fun {alias; public_key; id; secret_key_uri} ->
-        (alias, public_key, id, Uri.to_string (secret_key_uri :> Uri.t)))
-      (fun (alias, public_key, id, secret_key_uri) ->
-        {
-          alias;
-          public_key;
-          id;
-          secret_key_uri =
-            (match Client_keys.make_sk_uri (Uri.of_string secret_key_uri) with
-            | Ok sk -> sk
-            | Error e -> Format.kasprintf Stdlib.failwith "%a" pp_print_trace e);
-        })
-      (obj4
-         (req "alias" (option string))
-         (req "public_key" Signature.Public_key.encoding)
-         (req "public_key_hash" Signature.Public_key_hash.encoding)
-         (req "secret_key_uri" string))
-
-  let consensus_key_without_sk_encoding__cannot_decode =
-    let open Data_encoding in
-    conv
-      (fun {alias; public_key; id; _} -> (alias, public_key, id))
-      (fun (_alias, _public_key, _id) ->
-        Stdlib.failwith "Unexpected secret key")
+      (fun {alias; public_key; id; secret_key_uri = _} ->
+        (alias, public_key, id))
+      (fun _ ->
+        Stdlib.failwith
+          (Format.sprintf
+             "This encoding should only be used to encode values for event \
+              logging; decoding is impossible (%s)"
+             __LOC__))
       (obj3
          (req "alias" (option string))
          (req "public_key" Signature.Public_key.encoding)
@@ -92,7 +76,7 @@ module Delegate = struct
     delegate_id : Delegate_id.t;
   }
 
-  let encoding =
+  let encoding_for_logging__cannot_decode =
     let open Data_encoding in
     conv
       (fun {consensus_key; companion_key; delegate_id} ->
@@ -100,9 +84,9 @@ module Delegate = struct
       (fun (consensus_key, delegate_id, companion_key) ->
         {consensus_key; delegate_id; companion_key})
       (obj3
-         (req "consensus_key" Key.encoding)
+         (req "consensus_key" Key.encoding_for_logging__cannot_decode)
          (req "delegate" Delegate_id.encoding)
-         (opt "companion_key" Key.encoding))
+         (opt "companion_key" Key.encoding_for_logging__cannot_decode))
 
   let pp fmt {consensus_key; delegate_id; companion_key} =
     let str_companion_key =
