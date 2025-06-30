@@ -28,8 +28,7 @@ pub(crate) const SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS: &str =
 
 sol! {
     event SendWithdrawalInput (
-        bytes22 target,
-        bytes22 ticketer,
+        string target,
         uint256 amount,
     );
 }
@@ -129,22 +128,19 @@ where
     }
 
     match input {
-        // "0c22d28f" is the function selector for `push_withdrawal_to_outbox(bytes22,bytes22,uint256)`
-        [0x0c, 0x22, 0xd2, 0x8f, input_data @ ..] => {
+        // "0x7bced8e4" is the function selector for `push_withdrawal_to_outbox(string,uint256)`
+        [0x7b, 0xce, 0xd8, 0xe4, input_data @ ..] => {
             // Decode
-            let (target, ticketer, amount) =
-                SendWithdrawalInput::abi_decode_data(input_data, true)
-                    .map_err(|e| e.to_string())?;
-            let (_, target) =
-                Contract::nom_read(target.as_slice()).map_err(|e| e.to_string())?;
-            let (_, ticketer) =
-                Contract::nom_read(ticketer.as_slice()).map_err(|e| e.to_string())?;
+            let (target, amount) = SendWithdrawalInput::abi_decode_data(input_data, true)
+                .map_err(|e| e.to_string())?;
+            let target = Contract::from_b58check(&target).unwrap();
             let amount = BigInt::from_bytes_be(
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
 
             // Build
+            let ticketer = Contract::Originated(context.db().ticketer().unwrap());
             let content = MichelsonPair(0.into(), MichelsonOption(None));
             let entrypoint = Entrypoint::try_from(String::from("burn")).unwrap();
             let destination = ticketer.clone();

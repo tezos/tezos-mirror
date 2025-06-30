@@ -248,11 +248,12 @@ mod test {
     };
     use serde_json::Value;
     use tezos_evm_runtime::runtime::MockKernelHost;
+    use tezos_smart_rollup_host::runtime::Runtime;
     use utilities::{
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
-    use crate::world_state_handler::new_world_state_handler;
+    use crate::world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH};
     use crate::{
         precompile_provider::EtherlinkPrecompiles, run_transaction,
         world_state_handler::account_path, ExecutionOutcome,
@@ -519,6 +520,12 @@ mod test {
         let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
+        host.store_write_all(
+            &WITHDRAWALS_TICKETER_PATH,
+            "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
+        )
+        .unwrap();
+
         // TODO: use foundry-compilers here when kernel rust version is bumped to 1.87
         // For the moment if you need to rebuild you can run:
         // $ forge build etherlink/kernel_latest/revm/contracts/withdrawal.sol --out etherlink/kernel_latest/revm/contracts/out
@@ -565,13 +572,9 @@ mod test {
         assert!(result.is_success());
 
         // Call the created address with data generated from:
-        // $ cast calldata "withdraw_base58(bytes22,bytes22)" 0x012c895aa0a61697411ffc877120556a6c2b83ca5100 0x0000ff017f06e07213afbc546091d39c68e4028e091a
-        //
-        // Hex encoded values can be retrieved from the following contracts:
-        // let ticketer = Contract::from_b58check("KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj");
-        // let target = Contract::from_b58check("tz1itNnzav2CCQPe1za8924GhtqgWjjNRG4G");
+        // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
 
-        let calldata = "0x081952b3012c895aa0a61697411ffc877120556a6c2b83ca5100000000000000000000000000ff017f06e07213afbc546091d39c68e4028e091a00000000000000000000";
+        let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
         let addr = result.created_address();
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
 
@@ -612,7 +615,8 @@ mod test {
             .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
             .unwrap();
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
-        assert!(!withdrawals.is_empty());
+        let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
+        assert_eq!(format!("{:?}", withdrawals), raw_expected_withdrawals);
     }
 
     #[test]
