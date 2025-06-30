@@ -207,9 +207,8 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
       loop ([], 0L) keys_list |> fst |> List.rev
 
 let get_delegates_and_accounts (module P : Sigs.PROTOCOL)
-    ?(override_with_consensus_key = true) context
-    (header : Block_header.shell_header) active_bakers_only staking_share_opt
-    accounts_pkh_lists =
+    ~override_with_consensus_key context (header : Block_header.shell_header)
+    active_bakers_only staking_share_opt accounts_pkh_lists =
   let open Lwt_result_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
@@ -557,18 +556,19 @@ let get_context ?level ~network_opt base_dir =
   return (protocol_hash, context, header, store)
 
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
-    ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context at the
-    given [base_dir] and computes a list of [(alias, pkh, pk, stake,
-    frozen_deposits, unstake_frozen_deposits)] corresponding to all delegates in
-    that context. The [alias] for the delegates are gathered from
-    [alias_pkh_pk_list]).
+    ~active_backers_only ~override_with_consensus_key base_dir
+    alias_phk_pk_list] checkouts the head context at the given [base_dir] and
+    computes a list of [(alias, pkh, pk, stake, frozen_deposits,
+    unstake_frozen_deposits)] corresponding to all delegates in that context.
+    The [alias] for the delegates are gathered from [alias_pkh_pk_list]).
 
     if [active_bakers_only] then the deactivated delegates are
     filtered out of the list. if an optional [level] is given, use the
     context from this level instead of head, if it exists.
 *)
 let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
-    ~active_bakers_only base_dir alias_pkh_pk_list other_accounts_pkh =
+    ~active_bakers_only ~override_with_consensus_key base_dir alias_pkh_pk_list
+    other_accounts_pkh =
   let open Lwt_result_syntax in
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
@@ -615,6 +615,7 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           pp_protocol
           protocol ;
         get_delegates_and_accounts
+          ~override_with_consensus_key
           protocol
           context
           header
@@ -716,12 +717,14 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   return contracts
 
 let build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases ~other_accounts_pkh =
+    ~override_with_consensus_key ~active_bakers_only ~aliases
+    ~other_accounts_pkh =
   let open Lwt_result_syntax in
   let+ bakers, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
+      ~override_with_consensus_key
       base_dir
       ~active_bakers_only
       aliases

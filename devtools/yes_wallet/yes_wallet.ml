@@ -28,7 +28,8 @@ type error = Overwrite_forbiden of string | File_not_found of string
 
 (* We need to exit Lwt + tzResult context from Yes_wallet. *)
 let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
-    ~active_bakers_only alias_pkh_pk_list other_accounts_pkh =
+    ~override_with_consensus_key ~active_bakers_only alias_pkh_pk_list
+    other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -38,6 +39,7 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
          ?network_opt
          ?level
          base_dir
+         ~override_with_consensus_key
          ~active_bakers_only
          alias_pkh_pk_list
          other_accounts_pkh)
@@ -60,7 +62,8 @@ let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
       exit 1
 
 let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases ~other_accounts_pkh =
+    ~override_with_consensus_key ~active_bakers_only ~aliases
+    ~other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -69,6 +72,7 @@ let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
          ?staking_share_opt
          ?network_opt
          base_dir
+         ~override_with_consensus_key
          ~active_bakers_only
          ~aliases
          ~other_accounts_pkh)
@@ -186,6 +190,8 @@ let level_opt_name = "--level"
 
 let other_accounts_opt_name = "--other-accounts"
 
+let consensus_key_override = "--consensus-key-override"
+
 let supported_networks = List.map fst Yes_wallet_lib.supported_networks
 
 let force = ref false
@@ -218,7 +224,10 @@ let usage () =
      parameter (default is mainnet) @,\
      if %s <pkh .. pkh> is used, the generated wallet will also contain the \
      addresses for the given list of space separated pkh. Consensus keys are \
-     note supported for this parameter @]@]@,\
+     not supported for this parameter @,\
+     if %s is used, there will be an override of delegate's public key and \
+     public key hash by, respectively, it's consensus public key and public \
+     key hash@]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -245,6 +254,7 @@ let usage () =
         pp_print_string)
     supported_networks
     other_accounts_opt_name
+    consensus_key_override
     alias_file_opt_name
     force_opt_name
 
@@ -345,6 +355,9 @@ let () =
   let active_bakers_only =
     List.exists (fun opt -> opt = active_bakers_only_opt_name) options
   in
+  let override_with_consensus_key =
+    List.exists (fun opt -> opt = consensus_key_override) options
+  in
   force := List.exists (fun opt -> opt = force_opt_name) options ;
   let unknown_options =
     let rec filter args =
@@ -367,6 +380,7 @@ let () =
       | opt :: net :: t when opt = network_opt_name && is_supported_network net
         ->
           filter t
+      | opt :: t when opt = consensus_key_override -> filter t
       | h :: t -> h :: filter t
     in
     filter options
@@ -397,6 +411,7 @@ let () =
             ?staking_share_opt
             ?network_opt
             base_dir
+            ~override_with_consensus_key
             ~active_bakers_only
             ~aliases
             ~other_accounts_pkh
@@ -476,6 +491,7 @@ let () =
           ?network_opt
           ?level:level_opt
           base_dir
+          ~override_with_consensus_key
           ~active_bakers_only
           aliases
           other_accounts_pkh
