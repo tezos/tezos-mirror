@@ -47,7 +47,7 @@ val start :
   data_dir:string ->
   ?smart_rollup_address:string ->
   store_perm:Sqlite.perm ->
-  ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
+  ?signer:Signer.t ->
   ?snapshot_url:string ->
   tx_container:_ Services_backend_sig.tx_container ->
   unit ->

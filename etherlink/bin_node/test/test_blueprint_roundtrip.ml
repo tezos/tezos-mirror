@@ -61,8 +61,7 @@ let make_blueprint ~delayed_transactions ~transactions =
   let cctxt = wallet () in
   let* chunks =
     Sequencer_blueprint.prepare
-      ~cctxt
-      ~sequencer_key
+      ~signer:(Signer.wallet cctxt sequencer_key)
       ~timestamp:Time.Protocol.epoch
       ~number:(Qty Z.zero)
       ~parent_hash:zero_hash
