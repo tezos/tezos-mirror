@@ -9,7 +9,12 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let prefix = "rollup"
+let prefix = "rollup-node"
+
+let job ~name = job ~name:(prefix ^ "." ^ name)
+
+let job_docker_authenticated ~name =
+  job_docker_authenticated ~name:(prefix ^ "." ^ name)
 
 (** TODO: These jobs should be definied in [lib_tezos_ci]. *)
 

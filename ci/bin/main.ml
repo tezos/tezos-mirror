@@ -303,7 +303,7 @@ let () =
     If.(
       not_on_tezos_namespace && push
       && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Release_tag.octez_smart_rollup_node_jobs ())
+    ~jobs:(Rollup_node.Release.jobs ())
     ~description:
       "Release tag pipelines for the Smart Rollup node.\n\n\
        This pipeline checks that 'octez_smart_rollup_node_release_tag' \
@@ -313,7 +313,7 @@ let () =
   register
     "octez_smart_rollup_node_release_tag"
     If.(push && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Release_tag.octez_smart_rollup_node_jobs ())
+    ~jobs:(Rollup_node.Release.jobs ())
     ~description:
       ("Release tag pipelines for the Smart Rollup node.\n\n\
         Created when the release manager pushes a tag in the format \

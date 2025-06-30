@@ -68,7 +68,7 @@ datadog_pipeline_trace:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-oc.build:static-arm64-linux-binaries:
+rollup-node.build:static-arm64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -113,11 +113,11 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-x86_64-linux-binaries:
+rollup-node.build:static-x86_64-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -158,7 +158,7 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.docker:amd64:
+rollup-node.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
@@ -180,7 +180,7 @@ oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
-oc.docker:arm64:
+rollup-node.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
@@ -202,14 +202,14 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
 
-docker:merge_manifests:
+rollup-node.docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
   - gcp
   needs:
-  - oc.docker:amd64
-  - oc.docker:arm64
+  - rollup-node.docker:amd64
+  - rollup-node.docker:arm64
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -223,20 +223,20 @@ docker:merge_manifests:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
 
-gitlab:octez-smart-rollup-node-release:
+rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp
   needs:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - rollup-node.build:static-x86_64-binaries
+  - rollup-node.build:static-arm64-binaries
   dependencies:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - rollup-node.build:static-x86_64-binaries
+  - rollup-node.build:static-arm64-binaries
   timeout: 60 minutes
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
-  - ./scripts/ci/create_gitlab_octez_smart_rollup_node_release.sh
+  - ./scripts/rollup_node/releases/create_gitlab_release.sh
