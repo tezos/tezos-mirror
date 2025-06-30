@@ -471,7 +471,11 @@ let () =
   register
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
-    ~jobs:[Release_tag.job_release_page ~test:true ()]
+    ~jobs:
+      [
+        Tezos_ci.job_datadog_pipeline_trace;
+        Release_tag.job_release_page ~test:true ();
+      ]
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
