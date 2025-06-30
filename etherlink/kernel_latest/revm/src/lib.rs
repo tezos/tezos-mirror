@@ -3,6 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::account_init::init_withdrawal_account;
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
@@ -29,8 +30,10 @@ pub mod precompile_provider;
 pub mod send_outbox_message;
 pub mod world_state_handler;
 
+mod account_init;
 mod block_storage;
 mod code_storage;
+mod constants;
 mod database;
 mod storage_helpers;
 
@@ -40,6 +43,10 @@ pub enum Error {
     Runtime(#[from] RuntimeError),
     #[error("Execution error: {0}")]
     Custom(String),
+}
+
+pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
+    Error::Custom(e.to_string())
 }
 
 impl DBErrorMarker for Error {}
@@ -181,6 +188,8 @@ pub fn run_transaction<'a, Host: Runtime>(
     value: U256,
     access_list: AccessList,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
+    init_withdrawal_account(host, world_state_handler)?;
+
     let mut commit_status = true;
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
@@ -253,7 +262,9 @@ mod test {
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
-    use crate::world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH};
+    use crate::world_state_handler::{
+        new_world_state_handler, WITHDRAWALS_TICKETER_PATH,
+    };
     use crate::{
         precompile_provider::EtherlinkPrecompiles, run_transaction,
         world_state_handler::account_path, ExecutionOutcome,
@@ -577,6 +588,13 @@ mod test {
         let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
         let addr = result.created_address();
         let withdrawn_amount = U256::from(1_000_000_000_000u64);
+
+        // Snippet used to generate `WITHDRAWAL_SOL_CONTRACT`:
+        // let created_account = world_state_handler
+        //     .get_or_create(&host, &account_path(&addr.unwrap()).unwrap())
+        //     .unwrap();
+        // let code = created_account.code(&host).unwrap();
+        // println!("STORED = {:?}", code.clone());
 
         let ExecutionOutcome {
             result,
