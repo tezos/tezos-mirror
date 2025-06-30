@@ -485,7 +485,6 @@ struct
     let ikm = generate_random_bytes 32 in
     let sk = Bls12_381_signature.generate_sk ikm in
     let pk = SignatureM.derive_pk sk in
-    (* sign a random message *)
     let proof = SignatureM.Pop.pop_prove sk in
     assert (SignatureM.Pop.pop_verify pk proof)
 
@@ -494,7 +493,6 @@ struct
     let ikm' = generate_random_bytes 32 in
     let sk = Bls12_381_signature.generate_sk ikm in
     let pk' = SignatureM.(derive_pk (Bls12_381_signature.generate_sk ikm')) in
-    (* sign a random message *)
     let proof = SignatureM.Pop.pop_prove sk in
     assert (not (SignatureM.Pop.pop_verify pk' proof))
 
@@ -727,7 +725,7 @@ struct
     let verify = SignatureM.Pop.verify
   end)
 
-  let test_pop_g2_from_blst_sigs_ref_files () =
+  let test_pop_from_blst_sigs_ref_files () =
     let aux filename =
       let contents = read_file filename in
       List.iter
@@ -839,7 +837,7 @@ struct
                test_pk_to_bytes_of_bytes_exn_are_inverse_functions_on_valid_inputs);
           test_case
             "unsafe_pk_of_bytes and pk_to_bytes are inverse functions on any \
-             valid input"
+             input"
             `Quick
             (Utils.repeat
                10
@@ -933,7 +931,7 @@ struct
                test_signature_to_bytes_of_bytes_exn_are_inverse_functions_on_valid_inputs);
           test_case
             "unsafe_signature_of_bytes and signature_to_bytes are inverse \
-             functions on any valid input"
+             functions on any input"
             `Quick
             (Utils.repeat
                10
@@ -959,9 +957,9 @@ struct
       ( "Proof of possession proof/verify properties and test vectors",
         [
           test_case
-            "Pop G2 from file"
+            "Pop test vectors from file"
             `Quick
-            test_pop_g2_from_blst_sigs_ref_files;
+            test_pop_from_blst_sigs_ref_files;
           test_case
             "Prove and verify with correct keys"
             `Quick

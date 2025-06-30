@@ -133,20 +133,20 @@ struct
       ( Printf.sprintf "Properties for %s" Scheme.name,
         [
           test_case
-            "Sign and verify corret signature with correct pks and msgs"
+            "Sign and verify correct signature with correct pks and msgs"
             `Quick
             (Utils.repeat
                10
                test_sign_and_verify_correct_signature_with_correct_pks_and_msgs);
           test_case
-            "Sign and verify corret signature with correct pks and some \
+            "Sign and verify correct signature with correct pks and some \
              incorrect msgs"
             `Quick
             (Utils.repeat
                10
                test_sign_and_verify_correct_signature_with_correct_pks_and_some_incorrect_msgs);
           test_case
-            "Sign and verify corret signature with some incorrect pks and \
+            "Sign and verify correct signature with some incorrect pks and \
              correct msgs"
             `Quick
             (Utils.repeat
