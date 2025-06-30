@@ -6,7 +6,7 @@
 use tezos_smart_rollup::entrypoint;
 use tezos_smart_rollup_debug::debug_msg;
 use tezos_smart_rollup_host::dal_parameters::RollupDalParameters;
-use tezos_smart_rollup_host::path::OwnedPath;
+use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 use tezos_smart_rollup_host::runtime::Runtime;
 
 fn process_slot(
@@ -17,6 +17,8 @@ fn process_slot(
     slot_index: u8,
 ) {
     let mut buffer = vec![0u8; page_size * num_pages];
+
+    let mut read_bytes = 0;
 
     for page_index in 0..num_pages {
         let result = host.reveal_dal_page(
@@ -46,12 +48,7 @@ fn process_slot(
                     slot_index,
                     num
                 );
-                let slot_path = format!("/output/slot-{}", slot_index);
-                let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
-
-                host.store_write(&path, &buffer, 0)
-                    .map_err(|_| "Error writing to storage".to_string())
-                    .unwrap_or_default();
+                read_bytes += num;
             }
             Err(err) => {
                 debug_msg!(
@@ -65,22 +62,37 @@ fn process_slot(
             }
         }
     }
+
+    let slot_path = format!("/output/slot-{}", slot_index);
+    let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
+    host.store_write(&path, &read_bytes.to_le_bytes(), 0)
+        .map_err(|_| "Error writing to storage".to_string())
+        .unwrap_or_default();
 }
 
-fn get_slot_indexes_from_env() -> Vec<u8> {
-    // By default track slot index 0.
-    let default_slot_indexes = vec![0];
+fn get_slots_from_storage(host: &impl Runtime, number_of_slots: u64) -> Vec<u8> {
+    let path = RefPath::assert_from("/slots".as_bytes());
+    let bitvec_bytes = host.store_read_all(&path).unwrap();
 
-    let slot_indexes = match option_env!("SLOT_INDEXES") {
-        None => default_slot_indexes,
-        Some(s) => s
-            .split(',')
-            .map(|s| s.parse::<u8>())
-            .collect::<Result<Vec<u8>, _>>()
-            .unwrap_or(default_slot_indexes),
-    };
-
-    slot_indexes
+    let mut slots = Vec::new();
+    for (i, byte) in bitvec_bytes.iter().enumerate() {
+        let slots_start = i * 8;
+        // Stop early if the slots are out of bounds, which can happen with
+        // padding in the bitvector.
+        if slots_start >= number_of_slots as usize {
+            continue;
+        }
+        for bit in 0..8 {
+            let slot = slots_start + bit;
+            // Stop early if the slot is out of bound, due to padding again.
+            if slot >= number_of_slots as usize {
+                continue;
+            } else if byte >> bit & 1 > 0 {
+                slots.push(slot as u8)
+            }
+        }
+    }
+    slots
 }
 
 #[entrypoint::main]
@@ -88,13 +100,13 @@ pub fn entry(host: &mut impl Runtime) {
     let parameters = host.reveal_dal_parameters();
     debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
     let RollupDalParameters {
-        number_of_slots: _number_of_slots,
+        number_of_slots,
         attestation_lag,
         slot_size,
         page_size,
     } = parameters;
 
-    let slot_indexes = get_slot_indexes_from_env();
+    let slot_indexes: Vec<u8> = get_slots_from_storage(host, number_of_slots);
 
     match host.read_input() {
         Ok(Some(message)) => {

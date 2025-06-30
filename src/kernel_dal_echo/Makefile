@@ -14,6 +14,10 @@ all: build test check
 dal_echo_kernel:
 	@cargo build --target wasm32-unknown-unknown --release -p dal_echo_kernel
 
+.PHONY: dal_echo_kernel_bandwidth
+dal_echo_kernel_bandwidth:
+	@cargo build --target wasm32-unknown-unknown --release -p dal_echo_kernel_bandwidth
+
 .PHONY: build
 build: dal_echo_kernel
 
