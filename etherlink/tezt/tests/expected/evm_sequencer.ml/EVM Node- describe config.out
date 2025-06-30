@@ -23,7 +23,7 @@
         integer ∈ [1, 128]
         /* Maximum number of chunks a blueprint can be divided into. The
            sequencer will not produce blueprints unable to fit in this limit. */,
-      "sequencer": $unistring /* Secret key URI of the sequencer. */,
+      "sequencer"?: $unistring /* Secret key URI of the sequencer. */,
       "blueprints_publisher_config"?:
         { "max_blueprints_lag"?:
             integer ∈ [1, 2^30]

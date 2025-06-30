@@ -4,6 +4,16 @@
     "max_nb_logs": 1000,
     "chunk_size": 10
   },
+  "sequencer": {
+    "time_between_blocks": 5,
+    "max_number_of_chunks": 128,
+    "blueprints_publisher_config": {
+      "max_blueprints_lag": 50,
+      "max_blueprints_ahead": 100,
+      "max_blueprints_catchup": 50,
+      "catchup_cooldown": 1
+    }
+  },
   "tx_pool_timeout_limit": "3600",
   "tx_pool_addr_limit": "4000",
   "tx_pool_tx_per_addr_limit": "16",
@@ -67,7 +77,6 @@
   "sequencer": {
     "time_between_blocks": 5,
     "max_number_of_chunks": 128,
-    "sequencer": "hidden",
     "blueprints_publisher_config": {
       "max_blueprints_lag": 50,
       "max_blueprints_ahead": 100,
@@ -134,6 +143,16 @@
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
     "chunk_size": 10
+  },
+  "sequencer": {
+    "time_between_blocks": 5,
+    "max_number_of_chunks": 128,
+    "blueprints_publisher_config": {
+      "max_blueprints_lag": 50,
+      "max_blueprints_ahead": 100,
+      "max_blueprints_catchup": 50,
+      "catchup_cooldown": 1
+    }
   },
   "observer": {
     "evm_node_endpoint": "hidden",

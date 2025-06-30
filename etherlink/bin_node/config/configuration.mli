@@ -135,7 +135,8 @@ type sequencer = {
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  sequencer : Client_keys.sk_uri;  (** The key used to sign the blueprints. *)
+  sequencer : Client_keys.sk_uri option;
+      (** The key used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
@@ -186,7 +187,7 @@ type t = {
   websockets : websockets_config option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
-  sequencer : sequencer option;
+  sequencer : sequencer;
   observer : observer option;
   proxy : proxy;
   tx_pool_timeout_limit : int64;
@@ -242,27 +243,13 @@ val load_file :
 val load :
   ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
-(** [sequencer_config_exn config] returns the sequencer config of
-    [config] or fails *)
-val sequencer_config_exn : t -> sequencer tzresult
+(** [sequencer_key config] returns the key the sequencer should use, or
+    fails. *)
+val sequencer_key : t -> Client_keys.sk_uri tzresult
 
 (** [observer_config_exn config] returns the observer config of
     [config] or fails *)
 val observer_config_exn : t -> observer tzresult
-
-(** [sequencer_config_dft ()] returns the default sequencer config
-    populated with given value. *)
-val sequencer_config_dft :
-  ?time_between_blocks:time_between_blocks ->
-  ?max_number_of_chunks:int ->
-  sequencer:Client_keys.sk_uri ->
-  ?max_blueprints_lag:int ->
-  ?max_blueprints_ahead:int ->
-  ?max_blueprints_catchup:int ->
-  ?catchup_cooldown:int ->
-  ?dal_slots:int list ->
-  unit ->
-  sequencer
 
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)

@@ -310,6 +310,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* finalizer_public_server =
     Rpc_server.start_public_server
+      ~is_sequencer:false
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
