@@ -142,7 +142,8 @@ let convert_wallet ~replace wallet_dir target_dir =
         "Warning: cannot produce yes-wallet, the file %s does not exist@."
         pk_source
 
-let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
+let populate_wallet ~replace ~override_with_consensus_key yes_wallet_dir
+    alias_pkh_pk_list =
   let pkh_filename = Filename.concat yes_wallet_dir "public_key_hashs" in
   let pk_filename = Filename.concat yes_wallet_dir "public_keys" in
   let sk_filename = Filename.concat yes_wallet_dir "secret_keys" in
@@ -163,7 +164,10 @@ let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
       sk_filename ;
     false)
   else (
-    Yes_wallet_lib.write_yes_wallet yes_wallet_dir alias_pkh_pk_list ;
+    Yes_wallet_lib.write_yes_wallet
+      ~write_consensus_keys:override_with_consensus_key
+      yes_wallet_dir
+      alias_pkh_pk_list ;
     true)
 
 let alias_file_opt_name = "--aliases"
@@ -213,7 +217,8 @@ let usage () =
      if %s <%a|http://...> is used the store is opened using the right genesis \
      parameter (default is mainnet) @,\
      if %s <pkh .. pkh> is used, the generated wallet will also contain the \
-     addresses for the given list of space separated pkh. @]@]@,\
+     addresses for the given list of space separated pkh. Consensus keys are \
+     note supported for this parameter @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -399,8 +404,13 @@ let () =
         Format.printf
           "@[<h>Number of keys to export:@;<3 0>%d@]@."
           (List.length yes_alias_list) ;
-        if populate_wallet ~replace:!force yes_wallet_dir yes_alias_list then
-          Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
+        if
+          populate_wallet
+            ~replace:!force
+            ~override_with_consensus_key
+            yes_wallet_dir
+            yes_alias_list
+        then Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
       convert_wallet ~replace:!force base_dir target_dir ;
       Format.printf
@@ -486,6 +496,7 @@ let () =
             (fun ( _alias,
                    pkh,
                    _pk,
+                   _ck,
                    stake,
                    frozen_deposits,
                    unstake_frozen_deposits ) ->
