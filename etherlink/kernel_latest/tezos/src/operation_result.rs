@@ -261,7 +261,7 @@ pub struct OperationResult<M: OperationKind> {
     //TODO Placeholder for internal operations : #8018
     pub internal_operation_results: VecEmpty,
 }
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
     Transfer(OperationResult<Transfer>),
