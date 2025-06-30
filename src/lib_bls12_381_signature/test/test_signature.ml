@@ -502,6 +502,46 @@ struct
     let proof = generate_random_bytes (PkGroup.size_in_bytes / 2) in
     assert (not (SignatureM.Pop.pop_verify pk proof))
 
+  let test_pop_verify_with_override_pk () =
+    let ikm = generate_random_bytes 32 in
+    let sk = Bls12_381_signature.generate_sk ikm in
+    let pk = SignatureM.derive_pk sk in
+    let ikm' = generate_random_bytes 32 in
+    let sk' = Bls12_381_signature.generate_sk ikm' in
+    let pk' = SignatureM.derive_pk sk' in
+    let proof = SignatureM.Pop.pop_prove sk ~msg:pk' in
+    assert (SignatureM.Pop.pop_verify pk ~msg:pk' proof)
+
+  let test_pop_verify_with_incorrect_override_pk () =
+    let ikm = generate_random_bytes 32 in
+    let sk = Bls12_381_signature.generate_sk ikm in
+    let pk = SignatureM.derive_pk sk in
+    let ikm' = generate_random_bytes 32 in
+    let sk' = Bls12_381_signature.generate_sk ikm' in
+    let pk' = SignatureM.derive_pk sk' in
+    let proof = SignatureM.Pop.pop_prove sk ~msg:pk' in
+    assert (not (SignatureM.Pop.pop_verify pk proof))
+
+  let test_pop_sig_verify_does_not_accept_aug_signature () =
+    let ikm = generate_random_bytes 32 in
+    let sk = Bls12_381_signature.generate_sk ikm in
+    let pk = SignatureM.derive_pk sk in
+    (* sign a random message *)
+    let msg_length = 1 + Random.int 512 in
+    let msg = generate_random_bytes msg_length in
+    let signature = SignatureM.Aug.sign sk msg in
+    assert (not (SignatureM.Pop.verify pk msg signature))
+
+  let test_pop_verify_does_not_accept_signature_of_pk () =
+    let ikm = generate_random_bytes 32 in
+    let sk = Bls12_381_signature.generate_sk ikm in
+    let pk = SignatureM.derive_pk sk in
+    let proof =
+      SignatureM.Pop.sign sk (SignatureM.pk_to_bytes pk)
+      |> SignatureM.signature_to_bytes
+    in
+    assert (not (SignatureM.Pop.pop_verify pk proof))
+
   module MakeProperties (Scheme : sig
     val test_vector_filenames : string list
 
@@ -985,6 +1025,22 @@ struct
             "Verify random proof"
             `Quick
             (Utils.repeat 10 test_pop_verify_random_proof);
+          test_case
+            "Prove and verify with override pk"
+            `Quick
+            (Utils.repeat 10 test_pop_verify_with_override_pk);
+          test_case
+            "Prove and verify with incorrect override pk"
+            `Quick
+            (Utils.repeat 10 test_pop_verify_with_incorrect_override_pk);
+          test_case
+            "Signature verify does not accept Aug signature"
+            `Quick
+            (Utils.repeat 10 test_pop_sig_verify_does_not_accept_aug_signature);
+          test_case
+            "Verify does not accept signature of pk"
+            `Quick
+            (Utils.repeat 10 test_pop_verify_does_not_accept_signature_of_pk);
         ] );
     ]
 end
