@@ -18,6 +18,8 @@
 
 ### Execution changes
 
+- Support signing blueprints via a key stored in a GCP KMS. (!18527)
+
 ### Storage changes
 
 ### Documentation changes

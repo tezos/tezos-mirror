@@ -1027,12 +1027,10 @@ let get_key_or_generate wallet_ctxt key =
   let open Evm_node_lib_dev in
   match key with
   | Some key ->
-      let* sk_uri =
-        Client_keys.Secret_key.parse_source_string wallet_ctxt key
-      in
-      let* pk_uri = Client_keys.neuterize sk_uri in
-      let* pk = Client_keys.public_key pk_uri in
-      return (pk, Signer.wallet wallet_ctxt sk_uri)
+      let open Evm_node_lib_dev in
+      let* signer = Signer.of_string wallet_ctxt key in
+      let* pk = Signer.public_key signer in
+      return (pk, signer)
   | None ->
       let _pkh, pk, sk =
         Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
@@ -1358,10 +1356,10 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   in
   let* messages =
     match kind with
-    | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
+    | `Blueprint (signer, timestamp, number, parent_hash) ->
         let* blueprint_chunks =
           Sequencer_blueprint.prepare
-            ~signer:(Signer.wallet cctxt sk_uri)
+            ~signer
             ~timestamp
             ~number:(Ethereum_types.quantity_of_z number)
             ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
@@ -1445,12 +1443,11 @@ let chunker_command =
             | None -> Lwt.fail_with "missing sequencer key"
           in
           let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-          let+ sequencer_key =
-            Client_keys.Secret_key.parse_source_string wallet_ctxt sequencer_str
+          let+ signer =
+            Evm_node_lib_dev.Signer.of_string wallet_ctxt sequencer_str
           in
           `Blueprint
-            ( wallet_ctxt,
-              sequencer_key,
+            ( signer,
               blueprint_timestamp,
               blueprint_number,
               blueprint_parent_hash )
@@ -1517,14 +1514,10 @@ let make_sequencer_upgrade_command =
     @@ prefix "for" @@ Params.sequencer_key @@ stop)
     (fun wallet_dir pool_address activation_timestamp sequencer_str () ->
       let wallet_ctxt = register_wallet ~wallet_dir () in
-      let* _pk_uri, sequencer_pk_opt =
-        Client_keys.Public_key.parse_source_string wallet_ctxt sequencer_str
+      let* signer =
+        Evm_node_lib_dev.Signer.of_string wallet_ctxt sequencer_str
       in
-      let*? sequencer =
-        Option.to_result
-          ~none:[error_of_fmt "invalid format or unknown public key."]
-          sequencer_pk_opt
-      in
+      let* sequencer = Evm_node_lib_dev.Signer.public_key signer in
       let* payload =
         let open Evm_node_lib_dev_encoding.Evm_events in
         let sequencer_upgrade : Sequencer_upgrade.t =
@@ -1893,11 +1886,13 @@ let init_config_command =
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
+      let wallet_ctxt = register_wallet ~wallet_dir () in
       let* sequencer_key =
         Option.map_es
           (fun str ->
-            let wallet_ctxt = register_wallet ~wallet_dir () in
-            Client_keys.Secret_key.parse_source_string wallet_ctxt str)
+            let open Evm_node_lib_dev in
+            let* signer = Signer.of_string wallet_ctxt str in
+            return (Signer.sequencer_key signer))
           sequencer_str
       in
       let* config =
@@ -2451,11 +2446,9 @@ let sequencer_command =
       let* signer =
         match sequencer_str with
         | Some sequencer_str ->
-            let+ sk_uri =
-              (Client_keys.Secret_key.parse_source_string wallet_ctxt)
-                sequencer_str
-            in
-            Some (Evm_node_lib_dev.Signer.wallet wallet_ctxt sk_uri)
+            let open Evm_node_lib_dev in
+            let* signer = Signer.of_string wallet_ctxt sequencer_str in
+            return_some signer
         | None -> return_none
       in
       start_sequencer

@@ -7,17 +7,10 @@
 
 type t
 
-val wallet : #Client_context.wallet -> Client_keys.sk_uri -> t
+val from_gcp_key : Configuration.gcp_key -> t Lwt.t
 
-val gcp_kms : Gcp_kms.t -> t
+val gcp_key : t -> Configuration.gcp_key
 
-val of_sequencer_key :
-  #Client_context.wallet -> Configuration.sequencer_key -> t Lwt.t
-
-val of_string : #Client_context.wallet -> string -> t tzresult Lwt.t
-
-val public_key : t -> Signature.public_key tzresult Lwt.t
-
-val sequencer_key : t -> Configuration.sequencer_key
+val public_key : t -> Signature.Public_key.t tzresult Lwt.t
 
 val sign : t -> bytes -> Signature.t tzresult Lwt.t

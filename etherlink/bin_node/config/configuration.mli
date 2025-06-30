@@ -130,13 +130,22 @@ type experimental_features = {
   periodic_snapshot_path : string option;
 }
 
+type gcp_key = {
+  project : string;
+  keyring : string;
+  region : string;
+  key : string;
+  version : int;
+}
+
+type sequencer_key = Wallet of Client_keys.sk_uri | Gcp_key of gcp_key
+
 type sequencer = {
   time_between_blocks : time_between_blocks;
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  sequencer : Client_keys.sk_uri option;
-      (** The key used to sign the blueprints. *)
+  sequencer : sequencer_key option;  (** The key used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
@@ -245,7 +254,9 @@ val load :
 
 (** [sequencer_key config] returns the key the sequencer should use, or
     fails. *)
-val sequencer_key : t -> Client_keys.sk_uri tzresult
+val sequencer_key : t -> sequencer_key tzresult
+
+val gcp_key_from_string_opt : string -> gcp_key option
 
 (** [observer_config_exn config] returns the observer config of
     [config] or fails *)
@@ -293,7 +304,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -332,7 +343,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
@@ -371,7 +382,7 @@ module Cli : sig
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
