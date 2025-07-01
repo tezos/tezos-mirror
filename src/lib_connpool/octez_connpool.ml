@@ -105,25 +105,86 @@ let make_uri uri ?query ?userinfo route =
 exception Call_failure of exn
 
 let warm t =
+  Opentelemetry.Trace.with_ ~service_name:"Octez_connpool" "warm" @@ fun _ ->
   let rec warm n pool =
     Lwt_pool.use pool @@ fun _conn ->
     if n > 1 then warm (n - 1) pool else Lwt.return_unit
   in
   warm t.pool_len t.pool
 
-let call_exn ?headers ?body ?query ?userinfo t meth route =
+let add_traceparent_header header
+    ({trace_id; span_id; _} : Opentelemetry.Scope.t) =
+  Cohttp.Header.add
+    header
+    Opentelemetry.Trace_context.Traceparent.name
+    (Opentelemetry.Trace_context.Traceparent.to_value
+       ~trace_id
+       ~parent_id:span_id
+       ())
+
+let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo t meth
+    route =
   let open Lwt_syntax in
   let uri = make_uri t.endpoint ?query ?userinfo route in
   Lwt_pool.use t.pool @@ fun conn ->
+  let make_attrs () =
+    let full_attr = ("url.full", `String (Uri.to_string uri)) in
+    let http_server_attr =
+      match Uri.host uri with
+      | Some server -> [("server.name", `String server)]
+      | None -> []
+    in
+    let http_port_attr =
+      match (Uri.scheme uri, Uri.port uri) with
+      | Some "http", None -> [("server.port", `Int 80)]
+      | Some "https", None -> [("server.port", `Int 443)]
+      | _, Some port -> [("server.port", `Int port)]
+      | _, _ -> []
+    in
+    let headers_attrs =
+      List.map
+        (fun (h, v) -> ("http.request.header." ^ h, `String v))
+        (Cohttp.Header.to_list headers)
+    in
+    [
+      ("http.route", `String route);
+      ("http.request.method", `String (Cohttp.Code.string_of_method meth));
+      full_attr;
+    ]
+    @ http_server_attr @ http_port_attr @ headers_attrs
+  in
+  Opentelemetry.Trace.with_
+    ~service_name:"Octez_connpool"
+    ~kind:Span_kind_client
+    Format.(sprintf "%s %s" (Cohttp.Code.string_of_method meth) route)
+  @@ fun scope ->
+  Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
   Lwt.catch
     (fun () ->
-      let* resp, body = Client.call ~ctx:(Some conn) ?headers ?body meth uri in
+      let headers =
+        if Opentelemetry.Collector.has_backend () then
+          add_traceparent_header headers scope
+        else headers
+      in
+      let* resp, body = Client.call ~ctx:(Some conn) ~headers ?body meth uri in
       let* body = Cohttp_lwt.Body.to_string body in
       let* () =
         match Cohttp.Header.connection (Cohttp.Response.headers resp) with
         | None | Some `Keep_alive -> Lwt.return_unit
         | Some `Close | Some (`Unknown _) -> close_conn conn
       in
+      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+          let resp_code = Cohttp.Code.code_of_status resp.status in
+          if resp_code >= 400 then
+            Opentelemetry.Scope.set_status
+              scope
+              {message = ""; code = Status_code_error} ;
+          let headers_attrs =
+            List.map
+              (fun (h, v) -> ("http.request.header." ^ h, `String v))
+              (Cohttp.Header.to_list resp.headers)
+          in
+          ("http.response.status_code", `Int resp_code) :: headers_attrs) ;
       return (resp, body))
     (fun exn ->
       let* () = close_conn conn in

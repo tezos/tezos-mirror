@@ -4444,7 +4444,13 @@ let octez_connpool =
     ~opam:"octez-connpool"
     ~path:"src/lib_connpool"
     ~synopsis:"Persistent HTTP connection pool for Octez built with Cohttp-lwt"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; cohttp_lwt_unix; uri]
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        cohttp_lwt_unix;
+        uri;
+        opentelemetry_lwt;
+      ]
 
 let _octez_connpool_tests =
   tezt
