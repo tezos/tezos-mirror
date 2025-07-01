@@ -16,6 +16,8 @@ pub enum OperationContent {
     Reveal(ManagerOperationContent<RevealContent>),
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    #[encoding(tag = 110)]
+    Delegation(ManagerOperationContent<DelegationContent>),
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -45,6 +47,11 @@ pub struct Parameter {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct DelegationContent {
+    pub delegate: Option<PublicKeyHash>,
 }
 
 #[cfg(test)]
