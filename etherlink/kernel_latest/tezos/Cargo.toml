@@ -9,6 +9,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+thiserror.workspace = true
 
 tezos_crypto_rs.workspace = true
 hex.workspace = true

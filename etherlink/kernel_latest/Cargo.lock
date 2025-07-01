@@ -3470,6 +3470,7 @@ dependencies = [
  "tezos-smart-rollup",
  "tezos_crypto_rs",
  "tezos_data_encoding",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -3,5 +3,6 @@
 // SPDX-License-Identifier: MIT
 
 pub mod block;
+pub mod enc_wrappers;
 pub mod operation;
 pub mod operation_result;
