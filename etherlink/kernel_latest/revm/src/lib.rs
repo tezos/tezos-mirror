@@ -262,8 +262,9 @@ mod test {
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
-    use crate::world_state_handler::{
-        new_world_state_handler, WITHDRAWALS_TICKETER_PATH,
+    use crate::{
+        constants::WITHDRAWAL_SOL_ADDR,
+        world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH},
     };
     use crate::{
         precompile_provider::EtherlinkPrecompiles, run_transaction,
@@ -531,11 +532,84 @@ mod test {
         let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
 
+        // Insert account information
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+        let mut storage_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        // Store the ticketer address required to build the outbox message
         host.store_write_all(
             &WITHDRAWALS_TICKETER_PATH,
             "KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4".as_bytes(),
         )
         .unwrap();
+
+        // Call the created address with data generated from:
+        // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
+
+        let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
+        let withdrawn_amount = U256::from(1_000_000_000_000u64);
+
+        let ExecutionOutcome {
+            result,
+            withdrawals,
+        } = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(WITHDRAWAL_SOL_ADDR),
+            Bytes::from_hex(calldata).unwrap(),
+            10_000_000,
+            0,
+            withdrawn_amount,
+            AccessList(vec![]),
+        )
+        .unwrap();
+
+        // Verify that:
+        //  - caller is deducted
+        //  - withdrawal contract burned the received amount
+        //  - zero address received the burned amound
+        //  - outbox message has been built and sent
+        assert!(result.is_success());
+        assert_eq!(
+            storage_account.balance(&host).unwrap(),
+            U256::MAX.saturating_sub(withdrawn_amount)
+        );
+        let created_account = world_state_handler
+            .get_or_create(&host, &account_path(&WITHDRAWAL_SOL_ADDR).unwrap())
+            .unwrap();
+        assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
+        let zero_account = world_state_handler
+            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
+            .unwrap();
+        assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
+        let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
+        assert_eq!(format!("{:?}", withdrawals), raw_expected_withdrawals);
+    }
+
+    #[test]
+    #[ignore]
+    fn create_withdrawal_contract() {
+        // TODO: Automate this
+        // This contract sole purpose is generating the result of a CREATE operation
+        // Do not remove `#[ignore]`
+
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = block_constants_with_no_fees();
 
         // TODO: use foundry-compilers here when kernel rust version is bumped to 1.87
         // For the moment if you need to rebuild you can run:
@@ -549,7 +623,7 @@ mod test {
         let hex = json["bytecode"]["object"].as_str().unwrap();
         let deployed = Bytes::from_hex(hex).unwrap();
 
-        // Insert account information for caller of both transactions
+        // Insert account information
         let caller =
             Address::from_hex("1111111111111111111111111111111111111111").unwrap();
         let caller_info = AccountInfo {
@@ -580,61 +654,14 @@ mod test {
         )
         .unwrap();
 
+        // Read and display the written bytecode
         assert!(result.is_success());
-
-        // Call the created address with data generated from:
-        // $ cast calldata "withdraw_base58(string)" "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX"
-
-        let calldata = "0xcda4fee200000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024747a316670356e63446d7159775943353638665245597a3969775154674751754b5a715800000000000000000000000000000000000000000000000000000000";
-        let addr = result.created_address();
-        let withdrawn_amount = U256::from(1_000_000_000_000u64);
-
-        // Snippet used to generate `WITHDRAWAL_SOL_CONTRACT`:
-        // let created_account = world_state_handler
-        //     .get_or_create(&host, &account_path(&addr.unwrap()).unwrap())
-        //     .unwrap();
-        // let code = created_account.code(&host).unwrap();
-        // println!("STORED = {:?}", code.clone());
-
-        let ExecutionOutcome {
-            result,
-            withdrawals,
-        } = run_transaction(
-            &mut host,
-            DEFAULT_SPEC_ID,
-            &block_constants,
-            &mut world_state_handler,
-            EtherlinkPrecompiles::new(),
-            caller,
-            addr,
-            Bytes::from_hex(calldata).unwrap(),
-            10_000_000,
-            0,
-            withdrawn_amount,
-            AccessList(vec![]),
-        )
-        .unwrap();
-
-        // Verify that:
-        //  - caller is deducted
-        //  - withdrawal contract burned the received amount
-        //  - zero address received the burned amound
-        //  - outbox message has been built and sent
-        assert!(result.is_success());
-        assert_eq!(
-            storage_account.balance(&host).unwrap(),
-            U256::MAX.saturating_sub(withdrawn_amount)
-        );
+        let created_address = result.created_address().unwrap();
         let created_account = world_state_handler
-            .get_or_create(&host, &account_path(&addr.unwrap()).unwrap())
+            .get_or_create(&host, &account_path(&created_address).unwrap())
             .unwrap();
-        assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
-        let zero_account = world_state_handler
-            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
-            .unwrap();
-        assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
-        let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
-        assert_eq!(format!("{:?}", withdrawals), raw_expected_withdrawals);
+        let code = created_account.code(&host).unwrap();
+        println!("Create output = {:?}", code.clone());
     }
 
     #[test]

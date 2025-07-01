@@ -21,7 +21,7 @@ use tezos_smart_rollup_encoding::{
     outbox::OutboxMessageTransaction,
 };
 
-use crate::database::PrecompileDatabase;
+use crate::{constants::WITHDRAWAL_SOL_ADDR, database::PrecompileDatabase};
 
 pub(crate) const SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS: &str =
     "0xff00000000000000000000000000000000000003";
@@ -122,6 +122,7 @@ where
 {
     if transfer.target_address != *current
         || context.tx().caller() == *current
+        || transfer.caller_address != WITHDRAWAL_SOL_ADDR
         || is_static
     {
         return Ok(revert());
