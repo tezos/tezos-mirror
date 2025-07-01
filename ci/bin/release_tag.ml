@@ -51,7 +51,6 @@ let monitoring_child_pipeline =
     ~jobs:
       [
         job_datadog_pipeline_trace;
-        Grafazos.Common.job_build ();
         job_build_layer1_profiling ~expire_in:Never ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ~cpu:Very_high ();
