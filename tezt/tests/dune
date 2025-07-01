@@ -106,6 +106,7 @@
   src_lib_crypto_test_tezt_lib
   src_lib_context_test_tezt_lib
   src_lib_context_memory_test_tezt_lib
+  src_lib_connpool_test_tezt_lib
   src_lib_client_base_unix_test_tezt_lib
   src_lib_client_base_test_tezt_lib
   src_lib_clic_test_tezt_lib

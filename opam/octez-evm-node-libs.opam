@@ -31,6 +31,7 @@ depends: [
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
   "dream" { >= "1.0.0~alpha7" }
+  "octez-connpool"
   "octez-version"
   "lwt-exit"
   "octez-smart-rollup-wasm-debugger-lib"

@@ -4438,6 +4438,27 @@ let octez_shell =
         octez_bees;
       ]
 
+let octez_connpool =
+  public_lib
+    "octez-connpool"
+    ~opam:"octez-connpool"
+    ~path:"src/lib_connpool"
+    ~synopsis:"Persistent HTTP connection pool for Octez built with Cohttp-lwt"
+    ~deps:[octez_base |> open_ ~m:"TzPervasives"; cohttp_lwt_unix; uri]
+
+let _octez_connpool_tests =
+  tezt
+    ~path:"src/lib_connpool/test"
+    ~opam:"octez-connpool"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tezt_lib |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_;
+        octez_connpool;
+      ]
+    ["test_connpool"]
+
 let octez_rpc_http =
   octez_lib
     "rpc-http"

@@ -30,6 +30,7 @@
 (package (name octez-client))
 (package (name octez-codec))
 (package (name octez-codec-kaitai))
+(package (name octez-connpool))
 (package (name octez-crawler))
 (package (name octez-dal-node))
 (package (name octez-distributed-internal))

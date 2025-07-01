@@ -316,6 +316,7 @@ let evm_node_lib_dev =
         websocket_lwt_unix;
         websocket_cohttp_lwt;
         octez_workers |> open_;
+        octez_connpool;
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
