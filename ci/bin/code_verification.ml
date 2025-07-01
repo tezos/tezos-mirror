@@ -506,6 +506,7 @@ let jobs pipeline_type =
         | Schedule_extended_test -> [])
     in
     let job_check_jsonnet =
+      (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
       job
         ~__POS__
         ~name:"check_jsonnet"
