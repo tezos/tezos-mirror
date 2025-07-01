@@ -586,6 +586,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 mod tests {
     use super::*;
     use tezos_execution::account_storage::TezlinkAccount;
+    use tezos_tezlink::enc_wrappers::BlockHash;
     use tezos_tezlink::operation::Parameter;
 
     use crate::block_storage;
@@ -640,7 +641,6 @@ mod tests {
 
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_tezlink::block::TezBlock;
-    use tezos_tezlink::operation::BlockHash;
     use tezos_tezlink::operation::ManagerOperation;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;

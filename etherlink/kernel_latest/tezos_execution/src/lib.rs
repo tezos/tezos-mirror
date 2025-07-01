@@ -409,9 +409,10 @@ mod tests {
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
+        enc_wrappers::BlockHash,
         operation::{
-            BlockHash, ManagerOperation, Operation, OperationContent, Parameter,
-            RevealContent, TransferContent,
+            ManagerOperation, Operation, OperationContent, Parameter, RevealContent,
+            TransferContent,
         },
         operation_result::{
             Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,

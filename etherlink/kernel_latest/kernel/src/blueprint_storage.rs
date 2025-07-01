@@ -155,7 +155,7 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
                 number: block.number,
                 timestamp: block.timestamp,
             },
-            chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash }),
+            chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash.0 }),
         }
     }
 }
