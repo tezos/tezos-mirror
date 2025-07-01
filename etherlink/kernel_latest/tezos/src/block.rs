@@ -12,103 +12,27 @@ use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::nom::{self as tezos_nom};
 use tezos_enc::{BinError, BinWriter};
-use tezos_nom::{NomReader, NomResult};
+use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Timestamp;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct AppliedOperation {
     // OperationHash are 32 bytes long
     pub hash: OperationHash,
     pub branch: BlockHash,
+    #[encoding(dynamic)]
     pub op_and_receipt: OperationDataAndMetadata,
-}
-impl NomReader<'_> for AppliedOperation {
-    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) = OperationHash::nom_read(input)?;
-        let (remaining, branch) = BlockHash::nom_read(remaining)?;
-        let (remaining, op_and_receipt) =
-            tezos_nom::dynamic(OperationDataAndMetadata::nom_read)(remaining)?;
-
-        Ok((
-            remaining,
-            Self {
-                hash,
-                branch,
-                op_and_receipt,
-            },
-        ))
-    }
-}
-
-impl BinWriter for AppliedOperation {
-    fn bin_write(&self, output: &mut Vec<u8>) -> Result<(), BinError> {
-        self.hash.bin_write(output)?;
-        self.branch.bin_write(output)?;
-        tezos_enc::dynamic(OperationDataAndMetadata::bin_write)(
-            &self.op_and_receipt,
-            output,
-        )?;
-        Ok(())
-    }
 }
 
 // WIP: This structure will evolve to look like Tezos block
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TezBlock {
     pub hash: BlockHash,
     pub number: BlockNumber,
-    pub timestamp: Timestamp,
     pub previous_hash: BlockHash,
+    pub timestamp: Timestamp,
+    #[encoding(dynamic, list)]
     pub operations: Vec<AppliedOperation>,
-}
-
-impl NomReader<'_> for TezBlock {
-    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) = BlockHash::nom_read(input)?;
-        let (remaining, number) = BlockNumber::nom_read(remaining)?;
-        let (remaining, previous_hash) = BlockHash::nom_read(remaining)?;
-
-        // Decode the timestamp
-        let (remaining, timestamp) = nom::number::complete::be_i64(remaining)?;
-        let timestamp = Timestamp::from(timestamp);
-
-        let (remaining, operations) =
-            tezos_nom::dynamic(tezos_nom::list(AppliedOperation::nom_read))(remaining)?;
-
-        Ok((
-            remaining,
-            Self {
-                hash,
-                number,
-                timestamp,
-                previous_hash,
-                operations,
-            },
-        ))
-    }
-}
-
-impl BinWriter for TezBlock {
-    // Encoded size for parameter were taken from this command:
-    // `octez-codec describe block_header binary schema`
-    fn bin_write(&self, output: &mut Vec<u8>) -> Result<(), BinError> {
-        let Self {
-            hash,
-            number,
-            timestamp,
-            previous_hash,
-            operations,
-        } = self;
-        // Encode all block fields
-        hash.bin_write(output)?;
-        number.bin_write(output)?;
-        previous_hash.bin_write(output)?;
-        tezos_enc::i64(&timestamp.i64(), output)?;
-        tezos_enc::dynamic(tezos_enc::list(AppliedOperation::bin_write))(
-            operations, output,
-        )?;
-        Ok(())
-    }
 }
 
 impl TezBlock {

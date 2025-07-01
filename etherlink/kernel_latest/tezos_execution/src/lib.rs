@@ -16,7 +16,7 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
-use tezos_tezlink::operation_result::{TransferTarget, UpdateOrigin};
+use tezos_tezlink::operation_result::{BalanceTooLow, TransferTarget, UpdateOrigin};
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -186,11 +186,11 @@ pub fn transfer<Host: Runtime>(
     let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
         None => {
             log!(host, Debug, "Balance is too low");
-            let error = TransferError::BalanceTooLow {
+            let error = TransferError::BalanceTooLow(BalanceTooLow {
                 contract: src_contract.clone(),
                 balance: current_src_balance.into(),
                 amount: amount.clone(),
-            };
+            });
             return Ok(Err(error.into()));
         }
         Some(new_source_balance) => new_source_balance,
@@ -415,9 +415,9 @@ mod tests {
             TransferContent,
         },
         operation_result::{
-            Balance, BalanceUpdate, ContentResult, OperationResult, OperationResultSum,
-            RevealError, RevealSuccess, TransferError, TransferSuccess, TransferTarget,
-            UpdateOrigin,
+            Balance, BalanceTooLow, BalanceUpdate, ContentResult, OperationResult,
+            OperationResultSum, RevealError, RevealSuccess, TransferError,
+            TransferSuccess, TransferTarget, UpdateOrigin,
         },
     };
 
@@ -837,11 +837,11 @@ mod tests {
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Apply(
-                TransferError::BalanceTooLow {
+                TransferError::BalanceTooLow(BalanceTooLow {
                     contract: Contract::from_b58check(BOOTSTRAP_1).unwrap(),
                     balance: 50_u64.into(),
                     amount: 100_u64.into(),
-                }
+                })
                 .into(),
             )]),
             internal_operation_results: vec![],
