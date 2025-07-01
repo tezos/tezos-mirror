@@ -821,12 +821,6 @@ let jobs pipeline_type =
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:"2G"
     in
-    let job_build_grafazos =
-      match pipeline_type with
-      | Merge_train | Before_merging -> []
-      | Schedule_extended_test ->
-          [Grafazos.Common.job_build ~rules:[job_rule ~when_:Always ()] ()]
-    in
     let job_build_teztale ?cpu ~arch ?storage ?(sccache_size = "5G") () =
       Teztale.Common.job_build
         ~arch
@@ -848,22 +842,19 @@ let jobs pipeline_type =
       job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
+      job_build_teztale
+        ~arch:Amd64
+        ~cpu:Very_high
+        ~storage:Ramfs
+        ~sccache_size:"2G"
+        ();
+      job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
+      job_evm_static_x86_64_experimental;
+      job_evm_static_arm64_experimental;
+      job_build_layer1_profiling
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ();
     ]
-    @ job_build_grafazos
-    @ [
-        job_build_teztale
-          ~arch:Amd64
-          ~cpu:Very_high
-          ~storage:Ramfs
-          ~sccache_size:"2G"
-          ();
-        job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
-        job_evm_static_x86_64_experimental;
-        job_evm_static_arm64_experimental;
-        job_build_layer1_profiling
-          ~rules:(make_rules ~changes:changeset_octez ())
-          ();
-      ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs
   in

@@ -39,4 +39,8 @@ let job_build =
 
 let register () =
   CI.register_before_merging_jobs [(Auto, job_build Test)] ;
+  CI.register_scheduled_pipeline
+    "daily"
+    ~description:"Daily tests to run for Grafazos."
+    [(Auto, job_build Test)] ;
   ()
