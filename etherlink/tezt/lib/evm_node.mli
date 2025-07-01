@@ -64,12 +64,6 @@ type mode =
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
     }
-  | Threshold_encryption_observer of {
-      initial_kernel : string;
-      preimages_dir : string;
-      rollup_node_endpoint : string;
-      bundler_node_endpoint : string;
-    }
   | Sequencer of {
       initial_kernel : string;
           (** Path to the initial kernel used by the sequencer. *)
@@ -109,36 +103,6 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
     }
-  | Threshold_encryption_sequencer of {
-      initial_kernel : string;
-          (** Path to the initial kernel used by the sequencer. *)
-      preimage_dir : string option;
-          (** Path to the directory with the associated preimages. *)
-      private_rpc_port : int option;  (** Port for private RPC server*)
-      time_between_blocks : time_between_blocks option;
-          (** See {!time_between_blocks}, if the value is not
-              provided, the sequencer uses it default value. *)
-      sequencer : string;  (** Secret key used to sign the blueprints. *)
-      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
-      max_blueprints_lag : int option;
-      max_blueprints_ahead : int option;
-      max_blueprints_catchup : int option;
-      catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_pool_timeout_limit : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
-      tx_pool_addr_limit : int option;
-          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
-              the pool. *)
-      tx_pool_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
-              simultaneously inside the pool. *)
-      sequencer_sidecar_endpoint : string;
-          (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
-              proposals are forwarded, and from where preblocks are fetched. *)
-      dal_slots : int list option;
-    }
   | Proxy
   | Rpc of mode
 
@@ -163,8 +127,6 @@ val config_file : t -> string option
 (** Returns the path to the directory storing the preimages used by the
     kernel run by the node. *)
 val preimages_dir : t -> string
-
-val supports_threshold_encryption : t -> bool
 
 (** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
     ?spawn_rpc ?websockets rollup_node_endpoint] creates an EVM node server.

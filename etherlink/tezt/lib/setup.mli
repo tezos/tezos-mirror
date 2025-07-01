@@ -109,7 +109,6 @@ val register_test :
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
-  ?threshold_encryption:bool ->
   ?uses:(Protocol.t -> Uses.t list) ->
   ?additional_uses:Uses.t list ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
@@ -161,7 +160,6 @@ val register_multichain_test :
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
-  ?threshold_encryption:bool ->
   ?uses:(Protocol.t -> Uses.t list) ->
   ?additional_uses:Uses.t list ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
@@ -215,7 +213,6 @@ val register_test_for_kernels :
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?additional_uses:Tezt_wrapper.Uses.t list ->
-  threshold_encryption:bool ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
   enable_multichain:bool ->
@@ -266,7 +263,6 @@ val setup_sequencer :
   enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
-  ?threshold_encryption:bool ->
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->

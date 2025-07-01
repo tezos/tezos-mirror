@@ -201,10 +201,6 @@ type feature_test_registration =
        MR CI. *)
 [@@warning "-unused-constructor"]
 
-let default_threshold_encryption_registration =
-  Register_both
-    {additional_tags_with = [Tag.ci_disabled]; additional_tags_without = []}
-
 let default_dal_registration =
   Register_both
     {additional_tags_with = [Tag.extra]; additional_tags_without = []}
@@ -264,7 +260,6 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?history_mode
-    ?(use_threshold_encryption = default_threshold_encryption_registration)
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration)
     ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
@@ -276,78 +271,72 @@ let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
     | Register_without_feature -> [(false, [])]
   in
   let dal_cases = register_cases use_dal in
-  let threshold_encryption_cases = register_cases use_threshold_encryption in
   let multichain_cases = register_cases use_multichain in
   let revm_cases = register_cases use_revm in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
      Also register the tests with and without FA bridge feature flag. *)
   List.iter
-    (fun (threshold_encryption, te_tags) ->
+    (fun (enable_dal, dal_tags) ->
       List.iter
-        (fun (enable_dal, dal_tags) ->
+        (fun (enable_multichain, multichain_tags) ->
           List.iter
-            (fun (enable_multichain, multichain_tags) ->
-              List.iter
-                (fun (enable_revm, revm_tags) ->
-                  (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
-                     we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
-                  let spawn_rpc =
-                    match spawn_rpc with
-                    | None when enable_multichain -> Some (Port.fresh ())
-                    | _ -> spawn_rpc
-                  in
-                  register_test_for_kernels
-                    ~__FILE__
-                    ?max_delayed_inbox_blueprint_length
-                    ?sequencer_rpc_port
-                    ?sequencer_private_rpc_port
-                    ?commitment_period
-                    ?challenge_window
-                    ?genesis_timestamp
-                    ?time_between_blocks
-                    ?max_blueprints_lag
-                    ?max_blueprints_ahead
-                    ?max_blueprints_catchup
-                    ?catchup_cooldown
-                    ?delayed_inbox_timeout
-                    ?delayed_inbox_min_levels
-                    ?max_number_of_chunks
-                    ?eth_bootstrap_accounts
-                    ?tez_bootstrap_accounts
-                    ?sequencer
-                    ?sequencer_pool_address
-                    ~kernels
-                    ?da_fee
-                    ?minimum_base_fee_per_gas
-                    ?preimages_dir
-                    ?maximum_allowed_ticks
-                    ?maximum_gas_per_transaction
-                    ?max_blueprint_lookahead_in_seconds
-                    ?enable_fa_bridge
-                    ~enable_revm
-                    ?enable_fast_withdrawal
-                    ?enable_fast_fa_withdrawal
-                    ?additional_uses
-                    ?rpc_server
-                    ?websockets
-                    ?history_mode
-                    ~threshold_encryption
-                    ?rollup_history_mode
-                    ~enable_dal
-                    ~enable_multichain
-                    ?enable_tx_queue
-                    ?spawn_rpc
-                    ?periodic_snapshot_path
-                    ?l2_setups
-                    ~title
-                    ~tags:
-                      (te_tags @ dal_tags @ multichain_tags @ revm_tags @ tags)
-                    body
-                    protocols)
-                revm_cases)
-            multichain_cases)
-        dal_cases)
-    threshold_encryption_cases
+            (fun (enable_revm, revm_tags) ->
+              (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
+                 we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
+              let spawn_rpc =
+                match spawn_rpc with
+                | None when enable_multichain -> Some (Port.fresh ())
+                | _ -> spawn_rpc
+              in
+              register_test_for_kernels
+                ~__FILE__
+                ?max_delayed_inbox_blueprint_length
+                ?sequencer_rpc_port
+                ?sequencer_private_rpc_port
+                ?commitment_period
+                ?challenge_window
+                ?genesis_timestamp
+                ?time_between_blocks
+                ?max_blueprints_lag
+                ?max_blueprints_ahead
+                ?max_blueprints_catchup
+                ?catchup_cooldown
+                ?delayed_inbox_timeout
+                ?delayed_inbox_min_levels
+                ?max_number_of_chunks
+                ?eth_bootstrap_accounts
+                ?tez_bootstrap_accounts
+                ?sequencer
+                ?sequencer_pool_address
+                ~kernels
+                ?da_fee
+                ?minimum_base_fee_per_gas
+                ?preimages_dir
+                ?maximum_allowed_ticks
+                ?maximum_gas_per_transaction
+                ?max_blueprint_lookahead_in_seconds
+                ?enable_fa_bridge
+                ~enable_revm
+                ?enable_fast_withdrawal
+                ?enable_fast_fa_withdrawal
+                ?additional_uses
+                ?rpc_server
+                ?websockets
+                ?history_mode
+                ?rollup_history_mode
+                ~enable_dal
+                ~enable_multichain
+                ?enable_tx_queue
+                ?spawn_rpc
+                ?periodic_snapshot_path
+                ?l2_setups
+                ~title
+                ~tags:(dal_tags @ multichain_tags @ revm_tags @ tags)
+                body
+                protocols)
+            revm_cases)
+        multichain_cases)
+    dal_cases
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
@@ -1965,13 +1954,13 @@ let test_sequencer_too_ahead =
   in
   let* () =
     (* Failing as the block_producer is locked. *)
-    let*@? _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+    let*@? _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_block_producer_locked sequencer in
   let* () =
     (* Repeating won't make the production magically successful. *)
     repeat max_blueprints_ahead (fun () ->
-        let*@? _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+        let*@? _ = produce_block sequencer in
         unit)
   in
   let*@ block_number = Rpc.block_number sequencer in
@@ -4490,7 +4479,6 @@ let test_clean_bps =
     ~title:"All blueprints are cleared on flush"
     ~tags:["evm"; "flush"; "clean"]
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4596,7 +4584,6 @@ let test_delayed_inbox_flushing_event =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"]
     ~title:"Flush delayed inbox event"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
@@ -4663,7 +4650,6 @@ let test_flushed_blueprint_reorg =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
     ~title:"Flush delayed inbox event leads to reorg"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
@@ -4801,7 +4787,6 @@ let test_multiple_flushed_blueprints =
       ]
     ~title:"Multiple flushed blueprints"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4933,7 +4918,6 @@ let test_observer_reorg_on_blueprint_stream =
     ~title:
       "Observer tracking a rollup node reorganizes after blueprint on stream"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
@@ -5048,7 +5032,6 @@ let test_observer_reorg_on_blueprint_catchup =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
     ~title:"Observer reorganizes after blueprint on catchup"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -5173,7 +5156,6 @@ let test_flushed_blueprint_reorg_late =
       ["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"; "late"]
     ~title:"Flush delayed inbox event leads to reorg, including late delayed tx"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
@@ -5306,7 +5288,6 @@ let test_flushed_blueprint_reorg_done_late =
       "Flush delayed inbox event leads to reorg, including delayed tx included \
        too late"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
@@ -6672,12 +6653,6 @@ let test_non_increasing_timestamp =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
         in
         unit
-    | Threshold_encryption_sequencer _ ->
-        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
-        let* _ntx =
-          Rpc.produce_proposal ~timestamp:"2020-01-01T00:00:00Z" sequencer
-        and* () = wait_for_invalid in
-        unit
     | _ -> assert false (* impossible case as it's a sequencer. *)
   in
   (* However the same timestamp is accepted. *)
@@ -6781,7 +6756,6 @@ let test_sequencer_upgrade =
       (* TODO #7843: Adapt this test to multichain context *)
       Register_without_feature
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
-    ~use_threshold_encryption:Register_without_feature
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -7156,17 +7130,6 @@ let test_sequencer_diverge =
           return
           @@ Evm_node.Sequencer
                {config with private_rpc_port = Some (Port.fresh ())}
-      | Threshold_encryption_sequencer config ->
-          let sequencer_sidecar = Dsn_node.sequencer () in
-          let* () = Dsn_node.start sequencer_sidecar in
-          return
-          @@ Evm_node.Threshold_encryption_sequencer
-               {
-                 config with
-                 private_rpc_port = Some (Port.fresh ());
-                 sequencer_sidecar_endpoint =
-                   Dsn_node.endpoint sequencer_sidecar;
-               }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
     return
@@ -7903,8 +7866,6 @@ let test_preimages_endpoint =
     match Evm_node.mode sequencer with
     | Evm_node.Sequencer mode ->
         Evm_node.Sequencer {mode with preimage_dir = None}
-    | Evm_node.Threshold_encryption_sequencer mode ->
-        Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
@@ -8080,8 +8041,6 @@ let test_preimages_endpoint_retry =
     match Evm_node.mode sequencer with
     | Evm_node.Sequencer mode ->
         Evm_node.Sequencer {mode with preimage_dir = None}
-    | Evm_node.Threshold_encryption_sequencer mode ->
-        Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
   let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
@@ -12467,7 +12426,6 @@ let test_transaction_object expected_type_ name make_transaction =
     ~tags:[name; "transaction_object"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~title:
       (sf "RPC returns the correct transaction object for %s transactions" name)
@@ -12569,7 +12527,6 @@ let test_tx_queue =
     ~tags:["observer"; "tx_queue"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
     ~enable_tx_queue:
@@ -12695,7 +12652,6 @@ let test_tx_queue_clear =
     ~delayed_inbox_min_levels:1
     ~kernels:[Latest]
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~websockets:false
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
@@ -12787,7 +12743,6 @@ let test_tx_queue_nonce =
     ~tags:["observer"; "tx_queue"; "nonce"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
     ~enable_tx_queue:
@@ -13084,7 +13039,6 @@ let test_tx_queue_limit =
     ~tags:["observer"; "tx_queue"; "limit"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
     ~enable_tx_queue:
@@ -13193,7 +13147,6 @@ let test_observer_periodic_snapshot =
     ~tags:["evm"; "observer"; "periodic"; "snapshot"]
     ~title:"Can export periodic snapshots"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:Register_without_feature
     ~websockets:false
     ~kernels:[Latest]
@@ -13327,12 +13280,7 @@ let test_deposit_event =
         unit)
   in
   (* Produce an Etherlink block *)
-  let*@ nb_txns =
-    produce_block
-      ~timestamp:(next_timestamp ())
-      ~wait_on_blueprint_applied:true
-      sequencer
-  in
+  let*@ nb_txns = produce_block ~timestamp:(next_timestamp ()) sequencer in
   Check.(
     (nb_txns = 1)
       int
@@ -13485,12 +13433,7 @@ let test_fa_deposit_and_withdrawals_events =
         unit)
   in
   (* Produce an Etherlink block *)
-  let*@ nb_txns =
-    produce_block
-      ~timestamp:(next_timestamp ())
-      ~wait_on_blueprint_applied:true
-      sequencer
-  in
+  let*@ nb_txns = produce_block ~timestamp:(next_timestamp ()) sequencer in
   Check.(
     (nb_txns = 1)
       int
@@ -13574,7 +13517,6 @@ let test_block_producer_validation =
     ~tags:["observer"; "tx_queue"; "validation"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~websockets:false
     ~enable_tx_queue:
@@ -13802,7 +13744,6 @@ let test_fa_deposit_can_be_claimed =
     ~use_dal:Register_without_feature
     ~enable_fa_bridge:true
     ~use_multichain:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
     ~title:"Claims are operational"
   @@ fun {
@@ -13879,7 +13820,7 @@ let test_fa_deposit_can_be_claimed =
 
   let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
 
-  let*@ _ = produce_block ~wait_on_blueprint_applied:true sequencer in
+  let*@ _ = produce_block sequencer in
 
   let* nonce = get_deposit_nonce_from_latest_block sequencer in
 

@@ -73,10 +73,7 @@ val next_rollup_node_level :
 (** [produce_block timestampt ~sc_rollup_node ~client] moves
     [evm_node] to the next L2 level. *)
 val produce_block :
-  ?wait_on_blueprint_applied:bool ->
-  ?timestamp:string ->
-  Evm_node.t ->
-  (int, Rpc.error) result Lwt.t
+  ?timestamp:string -> Evm_node.t -> (int, Rpc.error) result Lwt.t
 
 (** [check_header ~previous_header ~current_header] checks that two
     consecutive headers are consistent. *)
