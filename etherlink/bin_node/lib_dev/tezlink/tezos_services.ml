@@ -598,6 +598,18 @@ let operation_hashes :
     Tezos_rpc.Service.t =
   import_service Block_services.S.Operation_hashes.operation_hashes
 
+let operation :
+    ( [`GET],
+      tezlink_rpc_context,
+      (tezlink_rpc_context * int) * int,
+      < force_metadata : bool
+      ; metadata : [`Always | `Never] option
+      ; version : Tezos_shell_services.Block_services.version >,
+      unit,
+      Tezos_shell_services.Block_services.version * Block_services.operation )
+    Tezos_rpc.Service.t =
+  Tezos_rpc.Service.subst2 Block_services.S.Operations.operation
+
 let bootstrapped :
     ( [`GET],
       unit,

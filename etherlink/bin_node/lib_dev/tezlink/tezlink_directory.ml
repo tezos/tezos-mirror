@@ -399,6 +399,19 @@ let build_block_static_directory ~l2_chain_id
              anonymous_operation_hashes;
              manager_operation_hashes;
            ])
+  |> opt_register
+       ~service:Tezos_services.operation
+       ~impl:(fun (({chain; block}, operation_pass), operation_index) o () ->
+         let*? chain = check_chain chain in
+         let*? block = check_block block in
+         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+         if operation_pass <> Imported_protocol.Operation_repr.manager_pass then
+           (* All tezlink operations are manager operations *)
+           return_none
+         else
+           let* operations = Backend.operations ~chain_id chain block in
+           let operation_opt = List.nth_opt operations operation_index in
+           return (Option.map (fun op -> (o#version, op)) operation_opt))
 
 let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
