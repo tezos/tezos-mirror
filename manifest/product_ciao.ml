@@ -50,8 +50,7 @@ let ci_grafazos =
     ~opam:""
     ~path:"grafazos/ci"
     ~bisect_ppx:No
-    ~deps:
-      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
+    ~deps:[ci_lib_gitlab_ci_main; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let ci_teztale =
