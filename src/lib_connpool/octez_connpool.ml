@@ -64,10 +64,19 @@ let close_conn conn =
       return_unit)
     (fun _ -> return_unit)
 
+let validate {alive; _} =
+  let open Lwt_syntax in
+  (match Opentelemetry.Scope.get_ambient_scope () with
+  | Some scope ->
+      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+          [("octez_connpool.reuse", `Bool alive)])
+  | _ -> ()) ;
+  return alive
+
 let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
   Lwt_pool.create
     pool_len
-    ~validate:(fun {alive; _} -> Lwt.return alive)
+    ~validate
     ~check:(fun {alive; _} is_ok -> is_ok alive)
     ~dispose:(fun conn ->
       let open Lwt_syntax in
@@ -75,6 +84,10 @@ let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
       close_conn conn)
     (fun () ->
       let open Lwt_syntax in
+      Opentelemetry.Trace.with_
+        ~service_name:"Octez_connpool"
+        "create_new_connection"
+      @@ fun _ ->
       let* conn, ic, oc = Cohttp_lwt_unix.Net.connect_uri ~ctx uri in
       let* () = Connpool_events.new_connection uri in
       return {conn; ic; oc; alive = true})
