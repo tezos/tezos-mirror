@@ -182,7 +182,7 @@ type experimental_features = {
 type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
-  sequencer : Client_keys.sk_uri;
+  sequencer : Client_keys.sk_uri option;
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
@@ -227,7 +227,7 @@ type t = {
   websockets : websockets_config option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
-  sequencer : sequencer option;
+  sequencer : sequencer;
   observer : observer option;
   proxy : proxy;
   tx_pool_timeout_limit : int64;
@@ -496,7 +496,7 @@ let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
         native_execution_policy;
   }
 
-let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ~sequencer
+let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
     ?catchup_cooldown ?dal_slots () =
   let default_blueprints_publisher_config =
@@ -675,7 +675,7 @@ let max_number_of_chunks_field =
 
 let sequencer_field =
   Data_encoding.(
-    req
+    opt
       ~description:"Secret key URI of the sequencer."
       "sequencer"
       (string' Plain))
@@ -694,7 +694,7 @@ let sequencer_encoding =
          } ->
       ( time_between_blocks,
         max_number_of_chunks,
-        Client_keys.string_of_sk_uri sequencer,
+        Option.map Client_keys.string_of_sk_uri sequencer,
         blueprints_publisher_config ))
     (fun ( time_between_blocks,
            max_number_of_chunks,
@@ -703,7 +703,7 @@ let sequencer_encoding =
       {
         time_between_blocks;
         max_number_of_chunks;
-        sequencer = Client_keys.sk_uri_of_string sequencer;
+        sequencer = Option.map Client_keys.sk_uri_of_string sequencer;
         blueprints_publisher_config;
       })
     (obj4
@@ -1352,7 +1352,7 @@ let encoding ?network data_dir : t Data_encoding.t =
              "log_filter"
              log_filter_config_encoding
              (default_filter_config ()))
-          (opt "sequencer" sequencer_encoding)
+          (dft "sequencer" sequencer_encoding (sequencer_config_dft ()))
           (observer_field "observer" (observer_encoding ?network ())))
        (merge_objs
           (obj9
@@ -1593,8 +1593,10 @@ let load ?network ~data_dir config_file =
 
 let error_missing_config ~name = [error_of_fmt "missing %s config" name]
 
-let sequencer_config_exn {sequencer; _} =
-  Option.to_result ~none:(error_missing_config ~name:"sequencer") sequencer
+let sequencer_key {sequencer = {sequencer; _}; _} =
+  Option.to_result
+    ~none:(error_missing_config ~name:"sequencer.sequencer")
+    sequencer
 
 let observer_config_exn {observer; _} =
   Option.to_result ~none:(error_missing_config ~name:"observer") observer
@@ -1625,7 +1627,7 @@ module Cli = struct
       websockets = None;
       log_filter = default_filter_config ();
       kernel_execution;
-      sequencer = None;
+      sequencer = sequencer_config_dft ();
       observer;
       proxy = default_proxy ();
       tx_pool_timeout_limit = default_tx_pool_timeout_limit;
@@ -1716,61 +1718,43 @@ module Cli = struct
     in
     let sequencer =
       let sequencer_config = configuration.sequencer in
-      match sequencer_config with
-      | Some sequencer_config ->
-          let blueprints_publisher_config =
-            let blueprints_publisher_config =
-              sequencer_config.blueprints_publisher_config
-            in
-            {
-              max_blueprints_lag =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_lag
-                  max_blueprints_lag;
-              max_blueprints_ahead =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_ahead
-                  max_blueprints_ahead;
-              max_blueprints_catchup =
-                Option.value
-                  ~default:blueprints_publisher_config.max_blueprints_catchup
-                  max_blueprints_catchup;
-              catchup_cooldown =
-                Option.value
-                  ~default:blueprints_publisher_config.catchup_cooldown
-                  catchup_cooldown;
-              dal_slots =
-                Option.either dal_slots blueprints_publisher_config.dal_slots;
-            }
-          in
-          Some
-            {
-              time_between_blocks =
-                Option.value
-                  ~default:sequencer_config.time_between_blocks
-                  time_between_blocks;
-              max_number_of_chunks =
-                Option.value
-                  ~default:sequencer_config.max_number_of_chunks
-                  max_number_of_chunks;
-              sequencer =
-                Option.value ~default:sequencer_config.sequencer sequencer_key;
-              blueprints_publisher_config;
-            }
-      | None ->
-          Option.map
-            (fun sequencer ->
-              sequencer_config_dft
-                ?time_between_blocks
-                ?max_number_of_chunks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ~sequencer
-                ?dal_slots
-                ())
-            sequencer_key
+      let blueprints_publisher_config =
+        let blueprints_publisher_config =
+          sequencer_config.blueprints_publisher_config
+        in
+        {
+          max_blueprints_lag =
+            Option.value
+              ~default:blueprints_publisher_config.max_blueprints_lag
+              max_blueprints_lag;
+          max_blueprints_ahead =
+            Option.value
+              ~default:blueprints_publisher_config.max_blueprints_ahead
+              max_blueprints_ahead;
+          max_blueprints_catchup =
+            Option.value
+              ~default:blueprints_publisher_config.max_blueprints_catchup
+              max_blueprints_catchup;
+          catchup_cooldown =
+            Option.value
+              ~default:blueprints_publisher_config.catchup_cooldown
+              catchup_cooldown;
+          dal_slots =
+            Option.either dal_slots blueprints_publisher_config.dal_slots;
+        }
+      in
+      {
+        time_between_blocks =
+          Option.value
+            ~default:sequencer_config.time_between_blocks
+            time_between_blocks;
+        max_number_of_chunks =
+          Option.value
+            ~default:sequencer_config.max_number_of_chunks
+            max_number_of_chunks;
+        sequencer = Option.either sequencer_key sequencer_config.sequencer;
+        blueprints_publisher_config;
+      }
     in
     let observer =
       match configuration.observer with

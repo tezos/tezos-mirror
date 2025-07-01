@@ -183,7 +183,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let is_sandbox = Option.is_some sandbox_config in
   let {rollup_node_endpoint; keep_alive; _} = configuration in
-  let*? sequencer_config = Configuration.sequencer_config_exn configuration in
+  let sequencer_config = configuration.sequencer in
   let* rollup_node_smart_rollup_address =
     if Option.is_some sandbox_config then return_none
     else
@@ -238,6 +238,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
   in
+  let*? sequencer_key = Configuration.sequencer_key configuration in
   let* status, smart_rollup_address_typed =
     Evm_context.start
       ~configuration
@@ -245,7 +246,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:Read_write
-      ~sequencer_wallet:(sequencer_config.sequencer, cctxt)
+      ~sequencer_wallet:(sequencer_key, cctxt)
       ?snapshot_url
       ~tx_container
       ()
@@ -320,7 +321,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
         Signals_publisher.start
           ~cctxt
           ~smart_rollup_address:smart_rollup_address_b58
-          ~sequencer_key:sequencer_config.sequencer
+          ~sequencer_key
           ~rollup_node_endpoint
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
@@ -353,7 +354,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       let* genesis_chunks =
         Sequencer_blueprint.prepare
           ~cctxt
-          ~sequencer_key:sequencer_config.sequencer
+          ~sequencer_key
           ~timestamp:genesis_timestamp
           ~transactions:[]
           ~delayed_transactions:[]
@@ -404,7 +405,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       {
         cctxt;
         smart_rollup_address = smart_rollup_address_b58;
-        sequencer_key = sequencer_config.sequencer;
+        sequencer_key;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         tx_container = Ex_tx_container tx_container;
       }
@@ -428,6 +429,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   in
   let* finalizer_public_server =
     Rpc_server.start_public_server
+      ~is_sequencer:true
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(

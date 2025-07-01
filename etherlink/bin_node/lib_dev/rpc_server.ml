@@ -144,7 +144,7 @@ let monitor_performances ~data_dir =
   in
   Lwt.dont_wait aux (Fun.const ())
 
-let start_public_server (type f)
+let start_public_server (type f) ~is_sequencer
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
     ?delegate_health_check_to ?evm_services ?data_dir validation
     (config : Configuration.t)
@@ -214,6 +214,7 @@ let start_public_server (type f)
   let directory =
     register_tezos_services
     |> Services.directory
+         ~is_sequencer
          ~rpc_server_family
          ?delegate_health_check_to
          rpc
