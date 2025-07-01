@@ -196,11 +196,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~service_name:"observer"
       config.opentelemetry
   in
-  let*? {
-          evm_node_endpoint;
-          threshold_encryption_bundler_endpoint;
-          rollup_node_tracking;
-        } =
+  let*? {evm_node_endpoint; rollup_node_tracking} =
     Configuration.observer_config_exn config
   in
   let* smart_rollup_address =
@@ -277,11 +273,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     Evm_ro_context.load ?network ~smart_rollup_address ~data_dir config
   in
 
-  let evm_node_endpoint =
-    match threshold_encryption_bundler_endpoint with
-    | Some endpoint -> endpoint
-    | None -> evm_node_endpoint
-  in
   let observer_backend =
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in

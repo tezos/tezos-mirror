@@ -404,7 +404,7 @@ Run commands:
       [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
       [--whitelisted-rpcs <whitelist>] [--finalized-view]
       [--profiling [BOOL]] [--private-rpc-port <PORT>]
-      [--evm-node-endpoint <url>] [--bundler-node-endpoint <url>]
+      [--evm-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
@@ -458,8 +458,6 @@ Run commands:
       Defaults to `true`.
     --private-rpc-port <PORT>: The EVM node private server rpc port.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
-    --bundler-node-endpoint <url>: The address of a service which encrypts
-      incoming transactions for the rollup.
     --preimages-dir <_evm_installer_preimages>: Path to the preimages
       directory.
     --preimages-endpoint <url>: The address of a service which provides
@@ -596,16 +594,14 @@ Configuration commands:
       [--maximum-blueprints-lag <LAG>] [--maximum-blueprints-ahead <AHEAD>]
       [--maximum-blueprints-catch-up <CATCH_UP>]
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
-      [--bundler-node-endpoint <url>] [--sequencer-sidecar-endpoint <url>]
       [--history <archive | rolling:n | full:n>] [--dont-track-rollup-node]
       [-d --wallet-dir <path>] [-f --force] [--dal-slots <slot indices>]
       [--network <network>]
     Create an initial config with default value.
     If the <rollup-node-endpoint> is set then adds the configuration for the
     proxy mode. If the  <sequencer-key> is set,then adds the configuration
-    for the sequencer and threshold encryption sequencer modes. If the
-    <evm-node-endpoint> is set then adds the configuration for the observer
-    mode.
+    for the sequencer mode. If the <evm-node-endpoint> is set then adds the
+    configuration for the observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
       if it exists, or `$HOME/.octez-evm-node` otherwise.
@@ -675,10 +671,6 @@ Configuration commands:
       Sequencer waits after resending its blueprints before trying to
       catch-up again.
     --evm-node-endpoint <url>: The address of an EVM node to connect to.
-    --bundler-node-endpoint <url>: The address of a service which encrypts
-      incoming transactions for the rollup.
-    --sequencer-sidecar-endpoint <url>: The address of The sequencer sidecar
-      to connect to.
     --history <archive | rolling:n | full:n>: History mode for the EVM node.
       ':n' means n days of history.
     --dont-track-rollup-node: Disable tracking the head of the rollup node.

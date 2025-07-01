@@ -48,45 +48,11 @@
                sending another batch of blueprints, as part of its catchup
                mechanism. */,
           "dal_slots"?: [ integer ∈ [-128, 127] ... ] } },
-  "threshold_encryption_sequencer"?:
-    { "time_between_blocks"?:
-        $time_between_blocks
-        /* The maximum number of seconds separating two consecutive blocks.
-           If the TX pool of the sequencer is empty after this duration, an
-           empty blueprint is produced. */,
-      "max_number_of_chunks"?: integer ∈ [-2^30, 2^30],
-      "sequencer": $unistring /* Secret key URI of the sequencer. */,
-      "blueprints_publisher_config"?:
-        { "max_blueprints_lag"?:
-            integer ∈ [1, 2^30]
-            /* The number of EVM blocks after which the sequencer considers
-               that something went wrong with the injection of a previous
-               blueprint. Once reached, the sequencer tries to send them a
-               second time. */,
-          "max_blueprints_ahead"?:
-            integer ∈ [1, 2^30]
-            /* The maximum number of EVM blocks that the sequencer accepts to
-               create speculatively. If the difference between its head and
-               the head of its companion rollup node reaches this number, the
-               sequencer will stop creating new blueprints until the rollup
-               node has caught up. */,
-          "max_blueprints_catchup"?:
-            integer ∈ [1, 2^30]
-            /* The maximum number of blueprints the sequencer retries to send
-               at once whenever its companion rollup node is lagging behind. */,
-          "catchup_cooldown"?:
-            integer ∈ [1, 2^30]
-            /* The number of Layer 1 blocks the sequencer awaits before
-               sending another batch of blueprints, as part of its catchup
-               mechanism. */,
-          "dal_slots"?: [ integer ∈ [-128, 127] ... ] },
-      "sidecar_endpoint"?: $unistring },
   "observer"?:
     { "evm_node_endpoint":
         $unistring
         /* Upstream EVM node endpoint used to fetch speculative blueprints
            and forward incoming transactions. */,
-      "threshold_encryption_bundler_endpoint"?: $unistring,
       "rollup_node_tracking"?:
         boolean
         /* Enable or disable monitoring a companion rollup node to verify the
