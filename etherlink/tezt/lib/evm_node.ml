@@ -73,12 +73,6 @@ type mode =
       private_rpc_port : int option;
       rollup_node_endpoint : string;
     }
-  | Threshold_encryption_observer of {
-      initial_kernel : string;
-      preimages_dir : string;
-      rollup_node_endpoint : string;
-      bundler_node_endpoint : string;
-    }
   | Sequencer of {
       initial_kernel : string;
       preimage_dir : string option;
@@ -108,25 +102,6 @@ type mode =
       tx_pool_timeout_limit : int option;
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
-    }
-  | Threshold_encryption_sequencer of {
-      initial_kernel : string;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      sequencer : string;
-      genesis_timestamp : Client.timestamp option;
-      max_blueprints_lag : int option;
-      max_blueprints_ahead : int option;
-      max_blueprints_catchup : int option;
-      catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
-      sequencer_sidecar_endpoint : string;
-      dal_slots : int list option;
     }
   | Proxy
   | Rpc of mode
@@ -171,23 +146,19 @@ let mode t = t.persistent_state.mode
 
 let is_sequencer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy | Rpc _ -> false
+  | Sequencer _ | Sandbox _ -> true
+  | Observer _ | Proxy | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Proxy | Rpc _
-    ->
-      false
-  | Observer _ | Threshold_encryption_observer _ -> true
+  | Sequencer _ | Sandbox _ | Proxy | Rpc _ -> false
+  | Observer _ -> true
 
 let initial_kernel t =
   let rec from_mode = function
     | Sandbox {initial_kernel; _}
     | Sequencer {initial_kernel; _}
-    | Threshold_encryption_sequencer {initial_kernel; _}
-    | Observer {initial_kernel; _}
-    | Threshold_encryption_observer {initial_kernel; _} ->
+    | Observer {initial_kernel; _} ->
         initial_kernel
     | Rpc mode -> from_mode mode
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
@@ -196,9 +167,7 @@ let initial_kernel t =
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Observer _
-  | Threshold_encryption_observer _ ->
-      true
+  | Sequencer _ | Sandbox _ | Observer _ -> true
   | Proxy | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
@@ -793,46 +762,6 @@ let mode_with_new_private_rpc (mode : mode) =
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
         }
-  | Threshold_encryption_sequencer
-      {
-        initial_kernel;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        sequencer;
-        genesis_timestamp;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        max_number_of_chunks;
-        wallet_dir;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
-        sequencer_sidecar_endpoint;
-        dal_slots;
-      } ->
-      Threshold_encryption_sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          sequencer;
-          genesis_timestamp;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
-          sequencer_sidecar_endpoint;
-          dal_slots;
-        }
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
@@ -846,10 +775,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     | Proxy -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Sandbox _ -> "sandbox_" ^ fresh_name ()
-    | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
-    | Threshold_encryption_observer _ ->
-        "threshold_encryption_observer_" ^ fresh_name ()
     | Rpc _ -> "rpc_" ^ fresh_name ()
   in
   let name = Option.value ~default:(new_name ()) name in
@@ -928,34 +854,8 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Threshold_encryption_sequencer
-        {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        [
-          "run";
-          "threshold";
-          "encryption";
-          "sequencer";
-          "--initial-kernel";
-          initial_kernel;
-        ]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
-    | Threshold_encryption_observer {initial_kernel; bundler_node_endpoint; _}
-      ->
-        [
-          "run";
-          "observer";
-          "--initial-kernel";
-          initial_kernel;
-          "--bundler-node-endpoint";
-          bundler_node_endpoint;
-        ]
     | Rpc _ -> ["experimental"; "run"; "rpc"]
   in
   mode_args @ shared_args
@@ -1217,77 +1117,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_pool_tx_per_addr_limit
-    | Threshold_encryption_sequencer
-        {
-          initial_kernel = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          sequencer;
-          genesis_timestamp = _;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
-          sequencer_sidecar_endpoint;
-          dal_slots;
-        } ->
-        [
-          "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--sequencer-key";
-          sequencer;
-          "--sequencer-sidecar-endpoint";
-          sequencer_sidecar_endpoint;
-        ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-lag"
-            string_of_int
-            max_blueprints_lag
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-ahead"
-            string_of_int
-            max_blueprints_ahead
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-catch-up"
-            string_of_int
-            max_blueprints_catchup
-        @ Cli_arg.optional_arg
-            "catch-up-cooldown"
-            string_of_int
-            catchup_cooldown
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_pool_tx_per_addr_limit
-        @ Cli_arg.optional_arg
-            "dal-slots"
-            (fun l -> String.concat "," (List.map string_of_int l))
-            dal_slots
     | Observer
         {
           preimages_dir;
@@ -1303,23 +1132,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         ]
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-    | Threshold_encryption_observer
-        {
-          preimages_dir;
-          initial_kernel = _;
-          rollup_node_endpoint;
-          bundler_node_endpoint;
-        } ->
-        [
-          "--evm-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--rollup-node-endpoint";
-          rollup_node_endpoint;
-          "--bundler-node-endpoint";
-          bundler_node_endpoint;
-          "--preimages-dir";
-          preimages_dir;
-        ]
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -1339,18 +1151,9 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       | Sequencer {private_rpc_port = None; _}
       | Sandbox {private_rpc_port = None; _} ->
           Test.fail "Sequencer doesn't have a private RPC server"
-      | Threshold_encryption_sequencer
-          {private_rpc_port = Some private_rpc_port; _} ->
-          (host, private_rpc_port, "/private")
-      | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
-          Test.fail
-            "Threshold encryption sequencer doesn't have a private RPC server"
       | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
       | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
-      | Threshold_encryption_observer _ ->
-          Test.fail
-            "Threshold encryption observer doesn't have a private RPC server"
     else (host, evm_node.persistent_state.rpc_port, "")
   in
   Format.sprintf "http://%s:%d%s" addr port path
@@ -1960,23 +1763,12 @@ let preimages_dir evm_node =
   let rec from_node ~data_dir = function
     | Sandbox {preimage_dir; _}
     | Sequencer {preimage_dir; _}
-    | Threshold_encryption_sequencer {preimage_dir; _}
     | Observer {preimages_dir = preimage_dir; _} ->
         Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
     | Rpc mode -> from_node ~data_dir mode
-    | Threshold_encryption_observer {preimages_dir; _} -> preimages_dir
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
-
-let supports_threshold_encryption evm_node =
-  let rec from_node = function
-    | Sandbox _ | Sequencer _ | Observer _ -> false
-    | Threshold_encryption_observer _ | Threshold_encryption_sequencer _ -> true
-    | Rpc mode -> from_node mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_node evm_node.persistent_state.mode
 
 let list_metrics ?hooks () =
   let cmd = ["list"; "metrics"] in

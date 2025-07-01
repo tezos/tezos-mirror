@@ -206,29 +206,14 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
             ()
           @@ patch_config c
   in
-  let* observer_mode =
-    if Evm_node.supports_threshold_encryption evm_node then
-      let bundler =
-        Dsn_node.bundler ~endpoint:(Evm_node.endpoint evm_node) ()
-      in
-      let* () = Dsn_node.start bundler in
-      return
-        (Evm_node.Threshold_encryption_observer
-           {
-             initial_kernel;
-             preimages_dir;
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-             bundler_node_endpoint = Dsn_node.endpoint bundler;
-           })
-    else
-      return
-        (Evm_node.Observer
-           {
-             initial_kernel;
-             preimages_dir = Some preimages_dir;
-             private_rpc_port = Some (Port.fresh ());
-             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
-           })
+  let observer_mode =
+    Evm_node.Observer
+      {
+        initial_kernel;
+        preimages_dir = Some preimages_dir;
+        private_rpc_port = Some (Port.fresh ());
+        rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+      }
   in
   let* observer =
     Evm_node.init
@@ -491,7 +476,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?(kernel = Constant.WASM.evm_kernel) ?evm_version ?preimages_dir
     ?maximum_allowed_ticks ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge
     ~enable_revm ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?(threshold_encryption = false) ?(drop_duplicate_when_injection = true)
+    ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
     ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
@@ -604,52 +589,26 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?periodic_snapshot_path
       ()
   in
-  let* sequencer_mode =
-    if threshold_encryption then
-      let sequencer_sidecar = Dsn_node.sequencer () in
-      let* () = Dsn_node.start sequencer_sidecar in
-      return
-      @@ Evm_node.Threshold_encryption_sequencer
-           {
-             initial_kernel = output;
-             preimage_dir = Some preimages_dir;
-             private_rpc_port;
-             time_between_blocks;
-             sequencer = sequencer.alias;
-             genesis_timestamp;
-             max_blueprints_lag;
-             max_blueprints_ahead;
-             max_blueprints_catchup;
-             catchup_cooldown;
-             max_number_of_chunks;
-             wallet_dir = Some (Client.base_dir client);
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
-             sequencer_sidecar_endpoint = Dsn_node.endpoint sequencer_sidecar;
-             dal_slots;
-           }
-    else
-      return
-      @@ Evm_node.Sequencer
-           {
-             initial_kernel = output;
-             preimage_dir = Some preimages_dir;
-             private_rpc_port;
-             time_between_blocks;
-             sequencer = sequencer.alias;
-             genesis_timestamp;
-             max_blueprints_lag;
-             max_blueprints_ahead;
-             max_blueprints_catchup;
-             catchup_cooldown;
-             max_number_of_chunks;
-             wallet_dir = Some (Client.base_dir client);
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
-             dal_slots;
-           }
+  let sequencer_mode =
+    Evm_node.Sequencer
+      {
+        initial_kernel = output;
+        preimage_dir = Some preimages_dir;
+        private_rpc_port;
+        time_between_blocks;
+        sequencer = sequencer.alias;
+        genesis_timestamp;
+        max_blueprints_lag;
+        max_blueprints_ahead;
+        max_blueprints_catchup;
+        catchup_cooldown;
+        max_number_of_chunks;
+        wallet_dir = Some (Client.base_dir client);
+        tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
+        dal_slots;
+      }
   in
   let* sequencer =
     Evm_node.init
@@ -719,7 +678,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?sequencer ?sequencer_pool_address ?kernel ?da_fee ?minimum_base_fee_per_gas
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?threshold_encryption
+    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
@@ -770,7 +729,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?enable_fast_fa_withdrawal
       ?blueprints_publisher_order_enabled
       ?drop_duplicate_when_injection
-      ?threshold_encryption
       ?rollup_history_mode
       ?websockets
       ?history_mode
@@ -798,8 +756,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ~enable_revm ?enable_fast_withdrawal
     ?enable_fast_fa_withdrawal ?commitment_period ?challenge_window
-    ?(threshold_encryption = false) ?(uses = uses) ?(additional_uses = [])
-    ?rollup_history_mode ~enable_dal
+    ?(uses = uses) ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
     ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
@@ -807,8 +764,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
-    (if threshold_encryption then [Constant.octez_dsn_node] else [])
-    @ [kernel_use]
+    [kernel_use]
     @ (if enable_dal then [Constant.octez_dal_node] else [])
     @ additional_uses
   in
@@ -862,7 +818,6 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_revm
         ?enable_fast_withdrawal
         ?enable_fast_fa_withdrawal
-        ~threshold_encryption
         ?rollup_history_mode
         ?websockets
         ?history_mode
@@ -879,17 +834,15 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     body sequencer_setup protocol
   in
   let tags =
-    (if threshold_encryption then ["threshold_encryption"] else [])
-    @ (if enable_dal then ["dal"] else [])
+    (if enable_dal then ["dal"] else [])
     @ (if enable_multichain then ["multichain_enabled"] else [])
     @ (if enable_revm then ["revm"] else [])
     @ tags
   in
   let title =
     sf
-      "%s (%s, %s, %s, %s, %s)"
+      "%s (%s, %s, %s, %s)"
       title
-      (if threshold_encryption then "te_sequencer" else "sequencer")
       kernel_tag
       (if enable_dal then "with dal" else "without dal")
       (if enable_multichain then "multichain" else "single chain")
@@ -926,10 +879,10 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?preimages_dir ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ~enable_revm
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
-    ?challenge_window ?threshold_encryption ?uses ?additional_uses
-    ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
-    ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_setups body ~title ~tags protocols =
+    ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
+    ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups body ~title
+    ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -964,7 +917,6 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fast_fa_withdrawal
     ?commitment_period
     ?challenge_window
-    ?threshold_encryption
     ?uses
     ?additional_uses
     ?rollup_history_mode
@@ -994,11 +946,10 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
     ?enable_fa_bridge ~enable_revm ?rollup_history_mode ?commitment_period
-    ?challenge_window ?additional_uses ~threshold_encryption ~enable_dal
-    ?dal_slots ~enable_multichain ?rpc_server ?websockets
-    ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups ~title ~tags
-    body protocols =
+    ?challenge_window ?additional_uses ~enable_dal ?dal_slots ~enable_multichain
+    ?rpc_server ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
+    ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -1036,7 +987,6 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?rpc_server
         ?websockets
         ?history_mode
-        ~threshold_encryption
         ?rollup_history_mode
         ~enable_dal
         ?dal_slots
