@@ -11249,7 +11249,7 @@ let register ~protocols =
     test_restart_dal_node
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["http"; "backup"; "retrievability"; Tag.extra]
+    ~tags:["http"; "backup"; "retrievability"; Tag.extra; Tag.memory_hungry]
     ~operator_profiles:[0]
     ~l1_history_mode:(Custom Node.Archive)
     ~history_mode:Full
