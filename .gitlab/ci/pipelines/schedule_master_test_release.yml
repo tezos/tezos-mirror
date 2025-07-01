@@ -888,19 +888,23 @@ rpm_repo_fedora:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-grafazos.build_dashboards:
+grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
   - gcp
+  rules: []
+  needs:
+  - oc.docker:jsonnet:amd64
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
+  interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  script:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
-  script:
   - make
   artifacts:
     name: grafazos-dashboards
@@ -909,7 +913,7 @@ grafazos.build_dashboards:
     - grafazos/output/**/*.json
     when: on_success
 
-grafazos.publish:release-page:
+grafazos.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
@@ -918,10 +922,11 @@ grafazos.publish:release-page:
   - when: manual
     allow_failure: true
   needs:
-  - grafazos.build_dashboards
+  - grafazos.build
   dependencies:
-  - grafazos.build_dashboards
+  - grafazos.build
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
@@ -936,7 +941,6 @@ grafazos.publish:release-page:
     paths:
     - ./index.md
     - index.html
-  retry: 0
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
