@@ -23,7 +23,7 @@ impl L2Block {
     pub fn number(&self) -> U256 {
         match self {
             Self::Etherlink(block) => block.number,
-            Self::Tezlink(block) => block.number,
+            Self::Tezlink(block) => block.number.into(),
         }
     }
 

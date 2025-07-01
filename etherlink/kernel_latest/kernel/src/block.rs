@@ -303,7 +303,7 @@ fn next_bip_from_blueprints<Host: Runtime, ChainConfig: ChainConfigTrait>(
                     next_bip_number,
                     chain_header,
                     blueprint,
-                );
+                )?;
             Ok(BlueprintParsing::Next(Box::new(bip)))
         }
         None => Ok(BlueprintParsing::None),

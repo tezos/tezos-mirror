@@ -152,7 +152,7 @@ impl From<TezBlock> for BlockHeader<ChainHeader> {
     fn from(block: TezBlock) -> Self {
         Self {
             blueprint_header: BlueprintHeader {
-                number: block.number,
+                number: block.number.into(),
                 timestamp: block.timestamp,
             },
             chain_header: ChainHeader::Tez(TezBlockHeader { hash: block.hash.0 }),

@@ -37,6 +37,7 @@ use tezos_smart_rollup::{outbox::OutboxQueue, types::Timestamp};
 use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
+    enc_wrappers::BlockNumber,
     operation::Operation,
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationWithMetadata,
@@ -93,7 +94,7 @@ impl BlockInProgressTrait for EthBlockInProgress {
 }
 
 pub struct TezBlockInProgress {
-    number: U256,
+    number: BlockNumber,
     timestamp: Timestamp,
     previous_hash: H256,
     applied: Vec<AppliedOperation>,
@@ -102,7 +103,7 @@ pub struct TezBlockInProgress {
 
 impl BlockInProgressTrait for TezBlockInProgress {
     fn number(&self) -> U256 {
-        self.number
+        self.number.into()
     }
 }
 
@@ -236,7 +237,7 @@ pub trait ChainConfigTrait: Debug {
         current_block_number: U256,
         previous_chain_header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress;
+    ) -> anyhow::Result<Self::BlockInProgress>;
 
     fn read_block_in_progress(
         host: &impl Runtime,
@@ -291,15 +292,15 @@ impl ChainConfigTrait for EvmChainConfig {
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress {
-        eth_bip_from_blueprint(
+    ) -> anyhow::Result<Self::BlockInProgress> {
+        Ok(eth_bip_from_blueprint(
             host,
             self,
             tick_counter,
             current_block_number,
             header,
             blueprint,
-        )
+        ))
     }
 
     fn transactions_from_bytes(
@@ -428,15 +429,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
         current_block_number: U256,
         header: Self::ChainHeader,
         blueprint: Blueprint<Self::Transactions>,
-    ) -> Self::BlockInProgress {
+    ) -> anyhow::Result<Self::BlockInProgress> {
         let TezTransactions(operations) = blueprint.transactions;
-        TezBlockInProgress {
+        let current_block_number: BlockNumber = current_block_number.try_into()?;
+        Ok(TezBlockInProgress {
             number: current_block_number,
             timestamp: blueprint.timestamp,
             previous_hash: header.hash,
             applied: vec![],
             operations: VecDeque::from(operations),
-        }
+        })
     }
 
     fn fetch_hashes_from_delayed_inbox(

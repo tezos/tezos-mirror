@@ -2,11 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::enc_wrappers::{BlockHash, OperationHash};
+use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
 use nom::error::ParseError;
 use nom::Finish;
-use primitive_types::{H256, U256};
+use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom::error::DecodeError;
@@ -56,7 +56,7 @@ impl BinWriter for AppliedOperation {
 #[derive(PartialEq, Debug)]
 pub struct TezBlock {
     pub hash: BlockHash,
-    pub number: U256,
+    pub number: BlockNumber,
     pub timestamp: Timestamp,
     pub previous_hash: BlockHash,
     pub operations: Vec<AppliedOperation>,
@@ -65,8 +65,7 @@ pub struct TezBlock {
 impl NomReader<'_> for TezBlock {
     fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
         let (remaining, hash) = BlockHash::nom_read(input)?;
-        let (remaining, number) = nom::number::complete::be_u32(remaining)?;
-        let number = U256::from(number);
+        let (remaining, number) = BlockNumber::nom_read(remaining)?;
         let (remaining, previous_hash) = BlockHash::nom_read(remaining)?;
 
         // Decode the timestamp
@@ -102,7 +101,7 @@ impl BinWriter for TezBlock {
         } = self;
         // Encode all block fields
         hash.bin_write(output)?;
-        tezos_enc::u32(&number.as_u32(), output)?;
+        number.bin_write(output)?;
         previous_hash.bin_write(output)?;
         tezos_enc::i64(&timestamp.i64(), output)?;
         tezos_enc::dynamic(tezos_enc::list(AppliedOperation::bin_write))(
@@ -133,7 +132,7 @@ impl TezBlock {
     }
 
     pub fn new(
-        number: U256,
+        number: BlockNumber,
         timestamp: Timestamp,
         previous_hash: H256,
         operations: Vec<AppliedOperation>,
@@ -171,7 +170,7 @@ impl TezBlock {
 
 #[cfg(test)]
 mod tests {
-    use primitive_types::{H256, U256};
+    use primitive_types::H256;
     use tezos_smart_rollup::types::Timestamp;
 
     use crate::operation_result::{
@@ -216,7 +215,7 @@ mod tests {
     }
 
     fn dummy_tezblock(operations: Vec<AppliedOperation>) -> TezBlock {
-        let number = U256::one();
+        let number = 1u32.into();
         let timestamp = Timestamp::from(0);
         let previous_hash = TezBlock::genesis_block_hash();
         TezBlock::new(number, timestamp, previous_hash, operations)
