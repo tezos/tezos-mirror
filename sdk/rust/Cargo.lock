@@ -1069,6 +1069,11 @@ dependencies = [
 [[package]]
 name = "tezos-protocol"
 version = "0.1.0"
+dependencies = [
+ "nom",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+]
 
 [[package]]
 name = "tezos_crypto_rs"
