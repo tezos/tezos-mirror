@@ -42,7 +42,7 @@ depends: [
   "bos" {= "0.2.1"}
   "ca-certs" {= "1.0.1"}
   "camlp-streams" {= "5.0.1"}
-  "camlzip" {= "1.12"}
+  "camlzip" {= "1.13"}
   "caqti" {= "2.1.2"}
   "caqti-driver-postgresql" {= "2.1.2"}
   "caqti-driver-sqlite3" {= "2.1.1"}
