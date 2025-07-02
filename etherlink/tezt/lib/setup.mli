@@ -278,3 +278,69 @@ val setup_sequencer :
   ?l2_chains:Evm_node.l2_setup list ->
   Protocol.t ->
   sequencer_setup Lwt.t
+
+(* For each feature (threshold encryption, DAL, FA Bridge), tests may
+   registered with the feature enabled, with the feature disabled, or both. *)
+type feature_test_registration =
+  | Register_with_feature
+  | Register_without_feature
+  | Register_both of {
+      additional_tags_with : string list;
+      additional_tags_without : string list;
+    }
+(* We want at most one variant of the test in MR CI, the
+   [additional_tags_with] and [additional_tags_without] fields allow to
+   select which one by passing [Tag.ci_disabled] or
+   [Tag.extra] to the case which should not run in
+   MR CI. *)
+
+val ci_enabled_dal_registration : feature_test_registration
+
+val activate_revm_registration : feature_test_registration
+
+val register_all :
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?sequencer_rpc_port:int ->
+  ?sequencer_private_rpc_port:int ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?time_between_blocks:Evm_node.time_between_blocks ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?max_number_of_chunks:int ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?sequencer:Account.key ->
+  ?sequencer_pool_address:string ->
+  ?kernels:Kernel.t list ->
+  ?da_fee:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?preimages_dir:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?enable_fa_bridge:bool ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
+  ?commitment_period:int ->
+  ?challenge_window:int ->
+  ?additional_uses:Uses.t list ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
+  ?history_mode:Evm_node.history_mode ->
+  ?use_dal:feature_test_registration ->
+  ?use_multichain:feature_test_registration ->
+  ?use_revm:feature_test_registration ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
+  title:string ->
+  tags:string list ->
+  (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
+  Protocol.t list ->
+  unit

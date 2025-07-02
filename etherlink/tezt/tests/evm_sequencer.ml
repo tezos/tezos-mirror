@@ -185,40 +185,6 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-(* For each feature (threshold encryption, DAL, FA Bridge), tests may
-   registered with the feature enabled, with the feature disabled, or both. *)
-type feature_test_registration =
-  | Register_with_feature
-  | Register_without_feature
-  | Register_both of {
-      additional_tags_with : string list;
-      additional_tags_without : string list;
-    }
-    (* We want at most one variant of the test in MR CI, the
-       [additional_tags_with] and [additional_tags_without] fields allow to
-       select which one by passing [Tag.ci_disabled] or
-       [Tag.extra] to the case which should not run in
-       MR CI. *)
-[@@warning "-unused-constructor"]
-
-let default_dal_registration =
-  Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
-
-let ci_enabled_dal_registration =
-  Register_both {additional_tags_with = []; additional_tags_without = []}
-
-let default_multichain_registration =
-  Register_both
-    {additional_tags_with = [Tag.extra]; additional_tags_without = []}
-
-(* By default REVM is completely disabled. *)
-let default_revm_registration = Register_without_feature
-
-(* Use this value to register a specific test in the CI. *)
-let activate_revm_registration =
-  Register_both {additional_tags_with = []; additional_tags_without = []}
-
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
     body =
@@ -247,96 +213,6 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
       ()
   in
   body sequencer
-
-(* Register all variants of a test. *)
-let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?eth_bootstrap_accounts ?tez_bootstrap_accounts
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?history_mode
-    ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration)
-    ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
-  let register_cases = function
-    | Register_both {additional_tags_with; additional_tags_without} ->
-        [(false, additional_tags_without); (true, additional_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  let dal_cases = register_cases use_dal in
-  let multichain_cases = register_cases use_multichain in
-  let revm_cases = register_cases use_revm in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
-     Also register the tests with and without FA bridge feature flag. *)
-  List.iter
-    (fun (enable_dal, dal_tags) ->
-      List.iter
-        (fun (enable_multichain, multichain_tags) ->
-          List.iter
-            (fun (enable_revm, revm_tags) ->
-              (* Since the set of RPCs the sequencer has access to is restricted in the multichain case,
-                 we need the intermediate RPC node to handle the extra RPCs necessary in the tests. *)
-              let spawn_rpc =
-                match spawn_rpc with
-                | None when enable_multichain -> Some (Port.fresh ())
-                | _ -> spawn_rpc
-              in
-              register_test_for_kernels
-                ~__FILE__
-                ?max_delayed_inbox_blueprint_length
-                ?sequencer_rpc_port
-                ?sequencer_private_rpc_port
-                ?commitment_period
-                ?challenge_window
-                ?genesis_timestamp
-                ?time_between_blocks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ?delayed_inbox_timeout
-                ?delayed_inbox_min_levels
-                ?max_number_of_chunks
-                ?eth_bootstrap_accounts
-                ?tez_bootstrap_accounts
-                ?sequencer
-                ?sequencer_pool_address
-                ~kernels
-                ?da_fee
-                ?minimum_base_fee_per_gas
-                ?preimages_dir
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?max_blueprint_lookahead_in_seconds
-                ?enable_fa_bridge
-                ~enable_revm
-                ?enable_fast_withdrawal
-                ?enable_fast_fa_withdrawal
-                ?additional_uses
-                ?rpc_server
-                ?websockets
-                ?history_mode
-                ?rollup_history_mode
-                ~enable_dal
-                ~enable_multichain
-                ?enable_tx_queue
-                ?spawn_rpc
-                ?periodic_snapshot_path
-                ?l2_setups
-                ~title
-                ~tags:(dal_tags @ multichain_tags @ revm_tags @ tags)
-                body
-                protocols)
-            revm_cases)
-        multichain_cases)
-    dal_cases
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
