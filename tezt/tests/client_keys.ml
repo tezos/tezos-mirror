@@ -292,7 +292,7 @@ module Wallet = struct
       let* account = Client.show_address ~alias client in
       match account.secret_key with
       | Encrypted _ -> unit
-      | Unencrypted _ -> Test.fail "Expected an encrypted secret key"
+      | Unencrypted _ | Remote _ -> Test.fail "Expected an encrypted secret key"
     in
     Log.info "Test that the command fails if the user gives a bad mnemonic." ;
     let* () =

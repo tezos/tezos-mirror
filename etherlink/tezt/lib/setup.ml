@@ -479,13 +479,57 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path protocol =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path
+    ?(signatory = false) protocol =
   let* node, client =
     setup_l1
       ?commitment_period
       ?challenge_window
       ?timestamp:genesis_timestamp
       protocol
+  in
+  let* remote_signer, client2 =
+    if not signatory then return (None, client)
+    else
+      let* signer =
+        Signatory.create
+        @@ List.map
+             (fun account ->
+               Signatory.
+                 {
+                   account;
+                   active = true;
+                   log_payloads = true;
+                   restrictions =
+                     [
+                       `Generic
+                         [
+                           `Smart_rollup_add_messages;
+                           `Smart_rollup_cement;
+                           `Smart_rollup_execute_outbox_message;
+                           `Smart_rollup_originate;
+                           `Smart_rollup_publish;
+                           `Smart_rollup_recover_bond;
+                           `Smart_rollup_refute;
+                           `Smart_rollup_timeout;
+                         ];
+                     ];
+                 })
+             Constant.all_secret_keys
+      in
+      let* () = Signatory.run signer in
+      let signer_port = Signatory.port signer in
+      let remote_signer =
+        Uri.of_string ("http://localhost:" ^ string_of_int signer_port)
+      in
+      let client = Client.create ~endpoint:(Node node) ~remote_signer () in
+      let* () =
+        Lwt_list.iter_s
+          (fun Account.{alias; public_key_hash; _} ->
+            Client.import_secret_key client (Remote public_key_hash) ~alias)
+          Constant.all_secret_keys
+      in
+      return (Some remote_signer, client)
   in
   let* dal_node =
     if enable_dal then
@@ -504,9 +548,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~default_operator:Constant.bootstrap1.public_key_hash
       Operator
       node
-      ~base_dir:(Client.base_dir client)
+      ~base_dir:(Client.base_dir client2)
       ?dal_node
       ?history_mode:rollup_history_mode
+      ?remote_signer
   in
   let preimages_dir =
     Option.value
@@ -682,7 +727,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_chains protocol =
+    ?periodic_snapshot_path ?signatory ?l2_chains protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
     Option.value
@@ -740,6 +785,7 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ?enable_tx_queue
       ?spawn_rpc
       ?periodic_snapshot_path
+      ?signatory
       protocol
   in
   return (multichain_setup_to_single ~setup:sequencer_setup)
@@ -759,8 +805,8 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(uses = uses) ?(additional_uses = []) ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path body ~title ~tags
-    protocols =
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory body ~title
+    ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
   let additional_uses =
@@ -829,6 +875,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?enable_tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?signatory
         protocol
     in
     body sequencer_setup protocol
@@ -881,8 +928,8 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
     ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
     ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups body ~title
-    ~tags protocols =
+    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
+    body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
   in
@@ -929,6 +976,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_tx_queue
     ?spawn_rpc
     ?periodic_snapshot_path
+    ?signatory
     ~l2_setups
     body
     ~title
@@ -948,8 +996,8 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ~enable_revm ?rollup_history_mode ?commitment_period
     ?challenge_window ?additional_uses ~enable_dal ?dal_slots ~enable_multichain
     ?rpc_server ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?l2_setups
-    ~title ~tags body protocols =
+    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
+    ?l2_setups ~title ~tags body protocols =
   List.iter
     (fun kernel ->
       register_test
@@ -994,6 +1042,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ?enable_tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
+        ?signatory
         ?l2_setups
         ~title
         ~tags
@@ -1043,7 +1092,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration)
     ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?l2_setups ~title ~tags body protocols =
+    ?periodic_snapshot_path ?signatory ?l2_setups ~title ~tags body protocols =
   let register_cases = function
     | Register_both {additional_tags_with; additional_tags_without} ->
         [(false, additional_tags_without); (true, additional_tags_with)]
@@ -1109,6 +1158,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
                 ?enable_tx_queue
                 ?spawn_rpc
                 ?periodic_snapshot_path
+                ?signatory
                 ?l2_setups
                 ~title
                 ~tags:(dal_tags @ multichain_tags @ revm_tags @ tags)

@@ -594,6 +594,7 @@ let spawn_import_encrypted_secret_key ?hooks ?(force = false) ?endpoint client
     match secret_key with
     | Encrypted _ -> Account.uri_of_secret_key secret_key
     | Unencrypted _ -> Test.fail "Unencrypted key"
+    | Remote _ -> Test.fail "Remote key"
   in
   spawn_command_with_stdin
     ?hooks
@@ -628,9 +629,8 @@ let spawn_import_public_key ?(force = false) ?endpoint client public_key ~alias
 
 let spawn_import_secret_key ?(force = false) ?endpoint client
     (secret_key : Account.secret_key) ~alias =
-  let sk_uri =
-    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ secret_key
-  in
+  Account.require_unencrypted_or_remote_secret_key ~__LOC__ secret_key ;
+  let sk_uri = Account.uri_of_secret_key secret_key in
   let force = if force then ["--force"] else [] in
   spawn_command
     ?endpoint
