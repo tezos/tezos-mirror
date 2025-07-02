@@ -25,7 +25,7 @@ type parameters = {
   data_dir : string;
   smart_rollup_address : string option;
   store_perm : Sqlite.perm;
-  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
+  signer : Signer.t option;
   snapshot_url : string option;
   tx_container : Services_backend_sig.ex_tx_container;
 }
@@ -50,12 +50,12 @@ type t = {
   smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
   store : Evm_store.t;
   session : session_state;
-  sequencer_wallet : (Client_keys.sk_uri * Client_context.wallet) option;
+  signer : Signer.t option;
   legacy_block_storage : bool;
   tx_container : Services_backend_sig.ex_tx_container;
 }
 
-let is_sequencer t = Option.is_some t.sequencer_wallet
+let is_sequencer t = Option.is_some t.signer
 
 let pvm_config ctxt =
   Wasm_debugger.config
@@ -1083,16 +1083,15 @@ module State = struct
     let hashes =
       List.map (fun tx -> tx.Evm_events.Delayed_transaction.hash) transactions
     in
-    let* sequencer_key, cctxt =
-      match ctxt.sequencer_wallet with
+    let* signer =
+      match ctxt.signer with
       | None ->
           failwith "Only sequencer is capable to handle the flushed blueprint"
-      | Some (sequencer_key, cctxt) -> return (sequencer_key, cctxt)
+      | Some signer -> return signer
     in
     let* blueprint_chunks =
       Sequencer_blueprint.prepare
-        ~sequencer_key
-        ~cctxt
+        ~signer
         ~timestamp
         ~transactions:[]
         ~delayed_transactions:hashes
@@ -1602,7 +1601,7 @@ module State = struct
   let on_disk_kernel = function Wasm_debugger.On_disk _ -> true | _ -> false
 
   let init ~(configuration : Configuration.t) ?kernel_path ~data_dir
-      ?smart_rollup_address ~store_perm ?sequencer_wallet ?snapshot_url
+      ?smart_rollup_address ~store_perm ?signer ?snapshot_url
       ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
     let*! () =
@@ -1624,7 +1623,7 @@ module State = struct
     let* () =
       let* is_empty = Evm_store.Pending_confirmations.is_empty conn in
       when_
-        (Option.is_some sequencer_wallet && not is_empty)
+        (Option.is_some signer && not is_empty)
         (fun () ->
           failwith "Store has pending confirmation, state is not final")
     in
@@ -1719,7 +1718,7 @@ module State = struct
             last_split_block;
           };
         store;
-        sequencer_wallet;
+        signer;
         legacy_block_storage;
         tx_container = Ex_tx_container tx_container;
       }
@@ -2015,7 +2014,7 @@ module Handlers = struct
         data_dir : string;
         smart_rollup_address : string option;
         store_perm;
-        sequencer_wallet;
+        signer;
         snapshot_url;
         tx_container = Ex_tx_container tx_container;
       } =
@@ -2027,7 +2026,7 @@ module Handlers = struct
         ~data_dir
         ?smart_rollup_address
         ~store_perm
-        ?sequencer_wallet
+        ?signer
         ?snapshot_url
         ~tx_container
         ()
@@ -2210,7 +2209,7 @@ let worker_wait_for_request req =
   return_ res
 
 let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
-    ~store_perm ?sequencer_wallet ?snapshot_url
+    ~store_perm ?signer ?snapshot_url
     ~(tx_container : _ Services_backend_sig.tx_container) () =
   let open Lwt_result_syntax in
   let* () = lock_data_dir ~data_dir in
@@ -2224,7 +2223,7 @@ let start ~configuration ?kernel_path ~data_dir ?smart_rollup_address
         data_dir;
         smart_rollup_address;
         store_perm;
-        sequencer_wallet;
+        signer;
         snapshot_url;
         tx_container = Ex_tx_container tx_container;
       }

@@ -6,9 +6,8 @@
 (*****************************************************************************)
 
 type parameters = {
-  cctxt : Client_context.wallet;
+  signer : Signer.t;
   smart_rollup_address : string;
-  sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
 }

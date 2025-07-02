@@ -8,7 +8,6 @@
 
 type sandbox_config = {
   public_key : Signature.public_key;
-  secret_key : Client_keys.sk_uri;
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
   funded_addresses : Ethereum_types.address list;
@@ -170,7 +169,7 @@ let activate_tezlink chain_id =
   in
   return_unit
 
-let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
+let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
@@ -238,7 +237,15 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
   in
-  let*? sequencer_key = Configuration.sequencer_key configuration in
+
+  let* signer =
+    match signer with
+    | Some signer -> return signer
+    | None ->
+        let*? sk_uri = Configuration.sequencer_key configuration in
+        return (Signer.wallet cctxt sk_uri)
+  in
+
   let* status, smart_rollup_address_typed =
     Evm_context.start
       ~configuration
@@ -246,7 +253,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       ~data_dir
       ?smart_rollup_address:rollup_node_smart_rollup_address
       ~store_perm:Read_write
-      ~sequencer_wallet:(sequencer_key, cctxt)
+      ~signer
       ?snapshot_url
       ~tx_container
       ()
@@ -319,9 +326,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
     Option.iter_es
       (fun _ ->
         Signals_publisher.start
-          ~cctxt
+          ~signer
           ~smart_rollup_address:smart_rollup_address_b58
-          ~sequencer_key
           ~rollup_node_endpoint
           ())
       sequencer_config.blueprints_publisher_config.dal_slots
@@ -353,8 +359,7 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
       (* Create the first empty block. *)
       let* genesis_chunks =
         Sequencer_blueprint.prepare
-          ~cctxt
-          ~sequencer_key
+          ~signer
           ~timestamp:genesis_timestamp
           ~transactions:[]
           ~delayed_transactions:[]
@@ -403,9 +408,8 @@ let main ~data_dir ?(genesis_timestamp = Misc.now ()) ~cctxt
   let* () =
     Block_producer.start
       {
-        cctxt;
+        signer;
         smart_rollup_address = smart_rollup_address_b58;
-        sequencer_key;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         tx_container = Ex_tx_container tx_container;
       }

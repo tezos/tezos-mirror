@@ -1024,6 +1024,7 @@ let register_wallet ?password_filename ~wallet_dir () =
 
 let get_key_or_generate wallet_ctxt key =
   let open Lwt_result_syntax in
+  let open Evm_node_lib_dev in
   match key with
   | Some key ->
       let* sk_uri =
@@ -1031,13 +1032,13 @@ let get_key_or_generate wallet_ctxt key =
       in
       let* pk_uri = Client_keys.neuterize sk_uri in
       let* pk = Client_keys.public_key pk_uri in
-      return (pk, sk_uri)
+      return (pk, Signer.wallet wallet_ctxt sk_uri)
   | None ->
       let _pkh, pk, sk =
         Tezos_crypto.Signature.(generate_key ~algo:Ed25519) ()
       in
       let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
-      return (pk, sk_uri)
+      return (pk, Signer.wallet wallet_ctxt sk_uri)
 
 let sequencer_disable_native_execution configuration =
   let open Lwt_syntax in
@@ -1082,26 +1083,17 @@ let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   in
   {configuration with experimental_features}
 
-let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
+let start_sequencer ~wallet_ctxt ~data_dir ?signer ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
     ~keep_alive ?rollup_node_endpoint ~verbose ?profiling ?preimages
     ?preimages_endpoint ?native_execution_policy ?time_between_blocks
-    ?max_number_of_chunks ?private_rpc_port ?sequencer_str ?max_blueprints_lag
+    ?max_number_of_chunks ?private_rpc_port ?max_blueprints_lag
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
     ?genesis_timestamp ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config
     ~finalized_view config_file =
   let open Lwt_result_syntax in
-  let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-  let* sequencer_key =
-    match sandbox_config with
-    | Some Evm_node_lib_dev.Sequencer.{secret_key; _} -> return_some secret_key
-    | None ->
-        Option.map_es
-          (Client_keys.Secret_key.parse_source_string wallet_ctxt)
-          sequencer_str
-  in
   let* configuration =
     Cli.create_or_read_config
       ~data_dir
@@ -1124,7 +1116,6 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
       ?time_between_blocks
       ?max_number_of_chunks
       ?private_rpc_port
-      ?sequencer_key
       ?max_blueprints_lag
       ?max_blueprints_ahead
       ?max_blueprints_catchup
@@ -1160,9 +1151,10 @@ let start_sequencer ?password_filename ~wallet_dir ~data_dir ?rpc_addr ?rpc_port
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
 
   Evm_node_lib_dev.Sequencer.main
+    ~cctxt:wallet_ctxt
+    ?signer
     ~data_dir
     ?genesis_timestamp
-    ~cctxt:(wallet_ctxt :> Client_context.wallet)
     ~configuration
     ?kernel
     ?sandbox_config
@@ -1369,8 +1361,7 @@ let make_dev_messages ~kind ~smart_rollup_address data =
     | `Blueprint (cctxt, sk_uri, timestamp, number, parent_hash) ->
         let* blueprint_chunks =
           Sequencer_blueprint.prepare
-            ~cctxt
-            ~sequencer_key:sk_uri
+            ~signer:(Signer.wallet cctxt sk_uri)
             ~timestamp
             ~number:(Ethereum_types.quantity_of_z number)
             ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
@@ -2456,9 +2447,20 @@ let sequencer_command =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
       let config_file = config_filename ~data_dir config_file in
+      let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
+      let* signer =
+        match sequencer_str with
+        | Some sequencer_str ->
+            let+ sk_uri =
+              (Client_keys.Secret_key.parse_source_string wallet_ctxt)
+                sequencer_str
+            in
+            Some (Evm_node_lib_dev.Signer.wallet wallet_ctxt sk_uri)
+        | None -> return_none
+      in
       start_sequencer
-        ?password_filename
-        ~wallet_dir
+        ~wallet_ctxt
+        ?signer
         ~data_dir
         ?rpc_addr
         ?rpc_port
@@ -2478,7 +2480,6 @@ let sequencer_command =
         ?time_between_blocks
         ?max_number_of_chunks
         ?private_rpc_port
-        ?sequencer_str
         ?max_blueprints_lag
         ?max_blueprints_ahead
         ?max_blueprints_catchup
@@ -2547,7 +2548,7 @@ let sandbox_command =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-      let* pk, sk = get_key_or_generate wallet_ctxt sequencer_str in
+      let* pk, signer = get_key_or_generate wallet_ctxt sequencer_str in
       let rollup_node_endpoint =
         Option.value ~default:Uri.empty rollup_node_endpoint
       in
@@ -2568,7 +2569,6 @@ let sandbox_command =
         Evm_node_lib_dev.Sequencer.
           {
             public_key = pk;
-            secret_key = sk;
             init_from_snapshot;
             network;
             funded_addresses = Option.value ~default:[] funded_addresses;
@@ -2580,8 +2580,8 @@ let sandbox_command =
       in
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
-        ?password_filename
-        ~wallet_dir
+        ~wallet_ctxt
+        ~signer
         ~data_dir
         ?rpc_addr
         ?rpc_port
@@ -2672,12 +2672,11 @@ let tezlink_sandbox_command =
         Option.value ~default:Uri.empty rollup_node_endpoint
       in
       let wallet_ctxt = register_wallet ?password_filename ~wallet_dir () in
-      let* pk, sk = get_key_or_generate wallet_ctxt sequencer_str in
+      let* pk, signer = get_key_or_generate wallet_ctxt sequencer_str in
       let sandbox_config =
         Evm_node_lib_dev.Sequencer.
           {
             public_key = pk;
-            secret_key = sk;
             init_from_snapshot = None;
             network = None;
             funded_addresses = [];
@@ -2689,8 +2688,8 @@ let tezlink_sandbox_command =
       in
       let config_file = config_filename ~data_dir config_file in
       start_sequencer
-        ?password_filename
-        ~wallet_dir
+        ~wallet_ctxt
+        ~signer
         ~data_dir
         ?rpc_addr
         ?rpc_port

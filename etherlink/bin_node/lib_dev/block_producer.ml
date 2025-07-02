@@ -6,9 +6,8 @@
 (*****************************************************************************)
 
 type parameters = {
-  cctxt : Client_context.wallet;
+  signer : Signer.t;
   smart_rollup_address : string;
-  sequencer_key : Client_keys.sk_uri;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
 }
@@ -134,9 +133,8 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
-let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
-    ~smart_rollup_address ~transactions_and_objects ~delayed_hashes
-    ~hash_of_tx_object head_info =
+let produce_block_with_transactions ~signer ~timestamp ~smart_rollup_address
+    ~transactions_and_objects ~delayed_hashes ~hash_of_tx_object head_info =
   let open Lwt_result_syntax in
   let transactions, tx_hashes =
     List.to_seq transactions_and_objects
@@ -154,8 +152,7 @@ let produce_block_with_transactions ~sequencer_key ~cctxt ~timestamp
          head_info.Evm_context.next_blueprint_number)
     @@ fun () ->
     Sequencer_blueprint.prepare
-      ~sequencer_key
-      ~cctxt
+      ~signer
       ~timestamp
       ~transactions
       ~delayed_transactions:delayed_hashes
@@ -314,8 +311,8 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed (type f) ~cctxt ~smart_rollup_address ~sequencer_key
-    ~force ~timestamp ~delayed_hashes ~remaining_cumulative_size
+let produce_block_if_needed (type f) ~signer ~smart_rollup_address ~force
+    ~timestamp ~delayed_hashes ~remaining_cumulative_size
     ~(tx_container : f Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
@@ -333,8 +330,7 @@ let produce_block_if_needed (type f) ~cctxt ~smart_rollup_address ~sequencer_key
   if force || n > 0 then
     let* confirmed_txs =
       produce_block_with_transactions
-        ~sequencer_key
-        ~cctxt
+        ~signer
         ~timestamp
         ~smart_rollup_address
         ~transactions_and_objects:(Some transactions_and_objects)
@@ -371,8 +367,8 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
   let*! head_info = Evm_context.head_info () in
   return (head_info, delayed_hashes, remaining_cumulative_size)
 
-let produce_block (type f) ~cctxt ~smart_rollup_address ~sequencer_key ~force
-    ~timestamp ~maximum_number_of_chunks ~with_delayed_transactions
+let produce_block (type f) ~signer ~smart_rollup_address ~force ~timestamp
+    ~maximum_number_of_chunks ~with_delayed_transactions
     ~(tx_container : f Services_backend_sig.tx_container) =
   let open Lwt_result_syntax in
   let (module Tx_container) =
@@ -397,8 +393,7 @@ let produce_block (type f) ~cctxt ~smart_rollup_address ~sequencer_key ~force
     if is_going_to_upgrade then
       let* hashes =
         produce_block_with_transactions
-          ~sequencer_key
-          ~cctxt
+          ~signer
           ~timestamp
           ~smart_rollup_address
           ~transactions_and_objects:None
@@ -410,8 +405,7 @@ let produce_block (type f) ~cctxt ~smart_rollup_address ~sequencer_key ~force
       return (`Block_produced (Seq.length hashes))
     else
       produce_block_if_needed
-        ~cctxt
-        ~sequencer_key
+        ~signer
         ~timestamp
         ~smart_rollup_address
         ~force
@@ -433,18 +427,16 @@ module Handlers = struct
     | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
         let {
-          cctxt;
+          signer;
           smart_rollup_address;
-          sequencer_key;
           maximum_number_of_chunks;
           tx_container = Ex_tx_container tx_container;
         } =
           state
         in
         produce_block
-          ~cctxt
+          ~signer
           ~smart_rollup_address
-          ~sequencer_key
           ~force
           ~timestamp
           ~maximum_number_of_chunks
