@@ -2378,9 +2378,7 @@ audit_riscv_deps:
   - gcp
   rules:
   - when: on_success
-  needs:
-  - job: trigger
-    optional: true
+  needs: []
   dependencies: []
   timeout: 60 minutes
   cache:

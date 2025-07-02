@@ -164,8 +164,7 @@ sanity_ci:
   stage: sanity
   tags:
   - gcp
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -186,8 +185,7 @@ docker:hadolint:
     - Dockerfile
     - build.Dockerfile
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -209,8 +207,7 @@ oc.ocaml_fmt:
     - .gitlab-ci.yml
     - .gitlab/**/*
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -248,8 +245,7 @@ oc.semgrep:
     - src/**/*
     - tezt/**/*
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -277,8 +273,7 @@ oc.misc_checks:
     - src/**/*
     - tezt/**/*
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -304,8 +299,7 @@ check_jsonnet:
   - changes:
     - '**/*.jsonnet'
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -328,8 +322,7 @@ check_rust_fmt:
     - .gitlab-ci.yml
     - .gitlab/**/*
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -348,8 +341,7 @@ documentation:rst-check:
     - .gitlab-ci.yml
     - .gitlab/**/*
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -369,8 +361,7 @@ nix:
     - flake.lock
     - scripts/version.sh
     when: on_success
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -394,8 +385,7 @@ commit_titles:
   stage: sanity
   tags:
   - gcp
-  needs:
-  - trigger
+  needs: []
   dependencies: []
   allow_failure:
     exit_codes: 65
@@ -2317,9 +2307,7 @@ audit_riscv_deps:
     - src/kernel_sdk/**/*
     - src/riscv/**/*
     when: on_success
-  needs:
-  - job: trigger
-    optional: true
+  needs: []
   dependencies: []
   timeout: 60 minutes
   cache:
