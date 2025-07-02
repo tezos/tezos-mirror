@@ -400,6 +400,7 @@ let _tezt_etherlink =
       "dal_sequencer";
       "eth_call";
       "gc";
+      "tezlink";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
