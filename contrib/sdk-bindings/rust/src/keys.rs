@@ -13,7 +13,8 @@ use tezos_crypto_rs::{
 macro_rules! bind_hash {
     ($bind_name:ident, $name:ty) => {
         paste! {
-            #[derive(uniffi::Object)]
+            #[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
+            #[uniffi::export(Debug, Display, Eq)]
             pub struct $bind_name(pub(crate) $name);
 
             #[uniffi::export]
@@ -29,6 +30,12 @@ macro_rules! bind_hash {
                 #[doc = "Encodes the `" $bind_name "` into a Base58Check-encoded string."]
                 pub fn to_b58check(&self) -> String {
                     <$name>::to_b58check(&self.0)
+                }
+            }
+
+            impl ::std::fmt::Display for $bind_name {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{}", self.0)
                 }
             }
         }
@@ -56,7 +63,8 @@ bind_hash!(BlsSignature, hash::BlsSignature);
 // TODO: https://linear.app/tezos/issue/SDK-73.
 // Unable use the `bind_hash!` macro because the `signature::Signature` struct does not implement `from_b58check` and `to_b58check` but `from_base58_check` and `to_base58_check`
 /// Generic signature structure gathering the four types of signature hash and the unknown signature hash.
-#[derive(uniffi::Object)]
+#[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
+#[uniffi::export(Debug, Display, Eq)]
 pub struct Signature(pub(crate) signature::Signature);
 
 #[uniffi::export]
@@ -72,6 +80,12 @@ impl Signature {
     /// Encodes the `Signature` into a Base58Check-encoded string.
     pub fn to_b58check(&self) -> String {
         signature::Signature::to_base58_check(&self.0)
+    }
+}
+
+impl ::std::fmt::Display for Signature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
