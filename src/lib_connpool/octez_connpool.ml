@@ -135,8 +135,8 @@ let add_traceparent_header header
        ~parent_id:span_id
        ())
 
-let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo t meth
-    route =
+let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo
+    ~retry_count t meth route =
   let open Lwt_syntax in
   let uri = make_uri t.endpoint ?query ?userinfo route in
   Lwt_pool.use t.pool @@ fun conn ->
@@ -154,6 +154,10 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo t meth
       | _, Some port -> [("server.port", `Int port)]
       | _, _ -> []
     in
+    let retry_attr =
+      if retry_count > 0 then [("http.request.resend_count", `Int retry_count)]
+      else []
+    in
     let headers_attrs =
       List.map
         (fun (h, v) -> ("http.request.header." ^ h, `String v))
@@ -164,7 +168,7 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo t meth
       ("http.request.method", `String (Cohttp.Code.string_of_method meth));
       full_attr;
     ]
-    @ http_server_attr @ http_port_attr @ headers_attrs
+    @ http_server_attr @ http_port_attr @ headers_attrs @ retry_attr
   in
   Opentelemetry.Trace.with_
     ~service_name:"Octez_connpool"
@@ -207,12 +211,19 @@ type error +=
   | Cannot_perform_http_request
   | Connection_pool_internal_error of string
 
-let rec retry n k =
-  let open Lwt_result_syntax in
-  Lwt.catch k (function
-      | Call_failure _ | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
-          if n < 0 then tzfail Cannot_perform_http_request else retry (n - 1) k
-      | exn -> tzfail (Connection_pool_internal_error (Printexc.to_string exn)))
+let retry max k =
+  let rec retry n k =
+    let open Lwt_result_syntax in
+    Lwt.catch
+      (fun () -> k (max - n))
+      (function
+        | Call_failure _ | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
+            if n < 0 then tzfail Cannot_perform_http_request
+            else retry (n - 1) k
+        | exn ->
+            tzfail (Connection_pool_internal_error (Printexc.to_string exn)))
+  in
+  retry max k
 
 let call ?headers ?body ?query ?userinfo t meth route =
   (* When trying to make a call, we need to take into account the edge case
@@ -220,8 +231,9 @@ let call ?headers ?body ?query ?userinfo t meth route =
      it had to close some of the connections for some reasons). So we retry
      [pool_len + 1] to handle the worst case scenario where all connections are
      stalled. *)
-  retry (t.pool_len + 1) @@ fun () ->
-  Lwt_result.ok (call_exn ?headers ?body ?query ?userinfo t meth route)
+  retry (t.pool_len + 1) @@ fun retry_count ->
+  Lwt_result.ok
+    (call_exn ?headers ?body ?query ?userinfo ~retry_count t meth route)
 
 let get ?headers ?query ?userinfo t route =
   call ?headers ?query ?userinfo t `GET route
