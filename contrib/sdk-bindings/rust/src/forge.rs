@@ -96,6 +96,8 @@ pub mod operation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keys::PublicKeyHash;
+    use operation::*;
 
     // All messages bytes were generated using `octez-codec encode "alpha.script.expr" from '{ "string": "$MSG" }'`
 
@@ -133,6 +135,71 @@ mod tests {
         assert_eq!(
             raw_msg, expected_bytes,
             "Message must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "delegation",
+      "source": "tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif",
+      "fee": "13",
+      "counter": "66",
+      "gas_limit": "271",
+      "storage_limit": "128",
+      "delegate": "tz3NGKzVp8ezNnu5qx8mY3iioSUXKfC1d8Yc"
+    }'
+    */
+    #[test]
+    fn delegation_forging() {
+        let delegate =
+            PublicKeyHash::from_b58check("tz3NGKzVp8ezNnu5qx8mY3iioSUXKfC1d8Yc").unwrap();
+        let source = PublicKeyHash::from_b58check("tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif").unwrap();
+        let (fee, counter, gas_limit, storage_limit) = (13, 66, 271, 128);
+        let delegation = Delegation::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            Some(Arc::new(delegate)),
+        );
+        let raw_delegation = delegation.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            delegation
+        ));
+
+        let bytes = hex::decode("6e00499e3772f0fd50e62d325ad12ca9e54fde8b4f1f0d428f028001ff02153c42139fbbe509e9023bb85eac281709766070").unwrap();
+        assert_eq!(
+            bytes, raw_delegation,
+            "Delegation must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "delegation",
+      "source": "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p",
+      "fee": "609",
+      "counter": "7",
+      "gas_limit": "12",
+      "storage_limit": "11"
+    }'
+    */
+    #[test]
+    fn remove_delegate_forging() {
+        let source = PublicKeyHash::from_b58check("tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p").unwrap();
+        let (fee, counter, gas_limit, storage_limit) = (609, 7, 12, 11);
+        let delegation = Delegation::new(&source, fee, counter, gas_limit, storage_limit, None);
+        let raw_delegation = delegation.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            delegation
+        ));
+
+        let bytes =
+            hex::decode("6e01585a321426fbb1303d16b569e571109eb68d8c1be104070c0b00").unwrap();
+        assert_eq!(
+            bytes, raw_delegation,
+            "Delegation must be forged into the expected bytes"
         );
     }
 }
