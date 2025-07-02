@@ -192,5 +192,3 @@ let () =
   warm_established_reusable_connections () ;
   connection_close_prevents_reuse () ;
   server_restarts_gracefully_handled ()
-
-let () = Test.run ()
