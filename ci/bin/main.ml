@@ -303,9 +303,9 @@ let () =
     If.(
       not_on_tezos_namespace && push
       && has_tag_match octez_smart_rollup_node_release_tag_re)
-    ~jobs:(Rollup_node.Release.jobs ())
+    ~jobs:(Rollup_node.Release.jobs ~test:true ())
     ~description:
-      "Release tag pipelines for the Smart Rollup node.\n\n\
+      "Test release pipeline for the Smart Rollup node.\n\n\
        This pipeline checks that 'octez_smart_rollup_node_release_tag' \
        pipelines work as intended, without publishing any release. Developers \
        or release managers can create this pipeline by pushing a tag to a fork \
