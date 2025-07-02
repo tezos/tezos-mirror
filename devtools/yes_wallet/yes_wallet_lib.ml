@@ -543,9 +543,10 @@ let get_context ?level ~network_opt base_dir =
         | Some block -> Lwt.return block)
   in
   Format.printf
-    "@[<h>Head block:@;<17 0>%a@]@."
+    "@[<h>Head block:@;<17 0>%a@] @.@[<h>Head block level:@;<11 0>%ld@] @."
     Block_hash.pp
-    (Tezos_store.Store.Block.hash block) ;
+    (Tezos_store.Store.Block.hash block)
+    (Tezos_store.Store.Block.level block) ;
   let header = Store.Block.header block in
   let*! context =
     let*! r = Store.Block.context_exn main_chain_store block in
