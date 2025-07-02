@@ -179,10 +179,20 @@ type experimental_features = {
   periodic_snapshot_path : string option;
 }
 
+type gcp_key = {
+  project : string;
+  keyring : string;
+  region : string;
+  key : string;
+  version : int;
+}
+
+type sequencer_key = Wallet of Client_keys.sk_uri | Gcp_key of gcp_key
+
 type sequencer = {
   time_between_blocks : time_between_blocks;
   max_number_of_chunks : int;
-  sequencer : Client_keys.sk_uri option;
+  sequencer : sequencer_key option;
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
@@ -673,12 +683,72 @@ let max_number_of_chunks_field =
       (ranged_int 1 hard_maximum_number_of_chunks)
       default_max_number_of_chunks)
 
-let sequencer_field =
-  Data_encoding.(
-    opt
-      ~description:"Secret key URI of the sequencer."
-      "sequencer"
-      (string' Plain))
+let gcp_key_from_string_opt key_handler =
+  let open Option_syntax in
+  let* key_handler = String.remove_prefix ~prefix:"gcp-kms://" key_handler in
+  match String.split '/' key_handler with
+  | [project; region; keyring; key; version] ->
+      Some {project; keyring; key; region; version = int_of_string version}
+  | _ -> None
+
+let gcp_key_uri_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun {project; region; keyring; key; version} ->
+      Format.sprintf
+        "gcp-kms://%s/%s/%s/%s/%d"
+        project
+        region
+        keyring
+        key
+        version)
+    (fun uri ->
+      Option.to_result
+        ~none:(Format.sprintf "%s is not a valid GCP key URI" uri)
+        (gcp_key_from_string_opt uri))
+    (string' Plain)
+
+let gcp_key_full_encoding =
+  let open Data_encoding in
+  conv
+    (fun {region; project; keyring; key; version} ->
+      (region, project, keyring, key, version))
+    (fun (region, project, keyring, key, version) ->
+      {region; project; keyring; key; version})
+    (obj5
+       (req "project" ~description:"GCP project hosting the key" string)
+       (req "keyring" ~description:"Keyring owning the key" string)
+       (req "key" ~description:"Key name" string)
+       (req "region" ~description:"GCP region hosting the keyring" string)
+       (req "version" ~description:"Key version number" int31))
+
+let gcp_key_encoding =
+  let open Data_encoding in
+  union
+    [
+      case Json_only ~title:"URI" gcp_key_uri_encoding Option.some Fun.id;
+      case Json_only ~title:"Full" gcp_key_full_encoding (Fun.const None) Fun.id;
+    ]
+
+let sequencer_key_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        Json_only
+        ~title:"Wallet"
+        (string' Plain)
+        (function
+          | Wallet sk_uri -> Some (Client_keys.string_of_sk_uri sk_uri)
+          | _ -> None)
+        (fun sk_uri -> Wallet (Client_keys.sk_uri_of_string sk_uri));
+      case
+        Json_only
+        ~title:"GCP Key"
+        gcp_key_encoding
+        (function Gcp_key k -> Some k | _ -> None)
+        (fun k -> Gcp_key k);
+    ]
 
 let sequencer_encoding =
   let open Data_encoding in
@@ -694,7 +764,7 @@ let sequencer_encoding =
          } ->
       ( time_between_blocks,
         max_number_of_chunks,
-        Option.map Client_keys.string_of_sk_uri sequencer,
+        sequencer,
         blueprints_publisher_config ))
     (fun ( time_between_blocks,
            max_number_of_chunks,
@@ -703,13 +773,16 @@ let sequencer_encoding =
       {
         time_between_blocks;
         max_number_of_chunks;
-        sequencer = Option.map Client_keys.sk_uri_of_string sequencer;
+        sequencer;
         blueprints_publisher_config;
       })
     (obj4
        time_between_blocks_field
        max_number_of_chunks_field
-       sequencer_field
+       (opt
+          ~description:"Secret key URI of the sequencer."
+          "sequencer"
+          sequencer_key_encoding)
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding

@@ -242,8 +242,9 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     match signer with
     | Some signer -> return signer
     | None ->
-        let*? sk_uri = Configuration.sequencer_key configuration in
-        return (Signer.wallet cctxt sk_uri)
+        let*? key = Configuration.sequencer_key configuration in
+        let*! signer = Signer.of_sequencer_key cctxt key in
+        return signer
   in
 
   let* status, smart_rollup_address_typed =
