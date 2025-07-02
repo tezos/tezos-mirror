@@ -29,58 +29,66 @@ val warm : t -> unit Lwt.t
 (** [get t path] perform a [GET path] request to the endpoint of [t], using one
     of the connections of the pool.
 
+    Common known sensitive headers are redacted from telemetry traces but one
+    can provided additional headers to redact in [sensitive_headers].
+
     If all pre-established connections are already used for concurrent
     requests, a new one is established, or the function is blocking until a
     connection becomes available if the pool has already reached full capacity.
     *)
 val get :
   ?headers:Cohttp.Header.t ->
-  ?query:(string * string trace) trace ->
+  ?sensitive_headers:string list ->
+  ?query:(string * string list) list ->
   ?userinfo:string ->
   t ->
   string ->
-  (Cohttp.Response.t * string, error trace) result Lwt.t
+  (Cohttp.Response.t * string, error list) result Lwt.t
 
 (** [post t path] perform a [POST path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val post :
   ?headers:Cohttp.Header.t ->
+  ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
-  ?query:(string * string trace) trace ->
+  ?query:(string * string list) list ->
   ?userinfo:string ->
   t ->
   string ->
-  (Cohttp.Response.t * string, error trace) result Lwt.t
+  (Cohttp.Response.t * string) tzresult Lwt.t
 
 (** [put t path] perform a [PUT path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val put :
   ?headers:Cohttp.Header.t ->
+  ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
-  ?query:(string * string trace) trace ->
+  ?query:(string * string list) list ->
   ?userinfo:string ->
   t ->
   string ->
-  (Cohttp.Response.t * string, error trace) result Lwt.t
+  (Cohttp.Response.t * string) tzresult Lwt.t
 
 (** [patch t path] perform a [PATCH path] request to the endpoint of [t], using
     one of the connections of the pool. See {!get} for caveats. *)
 val patch :
   ?headers:Cohttp.Header.t ->
+  ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
-  ?query:(string * string trace) trace ->
+  ?query:(string * string list) list ->
   ?userinfo:string ->
   t ->
   string ->
-  (Cohttp.Response.t * string, error trace) result Lwt.t
+  (Cohttp.Response.t * string) tzresult Lwt.t
 
 (** [delete t path] perform a [DELETE path] request to the endpoint of [t],
     using one of the connections of the pool. See {!get} for caveats. *)
 val delete :
   ?headers:Cohttp.Header.t ->
+  ?sensitive_headers:string list ->
   ?body:Cohttp_lwt.Body.t ->
-  ?query:(string * string trace) trace ->
+  ?query:(string * string list) list ->
   ?userinfo:string ->
   t ->
   string ->
-  (Cohttp.Response.t * string, error trace) result Lwt.t
+  (Cohttp.Response.t * string) tzresult Lwt.t

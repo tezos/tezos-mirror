@@ -135,8 +135,30 @@ let add_traceparent_header header
        ~parent_id:span_id
        ())
 
-let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo
-    ~retry_count t meth route =
+let hardcoded_sensitive_headers =
+  let any = "" in
+  Cohttp.Header.of_list
+    [
+      ("cookie", any);
+      ("set-cookie", any);
+      ("authorization", any);
+      ("proxy-authorization", any);
+      ("x-api-key", any);
+      ("x-custom-auth", any);
+      ("x-auth-token", any);
+      ("www-authenticate", any);
+    ]
+
+let redact_sensitive_header ~sensitive_headers h v =
+  let sensitive_headers =
+    Cohttp.Header.add_list
+      hardcoded_sensitive_headers
+      (List.map (fun h -> (h, "")) sensitive_headers)
+  in
+  if Cohttp.Header.mem sensitive_headers h then "[REDACTED]" else v
+
+let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
+    ?query ?userinfo ~retry_count t meth route =
   let open Lwt_syntax in
   let uri = make_uri t.endpoint ?query ?userinfo route in
   Lwt_pool.use t.pool @@ fun conn ->
@@ -160,7 +182,9 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo
     in
     let headers_attrs =
       List.map
-        (fun (h, v) -> ("http.request.header." ^ h, `String v))
+        (fun (h, v) ->
+          let v = redact_sensitive_header ~sensitive_headers h v in
+          ("http.request.header." ^ h, `String v))
         (Cohttp.Header.to_list headers)
     in
     [
@@ -198,7 +222,9 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?body ?query ?userinfo
               {message = ""; code = Status_code_error} ;
           let headers_attrs =
             List.map
-              (fun (h, v) -> ("http.request.header." ^ h, `String v))
+              (fun (h, v) ->
+                let v = redact_sensitive_header ~sensitive_headers h v in
+                ("http.request.header." ^ h, `String v))
               (Cohttp.Header.to_list resp.headers)
           in
           ("http.response.status_code", `Int resp_code) :: headers_attrs) ;
@@ -225,7 +251,7 @@ let retry max k =
   in
   retry max k
 
-let call ?headers ?body ?query ?userinfo t meth route =
+let call ?headers ?sensitive_headers ?body ?query ?userinfo t meth route =
   (* When trying to make a call, we need to take into account the edge case
      that the scenario could have gone down and all connections are stalled (or
      it had to close some of the connections for some reasons). So we retry
@@ -233,22 +259,31 @@ let call ?headers ?body ?query ?userinfo t meth route =
      stalled. *)
   retry (t.pool_len + 1) @@ fun retry_count ->
   Lwt_result.ok
-    (call_exn ?headers ?body ?query ?userinfo ~retry_count t meth route)
+    (call_exn
+       ?headers
+       ?sensitive_headers
+       ?body
+       ?query
+       ?userinfo
+       ~retry_count
+       t
+       meth
+       route)
 
-let get ?headers ?query ?userinfo t route =
-  call ?headers ?query ?userinfo t `GET route
+let get ?headers ?sensitive_headers ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?query ?userinfo t `GET route
 
-let post ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `POST route
+let post ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `POST route
 
-let put ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `PUT route
+let put ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PUT route
 
-let delete ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `DELETE route
+let delete ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `DELETE route
 
-let patch ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `PATCH route
+let patch ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PATCH route
 
 let () =
   register_error_kind
