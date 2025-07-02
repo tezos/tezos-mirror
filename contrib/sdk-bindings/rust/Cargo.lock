@@ -1153,10 +1153,22 @@ name = "tezos-bindings"
 version = "0.1.0"
 dependencies = [
  "paste",
+ "tezos-protocol",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror",
  "uniffi",
+]
+
+[[package]]
+name = "tezos-protocol"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom",
+ "tezos_crypto_rs",
+ "tezos_data_encoding",
+ "thiserror",
 ]
 
 [[package]]
