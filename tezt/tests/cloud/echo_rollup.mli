@@ -13,7 +13,13 @@
     messages published via DAL slots.
 *)
 
-type operator
+type operator = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_node : Sc_rollup_node.t;
+  sc_rollup_address : string;
+  operator : Account.key;
+}
 
 (** [init_echo_rollup_account ~client ~echo_rollup ~alias_prefix] generates
     a new rollup operator key if [~echo_rollup] is [true]. The key alias will
