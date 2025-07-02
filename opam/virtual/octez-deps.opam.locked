@@ -86,13 +86,13 @@ depends: [
   "dream" {= "1.0.0~alpha7"}
   "dream-httpaf" {= "1.0.0~alpha3"}
   "dream-pure" {= "1.0.0~alpha2"}
-  "dune" {= "3.19.0"}
-  "dune-build-info" {= "3.19.0"}
-  "dune-configurator" {= "3.19.0"}
-  "dune-private-libs" {= "3.19.0"}
-  "dune-site" {= "3.19.0"}
+  "dune" {= "3.19.1"}
+  "dune-build-info" {= "3.19.1"}
+  "dune-configurator" {= "3.19.1"}
+  "dune-private-libs" {= "3.19.1"}
+  "dune-site" {= "3.19.1"}
   "duration" {= "0.2.1"}
-  "dyn" {= "3.19.0"}
+  "dyn" {= "3.19.1"}
   "eio" {= "1.2"}
   "eio_main" {= "1.2"}
   "either" {= "1.0.0"}
@@ -183,7 +183,7 @@ depends: [
   "opentelemetry" {= "0.11.2"}
   "opentelemetry-lwt" {= "0.11.2"}
   "optint" {= "0.3.0"}
-  "ordering" {= "3.19.0"}
+  "ordering" {= "3.19.1"}
   "parsexp" {= "v0.16.0"}
   "pbrt" {= "3.1.1"}
   "pecu" {= "0.7"}
@@ -241,7 +241,7 @@ depends: [
   "stdio" {= "v0.16.0"}
   "stdlib-random" {= "1.2.0"}
   "stdlib-shims" {= "0.3.0"}
-  "stdune" {= "3.19.0"}
+  "stdune" {= "3.19.1"}
   "stringext" {= "1.6.0"}
   "tar" {= "2.6.0"}
   "tar-unix" {= "2.6.0"}
