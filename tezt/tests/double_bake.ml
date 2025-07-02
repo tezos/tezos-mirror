@@ -137,7 +137,7 @@ let double_bake =
     ~__FILE__
     ~title:"double baking with accuser"
     ~tags:[team; "double"; "baking"; "accuser"; "node"]
-    ~uses:(fun protocol -> [Protocol.accuser protocol])
+    ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
   let log_step counter msg =
     let color = Log.Color.(bold ++ FG.blue) in
@@ -206,7 +206,7 @@ let double_bake =
   log_step 4 "Run Node 3, bake one block and wait for the accuser to be ready." ;
   let* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_3 = Client.init ~endpoint:(Node node_3) () in
-  let* accuser_3 = Accuser.init ~protocol node_3 in
+  let* accuser_3 = Accuser.init node_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 accuser_3
   in

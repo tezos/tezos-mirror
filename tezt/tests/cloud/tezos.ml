@@ -580,8 +580,8 @@ module Accuser = struct
   include Accuser
 
   module Agent = struct
-    let init ?(group = "L1") ?name ~protocol
-        ?(path = Uses.path (Protocol.accuser protocol)) node cloud agent =
+    let init ?(group = "L1") ?name ?(path = Uses.path Constant.octez_accuser)
+        node cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -592,7 +592,7 @@ module Accuser = struct
           ()
       in
       let runner = Agent.runner agent in
-      init ?name ~event_level:`Notice ?runner ~path ~protocol node
+      init ?name ~event_level:`Notice ?runner ~path node
   end
 end
 

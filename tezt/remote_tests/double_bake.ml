@@ -113,7 +113,7 @@ let double_bake =
   in
   let endpoint_3 = Client.(Node node_3) in
   let* client_3 = Client.init ~endpoint:endpoint_3 () in
-  let* accuser_3 = Accuser.init ~protocol node_3 in
+  let* accuser_3 = Accuser.init node_3 in
   let denunciation = wait_for_denunciation accuser_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 denunciation

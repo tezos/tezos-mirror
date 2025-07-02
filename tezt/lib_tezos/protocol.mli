@@ -85,14 +85,6 @@ val protocol_zero_hash : string
     directory of the protocol, relative to the root of the repository. *)
 val parameter_file : ?constants:constants -> t -> string
 
-(** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
-val accuser : t -> Uses.t
-
-(** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
-
-    This should not be used for anything except to compute the name of executables. *)
-val daemon_name : t -> string
-
 (** Get the part which is added at the beginning of all encoding names. *)
 val encoding_prefix : t -> string
 

@@ -80,23 +80,6 @@ let parameter_file ?(constants = default_constants) protocol =
   let name = constants_to_string constants in
   sf "src/%s/parameters/%s-parameters.json" (directory protocol) name
 
-let daemon_name = function Alpha -> "alpha" | p -> String.sub (hash p) 0 8
-
-let protocol_dependent_uses ~tag ~path =
-  let make protocol =
-    let protocol = daemon_name protocol in
-    Uses.make
-      ~tag:(tag ^ String.lowercase_ascii protocol)
-      ~path:(path ^ protocol)
-      ()
-  in
-  (* Make sure [Uses.lookup] knows about all executables even before tests
-     actually registers themselves. *)
-  let _ = List.map make all in
-  make
-
-let accuser = protocol_dependent_uses ~tag:"accuser_" ~path:"./octez-accuser-"
-
 let encoding_prefix = function
   | Alpha -> "alpha"
   | p -> sf "%03d-%s" (number p) (String.sub (hash p) 0 8)
