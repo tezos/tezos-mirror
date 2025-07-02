@@ -175,7 +175,7 @@ rollup-node.docker:amd64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
@@ -197,7 +197,7 @@ rollup-node.docker:arm64:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/smart-rollup-node-executable
@@ -221,7 +221,7 @@ rollup-node.docker:merge_manifests:
   - docker:${DOCKER_VERSION}-dind
   variables:
     DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "true"
+    CI_DOCKER_HUB: "false"
 
 rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
