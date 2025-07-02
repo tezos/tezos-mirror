@@ -881,6 +881,7 @@ val spawn_activate_account :
 val transfer :
   ?env:string String_map.t ->
   ?hooks:Process.hooks ->
+  ?log_requests:bool ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -906,6 +907,7 @@ val transfer :
 val spawn_transfer :
   ?env:string String_map.t ->
   ?hooks:Process.hooks ->
+  ?log_requests:bool ->
   ?log_output:bool ->
   ?endpoint:endpoint ->
   ?wait:string ->
@@ -1037,6 +1039,7 @@ val spawn_call_contract :
 (** Run [octez-client reveal key for <src>]. *)
 val reveal :
   ?endpoint:endpoint ->
+  ?log_requests:bool ->
   ?wait:string ->
   ?fee:Tez.t ->
   ?fee_cap:Tez.t ->

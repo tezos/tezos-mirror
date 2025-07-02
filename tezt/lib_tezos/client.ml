@@ -1247,17 +1247,18 @@ let spawn_add_address ?(force = false) client ~alias ~src =
 let add_address ?force client ~alias ~src =
   spawn_add_address ?force client ~alias ~src |> Process.check
 
-let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
-    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
-    ?arg ?(simulation = false) ?(force = false) ~amount ~giver ~receiver client
-    =
+let spawn_transfer ?env ?hooks ?(log_requests = false) ?log_output ?endpoint
+    ?(wait = "none") ?burn_cap ?fee ?fee_cap ?gas_limit ?safety_guard
+    ?storage_limit ?counter ?entrypoint ?arg ?(simulation = false)
+    ?(force = false) ~amount ~giver ~receiver client =
   spawn_command
     ?env
     ?log_output
     ?endpoint
     ?hooks
     client
-    (["--wait"; wait]
+    ((if log_requests then ["--log-requests"] else [])
+    @ ["--wait"; wait]
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
     @ Option.fold
         ~none:[]
@@ -1274,11 +1275,12 @@ let spawn_transfer ?env ?hooks ?log_output ?endpoint ?(wait = "none") ?burn_cap
     @ (if simulation then ["--simulation"] else [])
     @ if force then ["--force"] else [])
 
-let transfer ?env ?hooks ?log_output ?endpoint ?wait ?burn_cap ?fee ?fee_cap
-    ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint ?arg
-    ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
+let transfer ?env ?hooks ?log_requests ?log_output ?endpoint ?wait ?burn_cap
+    ?fee ?fee_cap ?gas_limit ?safety_guard ?storage_limit ?counter ?entrypoint
+    ?arg ?simulation ?force ?expect_failure ~amount ~giver ~receiver client =
   spawn_transfer
     ?env
+    ?log_requests
     ?log_output
     ?endpoint
     ?hooks
@@ -1421,13 +1423,14 @@ let call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint ?arg
     client
   |> Process.check
 
-let reveal ?endpoint ?(wait = "none") ?fee ?fee_cap ?(force_low_fee = false)
-    ~src client =
+let reveal ?endpoint ?(log_requests = false) ?(wait = "none") ?fee ?fee_cap
+    ?(force_low_fee = false) ~src client =
   let value =
     spawn_command
       ?endpoint
       client
-      (["--wait"; wait]
+      ((if log_requests then ["--log-requests"] else [])
+      @ ["--wait"; wait]
       @ ["reveal"; "key"; "for"; src]
       @ optional_arg "fee" Tez.to_string fee
       @ optional_arg "fee-cap" Tez.to_string fee_cap
