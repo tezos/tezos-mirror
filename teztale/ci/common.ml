@@ -19,7 +19,7 @@ let changeset = Changeset.(make ["teztale/**/*"])
 
 (** Job that builds the Teztale executables *)
 let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ?cpu
-    ~arch ?storage () =
+    ~arch ?storage ?(sccache_size = "5G") () =
   let arch_string = arch_to_string arch in
   job
     ~__POS__
@@ -49,4 +49,5 @@ let job_build ?rules ?(expire_in = Gitlab_ci.Types.(Duration (Days 1))) ?cpu
         "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
       ]
     ["make teztale"]
-  |> enable_cargo_cache |> enable_sccache
+  |> enable_cargo_cache
+  |> enable_sccache ~cache_size:sccache_size

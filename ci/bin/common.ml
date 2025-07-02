@@ -725,7 +725,7 @@ type bin_package_group = A | B
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
-    ?(release = false) ?dependencies () =
+    ?(release = false) ?dependencies ?(sccache_size = "5G") () =
   let arch_string = arch_to_string arch in
   let name =
     sf
@@ -799,7 +799,9 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache |> enable_sccache |> enable_cargo_target_caches
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:sccache_size
+    |> enable_cargo_target_caches
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
