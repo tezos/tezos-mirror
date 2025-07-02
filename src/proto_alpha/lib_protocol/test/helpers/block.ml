@@ -303,9 +303,9 @@ module Forge = struct
     let t = Array.map List.rev t in
     Array.to_list t
 
-  let forge_header ?(locked_round = None) ?(payload_round = None)
-      ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
+  let forge_header ?locked_round ?payload_round ?(policy = By_round 0)
+      ?timestamp ?(operations = []) ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote pred =
     let open Lwt_result_wrap_syntax in
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
