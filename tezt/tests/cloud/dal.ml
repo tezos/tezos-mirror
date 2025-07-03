@@ -3946,7 +3946,9 @@ let on_new_cycle t ~level =
     @@ RPC.get_chain_block_metadata_raw ~block:last_block_of_prev_cycle ()
   in
   (* This action is performed only if `--dal-slack-webhook` is provided. *)
-  Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
+  if t.configuration.network_health_monitoring then
+    Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
+  else Lwt.return_unit
 
 let on_new_block t ~level =
   let* () = wait_for_level t level in
