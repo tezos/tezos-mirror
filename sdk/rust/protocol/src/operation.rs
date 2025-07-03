@@ -16,6 +16,8 @@ pub enum OperationContent {
     Reveal(ManagerOperationContent<RevealContent>),
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    #[encoding(tag = 109)]
+    Origination(ManagerOperationContent<OriginationContent>),
     #[encoding(tag = 110)]
     Delegation(ManagerOperationContent<DelegationContent>),
 }
@@ -49,6 +51,21 @@ pub struct Parameter {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct OriginationContent {
+    pub balance: Narith,
+    pub delegate: Option<PublicKeyHash>,
+    pub script: Script,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct Script {
+    #[encoding(dynamic, bytes)]
+    pub code: Vec<u8>,
+    #[encoding(dynamic, bytes)]
+    pub storage: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
