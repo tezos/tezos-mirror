@@ -653,15 +653,7 @@ let check_consensus_operations ?expected_attestations_committee
   in
   unit
 
-(* Test that the baker aggregates eligible attestations.*)
-let simple_attestations_aggregation =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Simple attestations aggregation"
-    ~tags:[team; "baker"; "attestation"; "aggregation"]
-    ~supports:Protocol.(From_protocol 023)
-    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
-  @@ fun protocol ->
+let simple_attestation_aggregation ~remote_mode protocol =
   log_step 1 "Initialize a node and a client with protocol" ;
   let consensus_rights_delay = 1 in
   let* parameter_file =
@@ -730,7 +722,7 @@ let simple_attestations_aggregation =
   in
   (* Testing the baker automaton *)
   log_step 8 "Start a baker and wait until level 12" ;
-  let* _baker = Agnostic_baker.init ~delegates node client in
+  let* _baker = Agnostic_baker.init ~remote_mode ~delegates node client in
   let* _ = Node.wait_for_level node 12 in
   log_step 9 "Check consensus operations" ;
   let* () =
@@ -740,6 +732,26 @@ let simple_attestations_aggregation =
       client
   in
   unit
+
+(* Test that the baker aggregates eligible attestations.*)
+let simple_attestations_aggregation_local_context =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Simple attestations aggregation local context"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "local"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol -> simple_attestation_aggregation ~remote_mode:false protocol
+
+(* Test that the baker aggregates eligible attestations.*)
+let simple_attestations_aggregation_remote_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Simple attestations aggregation remote node"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "remote"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol -> simple_attestation_aggregation ~remote_mode:true protocol
 
 let prequorum_check_levels =
   Protocol.register_test
@@ -1145,6 +1157,7 @@ let register ~protocols =
   baker_remote_test protocols ;
   baker_check_consensus_branch protocols ;
   force_apply_from_round protocols ;
-  simple_attestations_aggregation protocols ;
+  simple_attestations_aggregation_local_context protocols ;
+  simple_attestations_aggregation_remote_node protocols ;
   prequorum_check_levels protocols ;
   attestations_aggregation_on_reproposal protocols
