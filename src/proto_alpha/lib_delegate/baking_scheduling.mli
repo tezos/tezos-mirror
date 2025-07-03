@@ -98,6 +98,15 @@ val first_potential_round_at_next_level :
   earliest_round:Round.t ->
   (Round.t * Baking_state_types.Delegate.t) option
 
+(** [first_potential_round_at_current_level] Returns the first round at current
+    level, at or after [earliest_round], whose baking slot belongs to one of our
+    own delegates; also returns the corresponding delegate. Or returns [None] if
+    no such round exists. *)
+val first_potential_round_at_current_level :
+  state ->
+  earliest_round:Round.t ->
+  (Round.t * Baking_state_types.Delegate.t) option
+
 (** [compute_next_potential_baking_time state] From the current [state], the
     function returns an optional association pair, which consists of the next
     baking timestamp and its baking round. In that case, an elected block must
