@@ -272,11 +272,8 @@ let test_keep_alive =
 let register ~protocols = test_keep_alive protocols
 
 let register_migration ~migrate_from ~migrate_to =
-  (* We want to migrate only from Active protocols *)
-  if Agnostic_baker.protocol_status migrate_from = Active then (
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
-    migrate ~migrate_from ~migrate_to ~use_remote_signer:true)
-  else ()
+  migrate ~migrate_from ~migrate_to ~use_remote_signer:false ;
+  migrate ~migrate_from ~migrate_to ~use_remote_signer:true
 
 let register_protocol_independent () =
   test_start_and_stop () ;

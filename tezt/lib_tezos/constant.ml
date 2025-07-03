@@ -89,19 +89,29 @@ let _teztale_snitch =
   Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
 
 (* TODO: Remove these once the binaries are completely removed from
-   [released-executables]. (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
+   [released-executables] or [experimental-executables].
+   (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
 
-let octez_baker_quebec =
-  Uses.make ~tag:"baker_psquebec" ~path:"./octez-baker-PsQuebec" ()
-
-let octez_baker_rio =
+let _octez_baker_rio =
   Uses.make ~tag:"baker_psriotum" ~path:"./octez-baker-PsRiotum" ()
 
-let octez_baker_seoul =
+let _octez_baker_seoul =
   Uses.make ~tag:"baker_ptseoulo" ~path:"./octez-baker-PtSeouLo" ()
 
-let octez_baker_alpha =
+let _octez_baker_alpha =
   Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
+
+let octez_agnostic_baker =
+  Uses.make ~tag:"agnostic_baker" ~path:"./octez-baker" ()
+
+let _octez_accuser_rio =
+  Uses.make ~tag:"accuser_psriotum" ~path:"./octez-accuser-PsRiotum" ()
+
+let _octez_accuser_seoul =
+  Uses.make ~tag:"accuser_ptseoulo" ~path:"./octez-accuser-PtSeouLo" ()
+
+let _octez_accuser_alpha =
+  Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
 
 let octez_accuser = Uses.make ~tag:"accuser" ~path:"./octez-accuser" ()
 
@@ -163,9 +173,6 @@ module WASM = struct
   let tx_kernel_dal =
     Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm" ()
 end
-
-let octez_agnostic_baker =
-  Uses.make ~tag:"agnostic_baker" ~path:"./octez-baker" ()
 
 let octez_p2p_node =
   Uses.make

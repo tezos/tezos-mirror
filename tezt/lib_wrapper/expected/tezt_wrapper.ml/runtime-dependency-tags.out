@@ -14,7 +14,6 @@ accuser_ptseoulo: octez-accuser-PtSeouLo
 accuser_alpha: octez-accuser-alpha
 admin_client: octez-admin-client
 agnostic_baker: octez-baker
-baker_psquebec: octez-baker-PsQuebec
 baker_psriotum: octez-baker-PsRiotum
 baker_ptseoulo: octez-baker-PtSeouLo
 baker_alpha: octez-baker-alpha

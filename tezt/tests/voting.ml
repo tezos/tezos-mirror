@@ -888,7 +888,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
         "from_" ^ Protocol.tag from_protocol;
         "to_" ^ Protocol.tag to_protocol;
       ]
-    ~uses:[Protocol.accuser to_protocol; Constant.octez_agnostic_baker]
+    ~uses:[Constant.octez_accuser; Constant.octez_agnostic_baker]
   @@ fun () ->
   let node_arguments = [Node.Synchronisation_threshold 0] in
   let to_protocol_hash = Protocol.hash to_protocol in
@@ -1223,7 +1223,7 @@ let test_user_activated_protocol_override_baker_vote ~from_protocol ~to_protocol
 
   (* We also start an accuser for the [to_protocol] protocol. After the
      protocol switch, we verify that it starts registering blocks. *)
-  let to_protocol_accuser = Accuser.create ~protocol:to_protocol node in
+  let to_protocol_accuser = Accuser.create node in
   let to_protocol_accuser_received_block =
     Accuser.wait_for
       to_protocol_accuser
