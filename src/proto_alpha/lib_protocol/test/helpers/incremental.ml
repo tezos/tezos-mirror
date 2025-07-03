@@ -43,6 +43,8 @@ let predecessor {predecessor; _} = predecessor
 
 let header {header; _} = header
 
+let rev_operations {rev_operations; _} = rev_operations
+
 let rev_tickets {rev_tickets; _} = rev_tickets
 
 let validation_state {state = vs, _; _} = vs
