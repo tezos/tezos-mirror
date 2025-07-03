@@ -9215,8 +9215,8 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
-let test_inject_accusation_aggregated_attestation protocol dal_parameters
-    _cryptobox node client dal_node =
+let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
+    dal_parameters _cryptobox node client dal_node =
   let slot_index = 0 in
   let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
   let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
@@ -9306,33 +9306,39 @@ let test_inject_accusation_aggregated_attestation protocol dal_parameters
       client
   in
   let dal_attestation = Array.init number_of_slots (fun i -> i = slot_index) in
-  let faulty_baker = List.hd new_tz4_accounts in
-  let first_slot = Operation.Consensus.first_slot ~slots faulty_baker in
-  let attestation =
-    Operation.Consensus.attestation
-      ~dal_attestation
-      ~slot:first_slot
-      ~level
-      ~round
-      ~block_payload_hash
-      ()
+  let faulty_bakers, other_tz4 =
+    Tezos_stdlib.TzList.split_n nb_attesting_tz4 new_tz4_accounts
   in
-  let* _op_hash =
-    Operation.Consensus.inject
-      ~protocol
-      ~branch
-      ~signer_companion:(List.hd companions)
-      ~signer:faulty_baker
-      attestation
-      client
+  let* () =
+    Lwt_list.iteri_s
+      (fun i faulty_baker ->
+        let first_slot = Operation.Consensus.first_slot ~slots faulty_baker in
+        let attestation =
+          Operation.Consensus.attestation
+            ~dal_attestation
+            ~slot:first_slot
+            ~level
+            ~round
+            ~block_payload_hash
+            ()
+        in
+        let* _op_hash =
+          Operation.Consensus.inject
+            ~protocol
+            ~branch
+            ~signer_companion:(List.nth companions i)
+            ~signer:faulty_baker
+            attestation
+            client
+        in
+        unit)
+      faulty_bakers
   in
   Log.info "Attestation injected" ;
   (* Since we manually injected the attestation for the faulty baker,
      we have to prevent [bake_for] to inject another one in the mempool.
   *)
-  let all_other_delegates =
-    List.tl new_tz4_accounts @ Constant.all_secret_keys
-  in
+  let all_other_delegates = other_tz4 @ Constant.all_secret_keys in
   let* () =
     bake_for
       ~delegates:
@@ -9355,10 +9361,10 @@ let test_inject_accusation_aggregated_attestation protocol dal_parameters
          ~validation_pass:2
          ()
   in
-  Check.(List.length (JSON.as_list anonymous_ops) = 1)
+  Check.(List.length (JSON.as_list anonymous_ops) = nb_attesting_tz4)
     ~__LOC__
     Check.int
-    ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
+    ~error_msg:"Expected exactly %R anonymous op. Got: %L" ;
   let contents = JSON.(anonymous_ops |=> 0 |-> "contents" |=> 0) in
   let kind = JSON.(contents |-> "kind" |> as_string) in
   let attestation_kind =
@@ -10972,7 +10978,13 @@ let register ~protocols =
     ~traps_fraction:Q.one
     ~operator_profiles:[0]
     "inject accusation of aggregated attestation"
-    test_inject_accusation_aggregated_attestation
+    (test_inject_accusation_aggregated_attestation 1)
+    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
+  scenario_with_layer1_and_dal_nodes
+    ~traps_fraction:Q.one
+    ~operator_profiles:[0]
+    "inject several accusations for the same aggregated attestation"
+    (test_inject_accusation_aggregated_attestation 2)
     (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
     ~traps_fraction:Q.one
