@@ -553,7 +553,21 @@ module Dal_reverse_proxy = struct
 
     (* Start the NginX service *)
     let* () =
-      Process.spawn ?runner "service" ["nginx"; "restart"] |> Process.check
+      (* If the service can be stopped (i.e. the command doesn't fail), we
+         probably are in a SysV system. Nginx will run as a service natively.
+         Otherwise, we need to start it manually. *)
+      let* service_cmd =
+        Process.spawn ?runner "service" ["nginx"; "stop"] |> Process.wait
+      in
+      match Process.validate_status service_cmd with
+      | Ok () ->
+          Process.spawn ?runner "service" ["nginx"; "start"] |> Process.check
+      | Error _ ->
+          (* Runs the process as a daemon, and don't bind the process, otherwise
+             Tezt will wait for it to finish.
+          *)
+          let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
+          unit
     in
     (* In order to pass the reverse proxy to the various Tezt helpers we
        need to pretend to be a DAL node. The simplest way to do so is to
@@ -564,7 +578,7 @@ module Dal_reverse_proxy = struct
     let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
     let* dal_node =
       Dal_node.Agent.create_from_endpoint
-        ~name:"bootstrap-dal-node"
+        ~name:"reverse-proxy-dal-node"
         ~rpc_port:port
         cloud
         agent
