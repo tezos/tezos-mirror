@@ -36,7 +36,7 @@ type agent_kind =
   | Etherlink_dal_observer of {slot_index : int}
   | Etherlink_producer of int
   | Echo_rollup_operator
-  | Echo_rollup_dal_observer
+  | Echo_rollup_dal_observer of {slot_index : int}
 
 let name_of = function
   | Bootstrap -> "bootstrap"
@@ -53,7 +53,8 @@ let name_of = function
       Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
   | Echo_rollup_operator -> "echo-rollup-operator"
-  | Echo_rollup_dal_observer -> "echo-rollup-dal-node"
+  | Echo_rollup_dal_observer {slot_index} ->
+      Format.sprintf "echo-rollup-dal-node-%d" slot_index
 
 type snapshot_config =
   | Docker_embedded of string
@@ -3450,7 +3451,7 @@ let init_dal_reverse_proxy_observers
       _;
     } ~name_of ~default_endpoint ~bootstrap ~dal_slots ~next_agent ~otel ~cloud
     =
-  if dal_slots = [] then failwith "" ;
+  if dal_slots = [] then failwith "Expected at least a DAL slot." ;
   let* dal_slots_and_nodes =
     dal_slots
     |> Lwt_list.map_p (fun slot_index ->
@@ -4047,24 +4048,43 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
 
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
-    let name = name_of Echo_rollup_dal_observer in
-    let* agent = next_agent ~name in
-    let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
-    let* () =
-      Dal_node.init_config
-        ~expected_pow:(Network.expected_pow configuration.network)
-        ~observer_profiles:dal_slots
-        ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-        dal_node
-    in
-    let* () =
-      Dal_node.Agent.run
-        ?otel
-        ~ppx_profiling:configuration.ppx_profiling
-        ~ppx_profiling_backends:configuration.ppx_profiling_backends
-        dal_node
-    in
-    some dal_node
+    match dal_slots with
+    | [] ->
+        toplog "Echo rollup doesn't follow any slot" ;
+        none
+    | [slot_index] ->
+        let name = name_of (Echo_rollup_dal_observer {slot_index}) in
+        let* agent = next_agent ~name in
+        let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+        let* () =
+          Dal_node.init_config
+            ~expected_pow:(Network.expected_pow configuration.network)
+            ~observer_profiles:dal_slots
+            ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
+            dal_node
+        in
+        let* () =
+          Dal_node.Agent.run
+            ?otel
+            ~ppx_profiling:configuration.ppx_profiling
+            ~ppx_profiling_backends:configuration.ppx_profiling_backends
+            dal_node
+        in
+        some dal_node
+    | _ ->
+        let* dal_reverse_proxy_with_observers =
+          init_dal_reverse_proxy_observers
+            configuration
+            ~name_of:(fun slot_index ->
+              name_of (Echo_rollup_dal_observer {slot_index}))
+            ~default_endpoint:None
+            ~bootstrap
+            ~dal_slots
+            ~next_agent
+            ~otel
+            ~cloud
+        in
+        some dal_reverse_proxy_with_observers
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
@@ -4953,7 +4973,10 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Some {etherlink_producers; _} ->
                List.init etherlink_producers (fun i -> Etherlink_producer i));
            (if configuration.echo_rollup then
-              [Echo_rollup_operator; Echo_rollup_dal_observer]
+              Echo_rollup_operator :: Reverse_proxy
+              :: List.map
+                   (fun slot_index -> Echo_rollup_dal_observer {slot_index})
+                   configuration.dal_node_producers
             else []);
          ]
   in
@@ -4989,7 +5012,7 @@ let register (module Cli : Scenarios_cli.Dal) =
                let machine_type = configuration.producer_machine_type in
                Agent.Configuration.make ?docker_image ?machine_type ~name ()
            | Observer _ | Etherlink_dal_operator | Etherlink_dal_observer _
-           | Echo_rollup_dal_observer ->
+           | Echo_rollup_dal_observer _ ->
                Agent.Configuration.make ?docker_image ~name ()
            | Echo_rollup_operator -> default_vm_configuration ~name
            | Etherlink_operator -> default_vm_configuration ~name
