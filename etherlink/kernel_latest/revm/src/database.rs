@@ -9,7 +9,9 @@ use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
     code_storage::CodeStorage,
     send_outbox_message::Withdrawal,
-    world_state_handler::{account_path, StorageAccount, WorldStateHandler},
+    world_state_handler::{
+        account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
+    },
     Error,
 };
 
@@ -18,6 +20,7 @@ use revm::{
     state::{Account, AccountInfo, AccountStatus, Bytecode, EvmStorageSlot},
     Database, DatabaseCommit,
 };
+use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, Level::Error as LogError};
 use tezos_evm_runtime::runtime::Runtime;
@@ -60,6 +63,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
 
 pub trait PrecompileDatabase: Database {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
+    fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn push_withdrawal(&mut self, withdrawal: Withdrawal);
     fn take_withdrawals(&mut self) -> Vec<Withdrawal>;
 }
@@ -99,6 +103,13 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         self.world_state_handler
             .get_or_create(self.host, &account_path(&address)?)
             .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    // This is only used by native withdrawals for backwards compatibility
+    fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
+        let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
+        let kt1_b58 = String::from_utf8(ticketer.to_vec()).unwrap();
+        Ok(ContractKt1Hash::from_b58check(&kt1_b58).unwrap())
     }
 
     fn push_withdrawal(&mut self, withdrawal: Withdrawal) {

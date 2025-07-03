@@ -10,11 +10,11 @@ contract XTZWithdrawal {
     event StandardWithdrawalEvent(
         uint256 amount,
         address indexed sender,
-        bytes22 receiver,
+        // bytes22 receiver,
         uint256 withdrawalId
     );
 
-    function withdraw_base58(bytes22 ticketer, bytes22 target) external payable {
+    function withdraw_base58(string memory target) external payable {
         // Outbox precompile is known
         address outboxSender = 0xFF00000000000000000000000000000000000003;
 
@@ -32,8 +32,7 @@ contract XTZWithdrawal {
 
         // Call push_withdrawal_to_outbox
         bytes memory payload = abi.encodeWithSignature(
-            "push_withdrawal_to_outbox(bytes22,bytes22,uint256)",
-            ticketer,
+            "push_withdrawal_to_outbox(string,uint256)",
             target,
             mutezAmount
         );
@@ -48,7 +47,8 @@ contract XTZWithdrawal {
         emit StandardWithdrawalEvent(
             weiAmount,
             msg.sender,
-            target,
+            // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
+            // target,
             withdrawalCounter
         );
 
