@@ -1048,6 +1048,27 @@ val dal_publish :
   tzresult
   Lwt.t
 
+val get_pending_staking_parameters :
+  #Protocol_client_context.full ->
+  ?chain:Chain_services.chain ->
+  ?block:Block_services.block ->
+  public_key_hash ->
+  (Cycle.t * Staking_parameters_repr.t) list tzresult Lwt.t
+
+val get_active_staking_parameters :
+  #Protocol_client_context.full ->
+  ?chain:Chain_services.chain ->
+  ?block:Block_services.block ->
+  public_key_hash ->
+  Staking_parameters_repr.t tzresult Lwt.t
+
+val get_latest_staking_parameters :
+  #Protocol_client_context.full ->
+  ?chain:Chain_services.chain ->
+  ?block:Block_services.block ->
+  public_key_hash ->
+  Staking_parameters_repr.t tzresult Lwt.t
+
 val is_delegate :
   #Protocol_client_context.full ->
   ?chain:Chain_services.chain ->
