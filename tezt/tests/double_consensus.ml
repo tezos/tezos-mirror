@@ -834,6 +834,187 @@ let accusers_migration_test ~migrate_from ~migrate_to =
   let* () = Accuser.terminate accuser in
   unit
 
+let fetch_round ?block client =
+  Client.RPC.call client @@ RPC.get_chain_block_helper_round ?block ()
+
+let fetch_consensus_operations ?block client =
+  let* json =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_operations_validation_pass
+         ?block
+         ~validation_pass:0
+         ()
+  in
+  return JSON.(as_list json)
+
+let fetch_block_payload_hash client =
+  let* json = Client.RPC.call client @@ RPC.get_chain_block_header () in
+  return @@ JSON.(json |-> "payload_hash" |> as_string)
+
+let double_preattestation_aggregation_wrong_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"double preattestation aggregation wrong payload hash"
+    ~tags:[Tag.layer1; "double"; "preattestation"; "aggregation"]
+    ~supports:Protocol.(From_protocol 024)
+    ~uses:(fun _protocol -> [Constant.octez_accuser])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (* Diminish some constants to activate consensus keys faster. *)
+        (["blocks_per_cycle"], `Int 3);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node1, client1 =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  let* node2, client2 =
+    Client.init_with_node
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      `Client
+      ()
+  in
+  let* node1_id = Node.wait_for_identity node1 in
+  let* node2_id = Node.wait_for_identity node2 in
+  (* Connect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  let* _ = Node.wait_for_level node2 1 in
+  (* Run an accuser on node1 *)
+  let* _accuser = Accuser.init node1 in
+  (* Set BLS consensus key for some bootstrap accounts *)
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client1 in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client1 in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client1 in
+  (* Import the consensus keys in client2 aswell *)
+  let* () = Client.import_secret_key ~alias:"ck1" client2 ck1.secret_key in
+  let* () = Client.import_secret_key ~alias:"ck2" client2 ck2.secret_key in
+  let* () = Client.import_secret_key ~alias:"ck3" client2 ck3.secret_key in
+  let keys =
+    [
+      ck1.public_key_hash;
+      ck2.public_key_hash;
+      ck3.public_key_hash;
+      bootstrap1.public_key_hash;
+      bootstrap2.public_key_hash;
+      bootstrap3.public_key_hash;
+      bootstrap4.public_key_hash;
+      bootstrap5.public_key_hash;
+    ]
+  in
+  let double_preattesting_keys = public_key_hashes [ck1; ck2; bootstrap4] in
+  (* Bake until consensus keys become active *)
+  let* level = Client.bake_for_and_wait_level ~keys ~count:5 client1 in
+  let* _ = Node.wait_for_level node2 level in
+  (* Disconnect nodes *)
+  let* () = Client.Admin.kick_peer ~peer:node2_id client1 in
+  let* () = Client.Admin.kick_peer ~peer:node1_id client2 in
+  (* On node1's branch, bake 2 blocks and a reproposal *)
+  let* () =
+    Client.bake_for_and_wait ~count:2 ~keys:[bootstrap5.public_key_hash] client1
+  in
+  let* double_preattested_round = fetch_round client1 in
+  let* () =
+    Client.repropose_for_and_wait
+      ~key:double_preattesting_keys
+      ~minimal_timestamp:true
+      ~force_reproposal:true
+      client1
+  in
+  let* round = fetch_round client1 in
+  (* On node2's branch, inject a transfer and bake 3 blocks *)
+  let* _ = Operation.Manager.inject_single_transfer client2 in
+  let* () =
+    Client.bake_for_and_wait ~count:2 ~keys:[bootstrap5.public_key_hash] client2
+  in
+  let* () =
+    Client.repropose_for_and_wait
+      ~key:double_preattesting_keys
+      ~force_round:round
+      ~force_reproposal:true
+      client2
+  in
+  let* level =
+    Client.bake_for_and_wait_level
+      ~count:2
+      ~keys:[bootstrap5.public_key_hash]
+      client2
+  in
+  (* Reconnect nodes together *)
+  let* () = Client.Admin.connect_address ~peer:node1 client2 in
+  let* () = Client.Admin.connect_address ~peer:node2 client1 in
+  (* node1 is expected to switch to node2's branch *)
+  let* _ = Node.wait_for_level node1 level in
+  (* Bake a block: it is expected to contain denunciations *)
+  let* level =
+    Client.bake_for_and_wait_level ~minimal_timestamp:true ~keys client1
+  in
+  (* Fetch anonymous operations from the current head
+     and check for the expected denunciations *)
+  let* anonymous_operations = fetch_anonymous_operations client1 in
+  let () =
+    check_contains_consensus_denunciations
+      ~loc:__LOC__
+      ~level:(level - 3)
+      ~round:double_preattested_round
+      ~anonymous_operations
+      [
+        (bootstrap1, (Preattestations_aggregate, Preattestations_aggregate));
+        (bootstrap2, (Preattestations_aggregate, Preattestations_aggregate));
+        (bootstrap4, (Preattestation, Preattestation));
+      ]
+  in
+  let open Operation.Consensus in
+  let* branch = get_branch ~attested_level:level client1 in
+  let* block_payload_hash = get_block_payload_hash client1 in
+  let* slots = get_slots_by_consensus_key ~level client1 in
+  (* Attest with the double preattesting keys and check that they are forbidden *)
+  let* () =
+    Lwt_list.iter_s
+      (fun ck ->
+        let slot = first_slot ~slots ck in
+        let* (`OpHash _) =
+          attest_for
+            ~error:delegate_forbidden_error
+            ~protocol
+            ~branch
+            ~slot
+            ~level
+            ~round:0
+            ~block_payload_hash
+            ck
+            client1
+        in
+        unit)
+      [ck1; ck2; bootstrap4]
+  in
+  (* Attest with a non-misbehaving key and expect a success *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck3 in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck3
+      client1
+  in
+  unit
+
 let register_migration ~migrate_from ~migrate_to =
   accusers_migration_test ~migrate_from ~migrate_to
 
@@ -845,4 +1026,5 @@ let register ~protocols =
   operation_too_old protocols ;
   operation_too_far_in_future protocols ;
   attestation_and_aggregation_wrong_payload_hash protocols ;
-  double_aggregation_wrong_payload_hash protocols
+  double_aggregation_wrong_payload_hash protocols ;
+  double_preattestation_aggregation_wrong_payload_hash protocols
