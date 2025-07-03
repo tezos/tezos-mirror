@@ -299,24 +299,19 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
               let consensus_key_pkh =
                 consensus_key_info.active.consensus_key_pkh
               in
+              let* () =
+                if Signature.Public_key_hash.is_bls consensus_key_pkh then
+                  return_unit
+                else failwith "Cannot aggregate with non-BLS key"
+              in
               (* Update the activity of the committee *)
               let state = update_activity delegate_name block state in
               return
                 ( state,
-                  consensus_key_pkh :: committee,
+                  (consensus_key_pkh, None) :: committee,
                   (delegate.pkh, consensus_key_pkh) :: delegate_and_ck ))
             (state, [], [])
             delegates
-        in
-        let* () =
-          if
-            not
-            @@ List.for_all
-                 (function
-                   | (Bls _ : Signature.public_key_hash) -> true | _ -> false)
-                 committee
-          then failwith "Cannot aggregate non-BLS attestation"
-          else return_unit
         in
         (* Fails to produce an attestation if one of the delegates has no slot for the block *)
         let* op = Op.attestations_aggregate ~committee block in

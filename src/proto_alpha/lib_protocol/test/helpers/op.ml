@@ -250,17 +250,18 @@ let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
         let* attesters = Context.get_attesters (B attested_block) in
         return
         @@ List.filter_map
-             (fun attester ->
-               match attester.Plugin.RPC.Validators.consensus_key with
-               | Bls _ -> Some attester.delegate
-               | _ -> None)
+             (fun {Plugin.RPC.Validators.consensus_key; _} ->
+               if Signature.Public_key_hash.is_bls consensus_key then
+                 Some (consensus_key, None)
+               else None)
              attesters
   in
   let* attestations =
     List.map_es
-      (fun delegate ->
+      (fun (delegate, dal_content) ->
         raw_attestation
           ~delegate
+          ?dal_content
           ?level
           ?round
           ?block_payload_hash

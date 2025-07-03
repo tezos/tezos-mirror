@@ -389,7 +389,7 @@ let test_attestations_aggregate_invalid_signature () =
   in
   (* Craft an aggregate with a single attestation signed by this delegate *)
   let* aggregate =
-    Op.attestations_aggregate ~committee:[attester.consensus_key] block
+    Op.attestations_aggregate ~committee:[(attester.consensus_key, None)] block
   in
   (* Swap the signature for Signature.Bls.zero *)
   match aggregate.protocol_data with
@@ -554,7 +554,9 @@ let test_multiple_aggregates_per_block_forbidden () =
   let* aggregates =
     List.map_es
       (fun (_, (delegate : RPC.Validators.t)) ->
-        Op.attestations_aggregate ~committee:[delegate.consensus_key] block)
+        Op.attestations_aggregate
+          ~committee:[(delegate.consensus_key, None)]
+          block)
       bls_delegates_with_slots
   in
   (* Bake a block containing the multiple aggregates and expect an error *)
@@ -711,7 +713,8 @@ let test_metadata_committee_is_correctly_ordered () =
     let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
     let committee =
       List.map
-        (fun (_slot, (delegate : RPC.Validators.t)) -> delegate.consensus_key)
+        (fun (_slot, (delegate : RPC.Validators.t)) ->
+          (delegate.consensus_key, None))
         bls_delegates_with_slots
     in
     assert (List.length committee > 2) ;

@@ -110,7 +110,7 @@ val attestation :
     [Block.t]. Block context is expected to include at least one delegate with a
     BLS key (or a registered consensus keys). *)
 val attestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:(public_key_hash * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
