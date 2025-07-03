@@ -93,6 +93,8 @@ module type Dal = sig
   val ppx_profiling : bool
 
   val ppx_profiling_backends : string list
+
+  val enable_network_health_monitoring : bool
 end
 
 module Dal () : Dal = struct
@@ -492,6 +494,16 @@ module Dal () : Dal = struct
          selection: always `txt` and `json`, and also `prometheus` if \
          `--prometheus` and `opentelemetry` if `--opentelemetry`."
       ()
+
+  let enable_network_health_monitoring =
+    Clap.flag
+      ~section
+      ~set_long:"net-health"
+      ~set_long_synonyms:["enable-network-health-monitoring"]
+      ~description:
+        "If specified, the network health monitoring app.\n\
+         Recommendation: enable only for public dal bootstrap node deployments"
+      false
 end
 
 module type Layer1 = sig

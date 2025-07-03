@@ -568,6 +568,7 @@ type configuration = {
   ignore_pkhs : string list;
   ppx_profiling : bool;
   ppx_profiling_backends : string list;
+  network_health_monitoring : bool;
 }
 
 type bootstrap = {
@@ -2378,17 +2379,19 @@ let get_infos_per_level t ~level ~metadata =
   (* None of these actions are performed if `--dal-slack-webhook` is
      not provided. *)
   let* () =
-    let open Monitoring_app.Alert in
-    let* () =
-      check_for_dal_accusations
-        t
-        ~cycle
-        ~level
-        ~operations
-        ~endpoint:t.some_node_rpc_endpoint
-    in
-    let* () = check_for_recently_missed_a_lot t ~level ~metadata in
-    unit
+    if t.configuration.network_health_monitoring then
+      let open Monitoring_app.Alert in
+      let* () =
+        check_for_dal_accusations
+          t
+          ~cycle
+          ~level
+          ~operations
+          ~endpoint:t.some_node_rpc_endpoint
+      in
+      let* () = check_for_recently_missed_a_lot t ~level ~metadata in
+      unit
+    else Lwt.return_unit
   in
   Lwt.return
     {
@@ -3945,7 +3948,9 @@ let on_new_cycle t ~level =
     @@ RPC.get_chain_block_metadata_raw ~block:last_block_of_prev_cycle ()
   in
   (* This action is performed only if `--dal-slack-webhook` is provided. *)
-  Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
+  if t.configuration.network_health_monitoring then
+    Monitoring_app.Alert.check_for_lost_dal_rewards t ~metadata
+  else Lwt.return_unit
 
 let on_new_block t ~level =
   let* () = wait_for_level t level in
@@ -4226,6 +4231,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let disable_shard_validation = Cli.disable_shard_validation in
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
+    let network_health_monitoring = Cli.enable_network_health_monitoring in
     let t =
       {
         with_dal;
@@ -4255,6 +4261,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         ignore_pkhs;
         ppx_profiling;
         ppx_profiling_backends;
+        network_health_monitoring;
       }
     in
     (t, etherlink)
@@ -4387,7 +4394,8 @@ let register (module Cli : Scenarios_cli.Dal) =
         in
         Lwt.return agent
       in
-      Monitoring_app.Tasks.register_chronos_task cloud ~configuration endpoint ;
+      if configuration.network_health_monitoring then
+        Monitoring_app.Tasks.register_chronos_task cloud ~configuration endpoint ;
       let* t = init ~configuration etherlink_configuration cloud next_agent in
       Lwt.wakeup resolver_endpoint t.some_node_rpc_endpoint ;
       toplog "Starting main loop" ;
