@@ -979,16 +979,17 @@ let bake_until_level ~target_level ?keys ?node client =
   unit
 
 (* Handle attesting and preattesting similarly *)
-type tenderbake_action = Preattest | Attest | Propose
+type tenderbake_action = Preattest | Attest | Propose | Repropose
 
 let tenderbake_action_to_string = function
   | Preattest -> "preattest"
   | Attest -> "attest"
   | Propose -> "propose"
+  | Repropose -> "repropose"
 
 let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false)
-    ?(force = false) client =
+    ?(force = false) ?force_round ?(force_reproposal = false) client =
   spawn_command
     ?endpoint
     client
@@ -996,7 +997,11 @@ let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     @ [tenderbake_action_to_string tenderbake_action; "for"]
     @ key
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
-    @ if force then ["--force"] else [])
+    @ (if force_reproposal then ["--force-reproposal"] else [])
+    @
+    match force_round with
+    | Some r -> ["--force-round"; string_of_int r]
+    | None -> [] @ if force then ["--force"] else [])
 
 let spawn_attest_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for
@@ -1029,6 +1034,19 @@ let spawn_propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
     ?force
     client
 
+let spawn_repropose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  spawn_tenderbake_action_for
+    ~tenderbake_action:Repropose
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    ?force_round
+    ?minimal_timestamp
+    ?force_reproposal
+    client
+
 let attest_for ?endpoint ?protocol ?key ?force client =
   spawn_attest_for ?endpoint ?protocol ?key ?force client |> Process.check
 
@@ -1038,6 +1056,19 @@ let preattest_for ?endpoint ?protocol ?key ?force client =
 let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
     client =
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
+  |> Process.check
+
+let repropose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  spawn_repropose_for
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    ~minimal_timestamp
+    ?force_round
+    ?force_reproposal
+    client
   |> Process.check
 
 let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
@@ -1052,6 +1083,28 @@ let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
     propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
   in
   let* _level = Node.wait_for_level node (actual_level_before + 1) in
+  unit
+
+let repropose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  let node =
+    match node_of_client_mode client.mode with
+    | Some n -> n
+    | None -> Test.fail "No node found for repropose_for_and_wait"
+  in
+  let waiter = Node.wait_for_branch_switch node in
+  let* () =
+    repropose_for
+      ?endpoint
+      ?minimal_timestamp
+      ?protocol
+      ?key
+      ?force
+      ?force_round
+      ?force_reproposal
+      client
+  in
+  let* _ = waiter in
   unit
 
 let id = ref 0

@@ -78,6 +78,10 @@ val successor_level_arg : (bool, full) Tezos_clic.arg
 
 val force_switch : (bool, full) Tezos_clic.arg
 
+val force_reproposal : (bool, full) Tezos_clic.arg
+
+val force_round_arg : (int option, full) Tezos_clic.arg
+
 val minimal_timestamp_switch : (bool, full) Tezos_clic.arg
 
 val preserved_levels_arg : (int, full) Tezos_clic.arg
