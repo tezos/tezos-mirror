@@ -43,7 +43,8 @@
   test_seed
   test_aggregate
   test_dal_entrapment
-  test_companion_key))
+  test_companion_key
+  test_scenario_attestation))
 
 (executable
  (name main)

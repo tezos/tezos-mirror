@@ -6174,6 +6174,7 @@ end = struct
           ("test_aggregate", N.(number >= 022));
           ("test_dal_entrapment", N.(number >= 022));
           ("test_companion_key", N.(number >= 023));
+          ("test_scenario_attestation", N.(number >= 024));
         ]
         |> conditional_list
       in
