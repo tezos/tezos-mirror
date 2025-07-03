@@ -162,7 +162,7 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
           Signature.Public_key_hash.pp)
       (List.map fst committee_expect)
 
-let attest_with (delegate_name : string) : (t, t) scenarios =
+let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
   exec (fun (block, state) ->
       let open Lwt_result_wrap_syntax in
       let kind = Attestation in
@@ -176,8 +176,18 @@ let attest_with (delegate_name : string) : (t, t) scenarios =
         in
         let consensus_key = consensus_key_info.active in
         let* consensus_key = Account.find consensus_key.consensus_key_pkh in
+        let*?@ dal_content =
+          Option.map_e
+            Alpha_context.Dal.Attestation.Internal_for_tests.of_z
+            dal_content
+        in
+        let dal_content =
+          Option.map (fun i -> Alpha_context.{attestation = i}) dal_content
+        in
         (* Fails to produce an attestation if the delegate has no slot for the block *)
-        let* op = Op.attestation ~delegate:consensus_key.pkh block in
+        let* op =
+          Op.attestation ?dal_content ~delegate:consensus_key.pkh block
+        in
         (* Update the activity of the delegate *)
         let state = update_activity delegate_name block state in
         let state = State.add_pending_operations [op] state in
