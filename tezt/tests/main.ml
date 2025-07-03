@@ -69,6 +69,7 @@ let register_protocol_independent_tests () =
 let register_protocol_migration_tests () =
   let migrate_from = Option.get @@ Protocol.previous_protocol migrate_to in
   Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
+  Double_consensus.register_migration ~migrate_from ~migrate_to ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Protocol_migration.register ~migrate_from ~migrate_to ;
   Weeklynet.register () ;
@@ -101,6 +102,7 @@ let register_old_protocol_migration_tests () =
       | None, _ -> ()
       | Some migrate_from, migrate_to ->
           Agnostic_baker_test.register_migration ~migrate_from ~migrate_to ;
+          Double_consensus.register_migration ~migrate_from ~migrate_to ;
           Sc_rollup_migration.register ~migrate_from ~migrate_to ;
           Dal.register_migration ~migrate_from ~migrate_to)
     Protocol.all

@@ -493,42 +493,38 @@ let cleanup_old_operations state =
    - Check that every baker (pre)attested only once at the block's level and round
 *)
 let process_new_block (cctxt : #Protocol_client_context.full) state
-    {hash; chain_id; level; protocol; next_protocol; _} =
+    {hash; chain_id; level; _} =
   let open Lwt_result_syntax in
-  if Protocol_hash.(protocol <> next_protocol) then
-    let*! () = Events.(emit protocol_change_detected) () in
-    return_unit
-  else
-    let*! () = Events.(emit accuser_saw_block) (level, hash) in
-    let chain = `Hash chain_id in
-    let block = `Hash (hash, 0) in
-    state.highest_level_encountered <-
-      Raw_level.max level state.highest_level_encountered ;
-    (* Processing blocks *)
-    let* () =
-      let*! block_info = Alpha_block_services.info cctxt ~chain ~block () in
-      match block_info with
-      | Ok block_info -> (
-          let* () = process_block cctxt state block_info in
-          (* Processing (pre)attestations in the block *)
-          match block_info.operations with
-          | consensus_ops :: _ ->
-              let packed_op {Alpha_block_services.shell; protocol_data; _} =
-                {shell; protocol_data}
-              in
-              process_operations cctxt state consensus_ops ~packed_op chain_id
-          | _ ->
-              (* Should not happen as a block should contain 4 lists of
-                 operations, the first list being dedicated to consensus
-                 operations. *)
-              let*! () = Events.(emit fetch_operations_error hash) in
-              return_unit)
-      | Error errs ->
-          let*! () = Events.(emit accuser_block_error) (hash, errs) in
-          return_unit
-    in
-    cleanup_old_operations state ;
-    return_unit
+  let*! () = Events.(emit accuser_saw_block) (level, hash) in
+  let chain = `Hash chain_id in
+  let block = `Hash (hash, 0) in
+  state.highest_level_encountered <-
+    Raw_level.max level state.highest_level_encountered ;
+  (* Processing blocks *)
+  let* () =
+    let*! block_info = Alpha_block_services.info cctxt ~chain ~block () in
+    match block_info with
+    | Ok block_info -> (
+        let* () = process_block cctxt state block_info in
+        (* Processing (pre)attestations in the block *)
+        match block_info.operations with
+        | consensus_ops :: _ ->
+            let packed_op {Alpha_block_services.shell; protocol_data; _} =
+              {shell; protocol_data}
+            in
+            process_operations cctxt state consensus_ops ~packed_op chain_id
+        | _ ->
+            (* Should not happen as a block should contain 4 lists of
+               operations, the first list being dedicated to consensus
+               operations. *)
+            let*! () = Events.(emit fetch_operations_error hash) in
+            return_unit)
+    | Error errs ->
+        let*! () = Events.(emit accuser_block_error) (hash, errs) in
+        return_unit
+  in
+  cleanup_old_operations state ;
+  return_unit
 
 let process_new_block cctxt state bi =
   let open Lwt_syntax in
@@ -621,8 +617,13 @@ let create (cctxt : #Protocol_client_context.full) ?canceler ~preserved_levels
         tzfail Baking_errors.Node_connection_lost
     | `Block (Some (Ok bi)) ->
         last_get_block := None ;
-        let*! () = process_new_block cctxt state bi in
-        worker_loop ()
+        (* When protocol changes, we stop current accuser process. *)
+        if Protocol_hash.(bi.next_protocol <> Protocol.hash) then
+          let*! () = B_Events.(emit daemon_stop) name in
+          return_unit
+        else
+          let*! () = process_new_block cctxt state bi in
+          worker_loop ()
     | `Operations None ->
         (* restart a new operations monitor stream *)
         last_get_ops := None ;

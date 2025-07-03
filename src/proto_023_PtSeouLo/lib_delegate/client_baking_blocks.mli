@@ -49,7 +49,6 @@ val monitor_applied_blocks :
   #Protocol_client_context.rpc_context ->
   ?chains:Chain_services.chain list ->
   ?protocols:Protocol_hash.t list ->
-  next_protocols:Protocol_hash.t list option ->
   unit ->
   (block_info tzresult Lwt_stream.t * Tezos_rpc.Context.stopper) tzresult Lwt.t
 

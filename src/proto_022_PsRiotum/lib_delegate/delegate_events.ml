@@ -253,4 +253,12 @@ module Baking_scheduling = struct
       ~name:"daemon_start"
       ~msg:"starting {worker} daemon"
       ("worker", Data_encoding.string)
+
+  let daemon_stop =
+    declare_1
+      ~section
+      ~level:Notice
+      ~name:"daemon_stop"
+      ~msg:"stopping {worker} daemon"
+      ("worker", Data_encoding.string)
 end

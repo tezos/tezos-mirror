@@ -81,7 +81,7 @@ let get_double_consensus_denounciation_hash protocol consensus_name client =
   | None -> failwith "Denunciation not found in the mempool"
   | Some op -> return op
 
-let double_attestation_init
+let double_consensus_init
     (consensus_for :
       ?endpoint:Client.endpoint ->
       ?protocol:Protocol.t ->
@@ -143,7 +143,7 @@ let preattest_utils =
 let double_consensus_wrong_block_payload_hash
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
   let* (client, accuser), (branch, level, round, slots, _block_payload_hash) =
-    double_attestation_init consensus_for consensus_name protocol ()
+    double_consensus_init consensus_for consensus_name protocol ()
   in
   let* header =
     Client.RPC.call client @@ RPC.get_chain_block_header ~block:"head~2" ()
@@ -197,14 +197,7 @@ let double_attestation_wrong_block_payload_hash =
     ~__FILE__
     ~title:"double attestation using wrong block_payload_hash"
     ~tags:
-      [
-        Tag.layer1;
-        "double";
-        "attestation";
-        "accuser";
-        "block_payload_hash";
-        "node";
-      ]
+      [team; "double"; "attestation"; "accuser"; "block_payload_hash"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   double_consensus_wrong_block_payload_hash attest_utils protocol
@@ -215,12 +208,7 @@ let double_preattestation_wrong_block_payload_hash =
     ~title:"double preattestation using wrong block_payload_hash"
     ~tags:
       [
-        Tag.layer1;
-        "double";
-        "preattestation";
-        "accuser";
-        "block_payload_hash";
-        "node";
+        team; "double"; "preattestation"; "accuser"; "block_payload_hash"; "node";
       ]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
@@ -229,7 +217,7 @@ let double_preattestation_wrong_block_payload_hash =
 let double_consensus_wrong_branch
     (consensus_for, mk_consensus, consensus_waiter, consensus_name) protocol =
   let* (client, accuser), (_branch, level, round, slots, block_payload_hash) =
-    double_attestation_init consensus_for consensus_name protocol ()
+    double_consensus_init consensus_for consensus_name protocol ()
   in
   let* branch = Operation.Manager.get_branch ~offset:4 client in
   Log.info "Inject an invalid %s and wait for denounciation" consensus_name ;
@@ -276,7 +264,7 @@ let double_attestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double attestation using wrong branch"
-    ~tags:[Tag.layer1; "double"; "attestation"; "accuser"; "branch"; "node"]
+    ~tags:[team; "double"; "attestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch attest_utils protocol
 
@@ -284,7 +272,7 @@ let double_preattestation_wrong_branch =
   Protocol.register_test
     ~__FILE__
     ~title:"double preattestation using wrong branch"
-    ~tags:[Tag.layer1; "double"; "preattestation"; "accuser"; "branch"; "node"]
+    ~tags:[team; "double"; "preattestation"; "accuser"; "branch"; "node"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol -> double_consensus_wrong_branch preattest_utils protocol
 
@@ -295,7 +283,7 @@ let operation_too_old =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too old"
-    ~tags:[Tag.layer1; "accuser"; "old"; "operation"]
+    ~tags:[team; "accuser"; "old"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -358,7 +346,7 @@ let operation_too_far_in_future =
   Protocol.register_test
     ~__FILE__
     ~title:"operation too far in the future"
-    ~tags:[Tag.layer1; "accuser"; "future"; "operation"]
+    ~tags:[team; "accuser"; "future"; "operation"]
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
   let* node, client = Client.init_with_protocol ~protocol `Client () in
@@ -533,7 +521,7 @@ let attestation_and_aggregation_wrong_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"attestation and aggregation wrong payload hash"
-    ~tags:[Tag.layer1; "attestation"; "aggregation"]
+    ~tags:[team; "attestation"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
@@ -642,7 +630,7 @@ let double_aggregation_wrong_payload_hash =
   Protocol.register_test
     ~__FILE__
     ~title:"double aggregation wrong payload hash"
-    ~tags:[Tag.layer1; "double"; "aggregation"]
+    ~tags:[team; "double"; "aggregation"]
     ~supports:Protocol.(From_protocol 023)
     ~uses:(fun protocol -> [Protocol.accuser protocol])
   @@ fun protocol ->
@@ -786,6 +774,76 @@ let double_aggregation_wrong_payload_hash =
       [ck3; bootstrap5]
   in
   unit
+
+let accuser_processed_block accuser =
+  Accuser.wait_for accuser "accuser_processed_block.v0" (fun _json -> Some ())
+
+let daemon_stop accuser =
+  Accuser.wait_for accuser "daemon_stop.v0" (fun _json -> Some ())
+
+let accusers_migration_test ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  (* Migration level is set arbitrarily *)
+  let migration_level = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  Test.register
+    ~__FILE__
+    ~title:
+      (Format.asprintf
+         "accuser works correctly under migration from %s to %s"
+         (Protocol.tag migrate_from)
+         (Protocol.tag migrate_to))
+    ~tags:
+      [team; "migration"; Protocol.tag migrate_from; Protocol.tag migrate_to]
+    ~uses:[Protocol.accuser migrate_from; Protocol.accuser migrate_to]
+  @@ fun () ->
+  let* client, node =
+    Protocol_migration.user_migratable_node_init ~migration_level ~migrate_to ()
+  in
+  let* () = Client.activate_protocol ~protocol:migrate_from client in
+
+  Log.info "Initialise accusers for the two protocols" ;
+  let* accuser1 =
+    Accuser.init ~protocol:migrate_from ~event_level:`Debug node
+  in
+  let accuser1_processed_block = accuser_processed_block accuser1 in
+  let accuser1_stop = daemon_stop accuser1 in
+  let* accuser2 = Accuser.init ~protocol:migrate_to ~event_level:`Debug node in
+  let accuser2_processed_block = accuser_processed_block accuser2 in
+
+  Log.info "Bake %d levels" (migration_level - 1) ;
+  let* () =
+    repeat (migration_level - 1) (fun () ->
+        let* () = Client.bake_for_and_wait client in
+        accuser1_processed_block)
+  in
+
+  Log.info
+    "Bake one more level to migrate from %s to %s"
+    (Protocol.tag migrate_from)
+    (Protocol.tag migrate_to) ;
+  let* () = Client.bake_for_and_wait client in
+
+  Log.info "After migration, old protocol accuser should have stopped" ;
+  let* () = accuser1_stop in
+
+  Log.info "Bake a few more levels into the new protocol" ;
+  let* () =
+    repeat 5 (fun () ->
+        let* () =
+          Client.attest_for
+            ~protocol:migrate_to
+            ~force:true
+            ~key:[Constant.bootstrap1.alias]
+            client
+        in
+        let* () = Client.bake_for_and_wait client in
+        accuser2_processed_block)
+  in
+  let* () = Accuser.terminate accuser2 in
+  unit
+
+let register_migration ~migrate_from ~migrate_to =
+  accusers_migration_test ~migrate_from ~migrate_to
 
 let register ~protocols =
   double_attestation_wrong_block_payload_hash protocols ;
