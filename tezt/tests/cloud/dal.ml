@@ -2379,17 +2379,19 @@ let get_infos_per_level t ~level ~metadata =
   (* None of these actions are performed if `--dal-slack-webhook` is
      not provided. *)
   let* () =
-    let open Monitoring_app.Alert in
-    let* () =
-      check_for_dal_accusations
-        t
-        ~cycle
-        ~level
-        ~operations
-        ~endpoint:t.some_node_rpc_endpoint
-    in
-    let* () = check_for_recently_missed_a_lot t ~level ~metadata in
-    unit
+    if t.configuration.network_health_monitoring then
+      let open Monitoring_app.Alert in
+      let* () =
+        check_for_dal_accusations
+          t
+          ~cycle
+          ~level
+          ~operations
+          ~endpoint:t.some_node_rpc_endpoint
+      in
+      let* () = check_for_recently_missed_a_lot t ~level ~metadata in
+      unit
+    else Lwt.return_unit
   in
   Lwt.return
     {
