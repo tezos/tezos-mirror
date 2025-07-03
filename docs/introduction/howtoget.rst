@@ -32,9 +32,9 @@ There are several options for getting the binaries, depending on how you plan to
   sources.
 
 
-These different options are described in the following sections.
+These different options are described in the following sections, except the last one, described in its own page.
 
-Some Octez binaries also require some parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is currently described in section :doc:`howtobuild`, but those instructions may be used for other installation types:
+Some Octez binaries also require certain parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is described in page :doc:`howtobuild`, but those instructions may be used for other installation types:
 
 - :ref:`setup_zcash_params`
 - :ref:`setup_dal_crypto_params`
@@ -272,12 +272,7 @@ automatically generated and published on `DockerHub
 way to run an always up-to-date ``octez-node``.
 
 From version 22.0 all Octez Docker images are signed using Cosign.
-You can verify if the images are correctly signed using the Cosign utility, as explained below:
-
-.. toctree::
-   :maxdepth: 2
-
-   cosign-verify
+You can verify if the images are correctly signed, :doc:`using Cosign <./cosign-verify>`.
 
 You can use the Docker images either directly or using Docker compose files, as explained next.
 In both cases, you need to have `Docker <https://www.docker.com>`__ installed and started (`Docker Desktop <https://www.docker.com/products/docker-desktop/>`__ would suffice for the instructions below).
@@ -629,4 +624,6 @@ Appendix
 .. toctree::
    :maxdepth: 2
 
+   howtobuild
+   cosign-verify
    get_troubleshooting
