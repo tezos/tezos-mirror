@@ -875,15 +875,7 @@ let z_of_bool_vector dal_attestation =
   in
   Array.fold_left aux (0, 0) dal_attestation |> fst |> Z.of_int
 
-(* Test that the baker correctly aggregates eligible attestations on reproposals.*)
-let attestations_aggregation_on_reproposal =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Attestations aggregation on reproposal"
-    ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"]
-    ~supports:Protocol.(From_protocol 023)
-    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
-  @@ fun protocol ->
+let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let consensus_rights_delay = 1 in
   let consensus_committee_size = 256 in
   let* parameter_file =
@@ -959,6 +951,7 @@ let attestations_aggregation_on_reproposal =
   Log.info "Launch a baker with bootstrap5" ;
   let* _baker =
     Agnostic_baker.init
+      ~remote_mode
       ~delegates:[Constant.bootstrap5.public_key_hash]
       node
       client
@@ -1145,6 +1138,27 @@ let attestations_aggregation_on_reproposal =
   in
   unit
 
+(* Test that the baker correctly aggregates eligible attestations on reproposals.*)
+let attestations_aggregation_on_reproposal_local_context =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Attestations aggregation on reproposal local context"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"; "local"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  attestations_aggregation_on_reproposal ~remote_mode:false protocol
+
+let attestations_aggregation_on_reproposal_remote_node =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Attestations aggregation on reproposal remote node"
+    ~tags:[team; "baker"; "attestation"; "aggregation"; "reproposal"; "remote"]
+    ~supports:Protocol.(From_protocol 023)
+    ~uses:(fun _protocol -> [Constant.octez_agnostic_baker])
+  @@ fun protocol ->
+  attestations_aggregation_on_reproposal ~remote_mode:true protocol
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1160,4 +1174,5 @@ let register ~protocols =
   simple_attestations_aggregation_local_context protocols ;
   simple_attestations_aggregation_remote_node protocols ;
   prequorum_check_levels protocols ;
-  attestations_aggregation_on_reproposal protocols
+  attestations_aggregation_on_reproposal_local_context protocols ;
+  attestations_aggregation_on_reproposal_remote_node protocols
