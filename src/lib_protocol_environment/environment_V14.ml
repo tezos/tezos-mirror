@@ -352,7 +352,7 @@ struct
          s
          bytes
        [@profiler.span_f
-         {verbosity = Debug}
+         {verbosity = Notice}
            [
              (match (pk : public_key) with
              | Ed25519 _ -> "check_signature_ed25519"
