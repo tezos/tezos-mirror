@@ -851,6 +851,147 @@ let fetch_block_payload_hash client =
   let* json = Client.RPC.call client @@ RPC.get_chain_block_header () in
   return @@ JSON.(json |-> "payload_hash" |> as_string)
 
+let preattestation_and_aggregation_wrong_payload_hash =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"preattestation and aggregation wrong payload_hash"
+    ~tags:[Tag.layer1; "preattestation"; "aggregation"]
+    ~supports:Protocol.(From_protocol 024)
+    ~uses:(fun _protocol -> [Constant.octez_accuser])
+  @@ fun protocol ->
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (* Diminish some constants to activate consensus keys faster. *)
+        (["blocks_per_cycle"], `Int 3);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~nodes_args:[Synchronisation_threshold 0; Connections 1]
+      ()
+  in
+  (* Run an accuser *)
+  let* _accuser = Accuser.init node in
+  (* Set BLS consensus key for some bootstrap accounts *)
+  let* ck1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* ck2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* ck3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  let keys =
+    [
+      ck1.public_key_hash;
+      ck2.public_key_hash;
+      ck3.public_key_hash;
+      bootstrap1.public_key_hash;
+      bootstrap2.public_key_hash;
+      bootstrap3.public_key_hash;
+      bootstrap4.public_key_hash;
+      bootstrap5.public_key_hash;
+    ]
+  in
+  (* Bake until consensus keys become active *)
+  let* level = Client.bake_for_and_wait_level ~keys ~count:7 client in
+  (* Inject preattestations with a (dummy) block_payload_hash *)
+  let open Operation.Consensus in
+  let* branch = get_branch ~attested_level:level client in
+  let* block_payload_hash = get_block_payload_hash ~block:"2" client in
+  let* slots = get_slots_by_consensus_key ~level client in
+  Log.info
+    "preattesting level %d round 1 for bootstrap1, bootstrap2 and bootstrap4"
+    level ;
+  let* () =
+    Lwt_list.iter_s
+      (fun ck ->
+        let slot = first_slot ~slots ck in
+        let* (`OpHash _) =
+          preattest_for
+            ~protocol
+            ~branch
+            ~slot
+            ~level
+            ~round:0
+            ~block_payload_hash
+            ck
+            client
+        in
+        unit)
+      [ck1; ck2; bootstrap4]
+  in
+  (* Bake a reproposal, assumed to hold a preattestations_aggregate with the
+     correct block_payload_hash*)
+  let* () =
+    Client.repropose_for_and_wait
+      ~key:keys
+      ~minimal_timestamp:true
+      ~force_reproposal:true
+      client
+  in
+  (* Bake a block: it is expected to contain denunciations *)
+  let* _ =
+    Client.bake_for_and_wait_level ~minimal_timestamp:true ~keys client
+  in
+  (* Fetch anonymous operations from the current head
+     and check for the expected denunciations *)
+  let* anonymous_operations = fetch_anonymous_operations client in
+  let () =
+    check_contains_consensus_denunciations
+      ~loc:__LOC__
+      ~level
+      ~round:0
+      ~anonymous_operations
+      [
+        (bootstrap1, (Preattestation, Preattestations_aggregate));
+        (bootstrap2, (Preattestation, Preattestations_aggregate));
+        (bootstrap4, (Preattestation, Preattestation));
+      ]
+  in
+  (* Attest with the misbehaving keys and check that they are forbidden *)
+  let* branch = get_branch ~attested_level:level client in
+  let* block_payload_hash = get_block_payload_hash client in
+  let* slots = get_slots_by_consensus_key ~level client in
+  let* () =
+    Lwt_list.iter_s
+      (fun ck ->
+        let slot = first_slot ~slots ck in
+        let* (`OpHash _) =
+          attest_for
+            ~error:delegate_forbidden_error
+            ~protocol
+            ~branch
+            ~slot
+            ~level
+            ~round:0
+            ~block_payload_hash
+            ck
+            client
+        in
+        unit)
+      [ck1; ck2; bootstrap4]
+  in
+  (* Attest with a non-misbehaving key and expect a success *)
+  let* (`OpHash _) =
+    let slot = first_slot ~slots ck3 in
+    attest_for
+      ~protocol
+      ~branch
+      ~slot
+      ~level
+      ~round:0
+      ~block_payload_hash
+      ck3
+      client
+  in
+  unit
+
 let double_preattestation_aggregation_wrong_payload_hash =
   Protocol.register_test
     ~__FILE__
@@ -1027,4 +1168,5 @@ let register ~protocols =
   operation_too_far_in_future protocols ;
   attestation_and_aggregation_wrong_payload_hash protocols ;
   double_aggregation_wrong_payload_hash protocols ;
+  preattestation_and_aggregation_wrong_payload_hash protocols ;
   double_preattestation_aggregation_wrong_payload_hash protocols
