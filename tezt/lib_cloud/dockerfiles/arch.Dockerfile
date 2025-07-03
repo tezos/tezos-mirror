@@ -27,6 +27,14 @@ RUN ln -sf /usr/bin/python3 /usr/bin/python && \
     mkdir -p /run/sshd /root/.ssh && \
     ssh-keygen -A
 
+# Prepare nginx directories for DAL reverse proxy, which are not created by default
+RUN mkdir -p /etc/nginx/sites-available && mkdir -p /etc/nginx/sites-enabled
+RUN rm -f /etc/nginx/nginx.conf &&\
+    echo -e "events {\n      worker_connections  1024;\n}\n\
+             http {\n    include sites-enabled/*;\n}" > /etc/nginx/nginx.conf
+
+
+
 # Add public key for SSH access
 ARG SSH_PUBLIC_KEY
 RUN echo "$SSH_PUBLIC_KEY" >> /root/.ssh/authorized_keys
@@ -43,6 +51,7 @@ COPY $DAL_TRUSTED_SETUP_PATH /usr/local/share/dal-trusted-setup
 # Run SSH server in foreground on port 30000
 CMD ["-D", "-p", "30000", "-e"]
 ENTRYPOINT ["/usr/bin/sshd"]
+
 
 FROM raw AS full
 
