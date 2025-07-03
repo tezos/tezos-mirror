@@ -177,6 +177,7 @@ For instance, one can post slots, ask the node to compute and store shards, to u
 
 The default listening port for RPCs is 10732, but can be changed using option ``--rpc-addr``.
 The RPC server is started by default, even if this option is not given.
+Look at  :ref:`openapi description<dal-node-openapi>` for the list of available RPC.
 
 
 Operational aspects
