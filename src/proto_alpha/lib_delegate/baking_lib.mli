@@ -80,5 +80,6 @@ val repropose :
   Protocol_client_context.full ->
   ?force:bool ->
   ?force_round:Round.t ->
+  ?minimal_timestamp:bool ->
   Baking_state_types.Key.t list ->
   unit tzresult Lwt.t

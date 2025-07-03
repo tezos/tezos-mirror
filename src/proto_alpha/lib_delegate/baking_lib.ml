@@ -511,7 +511,7 @@ let propose (cctxt : Protocol_client_context.full) ?minimal_fees
   return_unit
 
 let repropose (cctxt : Protocol_client_context.full) ?(force = false)
-    ?force_round delegates =
+    ?force_round ?(minimal_timestamp = false) delegates =
   let open Lwt_result_syntax in
   let open Baking_state in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
@@ -526,9 +526,18 @@ let repropose (cctxt : Protocol_client_context.full) ?(force = false)
   let latest_proposal = state.level_state.latest_proposal in
   let open State_transitions in
   let round =
-    match force_round with
-    | Some x -> x
-    | None -> state.round_state.current_round
+    match (force_round, minimal_timestamp) with
+    | Some round, _ -> round
+    | None, true -> (
+        let next_round = Round.succ latest_proposal.block.round in
+        match
+          Baking_scheduling.first_potential_round_at_current_level
+            ~earliest_round:next_round
+            state
+        with
+        | Some (round, _) -> round
+        | None -> next_round)
+    | None, false -> state.round_state.current_round
   in
   let*! proposal_validity =
     is_acceptable_proposal_for_current_level state latest_proposal
