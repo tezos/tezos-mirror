@@ -3438,7 +3438,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node
+let init_dal_reverse_proxy_observers
     {
       external_rpc;
       network;
@@ -3448,7 +3448,73 @@ let init_etherlink_dal_node
       memtrace;
       simulate_network;
       _;
-    } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
+    } ~name_of ~default_endpoint ~bootstrap ~dal_slots ~next_agent ~otel ~cloud
+    =
+  if dal_slots = [] then failwith "" ;
+  let* dal_slots_and_nodes =
+    dal_slots
+    |> Lwt_list.map_p (fun slot_index ->
+           let name = name_of slot_index in
+           let* agent = next_agent ~name in
+           let env, with_yes_crypto = may_set_yes_crypto simulate_network in
+           let* node =
+             Node.init
+               ?env
+               ~name
+               ~arguments:
+                 [
+                   Peer bootstrap.node_p2p_endpoint;
+                   History_mode (Rolling (Some 79));
+                 ]
+               ~rpc_external:external_rpc
+               network
+               ~with_yes_crypto
+               ~snapshot
+               cloud
+               agent
+           in
+           let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+           let* () =
+             Dal_node.init_config
+               ~expected_pow:(Network.expected_pow network)
+               ~operator_profiles:[slot_index]
+               ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
+               dal_node
+           in
+           let* () =
+             Dal_node.Agent.run
+               ?otel
+               ~memtrace
+               ~ppx_profiling
+               ~ppx_profiling_backends
+               dal_node
+           in
+           return (slot_index, Dal_node.rpc_endpoint dal_node))
+  in
+  let default_endpoint =
+    match default_endpoint with
+    | Some e -> e
+    | None ->
+        let _, first_observer_endpoint = List.hd dal_slots_and_nodes in
+        first_observer_endpoint
+  in
+  Dal_reverse_proxy.init_reverse_proxy
+    cloud
+    ~next_agent
+    ~default_endpoint
+    (List.to_seq dal_slots_and_nodes)
+
+let init_etherlink_dal_node
+    ({
+       external_rpc;
+       network;
+       snapshot;
+       ppx_profiling;
+       ppx_profiling_backends;
+       memtrace;
+       simulate_network;
+       _;
+     } as configuration) ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -3531,53 +3597,17 @@ let init_etherlink_dal_node
           default_dal_node
       in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
-
-      let* dal_slots_and_nodes =
-        dal_slots
-        |> Lwt_list.map_p (fun slot_index ->
-               let name = name_of (Etherlink_dal_observer {slot_index}) in
-               let* agent = next_agent ~name in
-               let env, with_yes_crypto = may_set_yes_crypto simulate_network in
-               let* node =
-                 Node.init
-                   ?env
-                   ~name
-                   ~arguments:
-                     [
-                       Peer bootstrap.node_p2p_endpoint;
-                       History_mode (Rolling (Some 79));
-                     ]
-                   ~rpc_external:external_rpc
-                   network
-                   ~with_yes_crypto
-                   ~snapshot
-                   cloud
-                   agent
-               in
-               let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
-               let* () =
-                 Dal_node.init_config
-                   ~expected_pow:(Network.expected_pow network)
-                   ~operator_profiles:[slot_index]
-                   ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-                   dal_node
-               in
-               let* () =
-                 Dal_node.Agent.run
-                   ?otel
-                   ~memtrace
-                   ~ppx_profiling
-                   ~ppx_profiling_backends
-                   dal_node
-               in
-               return (slot_index, Dal_node.rpc_endpoint dal_node))
-      in
       let* reverse_proxy_dal_node =
-        Dal_reverse_proxy.init_reverse_proxy
-          cloud
+        init_dal_reverse_proxy_observers
+          configuration
+          ~name_of:(fun slot_index ->
+            name_of (Etherlink_dal_observer {slot_index}))
+          ~default_endpoint:(Some default_endpoint)
+          ~bootstrap
+          ~dal_slots
           ~next_agent
-          ~default_endpoint
-          (List.to_seq dal_slots_and_nodes)
+          ~otel
+          ~cloud
       in
       some reverse_proxy_dal_node
 
