@@ -884,10 +884,14 @@ let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
          ~source_version:true
          ~eval_opam:true
          [])
-    ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
+    ~variables:[("PROFILE", "static")]
     [
       "scripts/slim-mode.sh on";
-      "make build OCTEZ_EXECUTABLES?=octez-node";
+      (* 1) compile with PPX profiling *)
+      "TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node";
+      (* 2) compile with OpenTelemetry PPX *)
+      "TEZOS_PPX_PROFILER=opentelemetry make build \
+       OCTEZ_EXECUTABLES?=octez-node";
       "mkdir -p octez-binaries/x86_64/";
       "mv octez-node octez-binaries/x86_64/";
     ]
