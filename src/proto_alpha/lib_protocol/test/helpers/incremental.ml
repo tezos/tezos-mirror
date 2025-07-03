@@ -76,13 +76,15 @@ let begin_validation_and_application ctxt chain_id mode ~predecessor =
 
 let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
     ?(policy = Block.By_round 0) ?liquidity_baking_toggle_vote
-    ?adaptive_issuance_vote (predecessor : Block.t) =
+    ?adaptive_issuance_vote ?payload_round ?(payload = [])
+    (predecessor : Block.t) =
   let open Lwt_result_wrap_syntax in
   let* delegate, _consensus_key, round, real_timestamp =
     Block.get_next_baker ~policy predecessor
   in
   let* delegate = Account.find delegate in
-  let*?@ payload_round = Round.of_int round in
+  let payload_round = Option.value ~default:round payload_round in
+  let*?@ payload_round = Round.of_int payload_round in
   let timestamp = Option.value ~default:real_timestamp timestamp in
   let* seed_nonce_hash =
     match seed_nonce_hash with
@@ -108,12 +110,25 @@ let begin_construction ?timestamp ?seed_nonce_hash ?(mempool_mode = false)
       operations_hash = Operation_list_list_hash.zero;
     }
   in
+  let operations = Block.Forge.classify_operations payload in
+  let non_consensus_operations =
+    List.concat (match List.tl operations with None -> [] | Some l -> l)
+  in
+  let operations_hash =
+    List.map Operation.hash_packed non_consensus_operations
+  in
+  let payload_hash =
+    Block_payload.hash
+      ~predecessor_hash:shell.predecessor
+      ~payload_round
+      operations_hash
+  in
   let* contents =
     Block.Forge.contents
       ?seed_nonce_hash
       ?adaptive_issuance_vote
       ?liquidity_baking_toggle_vote
-      ~payload_hash:Block_payload_hash.zero
+      ~payload_hash
       ~payload_round
       shell
   in
@@ -293,11 +308,6 @@ let finalize_block_with_metadata st =
   in
   let*@ validation_result, metadata =
     finalize_validation_and_application st.state (Some shell_header)
-  in
-  let operations = List.rev st.rev_operations in
-  let operations_hash =
-    Operation_list_list_hash.compute
-      [Operation_list_hash.compute (List.map Operation.hash_packed operations)]
   in
   let header =
     {
