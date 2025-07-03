@@ -40,6 +40,7 @@ type info = {
   delegate : public_key_hash option;
   counter : Manager_counter.t option;
   script : Script.t option;
+  revealed : bool option;
 }
 
 val info_encoding : info Data_encoding.t
