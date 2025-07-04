@@ -240,12 +240,12 @@ module Internal_validator_process = struct
     let environment_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
-        Profiler.Info
+        Profiler.Debug
     in
     let context_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
-        Profiler.Info
+        Profiler.Debug
     in
     Tezos_profiler.Profiler.(plug main) environment_headless ;
 
