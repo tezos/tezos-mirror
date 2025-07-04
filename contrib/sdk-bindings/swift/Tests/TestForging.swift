@@ -10,6 +10,7 @@ class TestForging: XCTestCase {
     public static var allTests = [
       ("messageForging", messageForging),
       ("revealForging", revealForging),
+      ("originationForging", originationForging),
       ("delegationForging", delegationForging),
     ]
 
@@ -58,6 +59,49 @@ class TestForging: XCTestCase {
           0x42, 0x00
         ]
         XCTAssertEqual(Array(rawReveal), expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz2RcdU4n2PvJHUNYkS8FPuvcnFmBqEccxb4",
+      "fee": "1",
+      "counter": "30",
+      "gas_limit": "500",
+      "storage_limit": "7000",
+      "balance": "90000",
+      "delegate": "tz1XFq85mnnXhyhzpNEpxFvrkcuNtFBsSsVu",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    func originationForging() {
+        let delegate = try! PublicKeyHash.fromB58check(data: "tz1XFq85mnnXhyhzpNEpxFvrkcuNtFBsSsVu")
+        let source = try! PublicKeyHash.fromB58check(data: "tz2RcdU4n2PvJHUNYkS8FPuvcnFmBqEccxb4")
+        let origination = Origination(
+          source: source,
+          fee: 1,
+          counter: 30,
+          gasLimit: 500,
+          storageLimit: 7000,
+          balance: 90000,
+          delegate: delegate
+        )
+        let rawOrigination = try! origination.forge()
+        let expectedBytes: [UInt8] = [
+          0x6d, 0x01, 0xbd, 0xc4, 0x3f, 0x34, 0xca, 0x86, 0xf3, 0x28,
+          0xac, 0x92, 0x16, 0xcf, 0xa9, 0x73, 0x2f, 0x1c, 0x39, 0x02,
+          0x24, 0x5c, 0x01, 0x1e, 0xf4, 0x03, 0xd8, 0x36, 0x90, 0xbf,
+          0x05, 0xff, 0x00, 0x7f, 0x6e, 0xb3, 0x50, 0x0f, 0x83, 0x77,
+          0x2f, 0x53, 0xe7, 0x54, 0x03, 0xf9, 0x09, 0xb3, 0x10, 0x2f,
+          0x10, 0xe8, 0x11, 0x00, 0x00, 0x00, 0x05, 0x02, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x6c
+        ]
+        XCTAssertEqual(Array(rawOrigination), expectedBytes)
     }
 
     /*

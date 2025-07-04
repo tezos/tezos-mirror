@@ -364,6 +364,92 @@ mod tests {
 
     /*
     octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF",
+      "fee": "0",
+      "counter": "812",
+      "gas_limit": "74",
+      "storage_limit": "98",
+      "balance": "0",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn origination_forging() {
+        let source = PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
+        let (balance, fee, counter, gas_limit, storage_limit) = (0, 0, 812, 74, 98);
+        let origination = Origination::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            balance,
+            None,
+        );
+        let raw_origination = origination.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            origination
+        ));
+
+        let bytes = hex::decode("6d03ae7b7d713977a27ec643969f0c2e665ba9ad9aa100ac064a62000000000005020000000000000002036c").unwrap();
+        assert_eq!(
+            bytes, raw_origination,
+            "Origination must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+      "fee": "1722",
+      "counter": "461",
+      "gas_limit": "67000",
+      "storage_limit": "1",
+      "balance": "1000000",
+      "delegate": "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn origination_delegated_contract_forging() {
+        let source = PublicKeyHash::from_b58check("tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7").unwrap();
+        let (balance, fee, counter, gas_limit, storage_limit) = (1_000_000, 1722, 461, 67_000, 1);
+        let origination = Origination::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            balance,
+            Some(Arc::new(source.clone())),
+        );
+        let raw_origination = origination.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            origination
+        ));
+
+        let bytes =
+            hex::decode("6d004afbd2ede908e6700eb9b54352c1d2dceee8d0feba0dcd03b88b0401c0843dff004afbd2ede908e6700eb9b54352c1d2dceee8d0fe00000005020000000000000002036c").unwrap();
+        assert_eq!(
+            bytes, raw_origination,
+            "Origination must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "delegation",
       "source": "tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif",
       "fee": "13",
