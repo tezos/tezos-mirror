@@ -83,11 +83,19 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
 (** Initialize the test, given some initial parameters *)
 let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
     ?(force_preattest_all = false) ?(check_finalized_block_perm = [])
-    delegates_name_list : (constants, t) scenarios =
+    ?(disable_default_checks = false) delegates_name_list :
+    (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
       let bootstrap = "__bootstrap__" in
       let delegates_name_list = bootstrap :: delegates_name_list in
+      (* Do not disable default checks, unless for a good reason *)
+      let check_finalized_block_perm =
+        if disable_default_checks then check_finalized_block_perm
+        else
+          [check_all_balances; check_misc; check_issuance_rpc]
+          @ check_finalized_block_perm
+      in
       (* Override threshold value if activate *)
       let n = List.length delegates_name_list in
       let* block, delegates = Context.init_with_constants_n ?algo constants n in
@@ -164,5 +172,8 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             grandparent = block;
           }
       in
-      let* () = check_all_balances block state in
+      let* () =
+        if not disable_default_checks then check_all_balances () (block, state)
+        else return_unit
+      in
       return (block, state))
