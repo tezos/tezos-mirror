@@ -80,16 +80,6 @@ let kernel_blueprint_parent_hash_of_rlp s =
       Some (decode_block_hash parent_hash)
   | _ -> None
 
-let make_blueprint_chunks kernel_blueprint =
-  let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
-  match String.chunk_bytes max_chunk_size blueprint with
-  | Ok chunks -> chunks
-  | _ ->
-      (* [chunk_bytes] can only return an [Error] if the optional
-         argument [error_on_partial_chunk] is passed. As this is not
-         the case in this call, this branch is impossible. *)
-      assert false
-
 let encode_u16_le i =
   let bytes = Bytes.make 2 '\000' in
   Bytes.set_uint16_le bytes 0 i ;
@@ -97,13 +87,12 @@ let encode_u16_le i =
 
 let decode_u16_le bytes = Bytes.get_uint16_le bytes 0
 
-type unsigned_chunk =
-  | Unsigned_chunk of {
-      value : bytes;
-      number : quantity;
-      nb_chunks : int;
-      chunk_index : int;
-    }
+type unsigned_chunk = {
+  value : bytes;
+  number : quantity;
+  nb_chunks : int;
+  chunk_index : int;
+}
 
 type chunk = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
 
@@ -113,16 +102,10 @@ let chunk_encoding =
   Data_encoding.(
     let bytes_hex = bytes' Hex in
     conv
-      (fun {
-             unsigned_chunk =
-               Unsigned_chunk {value; number; nb_chunks; chunk_index};
-             signature;
-           } -> (value, number, nb_chunks, chunk_index, signature))
+      (fun {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature} ->
+        (value, number, nb_chunks, chunk_index, signature))
       (fun (value, number, nb_chunks, chunk_index, signature) ->
-        {
-          unsigned_chunk = Unsigned_chunk {value; number; nb_chunks; chunk_index};
-          signature;
-        })
+        {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature})
       (obj5
          (req "value" bytes_hex)
          (req "number" quantity_encoding)
@@ -130,8 +113,7 @@ let chunk_encoding =
          (req "chunk_index" int31)
          (req "signature" Signature.encoding)))
 
-let unsigned_chunk_to_rlp
-    (Unsigned_chunk {value; number; nb_chunks; chunk_index}) =
+let unsigned_chunk_to_rlp {value; number; nb_chunks; chunk_index} =
   Rlp.(
     List
       [
@@ -142,10 +124,7 @@ let unsigned_chunk_to_rlp
       ])
 
 let chunk_to_rlp
-    {
-      unsigned_chunk = Unsigned_chunk {value; number; nb_chunks; chunk_index};
-      signature;
-    } =
+    {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature} =
   Rlp.(
     List
       [
@@ -173,28 +152,30 @@ let chunk_of_rlp s =
       let chunk_index = decode_u16_le chunk_index in
       Option.map
         (fun signature ->
-          {
-            unsigned_chunk =
-              Unsigned_chunk {value; number; nb_chunks; chunk_index};
-            signature;
-          })
+          {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature})
         (Signature.of_bytes_opt signature)
   | _ -> None
 
-let prepare ~signer ~timestamp ~number ~parent_hash
-    ~(delayed_transactions : Ethereum_types.hash list) ~transactions =
+let make_blueprint_chunks ~number kernel_blueprint =
+  let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
+  match String.chunk_bytes max_chunk_size blueprint with
+  | Ok chunks ->
+      let nb_chunks = List.length chunks in
+      List.mapi
+        (fun chunk_index chunk ->
+          let value = Bytes.of_string chunk in
+          {value; number; nb_chunks; chunk_index})
+        chunks
+  | _ ->
+      (* [chunk_bytes] can only return an [Error] if the optional
+         argument [error_on_partial_chunk] is passed. As this is not
+         the case in this call, this branch is impossible. *)
+      assert false
+
+let sign ~signer ~chunks =
   let open Lwt_result_syntax in
   let open Rlp in
-  let chunks =
-    make_blueprint_chunks
-      {parent_hash; delayed_transactions; transactions; timestamp}
-  in
-  let nb_chunks = List.length chunks in
-  let message_from_chunk nb_chunks chunk_index chunk =
-    let value = Bytes.of_string chunk in
-    let unsigned_chunk =
-      Unsigned_chunk {value; number; nb_chunks; chunk_index}
-    in
+  let message_from_chunk unsigned_chunk =
     (* Takes the blueprints fields and sign them. *)
     let rlp_unsigned_blueprint =
       unsigned_chunk_to_rlp unsigned_chunk |> encode
@@ -202,7 +183,7 @@ let prepare ~signer ~timestamp ~number ~parent_hash
     let+ signature = Signer.sign signer rlp_unsigned_blueprint in
     {unsigned_chunk; signature}
   in
-  List.mapi_ep (message_from_chunk nb_chunks) chunks
+  List.map_ep message_from_chunk chunks
 
 let prepare_message smart_rollup_address kind rlp =
   let rlp_sequencer_blueprint = rlp |> Rlp.encode |> Bytes.to_string in
@@ -243,8 +224,8 @@ let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
     payload
   |> List.sort
        (fun
-         {unsigned_chunk = Unsigned_chunk {chunk_index = x; _}; _}
-         {unsigned_chunk = Unsigned_chunk {chunk_index = y; _}; _}
+         {unsigned_chunk = {chunk_index = x; _}; _}
+         {unsigned_chunk = {chunk_index = y; _}; _}
        -> compare x y)
 
 let create_dal_payloads chunks =
@@ -259,8 +240,7 @@ let kernel_blueprint_parent_hash_of_payload sequencer payload =
   let chunks = decode_inbox_payload sequencer payload in
   let bytes =
     List.fold_left
-      (fun buffer {unsigned_chunk = Unsigned_chunk {value; _}; _} ->
-        Bytes.cat buffer value)
+      (fun buffer {unsigned_chunk = {value; _}; _} -> Bytes.cat buffer value)
       Bytes.empty
       chunks
   in

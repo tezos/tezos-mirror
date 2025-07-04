@@ -5,6 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type unsigned_chunk = private {
+  value : bytes;
+  number : Ethereum_types.quantity;
+  nb_chunks : int;
+  chunk_index : int;
+}
+
 (* A signed blueprint chunk *)
 type t
 
@@ -13,18 +20,9 @@ val chunk_encoding : t Data_encoding.t
 (** [chunk_to_rlp chunk] encodes a chunk into its RLP format. *)
 val chunk_to_rlp : t -> Rlp.item
 
-(** [prepare ~signer ~timestamp ~number ~parent_hash ~delayed_transactions
-    ~transactions] creates a sequencer blueprint at [timestamp] with a given
-    [number] containing [transactions], signed with [signer]. Returns the list
-    of prepared chunks. *)
-val prepare :
-  signer:Signer.t ->
-  timestamp:Time.Protocol.t ->
-  number:Ethereum_types.quantity ->
-  parent_hash:Ethereum_types.block_hash ->
-  delayed_transactions:Ethereum_types.hash list ->
-  transactions:string list ->
-  t list tzresult Lwt.t
+(** [sign ~signer ~chunks] serializes and signs a list of chunks. *)
+val sign :
+  signer:Signer.t -> chunks:unsigned_chunk list -> t list tzresult Lwt.t
 
 (** [create_inbox_payload ~smart_rollup_address ~chunks] encodes the chunks into
     message(s) that can be read from the inbox by the kernel. *)
@@ -50,6 +48,12 @@ type kernel_blueprint = {
   transactions : string list;
   timestamp : Time.Protocol.t;
 }
+
+(** [make_blueprint_chunks ~number kernel_blueprint] serializes the
+    [kernel_blueprint] whose number is [number] and splits the result into
+    chunks small enough to fit in inbox messages. *)
+val make_blueprint_chunks :
+  number:Ethereum_types.quantity -> kernel_blueprint -> unsigned_chunk list
 
 (** [kernel_blueprint_parent_hash_of_payload sequencer bytes]
     partially decodes fields of a {!kernel_blueprint} and return the

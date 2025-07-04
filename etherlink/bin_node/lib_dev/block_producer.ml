@@ -159,13 +159,17 @@ let produce_block_with_transactions ~signer ~timestamp ~smart_rollup_address
       (Blueprint_events.blueprint_proposal
          head_info.Evm_context.next_blueprint_number)
     @@ fun () ->
-    Sequencer_blueprint.prepare
-      ~signer
-      ~timestamp
-      ~transactions
-      ~delayed_transactions:delayed_hashes
-      ~parent_hash:head_info.current_block_hash
-      ~number:head_info.next_blueprint_number
+    let chunks =
+      Sequencer_blueprint.make_blueprint_chunks
+        ~number:head_info.next_blueprint_number
+        {
+          parent_hash = head_info.current_block_hash;
+          delayed_transactions = delayed_hashes;
+          transactions;
+          timestamp;
+        }
+    in
+    Sequencer_blueprint.sign ~signer ~chunks
   in
   let blueprint_payload =
     Sequencer_blueprint.create_inbox_payload

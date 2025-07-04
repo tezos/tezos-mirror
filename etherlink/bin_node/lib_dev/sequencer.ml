@@ -350,15 +350,17 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
   let* () =
     if status = Created then
       (* Create the first empty block. *)
-      let* genesis_chunks =
-        Sequencer_blueprint.prepare
-          ~signer
-          ~timestamp:genesis_timestamp
-          ~transactions:[]
-          ~delayed_transactions:[]
+      let chunks =
+        Sequencer_blueprint.make_blueprint_chunks
           ~number:Ethereum_types.(Qty Z.zero)
-          ~parent_hash:(L2_types.genesis_parent_hash ~chain_family)
+          {
+            parent_hash = L2_types.genesis_parent_hash ~chain_family;
+            delayed_transactions = [];
+            transactions = [];
+            timestamp = genesis_timestamp;
+          }
       in
+      let* genesis_chunks = Sequencer_blueprint.sign ~signer ~chunks in
       let genesis_payload =
         Sequencer_blueprint.create_inbox_payload
           ~smart_rollup_address:smart_rollup_address_b58
