@@ -656,6 +656,16 @@ val is_synchronized : _ t -> bool
     already synchronized, it resolves immediately. *)
 val wait_synchronized : _ t -> unit Lwt.t
 
+(** {2 Kernel tracing} *)
+
+(** Reset the kernel tracing with the current time. Call this function before
+    executing the PVM/kernel. *)
+val reset_kernel_tracing : unit -> unit
+
+(** Kernel logging function to be used instead of [Event.kernel_log], which
+    extracts information from kernel logs to produce Opentelemetry traces. *)
+val kernel_tracing : Configuration.t -> string -> unit Lwt.t
+
 module Internal_for_tests : sig
   val write_protocols_in_store :
     [> `Write] store -> Store.Protocols.proto_info list -> unit tzresult Lwt.t

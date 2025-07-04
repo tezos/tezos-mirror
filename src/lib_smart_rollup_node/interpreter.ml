@@ -137,6 +137,7 @@ let transition_pvm (module Plugin : Protocol_plugin_sig.PARTIAL) node_ctxt ctxt
        } =
     Octez_telemetry.Trace.with_tzresult ~service_name:"Pvm" "eval_block"
     @@ fun _ ->
+    Node_context.reset_kernel_tracing () ;
     Plugin.Pvm.Fueled.Free.eval_block_inbox
       ~fuel:(Fuel.Free.of_ticks 0L)
       node_ctxt

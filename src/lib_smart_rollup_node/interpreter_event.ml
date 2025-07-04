@@ -94,6 +94,31 @@ module Simple = struct
       ~level:Error
       ("exception", Data_encoding.string)
       ~pp1:Format.pp_print_string
+
+  let eval_etherlink_block =
+    let ns_in_a_day = Int64.(mul 1_000_000_000L (of_int (24 * 3600))) in
+    let ns_to_span ns =
+      let d = Int64.div ns ns_in_a_day in
+      let ns = Int64.sub ns (Int64.mul d ns_in_a_day) in
+      let ps = Int64.mul ns 1000L in
+      Ptime.Span.of_d_ps (Int64.to_int d, ps)
+      |> Option.value ~default:(Ptime.Span.of_int_s (-1))
+    in
+    let span_to_ns span =
+      let d, ps = Ptime.Span.to_d_ps span in
+      Int64.mul (Int64.of_int d) ns_in_a_day |> Int64.add (Int64.div ps 1000L)
+    in
+    let time_encoding =
+      Data_encoding.conv ns_to_span span_to_ns Time.System.Span.encoding
+    in
+    declare_2
+      ~section
+      ~name:"smart_rollup_node_interpreter_eval_etherlink_block"
+      ~msg:"Evaluated Etherlink block {block_number} in {time}"
+      ~level:Info
+      ("block_number", Data_encoding.int31)
+      ("time", time_encoding)
+      ~pp2:(fun fmt ns -> Time.System.Span.pp_hum fmt (ns_to_span ns))
 end
 
 (** [transition_pvm inbox_level hash tick n] emits the event that a PVM
@@ -120,3 +145,6 @@ let fetched_incorrect_pre_image ~expected_hash ~content_hash =
 let patching_genesis_state patch = Simple.(emit patching_genesis_state) patch
 
 let fast_exec_panic exn = Simple.(emit fast_exec_panic) (Printexc.to_string exn)
+
+let eval_etherlink_block block_number time_ns =
+  Simple.(emit eval_etherlink_block) (block_number, time_ns)

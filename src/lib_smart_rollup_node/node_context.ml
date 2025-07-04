@@ -1181,6 +1181,39 @@ let wait_synchronized node_ctxt =
   if is_synchronized node_ctxt then Lwt.return_unit
   else Lwt_condition.wait node_ctxt.sync.on_synchronized
 
+(** {2 Kernel tracing} *)
+
+type kernel_tracer = {mutable start_time : int64}
+
+let kernel_tracer = {start_time = Opentelemetry.Timestamp_ns.now_unix_ns ()}
+
+let kernel_store_block_re = Re.Str.regexp ".*Storing block \\([0-9]+\\)"
+
+let reset_kernel_tracing () =
+  kernel_tracer.start_time <- Opentelemetry.Timestamp_ns.now_unix_ns ()
+
+let kernel_tracing config =
+  let open Lwt_syntax in
+  if not config.Configuration.etherlink then Event.kernel_debug
+  else fun msg ->
+    let* () = Event.kernel_debug msg in
+    let block_number =
+      if Re.Str.string_match kernel_store_block_re msg 0 then
+        try Re.Str.matched_group 1 msg |> int_of_string_opt with _ -> None
+      else None
+    in
+    match block_number with
+    | None -> return_unit
+    | Some block_number ->
+        let start_time = kernel_tracer.start_time in
+        let end_time = Opentelemetry.Timestamp_ns.now_unix_ns () in
+        let* () =
+          Interpreter_event.eval_etherlink_block
+            block_number
+            (Int64.sub end_time start_time)
+        in
+        return_unit
+
 (**/**)
 
 module Internal_for_tests = struct
