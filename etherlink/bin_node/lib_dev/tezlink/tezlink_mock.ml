@@ -121,7 +121,7 @@ module Operation_metadata = struct
                   consumed_gas;
                   storage_size = Z.zero;
                   paid_storage_size_diff = Z.zero;
-                  allocated_destination_contract = true;
+                  allocated_destination_contract = false;
                 }))
     | _ ->
         tzfail
