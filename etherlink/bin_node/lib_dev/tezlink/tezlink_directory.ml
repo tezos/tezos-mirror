@@ -387,10 +387,16 @@ let build_block_static_directory ~l2_chain_id
          let voting_operation_hashes = [] in
          let anonymous_operation_hashes = [] in
          let* manager_operation_hashes =
-           let+ operations = Backend.operations chain ~chain_id block in
-           List.map
-             (fun (op : Tezos_services.Block_services.operation) -> op.hash)
-             operations
+           let* block = Backend.block chain block in
+           let*? operations =
+             Tezos_services.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
+           return
+           @@ List.map
+                (fun (op : Tezos_services.Block_services.operation) -> op.hash)
+                operations
          in
          return
            [
@@ -409,7 +415,12 @@ let build_block_static_directory ~l2_chain_id
            (* All tezlink operations are manager operations *)
            return_none
          else
-           let* operations = Backend.operations ~chain_id chain block in
+           let* block = Backend.block chain block in
+           let*? operations =
+             Tezos_services.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
            let operation_opt = List.nth_opt operations operation_index in
            return (Option.map (fun op -> (o#version, op)) operation_opt))
 

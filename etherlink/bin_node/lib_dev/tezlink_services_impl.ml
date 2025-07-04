@@ -185,36 +185,4 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let `Main = chain in
     let* number = shell_block_param_to_block_number block in
     Block_storage.nth_block_hash (Z.of_int32 number)
-
-  let operations chain ~chain_id block_param =
-    let open Lwt_result_syntax in
-    let `Main = chain in
-    let* block = block chain block_param in
-    let operations =
-      Data_encoding.Binary.to_bytes_exn Data_encoding.bytes block.operations
-    in
-    let operations =
-      Data_encoding.Binary.of_bytes_exn
-        Data_encoding.(
-          list
-            (tup3
-               Operation_hash.encoding
-               Tezos_base.Operation.shell_header_encoding
-               bytes))
-        operations
-    in
-    let operations =
-      List.map
-        (fun (hash, shell, op_and_receipt) ->
-          let protocol_data, receipt =
-            Data_encoding.Binary.of_bytes_exn
-              Tezlink_imports.Imported_protocol
-              .operation_data_and_receipt_encoding
-              op_and_receipt
-          in
-          ({chain_id; hash; shell; protocol_data; receipt = Receipt receipt}
-            : Tezos_services.Block_services.operation))
-        operations
-    in
-    return operations
 end
