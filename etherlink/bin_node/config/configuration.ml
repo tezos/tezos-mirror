@@ -196,6 +196,8 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
+type gcp_kms = {pool_size : int}
+
 type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
 
 type proxy = {
@@ -240,6 +242,7 @@ type t = {
   sequencer : sequencer;
   observer : observer option;
   proxy : proxy;
+  gcp_kms : gcp_kms;
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
@@ -1108,6 +1111,32 @@ let proxy_encoding =
 let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
   {finalized_view = None; evm_node_endpoint; ignore_block_param}
 
+(* A chunk is at most 4 KBytes. A transaction is around 150 bytes. Having 4
+   connections up gives roughly 100TPS (4 * 4000 / 150), which should cover
+   most of traffic for now. *)
+let default_gcp_kms_pool_size = 4
+
+let default_gcp_kms = {pool_size = default_gcp_kms_pool_size}
+
+let gcp_kms_encoding =
+  let open Data_encoding in
+  conv
+    (fun ({pool_size} : gcp_kms) -> pool_size)
+    (fun pool_size -> {pool_size})
+    (obj1
+       (dft
+          ~title:
+            Format.(
+              sprintf
+                "The number of TCP connections kept alive with the GCP KMS. A \
+                 number too low will make signing blueprints a bottleneck, \
+                 while a number unnecessarily high will consume file \
+                 descriptors. Defaults to %d if absent."
+                default_gcp_kms_pool_size)
+          "connection_pool_size"
+          strictly_positive_encoding
+          default_gcp_kms_pool_size))
+
 let fee_history_encoding =
   let open Data_encoding in
   let max_count_encoding : fee_history_max_count Data_encoding.t =
@@ -1347,6 +1376,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            sequencer;
            observer;
            proxy;
+           gcp_kms;
            tx_pool_timeout_limit;
            tx_pool_addr_limit;
            tx_pool_tx_per_addr_limit;
@@ -1370,6 +1400,7 @@ let encoding ?network data_dir : t Data_encoding.t =
             verbose,
             experimental_features,
             proxy,
+            gcp_kms,
             fee_history ),
           ( kernel_execution,
             public_rpc,
@@ -1388,6 +1419,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                verbose,
                experimental_features,
                proxy,
+               gcp_kms,
                fee_history ),
              ( kernel_execution,
                public_rpc,
@@ -1405,6 +1437,7 @@ let encoding ?network data_dir : t Data_encoding.t =
         sequencer;
         observer;
         proxy;
+        gcp_kms;
         tx_pool_timeout_limit;
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
@@ -1428,7 +1461,7 @@ let encoding ?network data_dir : t Data_encoding.t =
           (dft "sequencer" sequencer_encoding (sequencer_config_dft ()))
           (observer_field "observer" (observer_encoding ?network ())))
        (merge_objs
-          (obj9
+          (obj10
              (dft
                 "tx_pool_timeout_limit"
                 ~description:
@@ -1471,6 +1504,7 @@ let encoding ?network data_dir : t Data_encoding.t =
                 experimental_features_encoding
                 default_experimental_features)
              (dft "proxy" proxy_encoding (default_proxy ()))
+             (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
           (obj8
              (dft
@@ -1703,6 +1737,7 @@ module Cli = struct
       sequencer = sequencer_config_dft ();
       observer;
       proxy = default_proxy ();
+      gcp_kms = default_gcp_kms;
       tx_pool_timeout_limit = default_tx_pool_timeout_limit;
       tx_pool_addr_limit = default_tx_pool_addr_limit;
       tx_pool_tx_per_addr_limit = default_tx_pool_tx_per_addr_limit;
@@ -1910,6 +1945,7 @@ module Cli = struct
       sequencer;
       observer;
       proxy;
+      gcp_kms = default_gcp_kms;
       tx_pool_timeout_limit =
         Option.value
           ~default:configuration.tx_pool_timeout_limit

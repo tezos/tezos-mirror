@@ -12,6 +12,10 @@
 
 ### Configuration changes
 
+- Adds `gcp_kms` top-level field to configure the interaction with a GCP KMS.
+  See `describe config` for more information about the available options.
+  (!18585)
+
 ### RPCs changes
 
 ### Metrics changes

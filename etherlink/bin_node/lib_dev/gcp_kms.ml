@@ -24,11 +24,11 @@ let auth () =
         "Environment variable ACCESS_TOKEN must be set for signing with GCP KMS"
   | s -> return s
 
-let from_gcp_key gcp_key =
+let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
   let open Lwt_syntax in
   let kms_handler =
     {
-      pool = Octez_connpool.make ~n:4 kms_uri;
+      pool = Octez_connpool.make ~n:config.pool_size kms_uri;
       key_path =
         Format.sprintf
           "v1/projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s/cryptoKeyVersions/%d"

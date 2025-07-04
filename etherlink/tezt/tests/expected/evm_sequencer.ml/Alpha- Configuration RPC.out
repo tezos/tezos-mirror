@@ -39,6 +39,9 @@
   "proxy": {
     "ignore_block_param": false
   },
+  "gcp_kms": {
+    "connection_pool_size": 4
+  },
   "fee_history": {
     "max_count": 1024
   },
@@ -108,6 +111,9 @@
   },
   "proxy": {
     "ignore_block_param": false
+  },
+  "gcp_kms": {
+    "connection_pool_size": 4
   },
   "fee_history": {
     "max_count": 1024
@@ -183,6 +189,9 @@
   "proxy": {
     "evm_node_endpoint": "hidden",
     "ignore_block_param": false
+  },
+  "gcp_kms": {
+    "connection_pool_size": 4
   },
   "fee_history": {
     "max_count": 1024

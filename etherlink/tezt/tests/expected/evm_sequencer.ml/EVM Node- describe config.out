@@ -161,6 +161,13 @@
            instead. */,
       "evm_node_endpoint"?: $unistring,
       "ignore_block_param"?: boolean },
+  "gcp_kms"?:
+    { "connection_pool_size"?:
+        integer ∈ [1, 2^30]
+        /* The number of TCP connections kept alive with the GCP KMS. A
+           number too low will make signing blueprints a bottleneck, while a
+           number unnecessarily high will consume file descriptors. Defaults
+           to 4 if absent. */ },
   "fee_history"?:
     { "max_count"?:
         /* The maximum number of blocks whose fee history can be retrieved at
