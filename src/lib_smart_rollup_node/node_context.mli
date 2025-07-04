@@ -658,9 +658,9 @@ val wait_synchronized : _ t -> unit Lwt.t
 
 (** {2 Kernel tracing} *)
 
-(** Reset the kernel tracing with the current time. Call this function before
-    executing the PVM/kernel. *)
-val reset_kernel_tracing : unit -> unit
+(** Reset the kernel tracing with the current time and provided scope. Call this
+    function before executing the PVM/kernel. *)
+val reset_kernel_tracing : Opentelemetry.Scope.t -> unit
 
 (** Kernel logging function to be used instead of [Event.kernel_log], which
     extracts information from kernel logs to produce Opentelemetry traces. *)

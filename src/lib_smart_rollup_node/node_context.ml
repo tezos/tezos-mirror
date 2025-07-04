@@ -1183,14 +1183,19 @@ let wait_synchronized node_ctxt =
 
 (** {2 Kernel tracing} *)
 
-type kernel_tracer = {mutable start_time : int64}
+type kernel_tracer = {
+  mutable start_time : int64;
+  mutable scope : Opentelemetry.Scope.t option;
+}
 
-let kernel_tracer = {start_time = Opentelemetry.Timestamp_ns.now_unix_ns ()}
+let kernel_tracer =
+  {start_time = Opentelemetry.Timestamp_ns.now_unix_ns (); scope = None}
 
 let kernel_store_block_re = Re.Str.regexp ".*Storing block \\([0-9]+\\)"
 
-let reset_kernel_tracing () =
-  kernel_tracer.start_time <- Opentelemetry.Timestamp_ns.now_unix_ns ()
+let reset_kernel_tracing scope =
+  kernel_tracer.start_time <- Opentelemetry.Timestamp_ns.now_unix_ns () ;
+  kernel_tracer.scope <- Some scope
 
 let kernel_tracing config =
   let open Lwt_syntax in
@@ -1212,7 +1217,28 @@ let kernel_tracing config =
             block_number
             (Int64.sub end_time start_time)
         in
-        return_unit
+        if not (Opentelemetry.Collector.has_backend ()) then return_unit
+        else
+          let trace_id, parent =
+            match kernel_tracer.scope with
+            | None -> (Opentelemetry.Trace_id.create (), None)
+            | Some scope -> (scope.trace_id, Some scope.span_id)
+          in
+          let span_id = Opentelemetry.Span_id.create () in
+          let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
+          let span, _ =
+            Opentelemetry.Span.create
+              ~attrs:[("etherlink.block.number", `Int block_number)]
+              ?parent
+              ~id:scope.span_id
+              ~trace_id:scope.trace_id
+              ~start_time
+              ~end_time
+              "eval_etherlink_block"
+          in
+          Opentelemetry.Trace.emit ~service_name:"rollup_node" [span] ;
+          kernel_tracer.start_time <- end_time ;
+          return_unit
 
 (**/**)
 
