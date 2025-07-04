@@ -688,7 +688,7 @@ let max_number_of_chunks_field =
 
 let gcp_key_from_string_opt key_handler =
   let open Option_syntax in
-  let* key_handler = String.remove_prefix ~prefix:"gcp-kms://" key_handler in
+  let* key_handler = String.remove_prefix ~prefix:"gcpkms://" key_handler in
   match String.split '/' key_handler with
   | [project; region; keyring; key; version] ->
       Some {project; keyring; key; region; version = int_of_string version}
@@ -699,7 +699,7 @@ let gcp_key_uri_encoding =
   conv_with_guard
     (fun {project; region; keyring; key; version} ->
       Format.sprintf
-        "gcp-kms://%s/%s/%s/%s/%d"
+        "gcpkms://%s/%s/%s/%s/%d"
         project
         region
         keyring
