@@ -7,7 +7,6 @@
 (*****************************************************************************)
 
 type sandbox_config = {
-  public_key : Signature.public_key;
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
   funded_addresses : Ethereum_types.address list;
@@ -243,7 +242,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     | Some signer -> return signer
     | None ->
         let*? key = Configuration.sequencer_key configuration in
-        let*! signer = Signer.of_sequencer_key cctxt key in
+        let*! signer = Signer.of_sequencer_key configuration cctxt key in
         return signer
   in
 
@@ -262,15 +261,8 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
   let smart_rollup_address_b58 = Address.to_string smart_rollup_address_typed in
   let* () =
     match sandbox_config with
-    | Some
-        {
-          public_key = pk;
-          funded_addresses;
-          disable_da_fees;
-          kernel_verbosity;
-          tezlink;
-          _;
-        } ->
+    | Some {funded_addresses; disable_da_fees; kernel_verbosity; tezlink; _} ->
+        let* pk = Signer.public_key signer in
         let* () = Evm_context.patch_sequencer_key pk in
         let new_balance =
           Ethereum_types.quantity_of_z Z.(of_int 10_000 * pow (of_int 10) 18)

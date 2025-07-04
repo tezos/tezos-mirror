@@ -761,7 +761,8 @@ Storage commands:
 
 Kernel commands:
 
-  chunk data [<data or file>...] [--rollup-address <sr1...>] [--as-blueprint]
+  chunk data [<data or file>...] [--config-file <path>]
+      [--data-dir <data-dir>] [--rollup-address <sr1...>] [--as-blueprint]
       [--timestamp <[TIMESTAMP]>] [--number <0>]
       [--parent-hash <ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff>]
       [--sequencer-key <edsk...>] [-d --wallet-dir <path>]
@@ -771,6 +772,12 @@ Kernel commands:
     <data or file>: Data to prepare and chunk with the EVM rollup format. If
       the data is prefixed with `file:`, the content is read from the given
       filename and can contain a list of data separated by a whitespace.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+    --data-dir <data-dir>: The path to the EVM node data directory.
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     --rollup-address <sr1...>: The smart rollup address in Base58 encoding
       used to produce the chunked messages.
       Defaults to `[SMART_ROLLUP_HASH]`.
@@ -799,12 +806,18 @@ Kernel commands:
   
   make sequencer upgrade payload with pool address <pool_address> at
       activation timestamp <activation_timestamp> for <sequencer-key>
-      [-d --wallet-dir <path>]
+      [--config-file <path>] [--data-dir <data-dir>] [-d --wallet-dir <path>]
     Create bytes payload for the sequencer upgrade entrypoint.
     <pool_address>: Pool address of the sequencer
     <activation_timestamp>: After activation timestamp, the kernel will
       upgrade to this value.
     <sequencer-key>: Key to sign the blueprints.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+    --data-dir <data-dir>: The path to the EVM node data directory.
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
     -d --wallet-dir <path>: The directory where the Tezos client stores all
       its wallet data.
       Defaults to the value of the environment variable `$TEZOS_CLIENT_DIR`

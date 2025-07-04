@@ -7,7 +7,7 @@
 
 type t
 
-val from_gcp_key : Configuration.gcp_key -> t Lwt.t
+val from_gcp_key : Configuration.gcp_kms -> Configuration.gcp_key -> t Lwt.t
 
 val gcp_key : t -> Configuration.gcp_key
 

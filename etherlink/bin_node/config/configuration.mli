@@ -190,6 +190,8 @@ type db = {
       (** Maximum number of times a connection can be reused *)
 }
 
+type gcp_kms = {pool_size : int}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -199,6 +201,7 @@ type t = {
   sequencer : sequencer;
   observer : observer option;
   proxy : proxy;
+  gcp_kms : gcp_kms;
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
@@ -412,3 +415,5 @@ val describe : unit -> unit
 val pp_print_json : data_dir:string -> Format.formatter -> t -> unit
 
 val observer_evm_node_endpoint : supported_network -> string
+
+val default_gcp_kms : gcp_kms
