@@ -24,13 +24,14 @@ let network_of_address addr =
   | "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg" -> Some Testnet
   | _ -> None
 
-type kernel = Bifrost | Calypso | Calypso2 | Dionysus
+type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1
 
 let kernel_from_string = function
   | "bifrost" -> Some Bifrost
   | "calypso" -> Some Calypso
   | "calypso2" -> Some Calypso2
   | "dionysus" -> Some Dionysus
+  | "dionysus-r1" -> Some DionysusR1
   | _ -> None
 
 let root_hash_from_kernel = function
@@ -42,3 +43,5 @@ let root_hash_from_kernel = function
       `Hex "008ce0e105f0f1446d78430badcc83aa5672c66bf0bc4fb51962cb765c80e8a60e"
   | Dionysus ->
       `Hex "0008105ea6fb0e4331d7bbc93f0e8843ae91eeb235741054cb2b345ac2d19b9ec9"
+  | DionysusR1 ->
+      `Hex "0001010d789e7cccc25c785cf73a658574ed0995ef36b8416a46ab0ddc6b058b39"

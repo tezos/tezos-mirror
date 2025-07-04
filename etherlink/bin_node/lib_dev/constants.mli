@@ -18,7 +18,7 @@ val network_of_address :
   Tezos_crypto.Hashed.Smart_rollup_address.t ->
   Configuration.supported_network option
 
-type kernel = Bifrost | Calypso | Calypso2 | Dionysus
+type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1
 
 val kernel_from_string : string -> kernel option
 
