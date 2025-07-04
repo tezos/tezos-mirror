@@ -604,6 +604,7 @@ let jobs pipeline_type =
       ~dependencies:dependencies_needs_start
       ~release:true
       ~rules:(make_rules ~changes:changeset_octez_or_doc ())
+      ~sccache_size:"2G"
       ()
   in
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
@@ -806,7 +807,8 @@ let jobs pipeline_type =
           "eval $(opam env)";
           "make octez";
         ]
-      |> enable_cargo_cache |> enable_sccache
+      |> enable_cargo_cache
+      |> enable_sccache ~cache_size:"2G"
     in
     let job_build_grafazos =
       match pipeline_type with
@@ -824,12 +826,13 @@ let jobs pipeline_type =
       | Schedule_extended_test ->
           Grafazos.Common.job_build ~rules:[job_rule ~when_:Always ()] ()
     in
-    let job_build_teztale ?cpu ~arch ?storage () =
+    let job_build_teztale ?cpu ~arch ?storage ?(sccache_size = "5G") () =
       Teztale.Common.job_build
         ~arch
         ?cpu
         ?storage
         ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
+        ?sccache_size:(Some sccache_size)
         ()
     in
     [
@@ -845,7 +848,12 @@ let jobs pipeline_type =
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
-      job_build_teztale ~arch:Amd64 ~cpu:Very_high ~storage:Ramfs ();
+      job_build_teztale
+        ~arch:Amd64
+        ~cpu:Very_high
+        ~storage:Ramfs
+        ~sccache_size:"2G"
+        ();
       job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
