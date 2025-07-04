@@ -26,6 +26,7 @@ type t = {
   param_requests : (string * staking_parameters * int) list;
   force_ai_vote_yes : bool;
   baking_policy : Block.baker_policy option;
+  payload_round : int option;
   last_level_rewards : Protocol.Alpha_context.Raw_level.t;
   snapshot_balances : (string * balance) list String.Map.t;
   saved_rate : Q.t option;

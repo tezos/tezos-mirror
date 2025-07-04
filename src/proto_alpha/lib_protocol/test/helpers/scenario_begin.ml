@@ -142,6 +142,7 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             param_requests = [];
             force_ai_vote_yes = true;
             baking_policy = None;
+            payload_round = None;
             last_level_rewards = init_level;
             snapshot_balances = String.Map.empty;
             saved_rate = None;
