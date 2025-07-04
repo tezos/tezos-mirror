@@ -5,6 +5,7 @@
 
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
+use helpers::u256_to_le_bytes;
 use precompile_provider::EtherlinkPrecompiles;
 use revm::context::result::EVMError;
 use revm::context::tx::TxEnvBuilder;
@@ -20,7 +21,6 @@ use revm::{
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
     Context, ExecuteCommitEvm, Journal, MainBuilder,
 };
-use storage_helpers::u256_to_le_bytes;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
@@ -36,8 +36,8 @@ mod block_storage;
 mod code_storage;
 mod constants;
 mod database;
-mod storage_helpers;
-mod ticket_table;
+mod helpers;
+mod table;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -626,9 +626,13 @@ mod test {
         let _file =
             std::fs::read_to_string("contracts/out/withdrawal.sol/XTZWithdrawal.json")
                 .unwrap();
-        let file =
+        let _file =
             std::fs::read_to_string("contracts/out/fa_withdrawal.sol/FAWithdrawal.json")
                 .unwrap();
+        let file = std::fs::read_to_string(
+            "contracts/out/internal_forwarder.sol/InternalForwarder.json",
+        )
+        .unwrap();
         let json: Value = serde_json::from_str(&file).unwrap();
         let hex = json["bytecode"]["object"].as_str().unwrap();
         let deployed = Bytes::from_hex(hex).unwrap();

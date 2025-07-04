@@ -8,6 +8,7 @@ use std::mem;
 use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
     code_storage::CodeStorage,
+    helpers::legacy::FaDepositWithProxy,
     send_outbox_message::Withdrawal,
     world_state_handler::{
         account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
@@ -66,7 +67,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     }
 }
 
-pub trait PrecompileDatabase: Database {
+pub(crate) trait PrecompileDatabase: Database {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn push_withdrawal(&mut self, withdrawal: Withdrawal);
@@ -83,6 +84,11 @@ pub trait PrecompileDatabase: Database {
         owner: &Address,
         amount: U256,
     ) -> Result<bool, Error>;
+    fn read_deposit_from_queue(
+        &self,
+        deposit_id: &U256,
+    ) -> Result<FaDepositWithProxy, Error>;
+    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
@@ -224,6 +230,19 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
     ) -> Result<bool, Error> {
         let mut account_zero = self.get_or_create_account(Address::ZERO)?;
         account_zero.ticket_balance_remove(self.host, ticket_hash, owner, amount)
+    }
+
+    fn read_deposit_from_queue(
+        &self,
+        deposit_id: &U256,
+    ) -> Result<FaDepositWithProxy, Error> {
+        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.read_deposit_from_queue(self.host, deposit_id)
+    }
+
+    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error> {
+        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.remove_deposit_from_queue(self.host, deposit_id)
     }
 }
 

@@ -11,11 +11,11 @@ use revm::{
 
 use crate::{
     constants::{
-        CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TICKET_TABLE_PRECOMPILE_ADDRESS,
+        CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
     },
     database::PrecompileDatabase,
     send_outbox_message::send_outbox_message_precompile,
-    ticket_table::ticket_table_precompile,
+    table::table_precompile,
 };
 
 #[derive(Debug, Default)]
@@ -76,8 +76,8 @@ impl EtherlinkPrecompiles {
                 )?;
                 Ok(Some(result))
             }
-            TICKET_TABLE_PRECOMPILE_ADDRESS => {
-                let result = ticket_table_precompile(
+            TABLE_PRECOMPILE_ADDRESS => {
+                let result = table_precompile(
                     &input_bytes,
                     context,
                     is_static,

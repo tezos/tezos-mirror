@@ -5,12 +5,12 @@
 pragma solidity ^0.8.24;
 
 contract InternalForwarder {
-    address public constant TICKET_TABLE =
-        0xFf00000000000000000000000000000000000004;
+    address private constant faWithdrawals =
+        0xff00000000000000000000000000000000000002;
 
     modifier onlyTicketTable() {
         require(
-            msg.sender == TICKET_TABLE,
+            msg.sender == faWithdrawals,
             "InternalForwarder: unauthorized caller"
         );
         _;
@@ -22,4 +22,8 @@ contract InternalForwarder {
     ) external onlyTicketTable returns (bool success, bytes memory returnData) {
         (success, returnData) = target.call(data);
     }
+
+    receive() external payable {}
+
+    fallback() external payable {}
 }

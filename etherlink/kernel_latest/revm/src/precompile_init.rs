@@ -11,8 +11,8 @@ use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
     constants::{
-        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR,
-        WITHDRAWAL_SOL_CONTRACT,
+        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT,
+        INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
     custom,
     world_state_handler::{account_path, WorldStateHandler},
@@ -23,6 +23,12 @@ pub fn init_precompile_bytecodes<'a, Host: Runtime>(
     host: &'a mut Host,
     world_state_handler: &'a mut WorldStateHandler,
 ) -> Result<(), Error> {
+    init_precompile_bytecode(
+        host,
+        world_state_handler,
+        &Address::ZERO,
+        INTERNAL_FORWARDER_SOL_CONTRACT,
+    )?;
     init_precompile_bytecode(
         host,
         world_state_handler,

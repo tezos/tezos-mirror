@@ -13,7 +13,7 @@ use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
 use crate::{
-    storage_helpers::{bytes_hash, concat, read_u64_le_default, write_u64_le},
+    helpers::{bytes_hash, concat, read_u64_le_default, write_u64_le},
     Error,
 };
 
@@ -127,7 +127,7 @@ impl CodeStorage {
 #[cfg(test)]
 mod test {
     use super::{CodeStorage, REFERENCE_PATH};
-    use crate::storage_helpers::{concat, read_u64_le};
+    use crate::helpers::{concat, read_u64_le};
 
     use revm::{
         primitives::{Bytes, KECCAK_EMPTY},
