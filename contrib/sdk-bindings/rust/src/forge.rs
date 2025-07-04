@@ -3,6 +3,27 @@
 // SPDX-License-Identifier: MIT
 
 use crate::Error;
+/*
+Parameters of exported functions need to implement the `Lift<UniFfiTag>` trait.
+Only uniffi primitive types and a few other types implement it:
+- `Option<T>` and `Vec<T>` implement it if `T` also implements it.
+- `HashMap<K, V>` implements it if `K` and `V` also implement it.
+- `Arc<T>` implements it if `T` implements the `FfiConverterArc<UniFfiTag>` trait.
+- enums deriving `uniffi::Enum` and structs deriving `uniffi::Record` implement it.
+
+struct deriving `uniffi::Object` does not implement the `Lift<UniFfiTag>` trait.
+But since it implements `FfiConverterArc<UniFfiTag>` trait, using Arc<> allows it to be derived.
+So to pass a struct deriving `uniffi::Object` as optional in an exported function parameter, an Arc<T> is required:
+```
+#[derive(uniffi::Object)]
+pub struct MyStruct;
+
+#[uniffi::export]
+pub fn my_function(my_struct: Option<Arc<MyStruct>>) -> ...
+```
+Notice that `&MyStruct` can also be passed as parameters of exported functions because it implements the `LiftRef<UniFfiTag>` trait.
+This does not help for optional struct deriving `uniffi::Object` because `Option<T>` implements this trait only if `T` implements the `Lift<UniFfiTag>` trait.
+*/
 use std::sync::Arc;
 use tezos_data_encoding::enc;
 
@@ -39,7 +60,8 @@ pub mod operation {
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_protocol::operation::{
-        DelegationContent, ManagerOperationContent, OperationContent, RevealContent,
+        DelegationContent, ManagerOperationContent, OperationContent, OriginationContent,
+        RevealContent, Script,
     };
 
     #[derive(uniffi::Object, Debug)]
@@ -91,6 +113,73 @@ pub mod operation {
                 },
             });
             reveal
+                .to_bytes()
+                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
+        }
+    }
+
+    #[derive(uniffi::Object, Debug)]
+    pub struct Origination {
+        pub source: PublicKeyHash,
+        pub fee: u64,
+        pub counter: u64,
+        pub gas_limit: u64,
+        pub storage_limit: u64,
+        pub balance: u64,
+        pub delegate: Option<PublicKeyHash>,
+        // Its script is always as follows:
+        // "script": {
+        //   "code": [],
+        //   "storage": {
+        //     "prim": "unit"
+        //   }
+        // }
+    }
+
+    #[uniffi::export]
+    impl Origination {
+        #[doc = "Build a origination operation."]
+        #[uniffi::constructor]
+        pub fn new(
+            source: &PublicKeyHash,
+            fee: u64,
+            counter: u64,
+            gas_limit: u64,
+            storage_limit: u64,
+            balance: u64,
+            delegate: Option<Arc<PublicKeyHash>>,
+        ) -> Self {
+            Self {
+                source: source.clone(),
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                balance,
+                delegate: delegate.map(|delegate| delegate.as_ref().clone()),
+            }
+        }
+
+        #[doc = "Forge the operation."]
+        pub fn forge(&self) -> Result<Vec<u8>, Error> {
+            let origination = OperationContent::Origination(ManagerOperationContent {
+                source: self.source.0.clone(),
+                fee: self.fee.into(),
+                counter: self.counter.into(),
+                gas_limit: self.gas_limit.into(),
+                storage_limit: self.storage_limit.into(),
+                operation: OriginationContent {
+                    balance: self.balance.into(),
+                    delegate: self.delegate.clone().map(|delegate| delegate.0),
+                    script: Script {
+                        // Seq(&[]).encode(),
+                        code: vec![0x02, 0x00, 0x00, 0x00, 0x00],
+                        // Micheline::App(Prim::unit, &[], NO_ANNS).encode(),
+                        storage: vec![0x03, 0x6c],
+                    },
+                },
+            });
+            origination
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
