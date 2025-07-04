@@ -168,7 +168,7 @@
            number too low will make signing blueprints a bottleneck, while a
            number unnecessarily high will consume file descriptors. Defaults
            to 4 if absent. */,
-      "authentication_method"?: "gcloud_auth",
+      "authentication_method"?: "metadata_server" | "gcloud_auth",
       "authentication_retries"?:
         integer ∈ [1, 2^30]
         /* Specify the number of retries the node does to get a new GCP token

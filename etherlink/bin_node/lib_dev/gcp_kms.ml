@@ -16,6 +16,15 @@ let service_name = "Gcp_kms"
 
 let kms_uri = Uri.of_string "https://cloudkms.googleapis.com/"
 
+let metadata_server_host = "metadata.google.internal"
+
+let metadata_server_uri =
+  Uri.make
+    ~scheme:"http"
+    ~host:metadata_server_host
+    ~path:"/computeMetadata/v1/instance/service-accounts/default/token"
+    ()
+
 exception Timeout
 
 let run_without_error cmd args =
@@ -63,6 +72,36 @@ let get_token_using_gcloud gcloud_path () =
   in
   Lwt_result.ok (Lwt_io.read_line pc#stdout)
 
+let get_token_using_metadata_server () =
+  let open Lwt_result_syntax in
+  let*! resp, body =
+    Cohttp_lwt_unix.Client.get
+      ~headers:
+        (Cohttp.Header.of_list
+           [("Accept", "application/json"); ("Metadata-Flavor", "Google")])
+      metadata_server_uri
+  in
+  let* () =
+    when_ (Cohttp.Response.status resp <> `OK) @@ fun () ->
+    failwith
+      "Could not fetch a token from the Metadata server (HTTP code %d)"
+      Cohttp.(Code.code_of_status @@ Response.status resp)
+  in
+  let*! body = Cohttp_lwt.Body.to_string body in
+  match Ezjsonm.value_from_string_result body with
+  | Ok json -> (
+      match Ezjsonm.find_opt json ["access_token"] with
+      | Some (`String access_token) -> return access_token
+      | _ ->
+          failwith
+            "Could not fetch the key access_token from the Metadata response \
+             (%s)"
+            (Ezjsonm.value_to_string ~minify:true json))
+  | Error err ->
+      failwith
+        "Could not parse response from Metadata server (%s)"
+        (Ezjsonm.read_error_description err)
+
 let get_token config =
   let open Lwt_syntax in
   let get =
@@ -72,6 +111,12 @@ let get_token config =
           trace
             (error_of_fmt "Could not fetch a new access token using gcloud")
             (get_token_using_gcloud config.gcloud_path ())
+    | Metadata_server ->
+        fun () ->
+          trace
+            (error_of_fmt
+               "Could not fetch a new access token using the metadata server")
+            (get_token_using_metadata_server ())
   in
   let* token =
     retry
@@ -238,6 +283,19 @@ let assert_authentication_method config =
       let*! can_use = run_without_error "which" [config.gcloud_path] in
       unless can_use (fun () ->
           failwith "gcloud executable (%s) not found" config.gcloud_path)
+  | Metadata_server ->
+      (* We check the metadata server is available *)
+      let*! resolv =
+        Lwt_unix.getaddrinfo
+          (* [Uri.host] will always return something since it is a top-level constant *)
+          metadata_server_host
+          "80"
+          [AI_FAMILY PF_INET; AI_SOCKTYPE SOCK_STREAM]
+      in
+      when_ (resolv = []) (fun () ->
+          failwith
+            "Could not resolve %s, meaning the metadata server is not available"
+            metadata_server_host)
 
 let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
   let open Lwt_result_syntax in

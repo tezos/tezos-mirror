@@ -190,7 +190,7 @@ type db = {
       (** Maximum number of times a connection can be reused *)
 }
 
-type gcp_authentication_method = Gcloud_auth
+type gcp_authentication_method = Gcloud_auth | Metadata_server
 
 type gcp_kms = {
   pool_size : int;
