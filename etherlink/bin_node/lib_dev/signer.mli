@@ -15,7 +15,7 @@ val of_sequencer_key :
   Configuration.t ->
   #Client_context.wallet ->
   Configuration.sequencer_key ->
-  t Lwt.t
+  t tzresult Lwt.t
 
 val of_string :
   Configuration.t -> #Client_context.wallet -> string -> t tzresult Lwt.t

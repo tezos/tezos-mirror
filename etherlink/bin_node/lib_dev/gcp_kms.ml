@@ -9,39 +9,90 @@ type t = {
   pool : Octez_connpool.t;
   key_path : string;
   gcp_key : Configuration.gcp_key;
+  mutable auth_token : string;
 }
 
 let service_name = "Gcp_kms"
 
 let kms_uri = Uri.of_string "https://cloudkms.googleapis.com/"
 
-(* TODO: Support auth token refresh *)
-let auth () =
-  let open Result_syntax in
-  match Sys.getenv "EVM_NODE_GCP_KMS_ACCESS_TOKEN" with
-  | (exception Not_found) | "" ->
-      error_with
-        "Environment variable ACCESS_TOKEN must be set for signing with GCP KMS"
-  | s -> return s
+exception Timeout
 
-let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
+let run_without_error cmd args =
   let open Lwt_syntax in
-  let kms_handler =
-    {
-      pool = Octez_connpool.make ~n:config.pool_size kms_uri;
-      key_path =
-        Format.sprintf
-          "v1/projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s/cryptoKeyVersions/%d"
-          gcp_key.Configuration.project
-          gcp_key.region
-          gcp_key.keyring
-          gcp_key.key
-          gcp_key.version;
-      gcp_key;
-    }
+  let+ status =
+    Lwt_process.with_process_full
+      (cmd, Array.of_list (cmd :: args))
+      (fun pc -> pc#status)
   in
-  Lwt.dont_wait (fun () -> Octez_connpool.warm kms_handler.pool) ignore ;
-  return kms_handler
+  match status with Unix.WEXITED 0 -> true | _ -> false
+
+let with_timeout t k =
+  let open Lwt_result_syntax in
+  Lwt.pick
+    [
+      k ();
+      (let*! () = Lwt_unix.sleep (float_of_int t) in
+       fail_with_exn Timeout);
+    ]
+
+let rec retry ~timeout ~backoff ~on_error remaining_count k =
+  let open Lwt_syntax in
+  if remaining_count > 0 then
+    let* try_result = protect (fun () -> with_timeout timeout k) in
+    match try_result with
+    | Error err ->
+        let* () = on_error err in
+        let* () = Lwt_unix.sleep (float_of_int backoff) in
+        retry ~timeout ~backoff ~on_error (remaining_count - 1) k
+    | Ok res -> return res
+  else Lwt_exit.exit_and_raise Node_error.exit_code_when_gcp_kms_auth_error
+
+let get_token_using_gcloud gcloud_path () =
+  Lwt_process.with_process_full
+    (gcloud_path, [|"gcloud"; "auth"; "print-access-token"; "--quiet"|])
+  @@ fun pc ->
+  let open Lwt_result_syntax in
+  let*! status = pc#status in
+  let* () =
+    when_ (status <> WEXITED 0) @@ fun () ->
+    match status with
+    | WEXITED i -> failwith "gcloud exited with code %d" i
+    | WSIGNALED i -> failwith "gcloud was kill by signal %d" i
+    | WSTOPPED i -> failwith "gcloud was stopped by signal %d" i
+  in
+  Lwt_result.ok (Lwt_io.read_line pc#stdout)
+
+let get_token config =
+  let open Lwt_syntax in
+  let get =
+    match config.Configuration.authentication_method with
+    | Gcloud_auth ->
+        fun () ->
+          trace
+            (error_of_fmt "Could not fetch a new access token using gcloud")
+            (get_token_using_gcloud config.gcloud_path ())
+  in
+  let* token =
+    retry
+      ~timeout:config.authentication_timeout_sec
+      ~backoff:config.authentication_retry_backoff_sec
+      ~on_error:Gcp_kms_events.cannot_refresh_access_token
+      config.Configuration.authentication_retries
+      get
+  in
+  let* () = Gcp_kms_events.new_token () in
+  return token
+
+let rec wait_and_refresh config t =
+  let open Lwt_syntax in
+  let* () =
+    Lwt_unix.sleep
+      (float_of_int config.Configuration.authentication_frequency_min *. 60.)
+  in
+  let* token = get_token config in
+  t.auth_token <- token ;
+  wait_and_refresh config t
 
 let gcp_key k = k.gcp_key
 
@@ -54,20 +105,17 @@ module Route = struct
   let public_key t = t.key_path ^ "/publicKey"
 end
 
-let request_header () =
-  let open Result_syntax in
-  let* access_token = auth () in
-  return
-  @@ Cohttp.Header.of_list
-       [
-         ("authorization", Format.sprintf "Bearer %s" access_token);
-         ("content-type", "application/json");
-         ("accept", "application/json");
-       ]
+let request_header t =
+  Cohttp.Header.of_list
+    [
+      ("authorization", Format.sprintf "Bearer %s" t.auth_token);
+      ("content-type", "application/json");
+      ("accept", "application/json");
+    ]
 
 let get_public_key kms_handler =
   let open Lwt_result_syntax in
-  let*? headers = request_header () in
+  let headers = request_header kms_handler in
   let* response, body_str =
     Octez_connpool.get ~headers kms_handler.pool (Route.public_key kms_handler)
   in
@@ -132,8 +180,8 @@ let sign_rpc kms_handler digest =
     ~service_name
     (Format.sprintf "POST %s" kms_handler.key_path)
   @@ fun _ ->
+  let headers = request_header kms_handler in
   let* response, body =
-    let*? headers = request_header () in
     Octez_connpool.post
       ~headers
       ~body:
@@ -182,3 +230,38 @@ let sign kms_handler payload =
   let digest = digest payload in
   let* b64_sig = sign_rpc kms_handler digest in
   signature_of_b64encoded b64_sig
+
+let assert_authentication_method config =
+  let open Lwt_result_syntax in
+  match config.Configuration.authentication_method with
+  | Configuration.Gcloud_auth ->
+      let*! can_use = run_without_error "which" [config.gcloud_path] in
+      unless can_use (fun () ->
+          failwith "gcloud executable (%s) not found" config.gcloud_path)
+
+let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
+  let open Lwt_result_syntax in
+  (* We fail early on startup, and keep the retry and backoff strategy for
+     refreshing token only. *)
+  let* () = assert_authentication_method config in
+  let*! auth_token = get_token {config with authentication_retries = 1} in
+  let kms_handler =
+    {
+      pool = Octez_connpool.make ~n:config.pool_size kms_uri;
+      key_path =
+        Format.sprintf
+          "v1/projects/%s/locations/%s/keyRings/%s/cryptoKeys/%s/cryptoKeyVersions/%d"
+          gcp_key.Configuration.project
+          gcp_key.region
+          gcp_key.keyring
+          gcp_key.key
+          gcp_key.version;
+      gcp_key;
+      auth_token;
+    }
+  in
+  let* pk = public_key kms_handler in
+  let*! () = Gcp_kms_events.is_ready pk in
+  Lwt.dont_wait (fun () -> Octez_connpool.warm kms_handler.pool) ignore ;
+  Lwt.dont_wait (fun () -> wait_and_refresh config kms_handler) ignore ;
+  return kms_handler

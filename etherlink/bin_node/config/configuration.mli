@@ -190,7 +190,17 @@ type db = {
       (** Maximum number of times a connection can be reused *)
 }
 
-type gcp_kms = {pool_size : int}
+type gcp_authentication_method = Gcloud_auth
+
+type gcp_kms = {
+  pool_size : int;
+  authentication_method : gcp_authentication_method;
+  authentication_retries : int;
+  authentication_frequency_min : int;
+  authentication_retry_backoff_sec : int;
+  authentication_timeout_sec : int;
+  gcloud_path : string;
+}
 
 type t = {
   public_rpc : rpc;

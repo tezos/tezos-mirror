@@ -40,7 +40,13 @@
     "ignore_block_param": false
   },
   "gcp_kms": {
-    "connection_pool_size": 4
+    "connection_pool_size": 4,
+    "authentication_method": "gcloud_auth",
+    "authentication_retries": 4,
+    "authentication_frequency_min": 30,
+    "authentication_retry_backoff_sec": 120,
+    "authentication_timeout_sec": 5,
+    "gcloud_path": "gcloud"
   },
   "fee_history": {
     "max_count": 1024
@@ -113,7 +119,13 @@
     "ignore_block_param": false
   },
   "gcp_kms": {
-    "connection_pool_size": 4
+    "connection_pool_size": 4,
+    "authentication_method": "gcloud_auth",
+    "authentication_retries": 4,
+    "authentication_frequency_min": 30,
+    "authentication_retry_backoff_sec": 120,
+    "authentication_timeout_sec": 5,
+    "gcloud_path": "gcloud"
   },
   "fee_history": {
     "max_count": 1024
@@ -191,7 +203,13 @@
     "ignore_block_param": false
   },
   "gcp_kms": {
-    "connection_pool_size": 4
+    "connection_pool_size": 4,
+    "authentication_method": "gcloud_auth",
+    "authentication_retries": 4,
+    "authentication_frequency_min": 30,
+    "authentication_retry_backoff_sec": 120,
+    "authentication_timeout_sec": 5,
+    "gcloud_path": "gcloud"
   },
   "fee_history": {
     "max_count": 1024

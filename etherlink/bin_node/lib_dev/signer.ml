@@ -14,7 +14,7 @@ let wallet cctxt sk_uri = Wallet (cctxt, sk_uri)
 let gcp_kms kms = Gcp_kms kms
 
 let of_sequencer_key config cctxt (k : Configuration.sequencer_key) =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   match k with
   | Wallet k -> return (Wallet (cctxt, k))
   | Gcp_key k ->
@@ -25,7 +25,7 @@ let of_string config cctxt key_str =
   let open Lwt_result_syntax in
   match Configuration.gcp_key_from_string_opt key_str with
   | Some key ->
-      let*! kms_handler =
+      let* kms_handler =
         Gcp_kms.from_gcp_key config.Configuration.gcp_kms key
       in
       return (gcp_kms kms_handler)

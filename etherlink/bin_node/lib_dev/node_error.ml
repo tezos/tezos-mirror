@@ -13,6 +13,8 @@ let exit_code_when_flushed_blueprint = 102
 
 let exit_code_when_error_blueprints_follower = 103
 
+let exit_code_when_gcp_kms_auth_error = 104
+
 type error_source = [`Node | `Kernel]
 
 let error_source_encoding =
