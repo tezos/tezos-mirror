@@ -1074,6 +1074,43 @@ let test_tezlink_sandbox () =
     ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
+let test_tezlink_internal_operation =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
+  register_tezlink_test
+    ~title:"Internal operation"
+    ~tags:["internal"; "operation"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_contracts:[faucet]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~fee:Tez.zero
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:faucet.address
+      ~burn_cap:Tez.one
+      ~entrypoint:"fund"
+      ~arg:"1000000"
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance = Tez.to_mutez bootstrap_balance + Tez.(to_mutez one))
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -1102,4 +1139,5 @@ let () =
   test_tezlink_storage [Alpha] ;
   test_tezlink_execution [Alpha] ;
   test_tezlink_bootstrap_block_info [Alpha] ;
-  test_tezlink_sandbox ()
+  test_tezlink_sandbox () ;
+  test_tezlink_internal_operation [Alpha]
