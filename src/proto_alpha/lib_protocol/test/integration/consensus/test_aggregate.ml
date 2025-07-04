@@ -821,6 +821,56 @@ let test_metadata_committee_is_correctly_ordered () =
   in
   return_unit
 
+let test_preattestation_signature_for_attestation ~block ~delegate =
+  let open Lwt_result_syntax in
+  let* op_preattestation = Op.preattestation ~delegate block in
+  let* op_attestation = Op.attestation ~delegate block in
+  let op_attestation_with_preattestation_signature =
+    Op.copy_op_signature ~src:op_preattestation ~dst:op_attestation
+  in
+  let* () =
+    Op.check_validation_and_application
+      ~loc:__LOC__
+      ~predecessor:block
+      ~error:signature_invalid_error
+      Mempool
+      op_attestation_with_preattestation_signature
+  in
+  let op_preattestation_with_attestation_signature =
+    Op.copy_op_signature ~dst:op_preattestation ~src:op_attestation
+  in
+  let* () =
+    Op.check_validation_and_application
+      ~loc:__LOC__
+      ~predecessor:block
+      ~error:signature_invalid_error
+      Mempool
+      op_preattestation_with_attestation_signature
+  in
+  return_unit
+
+let test_preattestation_signature_for_attestation_non_bls () =
+  let open Lwt_result_syntax in
+  let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
+  let* block = Block.bake genesis in
+  let* delegate, _slots = Context.get_attester (B block) in
+  test_preattestation_signature_for_attestation ~delegate ~block
+
+let test_preattestation_signature_for_attestation_bls () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  let delegate, _slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  test_preattestation_signature_for_attestation
+    ~delegate:delegate.delegate
+    ~block
+
 let tests =
   [
     Tztest.tztest
@@ -880,6 +930,14 @@ let tests =
       "test_metadata_committee_is_correctly_ordered"
       `Quick
       test_metadata_committee_is_correctly_ordered;
+    Tztest.tztest
+      "Use preattestation signature for attestation (non BLS)"
+      `Quick
+      test_preattestation_signature_for_attestation_non_bls;
+    Tztest.tztest
+      "Use preattestation signature for attestation (BLS)"
+      `Quick
+      test_preattestation_signature_for_attestation_bls;
   ]
 
 let () =

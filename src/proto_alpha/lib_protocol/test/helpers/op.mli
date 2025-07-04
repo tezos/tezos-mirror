@@ -820,3 +820,9 @@ val check_validation_and_application_all_modes :
   predecessor:Block.t ->
   t ->
   unit tzresult Lwt.t
+
+val get_op_signature : t -> signature option
+
+val set_op_signature : t -> signature option -> t
+
+val copy_op_signature : src:t -> dst:t -> t
