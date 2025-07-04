@@ -38,14 +38,6 @@ val head_processing : Block_hash.t -> int32 -> unit Lwt.t
     [level] in [process_time] seconds. *)
 val new_head_processed : Block_hash.t -> int32 -> Ptime.Span.t -> unit Lwt.t
 
-(** [etherlink_blocks_processed ~etherlink_start_block ~etherlink_end_block
-    process_time] emits an event for Etherlink processed block levels if any. *)
-val etherlink_blocks_processed :
-  etherlink_start_block:int option ->
-  etherlink_end_block:int option ->
-  Ptime.span ->
-  unit Lwt.t
-
 (** [new_head_degraded hash level] emits an error event that indicates the
     rollup node is running in degraded modes and sees an L1 block [hash] and at
     the given [level]. *)
