@@ -536,6 +536,33 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?data_dir
           ~state_recorder
           delegates);
+    command
+      ~group
+      ~desc:"Send a block proposal for the current level"
+      (args4
+         force_switch
+         force_round_arg
+         minimal_timestamp_switch
+         force_reproposal)
+      (prefixes ["repropose"; "for"] @@ sources_param)
+      (fun (force, force_round, minimal_timestamp, force_reproposal)
+           sources
+           cctxt ->
+        let*? force_round =
+          Option.map_e
+            (fun r ->
+              Result.map_error Environment.wrap_tztrace
+              @@ Protocol.Alpha_context.Round.of_int r)
+            force_round
+        in
+        let* delegates = get_delegates cctxt sources in
+        Baking_lib.repropose
+          cctxt
+          ~force
+          ~minimal_timestamp
+          ~force_reproposal
+          ?force_round
+          delegates);
   ]
 
 let directory_parameter =
