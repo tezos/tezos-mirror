@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: MIT
 
 .PHONY: all
-all: build test check
+all: build check
 
 # In some situations we might want to override the compilation target.
 NATIVE_TARGET ?=
