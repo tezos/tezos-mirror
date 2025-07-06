@@ -23,6 +23,8 @@
 ### Execution changes
 
 - Support signing blueprints via a key stored in a GCP KMS. (!18527)
+- Support downloading Etherlink 4.1 kernel (Dionysus first revision,
+  `dionysus-r1`) by name. (!18594)
 
 ### Storage changes
 
