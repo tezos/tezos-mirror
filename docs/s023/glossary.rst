@@ -352,6 +352,8 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
+.. _def_staker_s023:
+
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
