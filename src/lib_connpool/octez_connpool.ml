@@ -117,13 +117,20 @@ let make_uri uri ?query ?userinfo route =
 
 exception Call_failure of exn
 
+let pre_heat t =
+  List.iter_p
+    (fun _ -> Lwt_pool.use t.pool (fun _conn -> Lwt.return_unit))
+    (1 -- t.pool_len)
+
 let warm t =
+  let open Lwt_syntax in
   Opentelemetry.Trace.with_ ~service_name:"Octez_connpool" "warm" @@ fun _ ->
-  let rec warm n pool =
+  let rec re_warm n pool =
     Lwt_pool.use pool @@ fun _conn ->
-    if n > 1 then warm (n - 1) pool else Lwt.return_unit
+    if n > 1 then re_warm (n - 1) pool else return_unit
   in
-  warm t.pool_len t.pool
+  let* () = pre_heat t in
+  re_warm t.pool_len t.pool
 
 let add_traceparent_header header
     ({trace_id; span_id; _} : Opentelemetry.Scope.t) =
