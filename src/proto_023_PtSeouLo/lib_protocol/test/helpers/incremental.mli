@@ -34,6 +34,8 @@ val predecessor : incremental -> Block.t
 
 val header : incremental -> Block_header.t
 
+val rev_operations : incremental -> Operation.packed list
+
 val rev_tickets : incremental -> operation_receipt list
 
 val validation_state : incremental -> validation_state
