@@ -872,6 +872,44 @@ let test_preattestation_signature_for_attestation_bls () =
     ~delegate:delegate.delegate
     ~block
 
+let test_signature_bls_attestation_with_different_slot () =
+  let find_attester_slots_with_bls_key attesters =
+    List.find_map
+      (fun (attester : RPC.Validators.t) ->
+        match attester.consensus_key with
+        | Bls _ -> Some (attester, attester.slots)
+        | _ -> None)
+      attesters
+  in
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  let delegate, slots =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_slots_with_bls_key attesters)
+  in
+  let slot1, slot2 =
+    match slots with
+    | slot1 :: slot2 :: _ -> (slot1, slot2)
+    | _ -> Test.fail ~__LOC__ "Delegate must have at least two slots"
+  in
+  let* op_attestation1 =
+    Op.attestation ~slot:slot1 ~delegate:delegate.delegate block
+  in
+  let* op_attestation2 =
+    Op.attestation ~slot:slot2 ~delegate:delegate.delegate block
+  in
+  Assert.equal
+    ~loc:__LOC__
+    (Option.equal Signature.equal)
+    "Signatures must be equal"
+    (Format.pp_print_option Signature.pp)
+    (Op.get_op_signature op_attestation1)
+    (Op.get_op_signature op_attestation2)
+
 let tests =
   [
     Tztest.tztest
@@ -939,6 +977,10 @@ let tests =
       "Use preattestation signature for attestation (BLS)"
       `Quick
       test_preattestation_signature_for_attestation_bls;
+    Tztest.tztest
+      "Signatures for bls attestations with different slots are equal"
+      `Quick
+      test_signature_bls_attestation_with_different_slot;
   ]
 
 let () =
