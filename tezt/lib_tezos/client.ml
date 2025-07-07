@@ -1109,7 +1109,13 @@ let repropose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
 
 let id = ref 0
 
-let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
+type key_encryption =
+  | Encrypted of string
+  | Forced_encrypted of string
+  | Forced_unencrypted
+
+let spawn_gen_keys ?(force = false) ?alias ?sig_alg ?(force_unencrypted = false)
+    client =
   let alias =
     match alias with
     | None ->
@@ -1119,11 +1125,55 @@ let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
   in
   let force = if force then ["--force"] else [] in
   ( spawn_command client @@ ["gen"; "keys"; alias] @ force
-    @ optional_arg "sig" Fun.id sig_alg,
+    @ optional_arg "sig" Fun.id sig_alg
+    @ optional_switch "unencrypted" force_unencrypted,
     alias )
 
-let gen_keys ?force ?alias ?sig_alg client =
-  let p, alias = spawn_gen_keys ?force ?alias ?sig_alg client in
+let spawn_gen_keys_with_stdin ?(force = false) ?alias ?sig_alg
+    ?(force_encrypted = false) client =
+  let alias =
+    match alias with
+    | None ->
+        incr id ;
+        sf "tezt_%d" !id
+    | Some alias -> alias
+  in
+  let force = if force then ["--force"] else [] in
+  ( spawn_command_with_stdin client
+    @@ ["gen"; "keys"; alias] @ force
+    @ optional_arg "sig" Fun.id sig_alg
+    @ optional_switch "encrypted" force_encrypted,
+    alias )
+
+let gen_keys ?force ?alias ?sig_alg ?key_encryption client =
+  let* p, alias =
+    match key_encryption with
+    | None -> return @@ spawn_gen_keys ?force ?alias ?sig_alg client
+    | Some (Encrypted password) ->
+        let (process, output_channel), alias =
+          spawn_gen_keys_with_stdin ?force ?alias ?sig_alg client
+        in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.close output_channel in
+        return (process, alias)
+    | Some (Forced_encrypted password) ->
+        let (process, output_channel), alias =
+          spawn_gen_keys_with_stdin
+            ~force_encrypted:true
+            ?force
+            ?alias
+            ?sig_alg
+            client
+        in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.close output_channel in
+        return (process, alias)
+    | Some Forced_unencrypted ->
+        return
+        @@ spawn_gen_keys ~force_unencrypted:true ?force ?alias ?sig_alg client
+  in
   let* () = Process.check p in
   return alias
 
