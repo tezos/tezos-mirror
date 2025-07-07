@@ -45,6 +45,11 @@ Sapling, etc), and some details about its implementation.
 .. toctree::
    :maxdepth: 2
 
+   native_multisig
+
+.. toctree::
+   :maxdepth: 2
+
    michelson
 
 .. toctree::
