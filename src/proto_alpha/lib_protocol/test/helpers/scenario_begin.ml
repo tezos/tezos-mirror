@@ -87,8 +87,7 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
     (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
-      let bootstrap = "__bootstrap__" in
-      let delegates_name_list = bootstrap :: delegates_name_list in
+      assert (not @@ List.is_empty delegates_name_list) ;
       (* Do not disable default checks, unless for a good reason *)
       let check_finalized_block_perm =
         if disable_default_checks then check_finalized_block_perm
