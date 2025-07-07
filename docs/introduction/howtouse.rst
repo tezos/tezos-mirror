@@ -316,7 +316,7 @@ An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
 Secret keys are stored by default unencrypted on testnets (as can be seen here).
-On mainnet, the default is to store keys encrypted, because this is the recommended practice except when
+On mainnet, the default is to store keys encrypted, because this is the recommended practice for most use cases, except when
 using a hardware wallet (see :ref:`ledger`).
 
 If you want to force using encryption on a testnet, you must supply the option ``--encrypted`` when generating a new account::
