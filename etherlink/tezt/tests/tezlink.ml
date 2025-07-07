@@ -292,7 +292,7 @@ let test_tezlink_balance =
   unit
 
 let test_tezlink_storage =
-  let contract = (Michelson_contracts.bootstraps ()).(0) in
+  let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
     ~title:"Test of the storage rpc"
     ~tags:["rpc"; "storage"]
