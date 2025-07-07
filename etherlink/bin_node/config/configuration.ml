@@ -196,7 +196,17 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type gcp_kms = {pool_size : int}
+type gcp_authentication_method = Gcloud_auth
+
+type gcp_kms = {
+  pool_size : int;
+  authentication_method : gcp_authentication_method;
+  authentication_retries : int;
+  authentication_frequency_min : int;
+  authentication_retry_backoff_sec : int;
+  authentication_timeout_sec : int;
+  gcloud_path : string;
+}
 
 type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
 
@@ -1116,14 +1126,82 @@ let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
    most of traffic for now. *)
 let default_gcp_kms_pool_size = 4
 
-let default_gcp_kms = {pool_size = default_gcp_kms_pool_size}
+let default_gcp_authentication_method = Gcloud_auth
+
+(* GCP tokens live 60min by default. We refresh after half this time to be
+   sure we never have race condition. *)
+let default_gcp_authentication_frequency_min = 30
+
+let default_gcp_authentication_retries = 4
+
+let default_gcp_authentication_retry_backoff_sec = 120
+
+let default_gcp_authentication_timeout_sec = 5
+
+let default_gcloud_path = "gcloud"
+
+let default_gcp_kms =
+  {
+    pool_size = default_gcp_kms_pool_size;
+    authentication_method = default_gcp_authentication_method;
+    authentication_retries = default_gcp_authentication_retries;
+    authentication_frequency_min = default_gcp_authentication_frequency_min;
+    authentication_retry_backoff_sec =
+      default_gcp_authentication_retry_backoff_sec;
+    authentication_timeout_sec = default_gcp_authentication_timeout_sec;
+    gcloud_path = "gcloud";
+  }
+
+let gcp_authentication_method_to_string = function
+  | Gcloud_auth -> "gcloud_auth"
+
+let gcp_authentication_method_encoding =
+  let open Data_encoding in
+  (* Should have been
+     `string_enum @@ List.map (fun m -> (gcp_authentication_method_to_string m, m)) [Gcloud_auth]`
+     but Data-encoding is just too opinionated for that. *)
+  conv
+    (fun Gcloud_auth -> ())
+    (fun () -> Gcloud_auth)
+    (constant (gcp_authentication_method_to_string Gcloud_auth))
 
 let gcp_kms_encoding =
   let open Data_encoding in
   conv
-    (fun ({pool_size} : gcp_kms) -> pool_size)
-    (fun pool_size -> {pool_size})
-    (obj1
+    (fun ({
+            pool_size;
+            authentication_method;
+            authentication_retries;
+            authentication_frequency_min;
+            authentication_retry_backoff_sec;
+            authentication_timeout_sec;
+            gcloud_path;
+          } :
+           gcp_kms) ->
+      ( pool_size,
+        authentication_method,
+        authentication_retries,
+        authentication_frequency_min,
+        authentication_retry_backoff_sec,
+        authentication_timeout_sec,
+        gcloud_path ))
+    (fun ( pool_size,
+           authentication_method,
+           authentication_retries,
+           authentication_frequency_min,
+           authentication_retry_backoff_sec,
+           authentication_timeout_sec,
+           gcloud_path ) ->
+      {
+        pool_size;
+        authentication_method;
+        authentication_retries;
+        authentication_frequency_min;
+        authentication_retry_backoff_sec;
+        authentication_timeout_sec;
+        gcloud_path;
+      })
+    (obj7
        (dft
           ~title:
             Format.(
@@ -1135,7 +1213,71 @@ let gcp_kms_encoding =
                 default_gcp_kms_pool_size)
           "connection_pool_size"
           strictly_positive_encoding
-          default_gcp_kms_pool_size))
+          default_gcp_kms_pool_size)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the method used to fetch authentication tokens to \
+                 send requests to the GCP KMS. Defaults to `%s` if absent."
+                (gcp_authentication_method_to_string
+                   default_gcp_authentication_method))
+          "authentication_method"
+          gcp_authentication_method_encoding
+          default_gcp_authentication_method)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the number of retries the node does to get a new GCP \
+                 token before giving up and exiting. Defaults to `%d` if \
+                 absent."
+                default_gcp_authentication_retries)
+          "authentication_retries"
+          strictly_positive_encoding
+          default_gcp_authentication_retries)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the number of minutes before the node attempts to \
+                 refresh its current access token. Defaults to `%d` if absent."
+                default_gcp_authentication_frequency_min)
+          "authentication_frequency_min"
+          strictly_positive_encoding
+          default_gcp_authentication_frequency_min)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the number of seconds between two attemps at \
+                 refreshing the access token used to interact with GCP. \
+                 Defaults to `%d` if absent."
+                default_gcp_authentication_retry_backoff_sec)
+          "authentication_retry_backoff_sec"
+          strictly_positive_encoding
+          default_gcp_authentication_retry_backoff_sec)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the maximum number of seconds the selected \
+                 authentication method can used before considered having \
+                 failed. Defaults to `%d` if absents."
+                default_gcp_authentication_timeout_sec)
+          "authentication_timeout_sec"
+          strictly_positive_encoding
+          default_gcp_authentication_timeout_sec)
+       (dft
+          ~description:
+            Format.(
+              sprintf
+                "Specify the path of the `gcloud` binary. Defaults to `%s` if \
+                 absent."
+                default_gcloud_path)
+          "gcloud_path"
+          string
+          default_gcloud_path))
 
 let fee_history_encoding =
   let open Data_encoding in
@@ -1945,7 +2087,7 @@ module Cli = struct
       sequencer;
       observer;
       proxy;
-      gcp_kms = default_gcp_kms;
+      gcp_kms = configuration.gcp_kms;
       tx_pool_timeout_limit =
         Option.value
           ~default:configuration.tx_pool_timeout_limit

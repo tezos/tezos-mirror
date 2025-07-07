@@ -371,6 +371,14 @@ cannot_fetch_time_between_blocks:
           "trace": any } }
     $time_between_blocks: number /* Some */ || null /* None */
   
+cannot_refresh_token:
+  description: cannot refresh the access token for the GCP KMS: {trace}
+  level: fatal
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* cannot_refresh_token version 0 */
+      "cannot_refresh_token.v0": any }
+  
 catching_up:
   description: the EVM node is catching up on evm event from {from} to {to}
   level: notice
@@ -1099,6 +1107,22 @@ flush_delayed_inbox:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+gcp_kms_is_ready:
+  description: GCP KMS handler for {public_key} is ready
+  level: notice
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* gcp_kms_is_ready version 0 */
+      "gcp_kms_is_ready.v0": $Signature.Public_key }
+    $Signature.Public_key:
+      /* A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded) */
+      $unistring
+    $unistring:
+      /* Universal string representation
+         Either a plain UTF8 string, or a sequence of bytes for strings that
+         contain invalid byte sequences. */
+      string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
 ignored_kernel_arg:
   description: ignored the kernel command-line argument since the EVM state was already initialized
   level: warning
@@ -1339,6 +1363,14 @@ multichain_node_singlechain_kernel:
   json format:
     { /* multichain_node_singlechain_kernel version 0 */
       "multichain_node_singlechain_kernel.v0": any }
+  
+new_access_token:
+  description: successfully fetched a new access token
+  level: info
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* new_access_token version 0 */
+      "new_access_token.v0": any }
   
 no_l1_latest_level:
   description: no l1 level processed, no EVM events catch up will occur
@@ -2368,6 +2400,14 @@ cannot_fetch_time_between_blocks:
         { "tbb": $time_between_blocks,
           "trace": any } }
     $time_between_blocks: number /* Some */ || null /* None */
+  
+cannot_refresh_token:
+  description: cannot refresh the access token for the GCP KMS: {trace}
+  level: fatal
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* cannot_refresh_token version 0 */
+      "cannot_refresh_token.v0": any }
   
 evm_context_get_block_failed:
   description: get block by number failed for level {level}{trace}

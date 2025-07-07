@@ -242,7 +242,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     | Some signer -> return signer
     | None ->
         let*? key = Configuration.sequencer_key configuration in
-        let*! signer = Signer.of_sequencer_key configuration cctxt key in
+        let* signer = Signer.of_sequencer_key configuration cctxt key in
         return signer
   in
 

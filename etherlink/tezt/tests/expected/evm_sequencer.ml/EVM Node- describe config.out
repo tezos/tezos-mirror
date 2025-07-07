@@ -167,7 +167,30 @@
         /* The number of TCP connections kept alive with the GCP KMS. A
            number too low will make signing blueprints a bottleneck, while a
            number unnecessarily high will consume file descriptors. Defaults
-           to 4 if absent. */ },
+           to 4 if absent. */,
+      "authentication_method"?: "gcloud_auth",
+      "authentication_retries"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of retries the node does to get a new GCP token
+           before giving up and exiting. Defaults to `4` if absent. */,
+      "authentication_frequency_min"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of minutes before the node attempts to refresh
+           its current access token. Defaults to `30` if absent. */,
+      "authentication_retry_backoff_sec"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of seconds between two attemps at refreshing
+           the access token used to interact with GCP. Defaults to `120` if
+           absent. */,
+      "authentication_timeout_sec"?:
+        integer ∈ [1, 2^30]
+        /* Specify the maximum number of seconds the selected authentication
+           method can used before considered having failed. Defaults to `5`
+           if absents. */,
+      "gcloud_path"?:
+        $unistring
+        /* Specify the path of the `gcloud` binary. Defaults to `gcloud` if
+           absent. */ },
   "fee_history"?:
     { "max_count"?:
         /* The maximum number of blocks whose fee history can be retrieved at

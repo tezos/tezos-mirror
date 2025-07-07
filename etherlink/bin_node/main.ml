@@ -1147,8 +1147,8 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
   let* () = websocket_checks configuration in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
 
-  let*! signer =
-    Option.map_s
+  let* signer =
+    Option.map_es
       (Evm_node_lib_dev.Signer.of_sequencer_key configuration wallet_ctxt)
       sequencer_key
   in
