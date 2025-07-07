@@ -659,6 +659,10 @@ let make_denunciations ?single ?rev ?filter () =
 let add_account_with_funds ?algo name ~funder amount =
   add_account ?algo name --> transfer funder name amount --> reveal name
 
+let start_payload : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_, state) -> return {state with State.operation_mode = Wait})
+
 let batch ~source : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_state (fun (_, state) ->

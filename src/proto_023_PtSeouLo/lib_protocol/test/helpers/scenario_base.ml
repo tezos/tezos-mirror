@@ -59,6 +59,11 @@ let exclude_bakers bakers : (t, t) scenarios =
       return
         {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
 
+let set_baked_round (round : int) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_block, state) ->
+      return {state with State.baking_policy = Some (Block.By_round round)})
+
 (** Unsets the baking policy, it returns to default ([By_round 0]) *)
 let unset_baking_policy : (t, t) scenarios =
   let open Lwt_result_syntax in
