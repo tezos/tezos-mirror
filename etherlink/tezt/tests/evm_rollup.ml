@@ -2747,6 +2747,7 @@ let test_withdraw_via_calls =
     ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
     ~title:"Withdrawal via different kind of calls"
     ~admin
+    ~register_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->

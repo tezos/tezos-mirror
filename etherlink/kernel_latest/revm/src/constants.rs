@@ -1,4 +1,9 @@
-pub(crate) const WITHDRAWAL_SOL_ADDR: &str = "0xff00000000000000000000000000000000000001";
+use revm::primitives::{Address, FixedBytes};
+
+pub(crate) const WITHDRAWAL_SOL_ADDR: Address = Address(FixedBytes::new([
+    0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+]));
 
 // Snippet used to generate `WITHDRAWAL_SOL_CONTRACT` (use in test_withdrawal_contract):
 // let created_account = world_state_handler
