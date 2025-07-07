@@ -6,14 +6,8 @@
 use bitvec::slice::BitSlice;
 use bitvec::{bitvec, order::Msb0, view::BitView};
 use nom::{
-    branch::*,
-    bytes::complete::*,
-    combinator::*,
-    error::ErrorKind,
-    multi::*,
-    number::{complete::*, Endianness},
-    sequence::*,
-    Err, InputLength, Parser, Slice,
+    branch::*, bytes::complete::*, combinator::*, error::ErrorKind, multi::*, number::complete::u8,
+    sequence::*, Err, InputLength, Parser, Slice,
 };
 use num_bigint::{BigInt, BigUint, Sign};
 pub use tezos_data_encoding_derive::NomReader;
@@ -253,7 +247,7 @@ pub fn bytes(input: NomInput) -> NomResult<Vec<u8>> {
 /// Reads size encoded as 4-bytes big-endian unsigned.
 #[inline(always)]
 pub fn size(input: NomInput) -> NomResult<u32> {
-    u32(Endianness::Big)(input)
+    u32(input)
 }
 
 /// Reads size encoded as 1-byte unsigned.
@@ -511,6 +505,25 @@ pub fn n_bignum(mut input: NomInput) -> NomResult<BigUint> {
     Ok((input, BigUint::from_bytes_be(&bitvec.into_vec())))
 }
 
+mod integers {
+    macro_rules! decode_integer {
+        ($t:ident) => {
+            #[inline(always)]
+            pub fn $t(input: super::NomInput) -> super::NomResult<$t> {
+                use nom::number::complete::$t;
+                $t(nom::number::Endianness::Big)(input)
+            }
+        };
+    }
+    decode_integer!(i16);
+    decode_integer!(i32);
+    decode_integer!(i64);
+    decode_integer!(u16);
+    decode_integer!(u32);
+    decode_integer!(u64);
+}
+pub use integers::*;
+
 #[cfg(test)]
 mod test {
     use num_bigint::BigInt;
@@ -604,7 +617,7 @@ mod test {
     #[test]
     fn test_list() {
         let input = &[0, 1, 2, 3, 4, 5];
-        let res: NomResult<Vec<u16>> = list(u16(Endianness::Big))(input);
+        let res: NomResult<Vec<u16>> = list(u16)(input);
         assert_eq!(res, Ok((&[][..], vec![0x0001, 0x0203, 0x0405])));
     }
 
@@ -612,13 +625,13 @@ mod test {
     fn test_bounded_list() {
         let input = &[0, 1, 2, 3, 4, 5];
 
-        let res: NomResult<Vec<u16>> = bounded_list(4, u16(Endianness::Big))(input);
+        let res: NomResult<Vec<u16>> = bounded_list(4, u16)(input);
         assert_eq!(res, Ok((&[][..], vec![0x0001, 0x0203, 0x0405])));
 
-        let res: NomResult<Vec<u16>> = bounded_list(3, u16(Endianness::Big))(input);
+        let res: NomResult<Vec<u16>> = bounded_list(3, u16)(input);
         assert_eq!(res, Ok((&[][..], vec![0x0001, 0x0203, 0x0405])));
 
-        let res: NomResult<Vec<u16>> = bounded_list(2, u16(Endianness::Big))(input);
+        let res: NomResult<Vec<u16>> = bounded_list(2, u16)(input);
         let err = res.expect_err("Error is expected");
         assert_eq!(err, limit_error(&input[4..], BoundedEncodingKind::List));
     }
@@ -673,7 +686,7 @@ mod test {
         let res: NomResult<Vec<u8>> = bounded(10, bytes)(input);
         assert_eq!(res, Ok((&[][..], vec![1, 2, 3, 4, 5])));
 
-        let res: NomResult<u32> = bounded(3, u32(Endianness::Big))(input);
+        let res: NomResult<u32> = bounded(3, u32)(input);
         let err = res.expect_err("Error is expected");
         assert_eq!(err, limit_error(&input[..3], BoundedEncodingKind::Bounded));
     }
