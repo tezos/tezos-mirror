@@ -292,7 +292,7 @@ let test_tezlink_balance =
   unit
 
 let test_tezlink_storage =
-  let contract = (Michelson_contracts.bootstraps ()).(0) in
+  let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
     ~title:"Test of the storage rpc"
     ~tags:["rpc"; "storage"]
@@ -818,9 +818,9 @@ let test_tezlink_transfer =
     (Tez.to_mutez balance1
     = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
       int)
-    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
-    ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
 let test_tezlink_reveal =
@@ -860,6 +860,40 @@ let test_tezlink_reveal =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_execution =
+  let contract = Michelson_contracts.concat_hello () in
+  register_tezlink_test
+    ~title:"Test of tezlink execution"
+    ~tags:["execution"; "hello"]
+    ~bootstrap_contracts:[contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let expected_result = "{ \"Hello world\" }" in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 10)
+      ~giver:Constant.bootstrap1.public_key_hash
+      ~receiver:contract.address
+      ~arg:"{\"world\"}"
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* actual_result =
+    Client.contract_storage ~endpoint contract.address client
+  in
+  Check.(
+    (String.trim actual_result = String.trim expected_result)
+      string
+      ~error_msg:"Expected \"%R\" but got \"%L\"") ;
+  unit
+
 let () =
   test_describe_endpoint [Alpha] ;
   test_tezlink_current_level [Alpha] ;
@@ -883,4 +917,5 @@ let () =
   test_tezlink_transfer [Alpha] ;
   test_tezlink_reveal [Alpha] ;
   test_tezlink_block_info [Alpha] ;
-  test_tezlink_storage [Alpha]
+  test_tezlink_storage [Alpha] ;
+  test_tezlink_execution [Alpha]
