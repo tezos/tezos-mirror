@@ -315,9 +315,11 @@ using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
+Secret keys are stored by default unencrypted on testnets (as can be seen here).
+On mainnet, the default is to store keys encrypted, because this is the recommended practice except when
+using a hardware wallet (see :ref:`ledger`).
 
-Notice that by default, the keys were stored unencrypted, which is fine in our test example.
-In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
+If you want to force using encryption on a testnet, you must supply the option ``--encrypted`` when generating a new account::
 
       $ octez-client gen keys bob --encrypted
 
