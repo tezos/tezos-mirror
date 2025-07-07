@@ -22,10 +22,10 @@ use migration::MigrationStatus;
 use primitive_types::U256;
 use reveal_storage::{is_revealed_storage, reveal_storage};
 use storage::{
-    read_chain_id, read_da_fee, read_kernel_version, read_minimum_base_fee_per_gas,
-    read_tracer_input, store_chain_id, store_da_fee, store_kernel_version,
-    store_minimum_base_fee_per_gas, store_storage_version, STORAGE_VERSION,
-    STORAGE_VERSION_PATH,
+    is_revm_enabled, read_chain_id, read_da_fee, read_kernel_version,
+    read_minimum_base_fee_per_gas, read_tracer_input, store_chain_id, store_da_fee,
+    store_kernel_version, store_minimum_base_fee_per_gas, store_storage_version,
+    STORAGE_VERSION, STORAGE_VERSION_PATH,
 };
 use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_evm_logging::{log, Level::*, Verbosity};
@@ -281,6 +281,17 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
     let chain_configuration = fetch_chain_configuration(host, chain_id);
     let mut configuration = fetch_configuration(host);
     let sequencer_pool_address = read_sequencer_pool_address(host);
+
+    if is_revm_enabled(host)? {
+        let mut world_state_handler =
+            revm_etherlink::world_state_handler::new_world_state_handler()
+                .map_err(|_| Error::RevmPrecompileInitError)?;
+        revm_etherlink::precompile_init::init_precompile_bytecodes(
+            host,
+            &mut world_state_handler,
+        )
+        .map_err(|_| Error::RevmPrecompileInitError)?;
+    }
 
     // Run the stage one, this is a no-op if the inbox was already consumed
     // by another kernel run. This ensures that if the migration does not

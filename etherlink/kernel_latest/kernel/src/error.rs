@@ -120,6 +120,8 @@ pub enum Error {
     ImplicitToOriginated,
     #[error("Tried casting an Originated account into an Implicit account")]
     OriginatedToImplicit,
+    #[error("Error while initializing REVM precompile bytecodes")]
+    RevmPrecompileInitError,
 }
 
 impl From<PathError> for StorageError {

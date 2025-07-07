@@ -1,3 +1,8 @@
+// SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+//
+// SPDX-License-Identifier: MIT
+
 use revm::{
     primitives::{hex::FromHex, Bytes},
     state::Bytecode,
@@ -11,7 +16,7 @@ use crate::{
     Error,
 };
 
-pub fn init_withdrawal_account<'a, Host: Runtime>(
+pub fn init_precompile_bytecodes<'a, Host: Runtime>(
     host: &'a mut Host,
     world_state_handler: &'a mut WorldStateHandler,
 ) -> Result<(), Error> {
