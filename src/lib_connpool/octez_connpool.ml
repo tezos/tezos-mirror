@@ -64,10 +64,19 @@ let close_conn conn =
       return_unit)
     (fun _ -> return_unit)
 
+let validate {alive; _} =
+  let open Lwt_syntax in
+  (match Opentelemetry.Scope.get_ambient_scope () with
+  | Some scope ->
+      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+          [("octez_connpool.reuse", `Bool alive)])
+  | _ -> ()) ;
+  return alive
+
 let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
   Lwt_pool.create
     pool_len
-    ~validate:(fun {alive; _} -> Lwt.return alive)
+    ~validate
     ~check:(fun {alive; _} is_ok -> is_ok alive)
     ~dispose:(fun conn ->
       let open Lwt_syntax in
@@ -75,6 +84,10 @@ let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
       close_conn conn)
     (fun () ->
       let open Lwt_syntax in
+      Opentelemetry.Trace.with_
+        ~service_name:"Octez_connpool"
+        "create_new_connection"
+      @@ fun _ ->
       let* conn, ic, oc = Cohttp_lwt_unix.Net.connect_uri ~ctx uri in
       let* () = Connpool_events.new_connection uri in
       return {conn; ic; oc; alive = true})
@@ -105,25 +118,116 @@ let make_uri uri ?query ?userinfo route =
 exception Call_failure of exn
 
 let warm t =
+  Opentelemetry.Trace.with_ ~service_name:"Octez_connpool" "warm" @@ fun _ ->
   let rec warm n pool =
     Lwt_pool.use pool @@ fun _conn ->
     if n > 1 then warm (n - 1) pool else Lwt.return_unit
   in
   warm t.pool_len t.pool
 
-let call_exn ?headers ?body ?query ?userinfo t meth route =
+let add_traceparent_header header
+    ({trace_id; span_id; _} : Opentelemetry.Scope.t) =
+  Cohttp.Header.add
+    header
+    Opentelemetry.Trace_context.Traceparent.name
+    (Opentelemetry.Trace_context.Traceparent.to_value
+       ~trace_id
+       ~parent_id:span_id
+       ())
+
+let hardcoded_sensitive_headers =
+  let any = "" in
+  Cohttp.Header.of_list
+    [
+      ("cookie", any);
+      ("set-cookie", any);
+      ("authorization", any);
+      ("proxy-authorization", any);
+      ("x-api-key", any);
+      ("x-custom-auth", any);
+      ("x-auth-token", any);
+      ("www-authenticate", any);
+    ]
+
+let redact_sensitive_header ~sensitive_headers h v =
+  let sensitive_headers =
+    Cohttp.Header.add_list
+      hardcoded_sensitive_headers
+      (List.map (fun h -> (h, "")) sensitive_headers)
+  in
+  if Cohttp.Header.mem sensitive_headers h then "[REDACTED]" else v
+
+let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
+    ?query ?userinfo ~retry_count t meth route =
   let open Lwt_syntax in
   let uri = make_uri t.endpoint ?query ?userinfo route in
   Lwt_pool.use t.pool @@ fun conn ->
+  let make_attrs () =
+    let full_attr = ("url.full", `String (Uri.to_string uri)) in
+    let http_server_attr =
+      match Uri.host uri with
+      | Some server -> [("server.name", `String server)]
+      | None -> []
+    in
+    let http_port_attr =
+      match (Uri.scheme uri, Uri.port uri) with
+      | Some "http", None -> [("server.port", `Int 80)]
+      | Some "https", None -> [("server.port", `Int 443)]
+      | _, Some port -> [("server.port", `Int port)]
+      | _, _ -> []
+    in
+    let retry_attr =
+      if retry_count > 0 then [("http.request.resend_count", `Int retry_count)]
+      else []
+    in
+    let headers_attrs =
+      List.map
+        (fun (h, v) ->
+          let v = redact_sensitive_header ~sensitive_headers h v in
+          ("http.request.header." ^ h, `String v))
+        (Cohttp.Header.to_list headers)
+    in
+    [
+      ("http.route", `String route);
+      ("http.request.method", `String (Cohttp.Code.string_of_method meth));
+      full_attr;
+    ]
+    @ http_server_attr @ http_port_attr @ headers_attrs @ retry_attr
+  in
+  Opentelemetry.Trace.with_
+    ~service_name:"Octez_connpool"
+    ~kind:Span_kind_client
+    Format.(sprintf "%s %s" (Cohttp.Code.string_of_method meth) route)
+  @@ fun scope ->
+  Opentelemetry_lwt.Trace.add_attrs scope make_attrs ;
   Lwt.catch
     (fun () ->
-      let* resp, body = Client.call ~ctx:(Some conn) ?headers ?body meth uri in
+      let headers =
+        if Opentelemetry.Collector.has_backend () then
+          add_traceparent_header headers scope
+        else headers
+      in
+      let* resp, body = Client.call ~ctx:(Some conn) ~headers ?body meth uri in
       let* body = Cohttp_lwt.Body.to_string body in
       let* () =
         match Cohttp.Header.connection (Cohttp.Response.headers resp) with
         | None | Some `Keep_alive -> Lwt.return_unit
         | Some `Close | Some (`Unknown _) -> close_conn conn
       in
+      Opentelemetry_lwt.Trace.add_attrs scope (fun () ->
+          let resp_code = Cohttp.Code.code_of_status resp.status in
+          if resp_code >= 400 then
+            Opentelemetry.Scope.set_status
+              scope
+              {message = ""; code = Status_code_error} ;
+          let headers_attrs =
+            List.map
+              (fun (h, v) ->
+                let v = redact_sensitive_header ~sensitive_headers h v in
+                ("http.request.header." ^ h, `String v))
+              (Cohttp.Header.to_list resp.headers)
+          in
+          ("http.response.status_code", `Int resp_code) :: headers_attrs) ;
       return (resp, body))
     (fun exn ->
       let* () = close_conn conn in
@@ -133,36 +237,53 @@ type error +=
   | Cannot_perform_http_request
   | Connection_pool_internal_error of string
 
-let rec retry n k =
-  let open Lwt_result_syntax in
-  Lwt.catch k (function
-      | Call_failure _ | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
-          if n < 0 then tzfail Cannot_perform_http_request else retry (n - 1) k
-      | exn -> tzfail (Connection_pool_internal_error (Printexc.to_string exn)))
+let retry max k =
+  let rec retry n k =
+    let open Lwt_result_syntax in
+    Lwt.catch
+      (fun () -> k (max - n))
+      (function
+        | Call_failure _ | Unix.Unix_error (Unix.ECONNREFUSED, _, _) ->
+            if n < 0 then tzfail Cannot_perform_http_request
+            else retry (n - 1) k
+        | exn ->
+            tzfail (Connection_pool_internal_error (Printexc.to_string exn)))
+  in
+  retry max k
 
-let call ?headers ?body ?query ?userinfo t meth route =
+let call ?headers ?sensitive_headers ?body ?query ?userinfo t meth route =
   (* When trying to make a call, we need to take into account the edge case
      that the scenario could have gone down and all connections are stalled (or
      it had to close some of the connections for some reasons). So we retry
      [pool_len + 1] to handle the worst case scenario where all connections are
      stalled. *)
-  retry (t.pool_len + 1) @@ fun () ->
-  Lwt_result.ok (call_exn ?headers ?body ?query ?userinfo t meth route)
+  retry (t.pool_len + 1) @@ fun retry_count ->
+  Lwt_result.ok
+    (call_exn
+       ?headers
+       ?sensitive_headers
+       ?body
+       ?query
+       ?userinfo
+       ~retry_count
+       t
+       meth
+       route)
 
-let get ?headers ?query ?userinfo t route =
-  call ?headers ?query ?userinfo t `GET route
+let get ?headers ?sensitive_headers ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?query ?userinfo t `GET route
 
-let post ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `POST route
+let post ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `POST route
 
-let put ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `PUT route
+let put ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PUT route
 
-let delete ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `DELETE route
+let delete ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `DELETE route
 
-let patch ?headers ?body ?query ?userinfo t route =
-  call ?headers ?body ?query ?userinfo t `PATCH route
+let patch ?headers ?sensitive_headers ?body ?query ?userinfo t route =
+  call ?headers ?sensitive_headers ?body ?query ?userinfo t `PATCH route
 
 let () =
   register_error_kind
