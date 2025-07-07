@@ -36,6 +36,8 @@ briefly described below from a user point of view.
 The sizes of public keys, secret keys and signatures may differ between the
 different schemes but addresses are always 20 bytes long.
 
+.. _tz1_accounts_s023:
+
 ``tz1``: Ed25519
 ''''''''''''''''
 
@@ -48,6 +50,8 @@ because it offers better security guarantees than EcDSA and has good performance
 on most hardware. It may not be available in all wallets or on all dedicated
 chips which is why Tezos supports multiple schemes.
 
+.. _tz2_accounts_s023:
+
 ``tz2``: Secp256k1
 ''''''''''''''''''
 
@@ -57,6 +61,8 @@ and signatures must be produced by using the `EcDSA signature scheme
 with the `Secp256k1 curve <https://www.secg.org/sec2-v2.pdf>`_. Secp256k1 is
 notably the cryptographic scheme used by Bitcoin and Ethereum. This means that
 private keys and addresses used on Bitcoin can also be used on Tezos.
+
+.. _tz3_accounts_s023:
 
 ``tz3``: P-256
 ''''''''''''''
@@ -82,7 +88,7 @@ the `BLS12-381 curve <https://hackmd.io/@benjaminion/bls12-381>`_. One
 particularity of BLS signatures is that they are aggregatable. This means that
 multiple signatures can be aggregated into one, and later verified as having
 been produced for the correct expected public keys. This allows for numerous
-applications like mutli-signatures schemes, multi-party key exchanges,
+applications like multi-signatures schemes, multi-party key exchanges,
 signatures compaction, etc. BLS is notably used by Zcash and Ethereum 2.0.
 
 Starting in protocol S, ``tz4`` addresses can be used by bakers, to forge blocks
