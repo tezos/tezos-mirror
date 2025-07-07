@@ -824,6 +824,7 @@ let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
     ~arch:Arm64
     ~storage:Ramfs
     ~release:false
+    ~sccache_size:"2G"
     ()
 
 let job_build_kernels ?rules () : tezos_job =
