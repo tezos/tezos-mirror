@@ -9,14 +9,14 @@ release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^(grafazos|octez)-v([0-9]+)\.([0-9
 
 # Strips the leading 'grafazos-v'
 # X.Y
-release_no_v=$(echo "${release}" | sed -e 's/^(grafazos|octez)-v//g')
+release_no_v=$(echo "${release}" | sed -E 's/^(grafazos|octez)-v//g')
 
 # X
-release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\1/p')
+release_major_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\2/p')
 # Y
-release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\2/p')
+release_minor_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)((-rc[0-9]+)?|(-beta[0-9]+)?)$/\3/p')
 # Z
-release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\4/p')
+release_rc_version=$(echo "${CI_COMMIT_TAG}" | sed -nE 's/^(grafazos|octez)-v([0-9]+)\.([0-9]+)(-rc)?([0-9]+)?$/\5/p')
 
 release_name="Grafazos version ${release_no_v}"
 
