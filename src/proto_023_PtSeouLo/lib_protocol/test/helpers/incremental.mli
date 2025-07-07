@@ -34,6 +34,8 @@ val predecessor : incremental -> Block.t
 
 val header : incremental -> Block_header.t
 
+val rev_operations : incremental -> Operation.packed list
+
 val rev_tickets : incremental -> operation_receipt list
 
 val validation_state : incremental -> validation_state
@@ -56,6 +58,8 @@ val begin_construction :
   ?policy:Block.baker_policy ->
   ?liquidity_baking_toggle_vote:Per_block_votes_repr.per_block_vote ->
   ?adaptive_issuance_vote:Per_block_votes_repr.per_block_vote ->
+  ?payload_round:int ->
+  ?payload:packed_operation list ->
   Block.t ->
   incremental tzresult Lwt.t
 
@@ -82,12 +86,13 @@ val validate_operation :
   Operation.packed ->
   incremental tzresult Lwt.t
 
-(** [add_operation ?expect_failure ?expect_apply_failure
+(** [add_operation_with_metadata ?expect_failure ?expect_apply_failure
     ?allow_manager_failure ?check_size i op] tries to validate then
     apply [op] in the validation and application state of [i]. If the
     validation of [op] succeeds, the function returns the incremental
     value with a validation state updated after the application of
-    [op]. Otherwise raise the error from the validation of [op].
+    [op], and the operation metadata associated to the operation.
+    Otherwise raise the error from the validation of [op].
 
     Optional arguments allow to override defaults:
 
@@ -109,6 +114,17 @@ val validate_operation :
     enable the check that an operation size should not exceed
     [Constants_repr.max_operation_data_length]. Enabled (set to [true]) by
     default. *)
+val add_operation_with_metadata :
+  ?expect_failure:(error list -> unit tzresult Lwt.t) ->
+  ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
+  ?allow_manager_failure:bool ->
+  ?check_size:bool ->
+  incremental ->
+  Operation.packed ->
+  (incremental * Apply_results.packed_operation_metadata) tzresult Lwt.t
+
+(** Same as [add_operation_with_metadata], but without returning the metadata.
+    The metadata is still added in the incremental state. *)
 val add_operation :
   ?expect_failure:(error list -> unit tzresult Lwt.t) ->
   ?expect_apply_failure:(error list -> unit tzresult Lwt.t) ->
@@ -118,9 +134,13 @@ val add_operation :
   Operation.packed ->
   incremental tzresult Lwt.t
 
-(** [finalize_block i] creates a [Block.t] based on the protocol
+(** [finalize_block_with_metadata i] creates a [Block.t] based on the protocol
     states and the operations contained in [i]. The function calls
     [Main.finalize_application] to compute a new context. *)
+val finalize_block_with_metadata :
+  incremental -> (Block.t * block_header_metadata) tzresult Lwt.t
+
+(** Same as [finalize_block_with_metadata], but without the metadata *)
 val finalize_block : incremental -> Block.t tzresult Lwt.t
 
 (** [assert_validate_operation_fails expect_failure operation block]

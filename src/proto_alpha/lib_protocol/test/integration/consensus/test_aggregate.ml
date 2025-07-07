@@ -304,8 +304,8 @@ let test_preattestations_aggregate_with_a_single_delegate () =
     let round_zero = Alpha_context.Round.zero in
     Block.bake_with_metadata
       ~policy:(By_round 1)
-      ~payload_round:(Some round_zero)
-      ~locked_round:(Some round_zero)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
       ~operation
       block
   in
@@ -366,8 +366,8 @@ let test_preattestations_aggregate_with_multiple_delegates () =
     let round_zero = Alpha_context.Round.zero in
     Block.bake_with_metadata
       ~policy:(By_round 1)
-      ~payload_round:(Some round_zero)
-      ~locked_round:(Some round_zero)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
       ~operation
       block
   in
@@ -439,8 +439,8 @@ let test_preattestations_aggregate_invalid_signature () =
         let round_zero = Alpha_context.Round.zero in
         Block.bake
           ~policy:(By_round 1)
-          ~payload_round:(Some round_zero)
-          ~locked_round:(Some round_zero)
+          ~payload_round:round_zero
+          ~locked_round:round_zero
           ~operation:aggregate_with_incorrect_signature
           block
       in
@@ -489,8 +489,8 @@ let test_preattestations_aggregate_non_bls_delegate () =
         let round_zero = Alpha_context.Round.zero in
         Block.bake
           ~policy:(By_round 1)
-          ~payload_round:(Some round_zero)
-          ~locked_round:(Some round_zero)
+          ~payload_round:round_zero
+          ~locked_round:round_zero
           ~operation
           block
       in
@@ -587,8 +587,8 @@ let test_multiple_aggregates_per_block_forbidden () =
   let*! res =
     Block.bake
       ~policy:(By_round 1)
-      ~payload_round:(Some round_zero)
-      ~locked_round:(Some round_zero)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
       ~operations:aggregates
       block
   in
@@ -620,8 +620,8 @@ let test_eligible_preattestation_must_be_aggregated () =
         let round_zero = Alpha_context.Round.zero in
         Block.bake
           ~policy:(By_round 1)
-          ~payload_round:(Some round_zero)
-          ~locked_round:(Some round_zero)
+          ~payload_round:round_zero
+          ~locked_round:round_zero
           ~operation
           block
       in
@@ -700,8 +700,8 @@ let test_empty_committee () =
   let*! res =
     Block.bake
       ~policy:(By_round 1)
-      ~payload_round:(Some round_zero)
-      ~locked_round:(Some round_zero)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
       ~operation
       block
   in
@@ -745,8 +745,8 @@ let test_metadata_committee_is_correctly_ordered () =
     let round_zero = Alpha_context.Round.zero in
     Block.bake_with_metadata
       ~policy:(By_round 1)
-      ~payload_round:(Some round_zero)
-      ~locked_round:(Some round_zero)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
       ~operations:[attestations; preattestations]
       block
   in

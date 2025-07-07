@@ -1225,9 +1225,13 @@ module Internal_for_tests = struct
         let x = Random.int 26 in
         Char.chr (x + Char.code 'a'))
 
-  let get_commitment_and_shards_with_proofs cryptobox ~slot =
+  let get_commitment_and_shards_with_proofs ?precomputation cryptobox ~slot =
     let open Result_syntax in
-    let* precomputation = precompute_shards_proofs cryptobox in
+    let* precomputation =
+      match precomputation with
+      | None -> precompute_shards_proofs cryptobox
+      | Some x -> return x
+    in
     let* polynomial = polynomial_from_slot cryptobox slot in
     let shards = shards_from_polynomial cryptobox polynomial in
     let shard_proofs =

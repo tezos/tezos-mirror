@@ -96,8 +96,8 @@ module Forge : sig
   (** Forges a correct header following the policy.
       The header can then be modified and applied with [apply]. *)
   val forge_header :
-    ?locked_round:Alpha_context.Round.t option ->
-    ?payload_round:Round.t option ->
+    ?locked_round:Alpha_context.Round.t ->
+    ?payload_round:Round.t ->
     ?policy:baker_policy ->
     ?timestamp:Timestamp.time ->
     ?operations:Operation.packed list ->
@@ -221,8 +221,8 @@ val apply :
 val bake :
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
-  ?payload_round:Round.t option ->
-  ?locked_round:Alpha_context.Round.t option ->
+  ?payload_round:Round.t ->
+  ?locked_round:Alpha_context.Round.t ->
   ?policy:baker_policy ->
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
@@ -235,12 +235,12 @@ val bake :
 
 (** Variant of [bake] that returns the block metadata of the baked block. **)
 val bake_with_metadata :
-  ?locked_round:Alpha_context.Round.t option ->
+  ?locked_round:Alpha_context.Round.t ->
   ?policy:baker_policy ->
   ?timestamp:Timestamp.time ->
   ?operation:Operation.packed ->
   ?operations:Operation.packed list ->
-  ?payload_round:Round.t option ->
+  ?payload_round:Round.t ->
   ?check_size:bool ->
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->
@@ -308,10 +308,10 @@ val bake_n_with_liquidity_baking_toggle_ema :
 (** Variant of [bake_n] that returns the block metadata of the last
     baked block. [n] must be positive, otherwise a single block is baked. **)
 val bake_n_with_metadata :
-  ?locked_round:Round.t option ->
+  ?locked_round:Round.t ->
   ?policy:baker_policy ->
   ?timestamp:Timestamp.time ->
-  ?payload_round:Round.t option ->
+  ?payload_round:Round.t ->
   ?check_size:bool ->
   ?baking_mode:baking_mode ->
   ?allow_manager_failures:bool ->

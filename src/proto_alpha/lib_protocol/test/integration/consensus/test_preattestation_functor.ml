@@ -48,8 +48,8 @@ end = struct
 
   let bake = Block.bake ~baking_mode:Mode.baking_mode
 
-  let aux_simple_preattestation_inclusion ?(payload_round = Some Round.zero)
-      ?(locked_round = Some Round.zero) ?(block_round = 1)
+  let aux_simple_preattestation_inclusion ?(payload_round = Round.zero)
+      ?(locked_round = Round.zero) ?(block_round = 1)
       ?(preattestation_round = Round.zero)
       ?(preattested_block = fun _predpred _pred curr -> curr)
       ?(mk_ops = fun op -> [op])
@@ -236,7 +236,7 @@ end = struct
     in
     aux_simple_preattestation_inclusion
       ~preattestation_round:Round.zero
-      ~locked_round:(Some (Round.succ Round.zero))
+      ~locked_round:(Round.succ Round.zero)
       ~block_round:2
       ~loc:__LOC__
       ~post_process
