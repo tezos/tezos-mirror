@@ -41,7 +41,7 @@
   },
   "gcp_kms": {
     "connection_pool_size": 4,
-    "authentication_method": "gcloud_auth",
+    "authentication_method": "metadata_server",
     "authentication_retries": 4,
     "authentication_frequency_min": 30,
     "authentication_retry_backoff_sec": 120,
@@ -120,7 +120,7 @@
   },
   "gcp_kms": {
     "connection_pool_size": 4,
-    "authentication_method": "gcloud_auth",
+    "authentication_method": "metadata_server",
     "authentication_retries": 4,
     "authentication_frequency_min": 30,
     "authentication_retry_backoff_sec": 120,
@@ -204,7 +204,7 @@
   },
   "gcp_kms": {
     "connection_pool_size": 4,
-    "authentication_method": "gcloud_auth",
+    "authentication_method": "metadata_server",
     "authentication_retries": 4,
     "authentication_frequency_min": 30,
     "authentication_retry_backoff_sec": 120,

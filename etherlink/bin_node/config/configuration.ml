@@ -196,7 +196,7 @@ type sequencer = {
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type gcp_authentication_method = Gcloud_auth
+type gcp_authentication_method = Gcloud_auth | Metadata_server
 
 type gcp_kms = {
   pool_size : int;
@@ -1126,7 +1126,7 @@ let default_proxy ?evm_node_endpoint ?(ignore_block_param = false) () =
    most of traffic for now. *)
 let default_gcp_kms_pool_size = 4
 
-let default_gcp_authentication_method = Gcloud_auth
+let default_gcp_authentication_method = Metadata_server
 
 (* GCP tokens live 60min by default. We refresh after half this time to be
    sure we never have race condition. *)
@@ -1154,16 +1154,14 @@ let default_gcp_kms =
 
 let gcp_authentication_method_to_string = function
   | Gcloud_auth -> "gcloud_auth"
+  | Metadata_server -> "metadata_server"
 
 let gcp_authentication_method_encoding =
   let open Data_encoding in
-  (* Should have been
-     `string_enum @@ List.map (fun m -> (gcp_authentication_method_to_string m, m)) [Gcloud_auth]`
-     but Data-encoding is just too opinionated for that. *)
-  conv
-    (fun Gcloud_auth -> ())
-    (fun () -> Gcloud_auth)
-    (constant (gcp_authentication_method_to_string Gcloud_auth))
+  string_enum
+  @@ List.map
+       (fun m -> (gcp_authentication_method_to_string m, m))
+       [Gcloud_auth; Metadata_server]
 
 let gcp_kms_encoding =
   let open Data_encoding in
@@ -1219,7 +1217,10 @@ let gcp_kms_encoding =
             Format.(
               sprintf
                 "Specify the method used to fetch authentication tokens to \
-                 send requests to the GCP KMS. Defaults to `%s` if absent."
+                 send requests to the GCP KMS. To be noted that `%s` will only \
+                 work if the node is run within a GCP VM. Defaults to `%s` if \
+                 absent."
+                (gcp_authentication_method_to_string Metadata_server)
                 (gcp_authentication_method_to_string
                    default_gcp_authentication_method))
           "authentication_method"
