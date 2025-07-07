@@ -90,6 +90,7 @@ type mode =
           (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
               simultaneously inside the pool. *)
       dal_slots : int list option;
+      sequencer_sunset_sec : int option;
     }
   | Sandbox of {
       initial_kernel : string;

@@ -147,6 +147,7 @@ type sequencer = {
       (** The maximum number of chunks per blueprints. *)
   sequencer : sequencer_key option;  (** The key used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
+  sunset_sec : int64;
 }
 
 type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
@@ -332,6 +333,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?sunset_sec:int64 ->
     unit ->
     t
 
@@ -370,6 +372,7 @@ module Cli : sig
     ?proxy_ignore_block_param:bool ->
     ?history_mode:history_mode ->
     ?dal_slots:int list ->
+    ?sunset_sec:int64 ->
     t ->
     t
 
@@ -410,6 +413,7 @@ module Cli : sig
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
+    ?sunset_sec:int64 ->
     string ->
     t tzresult Lwt.t
 end

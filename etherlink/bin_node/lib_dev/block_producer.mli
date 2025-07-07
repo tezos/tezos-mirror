@@ -10,6 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
+  sequencer_sunset_sec : int64;
 }
 
 (** [start parameters] starts the events follower. *)

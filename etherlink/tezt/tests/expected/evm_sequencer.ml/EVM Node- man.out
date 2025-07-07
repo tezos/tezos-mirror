@@ -316,6 +316,7 @@ Run commands:
       [--genesis-timestamp <[TIMESTAMP]>]
       [--initial-kernel <evm_installer.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--dal-slots <slot indices>]
+      [--sunset-sec <SEC>]
     Start the EVM node in sequencer mode.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
@@ -393,6 +394,9 @@ Run commands:
     -f --password-filename <filename>: path to the password filename
     --dal-slots <slot indices>: The DAL slots indices on which the sequencer
       is allowed to send blueprints.
+    --sunset-sec <SEC>: Number of seconds prior to a sequencer operator
+      upgrade before which the current sequencer stops producing blocks
+      If set, defaults to the value of EVM_NODE_SEQUENCER_SUNSET_SEC.
   
   run observer [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]
@@ -596,7 +600,7 @@ Configuration commands:
       [--catch-up-cooldown <COOLDOWN>] [--evm-node-endpoint <url>]
       [--history <archive | rolling:n | full:n>] [--dont-track-rollup-node]
       [-d --wallet-dir <path>] [-f --force] [--dal-slots <slot indices>]
-      [--network <network>]
+      [--network <network>] [--sunset-sec <SEC>]
     Create an initial config with default value.
     If the <rollup-node-endpoint> is set then adds the configuration for the
     proxy mode. If the  <sequencer-key> is set,then adds the configuration
@@ -687,6 +691,9 @@ Configuration commands:
       be `mainnet` or `testnet`. If set, some configuration options defaults
       to well-known values for the selected network.
       If set, defaults to the value of EVM_NODE_NETWORK.
+    --sunset-sec <SEC>: Number of seconds prior to a sequencer operator
+      upgrade before which the current sequencer stops producing blocks
+      If set, defaults to the value of EVM_NODE_SEQUENCER_SUNSET_SEC.
   
   check config [--data-dir <data-dir>] [--config-file <path>] [-p --print]
       [--network <network>]

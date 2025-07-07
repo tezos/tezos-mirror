@@ -481,6 +481,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               tx_pool_addr_limit;
               tx_pool_tx_per_addr_limit;
               dal_slots;
+              sequencer_sunset_sec = None;
             }
         in
         let* sequencer =
@@ -5050,6 +5051,7 @@ let test_migrate_proxy_to_sequencer_future =
           tx_pool_addr_limit = None;
           tx_pool_tx_per_addr_limit = None;
           dal_slots = None;
+          sequencer_sunset_sec = None;
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
@@ -5220,6 +5222,7 @@ let test_migrate_proxy_to_sequencer_past =
           tx_pool_addr_limit = None;
           tx_pool_tx_per_addr_limit = None;
           dal_slots = None;
+          sequencer_sunset_sec = None;
         }
     in
     Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)

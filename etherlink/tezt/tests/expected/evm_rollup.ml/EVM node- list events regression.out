@@ -85,6 +85,14 @@ block_producer_transaction_rejected:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+block_production_sunset:
+  description: block production is sunset ahead of the change of sequencer
+  level: notice
+  section: evm_node.dev
+  json format:
+    { /* block_production_sunset version 0 */
+      "block_production_sunset.v0": any }
+  
 blueprint_application:
   description: head is now {level}, applied in {process_time}{timestamp}
   level: notice

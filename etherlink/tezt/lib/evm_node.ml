@@ -90,6 +90,7 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
       dal_slots : int list option;
+      sequencer_sunset_sec : int option;
     }
   | Sandbox of {
       initial_kernel : string;
@@ -729,6 +730,7 @@ let mode_with_new_private_rpc (mode : mode) =
         tx_pool_addr_limit;
         tx_pool_tx_per_addr_limit;
         dal_slots;
+        sequencer_sunset_sec;
       } ->
       Sequencer
         {
@@ -748,6 +750,7 @@ let mode_with_new_private_rpc (mode : mode) =
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
           dal_slots;
+          sequencer_sunset_sec;
         }
   | Sandbox
       {
@@ -1045,6 +1048,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
           dal_slots;
+          sequencer_sunset_sec;
         } ->
         [
           "--rollup-node-endpoint";
@@ -1095,6 +1099,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
+        @ Cli_arg.optional_arg "sunset-sec" string_of_int sequencer_sunset_sec
     | Sandbox
         {
           initial_kernel = _;

@@ -13,7 +13,12 @@ let pp_supported_network fmt network =
     fmt
     (match network with Mainnet -> "mainnet" | Testnet -> "testnet")
 
+let positive_encoding = Data_encoding.ranged_int 0 ((1 lsl 30) - 1)
+
 let strictly_positive_encoding = Data_encoding.ranged_int 1 ((1 lsl 30) - 1)
+
+let positive_i64_encoding =
+  Data_encoding.(conv Int64.to_int Int64.of_int positive_encoding)
 
 type log_filter_config = {
   max_nb_blocks : int;
@@ -194,6 +199,7 @@ type sequencer = {
   max_number_of_chunks : int;
   sequencer : sequencer_key option;
   blueprints_publisher_config : blueprints_publisher_config;
+  sunset_sec : int64;
 }
 
 type gcp_authentication_method = Gcloud_auth | Metadata_server
@@ -519,9 +525,11 @@ let kernel_execution_config_dft ~data_dir ?preimages ?preimages_endpoint
         native_execution_policy;
   }
 
+let default_sequencer_sunset_sec = 300L
+
 let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
     ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?dal_slots () =
+    ?catchup_cooldown ?dal_slots ?sunset_sec () =
   let default_blueprints_publisher_config =
     if Option.is_some dal_slots then
       default_blueprints_publisher_config_with_dal
@@ -555,6 +563,7 @@ let sequencer_config_dft ?time_between_blocks ?max_number_of_chunks ?sequencer
       Option.value ~default:default_max_number_of_chunks max_number_of_chunks;
     sequencer;
     blueprints_publisher_config;
+    sunset_sec = Option.value ~default:default_sequencer_sunset_sec sunset_sec;
   }
 
 let observer_evm_node_endpoint = function
@@ -774,22 +783,26 @@ let sequencer_encoding =
            max_number_of_chunks;
            sequencer;
            blueprints_publisher_config;
+           sunset_sec;
          } ->
       ( time_between_blocks,
         max_number_of_chunks,
         sequencer,
-        blueprints_publisher_config ))
+        blueprints_publisher_config,
+        sunset_sec ))
     (fun ( time_between_blocks,
            max_number_of_chunks,
            sequencer,
-           blueprints_publisher_config ) ->
+           blueprints_publisher_config,
+           sunset_sec ) ->
       {
         time_between_blocks;
         max_number_of_chunks;
         sequencer;
         blueprints_publisher_config;
+        sunset_sec;
       })
-    (obj4
+    (obj5
        time_between_blocks_field
        max_number_of_chunks_field
        (opt
@@ -799,7 +812,14 @@ let sequencer_encoding =
        (dft
           "blueprints_publisher_config"
           blueprints_publisher_config_encoding
-          default_blueprints_publisher_config))
+          default_blueprints_publisher_config)
+       (dft
+          ~description:
+            "Number of seconds prior to a sequencer operator upgrade before \
+             which the current sequencer stops producing blocks"
+          "sunset_sec"
+          positive_i64_encoding
+          default_sequencer_sunset_sec))
 
 let observer_encoding ?network () =
   let open Data_encoding in
@@ -1934,7 +1954,7 @@ module Cli = struct
       ?log_filter_max_nb_logs ?log_filter_chunk_size ?max_blueprints_lag
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?history_mode
-      ?dal_slots configuration =
+      ?dal_slots ?sunset_sec configuration =
     let public_rpc =
       patch_rpc
         ?rpc_addr
@@ -1994,6 +2014,9 @@ module Cli = struct
             Option.either dal_slots blueprints_publisher_config.dal_slots;
         }
       in
+      let sunset_sec =
+        Option.value ~default:sequencer_config.sunset_sec sunset_sec
+      in
       {
         time_between_blocks =
           Option.value
@@ -2005,6 +2028,7 @@ module Cli = struct
             max_number_of_chunks;
         sequencer = Option.either sequencer_key sequencer_config.sequencer;
         blueprints_publisher_config;
+        sunset_sec;
       }
     in
     let observer =
@@ -2121,7 +2145,8 @@ module Cli = struct
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
       ?catchup_cooldown ?restricted_rpcs ?finalized_view
-      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode () =
+      ?proxy_ignore_block_param ?dal_slots ?network ?history_mode ?sunset_sec ()
+      =
     default ~data_dir ?network ?evm_node_endpoint ()
     |> patch_configuration_from_args
          ?rpc_addr
@@ -2158,6 +2183,7 @@ module Cli = struct
          ?proxy_ignore_block_param
          ?dal_slots
          ?history_mode
+         ?sunset_sec
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
       ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
@@ -2169,7 +2195,7 @@ module Cli = struct
       ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
       ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
       ?restricted_rpcs ?finalized_view ?proxy_ignore_block_param ?dal_slots
-      ?network ?history_mode config_file =
+      ?network ?history_mode ?sunset_sec config_file =
     let open Lwt_result_syntax in
     let open Filename.Infix in
     (* Check if the data directory of the evm node is not the one of Octez
@@ -2225,6 +2251,7 @@ module Cli = struct
           ?proxy_ignore_block_param
           ?history_mode
           ?dal_slots
+          ?sunset_sec
           configuration
       in
       return configuration
@@ -2267,6 +2294,7 @@ module Cli = struct
           ?dal_slots
           ?network
           ?history_mode
+          ?sunset_sec
           ()
       in
       return config

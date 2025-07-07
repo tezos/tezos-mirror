@@ -324,6 +324,16 @@ let catchup_cooldown_arg =
        resending its blueprints before trying to catch-up again."
     Params.int
 
+let sunset_sec_arg =
+  Tezos_clic.arg
+    ~env:(config_env "SEQUENCER_SUNSET_SEC")
+    ~long:"sunset-sec"
+    ~placeholder:"SEC"
+    ~doc:
+      "Number of seconds prior to a sequencer operator upgrade before which \
+       the current sequencer stops producing blocks"
+    Params.int64
+
 let cors_allowed_headers_arg =
   Tezos_clic.arg
     ~long:"cors-headers"
@@ -1090,7 +1100,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
     ?max_blueprints_ahead ?max_blueprints_catchup ?catchup_cooldown
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
     ?genesis_timestamp ?restricted_rpcs ?kernel ?dal_slots ?sandbox_config
-    ~finalized_view config_file =
+    ~finalized_view ?sunset_sec config_file =
   let open Lwt_result_syntax in
   let* configuration =
     Cli.create_or_read_config
@@ -1125,6 +1135,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
       ?restricted_rpcs
       ?dal_slots
       ~finalized_view
+      ?sunset_sec
       config_file
   in
   let*! () = init_logs ~daily_logs:true ~data_dir configuration in
@@ -1872,7 +1883,7 @@ let init_config_command =
        then adds the configuration for the observer mode."
     (merge_options
        common_config_args
-       (args18
+       (args19
           (* sequencer and observer config*)
           preimages_arg
           preimages_endpoint_arg
@@ -1900,7 +1911,8 @@ let init_config_command =
              ~why:
                "If set, some configuration options defaults to well-known \
                 values for the selected network."
-             ())))
+             ())
+          sunset_sec_arg))
     (prefixes ["init"; "config"] @@ stop)
     (fun ( ( data_dir,
              config_file,
@@ -1941,7 +1953,8 @@ let init_config_command =
              wallet_dir,
              force,
              dal_slots,
-             network ) )
+             network,
+             sequencer_sunset_sec ) )
          () ->
       let config_file = config_filename ~data_dir config_file in
       Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
@@ -1995,6 +2008,7 @@ let init_config_command =
           ~finalized_view
           ?network
           ?history_mode
+          ?sunset_sec:sequencer_sunset_sec
           config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir config in
@@ -2403,7 +2417,7 @@ let proxy_command =
         ())
 
 let sequencer_config_args =
-  Tezos_clic.args15
+  Tezos_clic.args16
     preimages_arg
     preimages_endpoint_arg
     time_between_blocks_arg
@@ -2419,6 +2433,7 @@ let sequencer_config_args =
     wallet_dir_arg
     (Client_config.password_filename_arg ())
     dal_slots_arg
+    sunset_sec_arg
 
 let fund_arg =
   let long = "fund" in
@@ -2494,7 +2509,8 @@ let sequencer_command =
              kernel,
              wallet_dir,
              password_filename,
-             dal_slots ) )
+             dal_slots,
+             sunset_sec ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2541,6 +2557,7 @@ let sequencer_command =
         ?kernel
         ?dal_slots
         ~finalized_view
+        ?sunset_sec
         config_file)
 
 let sandbox_command =
