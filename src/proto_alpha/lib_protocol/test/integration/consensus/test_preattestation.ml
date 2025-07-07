@@ -201,9 +201,10 @@ let slot_substitution_does_not_affect_bytes () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
   let* b = Block.bake genesis in
-  let* delegate, _slots = Context.get_attester (B b) in
+  let* attester = Context.get_attester (B b) in
+  let consensus_pkh = attester.consensus_key in
   let* {shell = {branch}; protocol_data = {contents; _}} =
-    Op.raw_preattestation ~delegate ~slot:Slot.zero b
+    Op.raw_preattestation ~attesting_slot:{slot = Slot.zero; consensus_pkh} b
   in
   match contents with
   | Single (Preattestation consensus_content) ->
@@ -230,10 +231,11 @@ let encoding_incompatibility () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init_n 5 ~aggregate_attestation:true () in
   let* b = Block.bake genesis in
-  let* delegate, _slots = Context.get_attester (B b) in
-  let* signer = Account.find delegate in
+  let* attester = Context.get_attester (B b) in
+  let* signer = Account.find attester.consensus_key in
   let* {shell = {branch}; protocol_data = {contents; signature = _}} =
-    Op.raw_preattestation ~delegate b
+    let attesting_slot = Op.attesting_slot_of_attester attester in
+    Op.raw_preattestation ~attesting_slot b
   in
   let bytes_without_slot =
     Data_encoding.Binary.to_bytes_exn

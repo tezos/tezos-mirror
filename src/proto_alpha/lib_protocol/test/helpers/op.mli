@@ -58,19 +58,89 @@ val sign :
 
 val create_proof : Signature.secret_key -> Signature.Bls.t option
 
+(** Information needed on the author of a (pre)attestation: slot
+    (written into the (pre)attestation) and consensus key (required
+    for signing). *)
+type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
+
+(** Builds an {!attesting_slot} with the attester's consensus key and
+    canonical slot, that is, its first slot. *)
+val attesting_slot_of_attester : Context.attester -> attesting_slot
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators}. *)
+val get_attesting_slot : attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of delegate [manager_pkh]
+    for [attested_block]. Fails if it doesn't have any attesting
+    rights for this block. *)
+val get_attesting_slot_of_delegate :
+  manager_pkh:public_key_hash ->
+  attested_block:Block.t ->
+  attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is different from [consensus_pkh_to_avoid]. *)
+val get_different_attesting_slot :
+  consensus_pkh_to_avoid:public_key_hash ->
+  attested_block:Block.t ->
+  attesting_slot tzresult Lwt.t
+
+(** Builds an {!attesting_slot} with the attester's consensus key and
+    its second-smallest slot (that is, a non-canonical slot that still
+    belongs to the attester). *)
+val non_canonical_attesting_slot_of_attester :
+  Context.attester -> attesting_slot
+
+(** Retrieves the first attester returned by
+    {!Plugin.RPC.Validators.S.validators} and builds a non-canonical
+    {!attesting_slot} for it, where {!field-slot} is its
+    second-smallest slot. *)
+val get_non_canonical_attesting_slot :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Default committee for a (pre)attestations aggregate, that is, the
+    canonical attesting slots of all delegates with attesting rights
+    on [attested_block] whose consensus keys are BLS keys. *)
+val default_committee :
+  attested_block:Block.t -> attesting_slot list tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is a BLS key. *)
+val get_attesting_slot_with_bls_key :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} of the first attester
+    returned by {!Plugin.RPC.Validators.S.validators} whose consensus
+    key is a non-BLS key. *)
+val get_attesting_slot_with_non_bls_key :
+  attested_block:Block.t -> attesting_slot tzresult Lwt.t
+
+(** Returns the canonical {!attesting_slot} corresponding to a
+    {!RPC.Attestation_rights.delegate_rights}. *)
+val attesting_slot_of_delegate_rights :
+  RPC.Attestation_rights.delegate_rights -> attesting_slot
+
 (** Create an unpacked attestation that is expected for given [Block.t].
 
     Optional parameters allow to specify the attested values: [level],
     [round], [block_payload_hash], and/or [dal_content].
 
-    They also allow to specify the attester ([delegate]), and/or the
-    [slot]. These default to the first slot and its delegate.
+    The consensus slot and signer are the ones from [attesting_slot]
+    if provided, otherwise the canonical ones for the delegate with
+    [manager_pkh] if provided (and the function fails if [manager_pkh]
+    is not the manager key of a delegate with attesting rights at the
+    given [Block.t]'s level); otherwise, they default to the attesting
+    slot returned by {!get_attesting_slot}. The function fails if both
+    [attesting_slot] and [manager_pkh] are provided.
 
     Finally, the operation [branch] can be specified. It defaults to the
     predecessor of the attested block. *)
 val raw_attestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -84,8 +154,8 @@ val raw_attestation :
 
     Optional parameters are the same than {!raw_attestation}. *)
 val raw_preattestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -96,8 +166,8 @@ val raw_preattestation :
 (** Create a packed attestation that is expected for a given
     [Block.t] by packing the result of {!raw_attestation}. *)
 val attestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -109,9 +179,14 @@ val attestation :
 (** Crafts an {!Attestations_aggregate} operation pointing to the
     given {!Block.t}. Block context is expected to include at least
     one delegate with a BLS consensus key, otherwise this function
-    will return an error. *)
+    will return an error.
+
+    [committee] defaults to {!default_committee} with [dal_content =
+    None] for each member.
+
+    Other parameters are the same as in {!raw_attestation}. *)
 val raw_attestations_aggregate :
-  ?committee:(public_key_hash * dal_content option) list ->
+  ?committee:(attesting_slot * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -122,7 +197,7 @@ val raw_attestations_aggregate :
 (** Same as {!raw_preattestations_aggregate} but returns the packed
     operation. *)
 val attestations_aggregate :
-  ?committee:(public_key_hash * dal_content option) list ->
+  ?committee:(attesting_slot * dal_content option) list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -133,8 +208,8 @@ val attestations_aggregate :
 (** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preattestation}. *)
 val preattestation :
-  ?delegate:public_key_hash ->
-  ?slot:Slot.t ->
+  ?attesting_slot:attesting_slot ->
+  ?manager_pkh:public_key_hash ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -142,11 +217,16 @@ val preattestation :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed preattestations_aggregate that is expected for a given
-    [Block.t]. Block context is expected to include at least one delegate with a
-    BLS key (or a registered consensus keys). *)
+(** Crafts a {!Preattestations_aggregate} operation pointing to the
+    given {!Block.t}. Block context is expected to include at least
+    one delegate with a BLS consensus key, otherwise this function
+    will return an error.
+
+    [committee] defaults to {!default_committee}.
+
+    Other parameters are the same as in {!raw_attestation}. *)
 val raw_preattestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:attesting_slot list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->
@@ -157,7 +237,7 @@ val raw_preattestations_aggregate :
 (** Same as {!raw_preattestations_aggregate} but returns the packed
     operation. *)
 val preattestations_aggregate :
-  ?committee:public_key_hash list ->
+  ?committee:attesting_slot list ->
   ?level:Raw_level.t ->
   ?round:Round.t ->
   ?block_payload_hash:Block_payload_hash.t ->

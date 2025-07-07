@@ -471,8 +471,9 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
   let* main_branch, state = bake (block, state) in
   List.fold_left_es
     (fun (main_branch, state) delegate ->
-      let* attestation_a = op ~delegate:delegate.pkh forked_block in
-      let* attestation_b = op ~delegate:delegate.pkh main_branch in
+      let manager_pkh = delegate.pkh in
+      let* attestation_a = op ~manager_pkh ~attested_block:forked_block in
+      let* attestation_b = op ~manager_pkh ~attested_block:main_branch in
       let evidence = op_evidence attestation_a attestation_b in
       let dss =
         {
@@ -493,7 +494,8 @@ let double_attest_op ?other_bakers ~op ~op_evidence ~kind delegate_names
 
 let double_attest_ =
   double_attest_op
-    ~op:(fun ~delegate block -> Op.raw_attestation ~delegate block)
+    ~op:(fun ~manager_pkh ~attested_block ->
+      Op.raw_attestation ~manager_pkh attested_block)
     ~op_evidence:op_double_attestation
     ~kind:Double_attesting
 
@@ -506,7 +508,8 @@ let double_attest ?other_bakers delegate_name : (t, t) scenarios =
 
 let double_preattest_ =
   double_attest_op
-    ~op:(fun ~delegate block -> Op.raw_preattestation ~delegate block)
+    ~op:(fun ~manager_pkh ~attested_block ->
+      Op.raw_preattestation ~manager_pkh attested_block)
     ~op_evidence:op_double_preattestation
     ~kind:Double_preattesting
 
