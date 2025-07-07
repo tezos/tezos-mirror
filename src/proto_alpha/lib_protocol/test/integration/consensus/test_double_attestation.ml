@@ -620,16 +620,12 @@ let test_invalid_double_attestation_duplicate_in_committee () =
       ~loc:__LOC__
       (Test_aggregate.find_attester_with_bls_key attesters)
   in
-  let* op1 =
-    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_a
-  in
-  let* op2_standalone =
-    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_b
-  in
-  let op2 =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Op.raw_aggregate [op2_standalone; op2_standalone])
+  let* op1 = Op.raw_attestation ~delegate:attester.consensus_key ~slot blk_a in
+  let* op2 =
+    Op.raw_attestations_aggregate
+      ~committee:
+        [(attester.consensus_key, None); (attester.consensus_key, None)]
+      blk_b
   in
   let op =
     let contents =
@@ -653,7 +649,7 @@ let test_invalid_double_attestation_duplicate_in_committee () =
       op
   in
   (* Also check with duplicate slots with different dal contents *)
-  let* op2_standalone' =
+  let* op2 =
     let number_of_slots =
       Default_parameters.constants_test.dal.number_of_slots
     in
@@ -661,16 +657,13 @@ let test_invalid_double_attestation_duplicate_in_committee () =
     let dal_content =
       {attestation = Dal.Attestation.(commit empty slot_index)}
     in
-    Op.raw_attestation
-      ~delegate:attester.RPC.Validators.delegate
-      ~slot
-      ~dal_content
+    Op.raw_attestations_aggregate
+      ~committee:
+        [
+          (attester.consensus_key, None);
+          (attester.consensus_key, Some dal_content);
+        ]
       blk_b
-  in
-  let op2 =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Op.raw_aggregate [op2_standalone; op2_standalone'])
   in
   let op =
     let contents =

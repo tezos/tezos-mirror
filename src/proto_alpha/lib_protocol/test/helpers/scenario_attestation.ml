@@ -94,7 +94,8 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
       consensus_key_pkh
 
 let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
-    committee_expect : Block.full_metadata -> t -> unit tzresult Lwt.t =
+    ?(expect_same_order = true) committee_expect :
+    Block.full_metadata -> t -> unit tzresult Lwt.t =
  fun (_block_header_metadata, op_metadata) (_block, _state) ->
   let open Lwt_result_syntax in
   Log.debug ~color:low_debug_color "Check metadata: aggregated attestation" ;
@@ -102,6 +103,15 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
     if check_not_found then (not, "Not expected but found in metadata")
     else (Fun.id, "Expected but not found in metadata")
   in
+  let may_sort committee =
+    if expect_same_order then committee
+    else
+      List.sort
+        (fun {Alpha_context.Consensus_key.delegate = d1; _} {delegate = d2; _} ->
+          Signature.Public_key_hash.compare d1 d2)
+        committee
+  in
+  let committee_expect = may_sort committee_expect in
   if
     id_or_not
     @@ List.exists
@@ -133,19 +143,19 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
                            total_consensus_power = _;
                          });
                  } ) ->
-               let committee =
-                 List.map
-                   (fun ((ck : Protocol.Alpha_context.Consensus_key.t), _) ->
-                     ck.delegate)
-                   committee
-                 |> List.sort Signature.Public_key_hash.compare
-               in
-               let committee_expect =
-                 List.map fst committee_expect
-                 |> List.sort Signature.Public_key_hash.compare
-               in
+               let committee = List.map fst committee |> may_sort in
+               Log.debug
+                 "@[<v 2>Actual committee:@,%a@]"
+                 (Format.pp_print_list Alpha_context.Consensus_key.pp)
+                 committee ;
                List.equal
-                 Signature.Public_key_hash.equal
+                 (fun {
+                        Alpha_context.Consensus_key.delegate = d1;
+                        consensus_pkh = c1;
+                      }
+                      {delegate = d2; consensus_pkh = c2} ->
+                   Signature.Public_key_hash.equal d1 d2
+                   && Signature.Public_key_hash.equal c1 c2)
                  committee
                  committee_expect
            | _ -> false)
@@ -159,8 +169,8 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
       Format.(
         pp_print_list
           ~pp_sep:(fun fmt () -> fprintf fmt "; ")
-          Signature.Public_key_hash.pp)
-      (List.map fst committee_expect)
+          Alpha_context.Consensus_key.pp)
+      committee_expect
 
 let check_attestation_rewards ?(check_not_found = false) delegate_name :
     Block.full_metadata -> t -> unit tzresult Lwt.t =
@@ -287,29 +297,33 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
       if state.force_attest_all then
         failwith "Cannot manually attest if force_attest_all is true"
       else
-        let* state, committee, delegate_and_ck_committee =
+        let* state, committee, expected_metadata_committee =
           List.fold_left_es
-            (fun (state, committee, delegate_and_ck) delegate_name ->
+            (fun (state, committee, expected_metadata_committee) delegate_name ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
                 Context.Delegate.consensus_key
                   (B state.grandparent)
                   delegate.pkh
               in
-              let consensus_key_pkh =
-                consensus_key_info.active.consensus_key_pkh
-              in
+              let consensus_pkh = consensus_key_info.active.consensus_key_pkh in
               let* () =
-                if Signature.Public_key_hash.is_bls consensus_key_pkh then
+                if Signature.Public_key_hash.is_bls consensus_pkh then
                   return_unit
                 else failwith "Cannot aggregate with non-BLS key"
               in
               (* Update the activity of the committee *)
               let state = update_activity delegate_name block state in
+              let key_in_metadata =
+                {
+                  Alpha_context.Consensus_key.delegate = delegate.pkh;
+                  consensus_pkh;
+                }
+              in
               return
                 ( state,
-                  (consensus_key_pkh, None) :: committee,
-                  (delegate.pkh, consensus_key_pkh) :: delegate_and_ck ))
+                  (consensus_pkh, None) :: committee,
+                  key_in_metadata :: expected_metadata_committee ))
             (state, [], [])
             delegates
         in
@@ -320,11 +334,15 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
           State.add_current_block_check
             (check_attestation_aggregate_metadata
                ~kind
-               delegate_and_ck_committee)
+               expected_metadata_committee)
             state
         in
         let state = State.add_pending_operations [op] state in
         return (block, state))
+
+let key_for_metadata_of_delegate_rights
+    {RPC.Attestation_rights.delegate; consensus_key; _} =
+  {Alpha_context.Consensus_key.delegate; consensus_pkh = consensus_key}
 
 let attest_with_all_ : t -> t tzresult Lwt.t =
   let open Lwt_result_syntax in
@@ -340,12 +358,12 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
              so the returned list should only contain one element. *)
           assert false
     in
-    let* dlgs =
-      List.map
+    let* non_forbidden_delegates_rights =
+      List.filter_es
         (fun {
-               Plugin.RPC.Attestation_rights.delegate;
+               RPC.Attestation_rights.delegate;
                consensus_key = _;
-               first_slot;
+               first_slot = _;
                attestation_power;
              } ->
           Tezt.Check.(
@@ -353,88 +371,67 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
               int
               ~__LOC__
               ~error_msg:"Attestation power should be greater than 0, got %L") ;
-          (delegate, first_slot))
+          let* is_forbidden =
+            Context.Delegate.is_forbidden (B block) delegate
+          in
+          return (not is_forbidden))
         delegates_rights
-      |> List.filter_es (fun (delegate, _slot) ->
-             let* is_forbidden =
-               Context.Delegate.is_forbidden (B block) delegate
-             in
-             return (not is_forbidden))
     in
-    let* to_aggregate, ops =
+    let* state, bls_committee =
       List.fold_left_es
-        (fun (to_aggregate, regular) (delegate, slot) ->
-          let* consensus_key_info =
-            Context.Delegate.consensus_key (B state.grandparent) delegate
-          in
-          let consensus_key = consensus_key_info.active in
-          let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-          let* op =
-            Op.raw_attestation ~delegate:consensus_key.pkh ~slot block
-          in
-          match (state.constants.aggregate_attestation, consensus_key.pk) with
-          | true, Bls _ ->
-              return ((op, delegate, consensus_key.pkh) :: to_aggregate, regular)
-          | _ ->
-              return
-                ( to_aggregate,
-                  ( Protocol.Alpha_context.Operation.pack op,
-                    delegate,
-                    consensus_key.pkh )
-                  :: regular ))
-        ([], [])
-        dlgs
-    in
-    let aggregated =
-      Op.aggregate (List.map (fun (x, _, _) -> x) to_aggregate)
-    in
-    let state =
-      match aggregated with
-      | None -> state
-      | Some op ->
-          (* Update the activity of the committee *)
-          let state, delegate_and_ck_committee =
-            List.fold_left
-              (fun (state, delegate_and_ck) (_, delegate_pkh, consensus_key_pkh) ->
-                let delegate_name, _ =
-                  State.find_account_from_pkh delegate_pkh state
-                in
-                ( update_activity delegate_name block state,
-                  (delegate_pkh, consensus_key_pkh) :: delegate_and_ck ))
-              (state, [])
-              to_aggregate
-          in
-          (* Check metadata *)
-          let state =
-            State.add_current_block_check
-              (check_attestation_aggregate_metadata
-                 ~kind
-                 delegate_and_ck_committee)
-              state
-          in
-          let state = State.add_pending_operations [op] state in
-          state
-    in
-    (* Update the activity of the rest of the committee, and check metadata *)
-    let state =
-      List.fold_left
-        (fun state (_, delegate_pkh, consensus_key_pkh) ->
+        (fun (state, bls_committee)
+             ({
+                RPC.Attestation_rights.delegate = manager_pkh;
+                consensus_key;
+                first_slot = slot;
+                attestation_power = _;
+              } as delegate_rights) ->
+          (* Update delegate activity in any case. *)
           let delegate_name, _ =
-            State.find_account_from_pkh delegate_pkh state
+            State.find_account_from_pkh manager_pkh state
           in
           let state = update_activity delegate_name block state in
-          (* Check metadata *)
-          let state =
-            State.add_current_block_check
-              (check_attestation_metadata ~kind delegate_pkh consensus_key_pkh)
-              state
-          in
-          state)
-        state
-        ops
+          if
+            state.constants.aggregate_attestation
+            && Signature.Public_key_hash.is_bls consensus_key
+          then
+            (* Just add the delegate to the committee; aggregation and
+               metadata check will be handled below. *)
+            return (state, delegate_rights :: bls_committee)
+          else
+            (* Add standalone attestation and metadata check. *)
+            let* op = Op.attestation ~delegate:consensus_key ~slot block in
+            let state = State.add_pending_operations [op] state in
+            let state =
+              State.add_current_block_check
+                (check_attestation_metadata ~kind manager_pkh consensus_key)
+                state
+            in
+            return (state, bls_committee))
+        (state, [])
+        non_forbidden_delegates_rights
     in
-    let state =
-      State.add_pending_operations (List.map (fun (x, _, _) -> x) ops) state
+    let* state =
+      if List.is_empty bls_committee then return state
+      else
+        (* Add aggregated attestation and metadata check. *)
+        let committee =
+          List.map
+            (fun {RPC.Attestation_rights.consensus_key; _} ->
+              (consensus_key, None))
+            bls_committee
+        in
+        let* op = Op.attestations_aggregate ~committee block in
+        let state = State.add_pending_operations [op] state in
+        let expected_committee =
+          List.map key_for_metadata_of_delegate_rights bls_committee
+        in
+        let state =
+          State.add_current_block_check
+            (check_attestation_aggregate_metadata ~kind expected_committee)
+            state
+        in
+        return state
     in
     return (block, state)
 
@@ -518,16 +515,14 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
       else
         let kind = Preattestation in
         let* fake_block = make_fake_block ?payload_round incr in
-        let* state, committee, delegate_and_ck_committee =
+        let* state, committee, expected_metadata_committee =
           List.fold_left_es
-            (fun (state, committee, delegate_and_ck) delegate_name ->
+            (fun (state, committee, expected_metadata_committee) delegate_name ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
                 Context.Delegate.consensus_key (I incr) delegate.pkh
               in
-              let consensus_key_pkh =
-                consensus_key_info.active.consensus_key_pkh
-              in
+              let consensus_pkh = consensus_key_info.active.consensus_key_pkh in
               (* Update the activity of the committee *)
               let state =
                 update_activity
@@ -535,10 +530,16 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
                   (Incremental.predecessor incr)
                   state
               in
+              let key_for_metadata =
+                {
+                  Alpha_context.Consensus_key.delegate = delegate.pkh;
+                  consensus_pkh;
+                }
+              in
               return
                 ( state,
-                  consensus_key_pkh :: committee,
-                  (delegate.pkh, consensus_key_pkh) :: delegate_and_ck ))
+                  consensus_pkh :: committee,
+                  key_for_metadata :: expected_metadata_committee ))
             (state, [], [])
             delegates
         in
@@ -559,7 +560,7 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
           State.add_current_block_check
             (check_attestation_aggregate_metadata
                ~kind
-               delegate_and_ck_committee)
+               expected_metadata_committee)
             state
         in
         let* incr = Incremental.add_operation incr op in
@@ -580,12 +581,12 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
              so the returned list should only contain one element. *)
           assert false
     in
-    let* dlgs =
-      List.map
+    let* non_forbidden_delegates_rights =
+      List.filter_es
         (fun {
                Plugin.RPC.Attestation_rights.delegate;
                consensus_key = _;
-               first_slot;
+               first_slot = _;
                attestation_power;
              } ->
           Tezt.Check.(
@@ -593,95 +594,64 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
               int
               ~__LOC__
               ~error_msg:"Attestation power should be greater than 0, got %L") ;
-          (delegate, first_slot))
+          let* is_forbidden = Context.Delegate.is_forbidden (I incr) delegate in
+          return (not is_forbidden))
         delegates_rights
-      |> List.filter_es (fun (delegate, _slot) ->
-             let* is_forbidden =
-               Context.Delegate.is_forbidden (I incr) delegate
-             in
-             return (not is_forbidden))
     in
-    let* to_aggregate, ops =
+    let* incr, state, bls_committee =
       List.fold_left_es
-        (fun (to_aggregate, regular) (delegate, slot) ->
-          let* consensus_key_info =
-            Context.Delegate.consensus_key (I incr) delegate
-          in
-          let consensus_key = consensus_key_info.active in
-          let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-          let* op =
-            Op.raw_preattestation ~delegate:consensus_key.pkh ~slot fake_block
-          in
-          match (state.constants.aggregate_attestation, consensus_key.pk) with
-          | true, Bls _ ->
-              return ((op, delegate, consensus_key.pkh) :: to_aggregate, regular)
-          | _ ->
-              return
-                ( to_aggregate,
-                  ( Protocol.Alpha_context.Operation.pack op,
-                    delegate,
-                    consensus_key.pkh )
-                  :: regular ))
-        ([], [])
-        dlgs
-    in
-    let aggregated =
-      Op.aggregate_preattestations (List.map (fun (x, _, _) -> x) to_aggregate)
-    in
-    let* incr, state =
-      match aggregated with
-      | None -> return (incr, state)
-      | Some op ->
-          (* Update the activity of the committee *)
-          let state, delegate_and_ck_committee =
-            List.fold_left
-              (fun (state, delegate_and_ck) (_, delegate_pkh, consensus_key_pkh) ->
-                let delegate_name, _ =
-                  State.find_account_from_pkh delegate_pkh state
-                in
-                ( update_activity
-                    delegate_name
-                    (Incremental.predecessor incr)
-                    state,
-                  (delegate_pkh, consensus_key_pkh) :: delegate_and_ck ))
-              (state, [])
-              to_aggregate
-          in
-          (* Check metadata *)
-          let state =
-            State.add_current_block_check
-              (check_attestation_aggregate_metadata
-                 ~kind
-                 delegate_and_ck_committee)
-              state
-          in
-          let* incr = Incremental.add_operation incr op in
-          return (incr, state)
-    in
-    (* Update the activity of the rest of the committee, and check metadata *)
-    let state =
-      List.fold_left
-        (fun state (_, delegate_pkh, consensus_key_pkh) ->
+        (fun (incr, state, bls_committee)
+             ({
+                Plugin.RPC.Attestation_rights.delegate = manager_pkh;
+                consensus_key;
+                first_slot = slot;
+                attestation_power = _;
+              } as delegate_rights) ->
+          (* Update delegate activity in any case. *)
           let delegate_name, _ =
-            State.find_account_from_pkh delegate_pkh state
+            State.find_account_from_pkh manager_pkh state
           in
           let state =
             update_activity delegate_name (Incremental.predecessor incr) state
           in
-          (* Check metadata *)
-          let state =
-            State.add_current_block_check
-              (check_attestation_metadata ~kind delegate_pkh consensus_key_pkh)
-              state
-          in
-          state)
-        state
-        ops
+          if
+            state.constants.aggregate_attestation
+            && Signature.Public_key_hash.is_bls consensus_key
+          then
+            (* Just add the delegate to the committee; aggregation and
+               metadata check will be handled below. *)
+            return (incr, state, delegate_rights :: bls_committee)
+          else
+            (* Add standalone attestation and metadata check. *)
+            let* op =
+              Op.preattestation ~delegate:consensus_key ~slot fake_block
+            in
+            let* incr = Incremental.add_operation incr op in
+            let state =
+              State.add_current_block_check
+                (check_attestation_metadata ~kind manager_pkh consensus_key)
+                state
+            in
+            return (incr, state, bls_committee))
+        (incr, state, [])
+        non_forbidden_delegates_rights
     in
-    let* incr =
-      List.fold_left_es
-        Incremental.add_operation
-        incr
-        (List.map (fun (x, _, _) -> x) ops)
-    in
-    return (incr, state)
+    if List.is_empty bls_committee then return (incr, state)
+    else
+      (* Add aggregated attestation and metadata check. *)
+      let committee =
+        List.map
+          (fun {RPC.Attestation_rights.consensus_key; _} -> consensus_key)
+          bls_committee
+      in
+      let* op = Op.preattestations_aggregate ~committee fake_block in
+      let* incr = Incremental.add_operation incr op in
+      let expected_committee =
+        List.map key_for_metadata_of_delegate_rights bls_committee
+      in
+      let state =
+        State.add_current_block_check
+          (check_attestation_aggregate_metadata ~kind expected_committee)
+          state
+      in
+      return (incr, state)

@@ -655,25 +655,8 @@ let attestations_aggregate_descriptor =
     opt_prelude = None;
     candidates_generator =
       (fun state ->
-        let open Lwt_result_syntax in
-        let* attestations =
-          List.filter_map_es
-            (fun (delegate, consensus_key_opt) ->
-              let* slots_opt =
-                Context.get_attester_slot (B state.block) delegate
-              in
-              let delegate = Option.value ~default:delegate consensus_key_opt in
-              let* signer = Account.find delegate in
-              match (slots_opt, signer.sk) with
-              | Some (_ :: _), Bls _ ->
-                  let* op = Op.raw_attestation ~delegate state.block in
-                  return (Some op)
-              | _, _ -> return_none)
-            state.delegates
-        in
-        match Op.aggregate attestations with
-        | Some op -> return [op]
-        | None -> return_nil);
+        let* op = Op.attestations_aggregate state.block in
+        return [op]);
   }
 
 let preattestations_aggregate_descriptor =
@@ -686,25 +669,8 @@ let preattestations_aggregate_descriptor =
     opt_prelude = None;
     candidates_generator =
       (fun state ->
-        let open Lwt_result_syntax in
-        let* preattestations =
-          List.filter_map_es
-            (fun (delegate, consensus_key_opt) ->
-              let* slots_opt =
-                Context.get_attester_slot (B state.block) delegate
-              in
-              let delegate = Option.value ~default:delegate consensus_key_opt in
-              let* signer = Account.find delegate in
-              match (slots_opt, signer.sk) with
-              | Some (_ :: _), Bls _ ->
-                  let* op = Op.raw_preattestation ~delegate state.block in
-                  return (Some op)
-              | _, _ -> return_none)
-            state.delegates
-        in
-        match Op.aggregate_preattestations preattestations with
-        | Some op -> return [op]
-        | None -> return_nil);
+        let* op = Op.preattestations_aggregate state.block in
+        return [op]);
   }
 
 module Manager = Manager_operation_helpers

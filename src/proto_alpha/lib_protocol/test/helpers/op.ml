@@ -186,9 +186,6 @@ let raw_aggregate attestations =
   let protocol_data = {contents; signature = Some (Bls signature)} in
   ({shell; protocol_data} : Kind.attestations_aggregate operation)
 
-let aggregate attestations =
-  Option.map Operation.pack (raw_aggregate attestations)
-
 let raw_aggregate_preattestations preattestations =
   let aggregate_content =
     List.fold_left
@@ -221,9 +218,6 @@ let raw_aggregate_preattestations preattestations =
   let protocol_data = {contents; signature = Some (Bls signature)} in
   ({shell; protocol_data} : Kind.preattestations_aggregate operation)
 
-let aggregate_preattestations preattestations =
-  Option.map Operation.pack (raw_aggregate_preattestations preattestations)
-
 let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
     ?branch attested_block =
   let open Lwt_result_syntax in
@@ -240,8 +234,8 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
   in
   return (Operation.pack op)
 
-let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
+    ?branch attested_block =
   let open Lwt_result_syntax in
   let* committee =
     match committee with
@@ -269,9 +263,23 @@ let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
           attested_block)
       committee
   in
-  match aggregate attestations with
+  match raw_aggregate attestations with
   | Some aggregate_attestation -> return aggregate_attestation
   | None -> failwith "no Bls delegate found"
+
+let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
+    attested_block =
+  let open Lwt_result_syntax in
+  let* op =
+    raw_attestations_aggregate
+      ?committee
+      ?level
+      ?round
+      ?block_payload_hash
+      ?branch
+      attested_block
+  in
+  return (Operation.pack op)
 
 let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     attested_block =

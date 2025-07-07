@@ -261,16 +261,13 @@ let test_attestations_aggregate_with_a_single_delegate () =
   in
   let* attesters = Context.get_attesters (B block) in
   (* Find an attester with a BLS consensus key. *)
-  let attester, slot =
+  let attester, _slot =
     WithExceptions.Option.get
       ~loc:__LOC__
       (find_attester_with_bls_key attesters)
   in
-  let* attestation =
-    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot block
-  in
-  let operation =
-    WithExceptions.Option.get ~loc:__LOC__ (Op.aggregate [attestation])
+  let* operation =
+    Op.attestations_aggregate ~committee:[(attester.consensus_key, None)] block
   in
   let* _, (_, receipt) = Block.bake_with_metadata ~operation block in
   let result = find_attestations_aggregate_result receipt in
@@ -284,21 +281,13 @@ let test_preattestations_aggregate_with_a_single_delegate () =
   let* block' = Block.bake block in
   let* attesters = Context.get_attesters (B block') in
   (* Find an attester with a BLS consensus key. *)
-  let attester, slot =
+  let attester, _slot =
     WithExceptions.Option.get
       ~loc:__LOC__
       (find_attester_with_bls_key attesters)
   in
   let* operation =
-    let* preattestation =
-      Op.raw_preattestation
-        ~delegate:attester.RPC.Validators.delegate
-        ~slot
-        block'
-    in
-    return
-    @@ WithExceptions.Option.get ~loc:__LOC__
-    @@ Op.aggregate_preattestations [preattestation]
+    Op.preattestations_aggregate ~committee:[attester.consensus_key] block'
   in
   let* _, (_, receipt) =
     let round_zero = Alpha_context.Round.zero in
@@ -320,21 +309,13 @@ let test_attestations_aggregate_with_multiple_delegates () =
   let* attesters = Context.get_attesters (B block) in
   (* Filter delegates with BLS keys that have at least one slot *)
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
-  let* attestations =
-    List.map_es
-      (fun (slot, delegate) ->
-        Op.raw_attestation
-          ~delegate:delegate.RPC.Validators.delegate
-          ~slot
-          block)
+  let committee =
+    List.map
+      (fun (_slot, delegate) -> (delegate.RPC.Validators.consensus_key, None))
       bls_delegates_with_slots
   in
-  let aggregation =
-    WithExceptions.Option.get ~loc:__LOC__ (Op.aggregate attestations)
-  in
-  let* _, (_, receipt) =
-    Block.bake_with_metadata ~operation:aggregation block
-  in
+  let* operation = Op.attestations_aggregate ~committee block in
+  let* _, (_, receipt) = Block.bake_with_metadata ~operation block in
   let result = find_attestations_aggregate_result receipt in
   let delegates = List.map snd bls_delegates_with_slots in
   check_attestations_aggregate_result ~committee:delegates result
@@ -348,20 +329,12 @@ let test_preattestations_aggregate_with_multiple_delegates () =
   let* attesters = Context.get_attesters (B block') in
   (* Filter delegates with BLS keys that have at least one slot *)
   let bls_delegates_with_slots = filter_attesters_with_bls_key attesters in
-  let* preattestations =
-    List.map_es
-      (fun (slot, delegate) ->
-        Op.raw_preattestation
-          ~delegate:delegate.RPC.Validators.delegate
-          ~slot
-          block')
+  let committee =
+    List.map
+      (fun (_slot, delegate) -> delegate.RPC.Validators.consensus_key)
       bls_delegates_with_slots
   in
-  let operation =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Op.aggregate_preattestations preattestations)
-  in
+  let* operation = Op.preattestations_aggregate ~committee block' in
   let* _, (_, receipt) =
     let round_zero = Alpha_context.Round.zero in
     Block.bake_with_metadata

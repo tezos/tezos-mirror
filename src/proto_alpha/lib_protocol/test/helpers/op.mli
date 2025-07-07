@@ -106,9 +106,21 @@ val attestation :
   Block.t ->
   Operation.packed tzresult Lwt.t
 
-(** Create a packed attestations_aggregate that is expected for a given
-    [Block.t]. Block context is expected to include at least one delegate with a
-    BLS key (or a registered consensus keys). *)
+(** Crafts an {!Attestations_aggregate} operation pointing to the
+    given {!Block.t}. Block context is expected to include at least
+    one delegate with a BLS consensus key, otherwise this function
+    will return an error. *)
+val raw_attestations_aggregate :
+  ?committee:(public_key_hash * dal_content option) list ->
+  ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  ?branch:Block_hash.t ->
+  Block.t ->
+  Kind.attestations_aggregate Operation.t tzresult Lwt.t
+
+(** Same as {!raw_preattestations_aggregate} but returns the packed
+    operation. *)
 val attestations_aggregate :
   ?committee:(public_key_hash * dal_content option) list ->
   ?level:Raw_level.t ->
@@ -117,19 +129,6 @@ val attestations_aggregate :
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
-
-(** Aggregate a list of attestations in a single Attestations_aggregate.
-    Attestations signed by non-bls delegates are ignored. Evaluates to {!None} if
-    no bls-signed attestations are found or if signature_aggregation failed
-    (due to unreadable signature representation). *)
-val raw_aggregate :
-  Kind.attestation_consensus_kind Kind.consensus operation trace ->
-  Kind.attestations_aggregate operation option
-
-(** Same as {!raw_aggregate} but returns the packed operation. *)
-val aggregate :
-  Kind.attestation_consensus_kind Kind.consensus operation trace ->
-  Operation.packed option
 
 (** Create a packed preattestation that is expected for a given
     [Block.t] by packing the result of {!raw_preattestation}. *)
@@ -165,19 +164,6 @@ val preattestations_aggregate :
   ?branch:Block_hash.t ->
   Block.t ->
   Operation.packed tzresult Lwt.t
-
-(** Aggregate a list of preattestations in a single Preattestations_aggregate.
-    Preattestations signed by non-bls delegates are ignored. Evaluates to {!None} if
-    no bls-signed attestations are found or if signature_aggregation failed. *)
-val raw_aggregate_preattestations :
-  Kind.preattestation_consensus_kind Kind.consensus operation trace ->
-  Kind.preattestations_aggregate operation option
-
-(** Same as {!raw_aggregate_preattestations} but returns the packed
-    operation. *)
-val aggregate_preattestations :
-  Kind.preattestation_consensus_kind Kind.consensus operation trace ->
-  Operation.packed option
 
 type gas_limit =
   | Max  (** Max corresponds to the [max_gas_limit_per_operation] constant. *)

@@ -457,21 +457,12 @@ end = struct
         (Test_aggregate.find_attester_with_bls_key attesters)
     in
     let* op1 =
-      Op.raw_preattestation
-        ~delegate:attester.RPC.Validators.delegate
-        ~slot
-        blk_a
+      Op.raw_preattestation ~delegate:attester.consensus_key ~slot blk_a
     in
-    let* op2_standalone =
-      Op.raw_preattestation
-        ~delegate:attester.RPC.Validators.delegate
-        ~slot
+    let* op2 =
+      Op.raw_preattestations_aggregate
+        ~committee:[attester.consensus_key; attester.consensus_key]
         blk_b
-    in
-    let op2 =
-      WithExceptions.Option.get
-        ~loc:__LOC__
-        (Op.raw_aggregate_preattestations [op2_standalone; op2_standalone])
     in
     let op =
       let contents =
