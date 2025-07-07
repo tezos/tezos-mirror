@@ -1,6 +1,6 @@
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "0", "counter": "1" }
+{ "balance": "0", "counter": "1", "revealed": false }
 
 ./octez-client --wait none register key dummy_account_0 as delegate --consensus-key dummy_account_1 --companion-key dummy_account_2
 Node is bootstrapped.
@@ -121,7 +121,7 @@ This sequence of operations was run:
   "stakers": [], "delegators": [ "[PUBLIC_KEY_HASH]" ] }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "0", "counter": "5" }
+{ "balance": "0", "counter": "5", "revealed": false }
 
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "deactivated": false, "is_forbidden": false,

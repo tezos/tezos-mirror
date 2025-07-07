@@ -61,6 +61,11 @@ Breaking Changes
   other operations. This does not change anything about the revelation
   of new addresses, or non-tz4 addresses. (MR :gl:`!18078`)
 
+- ``../context/contracts/<pkh>`` result now contains, when called on an implicit
+  account, a boolean field ``revealed`` that tells if the public key of the
+  manager has been revealed.
+
+
 Operations
 ----------
 
@@ -130,6 +135,11 @@ Operation receipts
 
 RPC Changes
 -----------
+- Modified ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/contracts/<pkh>``
+  result now contains, when called on an implicit account, a boolean field
+  ``revealed`` that tells if the public key of the manager has been revealed.
+
 
 - Added ``GET
   /chains/<chain_id>/blocks/<block_id>/context/delegates/<delegate_pkh>/companion_key``,

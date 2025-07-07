@@ -30,6 +30,10 @@ General
 Node
 ----
 
+- ** Breaking change ** modified RPC ``../context/contracts/<pkh>``: the result
+  now contains, when called on an implicit account, a boolean field ``revealed``
+  that tells if the public key of the manager has been revealed.
+
 - Added RPC ``POST /bls/aggregate_public_keys`` to aggregate BLS
   public keys. (MR :gl:`!17461`)
 
