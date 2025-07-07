@@ -19,6 +19,7 @@ type operator = {
   sc_rollup_node : Sc_rollup_node.t;
   sc_rollup_address : string;
   operator : Account.key;
+  origination_level : int;
 }
 
 (** [init_echo_rollup_account ~client ~echo_rollup ~alias_prefix] generates

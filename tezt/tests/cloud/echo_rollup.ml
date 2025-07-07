@@ -17,6 +17,7 @@ type operator = {
   sc_rollup_node : Sc_rollup_node.t;
   sc_rollup_address : string;
   operator : Account.key;
+  origination_level : int;
 }
 
 let init_echo_rollup_account ~client ~echo_rollup ~alias_prefix =
@@ -165,6 +166,8 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
       client
   in
   let () = toplog "Init Echo rollup: waiting again, for level %d" (l + 2) in
+  (* The origination level is an overapproximation, it prevents metrics to fail
+     if they attempt to read the rollup storage before its origination level. *)
   let* _ = Node.wait_for_level node (l + 2) in
   let () =
     toplog "Init Echo rollup: waiting again, for level %d: done" (l + 2)
@@ -173,8 +176,23 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
   let* () =
     Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
   in
+  let* genesis_info =
+    Client.RPC.call client
+    @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_genesis_info
+         sc_rollup_address
+  in
+  let origination_level = JSON.(genesis_info |-> "level" |> as_int) in
   let () = toplog "Init Echo rollup: launching the rollup node: done" in
-  let operator = {node; client; sc_rollup_node; operator; sc_rollup_address} in
+  let operator =
+    {
+      node;
+      client;
+      sc_rollup_node;
+      operator;
+      sc_rollup_address;
+      origination_level;
+    }
+  in
   let* () =
     add_prometheus_source
       ?dal_node

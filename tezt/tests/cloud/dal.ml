@@ -91,26 +91,21 @@ type t = {
 
 let get_echo_rollup t ~level =
   let slots = Hashtbl.create 32 in
-  let read_slot (echo_operator : Echo_rollup.operator) slot =
+  let read_slot echo_operator slot =
     let key = "/output/slot-" ^ string_of_int slot in
-    let rpc =
-      Sc_rollup_rpc.get_global_block_durable_state_value
-        ~pvm_kind:"wasm_2_0_0"
-        ~operation:Sc_rollup_rpc.Value
-        ~key
-        ~block:(string_of_int level)
-        ()
+    let* value_written =
+      Sc_rollup_node.RPC.call echo_operator.Echo_rollup.sc_rollup_node
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key
+           ~block:(string_of_int level)
+           ()
     in
-    let* resp = Sc_rollup_node.RPC.call_json echo_operator.Echo_rollup.sc_rollup_node rpc in
     let size =
-      (* If the RPC fails for whatever reason (mainly because the level asked is
-         below the origination level), do not make the test crash, simply return
-         0. *)
-      if not (Cohttp.Code.is_success resp.code) then 0
-      else
-        match rpc.decode resp.body with
-        | None -> 0
-        | Some bytes -> `Hex bytes |> Hex.to_string |> Z.of_bits |> Z.to_int
+      match value_written with
+      | None -> 0
+      | Some bytes -> `Hex bytes |> Hex.to_string |> Z.of_bits |> Z.to_int
     in
     Hashtbl.add slots slot size ;
     unit
@@ -119,16 +114,17 @@ let get_echo_rollup t ~level =
     match t.echo_rollup with
     | None -> unit
     | Some echo_rollup ->
-        (* Ensure the rollup is at the expected level before updating. *)
-        let* _level =
-          Sc_rollup_node.wait_for_level
-            ~timeout:30.
-            echo_rollup.sc_rollup_node
-            level
-        in
-        Lwt_list.iter_s
-          (read_slot echo_rollup)
-          t.configuration.dal_node_producers
+        if level < echo_rollup.Echo_rollup.origination_level then unit
+        else
+          let* _level =
+            Sc_rollup_node.wait_for_level
+              ~timeout:30.
+              echo_rollup.sc_rollup_node
+              level
+          in
+          Lwt_list.iter_s
+            (read_slot echo_rollup)
+            t.configuration.dal_node_producers
   in
   return slots
 
