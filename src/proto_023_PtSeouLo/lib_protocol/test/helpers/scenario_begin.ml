@@ -154,6 +154,7 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             force_attest_all;
             check_finalized_block_perm;
             check_finalized_block_temp = [];
+            previous_metadata = None;
             operation_mode = Bake;
           }
       in

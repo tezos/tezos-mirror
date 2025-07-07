@@ -299,3 +299,8 @@ let check_balance_fields ?(loc = __LOC__) src_name ~liquid ~staked
         src_name
         `Unstaked_finalizable
         unstaked_finalizable
+
+let with_metadata f (block, state) =
+  match state.previous_metadata with
+  | None -> assert false
+  | Some metadata -> f metadata (block, state)
