@@ -982,7 +982,7 @@ module Make_s
               {driver_ids = [Opentelemetry]}
                 (Opentelemetry_profiler.add_event "parse_operation failed")] ;
             failwith
-              "Invalid operation %a: %a."
+              "Invalid operation %a: %a"
               Operation_hash.pp
               oph
               Error_monad.pp_print_trace
