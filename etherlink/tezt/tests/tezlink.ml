@@ -818,9 +818,9 @@ let test_tezlink_transfer =
     (Tez.to_mutez balance1
     = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
       int)
-    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
-    ~error_msg:"Wrong balance for bootstrap2: exptected %R, actual %L" ;
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
   unit
 
 let test_tezlink_reveal =
