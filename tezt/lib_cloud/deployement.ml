@@ -324,6 +324,7 @@ module Ssh_host = struct
          logging in as root are careful. This allows to not be embarrassed with sudo *)
       if user = "root" then Lwt.return_unit
       else
+        (* TODO? might check with ssh-add that the provided key is loaded in agent *)
         let* _ =
           Process.spawn
             ~runner
@@ -790,7 +791,10 @@ let deploy ~configurations =
       Lwt.return (Remote remote)
   | `Remote_orchestrator_local_agents -> assert false
   | `Ssh_host (user, host, port) ->
-      let* host = Ssh_host.deploy ~user ~host ~port ~configurations () in
+      let ssh_id = Env.ssh_private_key_filename () in
+      let* host =
+        Ssh_host.deploy ~user ~ssh_id ~host ~port ~configurations ()
+      in
       Lwt.return (Ssh_host host)
 
 let agents t =
