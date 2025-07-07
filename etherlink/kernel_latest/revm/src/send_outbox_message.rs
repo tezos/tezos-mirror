@@ -21,7 +21,10 @@ use tezos_smart_rollup_encoding::{
     outbox::OutboxMessageTransaction,
 };
 
-use crate::{constants::WITHDRAWAL_SOL_ADDR, database::PrecompileDatabase};
+use crate::{
+    constants::{FA_WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_ADDR},
+    database::PrecompileDatabase,
+};
 
 sol! {
     event SendWithdrawalInput (
@@ -136,8 +139,11 @@ where
 {
     if transfer.target_address != *current
         || context.tx().caller() == *current
-        || transfer.caller_address != WITHDRAWAL_SOL_ADDR
         || is_static
+        || !matches!(
+            transfer.caller_address,
+            WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
+        )
     {
         return Ok(revert());
     }
