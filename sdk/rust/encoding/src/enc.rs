@@ -166,6 +166,11 @@ pub type BinResult = Result<(), BinError>;
 
 pub trait BinWriter {
     fn bin_write(&self, output: &mut Vec<u8>) -> BinResult;
+    fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
+        let mut output = Vec::new();
+        self.bin_write(&mut output)?;
+        Ok(output)
+    }
 }
 
 impl<T> BinWriter for Box<T>
