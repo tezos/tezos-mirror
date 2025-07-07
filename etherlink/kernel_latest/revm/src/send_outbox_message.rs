@@ -35,10 +35,9 @@ sol! {
 
 sol! {
     event SendFAWithdrawalInput (
-        bytes22 target,
-        bytes22 ticketer,
-        bytes22 proxy,
+        bytes   routing_info,
         uint256 amount,
+        bytes22 ticketer,
         bytes   content,
     );
 }
@@ -109,6 +108,24 @@ fn prepare_standard_message(
     Withdrawal::Standard(OutboxMessage::AtomicTransactionBatch(vec![message].into()))
 }
 
+fn parse_l1_routing_info(routing_info: &[u8]) -> Result<(Contract, Contract), String> {
+    let (rest, receiver) = Contract::nom_read(routing_info)
+        .map_err(|e| format!("Receiver address decoding failed: {}", e))?;
+
+    let (rest, proxy) = Contract::nom_read(rest)
+        .map_err(|e| format!("Receiver address decoding failed {}", e))?;
+
+    if let Contract::Implicit(_) = proxy {
+        return Err("Proxy address must be an originated contract".to_string());
+    }
+
+    if !rest.is_empty() {
+        return Err("Remaining bytes after routing info consumer".to_string());
+    }
+
+    Ok((receiver, proxy))
+}
+
 pub fn send_outbox_message_precompile<CTX>(
     input: &[u8],
     context: &mut CTX,
@@ -164,18 +181,15 @@ where
             };
             Ok(result)
         }
-        // "0x0cd79fc7" is the function selector for `push_fa_withdrawal_to_outbox(bytes22,bytes22,bytes22,uint256,bytes)`
-        [0x0c, 0xd7, 0x9f, 0xc7, input_data @ ..] => {
+        // "0xe9f58a77" is the function selector for `push_fa_withdrawal_to_outbox(bytes,uint256,bytes22,bytes)`
+        [0xe9, 0xf5, 0x8a, 0x77, input_data @ ..] => {
             // Decode
-            let (target, ticketer, proxy, amount, content) =
+            let (routing_info, amount, ticketer, content) =
                 SendFAWithdrawalInput::abi_decode_data(input_data, true)
                     .map_err(|e| e.to_string())?;
-            let (_, target) =
-                Contract::nom_read(target.as_slice()).map_err(|e| e.to_string())?;
+            let (target, destination) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) =
                 Contract::nom_read(ticketer.as_slice()).map_err(|e| e.to_string())?;
-            let (_, destination) =
-                Contract::nom_read(proxy.as_slice()).map_err(|e| e.to_string())?;
             let amount = BigInt::from_bytes_be(
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
