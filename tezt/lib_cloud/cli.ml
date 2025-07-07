@@ -224,8 +224,11 @@ let machine_type =
     ~section
     ~long:"machine-type"
     ~description:
-      "Can specify a GCP machine type (see \
-       https://cloud.google.com/compute/docs/general-purpose-machines#c3d_series)"
+      (Format.sprintf
+         "Can specify a GCP machine type (see \
+          https://cloud.google.com/compute/docs/general-purpose-machines#n2_series). \
+          Default is %s."
+         Types.Agent_configuration.default_gcp_machine_type)
     Types.Agent_configuration.default_gcp_machine_type
 
 let dockerfile_alias =
