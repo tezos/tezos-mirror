@@ -910,6 +910,33 @@ let test_signature_bls_attestation_with_different_slot () =
     (Op.get_op_signature op_attestation1)
     (Op.get_op_signature op_attestation2)
 
+let test_signature_bls_attestation_with_different_level () =
+  let open Lwt_result_syntax in
+  let* _genesis, block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesters = Context.get_attesters (B block) in
+  let delegate, _slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (find_attester_with_bls_key attesters)
+  in
+  let*? level1 = Context.get_level (B block) in
+  let level2 = Alpha_context.Raw_level.add level1 1 in
+  let* op_attestation1 =
+    Op.attestation ~level:level1 ~delegate:delegate.delegate block
+  in
+  let* op_attestation2 =
+    Op.attestation ~level:level2 ~delegate:delegate.delegate block
+  in
+  Assert.not_equal
+    ~loc:__LOC__
+    (Option.equal Signature.equal)
+    "Signatures must be not equal"
+    (Format.pp_print_option Signature.pp)
+    (Op.get_op_signature op_attestation1)
+    (Op.get_op_signature op_attestation2)
+
 let tests =
   [
     Tztest.tztest
@@ -981,6 +1008,10 @@ let tests =
       "Signatures for bls attestations with different slots are equal"
       `Quick
       test_signature_bls_attestation_with_different_slot;
+    Tztest.tztest
+      "Signatures for bls attestations with different levels are different"
+      `Quick
+      test_signature_bls_attestation_with_different_level;
   ]
 
 let () =
