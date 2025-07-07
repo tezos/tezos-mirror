@@ -23,6 +23,8 @@ RUN apt-get update && apt-get install -y \
     prometheus-process-exporter \
     # rotation for logs
     logrotate \
+    # display file content
+    less \
     # emacs can be useful for debugging
     emacs \
     # wget can be used to import snapshots
