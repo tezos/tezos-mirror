@@ -20,6 +20,9 @@
 
 ### Metrics changes
 
+- Fix the finalized number metrics for EVM nodes not tracking a rollup
+  node. (!18603)
+
 ### Execution changes
 
 - Support signing blueprints via a key stored in a GCP KMS. (!18527)
