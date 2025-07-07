@@ -532,8 +532,8 @@ let test_no_conflict_with_preattestation_block () =
   let bake_both_ops baking_mode =
     Block.bake
       ~baking_mode
-      ~payload_round:(Some Round.zero)
-      ~locked_round:(Some Round.zero)
+      ~payload_round:Round.zero
+      ~locked_round:Round.zero
       ~policy:(By_round 1)
       ~operations:[op_attestation; op_preattestation]
       predecessor
