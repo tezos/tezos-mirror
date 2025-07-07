@@ -2102,7 +2102,8 @@ module Handlers = struct
     | Finalized_levels {l1_level; start_l2_level; end_l2_level} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        Evm_store.use ctxt.store @@ fun conn ->
+        State.Transaction.run ctxt @@ fun ctxt conn ->
+        ctxt.session.finalized_number <- end_l2_level ;
         State.store_finalized_levels
           ctxt
           conn
