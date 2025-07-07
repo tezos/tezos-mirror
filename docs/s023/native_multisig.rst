@@ -5,7 +5,7 @@ Native Multisig accounts
 .. note::
 
   This page provides reference documentation for native multisig accounts, available starting with protocol S.
-  For step-by-step instructions on how to stake and bake with native multisig accounts, see `User stories for staking and baking multisigs <https://docs.google.com/document/d/15zZviTAFecXTHZXYg0MyQ6J6sKEvwPpywoTrzBCxnfE/edit?usp=drive_link>`__ .
+  For step-by-step instructions on how to stake and bake with multisig accounts, see `User stories for staking and baking multisigs <https://docs.google.com/document/d/15zZviTAFecXTHZXYg0MyQ6J6sKEvwPpywoTrzBCxnfE/edit?usp=drive_link>`__ .
 
 :doc:`Tezos accounts <accounts>` are defined by a pair of secret and
 public keys. Users use their secret keys to sign :doc:`operations and
@@ -23,7 +23,7 @@ effective, it presents two main challenges:
 
 Both problems are usually solved by using a multisig **contract**, that allows to share its ownership and its associated balance or assets, between several participants. Tezos provides specific support for multisig contracts in the form of a :doc:`builtin multisig contract <../user/multisig>` and even a set of related client commands to interact with it. However, this solution is not applicable in all use cases, and most importantly in the case of collectively staking or baking. This is because in Tezos, a smart contract cannot be a :ref:`delegate <def_delegate_s023>`, and not even a :ref:`staker <def_staker_s023>`.
 
-Multisig **accounts** address the above limitations with a
+Native multisig **accounts** address the above limitations with a
 cryptographic solution based on BLS multi-signature schemes. BLS
 signatures are particularly well-suited for this purpose due to their
 *aggregation* properties. Tezos supports BLS signatures
@@ -34,17 +34,17 @@ can benefit from faster verification of multiple signatures of the
 same message without breaking compatibility with the existing support
 for BLS (and ``tz4`` accounts).
 
-The native multisig implementation offers :ref:`RPCs and client
+The multisig accounts implementation offers :ref:`RPCs and client
 commands <native_multisig_rpc_cli_s023>` to facilitate the signing of
 operations in a native multisig setup. As a result, the protocol does
 not need to differentiate between a ``tz4`` address belonging to a single
-user account and one associated with a native multisig account.
+user account and one associated with a multisig account.
 
 
 Enshrined multisig signing scenarios
 ------------------------------------
 
-A native **multisig account** is a ``tz4`` address managed collectively by N participants (also called members).
+A (native) **multisig account** is a ``tz4`` address managed collectively by N participants (also called members).
 
 Multisig accounts support two different multi-signature
 schemes, which provide different scenarios based on the requirements
@@ -59,7 +59,7 @@ for signing an operation:
   participants is required to sign the operation. Here, M denotes the
   minimum number of signatures required to create a valid signature,
   out of the total of N members. In this scenario, users generate a new
-  unencrypted secret for the native multisig account, which is then
+  unencrypted secret for the multisig account, which is then
   split into secret shares that need to be distributed among the
   participants along with a public identifier (a natural number between 1 and N).
   This entails that all
@@ -71,13 +71,13 @@ The workflow for signing operations is as follows:
 - The participants decide *a priori* which scheme to use: either
   N-of-N or M-of-N.
 
-- The participants reveal the resulting public key of the native
+- The participants reveal the resulting public key of the
   multisig account on-chain.
 
-- The participants inject operations signed with the native multisig
+- The participants inject operations signed with the multisig
   accounts’s signature scheme.
 
-For example, a native multisig account can stake 10,000 tez following
+For example, a multisig account can stake 10,000 tez following
 almost the same process as if it were carried out by a single
 staker. The only difference is the signing process: signatures (for
 each operation) must first be collected from the required members, and
@@ -96,12 +96,12 @@ of a multisig ``stake`` operation would look like this:
 Octez CLI commands and RPC endpoints
 ------------------------------------
 
-The native multisig project introduces the following Octez client
+Multisig accounts introduce the following Octez client
 commands and/or associated RPC endpoints to facilitate the creation
-of native multisig accounts and the aggregation of signatures.
+of multisig accounts and the aggregation of signatures.
 
-Setting up a native multisig account
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Setting up a multisig account
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table::
    :widths: 10 45 45
@@ -122,9 +122,9 @@ Setting up a native multisig account
        + total number of participants ``N``
        + threshold number ``M`` (minimum number of signatures required)
    * - Output
-     - + Public key of the native multisig account ``public_key`` and its hash ``public_key_hash``
-     - + Public key of the native multisig account ``public_key`` and its hash ``public_key_hash``
-       + Proof of possession ``proof`` required for revealing a native multisig account's public key ``public_key``
+     - + Public key of the multisig account ``public_key`` and its hash ``public_key_hash``
+     - + Public key of the multisig account ``public_key`` and its hash ``public_key_hash``
+       + Proof of possession ``proof`` required for revealing a multisig account's public key ``public_key``
        + Secret shares ``secret_shares``: a unique identifier ``id`` in the range [1; ``N``] and a secret key ``secret_key`` for each participant of the multisig
    * - Example output
      - .. code-block:: json
@@ -188,18 +188,18 @@ For revealing ``tz4`` accounts a proof of possession is required.
      - ``rpc post /bls/aggregate_proofs with '{"public_key": "<pk_multisig>", "proofs": ["<proof_1_pk_multisig>", ..., "<proof_N_pk_multisig>"]}'``
      - No RPC as it would require sending a secret key.
    * - Parameters
-     - + Public key of the native multisig account ``public_key``
-       + Proof of possession ``proof_i_pk_multisig`` of each multisig participant created for a native multisig account's public key ``public_key``
+     - + Public key of the multisig account ``public_key``
+       + Proof of possession ``proof_i_pk_multisig`` of each multisig participant created for a multisig account's public key ``public_key``
      - *N/A*
    * - Output
-     - Proof of possession ``proof`` required for revealing a native multisig account's public key ``public_key``
+     - Proof of possession ``proof`` required for revealing a multisig account's public key ``public_key``
      - *N/A*
    * - Example output
      - ``BLsig...``
      - *N/A*
 
 For N-of-N Scenario, it requires to create ``proof_i_pk_multisig`` for
-a native multisig account's public key ``pk_multisig``:
+a multisig account's public key ``pk_multisig``:
 
 .. list-table::
    :widths: 10 90
@@ -211,8 +211,8 @@ a native multisig account's public key ``pk_multisig``:
      - ``octez-client create bls proof for <pk_i> --override-public-key <pk_multisig>``
 
 
-Signing operations with native multisig accounts
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Signing operations with multisig accounts
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. list-table::
    :widths: 10 45 45
@@ -228,15 +228,15 @@ Signing operations with native multisig accounts
      - ``rpc post /bls/aggregate_signatures with '{"public_key": "<pk_multisig>", "message": "<msg>", "signature_shares": ["<signature_1>", ..., "<signature_N>"]}'``
      - ``rpc post /bls/threshold_signatures with '{"public_key": "<pk_multisig>", "message": "<msg>", "signature_shares": [{"id":1,"signature":"<signature_1>"}, {"id":5,"signature":"<signature_5>"},...]}'``
    * - Parameters
-     - + Public key of the native multisig account ``public_key``
+     - + Public key of the multisig account ``public_key``
        + Message ``message``
        + Signatures ``signature_i`` for ``message`` from each multisig participant
-     - + Public key of the native multisig account ``public_key``
+     - + Public key of the multisig account ``public_key``
        + Message ``message``
        + Signatures ``signature_i`` from threshold number of multisig participants with their identifier.
        + Signature ``signature_i`` for ``message`` is produced by a multisig participant ``id_i``
    * - Output
-     - Valid aggregated signature of a message ``message`` under a native multisig account's public key ``public_key``
+     - Valid aggregated signature of a message ``message`` under a multisig account's public key ``public_key``
      - *idem*
    * - Example output
      - ``BLsig...``
