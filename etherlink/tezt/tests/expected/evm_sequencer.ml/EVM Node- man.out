@@ -759,6 +759,19 @@ Storage commands:
       `config.json` inside the data directory of the node.
       If set, defaults to the value of EVM_NODE_CONFIG_FILE.
 
+Keys commands:
+
+  show gcp key <KEY_URI> [--config-file <path>] [--data-dir <data-dir>]
+    Print various Tezos-specific information about a given KMS key.
+    <KEY_URI>: URI to a key held by a GCP KMS, following the form
+      gcpkms://project/region/keyring/key/version.
+    --config-file <path>: Path to a configuration file. Defaults to
+      `config.json` inside the data directory of the node.
+      If set, defaults to the value of EVM_NODE_CONFIG_FILE.
+    --data-dir <data-dir>: The path to the EVM node data directory.
+      Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
+      if it exists, or `$HOME/.octez-evm-node` otherwise.
+
 Kernel commands:
 
   chunk data [<data or file>...] [--config-file <path>]

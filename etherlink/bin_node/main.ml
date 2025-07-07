@@ -892,6 +892,8 @@ module Groups = struct
 
   let storage = Tezos_clic.{name = "storage"; title = "Storage commands"}
 
+  let keys = Tezos_clic.{name = "keys"; title = "Keys commands"}
+
   let kernel = Tezos_clic.{name = "kernel"; title = "Kernel commands"}
 
   let debug = Tezos_clic.{name = "debug"; title = "Debug commands"}
@@ -1403,6 +1405,40 @@ let from_data_or_file data_for_file =
       ("data", fun data -> return [data]);
     ]
     data_for_file
+
+let show_kms_key_info_command =
+  let open Tezos_clic in
+  command
+    ~group:Groups.keys
+    ~desc:"Print various Tezos-specific information about a given KMS key."
+    (args2 config_path_arg data_dir_arg)
+    (prefixes ["show"; "gcp"; "key"]
+    @@ param
+         ~name:"KEY_URI"
+         ~desc:
+           "URI to a key held by a GCP KMS, following the form \
+            gcpkms://project/region/keyring/key/version."
+         Params.string
+    @@ stop)
+    (fun (config_file, data_dir) key_str () ->
+      let open Lwt_result_syntax in
+      let config_file = config_filename ~data_dir config_file in
+      let* config = Cli.create_or_read_config ~data_dir config_file in
+      match gcp_key_from_string_opt key_str with
+      | Some gcp_key ->
+          let open Evm_node_lib_dev in
+          let* kms = Gcp_kms.from_gcp_key config.gcp_kms gcp_key in
+          let* pk = Gcp_kms.public_key kms in
+          let pkh = Signature.Public_key.hash pk in
+          Format.printf
+            "@[<v>Public key: %a@ Public key hash: %a@ @]"
+            Signature.Public_key.pp
+            pk
+            Signature.Public_key_hash.pp
+            pkh ;
+          return_unit
+      | None ->
+          failwith "%s is not a valid URI for a key held by a GCP KMS" key_str)
 
 let chunker_command =
   let open Tezos_clic in
@@ -3222,6 +3258,7 @@ let commands =
     export_snapshot_command;
     import_snapshot_command;
     switch_history_mode_command;
+    show_kms_key_info_command;
     chunker_command;
     make_upgrade_command;
     make_sequencer_upgrade_command;

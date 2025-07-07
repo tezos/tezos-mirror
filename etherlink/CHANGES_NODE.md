@@ -12,6 +12,10 @@
 
 ### Execution changes
 
+- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
+  (b58-encoded public key, Tezos implicit account) information about a key
+  stored in a GCP KMS. (!18617)
+
 ### Storage changes
 
 ### Documentation changes
