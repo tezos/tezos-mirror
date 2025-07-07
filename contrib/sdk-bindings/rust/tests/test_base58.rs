@@ -178,6 +178,24 @@ test_b58check!(
     "sigw87gSwNrAt8DJUG8kFCgiy8PB3rfrRYrHYtcBNhDeiBnrhk4B9MwaJDSb6BXDttvTeTMJkkSK6DP4u44Q336qtb7Fgrif",
 );
 
+test_b58check!(
+    kt1_decode_encode,
+    ContractKt1Hash,
+    "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",
+    "KT1BzqPeYDt8xWmgjkGJupRtdxMsZS37Xm7U",
+    "KT1Bt81PD1FwEw8cou8z391vdWAKtLaEnC8z"
+);
+
+test_b58check!(
+    contract_decode_encode,
+    Contract,
+    "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+    "tz2PbzLDYrPAZS38BteBY7gqtnZfsTqHF2xu",
+    "tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn",
+    "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
+    "KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT",
+);
+
 #[test]
 fn decode_invalid_checksum() {
     assert!(
