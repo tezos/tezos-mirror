@@ -3287,6 +3287,25 @@ val spawn_set_delegate_parameters :
   t ->
   Process.t
 
+(** Run [octez-client update delegate parameters for <delegate> --limit-of-staking-over-baking <limit> --edge-of-baking-over-staking <edge>].
+Either edge or limit can be omitted, the corresponding argument will not be passed. *)
+val update_delegate_parameters :
+  ?wait:string ->
+  delegate:string ->
+  ?limit:string ->
+  ?edge:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [update_delegate_parameters], but do not wait for the process to exit. *)
+val spawn_update_delegate_parameters :
+  ?wait:string ->
+  delegate:string ->
+  ?limit:string ->
+  ?edge:string ->
+  t ->
+  Process.t
+
 module RPC : sig
   (** Perform RPC calls using [octez-client]. *)
 

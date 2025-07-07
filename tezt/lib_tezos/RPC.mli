@@ -1089,6 +1089,13 @@ val get_chain_block_context_delegate :
 val get_chain_block_context_delegate_active_staking_parameters :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/pending_staking_parameters]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_pending_staking_parameters :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/current_frozen_deposits]
 
     [chain] defaults to ["main"].

@@ -106,11 +106,24 @@ parameters need to be supplied. The new parameters are then applied
 
 ::
 
-   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth> (Pair <edge as int value in billionth> Unit)"
+   octez-client transfer 0 from <delegate> to <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth> (Pair <edge as int value in billionth> Unit)"
 
 or more conveniently::
 
-   octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+   octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+
+Once you have set your parameters, if you want to update only one parameter you
+can use::
+
+   octez-client update delegate parameters for <delegate> [--limit-of-staking-over-baking <value>] [--edge-of-baking-over-staking <value>]
+
+The command will fill the missing parameter with the value of the last pending
+parameters (or the active parameters if no set/update are pending).
+
+Please ensure to not send two updates in a row without waiting for the first
+update operation to be included (i.e. do not use --wait none) or you might end
+up with inconsistent parameters (The modification of one parameter could be
+reverted by the subsequent modification of another parameter).
 
 **On overstaking and overdelegation.** Note that if a delegate’s
 ``limit_of_staking_over_baking`` is exceeded (that is, the delegate is

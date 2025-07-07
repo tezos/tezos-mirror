@@ -4556,6 +4556,22 @@ let set_delegate_parameters ?wait ~delegate ~limit ~edge client =
   spawn_set_delegate_parameters ?wait ~delegate ~limit ~edge client
   |> Process.check
 
+let spawn_update_delegate_parameters ?(wait = "none") ~delegate ?limit ?edge
+    client =
+  spawn_command client
+  @@ ["--wait"; wait; "update"; "delegate"; "parameters"; "for"; delegate]
+  @ (match limit with
+    | None -> []
+    | Some limit -> ["--limit-of-staking-over-baking"; limit])
+  @
+  match edge with
+  | None -> []
+  | Some edge -> ["--edge-of-baking-over-staking"; edge]
+
+let update_delegate_parameters ?wait ~delegate ?limit ?edge client =
+  spawn_update_delegate_parameters ?wait ~delegate ?limit ?edge client
+  |> Process.check
+
 (* Keep an alias to external RPC module to allow RPC calls *)
 module R = RPC
 
