@@ -88,7 +88,7 @@ the `BLS12-381 curve <https://hackmd.io/@benjaminion/bls12-381>`_. One
 particularity of BLS signatures is that they are aggregatable. This means that
 multiple signatures can be aggregated into one, and later verified as having
 been produced for the correct expected public keys. This allows for numerous
-applications like mutli-signatures schemes, multi-party key exchanges,
+applications like multi-signatures schemes, multi-party key exchanges,
 signatures compaction, etc. BLS is notably used by Zcash and Ethereum 2.0.
 
 Starting in protocol S, ``tz4`` addresses can be used by bakers, to forge blocks
