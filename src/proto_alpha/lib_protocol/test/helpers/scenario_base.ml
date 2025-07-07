@@ -14,9 +14,13 @@ open State
 open Scenario_dsl
 open Log_helpers
 
-(** Usual threaded state for the tests. Contains the current block, pending operations
+(** Usual threaded state for the tests. Contains the current block
     and the known [State.t] *)
 type t = Block.t * State.t
+
+(** Threaded state when constructing a block step by step in incremental mode.
+    The operation metadata list is built as operations are getting applied. *)
+type t_incr = Incremental.t * State.t
 
 let log ?(level = Cli.Logs.Info) ?color format =
   Format.kasprintf
@@ -54,6 +58,11 @@ let exclude_bakers bakers : (t, t) scenarios =
         (String.concat ", " log_list) ;
       return
         {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
+
+let set_baked_round (round : int) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_block, state) ->
+      return {state with State.baking_policy = Some (Block.By_round round)})
 
 (** Unsets the baking policy, it returns to default ([By_round 0]) *)
 let unset_baking_policy : (t, t) scenarios =
@@ -299,3 +308,8 @@ let check_balance_fields ?(loc = __LOC__) src_name ~liquid ~staked
         src_name
         `Unstaked_finalizable
         unstaked_finalizable
+
+let with_metadata f (block, state) =
+  match state.previous_metadata with
+  | None -> assert false
+  | Some metadata -> f metadata (block, state)

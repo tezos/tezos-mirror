@@ -82,8 +82,8 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
-    ?(check_finalized_block = fun _ -> Lwt_result_syntax.return_unit)
-    delegates_name_list : (constants, t) scenarios =
+    ?(check_finalized_block_perm = []) delegates_name_list :
+    (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
       let bootstrap = "__bootstrap__" in
@@ -152,8 +152,14 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             pending_slashes = [];
             double_signings = [];
             force_attest_all;
-            check_finalized_block;
+            check_finalized_block_perm;
+            check_finalized_block_temp = [];
+            previous_metadata = None;
             operation_mode = Bake;
+            (* The grandparent is only used to get the consensus key, so it is
+               fine to set it to Genesis here. If needed in the future, an option
+               type would be more appropriate. *)
+            grandparent = block;
           }
       in
       let* () = check_all_balances block state in

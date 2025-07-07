@@ -37,8 +37,13 @@ type t = {
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
   force_attest_all : bool;
-  check_finalized_block : Block.t * t -> unit tzresult Lwt.t;
+  check_finalized_block_perm :
+    (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
+  check_finalized_block_temp :
+    (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
+  previous_metadata : Block.full_metadata option;
   operation_mode : operation_mode;
+  grandparent : Block.t;
 }
 
 (** Expected number of cycles before staking parameters get applied *)

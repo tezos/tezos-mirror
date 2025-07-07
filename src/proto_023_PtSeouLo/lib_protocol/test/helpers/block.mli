@@ -39,6 +39,8 @@ type t = {
 
 type block = t
 
+type full_metadata = block_header_metadata * operation_receipt list
+
 (** Not the same as [Context.get_alpha_ctxt] as it does not construct a new block *)
 val get_alpha_ctxt : t -> context tzresult Lwt.t
 
