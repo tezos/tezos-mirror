@@ -29,6 +29,13 @@ let ssh_host =
     ~description:"Whether to provision a non-gcp vm host via ssh"
     ()
 
+let ssh_private_key =
+  Clap.optional_string
+    ~section
+    ~long:"ssh-private-key"
+    ~description:"The ssh private key to use on permanent ssh hosts"
+    ()
+
 let monitoring =
   Clap.flag
     ~section
