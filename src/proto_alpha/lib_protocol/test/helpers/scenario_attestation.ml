@@ -162,6 +162,78 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
           Signature.Public_key_hash.pp)
       (List.map fst committee_expect)
 
+let check_attestation_rewards ?(check_not_found = false) delegate_name :
+    Block.full_metadata -> t -> unit tzresult Lwt.t =
+ fun (_block_header_metadata, _op_metadata) (block, state) ->
+  let open Lwt_result_syntax in
+  Log.debug ~color:low_debug_color "Check metadata: attestation rewards" ;
+  let* () =
+    if Block.last_block_of_cycle block then return_unit
+    else
+      failwith
+        "check_attestation_rewards must be called at the end of a cycle \
+         (current block position in cycle: %d, expecting %d)"
+        (Int32.to_int (Block.cycle_position block))
+        (Int32.to_int state.constants.blocks_per_cycle - 1)
+  in
+  (* In the block metadata, there is no exact correspondence between attestation rewards
+     and the receivers. For now, we do a simple check.
+     TODO: make a check function that covers all end-of-cycle rewards. This should
+     also include staking rewards, and rewards of amount zero should not appear. *)
+  let id_or_not, error_suffix =
+    if check_not_found then
+      ( not,
+        "balance increased, suggesting rewards were distributed, which is not \
+         expected." )
+    else
+      ( Fun.id,
+        "balance did not increase, suggesting rewards were not distributed, \
+         which is not expected." )
+  in
+  let delegate = State.find_account delegate_name state in
+  let* previous_balance =
+    Context.Contract.full_balance (B state.grandparent) delegate.contract
+  in
+  let* current_balance =
+    Context.Contract.full_balance (B block) delegate.contract
+  in
+  if id_or_not @@ Tez.(current_balance > previous_balance) then return_unit
+  else failwith "Check attestation rewards: %s's %s" delegate_name error_suffix
+
+let check_missed_attestation_rewards delegate_name ?(check_not_found = false) :
+    Block.full_metadata -> t -> unit tzresult Lwt.t =
+ fun (block_header_metadata, _op_metadata) (block, state) ->
+  let open Lwt_result_syntax in
+  Log.debug ~color:low_debug_color "Check metadata: missed attestation rewards" ;
+  let* () =
+    if Block.last_block_of_cycle block then return_unit
+    else
+      failwith
+        "check_missed_attestation_rewards must be called at the end of a cycle \
+         (current block position in cycle: %d, expecting %d)"
+        (Int32.to_int (Block.cycle_position block))
+        (Int32.to_int state.constants.blocks_per_cycle - 1)
+  in
+  let id_or_not, error_prefix =
+    if check_not_found then (not, "Not expected but found in metadata")
+    else (Fun.id, "Expected but not found in metadata")
+  in
+  let delegate = State.find_account delegate_name state in
+  if
+    id_or_not
+    @@ List.exists
+         (function
+           | Alpha_context.Receipt.Balance_update_item
+               ( Lost_attesting_rewards (pkh, _participation, _revelation),
+                 Credited _,
+                 Block_application ) ->
+               Signature.Public_key_hash.equal delegate.pkh pkh
+           | _ -> false)
+         block_header_metadata.balance_updates
+  then return_unit
+  else
+    failwith "%s: missed attestation receipt for %s" error_prefix delegate_name
+
 let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
   exec (fun (block, state) ->
       let open Lwt_result_wrap_syntax in
