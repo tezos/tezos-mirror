@@ -38,6 +38,9 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     operation::Operation,
+    operation_result::{
+        OperationBatchWithMetadata, OperationDataAndMetadata, OperationWithMetadata,
+    },
 };
 
 pub const ETHERLINK_SAFE_STORAGE_ROOT_PATH: RefPath =
@@ -517,8 +520,16 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Add the applied operation in the block in progress
             let applied_operation = AppliedOperation {
                 hash,
-                data: operation,
-                receipt,
+                branch: operation.branch,
+                op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
+                    OperationBatchWithMetadata {
+                        operations: vec![OperationWithMetadata {
+                            content: operation.content,
+                            receipt,
+                        }],
+                        signature: operation.signature,
+                    },
+                ),
             };
             applied.push(applied_operation);
         }
