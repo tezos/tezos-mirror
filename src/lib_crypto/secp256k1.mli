@@ -41,3 +41,7 @@ val check_keccak256 : Public_key.t -> t -> bytes -> bool
     the rightmost 160-bits of the Keccak-256 hash of the corresponding
     ECDSA public key. *)
 val recover : bytes -> bytes -> (bytes, string) result
+
+(** [eth_address_of_public_key pk] computes the Ethereum address of an
+    Externally Owned Account (EOA) using this public key. *)
+val eth_address_of_public_key : Public_key.t -> bytes

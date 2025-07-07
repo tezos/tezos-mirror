@@ -22,10 +22,13 @@ type partial = unit handler
    interpret their responses. *)
 type t = Signature.public_key handler
 
-type signature_algorithm = EC_SIGN_P256_SHA256
+type signature_algorithm = EC_SIGN_P256_SHA256 | EC_SIGN_SECP256K1_SHA256
 
 let signature_algorithm (kms : t) =
-  match kms.public_key with P256 _ -> EC_SIGN_P256_SHA256 | _ -> assert false
+  match kms.public_key with
+  | P256 _ -> EC_SIGN_P256_SHA256
+  | Secp256k1 _ -> EC_SIGN_SECP256K1_SHA256
+  | _ -> assert false
 
 type hash_algorithm = Blake2B
 
@@ -33,6 +36,7 @@ let signature_algorithm_of_string =
   let open Result_syntax in
   function
   | "EC_SIGN_P256_SHA256" -> return EC_SIGN_P256_SHA256
+  | "EC_SIGN_SECP256K1_SHA256" -> return EC_SIGN_SECP256K1_SHA256
   | algo -> tzfail (error_of_fmt "Unsupported algorithm %s" algo)
 
 let service_name = "Gcp_kms"
@@ -215,24 +219,29 @@ let extract_tail der_str n =
   if len < n then error_with "input is too short"
   else Result.return (String.sub der_str (len - n) n)
 
+let pem_to_der pem =
+  let lines = String.split_on_char '\n' pem in
+  let b64 =
+    lines
+    |> List.filter (fun l -> not (String.starts_with ~prefix:"-----" l))
+    |> String.concat ""
+  in
+  Base64.decode_exn b64
+
+let tag = function
+  | EC_SIGN_SECP256K1_SHA256 -> '\x01'
+  | EC_SIGN_P256_SHA256 -> '\x02'
+
 let key_of_pem algo pem =
   let open Result_syntax in
-  match algo with
-  | EC_SIGN_P256_SHA256 -> (
-      let* pem =
-        match X509.Public_key.decode_pem pem with
-        | Ok pem -> return pem
-        | Error (`Msg err) ->
-            error_with "Could not decode pem public key (%s)" err
-      in
-      let key_str = X509.Public_key.encode_der pem in
-      let* key_str = extract_tail key_str 65 in
-      match
-        Signature.Public_key.of_bytes_without_validation
-          (Bytes.unsafe_of_string (Format.sprintf "\x02%s" key_str))
-      with
-      | Some res -> return res
-      | _ -> error_with "Not a valid public key")
+  let der = pem_to_der pem in
+  let* key_str = extract_tail der 65 in
+  match
+    Signature.Public_key.of_bytes_without_validation
+      (Bytes.unsafe_of_string (Format.sprintf "%c%s" (tag algo) key_str))
+  with
+  | Some res -> return res
+  | _ -> error_with "Not a valid public key"
 
 let public_key kms_handler =
   let open Lwt_result_syntax in
@@ -310,6 +319,9 @@ let signature_of_b64encoded algo b64_sig =
   | EC_SIGN_P256_SHA256 ->
       let*? p256_sig = Signature.P256.of_string signature in
       return (Signature.of_p256 p256_sig)
+  | EC_SIGN_SECP256K1_SHA256 ->
+      let*? secp256k1_sig = Signature.Secp256k1.of_string signature in
+      return (Signature.of_secp256k1 secp256k1_sig)
 
 let sign kms_handler hash payload =
   let open Lwt_result_syntax in
@@ -371,3 +383,12 @@ let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
   return {kms_handler with public_key}
 
 let public_key t = t.public_key
+
+let ethereum_address_opt kms =
+  let pk = public_key (kms : t) in
+  match pk with
+  | Secp256k1 s ->
+      let str = Signature.Secp256k1.eth_address_of_public_key s in
+      let (`Hex hex) = Hex.of_bytes str in
+      Some Ethereum_types.(Address (Hex hex))
+  | _ -> None
