@@ -253,7 +253,8 @@ module Dal () : Dal = struct
       ~description:
         "Specify the machine type used by the stake. The nth machine type will \
          be assigned to the nth stake specified with [--stake]. If less \
-         machine types are specified, the default one will be used."
+         machine types are specified, the default one (or the one specified by \
+         --machine-type) will be used."
       stake_machine_type_typ
       ()
 
