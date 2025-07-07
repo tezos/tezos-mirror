@@ -1394,3 +1394,17 @@ let check_validation_and_application_all_modes ~loc ?error ~predecessor
     ?mempool_error:error
     ~predecessor
     operation
+
+let get_op_signature op =
+  let {shell = _; protocol_data = Operation_data {contents = _; signature}} =
+    op
+  in
+  signature
+
+let set_op_signature op new_signature =
+  let {shell; protocol_data = Operation_data {contents; signature = _}} = op in
+  {shell; protocol_data = Operation_data {contents; signature = new_signature}}
+
+let copy_op_signature ~src ~dst =
+  let signature = get_op_signature src in
+  set_op_signature dst signature
