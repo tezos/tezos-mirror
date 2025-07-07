@@ -386,23 +386,6 @@ module Voting_period = struct
       ~dst:Alpha_context.Voting_period.encoding
 end
 
-let mock_voting_period =
-  Voting_period.
-    {
-      index = 0l;
-      kind = Alpha_context.Voting_period.Proposal;
-      start_position = 0l;
-    }
-
-let mock_voting_period_info () =
-  let open Result_syntax in
-  let* voting_period = Voting_period.convert mock_voting_period in
-  let voting_period_info =
-    Imported_protocol.Alpha_context.Voting_period.
-      {voting_period; position = 0l; remaining = 0l}
-  in
-  return voting_period_info
-
 let balance_udpdate_bootstrap ~amount ~bootstrap =
   let open Alpha_context.Receipt in
   let migration =

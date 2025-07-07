@@ -109,7 +109,7 @@ module type HEADER = sig
 
   val tezlink_block_to_block_info :
     l2_chain_id:L2_types.chain_id ->
-    Alpha_context.Level.t
+    Tezos_types.level
     * Tezos_shell_services.Block_services.version
     * [`Main]
     * L2_types.Tezos_block.t ->
@@ -381,8 +381,7 @@ let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
          let*? block = check_block block in
          let* tezlink_block = Backend.block chain block in
          let* level = Backend.current_level chain block ~offset:0l in
-         let*? level_info = Protocol_types.Level.convert level in
-         Lwt_result_syntax.return (level_info, q#version, chain, tezlink_block))
+         Lwt_result_syntax.return (level, q#version, chain, tezlink_block))
        ~convert_output:(Block_header.tezlink_block_to_block_info ~l2_chain_id)
 
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at

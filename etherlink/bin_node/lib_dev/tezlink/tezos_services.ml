@@ -8,6 +8,78 @@
 include Tezlink_imports
 open Tezlink_mock
 
+(* Module importing, amending, and converting, protocol types. Those types
+   might be difficult to actually build, so we define conversion function from
+   local types to protocol types. *)
+module Protocol_types = struct
+  module Alpha_context = Imported_protocol.Alpha_context
+  module Raw_level = Alpha_context.Raw_level
+
+  module Cycle = struct
+    include Alpha_context.Cycle
+
+    (* This function is copied from [cycle_repr.ml] because it is not exposed
+       in [alpha_context.mli]. *)
+    let of_int32_exn i =
+      if Compare.Int32.(i >= 0l) then add root (Int32.to_int i)
+      else invalid_arg "Cycle_repr.of_int32_exn"
+  end
+
+  module Level = struct
+    open Tezos_types
+
+    type t = Alpha_context.Level.t
+
+    let encoding = Alpha_context.Level.encoding
+
+    (** The sole purpose of this encoding is to reflect as closely as possible
+          the encoding of Alpha_context.Level.t, so it can be used to convert to
+          that type, with a serialization pass. This is necessary only because
+          there isn't a simple way to build that type. *)
+    let conversion_encoding =
+      let open Data_encoding in
+      conv
+        (fun ({level; cycle; cycle_position} : level) ->
+          ( Raw_level.of_int32_exn level,
+            Int32.pred level,
+            Cycle.of_int32_exn cycle,
+            cycle_position,
+            false ))
+        (fun ( level,
+               _level_position,
+               cycle,
+               cycle_position,
+               _expected_commitment ) ->
+          let level = Raw_level.to_int32 level in
+          let cycle = Cycle.to_int32 cycle in
+          {level; cycle; cycle_position})
+        (obj5
+           (req "level" Raw_level.encoding)
+           (req "level_position" int32)
+           (req "cycle" Cycle.encoding)
+           (req "cycle_position" int32)
+           (req "expected_commitment" bool))
+
+    let convert : level -> t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"level"
+        ~dst:encoding
+        ~src:conversion_encoding
+  end
+
+  module Counter = struct
+    type t = Alpha_context.Manager_counter.t
+
+    let encoding = Alpha_context.Manager_counter.encoding_for_RPCs
+
+    let of_z : Z.t -> t tzresult =
+      Tezos_types.convert_using_serialization
+        ~name:"counter"
+        ~dst:encoding
+        ~src:Data_encoding.z
+  end
+end
+
 module type BLOCK_SERVICES = sig
   include Tezos_shell_services.Block_services.S
 
@@ -15,7 +87,7 @@ module type BLOCK_SERVICES = sig
     chain_id:Chain_id.t -> Proto.block_header_data tzresult
 
   val mock_block_header_metadata :
-    Alpha_context.Level.t -> Proto.block_header_metadata tzresult
+    Tezos_types.level -> Proto.block_header_metadata tzresult
 
   val operations : operation list list
 end
@@ -51,6 +123,52 @@ module Block_services = struct
       (Imported_protocol)
       (Imported_protocol)
 
+  let voting_period ~cycles_per_voting_period ~position ~level_info =
+    let open Tezos_types in
+    (* There's a certain amount of cycle in each period, to get the index
+       of the current, we just divide the current number of cycle by the
+       number of cycle for a period (floor div) *)
+    let index = Int32.div level_info.cycle cycles_per_voting_period in
+    (* The start_position can be determined based on the current position
+       given in parameter. *)
+    let start_position = Int32.(sub (sub level_info.level 1l) position) in
+    Voting_period.
+      {index; kind = Alpha_context.Voting_period.Proposal; start_position}
+
+  let voting_period_info ~block_per_cycle ~cycles_per_voting_period ~level_info
+      =
+    let open Tezos_types in
+    let open Result_syntax in
+    (* The number of cycles in the current period is the remainder of the
+       Euclidean division between the current cycle index the number of
+       cycles in a voting period. *)
+    let number_of_cycle_in_period =
+      Int32.rem level_info.cycle cycles_per_voting_period
+    in
+    (* During a voting period, the position parameter is the number of block
+       produced since the beginning of the period. We can deduce it based on
+       the number of cycles in the current period. *)
+    let position =
+      Int32.(
+        add
+          (mul number_of_cycle_in_period block_per_cycle)
+          level_info.cycle_position)
+    in
+    let* voting_period =
+      Voting_period.convert
+        (voting_period ~cycles_per_voting_period ~position ~level_info)
+    in
+    (* The number of block remaining is deducted from the current position
+       and the number of cycles needed to complete a period. *)
+    let remaining =
+      Int32.(sub (mul cycles_per_voting_period block_per_cycle) position)
+    in
+    let voting_period_info =
+      Imported_protocol.Alpha_context.Voting_period.
+        {voting_period; position; remaining}
+    in
+    return voting_period_info
+
   let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
       ~name:"block_header_data"
@@ -69,10 +187,7 @@ module Block_services = struct
         }
     in
     let balance_updates =
-      if
-        Alpha_context.Raw_level.(
-          equal level_info.Alpha_context.Level.level (of_int32_exn 2l))
-      then
+      if Int32.equal level_info.Tezos_types.level 2l then
         Tezlink_mock.balance_udpdate_bootstrap
           ~amount:200_000_000_000L
           ~bootstrap:Tezlink_mock.bootstrap_account.public_key_hash
@@ -82,7 +197,15 @@ module Block_services = struct
           ~baker:Tezlink_mock.bootstrap_account.public_key_hash
           ~amount
     in
-    let* voting_period_info = Tezlink_mock.mock_voting_period_info () in
+
+    let constant = Tezlink_constants.all_constants.parametric in
+    let* voting_period_info =
+      voting_period_info
+        ~block_per_cycle:constant.blocks_per_cycle
+        ~cycles_per_voting_period:constant.cycles_per_voting_period
+        ~level_info
+    in
+    let* level_info = Protocol_types.Level.convert level_info in
     return
       {
         proposer;
@@ -171,78 +294,6 @@ module Genesis_block_services = struct
       ()
 
   let operations = []
-end
-
-(* Module importing, amending, and converting, protocol types. Those types
-   might be difficult to actually build, so we define conversion function from
-   local types to protocol types. *)
-module Protocol_types = struct
-  module Alpha_context = Imported_protocol.Alpha_context
-  module Raw_level = Alpha_context.Raw_level
-
-  module Cycle = struct
-    include Alpha_context.Cycle
-
-    (* This function is copied from [cycle_repr.ml] because it is not exposed
-       in [alpha_context.mli]. *)
-    let of_int32_exn i =
-      if Compare.Int32.(i >= 0l) then add root (Int32.to_int i)
-      else invalid_arg "Cycle_repr.of_int32_exn"
-  end
-
-  module Level = struct
-    open Tezos_types
-
-    type t = Alpha_context.Level.t
-
-    let encoding = Alpha_context.Level.encoding
-
-    (** The sole purpose of this encoding is to reflect as closely as possible
-        the encoding of Alpha_context.Level.t, so it can be used to convert to
-        that type, with a serialization pass. This is necessary only because
-        there isn't a simple way to build that type. *)
-    let conversion_encoding =
-      let open Data_encoding in
-      conv
-        (fun ({level; cycle; cycle_position} : level) ->
-          ( Raw_level.of_int32_exn level,
-            Int32.pred level,
-            Cycle.of_int32_exn cycle,
-            cycle_position,
-            false ))
-        (fun ( level,
-               _level_position,
-               cycle,
-               cycle_position,
-               _expected_commitment ) ->
-          let level = Raw_level.to_int32 level in
-          let cycle = Cycle.to_int32 cycle in
-          {level; cycle; cycle_position})
-        (obj5
-           (req "level" Raw_level.encoding)
-           (req "level_position" int32)
-           (req "cycle" Cycle.encoding)
-           (req "cycle_position" int32)
-           (req "expected_commitment" bool))
-
-    let convert : level -> t tzresult =
-      Tezos_types.convert_using_serialization
-        ~name:"level"
-        ~dst:encoding
-        ~src:conversion_encoding
-  end
-
-  module Counter = struct
-    type t = Alpha_context.Manager_counter.t
-
-    let encoding = Alpha_context.Manager_counter.encoding_for_RPCs
-
-    let of_z : Z.t -> t tzresult =
-      Tezos_types.convert_using_serialization
-        ~name:"counter"
-        ~dst:encoding
-        ~src:Data_encoding.z
-  end
 end
 
 (** [wrap conversion service_implementation] changes the output type
