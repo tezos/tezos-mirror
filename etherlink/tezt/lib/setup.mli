@@ -299,6 +299,7 @@ val ci_enabled_dal_registration : feature_test_registration
 val activate_revm_registration : feature_test_registration
 
 val register_all :
+  __FILE__:string ->
   ?max_delayed_inbox_blueprint_length:int ->
   ?sequencer_rpc_port:int ->
   ?sequencer_private_rpc_port:int ->

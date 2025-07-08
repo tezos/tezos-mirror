@@ -224,6 +224,7 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
       let to_ = upgrade_to from in
       let to_tag, to_use = Kernel.to_uses_and_tags to_ in
       register_all
+        ~__FILE__
         ~kernels:[from]
         ~genesis_timestamp
         ~time_between_blocks
@@ -677,6 +678,7 @@ end
 
 let test_remove_sequencer =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "admin"]
     ~title:"Remove sequencer via sequencer admin contract"
@@ -787,6 +789,7 @@ let test_patch_state =
 
 let test_persistent_state =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
     ~time_between_blocks:Nothing
@@ -859,6 +862,7 @@ let snapshots_setup {sequencer; observer; _} =
 
 let test_snapshots_lock =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Sequencer snapshots export require lock"
     ~time_between_blocks:Nothing
@@ -874,6 +878,7 @@ let test_snapshots_lock =
 
 let test_snapshots_import_empty =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
@@ -924,6 +929,7 @@ let test_snapshots_import_empty =
 
 let test_snapshots_import_populated =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in populated data dir"
     ~time_between_blocks:Nothing
@@ -948,6 +954,7 @@ let test_snapshots_import_populated =
 
 let test_snapshots_import_outdated =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import outdated sequencer snapshot"
     ~time_between_blocks:Nothing
@@ -971,6 +978,7 @@ let test_snapshots_import_outdated =
    https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
 let test_snapshots_reexport =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot and re-export"
     ~time_between_blocks:Nothing
@@ -998,6 +1006,7 @@ let test_snapshots protocols =
 
 let test_publish_blueprints =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
@@ -1027,6 +1036,7 @@ let test_publish_blueprints =
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
   register_all
+    ~__FILE__
     ~max_blueprints_ahead
     ~time_between_blocks:Nothing
     ~tags:["evm"; "max_blueprint_ahead"]
@@ -1090,6 +1100,7 @@ let test_resilient_to_rollup_node_disconnect =
   let catchup_cooldown = 10 in
   let first_batch_blueprints_count = 5 in
   register_all
+    ~__FILE__
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -1228,6 +1239,7 @@ let test_resilient_to_rollup_node_disconnect =
 
 let test_can_fetch_blueprint =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer can provide blueprints on demand"
@@ -1263,6 +1275,7 @@ let test_can_fetch_blueprint =
 
 let test_can_fetch_smart_rollup_address =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "rpc"]
     ~title:"Sequencer can return the smart rollup address on demand"
@@ -1276,6 +1289,7 @@ let test_can_fetch_smart_rollup_address =
 
 let test_send_transaction_to_delayed_inbox =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
@@ -1320,6 +1334,7 @@ let test_send_transaction_to_delayed_inbox =
 
 let test_send_deposit_to_delayed_inbox =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"]
     ~title:"Send a deposit to the delayed inbox"
@@ -1376,6 +1391,7 @@ let test_send_deposit_to_delayed_inbox =
 
 let test_rpc_produceBlock =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "produce_block"]
     ~title:"RPC method produceBlock"
@@ -1430,6 +1446,7 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
 
 let test_delayed_transfer_is_included =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
@@ -1493,6 +1510,7 @@ let test_delayed_transfer_is_included =
 
 let test_largest_delayed_transfer_is_included =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
@@ -1574,6 +1592,7 @@ let test_largest_delayed_transfer_is_included =
 
 let test_delayed_deposit_is_included =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
@@ -1688,6 +1707,7 @@ let ticket_balance ~ticket_hash ~account endpoint =
 
 let test_delayed_fa_deposit_is_included =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:
       [
@@ -1756,6 +1776,7 @@ let test_delayed_fa_deposit_is_included =
 
 let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:
       [
@@ -1824,6 +1845,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
 
 let test_delayed_transaction_peeked =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "failure"]
     ~title:"Delayed deposit is removed only when it is applied"
@@ -1888,6 +1910,7 @@ let test_delayed_transaction_peeked =
 
 let test_invalid_delayed_transaction =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "invalid"]
     ~title:"Delayed transaction is removed even when invalid"
@@ -2009,6 +2032,7 @@ let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
 
 let test_fa_withdrawal_is_included =
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~tags:
       [
@@ -2161,6 +2185,7 @@ let test_fa_withdrawal_is_included =
 
 let test_fa_reentrant_deposit_reverts =
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~tags:
       [
@@ -2271,6 +2296,7 @@ let test_fa_reentrant_deposit_reverts =
 
 let test_delayed_deposit_from_init_rollup_node =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
@@ -2360,9 +2386,10 @@ let test_delayed_deposit_from_init_rollup_node =
 (** test to initialise a sequencer data dir based on a rollup node data dir *)
 let test_init_from_rollup_node_data_dir =
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade
-  *)
+    ~__FILE__
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+         Replace by [Any] after the next upgrade
+      *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
@@ -2437,6 +2464,7 @@ let test_init_from_rollup_node_data_dir =
 
 let test_init_from_rollup_node_with_delayed_inbox =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"; "omit"]
@@ -2561,6 +2589,7 @@ let test_observer_applies_blueprint =
   let levels_to_wait = 3 in
   let timeout = 30. in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can start an Observer node"
@@ -2585,6 +2614,7 @@ let test_observer_applies_blueprint =
 
 let test_observer_applies_blueprint_dont_track_rollup_node =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "dont_track_rollup_node"]
     ~title:"Can start an Observer node without a rollup node"
@@ -2636,6 +2666,7 @@ let test_observer_applies_blueprint_dont_track_rollup_node =
 
 let test_observer_applies_blueprint_from_rpc_node =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "rpc_mode"]
     ~title:"Can start an Observer node tracking a RPC node"
@@ -2701,6 +2732,7 @@ let test_observer_applies_blueprint_from_rpc_node =
 
 let test_observer_applies_blueprint_when_restarted =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart an Observer node"
@@ -2721,6 +2753,7 @@ let test_observer_applies_blueprint_when_restarted =
 
 let test_get_balance_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
@@ -2831,6 +2864,7 @@ let test_get_balance_block_param =
 
 let test_get_block_by_number_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
@@ -2920,6 +2954,7 @@ let test_get_block_by_number_block_param =
 
 let test_extended_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
     ~time_between_blocks:Nothing
@@ -3020,6 +3055,7 @@ let test_extended_block_param =
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart the sequencer node"
@@ -3050,7 +3086,11 @@ let test_observer_forwards_transaction =
   let tags = ["evm"; "observer"; "transaction"] in
   let title = "Observer forwards transaction" in
   let tbb = 1. in
-  register_all ~time_between_blocks:(Time_between_blocks tbb) ~tags ~title
+  register_all
+    ~__FILE__
+    ~time_between_blocks:(Time_between_blocks tbb)
+    ~tags
+    ~title
   @@ fun {sequencer = sequencer_node; observer = observer_node; _} _protocol ->
   (* Ensure the sequencer has produced the block. *)
   let* () =
@@ -3085,6 +3125,7 @@ let test_observer_forwards_transaction =
 
 let test_observer_timeout_when_necessary =
   register_all
+    ~__FILE__
     ~time_between_blocks:(Time_between_blocks 3.)
     ~tags:["evm"; "observer"; "timeout"]
     ~title:"Observer timeouts when blocks do not arrive quickly enough"
@@ -3115,6 +3156,7 @@ let test_sequencer_is_reimbursed =
      verify its balance increases. *)
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~time_between_blocks:(Time_between_blocks tbb)
     ~sequencer_pool_address
@@ -3185,6 +3227,7 @@ let test_self_upgrade_kernel =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
@@ -3259,6 +3302,7 @@ let test_self_upgrade_kernel =
 
 let test_empty_block_on_upgrade =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "empty"]
     ~title:"Sequencer produces an empty block in case of upgrade."
@@ -3561,6 +3605,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 let test_clean_bps =
   let sequencer_account = Constant.bootstrap1 in
   register_all
+    ~__FILE__
     ~sequencer:sequencer_account
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
@@ -3666,6 +3711,7 @@ let test_clean_bps =
 
 let test_delayed_inbox_flushing_event =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3732,6 +3778,7 @@ let test_delayed_inbox_flushing_event =
 
 let test_flushed_blueprint_reorg =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3859,6 +3906,7 @@ let test_flushed_blueprint_reorg =
 
 let test_multiple_flushed_blueprints =
   register_all
+    ~__FILE__
     ~max_delayed_inbox_blueprint_length:1
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
@@ -3999,6 +4047,7 @@ let test_multiple_flushed_blueprints =
 
 let test_observer_reorg_on_blueprint_stream =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -4114,6 +4163,7 @@ let test_observer_reorg_on_blueprint_stream =
 
 let test_observer_reorg_on_blueprint_catchup =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -4237,6 +4287,7 @@ let test_observer_reorg_on_blueprint_catchup =
    L2 level as the flush event. *)
 let test_flushed_blueprint_reorg_late =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -4358,6 +4409,7 @@ let test_flushed_blueprint_reorg_late =
    L2 level as the flush event, and transactions were included but too late. *)
 let test_flushed_blueprint_reorg_done_late =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -4499,6 +4551,7 @@ let test_upgrade_injected_before_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4626,6 +4679,7 @@ let test_upgrade_activated_after_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4779,6 +4833,7 @@ let test_upgrade_injected_after_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4929,6 +4984,7 @@ let test_flushed_blueprint_reorg_upgrade =
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   let after_timestamp = "2020-01-01T00:00:15Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp
@@ -5077,6 +5133,7 @@ let test_flushed_blueprint_reorg_upgrade =
 
 let test_delayed_transfer_timeout =
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5145,6 +5202,7 @@ let test_delayed_transfer_timeout =
 
 let test_forced_blueprint_takes_pred_timestamp =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
@@ -5205,6 +5263,7 @@ let test_forced_blueprint_takes_pred_timestamp =
 
 let test_forced_blueprint_takes_l1_timestamp =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
@@ -5259,6 +5318,7 @@ let test_forced_blueprint_takes_l1_timestamp =
 
 let test_delayed_transfer_timeout_fails_l1_levels =
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5415,6 +5475,7 @@ let test_force_kernel_upgrade =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
@@ -5511,6 +5572,7 @@ let test_external_transaction_to_delayed_inbox_fails =
      Since we want to test what happens when the tx is actually submitted, we
      bypass the da fee check here. *)
   register_all
+    ~__FILE__
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
@@ -5539,6 +5601,7 @@ let test_external_transaction_to_delayed_inbox_fails =
 
 let test_proxy_node_can_forward_to_evm_endpoint =
   register_all
+    ~__FILE__
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
@@ -5596,6 +5659,7 @@ let test_delayed_inbox_flushing =
      timed out yet.
   *)
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:1
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5691,6 +5755,7 @@ let test_delayed_inbox_flushing =
 
 let test_no_automatic_block_production =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "block"]
     ~title:"No automatic block production"
@@ -5727,6 +5792,7 @@ let test_no_automatic_block_production =
 
 let test_non_increasing_timestamp =
   register_all
+    ~__FILE__
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
@@ -5750,6 +5816,7 @@ let test_non_increasing_timestamp =
 
 let test_timestamp_from_the_future =
   register_all
+    ~__FILE__
     ~max_blueprint_lookahead_in_seconds:300L
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~kernels:[Kernel.Latest]
@@ -5836,6 +5903,7 @@ let test_sequencer_upgrade =
   let new_sequencer_key = Constant.bootstrap2 in
 
   register_all
+    ~__FILE__
     ~sequencer:sequencer_key
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
@@ -6177,6 +6245,7 @@ let test_sequencer_upgrade =
     diverged from the other. *)
 let test_sequencer_diverge =
   register_all
+    ~__FILE__
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
@@ -6284,6 +6353,7 @@ let test_sequencer_diverge =
     rollup node. *)
 let test_sequencer_can_catch_up_on_event =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"]
@@ -6347,6 +6417,7 @@ let test_sequencer_can_catch_up_on_event =
 
 let test_sequencer_dont_read_level_twice =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"; Tag.slow]
@@ -6412,6 +6483,7 @@ let test_outbox_size_limit_resilience ~slow =
   let commitment_period = 5 and challenge_window = 5 in
   let slow_str = if slow then "slow" else "fast" in
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:
@@ -6585,6 +6657,7 @@ let test_outbox_size_limit_resilience ~slow =
 
 let test_stage_one_reboot =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~maximum_allowed_ticks:9_000_000_000L
@@ -6663,6 +6736,7 @@ let test_stage_one_reboot =
 
 let test_blueprint_is_limited_in_size =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
@@ -6743,6 +6817,7 @@ let test_blueprint_is_limited_in_size =
 
 let test_blueprint_limit_with_delayed_inbox =
   register_all
+    ~__FILE__
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
@@ -6824,6 +6899,7 @@ let test_blueprint_limit_with_delayed_inbox =
 
 let test_reset =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "reset"]
@@ -6927,6 +7003,7 @@ let test_preimages_endpoint =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
@@ -7095,6 +7172,7 @@ let test_preimages_endpoint_retry =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
@@ -7198,6 +7276,7 @@ let test_preimages_endpoint_retry =
 
 let test_store_smart_rollup_address =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "store"]
     ~title:"Sequencer checks the smart rollup address"
@@ -7235,6 +7314,7 @@ let test_store_smart_rollup_address =
 
 let test_replay_rpc =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "replay"]
     ~title:"Sequencer can replay a block"
     ~time_between_blocks:Nothing
@@ -7290,6 +7370,7 @@ let test_trace_transaction =
     | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
   in
   register_all
+    ~__FILE__
     ~kernels:Kernel.[Latest]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "run"; "trace"]
@@ -7368,6 +7449,7 @@ let test_trace_transaction =
 
 let test_trace_transaction_on_invalid_transaction =
   register_all
+    ~__FILE__
     ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
@@ -7455,6 +7537,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_all
+    ~__FILE__
     ~kernels:Kernel.[Latest; Mainnet]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "trace"; "call"]
@@ -7552,6 +7635,7 @@ let test_trace_transaction_call =
 
 let test_trace_transaction_call_trace =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"]
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
@@ -7657,6 +7741,7 @@ let test_trace_transaction_call_trace =
 
 let test_trace_transaction_calltracer_failed_create =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "fail"]
     ~title:
@@ -7713,6 +7798,7 @@ let test_trace_transaction_calltracer_failed_create =
 
 let test_trace_delegate_call =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "delegate_call"]
     ~title:"calltracer correctly display delegate call infos"
@@ -7791,6 +7877,7 @@ let test_trace_delegate_call =
 
 let test_trace_transaction_calltracer_all_types =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "types"]
     ~title:
@@ -7881,6 +7968,7 @@ let test_trace_transaction_calltracer_all_types =
 
 let test_trace_transaction_call_tracer_with_logs =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "with_logs"]
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
@@ -7940,6 +8028,7 @@ let test_trace_transaction_call_tracer_with_logs =
 
 let test_trace_transaction_call_trace_certain_depth =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "depth"]
     ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
@@ -8016,6 +8105,7 @@ let test_trace_transaction_call_trace_certain_depth =
 
 let test_trace_transaction_call_revert =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"; "propagate"]
     ~title:
@@ -8072,6 +8162,7 @@ let test_trace_transaction_call_revert =
 
 let test_trace_transaction_call_trace_revert =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"]
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
@@ -8167,6 +8258,7 @@ let test_trace_transaction_call_trace_revert =
    having multiple top calls. *)
 let test_trace_transaction_calltracer_multiple_txs =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "multi_txs"]
     ~title:
@@ -8241,6 +8333,7 @@ let test_trace_transaction_calltracer_multiple_txs =
 
 let test_trace_transaction_calltracer_on_simple_transfer =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "simple_transfer"]
     ~title:"debug_traceTransaction can trace a simple transfer"
@@ -8271,6 +8364,7 @@ let test_trace_transaction_calltracer_on_simple_transfer =
 
 let test_trace_transaction_calltracer_precompiles =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "precompiles"]
     ~title:"debug_traceTransaction with calltracer can trace precompiles"
@@ -8383,6 +8477,7 @@ let test_trace_transaction_calltracer_precompiles =
 
 let test_trace_transaction_calltracer_deposit =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -8456,6 +8551,7 @@ let test_miner =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
   in
   register_all
+    ~__FILE__
     ~tags:["evm"; "miner"; "coinbase"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
@@ -8535,6 +8631,7 @@ let test_miner =
 
 let test_fa_bridge_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["fa_bridge"; "feature_flag"]
     ~title:"FA bridge feature is set in storage"
     ~enable_fa_bridge:true
@@ -8553,6 +8650,7 @@ let test_fa_bridge_feature_flag =
 
 let test_multichain_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["multichain"; "feature_flag"]
     ~title:"Check the multichain feature value in storage"
   @@ fun {sequencer; enable_multichain; _} _protocol ->
@@ -8567,6 +8665,7 @@ let test_multichain_feature_flag =
 
 let test_fast_withdrawal_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["fast_withdrawal"; "feature_flag"]
     ~title:"Fast withdrawal feature is set in storage"
     ~enable_fast_withdrawal:true
@@ -8615,6 +8714,7 @@ let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
 let test_fast_withdraw_feature_flag_deactivated =
   let commitment_period = 5 and challenge_window = 5 in
   register_all
+    ~__FILE__
     ~tags:["evm"; "feature_flag"; "fast_withdrawal"]
     ~title:"Check fast withdraw tez is deactivated with feature flag"
     ~commitment_period
@@ -8851,6 +8951,7 @@ let execute_payout ~service_provider_pkh ~exchanger
 let test_fast_withdrawal_l2_caller =
   let commitment_period = 5 and challenge_window = 5 in
   register_all
+    ~__FILE__
     ~tags:["fast_withdrawal"; "deposit"]
     ~title:"Deposit and fast withdraw tez with forwarding contract"
     ~commitment_period
@@ -8924,6 +9025,7 @@ let test_fast_withdrawal_l2_caller =
 let test_deposit_and_fast_withdraw =
   let commitment_period = 5 and challenge_window = 5 in
   register_all
+    ~__FILE__
     ~tags:["fast_withdrawal"; "deposit"]
     ~title:"Deposit and fast withdraw tez"
     ~commitment_period
@@ -9103,6 +9205,7 @@ let test_deposit_and_fast_withdraw =
 let test_deposit_and_fa_fast_withdraw =
   let commitment_period = 5 and challenge_window = 5 in
   register_all
+    ~__FILE__
     ~tags:["fast_withdrawal"; "fa_tokens"; "deposit"]
     ~title:"Deposit and fast withdraw FA tokens"
     ~commitment_period
@@ -9308,6 +9411,7 @@ let test_deposit_and_fa_fast_withdraw =
 
 let test_trace_call =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
@@ -9421,6 +9525,7 @@ let test_trace_call =
 
 let test_patch_kernel =
   register_all
+    ~__FILE__
     ~kernels:[Mainnet]
     ~tags:["evm"; "patch_kernel"; "experimental"]
     ~title:"Can patch the kernel of an existing node"
@@ -9450,6 +9555,7 @@ let test_patch_kernel =
 
 let test_observer_finalized_view =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "observer"; "finalized"; "dont_track_rollup_node"]
     ~title:
@@ -9497,6 +9603,7 @@ let test_observer_finalized_view =
 
 let test_finalized_persistent =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "finalized"]
     ~title:"Persistent finalized block parameter"
@@ -9559,6 +9666,7 @@ let test_finalized_persistent =
 
 let test_finalized_view =
   register_all
+    ~__FILE__
     ~kernels:
       [
         Latest
@@ -9659,6 +9767,7 @@ let test_finalized_view_forward_txn =
   in
   let nb_transactions = 3 in
   register_all
+    ~__FILE__
     ~kernels:
       [
         Latest
@@ -9736,6 +9845,7 @@ let test_finalized_view_forward_txn =
 
 let test_finalized_block_param =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:
       [
@@ -9809,6 +9919,7 @@ let test_regression_block_hash_gen =
      This test checks regression for the fix *)
   let timestamp = "2020-01-01T00:00:05Z" in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
     ~title:"Random generation based on block hash and timestamp"
@@ -9863,6 +9974,7 @@ let test_sequencer_sandbox () =
 
 let test_rpc_mode_while_block_are_produced =
   register_all
+    ~__FILE__
     ~title:"rpc node can respond to rpcs without disturbing the sequencer."
     ~tags:["rpc_mode"; Tag.ci_disabled]
     ~time_between_blocks:Nothing
@@ -9929,6 +10041,7 @@ let test_rpc_mode_while_block_are_produced =
 
 let test_batch_limit_size_rpc =
   register_all
+    ~__FILE__
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~title:"Test batch size limit"
@@ -10020,6 +10133,7 @@ let test_describe_config () =
 
 let test_relay_restricted_rpcs =
   register_all
+    ~__FILE__
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
@@ -10044,6 +10158,7 @@ let test_relay_restricted_rpcs =
 
 let test_tx_pool_replacing_transactions =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "tx_pool"]
@@ -10218,6 +10333,7 @@ let test_tx_pool_pending_nonce () =
 
 let test_da_fees_after_execution =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:
       [
@@ -10316,6 +10432,7 @@ let test_configuration_service =
 
 let test_produce_block_with_no_delayed_transactions =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "delayed_transaction"]
     ~title:"Produce block with no delayed transactions"
@@ -10359,6 +10476,7 @@ let test_produce_block_with_no_delayed_transactions =
 
 let test_websocket_rpcs =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"]
     ~title:"RPC methods over websocket"
     ~time_between_blocks:Nothing
@@ -10432,6 +10550,7 @@ let test_websocket_rpcs =
 
 let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "http"]
     ~title:
       "Check that subscriptions rpcs can't be called via regular http requests"
@@ -10492,6 +10611,7 @@ let check_unsubscription ~websocket ~id ~sequencer evm_node =
 
 let test_websocket_newHeads_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
     ~title:"Check that websocket event `newHeads` is behaving correctly"
     ~time_between_blocks:Nothing
@@ -10531,6 +10651,7 @@ let test_websocket_newHeads_event =
    connections closed by the client. *)
 let test_websocket_cleanup =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "cleanup"]
     ~title:"Check that websocket subscriptions are cleaned up on close"
     ~time_between_blocks:Nothing
@@ -10812,6 +10933,7 @@ let test_websocket_heartbeat_monitoring () =
 
 let test_websocket_newPendingTransactions_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "new_pending_transactions"]
     ~title:
       "Check that websocket event `newPendingTransactions` is behaving \
@@ -10874,6 +10996,7 @@ let test_websocket_newPendingTransactions_event =
 
 let test_websocket_logs_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "logs"]
     ~title:"Check that websocket event `logs` is behaving correctly"
     ~time_between_blocks:Nothing
@@ -11159,6 +11282,7 @@ let test_node_correctly_uses_batcher_heap =
 
 let test_trace_empty_block =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
     ~title:"debug_traceBlockByNumber succeeds on empty block"
@@ -11174,6 +11298,7 @@ let test_trace_empty_block =
 
 let test_trace_block_struct_logger =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
@@ -11195,6 +11320,7 @@ let test_trace_block_struct_logger =
 
 let test_trace_block =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
@@ -11298,6 +11424,7 @@ let test_init_config_mainnet network =
 
 let test_filling_max_slots_cant_lead_to_out_of_memory =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "slots"; "out_of_memory"]
     ~title:
@@ -11343,6 +11470,7 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
 
 let test_rpc_getLogs_with_earliest_fail =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
@@ -11400,6 +11528,7 @@ let test_rpc_getLogs_with_earliest_fail =
 
 let test_estimate_gas_with_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
     ~time_between_blocks:Nothing
@@ -11457,6 +11586,7 @@ let test_estimate_gas_with_block_param =
 
 let test_transaction_object expected_type_ name make_transaction =
   register_all
+    ~__FILE__
     ~tags:[name; "transaction_object"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
@@ -11521,6 +11651,7 @@ let test_eip1559_transaction_object =
 
 let test_apply_from_full_history_mode =
   register_all
+    ~__FILE__
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
@@ -11558,6 +11689,7 @@ let test_apply_from_full_history_mode =
 
 let test_tx_queue =
   register_all
+    ~__FILE__
     ~tags:["observer"; "tx_queue"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
@@ -11672,6 +11804,7 @@ let test_tx_queue =
 
 let test_tx_queue_clear =
   register_all
+    ~__FILE__
     ~title:"Tx_queue clears after delayed inbox flush"
     ~tags:["evm"; "tx_queue"; "clear"; "delayed_inbox"; "flush"]
     ~enable_tx_queue:
@@ -11774,6 +11907,7 @@ let test_tx_queue_clear =
 
 let test_tx_queue_nonce =
   register_all
+    ~__FILE__
     ~tags:["observer"; "tx_queue"; "nonce"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
@@ -11979,6 +12113,7 @@ let test_tx_queue_nonce =
 let test_spawn_rpc =
   let fresh_port = Port.fresh () in
   register_all
+    ~__FILE__
     ~spawn_rpc:fresh_port
     ~tags:["sequencer"; "spawn"; "rpc"; Tag.flaky]
     ~title:
@@ -12010,6 +12145,7 @@ let test_spawn_rpc =
 
 let test_observer_init_from_snapshot =
   register_all
+    ~__FILE__
     ~tags:["observer"; "init"; "from"; "snapshot"]
     ~title:"Observer successfully inits from a rolling snapshot"
   @@ fun {sequencer; sc_rollup_node; l2_chains; enable_multichain; _} _protocol
@@ -12070,6 +12206,7 @@ let test_observer_init_from_snapshot =
 let test_tx_queue_limit =
   let max_number_of_txs = 10 in
   register_all
+    ~__FILE__
     ~tags:["observer"; "tx_queue"; "limit"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
@@ -12174,6 +12311,7 @@ let test_tx_queue_limit =
 let test_observer_periodic_snapshot =
   let gc = 2 in
   register_all
+    ~__FILE__
     ~periodic_snapshot_path:"periodic_snapshot/evm-%h-snapshot-%r-%l"
     ~history_mode:(Rolling gc)
     ~genesis_timestamp
@@ -12548,6 +12686,7 @@ let test_fa_deposit_and_withdrawals_events =
 
 let test_block_producer_validation =
   register_all
+    ~__FILE__
     ~tags:["observer"; "tx_queue"; "validation"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* node only test *)
@@ -12678,6 +12817,7 @@ let test_block_producer_validation =
    is. *)
 let test_durable_storage_consistency =
   register_all
+    ~__FILE__
     ~tags:["durable_storage"; "consistency"]
     ~time_between_blocks:Nothing
     ~title:"Everyone agrees on L1 level"
@@ -12772,6 +12912,7 @@ let expect_failure msg k =
 
 let test_fa_deposit_can_be_claimed =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "fa_deposit"; "claim"]
     ~time_between_blocks:Nothing
@@ -12916,6 +13057,7 @@ let test_fa_deposit_can_be_claimed =
 
 let test_eip2930_storage_access =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "eip2930"]
     ~title:"Check EIP-2930's semantic correctness"

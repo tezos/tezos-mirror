@@ -1029,17 +1029,17 @@ let activate_revm_registration =
   Register_both {additional_tags_with = []; additional_tags_without = []}
 
 (* Register all variants of a test. *)
-let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?eth_bootstrap_accounts ?tez_bootstrap_accounts
-    ?sequencer ?sequencer_pool_address ?(kernels = Kernel.all) ?da_fee
-    ?minimum_base_fee_per_gas ?preimages_dir ?maximum_allowed_ticks
-    ?maximum_gas_per_transaction ?max_blueprint_lookahead_in_seconds
-    ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
-    ?additional_uses ?rpc_server ?websockets ?enable_fast_withdrawal
-    ?enable_fast_fa_withdrawal ?history_mode
+let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
+    ?sequencer_rpc_port ?sequencer_private_rpc_port ?genesis_timestamp
+    ?time_between_blocks ?max_blueprints_lag ?max_blueprints_ahead
+    ?max_blueprints_catchup ?catchup_cooldown ?delayed_inbox_timeout
+    ?delayed_inbox_min_levels ?max_number_of_chunks ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts ?sequencer ?sequencer_pool_address
+    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
+    ?maximum_allowed_ticks ?maximum_gas_per_transaction
+    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
+    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
+    ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
     ?(use_multichain = default_multichain_registration)
     ?(use_revm = default_revm_registration) ?enable_tx_queue ?spawn_rpc
