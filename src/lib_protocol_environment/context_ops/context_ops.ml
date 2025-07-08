@@ -708,7 +708,10 @@ let is_gc_allowed context_index =
   | Brassaia_memory_index index -> Brassaia_memory.is_gc_allowed index
   | Duo_index index -> Duo_context.is_gc_allowed index
   | Duo_memory_index index -> Duo_memory_context.is_gc_allowed index
-  | Tezedge_index _ -> false (* FIXME *)
+  | Tezedge_index _ ->
+      true
+      (* snapshot export fails if is_gc_allowed returns false *)
+      (* FIXME *)
   | Duo_irmin_tezedge_index index ->
       Duo_irmin_tezedge_context.is_gc_allowed index
 
@@ -923,7 +926,8 @@ let close context_index =
   | Brassaia_memory_index index -> Brassaia_memory.close index
   | Duo_index index -> Duo_context.close index
   | Duo_memory_index index -> Duo_memory_context.close index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ ->
+      Lwt.return_unit (* assert false *)
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f
@@ -959,10 +963,13 @@ let export_snapshot context_index context_hash ~path =
   | Duo_index index -> Duo_context.export_snapshot index context_hash ~path
   | Duo_memory_index index ->
       Duo_memory_context.export_snapshot index context_hash ~path
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false
+  | Tezedge_index index ->
+      Lwt.return (Tezedge.export_snapshot index context_hash ~path)
+  | Duo_irmin_tezedge_index _ -> assert false
 
 let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   let open Lwt_syntax in
+  (* FIXME: it needs to be provided by the backend and not by the context_ops *)
   match context_index with
   | Disk_index _ ->
       Context.Checks.Pack.Integrity_check.run
@@ -986,7 +993,8 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Brassaia_memory_index _ ->
       Fmt.failwith
         "An in memory context doesn't need to be checked for integrity"
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
+  | Tezedge_index _ -> Lwt.return_unit (* FIXME *)
+  | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
   | Duo_index _ ->
       let* () =
         Context.Checks.Pack.Integrity_check.run

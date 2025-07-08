@@ -20,9 +20,12 @@ module Tezedge = Octez_rust_tezos_context.Rust_tezedge_gen
 
 type patch_context = t -> t tzresult Lwt.t
 
-and index = {index : Tezedge.index; patch_context : patch_context option}
+(* TODO: get rid of this and use tezedge type directly *)
+and extra_payload = {patch_context : patch_context option; base_path : string}
 
-and t = {context : Tezedge.context; patch_context : patch_context option}
+and index = {index : Tezedge.index; extra : extra_payload}
+
+and t = {context : Tezedge.context; extra : extra_payload}
 
 [@@@warning "+duplicate-definitions"]
 
@@ -51,21 +54,21 @@ let list ctxt ?offset ?length key =
 
 let length ctxt key = Lwt.return (Tezedge.length ctxt.context key)
 
-let add_raw {context; patch_context} (key : key) (v : value) =
+let add_raw {context; extra} (key : key) (v : value) =
   let context = Tezedge.add context key v in
-  Lwt.return {context; patch_context}
+  Lwt.return {context; extra}
 
 let add (ctxt : t) (key : key) (v : value) = add_raw ctxt (data_key key) v
 
 [@@@warning "+duplicate-definitions"]
 
-let add_tree {context; patch_context} key tree =
+let add_tree {context; extra} key tree =
   let context = Tezedge.add_tree context (data_key key) tree in
-  Lwt.return {context; patch_context}
+  Lwt.return {context; extra}
 
-let remove {context; patch_context} key =
+let remove {context; extra} key =
   let context = Tezedge.remove context (data_key key) in
-  Lwt.return {context; patch_context}
+  Lwt.return {context; extra}
 
 let config _ = assert false
 
@@ -167,13 +170,13 @@ let fold ?depth t k ~order ~init ~f =
 
 let mem ctxt key = Lwt.return (Tezedge.mem ctxt.context (data_key key))
 
-let index {context; patch_context} =
+let index {context; extra} =
   let index = Tezedge.index context in
-  {index; patch_context}
+  {index; extra}
 
 let init ?patch_context dir =
   let index = Tezedge.index_init dir in
-  {index; patch_context}
+  {index; extra = {patch_context; base_path = dir}}
 
 let commit ~time ?(message = "") context =
   Lwt.return @@ Context_hash.of_bytes_exn
@@ -197,12 +200,12 @@ let hash ~time ?(message = "") {context; _} =
   in
   Context_hash.of_bytes_exn hash
 
-let commit_genesis {index; patch_context} ~chain_id:_ ~time ~protocol =
+let commit_genesis {index; extra} ~chain_id:_ ~time ~protocol =
   let open Lwt_result_syntax in
   let context = Tezedge.context_init index in
-  let context = {context; patch_context} in
+  let context = {context; extra} in
   let* context =
-    match patch_context with
+    match extra.patch_context with
     | None -> return context
     | Some patch_context -> patch_context context
   in
@@ -214,9 +217,9 @@ let commit_genesis {index; patch_context} ~chain_id:_ ~time ~protocol =
 let exists (index : index) context_hash =
   Tezedge.exists index.index context_hash
 
-let checkout {index; patch_context} context_hash =
+let checkout {index; extra} context_hash =
   Option.map
-    (fun context -> {context; patch_context})
+    (fun context -> {context; extra})
     (Tezedge.checkout index context_hash)
 
 let checkout_exn index context_hash =
@@ -242,3 +245,6 @@ let compute_testchain_genesis _ = assert false
 let merkle_tree_v2 _ctx _leaf_kind _key = assert false
 
 let compute_testchain_chain_id _ = assert false
+
+let export_snapshot {index = _; extra = {base_path; _}} context_hash ~path =
+  Tezedge.export_snapshot base_path context_hash path

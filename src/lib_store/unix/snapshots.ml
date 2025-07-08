@@ -2522,6 +2522,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     let*! context_index =
       Context_ops.init ~kind:`Disk ~readonly:true ~data_dir ()
     in
+    (* Is it the right test? *)
     let is_gc_allowed = Context_ops.is_gc_allowed context_index in
     let* () =
       if not is_gc_allowed then tzfail Cannot_export_snapshot_format

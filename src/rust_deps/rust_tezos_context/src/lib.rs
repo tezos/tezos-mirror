@@ -514,3 +514,12 @@ pub fn tree_equal(tree1: Pointer<Tree>, tree2: Pointer<Tree>) -> bool {
         .equal(tree2.as_ref().as_ref())
         .unwrap()
 }
+
+#[ocaml::func]
+#[ocaml::sig("string -> 'a -> string -> unit")]
+pub fn export_snapshot(context_path: String, context_hash: Value, output: String) -> () {
+    let context_hash = unsafe { context_hash.field(0) };
+    let context_hash = unsafe { context_hash.bytes_val() };
+    let context_hash = ContextHash::try_from_bytes(context_hash).expect("export_snapshot");
+    tezos_context::snapshot::export_snapshot(context_path, &context_hash, output)
+}
