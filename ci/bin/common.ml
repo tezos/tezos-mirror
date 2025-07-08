@@ -887,6 +887,8 @@ let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     ~variables:[("PROFILE", "static")]
     [
       "scripts/slim-mode.sh on";
+      (* turn on -opaque for all subsequent builds *)
+      "scripts/custom-flags.sh set -opaque";
       (* 1) compile with PPX profiling *)
       "TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node";
       (* 2) compile with OpenTelemetry PPX *)

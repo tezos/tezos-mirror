@@ -1094,6 +1094,7 @@ build-layer1-profiling:
   - . ./scripts/ci/sccache-start.sh
   script:
   - scripts/slim-mode.sh on
+  - scripts/custom-flags.sh set -opaque
   - TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node
   - TEZOS_PPX_PROFILER=opentelemetry make build OCTEZ_EXECUTABLES?=octez-node
   - mkdir -p octez-binaries/x86_64/
