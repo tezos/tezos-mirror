@@ -186,32 +186,17 @@ impl NomReader<'_> for Empty {
     }
 }
 
-// PlaceHolder Type for temporary unused fields that encode as vectors
-#[derive(PartialEq, Debug)]
-pub struct VecEmpty;
-
-impl BinWriter for VecEmpty {
-    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        tezos_enc::u32(&0, output)
-    }
-}
-impl NomReader<'_> for VecEmpty {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        // We expect an empty vector, so we just consume the size of the vector
-        let (input, _) = tezos_nom::size(input)?;
-        Ok((input, Self))
-    }
-}
-
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     // TODO: Placeholder for ticket receipt issue : #8018
-    pub ticket_receipt: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub ticket_receipt: Vec<u8>,
     // TODO: Placeholder for originated contracts issue : #8018
-    pub originated_contracts: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub originated_contracts: Vec<u8>,
     pub consumed_gas: Narith,
     pub storage_size: Narith,
     pub paid_storage_size_diff: Narith,
@@ -259,7 +244,8 @@ pub struct OperationResult<M: OperationKind> {
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
     //TODO Placeholder for internal operations : #8018
-    pub internal_operation_results: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub internal_operation_results: Vec<u8>,
 }
 #[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
@@ -274,12 +260,12 @@ pub fn produce_operation_result<M: OperationKind>(
         Ok(success) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Applied(success),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         },
         Err(operation_error) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![operation_error]),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         },
     }
 }
@@ -349,10 +335,10 @@ mod tests {
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
-                            ], ticket_receipt: VecEmpty, originated_contracts: VecEmpty, consumed_gas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
+                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_gas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
                             ))
 
-                        , internal_operation_results: VecEmpty })
+                        , internal_operation_results: vec![] })
                     }],
                     signature:  UnknownSignature::from_base58_check(
                         "sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"

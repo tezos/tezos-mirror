@@ -189,7 +189,7 @@ mod tests {
 
     use crate::operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, RevealSuccess, VecEmpty,
+        OperationResultSum, OperationWithMetadata, RevealSuccess,
     };
 
     use super::{AppliedOperation, TezBlock};
@@ -211,7 +211,7 @@ mod tests {
             result: crate::operation_result::ContentResult::Applied(RevealSuccess {
                 consumed_gas: 0u64.into(),
             }),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         });
         AppliedOperation {
             hash,
