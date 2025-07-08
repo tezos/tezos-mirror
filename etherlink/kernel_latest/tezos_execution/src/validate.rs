@@ -4,12 +4,16 @@
 
 use tezos_data_encoding::types::Narith;
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::{
-    operation::{ManagerOperation, OperationContent},
+    operation::{ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
 };
 
-use crate::{account_storage::TezlinkImplicitAccount, ApplyKernelError};
+use crate::{
+    account_storage::{Manager, TezlinkImplicitAccount},
+    ApplyKernelError,
+};
 
 impl TezlinkImplicitAccount {
     /// Inspired from `contract_storage.ml` in the Tezos protocol
@@ -40,6 +44,37 @@ impl TezlinkImplicitAccount {
             };
             Ok(Err(ValidityError::CounterInTheFuture(error)))
         }
+    }
+
+    pub fn get_manager_key(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<Result<PublicKey, ValidityError>, tezos_storage::error::Error> {
+        let manager = self.manager(host).ok();
+        match manager {
+            None => Ok(Err(ValidityError::MissingManagerContract)),
+            Some(Manager::NotRevealed(public_key_hash)) => {
+                Ok(Err(ValidityError::UnrevealedManagerKey(public_key_hash)))
+            }
+            Some(Manager::Revealed(public_key)) => Ok(Ok(public_key)),
+        }
+    }
+}
+
+/// In order to validate an operation, we need to check its signature,
+/// which requires obtaining the public key of the source.
+/// In all cases except Reveal, we obtain the public key from the context.
+/// However, the purpose of Reveal is to register the public key in the context,
+/// making it a special case. In this case, we obtain the public key
+/// from the operation's payload.
+fn _get_revealed_key<Host: Runtime>(
+    host: &Host,
+    account: &TezlinkImplicitAccount,
+    content: &OperationContent,
+) -> Result<Result<PublicKey, ValidityError>, ApplyKernelError> {
+    match content {
+        OperationContent::Reveal(RevealContent { pk }) => Ok(Ok(pk.clone())),
+        _ => Ok(account.get_manager_key(host)?),
     }
 }
 
