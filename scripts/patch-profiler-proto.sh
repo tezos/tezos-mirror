@@ -15,10 +15,10 @@ for arg in "$@"; do
 done
 
 #shellcheck disable=SC2086
-patch $dry_run -p 1 < scripts/profile_quebec.patch
-
-#shellcheck disable=SC2086
 patch $dry_run -p 1 < scripts/profile_riotuma.patch
 
 #shellcheck disable=SC2086
-patch $dry_run -p 1 < scripts/profile_alpha.patch
+patch $dry_run -p 1 < scripts/profile_seoul.patch
+
+#shellcheck disable=SC2086
+patch $dry_run -p 1 -t < scripts/profile_alpha.patch
