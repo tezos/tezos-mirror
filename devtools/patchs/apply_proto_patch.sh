@@ -82,8 +82,9 @@ apply() {
     eval "$PATCH"
     if "$COMMITING"; then
       # adding all files touched by the initial commit
-      # shellcheck disable=SC2046
-      git add $(git show --name-only --pretty="" "$PATCH_NAME" "$CHANGES_PATH" | cut -d'/' -f3-)
+      # shellcheck disable=SC2046,SC2086
+      git add $(git show --name-only --pretty="" "$PATCH_NAME" $CHANGES_PATH | cut -d'/' -f3-)
+      git status
       # committing the changes with a new message
       git commit -m"$proto_name/$COMMIT_TITLE
 
