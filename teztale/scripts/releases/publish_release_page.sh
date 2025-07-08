@@ -55,16 +55,16 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Upload binaries to S3 bucket
     echo "Uploading binaries..."
-    aws s3 sync "./teztale-binaries/x86_64/" "s3://${S3_BUCKET}/teztale/${release}/binaries/x86_64" --region "${REGION}"
-    aws s3 sync "./teztale-binaries/arm64/" "s3://${S3_BUCKET}/teztale/${release}/binaries/arm64" --region "${REGION}"
+    aws s3 sync "./teztale-binaries/x86_64/" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/x86_64" --region "${REGION}"
+    aws s3 sync "./teztale-binaries/arm64/" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/arm64" --region "${REGION}"
 
     # Create and push archives
     tar -czf "${release}.tar.gz" --transform 's|^\teztale-binaries/x86_64/|teztale/|' teztale-binaries/x86_64/*
-    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/teztale/${release}/binaries/x86_64/" --region "${REGION}"
+    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/x86_64/" --region "${REGION}"
     sha256sum "${release}.tar.gz" >> "./x86_64_sha256sums.txt"
     tar -czf "${release}.tar.gz" --transform 's|^\teztale-binaries/arm64/|teztale/|' teztale-binaries/arm64/*
     sha256sum "${release}.tar.gz" >> "./arm64_sha256sums.txt"
-    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/teztale/${release}/binaries/arm64/" --region "${REGION}"
+    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/arm64/" --region "${REGION}"
 
     # Push checksums for x86_64 binaries
     echo "Generating checksums for x86_64 binaries"
@@ -72,7 +72,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./x86_64_sha256sums.txt"
     done
-    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}/teztale/${release}/binaries/x86_64/sha256sums.txt"
+    aws s3 cp "./x86_64_sha256sums.txt" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/x86_64/sha256sums.txt"
 
     # Push checksums for arm64 binaries
     echo "Generating checksums for arm64 binaries"
@@ -80,7 +80,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$binary")
       [ -f "$binary" ] && sha256sum "$binary" | awk -v name="$filename" '{print $1, name}' >> "./arm64_sha256sums.txt"
     done
-    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}/teztale/${release}/binaries/arm64/sha256sums.txt"
+    aws s3 cp "./arm64_sha256sums.txt" "s3://${S3_BUCKET}/teztale/teztale-v${release_no_v}/binaries/arm64/sha256sums.txt"
   fi
 else
   echo "No tag found. No asset will be added to the release page."
