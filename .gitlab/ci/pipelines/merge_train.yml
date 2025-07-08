@@ -1440,13 +1440,14 @@ build-layer1-profiling:
   - . ./scripts/ci/sccache-start.sh
   script:
   - scripts/slim-mode.sh on
-  - make build OCTEZ_EXECUTABLES?=octez-node
+  - scripts/custom-flags.sh set -opaque
+  - TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node
+  - TEZOS_PPX_PROFILER=opentelemetry make build OCTEZ_EXECUTABLES?=octez-node
   - mkdir -p octez-binaries/x86_64/
   - mv octez-node octez-binaries/x86_64/
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
-    TEZOS_PPX_PROFILER: profiling
     PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
