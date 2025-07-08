@@ -822,15 +822,6 @@ let jobs pipeline_type =
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:"2G"
     in
-    let job_build_teztale ?cpu ~arch ?storage ?(sccache_size = "5G") () =
-      Teztale.Common.job_build
-        ~arch
-        ?cpu
-        ?storage
-        ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
-        ?sccache_size:(Some sccache_size)
-        ()
-    in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
@@ -843,13 +834,6 @@ let jobs pipeline_type =
       job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
-      job_build_teztale
-        ~arch:Amd64
-        ~cpu:Very_high
-        ~storage:Ramfs
-        ~sccache_size:"2G"
-        ();
-      job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
       job_evm_static_x86_64_experimental;
       job_evm_static_arm64_experimental;
       job_build_layer1_profiling

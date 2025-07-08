@@ -1182,100 +1182,6 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
 
-teztale.build:static-x86_64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - teztale/**/*
-    when: on_success
-  - when: manual
-    allow_failure: true
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make teztale
-  after_script:
-  - mkdir -p ./teztale-binaries/x86_64
-  - mv octez-teztale-* ./teztale-binaries/x86_64/
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 2G
-  artifacts:
-    name: teztale-binaries
-    expire_in: 1 day
-    paths:
-    - teztale-binaries/x86_64/octez-teztale-*
-    when: on_success
-
-teztale.build:static-arm64:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_arm64
-  rules:
-  - changes:
-    - teztale/**/*
-    when: on_success
-  - when: manual
-    allow_failure: true
-  dependencies:
-  - oc.docker:ci:arm64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make teztale
-  after_script:
-  - mkdir -p ./teztale-binaries/arm64
-  - mv octez-teztale-* ./teztale-binaries/arm64/
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    PROFILE: static
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    name: teztale-binaries
-    expire_in: 1 day
-    paths:
-    - teztale-binaries/arm64/octez-teztale-*
-    when: on_success
-
 etherlink.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
@@ -4297,6 +4203,104 @@ oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
+
+teztale.build-arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_arm64
+  rules:
+  - changes:
+    - teztale/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:arm64
+  - trigger
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - make teztale
+  - mkdir -p ./teztale-binaries/arm64
+  - mv octez-teztale-* ./teztale-binaries/arm64/
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    PROFILE: static
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    name: teztale-binaries
+    expire_in: 1 day
+    paths:
+    - teztale-binaries/arm64/octez-teztale-*
+    when: on_success
+
+teztale.build-x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_very_high_cpu_ramfs
+  rules:
+  - changes:
+    - teztale/**/*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - make teztale
+  - mkdir -p ./teztale-binaries/x86_64
+  - mv octez-teztale-* ./teztale-binaries/x86_64/
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    PROFILE: static
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+  artifacts:
+    name: teztale-binaries
+    expire_in: 1 day
+    paths:
+    - teztale-binaries/x86_64/octez-teztale-*
+    when: on_success
 
 grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
