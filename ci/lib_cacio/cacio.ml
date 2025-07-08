@@ -50,6 +50,7 @@ type job = {
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   tag : Tezos_ci.tag option;
+  cargo_cache : bool;
 }
 
 type trigger = Auto | Manual
@@ -313,6 +314,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     script;
                     artifacts;
                     tag;
+                    cargo_cache;
                   };
                 trigger;
                 only_if_changed;
@@ -375,6 +377,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ?artifacts
                 ?tag
                 script
+              |> if cargo_cache then Tezos_ci.enable_cargo_cache else Fun.id
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -425,6 +428,7 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?tag:Tezos_ci.tag ->
+    ?cargo_cache:bool ->
     string ->
     string list ->
     job
@@ -455,8 +459,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let only_if_changed = Tezos_ci.Changeset.make Component.paths
 
   let job ~__POS__:source_location ~stage ~description ?arch ?cpu ?storage
-      ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts ?tag name
-      script =
+      ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts ?tag
+      ?(cargo_cache = false) name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -486,6 +490,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       script;
       artifacts;
       tag;
+      cargo_cache;
     }
 
   let register_before_merging_jobs jobs =

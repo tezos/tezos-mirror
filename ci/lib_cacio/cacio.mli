@@ -158,6 +158,9 @@ module type COMPONENT_API = sig
       but [needs_legacy] jobs are not automatically added to pipelines,
       contrary to [needs] jobs.
 
+      If [cargo_cache] is [true], the resulting job is modified with
+      {!Tezos_ci.enable_cargo_cache}. Default is [false].
+
       See {!Tezos_ci.job} for information about other arguments. *)
   val job :
     __POS__:string * int * int * int ->
@@ -172,6 +175,7 @@ module type COMPONENT_API = sig
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?tag:Tezos_ci.tag ->
+    ?cargo_cache:bool ->
     string ->
     string list ->
     job
