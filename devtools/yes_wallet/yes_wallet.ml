@@ -28,8 +28,7 @@ type error = Overwrite_forbiden of string | File_not_found of string
 
 (* We need to exit Lwt + tzResult context from Yes_wallet. *)
 let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
-    ~override_with_consensus_key ~active_bakers_only alias_pkh_pk_list
-    other_accounts_pkh =
+    ~active_bakers_only alias_pkh_pk_list other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -39,7 +38,6 @@ let run_load_bakers_public_keys ?staking_share_opt ?network_opt ?level base_dir
          ?network_opt
          ?level
          base_dir
-         ~override_with_consensus_key
          ~active_bakers_only
          alias_pkh_pk_list
          other_accounts_pkh)
@@ -62,8 +60,7 @@ let run_load_contracts ?dump_contracts ?network_opt ?level base_dir =
       exit 1
 
 let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~override_with_consensus_key ~active_bakers_only ~aliases
-    ~other_accounts_pkh =
+    ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Yes_wallet_lib in
   let open Tezos_error_monad in
   match
@@ -72,7 +69,6 @@ let run_build_yes_wallet ?staking_share_opt ?network_opt base_dir
          ?staking_share_opt
          ?network_opt
          base_dir
-         ~override_with_consensus_key
          ~active_bakers_only
          ~aliases
          ~other_accounts_pkh)
@@ -146,8 +142,7 @@ let convert_wallet ~replace wallet_dir target_dir =
         "Warning: cannot produce yes-wallet, the file %s does not exist@."
         pk_source
 
-let populate_wallet ~replace ~override_with_consensus_key yes_wallet_dir
-    alias_pkh_pk_list =
+let populate_wallet ~replace yes_wallet_dir alias_pkh_pk_list =
   let pkh_filename = Filename.concat yes_wallet_dir "public_key_hashs" in
   let pk_filename = Filename.concat yes_wallet_dir "public_keys" in
   let sk_filename = Filename.concat yes_wallet_dir "secret_keys" in
@@ -168,10 +163,7 @@ let populate_wallet ~replace ~override_with_consensus_key yes_wallet_dir
       sk_filename ;
     false)
   else (
-    Yes_wallet_lib.write_yes_wallet
-      ~write_consensus_keys:override_with_consensus_key
-      yes_wallet_dir
-      alias_pkh_pk_list ;
+    Yes_wallet_lib.write_yes_wallet yes_wallet_dir alias_pkh_pk_list ;
     true)
 
 let alias_file_opt_name = "--aliases"
@@ -189,8 +181,6 @@ let network_opt_name = "--network"
 let level_opt_name = "--level"
 
 let other_accounts_opt_name = "--other-accounts"
-
-let consensus_key_override = "--consensus-key-override"
 
 let supported_networks = List.map fst Yes_wallet_lib.supported_networks
 
@@ -216,7 +206,9 @@ let usage () =
      @[<v 4>> create from context <base_dir> in <yes_wallet_dir> [%s] [%s \
      <NUM>] [%s <%a>]@,\
      creates a yes-wallet with all delegates in the head block of the context \
-     in <base_dir> and store it in <yes_wallet_dir>@,\
+     in <base_dir> and store it in <yes_wallet_dir>. By default, it also \
+     outputs a consensus_keys_mapping file that associates every consensus key \
+     to its actual delegate@,\
      if %s is used the deactivated bakers are filtered out@,\
      if %s <NUM> is used, the first largest bakers that have an accumulated \
      stake of at least <NUM> percent of the total stake are kept@,\
@@ -224,10 +216,7 @@ let usage () =
      parameter (default is mainnet) @,\
      if %s <pkh .. pkh> is used, the generated wallet will also contain the \
      addresses for the given list of space separated pkh. Consensus keys are \
-     not supported for this parameter @,\
-     if %s is used, there will be an override of delegate's public key and \
-     public key hash by, respectively, it's consensus public key and public \
-     key hash@]@]@,\
+     not supported for this parameter @]@]@,\
      @[<v>@[<v 4>> compute total supply from <base_dir> [in <csv_file>]@,\
      computes the total supply form all contracts and commitments. result is \
      printed in stantdard output, optionally informations on all read \
@@ -254,7 +243,6 @@ let usage () =
         pp_print_string)
     supported_networks
     other_accounts_opt_name
-    consensus_key_override
     alias_file_opt_name
     force_opt_name
 
@@ -355,9 +343,6 @@ let () =
   let active_bakers_only =
     List.exists (fun opt -> opt = active_bakers_only_opt_name) options
   in
-  let override_with_consensus_key =
-    List.exists (fun opt -> opt = consensus_key_override) options
-  in
   force := List.exists (fun opt -> opt = force_opt_name) options ;
   let unknown_options =
     let rec filter args =
@@ -380,7 +365,6 @@ let () =
       | opt :: net :: t when opt = network_opt_name && is_supported_network net
         ->
           filter t
-      | opt :: t when opt = consensus_key_override -> filter t
       | h :: t -> h :: filter t
     in
     filter options
@@ -411,7 +395,6 @@ let () =
             ?staking_share_opt
             ?network_opt
             base_dir
-            ~override_with_consensus_key
             ~active_bakers_only
             ~aliases
             ~other_accounts_pkh
@@ -419,13 +402,8 @@ let () =
         Format.printf
           "@[<h>Number of keys to export:@;<3 0>%d@]@."
           (List.length yes_alias_list) ;
-        if
-          populate_wallet
-            ~replace:!force
-            ~override_with_consensus_key
-            yes_wallet_dir
-            yes_alias_list
-        then Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
+        if populate_wallet ~replace:!force yes_wallet_dir yes_alias_list then
+          Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
       convert_wallet ~replace:!force base_dir target_dir ;
       Format.printf
@@ -491,7 +469,6 @@ let () =
           ?network_opt
           ?level:level_opt
           base_dir
-          ~override_with_consensus_key
           ~active_bakers_only
           aliases
           other_accounts_pkh

@@ -158,7 +158,7 @@ let load_alias_file chn =
 (* Create a yes-wallet in [dest] using the alias list [alias_pkh_pk_ck_list].
    If [write_consensus_keys] is true, the consensus key mapping file will be
    written, even if it is an empty list. *)
-let write_yes_wallet ~write_consensus_keys dest alias_pkh_pk_ck_list =
+let write_yes_wallet dest alias_pkh_pk_ck_list =
   let pkh_filename = Filename.concat dest "public_key_hashs" in
   let pk_filename = Filename.concat dest "public_keys" in
   let sk_filename = Filename.concat dest "secret_keys" in
@@ -167,8 +167,7 @@ let write_yes_wallet ~write_consensus_keys dest alias_pkh_pk_ck_list =
   json_to_file (pkh_list_json alias_pkh_pk_ck_list) pkh_filename ;
   json_to_file (pk_list_json alias_pkh_pk_ck_list) pk_filename ;
   json_to_file (sk_list_json alias_pkh_pk_ck_list) sk_filename ;
-  if write_consensus_keys then
-    json_to_file (ck_list_json alias_pkh_pk_ck_list) ck_filename
+  json_to_file (ck_list_json alias_pkh_pk_ck_list) ck_filename
 
 (** Assuming that the [keys_list] is sorted in descending order, the
     function extracts the first keys until reaching the limit of
@@ -206,9 +205,9 @@ let filter_up_to_staking_share share total_stake to_mutez keys_list =
       in
       loop ([], 0L) keys_list |> fst |> List.rev
 
-let get_delegates_and_accounts (module P : Sigs.PROTOCOL)
-    ~override_with_consensus_key context (header : Block_header.shell_header)
-    active_bakers_only staking_share_opt accounts_pkh_lists =
+let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
+    (header : Block_header.shell_header) active_bakers_only staking_share_opt
+    accounts_pkh_lists =
   let open Lwt_result_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
@@ -239,20 +238,18 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL)
       ~f:(fun pkh acc ->
         let* pk = P.Delegate.pubkey ctxt pkh in
         let* ck =
-          if override_with_consensus_key then
-            let* cpk = P.Delegate.consensus_key ctxt pkh in
-            if
-              Tezos_crypto.Signature.Public_key.equal
-                (P.Signature.To_latest.public_key pk)
+          let* cpk = P.Delegate.consensus_key ctxt pkh in
+          if
+            Tezos_crypto.Signature.Public_key.equal
+              (P.Signature.To_latest.public_key pk)
+              (P.Signature.To_latest.public_key cpk)
+          then return_none
+          else
+            let cpkh =
+              Tezos_crypto.Signature.Public_key.hash
                 (P.Signature.To_latest.public_key cpk)
-            then return_none
-            else
-              let cpkh =
-                Tezos_crypto.Signature.Public_key.hash
-                  (P.Signature.To_latest.public_key cpk)
-              in
-              return_some (cpkh, P.Signature.To_latest.public_key cpk)
-          else return_none
+            in
+            return_some (cpkh, P.Signature.To_latest.public_key cpk)
         in
         let*? key_list_acc, staking_balance_acc = acc in
         let* staking_balance = P.Delegate.staking_balance ctxt pkh in
@@ -557,19 +554,18 @@ let get_context ?level ~network_opt base_dir =
   return (protocol_hash, context, header, store)
 
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
-    ~active_backers_only ~override_with_consensus_key base_dir
-    alias_phk_pk_list] checkouts the head context at the given [base_dir] and
-    computes a list of [(alias, pkh, pk, stake, frozen_deposits,
-    unstake_frozen_deposits)] corresponding to all delegates in that context.
-    The [alias] for the delegates are gathered from [alias_pkh_pk_list]).
+    ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context
+    at the given [base_dir] and computes a list of [(alias, pkh, pk, stake,
+    frozen_deposits, unstake_frozen_deposits)] corresponding to all delegates in
+    that context. The [alias] for the delegates are gathered from
+    [alias_pkh_pk_list]).
 
     if [active_bakers_only] then the deactivated delegates are
     filtered out of the list. if an optional [level] is given, use the
     context from this level instead of head, if it exists.
 *)
 let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
-    ~active_bakers_only ~override_with_consensus_key base_dir alias_pkh_pk_list
-    other_accounts_pkh =
+    ~active_bakers_only base_dir alias_pkh_pk_list other_accounts_pkh =
   let open Lwt_result_syntax in
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
@@ -616,7 +612,6 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           pp_protocol
           protocol ;
         get_delegates_and_accounts
-          ~override_with_consensus_key
           protocol
           context
           header
@@ -718,14 +713,12 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   return contracts
 
 let build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~override_with_consensus_key ~active_bakers_only ~aliases
-    ~other_accounts_pkh =
+    ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Lwt_result_syntax in
   let+ bakers, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
-      ~override_with_consensus_key
       base_dir
       ~active_bakers_only
       aliases
