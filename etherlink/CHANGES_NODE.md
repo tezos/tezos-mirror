@@ -4,6 +4,37 @@
 
 ### Breaking changes
 
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.32 (2025-07-08)
+
+This release of the EVM node adds support for the sequencer to sign blueprint
+using a key stored on GCP KMS. It also allows to download the upcoming kernel
+`dionysus-r1` by its alias and fixes an issue in the metrics introduced in
+version 0.31.
+
+This release will not apply any migration to the node’s store (version 21),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
 - Remove CLI arguments and configuration options related to the threshold
   encryption mode. This mode was never used in production, so it should not
   affect existing deployment as long as they have not configured in their
@@ -16,8 +47,6 @@
   See `describe config` for more information about the available options.
   (!18585)
 
-### RPCs changes
-
 ### Metrics changes
 
 - Fix the finalized number metrics for EVM nodes not tracking a rollup
@@ -25,20 +54,10 @@
 
 ### Execution changes
 
-- Support signing blueprints via a key stored in a GCP KMS. (!18527)
+- Support signing blueprints via a key stored in a GCP KMS. (!18527 !18586
+  !18587)
 - Support downloading Etherlink 4.1 kernel (Dionysus first revision,
   `dionysus-r1`) by name. (!18594)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.31 (2025-06-26)
 
