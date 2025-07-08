@@ -4128,7 +4128,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
     (* TODO/FIXME: https://gitlab.com/tezos/tezos/-/issues/8005
        remove the v8 import backward compatibility as soon as v9
        (and v23) are mandatory.*)
-    let is_v8_import = snapshot_version = Version.v8_version in
+    let is_v8_import =
+      is_legacy_format && snapshot_version = Version.v8_version
+    in
     let*! () = Event.(emit restoring_floating_blocks) () in
     let* () =
       Animation.display_progress
