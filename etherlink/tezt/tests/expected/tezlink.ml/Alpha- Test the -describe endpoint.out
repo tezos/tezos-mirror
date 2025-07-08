@@ -171,6 +171,8 @@ Available services:
         The block's hash, its unique identifier. 
     - GET /chains/main/blocks/head/header
         The whole block header. 
+    - GET /chains/main/blocks/head/header/shell
+        The shell-specific fragment of the block header. 
     + helpers/
       - GET /chains/main/blocks/head/helpers/current_level
           Returns the level of the interrogated block, or the one of a block
@@ -187,12 +189,20 @@ Available services:
           contents of the cache at that future moment. This RPC estimates
           future gas consumption by trying to predict the state of the cache
           using some heuristics. 
+    - GET /chains/main/blocks/head/operation_hashes
+        The hashes of all the operations included in the block. 
+    - GET /chains/main/blocks/head/operations/<list_offset>/<operation_offset>
+        The `m-th` operation in the `n-th` validation pass of the block. 
     - GET /chains/main/blocks/head/protocols
         Current and next protocol. 
 
 
 Dynamic parameter description:
   
+  <operation_offset>
+      Index `m` of the requested operation in its validation pass. 
+  <list_offset>
+      Index `n` of the requested validation pass. 
   <block_cycle>
       A cycle integer 
   <contract_id>

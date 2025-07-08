@@ -578,6 +578,38 @@ let header :
     Tezos_rpc.Service.t =
   import_service Block_services.S.header
 
+let shell_header :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Block_header.shell_header )
+    Tezos_rpc.Service.t =
+  import_service Block_services.S.Header.shell_header
+
+let operation_hashes :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Operation_hash.t list list )
+    Tezos_rpc.Service.t =
+  import_service Block_services.S.Operation_hashes.operation_hashes
+
+let operation :
+    ( [`GET],
+      tezlink_rpc_context,
+      (tezlink_rpc_context * int) * int,
+      < force_metadata : bool
+      ; metadata : [`Always | `Never] option
+      ; version : Tezos_shell_services.Block_services.version >,
+      unit,
+      Tezos_shell_services.Block_services.version * Block_services.operation )
+    Tezos_rpc.Service.t =
+  Tezos_rpc.Service.subst2 Block_services.S.Operations.operation
+
 let bootstrapped :
     ( [`GET],
       unit,
