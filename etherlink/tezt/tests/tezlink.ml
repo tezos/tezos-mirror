@@ -76,6 +76,7 @@ let test_describe_endpoint =
 let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     scenario protocols =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~title
     ~tags:("tezlink" :: tags)
