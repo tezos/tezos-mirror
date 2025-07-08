@@ -55,11 +55,11 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
 
     # Upload binaries to S3 bucket
     echo "Uploading dashboards..."
-    aws s3 sync "./grafazos/output/" "s3://${S3_BUCKET}/grafazos/${release}/dashboards/" --exclude "*" --include "*.json" --region "${REGION}"
+    aws s3 sync "./grafazos/output/" "s3://${S3_BUCKET}/grafazos/grafazos-v${release_no_v}/dashboards/" --exclude "*" --include "*.json" --region "${REGION}"
 
     # Create and push archives
     tar -czf "${release}.tar.gz" --transform 's|output/*||' --exclude ".keep" grafazos/output/
-    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/grafazos/${release}/dashboards/" --region "${REGION}"
+    aws s3 cp "./${release}.tar.gz" "s3://${S3_BUCKET}/grafazos/grafazos-v${release_no_v}/dashboards/" --region "${REGION}"
     sha256sum "${release}.tar.gz" >> "./sha256sums.txt"
 
     # Push checksums for dashboards
@@ -68,7 +68,7 @@ if [ -n "${CI_COMMIT_TAG}" ]; then
       filename=$(basename "$dashboard")
       [ -f "$dashboard" ] && sha256sum "$dashboard" | awk -v name="$filename" '{print $1, name}' >> "./sha256sums.txt"
     done
-    aws s3 cp "./sha256sums.txt" "s3://${S3_BUCKET}/grafazos/${release}/dashboards/sha256sums.txt"
+    aws s3 cp "./sha256sums.txt" "s3://${S3_BUCKET}/grafazos/grafazos-v${release_no_v}/dashboards/sha256sums.txt"
   fi
 else
   echo "No tag found. No asset will be added to the release page."
