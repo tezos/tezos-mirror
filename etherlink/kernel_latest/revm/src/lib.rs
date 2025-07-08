@@ -3,7 +3,6 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::account_init::init_withdrawal_account;
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
@@ -26,11 +25,11 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 use world_state_handler::{account_path, WorldStateHandler};
 
+pub mod precompile_init;
 pub mod precompile_provider;
 pub mod send_outbox_message;
 pub mod world_state_handler;
 
-mod account_init;
 mod block_storage;
 mod code_storage;
 mod constants;
@@ -188,8 +187,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     value: U256,
     access_list: AccessList,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
-    init_withdrawal_account(host, world_state_handler)?;
-
     let mut commit_status = true;
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
@@ -264,6 +261,7 @@ mod test {
 
     use crate::{
         constants::WITHDRAWAL_SOL_ADDR,
+        precompile_init::init_precompile_bytecodes,
         world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH},
     };
     use crate::{
@@ -531,6 +529,8 @@ mod test {
         let mut host = MockKernelHost::default();
         let mut world_state_handler = new_world_state_handler().unwrap();
         let block_constants = block_constants_with_no_fees();
+
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
 
         // Insert account information
         let caller =
