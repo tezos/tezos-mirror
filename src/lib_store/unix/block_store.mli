@@ -395,6 +395,3 @@ val may_recover_merge : block_store -> unit tzresult Lwt.t
     store's metadata. *)
 val stat_metadata_cycles :
   t -> (string * metadata_stat list) list tzresult Lwt.t
-
-(** Upgrade the block_store_status. *)
-val v_3_1_upgrade : [`Chain_dir] Naming.directory -> unit tzresult Lwt.t
