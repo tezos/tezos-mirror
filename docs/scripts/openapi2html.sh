@@ -22,10 +22,11 @@ for f in "$@"; do
   out="$dir/static/${file%.json}.html"
 
   echo "converting $f to $out..."
-  yq -o=yaml "$f" > "$yaml"
+  jq '.paths |= with_entries(.key as $k | .value |= with_entries(.value.summary |= $k))' "$f" > "$f.ext"
+  yq -p=json -o=yaml "$f.ext" > "$yaml"
   redocly build-docs "$yaml"
   mv redoc-static.html "$out"
-  rm "$yaml"
+  rm "$f.ext" "$yaml"
 done
 
 echo "Done"

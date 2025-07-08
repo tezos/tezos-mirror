@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol alpha RPC",
     "description": "The RPC API for protocol alpha served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (c249b2fa)"
+    "version": "Octez 1111.0~rc2+dev (958bc09e)"
   },
   "paths": {
     "/": {
@@ -2124,6 +2124,10 @@
                     },
                     "counter": {
                       "$ref": "#/components/schemas/positive_bignum"
+                    },
+                    "revealed": {
+                      "description": "field present for implicit account only: true means the manager pk has been revealed",
+                      "type": "boolean"
                     }
                   },
                   "required": [

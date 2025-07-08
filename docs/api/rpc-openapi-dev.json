@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez RPC",
     "description": "The RPC API served by the Octez node.",
-    "version": "Octez 21.0~rc3+dev (c249b2fa)"
+    "version": "Octez 1111.0~rc2+dev (958bc09e)"
   },
   "paths": {
     "/bls/aggregate_proofs": {
@@ -8722,7 +8722,7 @@
     },
     "/protocols": {
       "get": {
-        "description": "(no description)",
+        "description": "the list of protocols supported by the node",
         "responses": {
           "200": {
             "description": "",
@@ -8752,7 +8752,7 @@
     },
     "/protocols/{Protocol_hash}": {
       "get": {
-        "description": "(no description)",
+        "description": "the interface of a protocol grouped by its implementing modules",
         "parameters": [
           {
             "name": "Protocol_hash",
@@ -8821,7 +8821,7 @@
     },
     "/protocols/{Protocol_hash}/environment": {
       "get": {
-        "description": "(no description)",
+        "description": "the protocol environment version required by a protocol",
         "parameters": [
           {
             "name": "Protocol_hash",
