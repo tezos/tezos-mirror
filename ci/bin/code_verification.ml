@@ -1590,6 +1590,17 @@ let jobs pipeline_type =
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
+      let tezt_riscv_slow_sequential : tezos_job =
+        Tezt.job
+          ~__POS__
+          ~name:"tezt-riscv-slow-sequential"
+          ~rules:rules_manual
+          ~tezt_tests:(Tezt_core.TSL_AST.Has_tag "riscv_slow_sequential")
+          ~dependencies
+          ~keep_going
+          ~disable_test_timeout:true
+          ()
+      in
       let tezt_slow : tezos_job =
         Tezt.job
           ~__POS__
@@ -1691,6 +1702,7 @@ let jobs pipeline_type =
         tezt_extra;
         tezt_flaky;
         tezt_static_binaries;
+        tezt_riscv_slow_sequential;
       ]
     in
     let jobs_sdk_rust : tezos_job list =
