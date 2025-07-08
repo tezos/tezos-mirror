@@ -10,6 +10,7 @@ open State
 open Scenario_dsl
 open Log_helpers
 open Scenario_base
+open Scenario_attestation
 
 (** Applies when baking the last block of a cycle *)
 let apply_end_cycle current_cycle previous_block block state :
@@ -215,67 +216,6 @@ let check_issuance_rpc block : unit tzresult Lwt.t =
   in
   return_unit
 
-let attest_all_ previous_block =
-  let open Lwt_result_syntax in
-  fun (block, state) ->
-    let* rights = Plugin.RPC.Attestation_rights.get Block.rpc_ctxt block in
-    let delegates_rights =
-      match rights with
-      | [{level = _; delegates_rights; estimated_time = _}] -> delegates_rights
-      | _ ->
-          (* Cannot happen: RPC called to return only current level,
-             so the returned list should only contain one element. *)
-          assert false
-    in
-    let* dlgs =
-      List.map
-        (fun {
-               Plugin.RPC.Attestation_rights.delegate;
-               consensus_key = _;
-               first_slot;
-               attestation_power;
-             } ->
-          Tezt.Check.(
-            (attestation_power > 0)
-              int
-              ~__LOC__
-              ~error_msg:"Attestation power should be greater than 0, got %L") ;
-          (delegate, first_slot))
-        delegates_rights
-      |> List.filter_es (fun (delegate, _slot) ->
-             let* is_forbidden =
-               Context.Delegate.is_forbidden (B block) delegate
-             in
-             return (not is_forbidden))
-    in
-    let* to_aggregate, ops =
-      List.fold_left_es
-        (fun (to_aggregate, regular) (delegate, slot) ->
-          let* consensus_key_info =
-            Context.Delegate.consensus_key (B previous_block) delegate
-          in
-          let consensus_key = consensus_key_info.active in
-          let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-          let* op =
-            Op.raw_attestation ~delegate:consensus_key.pkh ~slot block
-          in
-          match (state.constants.aggregate_attestation, consensus_key.pk) with
-          | true, Bls _ -> return (op :: to_aggregate, regular)
-          | _ ->
-              return
-                ( to_aggregate,
-                  Protocol.Alpha_context.Operation.pack op :: regular ))
-        ([], [])
-        dlgs
-    in
-    let aggregated = Op.aggregate to_aggregate in
-    let ops = match aggregated with None -> ops | Some x -> x :: ops in
-    let state = State.add_pending_operations ops state in
-    return (block, state)
-
-(* Does not produce a new block *)
-let attest_all previous_block = exec (attest_all_ previous_block)
-
 let check_ai_launch_cycle_is_zero ~loc block =
   let open Lwt_result_syntax in
   let* ai_launch_cycle = Context.get_adaptive_issuance_launch_cycle (B block) in
@@ -296,8 +236,14 @@ let apply_all_pending_operations_ : t_incr -> t_incr tzresult Lwt.t =
 
 (** finalize the payload of the next block. Can start including preattestations. *)
 let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
- fun (block, state) ->
+ fun ((block, state) as input) ->
   let open Lwt_result_wrap_syntax in
+  (* Before going incremental mode, apply the [force_attest_all] *)
+  let* block, state =
+    if Int32.(block.header.shell.level <> zero) && state.force_attest_all then
+      attest_with_all_ input
+    else Lwt_result.return input
+  in
   let policy =
     match baker with
     | None -> state.baking_policy
@@ -375,53 +321,17 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let open Lwt_result_wrap_syntax in
   assert (List.is_empty state.pending_operations) ;
   let* block, block_metadata = Incremental.finalize_block_with_metadata i in
-  let ((_, op_metadata) as metadata) =
-    (block_metadata, List.rev (Incremental.rev_tickets i))
-  in
+  let metadata = (block_metadata, List.rev (Incremental.rev_tickets i)) in
   let previous_block = Incremental.predecessor i in
   let baker = Incremental.delegate i in
-  let baker_name, baker_acc = State.find_account_from_pkh baker.pkh state in
-  (* update baker and attesters activity *)
-  let update_activity delegate_account =
-    Account_helpers.update_activity
-      delegate_account
-      state.constants
-      (Block.current_cycle block)
-  in
-  let* attesters =
-    List.filter_map_es
-      (function
-        | Protocol.Apply_results.No_operation_metadata -> return_none
-        | Operation_metadata {contents} -> (
-            match contents with
-            | Single_result (Attestation_result {delegate; _})
-            | Single_result (Preattestation_result {delegate; _}) ->
-                return_some [delegate]
-            | Single_result (Attestations_aggregate_result {committee; _})
-            | Single_result (Preattestations_aggregate_result {committee; _}) ->
-                return_some
-                  (List.map
-                     (fun ((ck : Protocol.Alpha_context.Consensus_key.t), _) ->
-                       ck.delegate)
-                     committee)
-            | _ -> return_none))
-      op_metadata
-  in
-  let attesters = List.flatten attesters in
+  let baker_name, _ = State.find_account_from_pkh baker.pkh state in
+  (* Update baker activity *)
   let state =
-    State.update_map
-      ~f:(fun acc_map ->
-        let acc_map =
-          String.Map.add baker_name (update_activity baker_acc) acc_map
-        in
-        List.fold_left
-          (fun acc_map delegate_pkh ->
-            let delegate_name, delegate_acc =
-              State.find_account_from_pkh delegate_pkh state
-            in
-            String.Map.add delegate_name (update_activity delegate_acc) acc_map)
-          acc_map
-          attesters)
+    State.update_account_f
+      baker_name
+      (Account_helpers.update_activity
+         state.constants
+         (Block.current_cycle block))
       state
   in
   let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
@@ -447,10 +357,6 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
         (Protocol.Alpha_context.Cycle.to_int32 new_future_current_cycle
         |> Int32.to_int) ;
       return @@ apply_new_cycle new_future_current_cycle state)
-  in
-  let* block, state =
-    if state.force_attest_all then attest_all_ previous_block (block, state)
-    else return (block, state)
   in
   let* () =
     List.iter_es

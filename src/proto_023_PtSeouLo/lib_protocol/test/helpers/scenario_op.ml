@@ -166,17 +166,10 @@ let set_delegate src_name delegate_name_opt : (t, t) scenarios =
       let state =
         (* if self delegating *)
         if Option.equal String.equal delegate_name_opt (Some src_name) then
-          let src = State.find_account src_name state in
           let activity_cycle = current_cycle in
-          State.update_map
-            ~f:(fun acc_map ->
-              String.Map.add
-                src_name
-                (Account_helpers.update_activity
-                   src
-                   state.constants
-                   activity_cycle)
-                acc_map)
+          State.update_account_f
+            src_name
+            (Account_helpers.update_activity state.constants activity_cycle)
             state
         else state
       in

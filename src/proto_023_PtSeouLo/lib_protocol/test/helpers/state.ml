@@ -201,6 +201,17 @@ let update_account (account_name : string) (value : account_state) (state : t) :
   let account_map = String.Map.add account_name value state.account_map in
   {state with account_map}
 
+let update_account_f (account_name : string)
+    (f : account_state -> account_state) (state : t) : t =
+  let f = function
+    | None ->
+        Log.error "State.update_account_f: account %s not found" account_name ;
+        assert false
+    | Some s -> Some (f s)
+  in
+  let account_map = String.Map.update account_name f state.account_map in
+  {state with account_map}
+
 let update_delegate account_name delegate_name_opt state : t =
   let account = find_account account_name state in
   update_account account_name {account with delegate = delegate_name_opt} state
@@ -250,3 +261,9 @@ let pop_pending_operations state =
 
 let add_pending_batch operations state =
   {state with pending_batch = state.pending_batch @ operations}
+
+let add_temp_check check state =
+  {
+    state with
+    check_finalized_block_temp = state.check_finalized_block_temp @ [check];
+  }

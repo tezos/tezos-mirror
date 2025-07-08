@@ -560,7 +560,7 @@ let current_total_frozen_deposits_with_limits account_state =
       account_state.parameters.limit_of_staking_over_baking
     account_state.frozen_deposits
 
-let update_activity account constants current_cycle =
+let update_activity constants current_cycle account =
   match account.last_seen_activity with
   | None ->
       {
