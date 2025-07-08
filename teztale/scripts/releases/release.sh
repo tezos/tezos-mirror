@@ -9,7 +9,7 @@ binaries="$(cat "script-inputs/teztale-experimental-executables")"
 
 # Full release tag
 # teztale-vX.Y
-release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^(teztale|octez)-v([0-9]+)\.([0-9]+))?$' || :)
+release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^(teztale|octez)-v([0-9]+)\.([0-9]+)(-(rc|beta)([0-9]+))?$' || :)
 
 # Strips the leading 'teztale-v'
 # X.Y
