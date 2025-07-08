@@ -317,9 +317,14 @@ let finalize_payload ?payload_round ?baker () : (t, t_incr) scenarios =
   exec (finalize_payload_ ?payload_round ?baker)
 
 let finalize_block_ : t_incr -> t tzresult Lwt.t =
- fun (i, state) ->
+ fun ((_, state) as input) ->
   let open Lwt_result_wrap_syntax in
   assert (List.is_empty state.pending_operations) ;
+  (* Before going finalizing the block, apply the [force_preattest_all] *)
+  let* i, state =
+    if state.force_preattest_all then preattest_with_all_ input
+    else Lwt_result.return input
+  in
   let* block, block_metadata = Incremental.finalize_block_with_metadata i in
   let metadata = (block_metadata, List.rev (Incremental.rev_tickets i)) in
   let previous_block = Incremental.predecessor i in

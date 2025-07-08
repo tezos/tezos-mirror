@@ -38,6 +38,7 @@ type t = {
     (Signature.Public_key_hash.t * Protocol.Denunciations_repr.item) list;
   double_signings : double_signing_state list;
   force_attest_all : bool;
+  force_preattest_all : bool;
   check_finalized_block_perm :
     (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
   check_finalized_block_temp :
