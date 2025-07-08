@@ -148,6 +148,7 @@ fn reveal<Host: Runtime>(
 
     // Set the public key as the manager
     account.set_manager_public_key(host, public_key)?;
+    account.increment_counter(host)?;
 
     log!(host, Debug, "Reveal operation succeed");
 
@@ -253,6 +254,7 @@ pub fn transfer<Host: Runtime>(
         }
     };
 
+    src_account.increment_counter(host)?;
     Ok(Ok(success))
 }
 

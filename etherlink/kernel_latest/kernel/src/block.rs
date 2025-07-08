@@ -1147,7 +1147,7 @@ mod tests {
         // Bootstrap 1 transfer 35 mutez to bootstrap 2
         let transfer = make_transaction_operation(
             0,
-            1,
+            2,
             0,
             0,
             src.clone(),

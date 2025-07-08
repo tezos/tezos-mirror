@@ -138,6 +138,14 @@ impl TezlinkImplicitAccount {
         store_bin(counter, host, &path)
     }
 
+    /// Set the **counter** for the Tezlink account to the successor of the current value.
+    pub fn increment_counter(
+        &mut self,
+        host: &mut impl Runtime,
+    ) -> Result<(), tezos_storage::error::Error> {
+        self.set_counter(host, &Narith(self.counter(host)?.0 + 1u64))
+    }
+
     pub fn manager(
         &self,
         host: &impl Runtime,
