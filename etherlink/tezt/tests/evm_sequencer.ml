@@ -11554,6 +11554,7 @@ let test_estimate_gas_with_block_param =
     ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* gas_consumer = Solidity_contracts.even_block_gas_consumer evm_version in
@@ -11613,6 +11614,7 @@ let test_transaction_object expected_type_ name make_transaction =
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
     ~use_dal:Register_without_feature
+    ~use_revm:activate_revm_registration
     ~title:
       (sf "RPC returns the correct transaction object for %s transactions" name)
   @@ fun {sequencer; _} _protocol ->
@@ -11653,7 +11655,9 @@ let test_eip2930_transaction_object =
        ~chain_id:1337
        ~nonce:0
        ~gas_price:1_000_000_000
-       ~gas:23_300
+         (* BASE_CALL_GAS_COST + 1xACCESS_LIST_ADDRESS_COST + 1xACCESS_LIST_STORAGE_KEY_COST
+            = 21_000 + 2400 + 1900 = 25_300 *)
+       ~gas:25_300
        ~value:Wei.zero
        ~address:Eth_account.bootstrap_accounts.(1).address)
 
@@ -11717,6 +11721,7 @@ let test_tx_queue =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
+    ~use_revm:activate_revm_registration
     ~enable_tx_queue:
       (Config
          {
@@ -11843,6 +11848,7 @@ let test_tx_queue_clear =
     ~use_dal:Register_without_feature
     ~websockets:false
     ~use_multichain:Register_without_feature
+    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {
            client;
@@ -11946,6 +11952,7 @@ let test_tx_queue_nonce =
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
     ~use_multichain:Register_without_feature
+    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
@@ -12245,6 +12252,7 @@ let test_tx_queue_limit =
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
     ~use_multichain:Register_without_feature
+    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
@@ -12723,6 +12731,7 @@ let test_block_producer_validation =
          })
     ~title:"Test part of the validation is done when producing blocks."
     ~use_multichain:Register_without_feature
+    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
