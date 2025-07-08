@@ -46,6 +46,22 @@ type stage = Build | Test | Publish
     - [Artifacts]: download artifacts of the dependency. *)
 type need = Job | Artifacts
 
+(** Configuration of sccache. *)
+type sccache_config
+
+(** Make an sccache configuration.
+
+    See {!Tezos_ci.enable_sccache}. *)
+val sccache :
+  ?key:string ->
+  ?error_log:string ->
+  ?idle_timeout:string ->
+  ?log:string ->
+  ?path:string ->
+  ?cache_size:string ->
+  unit ->
+  sccache_config
+
 (** Pipeline jobs.
 
     Jobs are basically code to run in a given pipeline stage. *)
@@ -161,6 +177,9 @@ module type COMPONENT_API = sig
       If [cargo_cache] is [true], the resulting job is modified with
       {!Tezos_ci.enable_cargo_cache}. Default is [false].
 
+      If [sccache] is specified, the resulting job is modified with
+      {!Tezos_ci.enable_sccache}.
+
       See {!Tezos_ci.job} for information about other arguments. *)
   val job :
     __POS__:string * int * int * int ->
@@ -176,6 +195,7 @@ module type COMPONENT_API = sig
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?tag:Tezos_ci.tag ->
     ?cargo_cache:bool ->
+    ?sccache:sccache_config ->
     string ->
     string list ->
     job
