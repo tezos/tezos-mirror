@@ -39,6 +39,9 @@ type job = {
   name : string;
   stage : stage;
   description : string;
+  arch : Tezos_ci.arch option;
+  cpu : Tezos_ci.cpu option;
+  storage : Tezos_ci.storage option;
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
@@ -299,6 +302,9 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     name;
                     stage;
                     description;
+                    arch;
+                    cpu;
+                    storage;
                     image;
                     needs;
                     needs_legacy;
@@ -357,6 +363,9 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ~name
                 ~stage:(convert_stage stage)
                 ~description
+                ?arch
+                ?cpu
+                ?storage
                 ~image
                 ~dependencies:(Dependent dependencies)
                 ?rules
@@ -407,6 +416,9 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
+    ?arch:Tezos_ci.arch ->
+    ?cpu:Tezos_ci.cpu ->
+    ?storage:Tezos_ci.storage ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
@@ -442,8 +454,9 @@ end
 module Make (Component : COMPONENT) : COMPONENT_API = struct
   let only_if_changed = Tezos_ci.Changeset.make Component.paths
 
-  let job ~__POS__:source_location ~stage ~description ~image ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts ?tag name script =
+  let job ~__POS__:source_location ~stage ~description ?arch ?cpu ?storage
+      ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts ?tag name
+      script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -462,6 +475,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       name;
       stage;
       description;
+      arch;
+      cpu;
+      storage;
       image;
       needs;
       needs_legacy;

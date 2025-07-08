@@ -163,6 +163,9 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
+    ?arch:Tezos_ci.arch ->
+    ?cpu:Tezos_ci.cpu ->
+    ?storage:Tezos_ci.storage ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
