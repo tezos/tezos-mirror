@@ -56,7 +56,12 @@ val register_binary :
   unit ->
   unit Lwt.t
 
-val service_register : name:string -> executable:string -> Agent.t -> unit
+val service_register :
+  name:string ->
+  executable:string ->
+  ?on_alive_callback:(alive:bool -> unit) ->
+  Agent.t ->
+  unit
 
 val notify_service_start : name:string -> pid:int -> unit
 

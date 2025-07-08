@@ -13,10 +13,16 @@ type t
 (** [init] creates a new instance of a service manager *)
 val init : unit -> t
 
-(** [register_service ~executable ~pid t] register a new service with the
-    manager [t].
+(** [register_service ~executable ~pid ~on_alive_callback t] register a new
+    service with the manager [t]. The [on_alive_callback] callback is called
+    regularly with a boolean indicating the daemon state.
     Automatically start the loop on the first service. *)
-val register_service : name:string -> executable:string -> t -> unit
+val register_service :
+  name:string ->
+  executable:string ->
+  ?on_alive_callback:(alive:bool -> unit) ->
+  t ->
+  unit
 
 (** [notify_start_service name pid] notifies service [name] was started with [pid] *)
 val notify_start_service : name:string -> pid:int -> t -> unit

@@ -214,11 +214,22 @@ module Cloud : sig
     unit ->
     unit Lwt.t
 
-  (** [service_register: name executable agent] register a service, ie, a long
-      running background process, that we want to monitor for launch and crash.
+  (** [service_register: name executable on_alive_callback agent] register a
+      service, ie, a long running background process, that we want to monitor
+      for launch and crash.
+      [name] is a unique name to identify the service.
+      [on_alive_callback] is a callback whose argument is a boolean which
+      represent the service started if true, or the service was shutdown if
+      false. This callback is called regularly, and expects to be update some
+      metrics.
       TODO: change arguments executable and pid to a abstraction for tezt Daemon.t
             and merge register_binary functionality into register_service *)
-  val service_register : name:string -> executable:string -> Agent.t -> unit
+  val service_register :
+    name:string ->
+    executable:string ->
+    ?on_alive_callback:(alive:bool -> unit) ->
+    Agent.t ->
+    unit
 
   (** [notify_service_start: name] notify the start of a service *)
   val notify_service_start : name:string -> pid:int -> unit

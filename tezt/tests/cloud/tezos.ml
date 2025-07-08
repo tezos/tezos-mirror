@@ -105,6 +105,24 @@ let create_dir ?runner dir =
   let* () = Process.spawn ?runner "mkdir" ["-p"; dir] |> Process.check in
   Lwt.return_unit
 
+(* See the FIXME below: this should belong to service_manager but
+   requires splitting web in order to avoid dependency cycle *)
+let service_manager_receiver notifier =
+  let open Types in
+  match notifier with
+  | Notifier_null -> Alert.null_receiver
+  | Notifier_slack {name; slack_bot_token; slack_channel_id} ->
+      Alert.slack_bottoken_receiver
+        ~name:(Format.asprintf "%s_service_manager" name)
+        ~channel:slack_channel_id
+        ~bot_token:slack_bot_token
+        ~title:"service_manager: process crashed"
+        ~text:
+          {|{{ range .Alerts }}service_manager: process crashed: {{ .Labels.name }} on agent {{ .Labels.agent }}
+            {{ .Annotations.summary }}
+      {{ end }}|}
+        ()
+
 module Node = struct
   include Tezt_tezos.Node
 
@@ -163,7 +181,47 @@ module Node = struct
       in
       let name = Node.name node in
       let executable = Node.path node in
-      Cloud.service_register ~name ~executable agent ;
+      (* FIXME: The following metric and alert definition should belong to the
+         service_manager module. Unfortunately, for the metrics to be registered,
+         we need to define them in the web module, but this involves a mutual
+         dependency between the service_manager, web, agent and cloud modules.
+         A proper solution might be to split the web module into a backend
+         that serves the metrics and a frontend (not a web frontend), that
+         show information about the different tezt-cloud components *)
+      let metric_name = "service_manager_process_alive" in
+      let receiver = service_manager_receiver (Cloud.notifier cloud) in
+      let alert =
+        Alert.make
+          ~name:"ServiceManagerProcessDown"
+          ~description:
+            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+          ~summary:
+            (Format.asprintf
+               "'[%s.service_manager] the process [%s] is down'"
+               (Agent.name agent)
+               executable)
+          ~route:(Alert.route receiver)
+          ~severity:Alert.Critical
+          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+          ()
+      in
+      let* () = Cloud.add_alert cloud ~alert in
+      let on_alive_callback ~alive =
+        Cloud.push_metric
+          cloud
+          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~typ:`Gauge
+          ~name:metric_name
+          ~labels:
+            [
+              ("agent", Agent.name agent);
+              ("name", name);
+              ("executable", executable);
+              ("kind", "alive");
+            ]
+          (if alive then 1.0 else 0.0)
+      in
+      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
       Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
@@ -243,14 +301,7 @@ module Node = struct
     let terminate ?timeout node =
       let name = name node in
       (* Notify the Service manager. *)
-      let () =
-        match Node.pid node with
-        | None ->
-            Log.error
-              "Cannot update service %s: no pid. Is the program running ?"
-              name
-        | Some pid -> Cloud.notify_service_start ~name ~pid
-      in
+      Cloud.notify_service_stop ~name ;
       terminate ?timeout node
   end
 end
@@ -311,7 +362,40 @@ module Dal_node = struct
       in
       let name = Dal_node.name node in
       let executable = Dal_node.path node in
-      Cloud.service_register ~name ~executable agent ;
+      let metric_name = "service_manager_process_alive" in
+      let receiver = service_manager_receiver (Cloud.notifier cloud) in
+      let on_alive_callback ~alive =
+        Cloud.push_metric
+          cloud
+          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~typ:`Gauge
+          ~name:metric_name
+          ~labels:
+            [
+              ("agent", Agent.name agent);
+              ("name", name);
+              ("executable", executable);
+              ("kind", "alive");
+            ]
+          (if alive then 1.0 else 0.0)
+      in
+      let alert =
+        Alert.make
+          ~name:"ServiceManagerProcessDown"
+          ~description:
+            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+          ~summary:
+            (Format.asprintf
+               "'[%s.service_manager] the process [%s] is down'"
+               (Agent.name agent)
+               executable)
+          ~route:(Alert.route receiver)
+          ~severity:Alert.Critical
+          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+          ()
+      in
+      let* () = Cloud.add_alert cloud ~alert in
+      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
       Lwt.return node
 
     let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs

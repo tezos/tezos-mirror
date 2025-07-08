@@ -224,6 +224,7 @@ let run () =
                let content =
                  if Sys.file_exists file then read_file file else ""
                in
+               Log.report "[WEB] GET /metrics" ;
                let response = Dream.response content in
                Dream.add_header
                  response
