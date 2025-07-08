@@ -30,6 +30,8 @@ pub enum ValidityError {
     CounterInTheFuture(CounterError),
     CantPayFees(Narith),
     EmptyImplicitContract,
+    GasLimitTooHigh,
+    StorageLimitTooHigh,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]

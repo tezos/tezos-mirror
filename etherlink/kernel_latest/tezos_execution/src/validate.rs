@@ -46,6 +46,30 @@ impl TezlinkImplicitAccount {
     }
 }
 
+// Inspired from `check_gas_limit` in `src/proto_alpha/lib_protocol/gas_limit_repr.ml`
+fn check_gas_limit(
+    hard_gas_limit_per_operation: &Narith,
+    gas_limit: &Narith,
+) -> Result<(), ValidityError> {
+    if gas_limit.0 <= hard_gas_limit_per_operation.0 {
+        Ok(())
+    } else {
+        Err(ValidityError::GasLimitTooHigh)
+    }
+}
+
+// Inspired from `check_storage_limit` in `src/proto_alpha/lib_protocol/validate.ml`
+fn check_storage_limit(
+    hard_storage_limit_per_operation: &Narith,
+    storage_limit: &Narith,
+) -> Result<(), ValidityError> {
+    if storage_limit.0 <= hard_storage_limit_per_operation.0 {
+        Ok(())
+    } else {
+        Err(ValidityError::StorageLimitTooHigh)
+    }
+}
+
 pub fn is_valid_tezlink_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
@@ -58,6 +82,18 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
 
     if let Err(err) = account.check_counter_increment(host, &operation.counter)? {
         // Counter verification failed, return the error
+        return Ok(Err(err));
+    }
+
+    // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
+    if let Err(err) = check_gas_limit(&1040000_u64.into(), &operation.gas_limit) {
+        // Gas limit verification failed, return the error
+        return Ok(Err(err));
+    }
+
+    // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
+    if let Err(err) = check_storage_limit(&60000_u64.into(), &operation.storage_limit) {
+        // Storage limit verification failed, return the error
         return Ok(Err(err));
     }
 
