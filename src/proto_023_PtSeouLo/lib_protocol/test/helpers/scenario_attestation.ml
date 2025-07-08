@@ -28,8 +28,8 @@ let string_of_kind = function
 
 (** --- Attestations --- *)
 
-let check_attestation_metadata ~kind delegate_pkh consensus_key_pkh :
-    Block.full_metadata -> t -> unit tzresult Lwt.t =
+let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
+    consensus_key_pkh : Block.full_metadata -> t -> unit tzresult Lwt.t =
  fun (_block_header_metadata, op_metadata) (_block, _state) ->
   let open Lwt_result_syntax in
   Log.debug
@@ -40,105 +40,121 @@ let check_attestation_metadata ~kind delegate_pkh consensus_key_pkh :
     delegate_pkh
     Signature.Public_key_hash.pp
     consensus_key_pkh ;
+  let id_or_not, error_prefix =
+    if check_not_found then (not, "Not expected but found in metadata")
+    else (Fun.id, "Expected but not found in metadata")
+  in
   if
-    List.exists
-      (fun metadata ->
-        match (kind, metadata) with
-        | ( Attestation,
-            Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Attestation_result
-                      {
-                        balance_updates = _;
-                        delegate;
-                        consensus_key;
-                        consensus_power = _;
-                      });
-              } )
-        | ( Preattestation,
-            Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Attestation_result
-                      {
-                        balance_updates = _;
-                        delegate;
-                        consensus_key;
-                        consensus_power = _;
-                      });
-              } ) ->
-            Signature.Public_key_hash.(
-              equal delegate delegate_pkh
-              && equal consensus_key consensus_key_pkh)
-        | _ -> false)
-      op_metadata
+    id_or_not
+    @@ List.exists
+         (fun metadata ->
+           match (kind, metadata) with
+           | ( Attestation,
+               Protocol.Apply_results.Operation_metadata
+                 {
+                   contents =
+                     Single_result
+                       (Attestation_result
+                         {
+                           (* This list is always empty *)
+                           balance_updates = [];
+                           delegate;
+                           consensus_key;
+                           consensus_power = _;
+                         });
+                 } )
+           | ( Preattestation,
+               Protocol.Apply_results.Operation_metadata
+                 {
+                   contents =
+                     Single_result
+                       (Preattestation_result
+                         {
+                           (* This list is always empty *)
+                           balance_updates = [];
+                           delegate;
+                           consensus_key;
+                           consensus_power = _;
+                         });
+                 } ) ->
+               Signature.Public_key_hash.(
+                 equal delegate delegate_pkh
+                 && equal consensus_key consensus_key_pkh)
+           | _ -> false)
+         op_metadata
   then return_unit
   else
     failwith
-      "Expected but not found in metadata: %s for %a (consensus key : %a)"
+      "%s: %s for %a (consensus key : %a)"
+      error_prefix
       (string_of_kind kind)
       Signature.Public_key_hash.pp
       delegate_pkh
       Signature.Public_key_hash.pp
       consensus_key_pkh
 
-let check_attestation_aggregate_metadata ~kind committee_expect :
-    Block.full_metadata -> t -> unit tzresult Lwt.t =
+let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
+    committee_expect : Block.full_metadata -> t -> unit tzresult Lwt.t =
  fun (_block_header_metadata, op_metadata) (_block, _state) ->
   let open Lwt_result_syntax in
   Log.debug ~color:low_debug_color "Check metadata: aggregated attestation" ;
+  let id_or_not, error_prefix =
+    if check_not_found then (not, "Not expected but found in metadata")
+    else (Fun.id, "Expected but not found in metadata")
+  in
   if
-    List.exists
-      (fun metadata ->
-        match (kind, metadata) with
-        | ( Attestation,
-            Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Attestations_aggregate_result
-                      {
-                        balance_updates = _;
-                        committee;
-                        total_consensus_power = _;
-                      });
-              } )
-        | ( Preattestation,
-            Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Preattestations_aggregate_result
-                      {
-                        balance_updates = _;
-                        committee;
-                        total_consensus_power = _;
-                      });
-              } ) ->
-            let committee =
-              List.map
-                (fun ((ck : Protocol.Alpha_context.Consensus_key.t), _) ->
-                  ck.delegate)
-                committee
-              |> List.sort Signature.Public_key_hash.compare
-            in
-            let committee_expect =
-              List.map fst committee_expect
-              |> List.sort Signature.Public_key_hash.compare
-            in
-            List.equal
-              Signature.Public_key_hash.equal
-              committee
-              committee_expect
-        | _ -> false)
-      op_metadata
+    id_or_not
+    @@ List.exists
+         (fun metadata ->
+           match (kind, metadata) with
+           | ( Attestation,
+               Protocol.Apply_results.Operation_metadata
+                 {
+                   contents =
+                     Single_result
+                       (Attestations_aggregate_result
+                         {
+                           (* This list is always empty *)
+                           balance_updates = [];
+                           committee;
+                           total_consensus_power = _;
+                         });
+                 } )
+           | ( Preattestation,
+               Protocol.Apply_results.Operation_metadata
+                 {
+                   contents =
+                     Single_result
+                       (Preattestations_aggregate_result
+                         {
+                           (* This list is always empty *)
+                           balance_updates = [];
+                           committee;
+                           total_consensus_power = _;
+                         });
+                 } ) ->
+               let committee =
+                 List.map
+                   (fun ((ck : Protocol.Alpha_context.Consensus_key.t), _) ->
+                     ck.delegate)
+                   committee
+                 |> List.sort Signature.Public_key_hash.compare
+               in
+               let committee_expect =
+                 List.map fst committee_expect
+                 |> List.sort Signature.Public_key_hash.compare
+               in
+               List.equal
+                 Signature.Public_key_hash.equal
+                 committee
+                 committee_expect
+           | _ -> false)
+         op_metadata
   then return_unit
   else
     failwith
-      "Expected but not found in metadata: %s aggregate for committee@.[%a]"
+      "%s: %s aggregate for committee@.[%a]"
+      error_prefix
       (string_of_kind kind)
       Format.(
         pp_print_list
