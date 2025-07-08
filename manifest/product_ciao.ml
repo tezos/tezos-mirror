@@ -67,7 +67,8 @@ let ci_teztale =
     ~opam:""
     ~path:"teztale/ci"
     ~bisect_ppx:No
-    ~deps:[ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci]
+    ~deps:
+      [ci_lib_gitlab_ci_main |> open_ ~m:"Base"; ci_lib_tezos_ci; ci_lib_cacio]
     ~release_status:Unreleased
 
 let ci_rollup_node =

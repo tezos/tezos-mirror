@@ -104,7 +104,10 @@ let variables : variables =
 (** {3 Components} *)
 
 (* This must be done before registering shared pipelines. *)
+
 let () = Grafazos.register ()
+
+let () = Teztale.register ()
 
 (** {3 General pipelines} *)
 
