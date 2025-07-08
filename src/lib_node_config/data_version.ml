@@ -106,8 +106,6 @@ end
 (* FIXME https://gitlab.com/tezos/tezos/-/issues/2861
    We should enable the semantic versioning instead of applying
    hardcoded rules.*)
-let v_3_0 = Version.make ~major:3 ~minor:0
-
 let v_3_1 = Version.make ~major:3 ~minor:1
 
 let v_3_2 = Version.make ~major:3 ~minor:2
@@ -126,20 +124,11 @@ let current_version = v_3_2
    - we want to deprecate a specific upgrade
 *)
 let upgradable_data_version =
-  let open Lwt_result_syntax in
-  let v_3_1_upgrade ~data_dir genesis =
-    let store_dir = store_dir data_dir in
-    Store.Upgrade.v_3_1_upgrade ~store_dir genesis
-  in
   let v_3_2_upgrade ~data_dir genesis =
     let store_dir = store_dir data_dir in
     Store.Upgrade.v_3_2_upgrade ~store_dir genesis
   in
   [
-    ( v_3_0,
-      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        let* () = v_3_1_upgrade ~data_dir genesis in
-        v_3_2_upgrade ~data_dir genesis );
     ( v_3_1,
       fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
         v_3_2_upgrade ~data_dir genesis );
