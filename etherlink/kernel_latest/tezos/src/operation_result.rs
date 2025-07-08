@@ -34,6 +34,7 @@ pub enum ValidityError {
     EmptyImplicitContract,
     GasLimitTooHigh,
     StorageLimitTooHigh,
+    InvalidSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]

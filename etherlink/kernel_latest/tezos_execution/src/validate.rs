@@ -2,9 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_data_encoding::types::Narith;
+use tezos_crypto_rs::{hash::UnknownSignature, PublicKeySignatureVerifier};
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::{enc::BinError, types::Narith};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
+use tezos_tezlink::enc_wrappers::BlockHash;
+use tezos_tezlink::operation::ManagerOperationContent;
 use tezos_tezlink::{
     operation::{ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
@@ -67,15 +71,44 @@ impl TezlinkImplicitAccount {
 /// However, the purpose of Reveal is to register the public key in the context,
 /// making it a special case. In this case, we obtain the public key
 /// from the operation's payload.
-fn _get_revealed_key<Host: Runtime>(
+fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     content: &OperationContent,
 ) -> Result<Result<PublicKey, ValidityError>, ApplyKernelError> {
     match content {
-        OperationContent::Reveal(RevealContent { pk }) => Ok(Ok(pk.clone())),
+        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(Ok(pk.clone())),
         _ => Ok(account.get_manager_key(host)?),
     }
+}
+
+fn verify_signature(
+    pk: &PublicKey,
+    branch: &BlockHash,
+    operation: &ManagerOperationContent,
+    signature: UnknownSignature,
+) -> Result<bool, BinError> {
+    // Watermark comes from `src/lib_crypto/signature_v2.ml`
+    // The watermark for a ManagerOperation is always `Generic_operation`
+    // encoded with `0x03`
+    let watermark = 3_u8;
+
+    let mut serialized_unsigned_operation = vec![watermark];
+
+    let branch: [u8; 32] = branch.0.to_fixed_bytes();
+    tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
+    operation.bin_write(&mut serialized_unsigned_operation)?;
+
+    let signature = &signature.into();
+
+    // The verify_signature function never returns false. If the verification
+    // is incorrect the function will return an Error and it's up to us to
+    // transform that into a `false` boolean if we want.
+    let check = pk
+        .verify_signature(signature, &serialized_unsigned_operation)
+        .unwrap_or(false);
+
+    Ok(check)
 }
 
 // Inspired from `check_gas_limit` in `src/proto_alpha/lib_protocol/gas_limit_repr.ml`
@@ -105,7 +138,9 @@ fn check_storage_limit(
 pub fn is_valid_tezlink_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
-    operation: &ManagerOperation<OperationContent>,
+    branch: &BlockHash,
+    operation: ManagerOperation<OperationContent>,
+    signature: UnknownSignature,
 ) -> Result<Result<Narith, ValidityError>, ApplyKernelError> {
     // Account must exist in the durable storage
     if !account.allocated(host)? {
@@ -116,6 +151,14 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
         // Counter verification failed, return the error
         return Ok(Err(err));
     }
+
+    let pk = match get_revealed_key(host, account, &operation.operation)? {
+        Err(err) => {
+            // Retrieve public key failed, return the error
+            return Ok(Err(err));
+        }
+        Ok(pk) => pk,
+    };
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     if let Err(err) = check_gas_limit(&1040000_u64.into(), &operation.gas_limit) {
@@ -133,9 +176,15 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     let new_balance = match account.simulate_spending(host, &operation.fee)? {
         Some(new_balance) => new_balance,
         None => {
-            return Ok(Err(ValidityError::CantPayFees(operation.fee.clone())));
+            return Ok(Err(ValidityError::CantPayFees(operation.fee)));
         }
     };
 
-    Ok(Ok(new_balance))
+    let verify = verify_signature(&pk, branch, &operation.into(), signature)?;
+
+    if verify {
+        Ok(Ok(new_balance))
+    } else {
+        Ok(Err(ValidityError::InvalidSignature))
+    }
 }
