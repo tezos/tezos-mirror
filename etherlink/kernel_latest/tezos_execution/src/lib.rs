@@ -314,15 +314,7 @@ pub fn apply_operation<Host: Runtime>(
     context: &context::Context,
     operation: ManagerOperation<OperationContent>,
 ) -> Result<OperationResultSum, ApplyKernelError> {
-    let ManagerOperation {
-        source,
-        fee,
-        counter,
-        gas_limit: _,
-        storage_limit: _,
-        operation: content,
-    } = operation;
-
+    let source = &operation.source;
     log!(
         host,
         Debug,
@@ -330,12 +322,12 @@ pub fn apply_operation<Host: Runtime>(
         source
     );
 
-    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, &source)?;
+    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
 
     log!(host, Debug, "Verifying that the operation is valid");
 
     let validity_result =
-        validate::is_valid_tezlink_operation(host, &account, &fee, &counter)?;
+        validate::is_valid_tezlink_operation(host, &account, &operation)?;
 
     if let Err(validity_err) = validity_result {
         log!(host, Debug, "Operation is invalid, exiting apply_operation");
@@ -348,9 +340,9 @@ pub fn apply_operation<Host: Runtime>(
 
     log!(host, Debug, "Operation is valid");
 
-    let receipt = match content {
+    let receipt = match operation.operation {
         OperationContent::Reveal(RevealContent { pk }) => {
-            let reveal_result = reveal(host, &source, &mut account, &pk)?;
+            let reveal_result = reveal(host, source, &mut account, &pk)?;
             let manager_result = produce_operation_result(reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
@@ -360,7 +352,7 @@ pub fn apply_operation<Host: Runtime>(
             parameters,
         }) => {
             let transfer_result =
-                transfer(host, context, &source, &amount, &destination, &parameters)?;
+                transfer(host, context, source, &amount, &destination, &parameters)?;
             let manager_result = produce_operation_result(transfer_result);
             OperationResultSum::Transfer(manager_result)
         }

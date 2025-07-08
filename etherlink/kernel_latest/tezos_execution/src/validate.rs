@@ -2,19 +2,22 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_data_encoding::types::Narith;
+use tezos_evm_runtime::runtime::Runtime;
+use tezos_tezlink::{
+    operation::{ManagerOperation, OperationContent},
+    operation_result::ValidityError,
+};
+
 use crate::{
     account_storage::{TezlinkAccount, TezlinkImplicitAccount},
     ApplyKernelError,
 };
-use tezos_data_encoding::types::Narith;
-use tezos_evm_runtime::runtime::Runtime;
-use tezos_tezlink::operation_result::ValidityError;
 
 pub fn is_valid_tezlink_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
-    fee: &Narith,
-    expected_counter: &Narith,
+    operation: &ManagerOperation<OperationContent>,
 ) -> Result<Result<(), ValidityError>, ApplyKernelError> {
     // Account must exist in the durable storage
     if !account.allocated(host)? {
@@ -25,7 +28,7 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     // TODO: account balance should not be stored as U256
     let balance = account.balance(host)?;
 
-    if balance.0 < fee.0 {
+    if balance.0 < operation.fee.0 {
         return Ok(Err(ValidityError::CantPayFees(balance)));
     }
 
@@ -34,7 +37,7 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     // The provided counter value must be the successor of the manager's counter.
     let succ_counter = Narith(&previous_counter.0 + 1_u64);
 
-    if &succ_counter != expected_counter {
+    if succ_counter != operation.counter {
         return Ok(Err(ValidityError::InvalidCounter(previous_counter)));
     }
 
