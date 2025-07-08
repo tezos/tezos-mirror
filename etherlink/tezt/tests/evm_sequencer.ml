@@ -2050,6 +2050,7 @@ let test_fa_withdrawal_is_included =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;

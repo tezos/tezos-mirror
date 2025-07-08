@@ -605,8 +605,8 @@ mod test {
     #[ignore]
     fn create_withdrawal_contract() {
         // TODO: Automate this
-        // This contract sole purpose is generating the result of a CREATE operation
-        // Do not remove `#[ignore]`
+        // This test sole purpose is generating the result of a CREATE operation
+        // Currently used as a script, do not remove `#[ignore]`
 
         let mut host = MockKernelHost::default();
         let mut world_state_handler = new_world_state_handler().unwrap();
@@ -617,8 +617,11 @@ mod test {
         // $ forge build etherlink/kernel_latest/revm/contracts/withdrawal.sol --out etherlink/kernel_latest/revm/contracts/out
 
         // Read compiled XTZWithdrawal
-        let file =
+        let _file =
             std::fs::read_to_string("contracts/out/withdrawal.sol/XTZWithdrawal.json")
+                .unwrap();
+        let file =
+            std::fs::read_to_string("contracts/out/fa_withdrawal.sol/FAWithdrawal.json")
                 .unwrap();
         let json: Value = serde_json::from_str(&file).unwrap();
         let hex = json["bytecode"]["object"].as_str().unwrap();
