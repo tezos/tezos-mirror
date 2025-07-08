@@ -540,15 +540,7 @@ let test_attestations_aggregate_non_bls_delegate () =
       ~predecessor:block
       operation
   in
-  let dal_contents_to_test =
-    [
-      None;
-      Some Alpha_context.{attestation = Dal.Attestation.empty};
-      Some (Dal_helpers.dal_content_of_int ~loc:__LOC__ 1);
-      Some (Dal_helpers.dal_content_of_int ~loc:__LOC__ 255);
-    ]
-  in
-  List.iter_es check_non_bls_aggregate_refused dal_contents_to_test
+  List.iter_es check_non_bls_aggregate_refused Dal_helpers.various_dal_contents
 
 let test_multiple_aggregates_per_block_forbidden () =
   let open Lwt_result_syntax in

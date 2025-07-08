@@ -319,3 +319,52 @@ let dal_content_of_int ~loc n =
       (Alpha_context.Dal.Attestation.Internal_for_tests.of_z (Z.of_int n))
   in
   Alpha_context.{attestation}
+
+let dal_content_of_int_list
+    ?(number_of_slots = Default_parameters.constants_test.dal.number_of_slots)
+    attested_slots =
+  let open Alpha_context in
+  let dal_attestation =
+    List.fold_left
+      (fun dal_attestation slot ->
+        match Dal.Slot_index.of_int ~number_of_slots slot with
+        | Ok slot_index -> Dal.Attestation.commit dal_attestation slot_index
+        | Error err ->
+            Test.fail ~__LOC__ "%a" Environment.Error_monad.pp_trace err)
+      Dal.Attestation.empty
+      attested_slots
+  in
+  {attestation = dal_attestation}
+
+let various_dal_contents =
+  let number_of_slots = Default_parameters.constants_test.dal.number_of_slots in
+  None
+  :: List.map
+       (fun l -> Some (dal_content_of_int_list ~number_of_slots l))
+       [[]; [0]; [1; 3]; Misc.(0 --> (number_of_slots - 1))]
+
+(* Associates each committee member with an element of
+   dal_content_list in order, going back to the beginning of
+   dal_content_list if dal_content_list is shorter. In other words,
+   the member at position i in committee receives the dal_content in
+   dal_content_list at position (i modulo (length of
+   dal_content_list)). *)
+let committee_with_cycling_dal_contents
+    (dal_content_list : Alpha_context.dal_content option list)
+    (committee : 'a list) : ('a * Alpha_context.dal_content option) list =
+  let rec aux acc remaining_dal_contents_to_pick committee =
+    match (committee, remaining_dal_contents_to_pick) with
+    | [], _ -> List.rev acc
+    | _, [] ->
+        (* We have gone through the whole dal_content_list and there
+           are still committee members waiting to receive a dal
+           content: reset remaining_dal_contents_to_pick to
+           dal_content_list. *)
+        aux acc dal_content_list committee
+    | member :: rest_committee, dal :: rest_dal ->
+        aux ((member, dal) :: acc) rest_dal rest_committee
+  in
+  aux [] dal_content_list committee
+
+let committee_with_various_dal_contents committee =
+  committee_with_cycling_dal_contents various_dal_contents committee
