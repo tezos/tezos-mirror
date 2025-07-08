@@ -9,10 +9,7 @@ use tezos_tezlink::{
     operation_result::{CounterError, ValidityError},
 };
 
-use crate::{
-    account_storage::{TezlinkAccount, TezlinkImplicitAccount},
-    ApplyKernelError,
-};
+use crate::{account_storage::TezlinkImplicitAccount, ApplyKernelError};
 
 impl TezlinkImplicitAccount {
     /// Inspired from `contract_storage.ml` in the Tezos protocol
@@ -98,12 +95,12 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     }
 
     // The manager account must be solvent to pay the announced fees.
-    // TODO: account balance should not be stored as U256
-    let balance = account.balance(host)?;
-
-    if balance.0 < operation.fee.0 {
-        return Ok(Err(ValidityError::CantPayFees(balance)));
-    }
+    let _new_balance = match account.simulate_spending(host, &operation.fee)? {
+        Some(new_balance) => new_balance,
+        None => {
+            return Ok(Err(ValidityError::CantPayFees(operation.fee.clone())));
+        }
+    };
 
     Ok(Ok(()))
 }

@@ -548,7 +548,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::CantPayFees(50_u64.into()),
+                ValidityError::CantPayFees(100_u64.into()),
             )]),
             internal_operation_results: vec![],
         });
