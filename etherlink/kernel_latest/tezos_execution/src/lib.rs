@@ -24,7 +24,7 @@ use tezos_tezlink::{
     operation_result::{
         produce_operation_result, Balance, BalanceUpdate, OperationError,
         OperationResultSum, Reveal, RevealError, RevealSuccess, TransferError,
-        TransferSuccess, ValidityError,
+        TransferSuccess,
     },
 };
 use thiserror::Error;
@@ -32,6 +32,7 @@ use thiserror::Error;
 extern crate alloc;
 pub mod account_storage;
 pub mod context;
+mod validate;
 
 type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
 
@@ -86,37 +87,6 @@ impl From<mir::typechecker::TcError> for ApplyKernelError {
     fn from(err: mir::typechecker::TcError) -> Self {
         Self::MirTypecheckingError(err.to_string())
     }
-}
-
-fn is_valid_tezlink_operation<Host: Runtime>(
-    host: &Host,
-    account: &TezlinkImplicitAccount,
-    fee: &Narith,
-    expected_counter: &Narith,
-) -> Result<Result<(), ValidityError>, ApplyKernelError> {
-    // Account must exist in the durable storage
-    if !account.allocated(host)? {
-        return Ok(Err(ValidityError::EmptyImplicitContract));
-    }
-
-    // The manager account must be solvent to pay the announced fees.
-    // TODO: account balance should not be stored as U256
-    let balance = account.balance(host)?;
-
-    if balance.0 < fee.0 {
-        return Ok(Err(ValidityError::CantPayFees(balance)));
-    }
-
-    let previous_counter = account.counter(host)?;
-
-    // The provided counter value must be the successor of the manager's counter.
-    let succ_counter = Narith(&previous_counter.0 + 1_u64);
-
-    if &succ_counter != expected_counter {
-        return Ok(Err(ValidityError::InvalidCounter(previous_counter)));
-    }
-
-    Ok(Ok(()))
 }
 
 fn reveal<Host: Runtime>(
@@ -364,7 +334,8 @@ pub fn apply_operation<Host: Runtime>(
 
     log!(host, Debug, "Verifying that the operation is valid");
 
-    let validity_result = is_valid_tezlink_operation(host, &account, &fee, &counter)?;
+    let validity_result =
+        validate::is_valid_tezlink_operation(host, &account, &fee, &counter)?;
 
     if let Err(validity_err) = validity_result {
         log!(host, Debug, "Operation is invalid, exiting apply_operation");
@@ -415,13 +386,13 @@ mod tests {
         operation_result::{
             Balance, BalanceTooLow, BalanceUpdate, ContentResult, OperationResult,
             OperationResultSum, RevealError, RevealSuccess, TransferError,
-            TransferSuccess, TransferTarget, UpdateOrigin,
+            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        apply_operation, context, OperationError, ValidityError,
+        apply_operation, context, OperationError,
     };
 
     const BOOTSTRAP_1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
