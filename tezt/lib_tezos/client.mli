@@ -840,11 +840,21 @@ val spawn_list_known_remote_keys : t -> Uri.t -> Process.t
 val spawn_set_consensus_key :
   ?wait:string -> t -> account:string -> key:string -> Process.t
 
+type key_encryption =
+  | Encrypted of string
+  | Forced_encrypted of string
+  | Forced_unencrypted
+
 (** Run [octez-client gen keys] and return the key alias.
 
     The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
 val gen_keys :
-  ?force:bool -> ?alias:string -> ?sig_alg:string -> t -> string Lwt.t
+  ?force:bool ->
+  ?alias:string ->
+  ?sig_alg:string ->
+  ?key_encryption:key_encryption ->
+  t ->
+  string Lwt.t
 
 (** A helper to run [octez-client gen keys] followed by
     [octez-client show address] to get the generated key. *)

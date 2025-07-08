@@ -385,6 +385,18 @@ let commands network : Client_context.full Tezos_clic.command list =
     then Tezos_clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
     else Tezos_clic.constant true
   in
+  let unencrypted_switch () =
+    if
+      List.exists
+        (fun (scheme, _) -> scheme = Tezos_signer_backends.Unencrypted.scheme)
+        (Client_keys.registered_signers ())
+    then
+      Tezos_clic.switch
+        ~long:"unencrypted"
+        ~doc:"Store the secret key unencrypted on-disk"
+        ()
+    else Tezos_clic.constant false
+  in
   let show_private_switch =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
   in
@@ -428,16 +440,24 @@ let commands network : Client_context.full Tezos_clic.command list =
         command
           ~group
           ~desc:"Generate a pair of keys."
-          (args2 (Secret_key.force_switch ()) sig_algo_arg)
+          (args3
+             (Secret_key.force_switch ())
+             sig_algo_arg
+             (unencrypted_switch ()))
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
-          (fun (force, algo) name (cctxt : Client_context.full) ->
+          (fun (force, algo, unencrypted) name (cctxt : Client_context.full) ->
             let* name =
               Secret_key.of_fresh ~show_existing_key:false cctxt force name
             in
             let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
-              Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
+              if unencrypted then
+                Lwt.return (Tezos_signer_backends.Unencrypted.make_sk sk)
+              else
+                Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt
+                  cctxt
+                  sk
             in
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
     | Some `Testnet | None ->

@@ -1104,9 +1104,72 @@ module Account_activation = struct
   let register protocols = test_activate_accounts protocols
 end
 
+module Gen_keys = struct
+  let test_gen_keys_mainnet =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test gen keys on mainnet setup"
+      ~tags:[team; "client"; "gen"; "keys"; "mainnet"]
+    @@ fun _protocol ->
+    let* _node, client =
+      Client.init_with_node
+        ~nodes_args:[Network "mainnet"; Private_mode]
+        `Client
+        ()
+    in
+    Log.info "Generating an encrypted key" ;
+    let* alias = Client.gen_keys ~key_encryption:(Encrypted "pwd") client in
+    let* account = Client.show_address ~alias client in
+    let* () =
+      match account.Account.secret_key with
+      | Encrypted _ -> unit
+      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+    in
+    Log.info "Generating an unencrypted key (need to add --unencrypted)" ;
+    let* alias = Client.gen_keys ~key_encryption:Forced_unencrypted client in
+    let* account = Client.show_address ~alias client in
+    match account.Account.secret_key with
+    | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
+    | Unencrypted _ -> unit
+
+  let test_gen_keys_testnet =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test gen keys on testnet setup"
+      ~tags:[team; "client"; "gen"; "keys"; "testnet"]
+    @@ fun _protocol ->
+    let* _node, client =
+      Client.init_with_node
+        ~nodes_args:[Network "ghostnet"; Private_mode]
+        `Client
+        ()
+    in
+    Log.info "Generating an encrypted key (need to add --encrypted)" ;
+    let* alias =
+      Client.gen_keys ~key_encryption:(Forced_encrypted "pwd") client
+    in
+    let* account = Client.show_address ~alias client in
+    let* () =
+      match account.Account.secret_key with
+      | Encrypted _ -> unit
+      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+    in
+    Log.info "Generating an unencrypted key (default)" ;
+    let* alias = Client.gen_keys client in
+    let* account = Client.show_address ~alias client in
+    match account.Account.secret_key with
+    | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
+    | Unencrypted _ -> unit
+
+  let register protocols =
+    test_gen_keys_mainnet protocols ;
+    test_gen_keys_testnet protocols
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols ;
   Signatures.register protocols ;
-  Account_activation.register protocols
+  Account_activation.register protocols ;
+  Gen_keys.register protocols

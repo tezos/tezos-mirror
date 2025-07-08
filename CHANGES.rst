@@ -119,6 +119,10 @@ Client
 - Add a new command ``update delegate parameters`` that allows to change either
   one or both of the staking parameters of a delegate. (MR :gl:`!17472`)
 
+- Added ``--unencrypted`` argument for ``gen keys`` command. By default keys are
+  encrypted on mainnet, this argument allow users to explicitly create
+  unencrypted keys. (MR :gl:`!18601`)
+
 Signer
 ------
 

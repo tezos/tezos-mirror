@@ -8,7 +8,7 @@ However, these solutions are **not** enabled by default, so you have to turn the
 
 Indeed, by default:
 
-- Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
+- Private keys are stored in ``$OCTEZ_CLIENT_DIR/secret_keys``. Keys generated with ``octez-client`` are stored encrypted by default for Tezos ``mainnet``, whereas they are unencrypted by default for test networks.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
 - The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
 - The baker's own key is used to sign consensus operations and :doc:`DAL <../shell/dal>` attestations.
@@ -21,7 +21,7 @@ The solutions provided to strengthen the security of the default key management 
   + sign user operations (e.g. transfers) interactively on the wallet
   + automatically sign baking operations, such as (pre-)attestations, more securely.
 
-- If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
+- Using option ``--encrypted`` to encrypt the keys when using a testnet (this is the default on mainnet, where you must use option ``--unencrypted`` to force unencrypted keys.)
 
 - A separate signer daemon allows to decouple the client and baker from the signing process.
 
