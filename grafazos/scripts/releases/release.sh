@@ -5,7 +5,7 @@
 
 # Full release tag
 # grafazos-vX.Y
-release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^(grafazos|octez)-v([0-9]+)\.([0-9]+)$' || :)
+release=$(echo "${CI_COMMIT_TAG}" | grep -oE '^(grafazos|octez)-v([0-9]+)\.([0-9]+)(-(rc|beta)([0-9]+))?$' || :)
 
 # Strips the leading 'grafazos-v'
 # X.Y
