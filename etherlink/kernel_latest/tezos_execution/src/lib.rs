@@ -228,6 +228,32 @@ pub fn transfer<Host: Runtime>(
     Ok(Ok(success))
 }
 
+/// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
+fn compute_fees_balance_updates(
+    source: &PublicKeyHash,
+    amount: &Narith,
+) -> Result<
+    (BalanceUpdate, BalanceUpdate),
+    num_bigint::TryFromBigIntError<num_bigint::BigInt>,
+> {
+    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
+    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
+
+    let src_update = BalanceUpdate {
+        balance: Balance::Account(Contract::Implicit(source.clone())),
+        changes: source_delta.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    let block_fees = BalanceUpdate {
+        balance: Balance::BlockFees,
+        changes: block_fees.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    Ok((src_update, block_fees))
+}
+
 /// Prepares balance updates in the format expected by the Tezos operation.
 fn compute_balance_updates(
     src: &Contract,
@@ -334,9 +360,10 @@ pub fn apply_operation<Host: Runtime>(
         Err(validity_err) => {
             log!(host, Debug, "Operation is invalid, exiting apply_operation");
             // TODO: Don't force the receipt to a reveal receipt
-            let receipt = produce_operation_result::<Reveal>(Err(
-                OperationError::Validation(validity_err),
-            ));
+            let receipt = produce_operation_result::<Reveal>(
+                vec![],
+                Err(OperationError::Validation(validity_err)),
+            );
             return Ok(OperationResultSum::Reveal(receipt));
         }
     };
@@ -346,10 +373,14 @@ pub fn apply_operation<Host: Runtime>(
     log!(host, Debug, "Updates balance to pay fees");
     account.set_balance(host, &new_balance)?;
 
+    let (src_delta, block_fees) = compute_fees_balance_updates(source, &operation.fee)
+        .map_err(ApplyKernelError::BigIntError)?;
+
     let receipt = match operation.operation {
         OperationContent::Reveal(RevealContent { pk }) => {
             let reveal_result = reveal(host, source, &mut account, &pk)?;
-            let manager_result = produce_operation_result(reveal_result);
+            let manager_result =
+                produce_operation_result(vec![src_delta, block_fees], reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
         OperationContent::Transfer(TransferContent {
@@ -359,7 +390,8 @@ pub fn apply_operation<Host: Runtime>(
         }) => {
             let transfer_result =
                 transfer(host, context, source, &amount, &destination, &parameters)?;
-            let manager_result = produce_operation_result(transfer_result);
+            let manager_result =
+                produce_operation_result(vec![src_delta, block_fees], transfer_result);
             OperationResultSum::Transfer(manager_result)
         }
     };
@@ -623,7 +655,7 @@ mod tests {
             .expect("Setting manager field should have succeed");
 
         // Applying the operation
-        let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
+        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk.clone());
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
@@ -633,7 +665,18 @@ mod tests {
 
         // Reveal operation should fail
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::PreviouslyRevealedKey(pk).into(),
             )]),
@@ -667,7 +710,7 @@ mod tests {
         )
         .expect("Public key creation should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
+        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk);
 
         let receipt = apply_operation(
             &mut host,
@@ -677,7 +720,18 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::InconsistentHash(inconsistent_pkh).into(),
             )]),
@@ -714,7 +768,18 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.clone())),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Failed(vec![OperationError::Apply(
                 RevealError::InconsistentPublicKey(src).into(),
             )]),
@@ -745,7 +810,7 @@ mod tests {
         )
         .expect("Public key creation should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, src, pk.clone());
+        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk.clone());
 
         let receipt = apply_operation(
             &mut host,
@@ -755,7 +820,18 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Applied(RevealSuccess {
                 consumed_gas: 0_u64.into(),
             }),
@@ -791,7 +867,7 @@ mod tests {
             1,
             4,
             5,
-            src,
+            src.clone(),
             100_u64.into(),
             Contract::Implicit(dest),
             None,
@@ -805,7 +881,18 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Failed(vec![OperationError::Apply(
                 TransferError::BalanceTooLow(BalanceTooLow {
                     contract: Contract::from_b58check(BOOTSTRAP_1).unwrap(),
@@ -844,7 +931,7 @@ mod tests {
             1,
             4,
             5,
-            src,
+            src.clone(),
             30_u64.into(),
             Contract::Implicit(dest),
             None,
@@ -858,7 +945,18 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
                 lazy_storage_diff: None,
@@ -927,7 +1025,20 @@ mod tests {
         .expect("apply_operation should not have failed with a kernel error");
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
-            balance_updates: vec![],
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(
+                        Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                    ),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
             result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
                 storage: None,
                 lazy_storage_diff: None,
@@ -957,8 +1068,8 @@ mod tests {
             internal_operation_results: vec![],
         });
 
-        // Verify that balance did not change
-        assert_eq!(source.balance(&host).unwrap(), 50_u64.into());
+        // Verify that balance was only debited for fees
+        assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
     }
