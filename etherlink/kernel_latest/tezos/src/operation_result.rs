@@ -217,7 +217,7 @@ pub struct TransferSuccess {
     pub paid_storage_size_diff: Narith,
     pub allocated_destination_contract: bool,
     // TODO: Placeholder for lazy storage diff issue : #8018
-    pub lazy_storage_diff: Option<Empty>,
+    pub lazy_storage_diff: Option<()>,
 }
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
