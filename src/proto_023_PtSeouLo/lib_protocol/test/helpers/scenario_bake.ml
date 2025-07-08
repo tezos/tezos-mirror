@@ -313,6 +313,11 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
         in
         Some (Block.By_account pkh)
   in
+  let payload_round =
+    match payload_round with
+    | Some _ -> payload_round
+    | None -> state.payload_round
+  in
   let* baker, _, _, _ = Block.get_next_baker ?policy block in
   let baker_name, {contract = baker_contract; _} =
     State.find_account_from_pkh baker state
