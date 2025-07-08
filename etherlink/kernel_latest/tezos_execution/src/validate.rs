@@ -71,7 +71,7 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     operation: &ManagerOperation<OperationContent>,
-) -> Result<Result<(), ValidityError>, ApplyKernelError> {
+) -> Result<Result<Narith, ValidityError>, ApplyKernelError> {
     // Account must exist in the durable storage
     if !account.allocated(host)? {
         return Ok(Err(ValidityError::EmptyImplicitContract));
@@ -95,12 +95,12 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     }
 
     // The manager account must be solvent to pay the announced fees.
-    let _new_balance = match account.simulate_spending(host, &operation.fee)? {
+    let new_balance = match account.simulate_spending(host, &operation.fee)? {
         Some(new_balance) => new_balance,
         None => {
             return Ok(Err(ValidityError::CantPayFees(operation.fee.clone())));
         }
     };
 
-    Ok(Ok(()))
+    Ok(Ok(new_balance))
 }

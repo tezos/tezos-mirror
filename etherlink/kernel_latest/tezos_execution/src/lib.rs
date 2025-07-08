@@ -329,16 +329,22 @@ pub fn apply_operation<Host: Runtime>(
     let validity_result =
         validate::is_valid_tezlink_operation(host, &account, &operation)?;
 
-    if let Err(validity_err) = validity_result {
-        log!(host, Debug, "Operation is invalid, exiting apply_operation");
-        // TODO: Don't force the receipt to a reveal receipt
-        let receipt = produce_operation_result::<Reveal>(Err(
-            OperationError::Validation(validity_err),
-        ));
-        return Ok(OperationResultSum::Reveal(receipt));
-    }
+    let new_balance = match validity_result {
+        Ok(new_balance) => new_balance,
+        Err(validity_err) => {
+            log!(host, Debug, "Operation is invalid, exiting apply_operation");
+            // TODO: Don't force the receipt to a reveal receipt
+            let receipt = produce_operation_result::<Reveal>(Err(
+                OperationError::Validation(validity_err),
+            ));
+            return Ok(OperationResultSum::Reveal(receipt));
+        }
+    };
 
     log!(host, Debug, "Operation is valid");
+
+    log!(host, Debug, "Updates balance to pay fees");
+    account.set_balance(host, &new_balance)?;
 
     let receipt = match operation.operation {
         OperationContent::Reveal(RevealContent { pk }) => {
@@ -803,7 +809,7 @@ mod tests {
             result: ContentResult::Failed(vec![OperationError::Apply(
                 TransferError::BalanceTooLow(BalanceTooLow {
                     contract: Contract::from_b58check(BOOTSTRAP_1).unwrap(),
-                    balance: 50_u64.into(),
+                    balance: 35_u64.into(),
                     amount: 100_u64.into(),
                 })
                 .into(),
@@ -811,8 +817,8 @@ mod tests {
             internal_operation_results: vec![],
         });
 
-        // Verify that source and destination balances are unchanged
-        assert_eq!(source.balance(&host).unwrap(), 50_u64.into());
+        // Verify that source only paid the fees and the destination balance is unchanged
+        assert_eq!(source.balance(&host).unwrap(), 35.into());
         assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
@@ -883,7 +889,7 @@ mod tests {
         });
 
         // Verify that source and destination balances changed
-        assert_eq!(source.balance(&host).unwrap(), 20_u64.into());
+        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
         assert_eq!(receipt, expected_receipt);
