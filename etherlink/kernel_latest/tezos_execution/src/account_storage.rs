@@ -191,15 +191,6 @@ impl TezlinkImplicitAccount {
         Ok(())
     }
 
-    /// Verify if an account is allocated by attempting to read its balance
-    pub fn allocated(
-        &self,
-        host: &impl Runtime,
-    ) -> Result<bool, tezos_storage::error::Error> {
-        let path = concat(&self.path, &BALANCE_PATH)?;
-        Ok(Some(ValueType::Value) == host.store_has(&path)?)
-    }
-
     /// Allocate an account in the durable storage. Does nothing if account was
     /// already allocated.
     pub fn allocate(
@@ -219,6 +210,17 @@ impl TezlinkImplicitAccount {
             account.set_manager_public_key_hash(host, pkh)?;
         }
         Ok(false)
+    }
+
+    // Below this comment is multiple functions useful for validate an operation
+
+    /// Verify if an account is allocated by attempting to read its balance
+    pub fn allocated(
+        &self,
+        host: &impl Runtime,
+    ) -> Result<bool, tezos_storage::error::Error> {
+        let path = concat(&self.path, &BALANCE_PATH)?;
+        Ok(Some(ValueType::Value) == host.store_has(&path)?)
     }
 }
 

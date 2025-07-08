@@ -19,8 +19,15 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use crate::operation::ManagerOperationContent;
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+pub struct CounterError {
+    pub expected: Narith,
+    pub found: Narith,
+}
+
+#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ValidityError {
-    InvalidCounter(Narith),
+    CounterInThePast(CounterError),
+    CounterInTheFuture(CounterError),
     CantPayFees(Narith),
     EmptyImplicitContract,
 }

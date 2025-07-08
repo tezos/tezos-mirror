@@ -376,9 +376,9 @@ mod tests {
             TransferContent,
         },
         operation_result::{
-            Balance, BalanceTooLow, BalanceUpdate, ContentResult, OperationResult,
-            OperationResultSum, RevealError, RevealSuccess, TransferError,
-            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            Balance, BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
+            OperationResult, OperationResultSum, RevealError, RevealSuccess,
+            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -584,7 +584,10 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::InvalidCounter(0_u64.into()),
+                ValidityError::CounterInTheFuture(CounterError {
+                    expected: 1_u64.into(),
+                    found: 15_u64.into(),
+                }),
             )]),
             internal_operation_results: vec![],
         });
