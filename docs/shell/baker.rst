@@ -61,3 +61,28 @@ time, so the block can be submitted exactly at the scheduled time.
 Once injected, the block is validated by the node and propagated through the
 network. Other bakers then begin the attestation process for a new block,
 continuing the cycle of consensus.
+
+Support for ``tz4`` (BLS) Keys
+------------------------------
+
+Tezos supports the use of :ref:`tz4 keys <tz4_accounts>` using BLS cryptography (starting with protocol Seoul) as consensus keys for delegates. This enables (pre)attestation aggregation, a feature that significantly improves efficiency by allowing many (pre)attestations to be compressed into a single operation within blocks.
+
+BLS (Boneh–Lynn–Shacham) signatures have the unique property that multiple signatures over the same payload can be aggregated into a single signature. This makes them ideal for consensus, where many bakers attest to the same block. However, for this to work efficiently, all (pre)attestations must have identical payloads.
+
+This becomes a challenge when DAL (Data Availability Layer) data is involved. DAL attestations are included as part of the regular Layer 1 attestation operation, and the set of DAL slots attested to is different for each delegate. This means the payloads differ, which prevents simple BLS aggregation.
+
+The Role of the Companion Key
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To enable aggregation even when DAL slot data is included, a separate :ref:`companion_key` is used (introduced in protocol Seoul):
+
+- This is a second BLS key, separate from the consensus key.
+
+- The consensus key signs the common part of the attestation (the block reference and quorum vote).
+
+- The companion key signs the delegate-specific DAL payload (the set of DAL slots being attested).
+
+Both signatures, one from the consensus key and one from the companion key, are
+aggregated and included in the attestation.
+When a baker produces the next block, they aggregate all ``tz4`` attestations
+(including both already aggregated signatures) into a single aggregated attestation.
