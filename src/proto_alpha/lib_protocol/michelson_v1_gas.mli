@@ -357,6 +357,8 @@ module Cost_of : sig
 
     val is_implicit_account : Gas.cost
 
+    val index_address : Gas.cost
+
     val create_contract : Gas.cost
 
     val set_delegate : Gas.cost

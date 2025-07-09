@@ -117,6 +117,8 @@ type error += Cannot_serialize_storage
 
 type error += Michelson_too_many_recursive_calls
 
+type error += Address_registry_invalid_counter
+
 let () =
   let open Data_encoding in
   let trace_encoding : Script_typed_ir.execution_trace encoding =
@@ -193,7 +195,17 @@ let () =
       "The returned storage was too big to be serialized with the provided gas"
     Data_encoding.empty
     (function Cannot_serialize_storage -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_storage)
+    (fun () -> Cannot_serialize_storage) ;
+  (* Registry returns a negative counter *)
+  register_error_kind
+    `Temporary
+    ~id:"michelson_v1.address_registry_invalid_counterg"
+    ~title:"Address registry returned counter is invalid."
+    ~description:
+      "The returned counter for the given address in the registry is negative."
+    Data_encoding.empty
+    (function Address_registry_invalid_counter -> Some () | _ -> None)
+    (fun () -> Address_registry_invalid_counter)
 
 (*
 
@@ -1278,6 +1290,24 @@ module Raw = struct
                 | _ -> None
               in
               (step [@ocaml.tailcall]) g gas k ks res stack
+          | IIndex_address (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                let* ctxt, res =
+                  Script_address_registry.index ctxt address.destination
+                in
+                return (res, ctxt)
+              in
+              let*? res =
+                match Script_int.is_nat (Script_int.of_zint res) with
+                (* Note that this case is impossible, as the counter is handled
+                   by the protocol. If the counter is negative, this implies the
+                   protocol code is broken. *)
+                | None -> Result_syntax.tzfail Address_registry_invalid_counter
+                | Some n -> ok n
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id
