@@ -158,29 +158,6 @@ let processing_lockfile_path ~data_dir =
 
 let gc_lockfile_path ~data_dir = Filename.concat data_dir "gc_lock"
 
-let make_kernel_logger event ?log_kernel_debug_file logs_dir =
-  let open Lwt_syntax in
-  let path =
-    match log_kernel_debug_file with
-    | None -> Filename.concat logs_dir "kernel.log"
-    | Some path -> path
-  in
-  let path_dir = Filename.dirname path in
-  let* () = Lwt_utils_unix.create_dir path_dir in
-  let* fd =
-    Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
-  in
-  let chan =
-    Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
-  in
-  let kernel_debug msg =
-    let* () = Lwt_io.write chan msg in
-    let* () = Lwt_io.flush chan in
-    let* () = event msg in
-    return_unit
-  in
-  return (kernel_debug, fun () -> Lwt_io.close chan)
-
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
@@ -1197,11 +1174,11 @@ let reset_kernel_tracing scope =
   kernel_tracer.start_time <- Opentelemetry.Timestamp_ns.now_unix_ns () ;
   kernel_tracer.scope <- Some scope
 
-let kernel_tracing config =
+let kernel_tracing config event =
   let open Lwt_syntax in
-  if not config.Configuration.etherlink then Event.kernel_debug
+  if not config.Configuration.etherlink then event
   else fun msg ->
-    let* () = Event.kernel_debug msg in
+    let* () = event msg in
     let block_number =
       if Re.Str.string_match kernel_store_block_re msg 0 then
         try Re.Str.matched_group 1 msg |> int_of_string_opt with _ -> None
@@ -1239,6 +1216,36 @@ let kernel_tracing config =
           Opentelemetry.Trace.emit ~service_name:"rollup_node" [span] ;
           kernel_tracer.start_time <- end_time ;
           return_unit
+
+let make_kernel_logger ~enable_tracing ?log_kernel_debug_file ~logs_dir
+    (config : Configuration.t) event =
+  let open Lwt_syntax in
+  let on_kernel_log =
+    if enable_tracing then kernel_tracing config event else event
+  in
+  if not config.log_kernel_debug then
+    return (on_kernel_log, fun () -> return_unit)
+  else
+    let path =
+      match log_kernel_debug_file with
+      | None -> Filename.concat logs_dir "kernel.log"
+      | Some path -> path
+    in
+    let path_dir = Filename.dirname path in
+    let* () = Lwt_utils_unix.create_dir path_dir in
+    let* fd =
+      Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
+    in
+    let chan =
+      Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+    in
+    let kernel_debug msg =
+      let* () = Lwt_io.write chan msg in
+      let* () = Lwt_io.flush chan in
+      let* () = on_kernel_log msg in
+      return_unit
+    in
+    return (kernel_debug, fun () -> Lwt_io.close chan)
 
 (**/**)
 

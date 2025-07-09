@@ -112,13 +112,12 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     else Lwt.return_unit
   in
   let*! kernel_debug_logger, kernel_debug_finaliser =
-    let open Lwt_syntax in
-    if configuration.log_kernel_debug then
-      make_kernel_logger
-        (kernel_tracing configuration)
-        ?log_kernel_debug_file
-        data_dir
-    else return (kernel_tracing configuration, fun () -> return_unit)
+    make_kernel_logger
+      ~enable_tracing:true
+      ?log_kernel_debug_file
+      ~logs_dir:data_dir
+      configuration
+      Event.kernel_debug
   in
   let global_block_watcher = Lwt_watcher.create_input () in
   let private_info =
