@@ -19,6 +19,82 @@ module Clap = struct
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
 end
 
+(* [network_simulation_configuration] allows to configure the simulation of a
+   network, relying on the actual distribution of rights that will be found in
+   the imported data (data-dir or snapshot). It requires yes crypto to be
+   enabled.
+   The simulate option has three modes:
+     - scatter(x,y): selects the [x] biggest bakers found, and scatters their
+       baking rights, in a round robin fashion, on [y] baker daemons. This is
+       particularly useful to scatter the baking power across several baker
+       daemons,
+     - map(x,y): maps [y-1] keys from the biggest bakers found onto [y-1] baker
+       daemons (theses daemons are handling a single key) and gives the
+       remaining keys [x-y-1] to a single baker daemon. This is particularly
+       useful to simulate the behaviour of an actual network,
+     - disabled: no simulation, we rely on the configuration.stake parameter.
+   For example:
+     - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]
+     - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]] *)
+type network_simulation_config =
+  | Scatter of int * int
+  | Map of int * int
+  | Disabled
+
+let simulate_network_to_string = function
+  | Scatter (x, y) -> Format.sprintf "scatter(%d,%d)" x y
+  | Map (x, y) -> Format.sprintf "map(%d,%d)" x y
+  | Disabled -> Format.sprintf "disabled"
+
+let parse_network_simulation_config_from_args simulate_network_arg =
+  let is_positive_param p =
+    if p > 0 then p
+    else
+      Test.fail
+        "Unexpected value provided, [%d], from argument [%s]. Values must be \
+         positive integers.@."
+        p
+        simulate_network_arg
+  in
+  let is_arg1_sup_eq_arg2 arg1 arg2 =
+    if arg1 >= arg2 then ()
+    else
+      Test.fail
+        "Unexpected value provided for argument [%s]. %d must be greater or \
+         equal to %d."
+        simulate_network_arg
+        arg1
+        arg2
+  in
+  let re_scatter = Str.regexp "\\(scatter\\)(\\([^,]+\\),\\([^)]*\\))" in
+  let re_map = Str.regexp "\\(map\\)(\\([^,]+\\),\\([^)]*\\))" in
+  if Str.string_match re_scatter simulate_network_arg 0 then
+    let arg1 =
+      Str.matched_group 2 simulate_network_arg
+      |> int_of_string |> is_positive_param
+    in
+    let arg2 =
+      Str.matched_group 3 simulate_network_arg
+      |> int_of_string |> is_positive_param
+    in
+    let () = is_arg1_sup_eq_arg2 arg1 arg2 in
+    Some (Scatter (arg1, arg2))
+  else if Str.string_match re_map simulate_network_arg 0 then
+    let arg1 =
+      Str.matched_group 2 simulate_network_arg
+      |> int_of_string |> is_positive_param
+    in
+    let arg2 =
+      Str.matched_group 3 simulate_network_arg
+      |> int_of_string |> is_positive_param
+    in
+    let () = is_arg1_sup_eq_arg2 arg1 arg2 in
+    Some (Map (arg1, arg2))
+  else
+    Test.fail
+      "Unexpected network simulation config (--simulation) [%s]"
+      simulate_network_arg
+
 module type Dal = sig
   val blocks_history : int
 
@@ -29,6 +105,10 @@ module type Dal = sig
   val network_typ : Network.t Clap.typ
 
   val network : Network.t
+
+  val simulate_network_typ : network_simulation_config Clap.typ
+
+  val simulate_network : network_simulation_config
 
   val snapshot : string option
 
@@ -167,6 +247,40 @@ module Dal () : Dal = struct
       network_typ
       `Sandbox
 
+  let simulate_network_typ : network_simulation_config Clap.typ =
+    Clap.typ
+      ~name:"simulate_network"
+      ~dummy:Disabled
+      ~parse:parse_network_simulation_config_from_args
+      ~show:simulate_network_to_string
+
+  let simulate_network =
+    Clap.default
+      ~section
+      ~long:"simulate"
+      ~description:
+        "This option can be used to simulate a network, relying on the actual \
+         distribution of rights that will be found in the imported data \
+         (data-dir or snapshot). It requires yes crypto to be enabled.\n\
+        \ The simulate option has two modes:\n\
+        \      - scatter(x,y): selects the [x] biggest bakers found, and \
+         scatters their baking rights, in a round robin fashion, on [y] baker \
+         daemons. This is particularly useful to scatter the baking power \
+         across several baker daemons.\n\
+        \      - map(x,y): maps [y-1] keys from the biggest bakers found onto \
+         [y-1] baker daemons (these daemons are handling a single key) and \
+         gives the remaining keys [x-y-1] to a single baker daemon. This is \
+         particularly useful to simulate the behaviour of an actual network.\n\
+         Note that, for both scatter and map, if the [x] arguments exceeds the \
+         actual number of active baking accounts found in the imported data, \
+         everything works fine: the number of baking accounts used will simply \
+         be lower than requested.\n\
+         For example:\n\
+         - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]\n\
+         - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]]"
+      simulate_network_typ
+      Disabled
+
   let snapshot =
     Clap.optional_string
       ~section
@@ -230,7 +344,8 @@ module Dal () : Dal = struct
          provided share repartitions is the same as on this network (truncated \
          to the N biggest delegates if <network>_<N> is given)."
       stake_repartition_typ
-      (match network with `Sandbox -> Custom [100] | _ -> Custom [])
+      (if network = `Sandbox && simulate_network = Disabled then Custom [100]
+       else Custom [])
 
   let bakers =
     Clap.list_string
