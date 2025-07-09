@@ -1317,6 +1317,11 @@ let current_cycle b =
   let current_level = b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
+let cycle_of_next_block b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let current_level = Int32.succ b.header.shell.level in
+  current_cycle_of_level ~blocks_per_cycle ~current_level
+
 let cycle_position b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
   let level = b.header.shell.level in
