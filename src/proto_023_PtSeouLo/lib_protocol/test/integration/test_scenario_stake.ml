@@ -52,7 +52,8 @@ let init_staker_delegate_or_external =
   in
   let begin_test ~self_stake =
     let name = if self_stake then "staker" else "delegate" in
-    init_constants () --> begin_test [name]
+    init_constants ()
+    --> begin_test [name; "bootstrap"]
     --> set_delegate_params name init_params
   in
   (Tag "self stake" --> begin_test ~self_stake:true
@@ -732,14 +733,14 @@ let test_pseudotokens_roundings =
   in
   (* Any number works, we'll be in AI later anyways *)
   init_constants ~reward_per_block:1_000_000_007L ()
-  --> begin_test ["delegate"; "faucet"] ~force_attest_all:true
+  --> begin_test ["delegate"; "faucet"; "bootstrap"] ~force_attest_all:true
   --> set_baker "faucet"
   --> set_delegate_params "delegate" init_params
   (* delegate stake = 10_000 tz *)
   --> unstake "delegate" (Amount (Tez.of_mutez 190_000_000_000L))
   (* Set other's stake to avoid lack of attestation slots *)
   --> unstake "faucet" (Amount (Tez.of_mutez 190_000_000_000L))
-  --> unstake "__bootstrap__" (Amount (Tez.of_mutez 190_000_000_000L))
+  --> unstake "bootstrap" (Amount (Tez.of_mutez 190_000_000_000L))
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 10_000_000_000L)
   --> add_account_with_funds
         "staker"
@@ -954,7 +955,7 @@ let unstake_all =
     }
   in
   init_constants ~reward_per_block:1_000_000L ()
-  --> begin_test ~force_attest_all:true ["delegate"]
+  --> begin_test ~force_attest_all:true ["delegate"; "bootstrap"]
   --> set_delegate_params "delegate" init_params
   --> add_account_with_funds
         "staker"
