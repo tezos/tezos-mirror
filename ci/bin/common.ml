@@ -225,10 +225,23 @@ let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
 
 (** Modifying these files will unconditionally execute all conditional jobs.
 
-    If the CI configuration change, we execute all
-    jobs. [changeset_base] should be included in all changesets below,
-    any exceptions should be explained. *)
-let changeset_base = Changeset.make [".gitlab/**/*"; ".gitlab-ci.yml"]
+    If the CI configuration of [before_merging] or [merge_train]
+    pipelines change, we execute all jobs of these merge request
+    pipelines. (We cannot currently have a finer grain and run only
+    the jobs that are modified.)
+
+    As changesets should only be present in merge request pipelines,
+    other pipelines' files need not be in the changeset.
+
+    [changeset_base] should be included in all changesets below, any
+    exceptions should be explained. *)
+let changeset_base =
+  Changeset.make
+    [
+      ".gitlab/ci/pipelines/merge_train.yml";
+      ".gitlab/ci/pipelines/before_merging.yml";
+      ".gitlab-ci.yml";
+    ]
 
 let changeset_images = Changeset.make ["images/**/*"]
 
