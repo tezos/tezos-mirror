@@ -224,6 +224,7 @@
   Dal_slot_storage
   Sc_rollup_refutation_storage
   Zk_rollup_errors
+  Address_registry_storage
   Bootstrap_storage
   Init_storage
   Destination_storage
@@ -258,6 +259,7 @@
   Script_ir_unparser
   Script_ir_translator
   Script_big_map
+  Script_address_registry
   Script_cache
   Script_tc_errors_registration
   Ticket_token_unparser
@@ -516,6 +518,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -550,6 +553,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -809,6 +813,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -843,6 +848,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -1086,6 +1092,7 @@
   dal_slot_storage.ml dal_slot_storage.mli
   sc_rollup_refutation_storage.ml sc_rollup_refutation_storage.mli
   zk_rollup_errors.ml
+  address_registry_storage.ml address_registry_storage.mli
   bootstrap_storage.ml bootstrap_storage.mli
   init_storage.ml init_storage.mli
   destination_storage.ml destination_storage.mli
@@ -1120,6 +1127,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli

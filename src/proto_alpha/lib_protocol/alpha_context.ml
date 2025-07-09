@@ -449,6 +449,7 @@ module Contract = struct
 end
 
 module Global_constants_storage = Global_constants_storage
+module Address_registry_storage = Address_registry_storage
 
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map

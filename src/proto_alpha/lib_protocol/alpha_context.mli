@@ -4418,6 +4418,16 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+module Address_registry_storage : sig
+  type add_result = {ctxt : context; index : Z.t; existed : bool}
+
+  val init : context -> context tzresult Lwt.t
+
+  val find : context -> Destination.t -> (context * Z.t option) tzresult Lwt.t
+
+  val add_if_missing : context -> Destination.t -> add_result tzresult Lwt.t
+end
+
 (** See {!Block_payload_repr}. *)
 module Block_payload : sig
   (** See {!Block_payload_repr.hash}. *)
