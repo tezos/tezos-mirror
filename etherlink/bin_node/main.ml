@@ -1428,7 +1428,7 @@ let show_kms_key_info_command =
       | Some gcp_key ->
           let open Evm_node_lib_dev in
           let* kms = Gcp_kms.from_gcp_key config.gcp_kms gcp_key in
-          let* pk = Gcp_kms.public_key kms in
+          let pk = Gcp_kms.public_key kms in
           let pkh = Signature.Public_key.hash pk in
           Format.printf
             "@[<v>Public key: %a@ Public key hash: %a@ @]"

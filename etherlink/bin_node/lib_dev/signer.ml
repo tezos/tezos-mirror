@@ -47,7 +47,7 @@ let public_key =
   | Wallet (_cctxt, sk_uri) ->
       let* pk_uri = Client_keys.neuterize sk_uri in
       Client_keys.public_key pk_uri
-  | Gcp_kms kms -> Gcp_kms.public_key kms
+  | Gcp_kms kms -> return (Gcp_kms.public_key kms)
 
 let sequencer_key = function
   | Wallet (_, sk_uri) -> Configuration.Wallet sk_uri
@@ -55,4 +55,4 @@ let sequencer_key = function
 
 let sign = function
   | Wallet (cctxt, sk) -> Client_keys.sign cctxt sk
-  | Gcp_kms kms -> Gcp_kms.sign kms
+  | Gcp_kms kms -> Gcp_kms.sign kms Blake2B
