@@ -79,6 +79,27 @@ let find_account_from_pkh (pkh : Signature.public_key_hash) (state : t) :
       assert false
   | Some (name, acc) -> (name, acc)
 
+let get_delegates_of ~name state =
+  String.Map.fold
+    (fun _delegator account acc ->
+      match account.delegate with
+      | Some delegate when String.equal delegate name -> account :: acc
+      | _ -> acc)
+    state.account_map
+    []
+
+let get_stakers_of ~name state =
+  String.Map.fold
+    (fun _delegator account acc ->
+      match account.delegate with
+      | Some delegate
+        when String.equal delegate name
+             && Z.(account.staking_delegator_numerator > zero) ->
+          account :: acc
+      | _ -> acc)
+    state.account_map
+    []
+
 let liquid_delegated ~name state =
   let open Result_syntax in
   String.Map.fold_e
