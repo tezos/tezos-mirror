@@ -39,9 +39,14 @@ type t = {
   double_signings : double_signing_state list;
   force_attest_all : bool;
   force_preattest_all : bool;
-  check_finalized_block_perm :
+  (* Checks done after the finalization of every block. Usually set at the
+     beginning of a scenario, and remains the same for the whole duration
+     of a test. *)
+  check_finalized_every_block :
     (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
-  check_finalized_block_temp :
+  (* Checks done after the finalization of the current block. Set to empty
+     after every block. Usually checks associated with operations. *)
+  check_finalized_current_block :
     (Block.full_metadata -> Block.t * t -> unit tzresult Lwt.t) list;
   previous_metadata : Block.full_metadata option;
   operation_mode : operation_mode;
@@ -284,8 +289,9 @@ let pop_pending_operations state =
 let add_pending_batch operations state =
   {state with pending_batch = state.pending_batch @ operations}
 
-let add_temp_check check state =
+let add_current_block_check check state =
   {
     state with
-    check_finalized_block_temp = state.check_finalized_block_temp @ [check];
+    check_finalized_current_block =
+      state.check_finalized_current_block @ [check];
   }

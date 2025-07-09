@@ -82,18 +82,18 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
 
 (** Initialize the test, given some initial parameters *)
 let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
-    ?(force_preattest_all = false) ?(check_finalized_block_perm = [])
+    ?(force_preattest_all = false) ?(check_finalized_every_block = [])
     ?(disable_default_checks = false) delegates_name_list :
     (constants, t) scenarios =
   exec (fun (constants : constants) ->
       let open Lwt_result_syntax in
       assert (not @@ List.is_empty delegates_name_list) ;
       (* Do not disable default checks, unless for a good reason *)
-      let check_finalized_block_perm =
-        if disable_default_checks then check_finalized_block_perm
+      let check_finalized_every_block =
+        if disable_default_checks then check_finalized_every_block
         else
           [check_all_balances; check_misc; check_issuance_rpc]
-          @ check_finalized_block_perm
+          @ check_finalized_every_block
       in
       (* Override threshold value if activate *)
       let n = List.length delegates_name_list in
@@ -161,8 +161,8 @@ let begin_test ?algo ?(burn_rewards = false) ?(force_attest_all = false)
             double_signings = [];
             force_attest_all;
             force_preattest_all;
-            check_finalized_block_perm;
-            check_finalized_block_temp = [];
+            check_finalized_every_block;
+            check_finalized_current_block = [];
             previous_metadata = None;
             operation_mode = Bake;
             (* The grandparent is only used to get the consensus key, so it is
