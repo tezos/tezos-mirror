@@ -6,7 +6,13 @@ members = [
     "crypto",
     "encoding",
     "encoding-derive",
+    "protocol",
 ]
+
+[workspace.dependencies.tezos_crypto_rs]
+version = "0.6.0"
+path = "./crypto"
+default-features = false
 
 [workspace.dependencies.tezos_data_encoding]
 version = "0.6.0"
@@ -16,6 +22,11 @@ default-features = false
 [workspace.dependencies.tezos_data_encoding_derive]
 version = "0.6.0"
 path = "./encoding-derive"
+default-features = false
+
+[workspace.dependencies.tezos-protocol]
+version = "0.1.0"
+path = "./protocol"
 default-features = false
 
 [workspace.dependencies.nom]

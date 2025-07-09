@@ -11,6 +11,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
 - Add `ScriptExprHash` hash
 - Allow the unit type `()` as field in derived implementations of `NomReader` and `BinWriter`.
+- Add a new package `tezos-protocol`, holding the Tezos protocol structures.
+- Add `Contract` defining contract address.
+- Add `Entrypoint` defining transaction entrypoint.
+- Add `OperationContent`, `ManagerOperationContent`, `RevealContent`, `TransactionContent` defining operations contents for reveal and transaction.
 
 ### Changed
 
