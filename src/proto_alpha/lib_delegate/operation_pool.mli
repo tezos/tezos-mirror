@@ -112,9 +112,7 @@ val ordered_of_list_list : packed_operation list list -> ordered_pool option
 (** [preattestation] <> None => (List.length preattestations > 0) *)
 val extract_operations_of_list_list :
   packed_operation list list ->
-  (Kind.preattestation operation list option
-  * Kind.attestation operation list
-  * payload)
+  (Kind.preattestation operation list option * packed_operation list * payload)
   option
 
 module Prioritized_operation : sig
