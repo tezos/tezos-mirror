@@ -402,7 +402,9 @@ pub fn apply_operation<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::TezlinkImplicitAccount;
-    use tezos_crypto_rs::hash::UnknownSignature;
+    use primitive_types::H256;
+    use tezos_crypto_rs::hash::{SecretKeyEd25519, UnknownSignature};
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -410,13 +412,14 @@ mod tests {
         block::TezBlock,
         enc_wrappers::BlockHash,
         operation::{
-            ManagerOperation, Operation, OperationContent, Parameter, RevealContent,
-            TransferContent,
+            ManagerOperation, ManagerOperationContent, Operation, OperationContent,
+            Parameter, RevealContent, TransferContent,
         },
         operation_result::{
-            Balance, BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
-            OperationResult, OperationResultSum, RevealError, RevealSuccess,
-            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
+            CounterError, OperationResult, OperationResultSum, RevealError,
+            RevealSuccess, TransferError, TransferSuccess, TransferTarget, UpdateOrigin,
+            ValidityError,
         },
     };
 
@@ -425,32 +428,88 @@ mod tests {
         apply_operation, context, OperationError,
     };
 
-    const BOOTSTRAP_1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
+    #[derive(Clone)]
+    struct Bootstrap {
+        pkh: PublicKeyHash,
+        pk: PublicKey,
+        sk: SecretKeyEd25519,
+    }
 
-    const BOOTSTRAP_2: &str = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
+    fn bootstrap1() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh",
+            )
+            .unwrap(),
+        }
+    }
+
+    fn bootstrap2() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo",
+            )
+            .unwrap(),
+        }
+    }
+
+    fn sign_operation(
+        sk: &SecretKeyEd25519,
+        branch: &H256,
+        content: &ManagerOperationContent,
+    ) -> UnknownSignature {
+        // Watermark comes from `src/lib_crypto/signature_v2.ml`
+        // The watermark for a ManagerOperation is always `Generic_operation`
+        // encoded with `0x03`
+        let mut serialized_unsigned_operation = vec![3_u8];
+
+        let branch = branch.as_fixed_bytes();
+        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
+        content
+            .bin_write(&mut serialized_unsigned_operation)
+            .unwrap();
+        let signature = sk
+            .sign(serialized_unsigned_operation)
+            .expect("Signature should have succeeded");
+        signature.into()
+    }
 
     fn make_operation(
         fee: u64,
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
+        source: Bootstrap,
         content: OperationContent,
     ) -> Operation {
-        let branch = BlockHash::from(TezBlock::genesis_block_hash());
-        // No need a real signature for now
-        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+        let branch = TezBlock::genesis_block_hash();
+        let manager_op = ManagerOperation {
+            source: source.pkh,
+            fee: fee.into(),
+            counter: counter.into(),
+            operation: content,
+            gas_limit: gas_limit.into(),
+            storage_limit: storage_limit.into(),
+        }
+        .into();
+
+        let signature = sign_operation(&source.sk, &branch, &manager_op);
+
         Operation {
-            branch,
-            content: ManagerOperation {
-                source,
-                fee: fee.into(),
-                counter: counter.into(),
-                operation: content,
-                gas_limit: gas_limit.into(),
-                storage_limit: storage_limit.into(),
-            }
-            .into(),
+            branch: BlockHash::from(branch),
+            content: manager_op,
             signature,
         }
     }
@@ -460,16 +519,18 @@ mod tests {
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
-        pk: PublicKey,
+        source: Bootstrap,
     ) -> Operation {
         make_operation(
             fee,
             counter,
             gas_limit,
             storage_limit,
-            source,
-            OperationContent::Reveal(RevealContent { pk, proof: None }),
+            source.clone(),
+            OperationContent::Reveal(RevealContent {
+                pk: source.pk,
+                proof: None,
+            }),
         )
     }
 
@@ -479,7 +540,7 @@ mod tests {
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
+        source: Bootstrap,
         amount: Narith,
         destination: Contract,
         parameters: Option<Parameter>,
@@ -524,21 +585,23 @@ mod tests {
         account
     }
 
+    fn reveal_account(host: &mut impl Runtime, source: &Bootstrap) {
+        let context = context::Context::init_context();
+        let mut account =
+            TezlinkImplicitAccount::from_public_key_hash(&context, &source.pkh)
+                .expect("Account creation should have succeed");
+        account.set_manager_public_key(host, &source.pk).unwrap()
+    }
+
     // Test an operation on an account that has no entry in `/context/contracts/index`
     // This should fail as an EmptyImplicitContract
     #[test]
     fn apply_operation_empty_account() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let pk = PublicKey::from_b58check(
-            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-        )
-        .expect("Public key creation should have succeed");
-
-        let operation = make_reveal_operation(15, 1, 4, 5, src, pk);
+        let operation = make_reveal_operation(15, 1, 4, 5, source);
 
         let receipt = apply_operation(
             &mut host,
@@ -563,18 +626,12 @@ mod tests {
     fn apply_operation_cant_pay_fees() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let _ = init_account(&mut host, &src);
-
-        let pk = PublicKey::from_b58check(
-            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-        )
-        .expect("Public key creation should have succeed");
+        let _ = init_account(&mut host, &source.pkh);
 
         // Fees are too high for source's balance
-        let operation = make_reveal_operation(100, 1, 4, 5, src, pk);
+        let operation = make_reveal_operation(100, 1, 4, 5, source);
 
         let receipt = apply_operation(
             &mut host,
@@ -599,18 +656,12 @@ mod tests {
     fn apply_operation_invalid_counter() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let _ = init_account(&mut host, &src);
-
-        let pk = PublicKey::from_b58check(
-            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-        )
-        .expect("Public key creation should have succeed");
+        let _ = init_account(&mut host, &source.pkh);
 
         // Counter is incoherent for source's counter
-        let operation = make_reveal_operation(15, 15, 4, 5, src, pk);
+        let operation = make_reveal_operation(15, 15, 4, 5, source);
 
         let receipt = apply_operation(
             &mut host,
@@ -638,10 +689,9 @@ mod tests {
     fn apply_reveal_operation_on_already_revealed_account() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &src);
+        let mut account = init_account(&mut host, &source.pkh);
 
         // Setting the manager key of this account to its public_key, this account
         // will be considered as revealed and the reveal operation should fail
@@ -655,7 +705,7 @@ mod tests {
             .expect("Setting manager field should have succeed");
 
         // Applying the operation
-        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk.clone());
+        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
         let receipt = apply_operation(
             &mut host,
             &context::Context::init_context(),
@@ -667,7 +717,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src)),
+                    balance: Balance::Account(Contract::Implicit(source.pkh)),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -691,10 +741,9 @@ mod tests {
     fn apply_reveal_operation_with_an_inconsistent_manager() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &src);
+        let mut account = init_account(&mut host, &source.pkh);
 
         // Set the an inconsistent manager with the source
         let inconsistent_pkh =
@@ -705,12 +754,7 @@ mod tests {
             .set_manager_public_key_hash(&mut host, &inconsistent_pkh)
             .expect("Setting manager field should have succeed");
 
-        let pk = PublicKey::from_b58check(
-            "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-        )
-        .expect("Public key creation should have succeed");
-
-        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk);
+        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
         let receipt = apply_operation(
             &mut host,
@@ -722,7 +766,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src)),
+                    balance: Balance::Account(Contract::Implicit(source.pkh)),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -746,19 +790,18 @@ mod tests {
     fn apply_reveal_operation_with_an_inconsistent_public_key() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
-
-        // Even if we don't use it we need to init the account
-        let _ = init_account(&mut host, &src);
-
         // Wrong public key for source
         let pk = PublicKey::from_b58check(
             "edpkuT1qccDweCHnvgjLuNUHERpZmEaFZfbWvTzj2BxmTgQBZjaDFD",
         )
         .expect("Public key creation should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk);
+        let source = Bootstrap { pk, ..bootstrap1() };
+
+        // Even if we don't use it we need to init the account
+        let _ = init_account(&mut host, &source.pkh);
+
+        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
         let receipt = apply_operation(
             &mut host,
@@ -770,7 +813,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src.clone())),
+                    balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -781,7 +824,9 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(vec![OperationError::Apply(
-                RevealError::InconsistentPublicKey(src).into(),
+                ApplyOperationError::Reveal(RevealError::InconsistentPublicKey(
+                    source.pkh,
+                )),
             )]),
             internal_operation_results: vec![],
         });
@@ -794,23 +839,22 @@ mod tests {
     fn apply_reveal_operation() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let account = init_account(&mut host, &src);
+        let account = init_account(&mut host, &source.pkh);
 
         let manager = account
             .manager(&host)
             .expect("Read manager should have succeed");
 
-        assert_eq!(manager, Manager::NotRevealed(src.clone()));
+        assert_eq!(manager, Manager::NotRevealed(source.pkh.clone()));
 
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .expect("Public key creation should have succeed");
 
-        let operation = make_reveal_operation(15, 1, 4, 5, src.clone(), pk.clone());
+        let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
         let receipt = apply_operation(
             &mut host,
@@ -822,7 +866,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src)),
+                    balance: Balance::Account(Contract::Implicit(source.pkh)),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -852,24 +896,24 @@ mod tests {
     fn apply_transfer_with_not_enough_balance() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let source = bootstrap1();
 
-        let dest = PublicKeyHash::from_b58check(BOOTSTRAP_2)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let dest = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance
-        let source = init_account(&mut host, &src);
-        let destination = init_account(&mut host, &dest);
+        let source_account = init_account(&mut host, &source.pkh);
+        reveal_account(&mut host, &source);
+
+        let destination_account = init_account(&mut host, &dest.pkh);
 
         let operation = make_transfer_operation(
             15,
             1,
             4,
             5,
-            src.clone(),
+            source.clone(),
             100_u64.into(),
-            Contract::Implicit(dest),
+            Contract::Implicit(dest.pkh),
             None,
         );
 
@@ -883,7 +927,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src)),
+                    balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -895,7 +939,7 @@ mod tests {
             ],
             result: ContentResult::Failed(vec![OperationError::Apply(
                 TransferError::BalanceTooLow(BalanceTooLow {
-                    contract: Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                    contract: Contract::Implicit(source.pkh),
                     balance: 35_u64.into(),
                     amount: 100_u64.into(),
                 })
@@ -904,11 +948,11 @@ mod tests {
             internal_operation_results: vec![],
         });
 
-        // Verify that source only paid the fees and the destination balance is unchanged
-        assert_eq!(source.balance(&host).unwrap(), 35.into());
-        assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
-
         assert_eq!(receipt, expected_receipt);
+
+        // Verify that source only paid the fees and the destination balance is unchanged
+        assert_eq!(source_account.balance(&host).unwrap(), 35.into());
+        assert_eq!(destination_account.balance(&host).unwrap(), 50_u64.into());
     }
 
     // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
@@ -916,15 +960,15 @@ mod tests {
     fn apply_successful_transfer() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let src = bootstrap1();
 
-        let dest = PublicKeyHash::from_b58check(BOOTSTRAP_2)
-            .expect("PublicKeyHash b58 conversion should have succeed");
+        let dst = bootstrap2();
 
-        // Setup accounts with 50 mutez in their balance
-        let source = init_account(&mut host, &src);
-        let destination = init_account(&mut host, &dest);
+        // Setup accounts with 50 mutez in their balance and reveal the source
+        let source = init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let destination = init_account(&mut host, &dst.pkh);
 
         let operation = make_transfer_operation(
             15,
@@ -933,7 +977,7 @@ mod tests {
             5,
             src.clone(),
             30_u64.into(),
-            Contract::Implicit(dest),
+            Contract::Implicit(dst.pkh.clone()),
             None,
         );
 
@@ -947,7 +991,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(Contract::Implicit(src)),
+                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -962,16 +1006,12 @@ mod tests {
                 lazy_storage_diff: None,
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(
-                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
-                        ),
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
                         changes: -30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(
-                            Contract::from_b58check(BOOTSTRAP_2).unwrap(),
-                        ),
+                        balance: Balance::Account(Contract::Implicit(dst.pkh)),
                         changes: 30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
@@ -985,12 +1025,11 @@ mod tests {
             })),
             internal_operation_results: vec![],
         });
+        assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
-
-        assert_eq!(receipt, expected_receipt);
     }
 
     // Bootstrap 1 successfully transfers 30 mutez to itself
@@ -998,22 +1037,21 @@ mod tests {
     fn apply_successful_self_transfer() {
         let mut host = MockKernelHost::default();
 
-        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeeded");
+        let src = bootstrap1();
 
         let dest = src.clone();
 
         // Setup account with 50 mutez in its balance
-        let source = init_account(&mut host, &src);
+        let source = init_account(&mut host, &src.pkh);
 
         let operation = make_transfer_operation(
             15,
             1,
             4,
             5,
-            src,
+            src.clone(),
             30_u64.into(),
-            Contract::Implicit(dest),
+            Contract::Implicit(dest.pkh.clone()),
             None,
         );
 
@@ -1027,9 +1065,7 @@ mod tests {
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
-                    balance: Balance::Account(
-                        Contract::from_b58check(BOOTSTRAP_1).unwrap(),
-                    ),
+                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
                     changes: -15,
                     update_origin: UpdateOrigin::BlockApplication,
                 },
@@ -1044,16 +1080,12 @@ mod tests {
                 lazy_storage_diff: None,
                 balance_updates: vec![
                     BalanceUpdate {
-                        balance: Balance::Account(
-                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
-                        ),
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
                         changes: -30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
                     BalanceUpdate {
-                        balance: Balance::Account(
-                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
-                        ),
+                        balance: Balance::Account(Contract::Implicit(dest.pkh)),
                         changes: 30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
