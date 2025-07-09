@@ -879,6 +879,7 @@ module Scripts = struct
       | ITransfer_tokens _ -> pp_print_string fmt "TRANSFER_TOKENS"
       | IImplicit_account _ -> pp_print_string fmt "IMPLICIT_ACCOUNT"
       | IIs_implicit_account _ -> pp_print_string fmt "IS_IMPLICIT_ACCOUNT"
+      | IIndex_address _ -> pp_print_string fmt "INDEX_ADDRESS"
       | ICreate_contract _ -> pp_print_string fmt "CREATE_CONTRACT"
       | ISet_delegate _ -> pp_print_string fmt "SET_DELEGATE"
       | INow _ -> pp_print_string fmt "NOW"

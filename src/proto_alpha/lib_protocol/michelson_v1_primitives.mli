@@ -173,6 +173,7 @@ type prim =
   | I_EMIT
   | I_BYTES
   | I_NAT
+  | I_INDEX_ADDRESS
   | T_bool
   | T_contract
   | T_int

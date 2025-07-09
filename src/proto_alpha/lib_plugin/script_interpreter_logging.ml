@@ -1183,6 +1183,15 @@ module Stack_utils = struct
                  continuation = k;
                  reconstruct = (fun k -> IIs_implicit_account (loc, k));
                }
+      | IIndex_address (loc, k), Item_t (_, s) ->
+          let s = Item_t (nat_t, s) in
+          return
+          @@ Ex_split_kinstr
+               {
+                 cont_init_stack = s;
+                 continuation = k;
+                 reconstruct = (fun k -> IIndex_address (loc, k));
+               }
       | ( ICreate_contract {loc; storage_type; code; k},
           Item_t (_, Item_t (_, Item_t (_, s))) ) ->
           return

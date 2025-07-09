@@ -1278,6 +1278,21 @@ module Raw = struct
                 | _ -> None
               in
               (step [@ocaml.tailcall]) g gas k ks res stack
+          | IIndex_address (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                let* ctxt, res =
+                  Script_address_registry.index ctxt address.destination
+                in
+                return (res, ctxt)
+              in
+              let res =
+                match Script_int.is_nat (Script_int.of_zint res) with
+                | None -> Script_int.zero_n
+                | Some n -> n
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id
