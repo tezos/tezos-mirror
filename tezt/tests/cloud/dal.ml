@@ -2828,13 +2828,13 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* simulated_delegates =
     match configuration.simulate_network with
-    | Scatter (selected_baker_count, baker_daemons_count) ->
+    | Scatter (selected_bakers_count, baker_daemons_count) ->
         let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
         in
         let selected_delegates =
-          Tezos_stdlib.TzList.take_n selected_baker_count all_delegates_aliases
+          Tezos_stdlib.TzList.take_n selected_bakers_count all_delegates_aliases
         in
         let* delegates =
           Lwt_list.map_s
@@ -2842,7 +2842,10 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
             selected_delegates
         in
         round_robin_split baker_daemons_count delegates |> Lwt.return
-    | Map (selected_bakers_count, baker_daemons_count) ->
+    | Map
+        ( selected_bakers_count,
+          single_key_baker_daemons_count,
+          multiple_keys_baker_daemons_count ) ->
         let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
@@ -2852,7 +2855,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         in
         let single_key_bakers_aliases, remaining_baker_aliases =
           Tezos_stdlib.TzList.split_n
-            (baker_daemons_count - 1)
+            single_key_baker_daemons_count
             selected_delegates_aliases
         in
         let* single_key_bakers =
@@ -2862,12 +2865,15 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
               Lwt.return [a])
             single_key_bakers_aliases
         in
-        let* remaining_baker =
-          Lwt_list.map_s
-            (fun alias -> Client.show_address ~alias client)
-            remaining_baker_aliases
+        let* remaining_bakers =
+          let* r =
+            Lwt_list.map_s
+              (fun alias -> Client.show_address ~alias client)
+              remaining_baker_aliases
+          in
+          round_robin_split multiple_keys_baker_daemons_count r |> Lwt.return
         in
-        Lwt.return (single_key_bakers @ [remaining_baker])
+        Lwt.return (single_key_bakers @ remaining_bakers)
     | Disabled -> Lwt.return_nil
   in
   let* generated_baker_accounts =
@@ -3892,12 +3898,18 @@ let init ~(configuration : configuration) etherlink_configuration cloud
     (* As simulate_network and stake are mutually exclusive, the stake is used
        only when the simulation is Disabled. *)
     match configuration.simulate_network with
-    | Scatter (_, baker_count) | Map (_, baker_count) ->
+    | Scatter (_, baker_count) ->
         Lwt_list.mapi_s
           (fun i _ ->
             let name = name_of (Baker i) in
             next_agent ~name)
           (List.init baker_count Fun.id)
+    | Map (_, single_baker_count, multiple_baker_count) ->
+        Lwt_list.mapi_s
+          (fun i _ ->
+            let name = name_of (Baker i) in
+            next_agent ~name)
+          (List.init (single_baker_count + multiple_baker_count) Fun.id)
     | Disabled ->
         Lwt_list.mapi_s
           (fun i _stake ->
@@ -3911,9 +3923,15 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         let name = name_of (Baker i) in
         next_agent ~name)
       (match configuration.simulate_network with
-      | Scatter (_selected_baker_count, baker_daemon_count)
-      | Map (_selected_baker_count, baker_daemon_count) ->
+      | Scatter (_selected_baker_count, baker_daemon_count) ->
           List.init baker_daemon_count string_of_int
+      | Map
+          ( _selected_baker_count,
+            single_baker_daemon_count,
+            multiple_baker_daemon_count ) ->
+          List.init
+            (single_baker_daemon_count + multiple_baker_daemon_count)
+            string_of_int
       | Disabled -> configuration.bakers)
   in
   let* producers_agents =
@@ -4603,9 +4621,12 @@ let register (module Cli : Scenarios_cli.Dal) =
   let baker_daemon_count =
     match simulate_network with
     | Scenarios_cli.Disabled -> 0
-    | Scatter (_selected_baker_count, baker_daemon_count)
-    | Map (_selected_baker_count, baker_daemon_count) ->
-        baker_daemon_count
+    | Scatter (_selected_baker_count, baker_daemon_count) -> baker_daemon_count
+    | Map
+        ( _selected_baker_count,
+          single_baker_daemon_count,
+          multiple_baker_daemon_count ) ->
+        single_baker_daemon_count + multiple_baker_daemon_count
   in
   let vms =
     let* stake = configuration.stake in
