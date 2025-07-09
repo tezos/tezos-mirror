@@ -9215,13 +9215,22 @@ let test_inject_accusation protocol dal_parameters cryptobox node client
     ~error_msg:"Expected exactly one anonymous op. Got: %L" ;
   unit
 
-let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
-    dal_parameters _cryptobox node client dal_node =
-  let slot_index = 0 in
-  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
-  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
-  let number_of_slots = dal_parameters.number_of_slots in
-  let lag = dal_parameters.attestation_lag in
+type tz4_account = {delegate_key : Account.key; companion_key : Account.key}
+
+(* [round_robin n l] distributes the values of [l] in an array of [n] elements.
+   so [round_robin 3 [a1; ..; a10] = [|[a1;a4;a7;a10]; [a2;a5;a8]; [a3;a6;a9]|]].
+*)
+let round_robin n l =
+  let rec bis acc k = function
+    | [] -> Array.map List.rev acc
+    | hd :: tl ->
+        let acc_local = acc.(k) in
+        let () = acc.(k) <- hd :: acc_local in
+        bis acc ((k + 1) mod n) tl
+  in
+  bis (Array.init n (fun _ -> [])) 0 l
+
+let create_tz4_accounts_stake_and_wait ~funders ~client ~node nb_to_create =
   Log.info "Generate tz4 keys" ;
   let* new_tz4_accounts =
     Lwt_list.map_s
@@ -9230,22 +9239,28 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
           ~sig_alg:"bls"
           ~alias:("bls_account_" ^ string_of_int (1 + index))
           client)
-      (List.init 5 Fun.id)
+      (List.init nb_to_create Fun.id)
   in
   let* () = bake_for client in
   Log.info "We have the accounts, let's fund them" ;
-  let* _oph =
-    (* We give 500k tez to each account. *)
-    let amount = 500_000 * 1_000_000 in
-    let source = Constant.bootstrap1 in
-    let transfers =
-      List.map
-        (fun dest -> Operation.Manager.transfer ~dest ~amount ())
-        new_tz4_accounts
-    in
-    let* counter = Operation.Manager.get_next_counter ~source client in
-    let batch = Operation.Manager.make_batch ~source ~counter transfers in
-    Operation.Manager.inject batch client
+  let* _ophs =
+    Lwt.all
+    @@ List.map2
+         (fun accounds_to_fund source ->
+           (* We give 500k tez to each account. *)
+           let amount = 500_000 * 1_000_000 in
+           let transfers =
+             List.map
+               (fun dest -> Operation.Manager.transfer ~dest ~amount ())
+               accounds_to_fund
+           in
+           let* counter = Operation.Manager.get_next_counter ~source client in
+           let batch =
+             Operation.Manager.make_batch ~source ~counter transfers
+           in
+           Operation.Manager.inject batch client)
+         (Array.to_list @@ round_robin (List.length funders) new_tz4_accounts)
+         funders
   in
   let* () = bake_for client in
   Log.info "All keys funded, let's set them as delegates" ;
@@ -9278,7 +9293,117 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
   in
   Log.info "All keys have staked, let's wait for them to have rights" ;
-  let* () = Client.bake_until_cycle ~target_cycle:(cycle + 3) client in
+  let* proto_params =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(proto_params |-> "consensus_rights_delay" |> as_int)
+  in
+  let* () =
+    Client.bake_until_cycle
+      ~target_cycle:(cycle + consensus_rights_delay + 1)
+      client
+  in
+  return
+  @@ List.map2
+       (fun delegate_key companion_key -> {delegate_key; companion_key})
+       new_tz4_accounts
+       companions
+
+let test_aggregation_required_to_pass_quorum _protocol dal_parameters _cryptobox
+    node client dal_node =
+  let slot_index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let lag = dal_parameters.attestation_lag in
+  let* _tz4_accounts =
+    create_tz4_accounts_stake_and_wait
+      ~funders:(Account.Bootstrap.keys |> Array.to_list)
+      ~node
+      ~client
+      25
+  in
+  Log.info "Enough waiting, let's publish a commitment" ;
+  let message = Helpers.make_slot ~slot_size "Hello world!" in
+  let* _pid =
+    Helpers.publish_and_store_slot
+      client
+      dal_node
+      Constant.bootstrap1
+      ~index:slot_index
+      message
+  in
+  let* () = bake_for client in
+  let dal_node_endpoint =
+    Dal_node.as_rpc_endpoint dal_node |> Endpoint.as_string
+  in
+  Log.info "Let's wait for the attestation of this publication to be sent." ;
+  let* () = bake_for ~count:lag client ~dal_node_endpoint in
+  let* attestations =
+    Node.RPC.call node
+    @@ RPC.get_chain_block_operations_validation_pass ~validation_pass:0 ()
+  in
+  let aggregated_attestation =
+    JSON.(
+      List.find
+        (fun attestation ->
+          attestation |-> "contents" |> as_list |> List.hd |-> "kind"
+          |> as_string = "attestations_aggregate")
+        (as_list attestations))
+  in
+  let aggregated_attestation_consensus_power =
+    JSON.(
+      aggregated_attestation |-> "contents" |> as_list |> List.hd |-> "metadata"
+      |-> "total_consensus_power" |> as_int)
+  in
+  let* constants =
+    Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_committee_size =
+    JSON.(constants |-> "consensus_committee_size" |> as_int)
+  in
+  let* metadata = Node.RPC.call node @@ RPC.get_chain_block_metadata () in
+  Check.(
+    aggregated_attestation_consensus_power
+    >= consensus_committee_size
+       * (100 - dal_parameters.attestation_threshold)
+       / 100)
+    ~__LOC__
+    Check.int
+    ~error_msg:
+      "The consensus power of the tz4 accounts is not sufficient to ensure \
+       that the ability to read inside the aggregated attestations is required \
+       for the slot to be protocol attested." ;
+  match metadata.dal_attestation with
+  | None ->
+      Test.fail
+        "Field dal_attestation in block headers is mandatory when DAL is \
+         activated"
+  | Some bitset ->
+      Check.((Array.length bitset = 1) ~__LOC__ int)
+        ~error_msg:
+          "There should be only one slot DAL attested at protocol level. Got \
+           %L." ;
+      Check.is_true
+        bitset.(slot_index)
+        ~__LOC__
+        ~error_msg:"Slot was supposed to be protocol attested." ;
+      unit
+
+let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
+    dal_parameters _cryptobox node client dal_node =
+  let slot_index = 0 in
+  let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
+  let slot_size = dal_parameters.Dal.Parameters.cryptobox.slot_size in
+  let number_of_slots = dal_parameters.number_of_slots in
+  let lag = dal_parameters.attestation_lag in
+  let* tz4_accounts =
+    create_tz4_accounts_stake_and_wait
+      ~funders:[Constant.bootstrap1]
+      ~node
+      ~client
+      5
+  in
   Log.info "Enough waiting, let's publish a commitment" ;
   let message = Helpers.make_slot ~slot_size "Hello world!" in
   let* _pid =
@@ -9307,12 +9432,12 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
   in
   let dal_attestation = Array.init number_of_slots (fun i -> i = slot_index) in
   let faulty_bakers, other_tz4 =
-    Tezos_stdlib.TzList.split_n nb_attesting_tz4 new_tz4_accounts
+    Tezos_stdlib.TzList.split_n nb_attesting_tz4 tz4_accounts
   in
   let* () =
-    Lwt_list.iteri_s
-      (fun i faulty_baker ->
-        let first_slot = Operation.Consensus.first_slot ~slots faulty_baker in
+    Lwt_list.iter_s
+      (fun {delegate_key; companion_key} ->
+        let first_slot = Operation.Consensus.first_slot ~slots delegate_key in
         let attestation =
           Operation.Consensus.attestation
             ~dal_attestation
@@ -9326,8 +9451,8 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
           Operation.Consensus.inject
             ~protocol
             ~branch
-            ~signer_companion:(List.nth companions i)
-            ~signer:faulty_baker
+            ~signer_companion:companion_key
+            ~signer:delegate_key
             attestation
             client
         in
@@ -9338,7 +9463,10 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
   (* Since we manually injected the attestation for the faulty baker,
      we have to prevent [bake_for] to inject another one in the mempool.
   *)
-  let all_other_delegates = other_tz4 @ Constant.all_secret_keys in
+  let all_other_delegates =
+    List.map (fun {delegate_key; _} -> delegate_key) other_tz4
+    @ Constant.all_secret_keys
+  in
   let* () =
     bake_for
       ~delegates:
@@ -10969,6 +11097,11 @@ let register ~protocols =
     "one_committee_per_level"
     test_one_committee_per_level
     protocols ;
+  scenario_with_layer1_and_dal_nodes
+    ~operator_profiles:[0]
+    "slot is protocol attested even if attestations are aggregated"
+    test_aggregation_required_to_pass_quorum
+    (List.filter (fun p -> Protocol.number p >= 023) protocols) ;
   scenario_with_layer1_node
     ~traps_fraction:Q.one
     "inject accusation"
