@@ -5,9 +5,5 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Will be removed later in this MR. *)
-module Common = Common
-module Release = Release
-
 (** Register Teztale jobs and pipelines. *)
 val register : unit -> unit

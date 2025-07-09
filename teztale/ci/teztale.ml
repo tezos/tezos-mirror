@@ -5,10 +5,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* Will be removed later in this MR. *)
-module Common = Common
-module Release = Release
-
 module CI = Cacio.Make (struct
   let name = "teztale"
 
