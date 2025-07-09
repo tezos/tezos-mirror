@@ -52,6 +52,12 @@ module Encoding = struct
     let encoding = Data_encoding.z
   end
 
+  module N : VALUE with type t = Z.t = struct
+    type t = Z.t
+
+    let encoding = Data_encoding.n
+  end
+
   module Manager_counter : VALUE with type t = Manager_counter_repr.t = struct
     type t = Manager_counter_repr.t
 
@@ -570,6 +576,40 @@ module Contract = struct
         let name = ["total_supply"]
       end)
       (Tez_repr)
+
+  module Address_registry = struct
+    module Raw_context =
+      Make_subcontext (Registered) (Raw_context)
+        (struct
+          let name = ["address_registry"]
+        end)
+
+    module Next = struct
+      module Storage =
+        Make_single_data_storage (Registered) (Raw_context)
+          (struct
+            let name = ["next"]
+          end)
+          (Encoding.N)
+
+      let incr ctxt =
+        let open Lwt_result_syntax in
+        let* i = Storage.get ctxt in
+        let* ctxt = Storage.update ctxt (Z.succ i) in
+        return (ctxt, i)
+
+      let init ctxt = Storage.init ctxt Z.zero
+    end
+
+    module Registry =
+      Make_indexed_carbonated_data_storage
+        (Make_subcontext (Registered) (Raw_context)
+           (struct
+             let name = ["addresses"]
+           end))
+           (Make_index (Destination_repr.Index))
+        (Encoding.N)
+  end
 end
 
 module type NEXT = sig

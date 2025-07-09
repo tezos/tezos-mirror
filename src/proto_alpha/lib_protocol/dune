@@ -258,6 +258,7 @@
   Script_ir_unparser
   Script_ir_translator
   Script_big_map
+  Script_address_registry
   Script_cache
   Script_tc_errors_registration
   Ticket_token_unparser
@@ -550,6 +551,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -843,6 +845,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli
@@ -1120,6 +1123,7 @@
   script_ir_unparser.ml script_ir_unparser.mli
   script_ir_translator.ml script_ir_translator.mli
   script_big_map.ml script_big_map.mli
+  script_address_registry.ml
   script_cache.ml script_cache.mli
   script_tc_errors_registration.ml script_tc_errors_registration.mli
   ticket_token_unparser.ml ticket_token_unparser.mli

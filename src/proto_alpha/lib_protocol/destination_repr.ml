@@ -157,3 +157,39 @@ let in_memory_size =
   | Contract k -> h1w +! Contract_repr.in_memory_size k
   | Sc_rollup k -> h1w +! Sc_rollup_repr.in_memory_size k
   | Zk_rollup k -> h1w +! Zk_rollup_repr.in_memory_size k
+
+let rpc_arg =
+  let construct = to_b58check in
+  let destruct hash =
+    Result.map_error (fun _ -> "Cannot parse destination id") (of_b58check hash)
+  in
+  RPC_arg.make
+    ~descr:"A destination identifier encoded in b58check."
+    ~name:"contract_id"
+    ~construct
+    ~destruct
+    ()
+
+module Index = struct
+  type nonrec t = t
+
+  let path_length = 1
+
+  let to_path c l =
+    let raw_key = Data_encoding.Binary.to_bytes_exn encoding c in
+    let (`Hex key) = Hex.of_bytes raw_key in
+    key :: l
+
+  let of_path = function
+    | [key] ->
+        Option.bind
+          (Hex.to_bytes (`Hex key))
+          (Data_encoding.Binary.of_bytes_opt encoding)
+    | _ -> None
+
+  let rpc_arg = rpc_arg
+
+  let encoding = encoding
+
+  let compare = compare
+end

@@ -331,6 +331,20 @@ module Contract : sig
   (** Stores the amount of tokens currently present on chain *)
   module Total_supply :
     Single_data_storage with type value = Tez_repr.t and type t := Raw_context.t
+
+  module Address_registry : sig
+    module Next : sig
+      val incr : Raw_context.t -> (Raw_context.t * Z.t) tzresult Lwt.t
+
+      val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+    end
+
+    module Registry :
+      Non_iterable_indexed_carbonated_data_storage
+        with type t := Raw_context.t
+         and type key = Destination_repr.t
+         and type value = Z.t
+  end
 end
 
 module Big_map : sig

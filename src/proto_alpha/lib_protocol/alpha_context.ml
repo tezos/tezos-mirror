@@ -450,6 +450,16 @@ end
 
 module Global_constants_storage = Global_constants_storage
 
+module Address_registry = struct
+  let find = Storage.Contract.Address_registry.Registry.find
+
+  let add = Storage.Contract.Address_registry.Registry.add
+
+  let init = Storage.Contract.Address_registry.Next.init
+
+  let next_counter_and_incr = Storage.Contract.Address_registry.Next.incr
+end
+
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map
 

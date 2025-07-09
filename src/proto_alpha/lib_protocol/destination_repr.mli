@@ -61,3 +61,7 @@ val pp : Format.formatter -> t -> unit
 val in_memory_size : t -> Cache_memory_helpers.sint
 
 type error += Invalid_destination_b58check of string
+
+val rpc_arg : t RPC_arg.arg
+
+module Index : Storage_description.INDEX with type t = t
