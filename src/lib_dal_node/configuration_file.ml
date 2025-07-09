@@ -269,14 +269,14 @@ let encoding : t Data_encoding.t =
              default_rpc_addr)
           (dft
              "net-addr"
-             ~description:"P2P address of this node"
+             ~description:"P2P listening address of this node"
              P2p_point.Id.encoding
              default_listen_addr)
           (dft
              "public-addr"
-             ~description:"P2P address of this node"
+             ~description:"P2P public address of this node"
              P2p_point.Id.encoding
-             default_listen_addr)
+             default_public_addr)
           (dft
              "peers"
              ~description:"P2P addresses of remote peers"
