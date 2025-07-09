@@ -216,3 +216,15 @@ let unaggregated_eligible_attestation ?kind = function
 let empty_aggregation_committee = function
   | Validate_errors.Consensus.Empty_aggregation_committee -> true
   | _ -> false
+
+let wrong_slot_used_for_preattestation = function
+  | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+      {kind = Preattestation} ->
+      true
+  | _ -> false
+
+let wrong_slot_used_for_attestation = function
+  | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
+      {kind = Attestation} ->
+      true
+  | _ -> false

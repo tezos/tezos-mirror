@@ -189,6 +189,9 @@ let check_after_attestations_aggregate
 
 (** Tests the validation and application of a preattestations_aggregate.
 
+    [attesting_slots] defaults to the respective canonical slots of
+    [attesters].
+
     When [error] is [None], performs
     {!check_preattestations_aggregate_result} on the operation's
     metadata, otherwise checks that the error identified by [error] is
@@ -198,9 +201,14 @@ let check_after_attestations_aggregate
     only tests in application mode because making a context that
     accepts preattestations is slightly more complicated. *)
 let check_preattestations_aggregate_validation_and_application ~loc ~attesters
-    ~preattested_block ~preattested_block_predecessor ?error () =
+    ?attesting_slots ~preattested_block ~preattested_block_predecessor ?error ()
+    =
   let open Lwt_result_syntax in
-  let committee = List.map Op.attesting_slot_of_attester attesters in
+  let committee =
+    match attesting_slots with
+    | Some v -> v
+    | None -> List.map Op.attesting_slot_of_attester attesters
+  in
   let* operation = Op.preattestations_aggregate ~committee preattested_block in
   let*! res =
     Block.bake_with_metadata
@@ -218,6 +226,9 @@ let check_preattestations_aggregate_validation_and_application ~loc ~attesters
 
 (** Tests the validation and application of an attestations_aggregate.
 
+    [attesting_slots] defaults to the respective canonical slots of
+    [attesters].
+
     In mempool mode, always expects
     {!Error_helpers.aggregate_in_mempool}.
 
@@ -226,9 +237,13 @@ let check_preattestations_aggregate_validation_and_application ~loc ~attesters
     metadata, otherwise checks that the error identified by [error] is
     returned. *)
 let check_attestations_aggregate_validation_and_application ~loc ~attesters
-    ~attested_block ?error () =
+    ?attesting_slots ~attested_block ?error () =
   let open Lwt_result_syntax in
-  let attesting_slots = List.map Op.attesting_slot_of_attester attesters in
+  let attesting_slots =
+    match attesting_slots with
+    | Some v -> v
+    | None -> List.map Op.attesting_slot_of_attester attesters
+  in
   let committee =
     (* It would be nice to test with various DAL contents, but this
        would require setting up delegates with companion keys. *)
@@ -345,6 +360,161 @@ let test_preattestations_aggregate_with_multiple_delegates () =
     ~preattested_block
     ~preattested_block_predecessor
     ()
+
+(* Preattestations/atttestations aggregate where one of the slots is
+   not the first slot of its delegate (but still belongs to the
+   delegate). *)
+let test_non_canonical_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, attested_block_predecessor =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attested_block = Block.bake attested_block_predecessor in
+  let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
+  let attester, other_attester =
+    match attesters with
+    | x1 :: x2 :: _ -> (x1, x2)
+    | _ -> Test.fail ~__LOC__ "Expected at least two attesters with BLS key"
+  in
+  let non_canonical_attesting_slot =
+    Op.non_canonical_attesting_slot_of_attester attester
+  in
+  let other_attesters_canonical_slot =
+    Op.attesting_slot_of_attester other_attester
+  in
+  let attesters_and_slots_to_test =
+    [
+      (* Problematic slot alone *)
+      ([attester], [non_canonical_attesting_slot]);
+      (* Problematic slot first then normal slot *)
+      ( [attester; other_attester],
+        [non_canonical_attesting_slot; other_attesters_canonical_slot] );
+      (* Problematic slot last *)
+      ( [other_attester; attester],
+        [other_attesters_canonical_slot; non_canonical_attesting_slot] );
+    ]
+  in
+  List.iter_es
+    (fun (attesters, attesting_slots) ->
+      let* () =
+        check_preattestations_aggregate_validation_and_application
+          ~loc:__LOC__
+          ~attesters
+          ~attesting_slots
+          ~preattested_block:attested_block
+          ~preattested_block_predecessor:attested_block_predecessor
+          ~error:Error_helpers.wrong_slot_used_for_preattestation
+          ()
+      in
+      check_attestations_aggregate_validation_and_application
+        ~loc:__LOC__
+        ~attesters
+        ~attesting_slots
+        ~attested_block
+        ~error:Error_helpers.wrong_slot_used_for_attestation
+        ())
+    attesters_and_slots_to_test
+
+(* Preattestations/atttestations aggregate where a delegate uses a
+   slot that does not belong to it. *)
+let test_not_owned_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, attested_block_predecessor =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attested_block = Block.bake attested_block_predecessor in
+  let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
+  let attester, other_attester, third_attester =
+    match attesters with
+    | x1 :: x2 :: x3 :: _ -> (x1, x2, x3)
+    | _ -> Test.fail ~__LOC__ "Expected at least three attesters with BLS key"
+  in
+  let wrong_attesting_slot =
+    {
+      Op.consensus_pkh = attester.consensus_key;
+      slot =
+        WithExceptions.Option.get ~loc:__LOC__ (List.hd third_attester.slots);
+    }
+  in
+  let other_attesters_canonical_slot =
+    Op.attesting_slot_of_attester other_attester
+  in
+  let attesters_and_slots_to_test =
+    [
+      (* Problematic slot alone *)
+      ([attester], [wrong_attesting_slot]);
+      (* Problematic slot first then normal slot *)
+      ( [attester; other_attester],
+        [wrong_attesting_slot; other_attesters_canonical_slot] );
+      (* Problematic slot last *)
+      ( [other_attester; attester],
+        [other_attesters_canonical_slot; wrong_attesting_slot] );
+    ]
+  in
+  List.iter_es
+    (fun (attesters, attesting_slots) ->
+      let* () =
+        check_preattestations_aggregate_validation_and_application
+          ~loc:__LOC__
+          ~attesters
+          ~attesting_slots
+          ~preattested_block:attested_block
+          ~preattested_block_predecessor:attested_block_predecessor
+          ~error:Error_helpers.invalid_signature
+          ()
+      in
+      check_attestations_aggregate_validation_and_application
+        ~loc:__LOC__
+        ~attesters
+        ~attesting_slots
+        ~attested_block
+        ~error:Error_helpers.invalid_signature
+        ())
+    attesters_and_slots_to_test
+
+(* Preattestations/atttestations aggregate with a duplicate slot. *)
+let test_duplicate_slot () =
+  let open Lwt_result_syntax in
+  let* _genesis, attested_block_predecessor =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attested_block = Block.bake attested_block_predecessor in
+  let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
+  let attester, other_attester =
+    match attesters with
+    | x1 :: x2 :: _ -> (x1, x2)
+    | _ -> Test.fail ~__LOC__ "Expected at least two attesters with BLS key"
+  in
+  let attesters_to_test =
+    [
+      (* Only duplicate slot *)
+      [attester; attester];
+      (* Duplicate slot first then normal slot *)
+      [attester; attester; other_attester];
+      (* Duplicate slot last *)
+      [other_attester; attester; attester];
+      (* Duplicate slot before and after normal slot *)
+      [attester; other_attester; attester];
+    ]
+  in
+  List.iter_es
+    (fun attesters ->
+      let* () =
+        check_preattestations_aggregate_validation_and_application
+          ~loc:__LOC__
+          ~attesters
+          ~preattested_block:attested_block
+          ~preattested_block_predecessor:attested_block_predecessor
+          ~error:Error_helpers.conflicting_consensus_operation
+          ()
+      in
+      check_attestations_aggregate_validation_and_application
+        ~loc:__LOC__
+        ~attesters
+        ~attested_block
+        ~error:Error_helpers.conflicting_consensus_operation
+        ())
+    attesters_to_test
 
 let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
@@ -858,6 +1028,9 @@ let tests =
       "test_attestations_aggregate_with_multiple_delegates"
       `Quick
       test_attestations_aggregate_with_multiple_delegates;
+    Tztest.tztest "KO non canonical slot" `Quick test_non_canonical_slot;
+    Tztest.tztest "KO not owned slot" `Quick test_not_owned_slot;
+    Tztest.tztest "KO duplicate slot" `Quick test_duplicate_slot;
     Tztest.tztest
       "test_preattestations_aggregate_invalid_signature"
       `Quick
