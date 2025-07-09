@@ -853,14 +853,17 @@ type tested_mode = Application | Construction | Mempool
 
     - When [tested_mode] is [Mempool], a mempool is initialized using
       [predecessor] as head, then {!Incremental.add_operation} is called
-      on [operation].
+      on [operation], then {!Incremental.finalize_block_with_metadata}.
 
-    When [error] is [None], we check that everything succeeds,
-    otherwise we check that the error identified by [error] is
-    returned.
+    When [check_after] is provided, it is called on the resulting
+    block. When [error] is provided, we check that an error identified
+    by [error] is returned. When neither is provided, we return unit
+    if there the validation and application returned [Ok], or the
+    unchanged error. When both are provided, the function fails.
 *)
 val check_validation_and_application :
   loc:string ->
+  ?check_after:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?error:(Environment.Error_monad.error -> bool) ->
   predecessor:Block.t ->
   tested_mode ->
@@ -868,9 +871,12 @@ val check_validation_and_application :
   unit tzresult Lwt.t
 
 (** Calls {!check_validation_and_application} on all {!tested_mode}s
-    successively, with respective errors. *)
+    successively, with respective checks or errors. *)
 val check_validation_and_application_all_modes_different_outcomes :
   loc:string ->
+  ?check_after_application:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
+  ?check_after_construction:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
+  ?check_after_mempool:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?application_error:(Environment.Error_monad.error -> bool) ->
   ?construction_error:(Environment.Error_monad.error -> bool) ->
   ?mempool_error:(Environment.Error_monad.error -> bool) ->
@@ -879,9 +885,11 @@ val check_validation_and_application_all_modes_different_outcomes :
   unit tzresult Lwt.t
 
 (** Calls {!check_validation_and_application} on all {!tested_mode}s
-    successively, with the same [error] provided for each mode. *)
+    successively, with the same [check_after] or [error] provided for
+    each mode. *)
 val check_validation_and_application_all_modes :
   loc:string ->
+  ?check_after:(Block.block_with_metadata -> unit tzresult Lwt.t) ->
   ?error:(Environment.Error_monad.error -> bool) ->
   predecessor:Block.t ->
   t ->

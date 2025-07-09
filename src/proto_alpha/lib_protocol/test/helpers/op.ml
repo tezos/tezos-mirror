@@ -1399,58 +1399,79 @@ let show_mode = function
   | Construction -> "Construction"
   | Mempool -> "Mempool"
 
-let check_validation_and_application ~loc ?error ~predecessor mode operation =
+let check_validation_and_application ~loc ?check_after ?error ~predecessor mode
+    operation =
   let open Lwt_result_syntax in
-  let check_error res =
-    match error with
-    | Some error -> Assert.proto_error ~loc res error
-    | None ->
+  let check_res res =
+    match (check_after, error) with
+    | None, None ->
         (* assert success *)
-        let*? (_ : Block.t) = res in
+        let*? (_ : Block.block_with_metadata) = res in
         return_unit
+    | Some check_after, None ->
+        let*? block_with_metadata = res in
+        check_after block_with_metadata
+    | None, Some error -> Assert.proto_error ~loc res error
+    | Some _, Some _ ->
+        Test.fail
+          "Op.check_validation_and_application: cannot provide both \
+           [check_after] and [error] (called from: %s)"
+          loc
   in
   match mode with
   | Application ->
       let*! result =
-        Block.bake ~baking_mode:Application ~operation predecessor
+        Block.bake_with_metadata ~baking_mode:Application ~operation predecessor
       in
-      check_error result
+      check_res result
   | Construction ->
-      let*! result = Block.bake ~baking_mode:Baking ~operation predecessor in
-      check_error result
+      let*! result =
+        Block.bake_with_metadata ~baking_mode:Baking ~operation predecessor
+      in
+      check_res result
   | Mempool ->
       let*! res =
         let* inc =
           Incremental.begin_construction ~mempool_mode:true predecessor
         in
-        let* inc = Incremental.add_operation inc operation in
+        let* inc, op_receipt =
+          Incremental.add_operation_with_metadata inc operation
+        in
         (* Finalization doesn't do much in mempool mode, but some RPCs
            still call it, so we check that it doesn't fail unexpectedly. *)
-        Incremental.finalize_block inc
+        let* block, header_metadata =
+          Incremental.finalize_block_with_metadata inc
+        in
+        return (block, (header_metadata, [op_receipt]))
       in
-      check_error res
+      check_res res
 
 let check_validation_and_application_all_modes_different_outcomes ~loc
+    ?check_after_application ?check_after_construction ?check_after_mempool
     ?application_error ?construction_error ?mempool_error ~predecessor operation
     =
   List.iter_es
-    (fun (mode, error) ->
+    (fun (mode, check_after, error) ->
       check_validation_and_application
         ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
+        ?check_after
         ?error
         ~predecessor
         mode
         operation)
     [
-      (Application, application_error);
-      (Construction, construction_error);
-      (Mempool, mempool_error);
+      (Application, check_after_application, application_error);
+      (Construction, check_after_construction, construction_error);
+      (Mempool, check_after_mempool, mempool_error);
     ]
 
-let check_validation_and_application_all_modes ~loc ?error ~predecessor
-    operation =
+let check_validation_and_application_all_modes ~loc ?check_after ?error
+    ~predecessor operation =
   check_validation_and_application_all_modes_different_outcomes
     ~loc
+    ?check_after_application:check_after
+    ?check_after_construction:check_after
+    ?check_after_mempool:check_after
     ?application_error:error
     ?construction_error:error
     ?mempool_error:error
