@@ -603,8 +603,8 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
-    ?websockets ?enable_fast_withdrawal ?evm_version ?register_revm f protocols
-    =
+    ?websockets ?enable_fast_withdrawal ?evm_version ?(enable_revm = false) f
+    protocols =
   let register ~enable_dal ~enable_multichain ~enable_revm : unit =
     register_test
       ~title
@@ -633,8 +633,8 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       ~enable_revm
       ~setup_mode:Setup_proxy
   in
-  if register_revm = Some true then
-    register ~enable_dal:false ~enable_multichain:false ~enable_revm:true ;
+  if enable_revm then
+    register ~enable_dal:false ~enable_multichain:false ~enable_revm ;
   register ~enable_dal:false ~enable_multichain:false ~enable_revm:false ;
   register ~enable_dal:true ~enable_multichain:false ~enable_revm:false ;
   register ~enable_dal:false ~enable_multichain:true ~enable_revm:false ;
@@ -646,8 +646,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
-    ?genesis_timestamp ?enable_tx_queue f protocols =
-  let register ~enable_dal ~enable_multichain : unit =
+    ?genesis_timestamp ?enable_tx_queue ?(enable_revm = false) f protocols =
+  let register ~enable_dal ~enable_multichain ~enable_revm : unit =
     register_test
       ~title
       ~tags
@@ -672,6 +672,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       protocols
       ~enable_dal
       ~enable_multichain
+      ~enable_revm
       ~setup_mode:
         (Setup_sequencer
            {
@@ -682,17 +683,19 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              genesis_timestamp;
            })
   in
-  register ~enable_dal:false ~enable_multichain:false ;
-  register ~enable_dal:true ~enable_multichain:false ;
-  register ~enable_dal:false ~enable_multichain:true ;
-  register ~enable_dal:true ~enable_multichain:true
+  if enable_revm then
+    register ~enable_dal:false ~enable_multichain:false ~enable_revm ;
+  register ~enable_dal:false ~enable_multichain:false ~enable_revm:false ;
+  register ~enable_dal:true ~enable_multichain:false ~enable_revm:false ;
+  register ~enable_dal:false ~enable_multichain:true ~enable_revm:false ;
+  register ~enable_dal:true ~enable_multichain:true ~enable_revm:false
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version f protocols
-    : unit =
+    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
+    ?(enable_revm = false) f protocols : unit =
   register_proxy
     ~title
     ~tags
@@ -712,6 +715,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?restricted_rpcs
     ?websockets
     ?evm_version
+    ~enable_revm
     f
     protocols ;
   register_sequencer
@@ -735,6 +739,7 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?max_blueprints_ahead
     ?websockets
     ?evm_version
+    ~enable_revm
     f
     protocols
 
@@ -2608,7 +2613,7 @@ let test_deposit_and_withdraw =
     ~admin
     ~commitment_period
     ~challenge_window
-    ~register_revm:true
+    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                {
@@ -2692,7 +2697,7 @@ let test_withdraw_amount =
     ~tags:["evm"; "withdraw"; "wei"; "mutez"]
     ~title:"Minimum amount to withdraw"
     ~admin
-    ~register_revm:true
+    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{endpoint; produce_block; _} ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Minimal amount of Wei fails with revert. *)
@@ -2747,7 +2752,7 @@ let test_withdraw_via_calls =
     ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
     ~title:"Withdrawal via different kind of calls"
     ~admin
-    ~register_revm:true
+    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
@@ -5327,6 +5332,7 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
   register_both
     ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
     ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
+    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
