@@ -49,6 +49,58 @@ let job_build =
       "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
     ]
 
+let job_gitlab_release =
+  CI.job
+    "gitlab_release"
+    ~__POS__
+    ~image:Tezos_ci.Images.ci_release
+    ~stage:Publish
+    ~description:"Create a GitLab release for Teztale."
+    ~needs:
+      [
+        (Artifacts, job_build `release Amd64);
+        (Artifacts, job_build `release Arm64);
+      ]
+    ["./teztale/scripts/releases/create_gitlab_release.sh"]
+
+let job_release_page =
+  Cacio.parameterize @@ fun pipeline_type ->
+  CI.job
+    "release_page"
+    ~__POS__
+    ~image:Tezos_ci.Images.ci_release
+    ~stage:Publish
+    ~description:
+      "Update the Teztale release page. If running in a test pipeline, the \
+       assets are pushed in the [release-page-test.nomadic-labs.com] bucket. \
+       Otherwise they are pushed in [site.prod.octez.tezos.com]. Then its \
+       [index.html] is updated accordingly."
+    ~needs:
+      [
+        (Artifacts, job_build `release Amd64);
+        (Artifacts, job_build `release Arm64);
+      ]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["./index.md"; "index.html"])
+    ~variables:
+      (match pipeline_type with
+      | `test ->
+          [
+            ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+            ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+            ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+            ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+          ]
+      | `real ->
+          [
+            ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+            ("URL", "octez.tezos.com");
+            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+          ])
+    ["./teztale/scripts/releases/publish_release_page.sh"]
+
 let register () =
   CI.register_before_merging_jobs
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
@@ -56,4 +108,23 @@ let register () =
     "daily"
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
+  CI.register_global_release_jobs
+    [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
+  CI.register_global_test_release_jobs
+    [(Auto, job_gitlab_release); (Manual, job_release_page `test)] ;
+  CI.register_global_scheduled_test_release_jobs
+    [
+      (* Explicitly include the build jobs so that they have trigger [Auto]. *)
+      (Auto, job_build `release Amd64);
+      (Auto, job_build `release Arm64);
+      (Manual, job_release_page `test);
+    ] ;
+  (* Remove this [if false then] to allow dedicated releases of Teztale.
+     At the time Teztale was migrated to Cacio, it didn't have them.
+     (But it did have dedicated test releases.) *)
+  if false then
+    CI.register_dedicated_release_pipeline
+      [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
+  CI.register_dedicated_test_release_pipeline
+    [(Auto, job_gitlab_release); (Manual, job_release_page `test)] ;
   ()
