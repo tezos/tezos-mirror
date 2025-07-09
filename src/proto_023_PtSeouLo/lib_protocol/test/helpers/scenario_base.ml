@@ -318,3 +318,5 @@ let with_metadata f (block, state) =
   match state.previous_metadata with
   | None -> assert false
   | Some metadata -> f metadata (block, state)
+
+let exec_metadata f = exec_unit (with_metadata f)

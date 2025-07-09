@@ -481,6 +481,11 @@ let next_cycle_ input =
 (** Bake until the end of a cycle *)
 let next_cycle = exec next_cycle_
 
+let dawn_of_next_cycle =
+  exec (fun input ->
+      Log.info ~color:action_color "[Dawn of next cycle]" ;
+      bake_until_dawn_of_next_cycle input)
+
 (** Executes an operation: f should return a new state and a list of operations, which are then applied *)
 let exec_op f =
   let open Lwt_result_syntax in
