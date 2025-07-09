@@ -6,6 +6,8 @@
 
 ### Configuration changes
 
+- Fix encodings for sequencer key when using a remote key on GCP KMS. (!18642)
+
 ### RPCs changes
 
 ### Metrics changes
