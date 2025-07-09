@@ -6,24 +6,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Libsecp256k1.External
-
-module Secret_key : sig
-  type t = Key.secret Key.t
-
-  val from_hex_string : string -> t tzresult
-
-  val fresh : unit -> t
-end
-
-module Public_key : sig
-  type t = Key.public Key.t
-
-  val from_sk : Secret_key.t -> t
-
-  val to_address : t -> Ethereum_types.address
-end
-
 type t = {
   mutable nonce : Z.t;
       (** The nonce of the account, as far as Floodgate is concerned. The nonce
@@ -34,12 +16,10 @@ type t = {
       initial balance minus the fees and the funds it has transfered to
       other addresses. This value is updated by the {!Tx_queue} every time
       a transaction it has injected is accepted. *)
-  public_key : Public_key.t;
-  secret_key : Secret_key.t;
+  signer : Signer.t;
 }
 
-val from_secret_key :
-  evm_node_endpoint:Uri.t -> Secret_key.t -> t tzresult Lwt.t
+val from_signer : evm_node_endpoint:Uri.t -> Signer.t -> t tzresult Lwt.t
 
 val fresh : unit -> t
 

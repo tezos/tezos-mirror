@@ -10,9 +10,21 @@ module Parameter = struct
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
-  let secret_key =
+  let signer =
     Tezos_clic.parameter (fun _ value ->
-        Lwt.return (Account.Secret_key.from_hex_string value))
+        let open Lwt_result_syntax in
+        let* value =
+          try
+            match String.remove_prefix ~prefix:"0x" value with
+            | Some value ->
+                let _ = Hex.show (`Hex value) in
+                return (`Hex value)
+            | None -> raise (Invalid_argument "not prefixed by 0x")
+          with _ ->
+            failwith "%s value is not a valid hexadecimal string" value
+        in
+        let*? secret_key = Signer.secret_key_from_hex value in
+        return (Signer.from_secret_key secret_key))
 
   let int =
     Tezos_clic.parameter (fun _ n ->
@@ -87,13 +99,8 @@ module Arg = struct
       ~long:"rpc-endpoint"
       ~doc:"Endpoint used to fetch the state of the chain"
 
-  let secret_key ~long ~short ~doc =
-    Tezos_clic.arg
-      ~doc
-      ~long
-      ~short
-      ~placeholder:"SECRET_KEY"
-      Parameter.secret_key
+  let signer ~long ~short ~doc =
+    Tezos_clic.arg ~doc ~long ~short ~placeholder:"SIGNER" Parameter.signer
 
   let max_active_eoa =
     let default = "1" in
@@ -167,7 +174,7 @@ module Arg = struct
       Parameter.tez
 
   let controller =
-    secret_key
+    signer
       ~long:"controller"
       ~short:'c'
       ~doc:

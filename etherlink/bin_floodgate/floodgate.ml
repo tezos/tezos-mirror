@@ -10,10 +10,10 @@ let one_xtz = Z.(of_int 1_000_000_000 * of_int 1_000_000_000)
 
 let xtz_of_int x = Z.(of_int x * one_xtz)
 
-let controller_from_sk ~rpc_endpoint ~min_balance controller =
+let controller_from_signer ~rpc_endpoint ~min_balance controller =
   let open Lwt_result_syntax in
   let* controller =
-    Account.from_secret_key ~evm_node_endpoint:rpc_endpoint controller
+    Account.from_signer ~evm_node_endpoint:rpc_endpoint controller
   in
   let* (Qty controller_balance) =
     Batch.call
@@ -287,7 +287,10 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
     ~elapsed_time_between_report =
   let open Lwt_result_syntax in
   let* controller =
-    controller_from_sk ~rpc_endpoint ~min_balance:(xtz_of_int 100) controller
+    controller_from_signer
+      ~rpc_endpoint
+      ~min_balance:(xtz_of_int 100)
+      controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
   let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
