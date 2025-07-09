@@ -177,6 +177,60 @@ let check_attestations_aggregate_result ~attesters
       Tezos_protocol_alpha__Protocol.Apply_results.contents_result) =
   check_aggregate_result Attestation ~attesters result
 
+let check_after_preattestations_aggregate
+    ((_, (_, op_receipts)) : Block.block_with_metadata) =
+  check_preattestations_aggregate_result
+    (find_preattestations_aggregate_result op_receipts)
+
+let check_after_attestations_aggregate
+    ((_, (_, op_receipts)) : Block.block_with_metadata) =
+  check_attestations_aggregate_result
+    (find_attestations_aggregate_result op_receipts)
+
+(** Tests the validation and application of a preattestations_aggregate.
+
+    Unlike {!check_attestations_aggregate_validation_and_application},
+    only tests in application mode because making a context that
+    accepts preattestations is slightly more complicated. *)
+let check_preattestations_aggregate_validation_and_application ~attesters
+    ~preattested_block ~preattested_block_predecessor =
+  let open Lwt_result_syntax in
+  let committee = List.map Op.attesting_slot_of_attester attesters in
+  let* operation = Op.preattestations_aggregate ~committee preattested_block in
+  let* block_with_metadata =
+    Block.bake_with_metadata
+      ~policy:(By_round 1)
+      ~payload_round:Alpha_context.Round.zero
+      ~locked_round:Alpha_context.Round.zero
+      ~operation
+      preattested_block_predecessor
+  in
+  check_after_preattestations_aggregate ~attesters block_with_metadata
+
+(** Tests the validation and application of an attestations_aggregate.
+
+    In mempool mode, always expects
+    {!Error_helpers.aggregate_in_mempool}. In block modes, performs
+    {!check_attestations_aggregate_result}. *)
+let check_attestations_aggregate_validation_and_application ~loc ~attesters
+    ~attested_block =
+  let open Lwt_result_syntax in
+  let attesting_slots = List.map Op.attesting_slot_of_attester attesters in
+  let committee =
+    (* It would be nice to test with various DAL contents, but this
+       would require setting up delegates with companion keys. *)
+    List.map (fun attesting_slot -> (attesting_slot, None)) attesting_slots
+  in
+  let* operation = Op.attestations_aggregate ~committee attested_block in
+  let check_after_block_mode = check_after_attestations_aggregate ~attesters in
+  Op.check_validation_and_application_all_modes_different_outcomes
+    ~loc
+    ~check_after_application:check_after_block_mode
+    ~check_after_construction:check_after_block_mode
+    ~mempool_error:Error_helpers.aggregate_in_mempool
+    ~predecessor:attested_block
+    operation
+
 let test_aggregate_feature_flag_enabled () =
   let open Lwt_result_syntax in
   let* _genesis, attested_block =
@@ -207,95 +261,62 @@ let test_attestations_aggregate_with_a_single_delegate () =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
   let* attester = Context.get_attester_with_bls_key (B attested_block) in
-  let attesting_slot = Op.attesting_slot_of_attester attester in
-  let* operation =
-    Op.attestations_aggregate ~committee:[(attesting_slot, None)] attested_block
-  in
-  let* _, (_, receipt) = Block.bake_with_metadata ~operation attested_block in
-  let result = find_attestations_aggregate_result receipt in
-  check_attestations_aggregate_result ~attesters:[attester] result
+  check_attestations_aggregate_validation_and_application
+    ~loc:__LOC__
+    ~attesters:[attester]
+    ~attested_block
 
 let test_preattestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
+  let* _genesis, preattested_block_predecessor =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
-  let* block' = Block.bake block in
-  let* attester = Context.get_attester_with_bls_key (B block') in
-  let attesting_slot = Op.attesting_slot_of_attester attester in
-  let* operation =
-    Op.preattestations_aggregate ~committee:[attesting_slot] block'
-  in
-  let* _, (_, receipt) =
-    let round_zero = Alpha_context.Round.zero in
-    Block.bake_with_metadata
-      ~policy:(By_round 1)
-      ~payload_round:round_zero
-      ~locked_round:round_zero
-      ~operation
-      block
-  in
-  let result = find_preattestations_aggregate_result receipt in
-  check_preattestations_aggregate_result ~attesters:[attester] result
+  let* preattested_block = Block.bake preattested_block_predecessor in
+  let* attester = Context.get_attester_with_bls_key (B preattested_block) in
+  check_preattestations_aggregate_validation_and_application
+    ~attesters:[attester]
+    ~preattested_block
+    ~preattested_block_predecessor
 
 let test_attestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
+  let* _genesis, attested_block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
-  let* attesters = Context.get_attesters_with_bls_key (B block) in
-  let committee =
-    List.map
-      (fun attester -> (Op.attesting_slot_of_attester attester, None))
-      attesters
-  in
-  let* operation = Op.attestations_aggregate ~committee block in
-  let* _, (_, receipt) = Block.bake_with_metadata ~operation block in
-  let result = find_attestations_aggregate_result receipt in
-  check_attestations_aggregate_result ~attesters result
+  let* attesters = Context.get_attesters_with_bls_key (B attested_block) in
+  check_attestations_aggregate_validation_and_application
+    ~loc:__LOC__
+    ~attesters
+    ~attested_block
 
 let test_preattestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
-  let* _genesis, block =
+  let* _genesis, preattested_block_predecessor =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
-  let* block' = Block.bake block in
-  let* attesters = Context.get_attesters_with_bls_key (B block') in
-  let committee = List.map Op.attesting_slot_of_attester attesters in
-  let* operation = Op.preattestations_aggregate ~committee block' in
-  let* _, (_, receipt) =
-    let round_zero = Alpha_context.Round.zero in
-    Block.bake_with_metadata
-      ~policy:(By_round 1)
-      ~payload_round:round_zero
-      ~locked_round:round_zero
-      ~operation
-      block
-  in
-  let result = find_preattestations_aggregate_result receipt in
-  check_preattestations_aggregate_result ~attesters result
+  let* preattested_block = Block.bake preattested_block_predecessor in
+  let* attesters = Context.get_attesters_with_bls_key (B preattested_block) in
+  check_preattestations_aggregate_validation_and_application
+    ~attesters
+    ~preattested_block
+    ~preattested_block_predecessor
 
 let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
-  let* aggregate = Op.attestations_aggregate block in
-  (* Swap the signature for Signature.Bls.zero *)
-  match aggregate.protocol_data with
-  | Operation_data {contents; _} ->
-      let aggregate_with_incorrect_signature =
-        {
-          aggregate with
-          protocol_data =
-            Operation_data {contents; signature = Some (Bls Signature.Bls.zero)};
-        }
-      in
-      (* Bake a block containing this operation and expect an error *)
-      let*! res =
-        Block.bake ~operation:aggregate_with_incorrect_signature block
-      in
-      Assert.proto_error ~loc:__LOC__ res Error_helpers.invalid_signature
+  let* op = Op.attestations_aggregate block in
+  let op_with_signature_zero =
+    Op.set_op_signature op (Some (Bls Signature.Bls.zero))
+  in
+  Op.check_validation_and_application_all_modes_different_outcomes
+    ~loc:__LOC__
+    ~application_error:Error_helpers.invalid_signature
+    ~construction_error:Error_helpers.invalid_signature
+    ~mempool_error:Error_helpers.aggregate_in_mempool
+    ~predecessor:block
+    op_with_signature_zero
 
 let test_preattestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
@@ -303,28 +324,20 @@ let test_preattestations_aggregate_invalid_signature () =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
   let* block' = Block.bake block in
-  let* aggregate = Op.preattestations_aggregate block' in
-  (* Swap the aggregate signature for Signature.Bls.zero *)
-  match aggregate.protocol_data with
-  | Operation_data {contents; _} ->
-      let aggregate_with_incorrect_signature =
-        {
-          aggregate with
-          protocol_data =
-            Operation_data {contents; signature = Some (Bls Signature.Bls.zero)};
-        }
-      in
-      (* Bake a block containing this operation and expect an error *)
-      let*! res =
-        let round_zero = Alpha_context.Round.zero in
-        Block.bake
-          ~policy:(By_round 1)
-          ~payload_round:round_zero
-          ~locked_round:round_zero
-          ~operation:aggregate_with_incorrect_signature
-          block
-      in
-      Assert.proto_error ~loc:__LOC__ res Error_helpers.invalid_signature
+  let* op = Op.preattestations_aggregate block' in
+  let op_with_signature_zero =
+    Op.set_op_signature op (Some (Bls Signature.Bls.zero))
+  in
+  let*! res =
+    let round_zero = Alpha_context.Round.zero in
+    Block.bake
+      ~policy:(By_round 1)
+      ~payload_round:round_zero
+      ~locked_round:round_zero
+      ~operation:op_with_signature_zero
+      block
+  in
+  Assert.proto_error ~loc:__LOC__ res Error_helpers.invalid_signature
 
 let test_preattestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
