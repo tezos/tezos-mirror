@@ -701,7 +701,7 @@ let gcp_key_from_string_opt key_handler =
   let* key_handler = String.remove_prefix ~prefix:"gcpkms://" key_handler in
   match String.split '/' key_handler with
   | [project; region; keyring; key; version] ->
-      Some {project; keyring; key; region; version = int_of_string version}
+      Some {project; region; keyring; key; version = int_of_string version}
   | _ -> None
 
 let gcp_key_uri_encoding =
@@ -724,15 +724,15 @@ let gcp_key_uri_encoding =
 let gcp_key_full_encoding =
   let open Data_encoding in
   conv
-    (fun {region; project; keyring; key; version} ->
-      (region, project, keyring, key, version))
-    (fun (region, project, keyring, key, version) ->
-      {region; project; keyring; key; version})
+    (fun {project; region; keyring; key; version} ->
+      (project, region, keyring, key, version))
+    (fun (project, region, keyring, key, version) ->
+      {project; region; keyring; key; version})
     (obj5
        (req "project" ~description:"GCP project hosting the key" string)
+       (req "region" ~description:"GCP region hosting the keyring" string)
        (req "keyring" ~description:"Keyring owning the key" string)
        (req "key" ~description:"Key name" string)
-       (req "region" ~description:"GCP region hosting the keyring" string)
        (req "version" ~description:"Key version number" int31))
 
 let gcp_key_encoding =
@@ -749,18 +749,18 @@ let sequencer_key_encoding =
     [
       case
         Json_only
+        ~title:"GCP Key"
+        gcp_key_encoding
+        (function Gcp_key k -> Some k | _ -> None)
+        (fun k -> Gcp_key k);
+      case
+        Json_only
         ~title:"Wallet"
         (string' Plain)
         (function
           | Wallet sk_uri -> Some (Client_keys.string_of_sk_uri sk_uri)
           | _ -> None)
         (fun sk_uri -> Wallet (Client_keys.sk_uri_of_string sk_uri));
-      case
-        Json_only
-        ~title:"GCP Key"
-        gcp_key_encoding
-        (function Gcp_key k -> Some k | _ -> None)
-        (fun k -> Gcp_key k);
     ]
 
 let sequencer_encoding =
