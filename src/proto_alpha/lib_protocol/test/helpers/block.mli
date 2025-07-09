@@ -59,6 +59,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 (**
    The default baking functions below is to use (blocks) [Application] mode.
