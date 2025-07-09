@@ -7,7 +7,6 @@ open! Bigarray
 type index
 type context
 type tree
-type o_context_hash
 type o_caml_tree_walker
 type o_caml_depth = Eq of int | Le of int | Lt of int | Ge of int | Gt of int
 type o_caml_order = Sorted | Undefined

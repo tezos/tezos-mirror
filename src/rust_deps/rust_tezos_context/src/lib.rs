@@ -1,7 +1,7 @@
 use std::{ops::DerefMut, rc::Rc};
 
 use crypto::hash::{ContextHash, HashTrait};
-use ocaml::{Pointer, Runtime, Value};
+use ocaml::{FromValue, Pointer, Runtime, Value};
 use tezos_context::{
     self,
     initializer::initialize_tezedge_index,
@@ -53,13 +53,14 @@ impl Tree {
     }
 }
 
-#[ocaml::sig]
-pub struct OContextHash(ContextHash);
+fn value_of_context_hash(h: ContextHash) -> Value {
+    unsafe { ocaml::Value::bytes(h.as_ref()) }
+}
 
-unsafe impl ocaml::ToValue for OContextHash {
-    fn to_value(&self, rt: &Runtime) -> Value {
-        unsafe { ocaml::Value::bytes(self.0.as_ref()) }
-    }
+fn context_hash_of_value(origin: &str, v: Value) -> ContextHash {
+    let context_hash = unsafe { v.field(0) };
+    let context_hash = unsafe { context_hash.bytes_val() };
+    ContextHash::try_from_bytes(context_hash).expect(origin)
 }
 
 #[ocaml::func]
@@ -94,39 +95,27 @@ pub fn context_init(mut index: Pointer<Index>) -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig("context -> int64 -> string -> string -> bytes")]
-pub fn commit(
-    mut context: Pointer<Context>,
-    time: i64,
-    author: String,
-    message: String,
-) -> OContextHash {
+pub fn commit(mut context: Pointer<Context>, time: i64, author: String, message: String) -> Value {
     let context = context.as_mut();
     let hash = context
         .0
         .commit(author.into(), message.into(), time)
         .expect("commit");
-    OContextHash(hash)
+    value_of_context_hash(hash)
 }
 
 #[ocaml::func]
 #[ocaml::sig("context -> int64 -> string -> string -> bytes")]
-pub fn hash(
-    mut context: Pointer<Context>,
-    time: i64,
-    author: String,
-    message: String,
-) -> OContextHash {
+pub fn hash(mut context: Pointer<Context>, time: i64, author: String, message: String) -> Value {
     let context = context.as_mut();
     let hash = context.0.hash(author, message, time).expect("hash");
-    OContextHash(hash)
+    value_of_context_hash(hash)
 }
 
 #[ocaml::func]
 #[ocaml::sig("index -> 'a -> bool")]
 pub fn exists(mut index: Pointer<Index>, context_hash: Value) -> bool {
-    let context_hash = unsafe { context_hash.field(0) };
-    let context_hash = unsafe { context_hash.bytes_val() };
-    let context_hash = ContextHash::try_from_bytes(context_hash).expect("exists");
+    let context_hash = context_hash_of_value("exists", context_hash);
     let index = index.as_mut();
     index.0.exists(&context_hash).expect("exists")
 }
@@ -134,9 +123,7 @@ pub fn exists(mut index: Pointer<Index>, context_hash: Value) -> bool {
 #[ocaml::func]
 #[ocaml::sig("index -> 'a -> context option")]
 pub fn checkout(mut index: Pointer<Index>, context_hash: Value) -> Option<Pointer<Context>> {
-    let context_hash = unsafe { context_hash.field(0) };
-    let context_hash = unsafe { context_hash.bytes_val() };
-    let context_hash = ContextHash::try_from_bytes(context_hash).expect("checkout");
+    let context_hash = context_hash_of_value("checkout", context_hash);
     let index = index.as_mut();
     index
         .0
@@ -497,12 +484,14 @@ pub fn tree_of_value(mut context: Pointer<Context>, value: Value) -> Pointer<Tre
 
 #[ocaml::func]
 #[ocaml::sig("tree -> bytes")]
-pub fn tree_hash(tree: Pointer<Tree>) -> OContextHash {
-    tree.as_ref()
+pub fn tree_hash(tree: Pointer<Tree>) -> Value {
+    let hash = tree
+        .as_ref()
         .as_ref()
         .hash()
-        .map(|h| OContextHash(ContextHash::try_from(&h[..]).unwrap()))
-        .unwrap()
+        .map(|h| (ContextHash::try_from(&h[..]).unwrap()))
+        .unwrap();
+    value_of_context_hash(hash)
 }
 
 #[ocaml::func]
@@ -518,8 +507,6 @@ pub fn tree_equal(tree1: Pointer<Tree>, tree2: Pointer<Tree>) -> bool {
 #[ocaml::func]
 #[ocaml::sig("string -> 'a -> string -> unit")]
 pub fn export_snapshot(context_path: String, context_hash: Value, output: String) -> () {
-    let context_hash = unsafe { context_hash.field(0) };
-    let context_hash = unsafe { context_hash.bytes_val() };
-    let context_hash = ContextHash::try_from_bytes(context_hash).expect("export_snapshot");
+    let context_hash = context_hash_of_value("export_snapshot", context_hash);
     tezos_context::snapshot::export_snapshot(context_path, &context_hash, output)
 }
