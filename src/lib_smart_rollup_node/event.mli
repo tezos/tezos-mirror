@@ -63,6 +63,10 @@ val kernel_debug : string -> unit Lwt.t
     [str] during a simulation. *)
 val simulation_kernel_debug : string -> unit Lwt.t
 
+(** [refutation_kernel_debug str] emits the event that the kernel has logged
+    [str] during a refutation. *)
+val refutation_kernel_debug : string -> unit Lwt.t
+
 (** [kernel_debug str] emits the event that the kernel has logged [str].
     (Doesn't wait for event to be emitted) *)
 val kernel_debug_dont_wait : string -> unit

@@ -197,6 +197,14 @@ let worker_promise, worker_waker = Lwt.task ()
 let start (node_ctxt : _ Node_context.t) =
   let open Lwt_result_syntax in
   let*! () = Refutation_game_event.Coordinator.starting () in
+  let*! kernel_debug_logger, finaliser =
+    Node_context.make_kernel_logger
+      ~enable_tracing:false
+      ~logs_dir:(Filename.concat node_ctxt.data_dir "refutation")
+      node_ctxt.config
+      Event.refutation_kernel_debug
+  in
+  let node_ctxt = {node_ctxt with kernel_debug_logger; finaliser} in
   let+ worker = Worker.launch table () node_ctxt (module Handlers) in
   Lwt.wakeup worker_waker worker
 
