@@ -184,3 +184,35 @@ let expect_missing_bls_proof ~loc ~kind_pk ~pk ~source_pkh errs =
           && Signature.Public_key.(err_pk = pk)
           && Signature.Public_key_hash.(err_source = source_pkh)
       | _ -> false)
+
+let invalid_signature = function
+  | Operation_repr.Invalid_signature -> true
+  | _ -> false
+
+let conflicting_consensus_operation ?kind = function
+  | Validate_errors.Consensus.Conflicting_consensus_operation {kind = kind'; _}
+    ->
+      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
+  | _ -> false
+
+let aggregate_disabled = function
+  | Validate_errors.Consensus.Aggregate_disabled -> true
+  | _ -> false
+
+let aggregate_in_mempool = function
+  | Validate_errors.Consensus.Aggregate_in_mempool -> true
+  | _ -> false
+
+let non_bls_key_in_aggregate = function
+  | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
+  | _ -> false
+
+let unaggregated_eligible_attestation ?kind = function
+  | Validate_errors.Consensus.Unaggregated_eligible_operation {kind = kind'; _}
+    ->
+      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
+  | _ -> false
+
+let empty_aggregation_committee = function
+  | Validate_errors.Consensus.Empty_aggregation_committee -> true
+  | _ -> false

@@ -36,42 +36,6 @@ let init_genesis_with_some_bls_accounts ?policy ?dal_enable
   let* b = Block.bake ?policy genesis in
   return (genesis, b)
 
-let aggregate_in_mempool_error = function
-  | Validate_errors.Consensus.Aggregate_in_mempool -> true
-  | _ -> false
-
-let aggregate_disabled_error = function
-  | Validate_errors.Consensus.Aggregate_disabled -> true
-  | _ -> false
-
-let aggregate_unimplemented_error = function
-  | Validate_errors.Consensus.Aggregate_not_implemented -> true
-  | _ -> false
-
-let signature_invalid_error = function
-  | Operation_repr.Invalid_signature -> true
-  | _ -> false
-
-let non_bls_in_aggregate = function
-  | Validate_errors.Consensus.Non_bls_key_in_aggregate -> true
-  | _ -> false
-
-let conflicting_consensus_operation ?kind = function
-  | Validate_errors.Consensus.Conflicting_consensus_operation {kind = kind'; _}
-    ->
-      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
-  | _ -> false
-
-let unaggregated_eligible_attestation ?kind = function
-  | Validate_errors.Consensus.Unaggregated_eligible_operation {kind = kind'; _}
-    ->
-      Option.fold ~none:true ~some:(fun kind -> kind = kind') kind
-  | _ -> false
-
-let empty_aggregation_committee = function
-  | Validate_errors.Consensus.Empty_aggregation_committee -> true
-  | _ -> false
-
 let find_preattestations_aggregate_result receipt =
   let result_opt =
     List.find_map
@@ -221,7 +185,7 @@ let test_aggregate_feature_flag_enabled () =
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block
-    ~mempool_error:aggregate_in_mempool_error
+    ~mempool_error:Error_helpers.aggregate_in_mempool
     Aggregate
 
 let test_aggregate_feature_flag_disabled () =
@@ -232,9 +196,9 @@ let test_aggregate_feature_flag_disabled () =
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block
-    ~application_error:aggregate_disabled_error
-    ~construction_error:aggregate_disabled_error
-    ~mempool_error:aggregate_in_mempool_error
+    ~application_error:Error_helpers.aggregate_disabled
+    ~construction_error:Error_helpers.aggregate_disabled
+    ~mempool_error:Error_helpers.aggregate_in_mempool
     Aggregate
 
 let test_attestations_aggregate_with_a_single_delegate () =
@@ -331,7 +295,7 @@ let test_attestations_aggregate_invalid_signature () =
       let*! res =
         Block.bake ~operation:aggregate_with_incorrect_signature block
       in
-      Assert.proto_error ~loc:__LOC__ res signature_invalid_error
+      Assert.proto_error ~loc:__LOC__ res Error_helpers.invalid_signature
 
 let test_preattestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
@@ -360,7 +324,7 @@ let test_preattestations_aggregate_invalid_signature () =
           ~operation:aggregate_with_incorrect_signature
           block
       in
-      Assert.proto_error ~loc:__LOC__ res signature_invalid_error
+      Assert.proto_error ~loc:__LOC__ res Error_helpers.invalid_signature
 
 let test_preattestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
@@ -405,7 +369,7 @@ let test_preattestations_aggregate_non_bls_delegate () =
           ~operation
           block
       in
-      Assert.proto_error ~loc:__LOC__ res non_bls_in_aggregate
+      Assert.proto_error ~loc:__LOC__ res Error_helpers.non_bls_key_in_aggregate
 
 let test_attestations_aggregate_non_bls_delegate () =
   let open Lwt_result_syntax in
@@ -442,9 +406,9 @@ let test_attestations_aggregate_non_bls_delegate () =
     in
     Op.check_validation_and_application_all_modes_different_outcomes
       ~loc:__LOC__
-      ~application_error:non_bls_in_aggregate
-      ~construction_error:non_bls_in_aggregate
-      ~mempool_error:aggregate_in_mempool_error
+      ~application_error:Error_helpers.non_bls_key_in_aggregate
+      ~construction_error:Error_helpers.non_bls_key_in_aggregate
+      ~mempool_error:Error_helpers.aggregate_in_mempool
       ~predecessor:block
       operation
   in
@@ -470,7 +434,7 @@ let test_multiple_aggregates_per_block_forbidden () =
     Assert.proto_error
       ~loc:__LOC__
       res
-      (conflicting_consensus_operation
+      (Error_helpers.conflicting_consensus_operation
          ~kind:Validate_errors.Consensus.Attestations_aggregate)
   in
   (* Craft one preattestations_aggregate per attester *)
@@ -495,7 +459,7 @@ let test_multiple_aggregates_per_block_forbidden () =
   Assert.proto_error
     ~loc:__LOC__
     res
-    (conflicting_consensus_operation
+    (Error_helpers.conflicting_consensus_operation
        ~kind:Validate_errors.Consensus.Preattestations_aggregate)
 
 let test_eligible_preattestation_must_be_aggregated () =
@@ -525,7 +489,7 @@ let test_eligible_preattestation_must_be_aggregated () =
   Assert.proto_error
     ~loc:__LOC__
     res
-    (unaggregated_eligible_attestation
+    (Error_helpers.unaggregated_eligible_attestation
        ~kind:Validate_errors.Consensus.Preattestation)
 
 let test_eligible_attestation_must_be_aggregated () =
@@ -546,7 +510,7 @@ let test_eligible_attestation_must_be_aggregated () =
   Assert.proto_error
     ~loc:__LOC__
     res
-    (unaggregated_eligible_attestation
+    (Error_helpers.unaggregated_eligible_attestation
        ~kind:Validate_errors.Consensus.Attestation)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7827
    Also test this behaviour for attestations with DAL contents. *)
@@ -573,7 +537,12 @@ let test_empty_committee () =
   let operation = Op.pack_operation (B block) signature (Single contents) in
   (* Baking with the attestations_aggregate and expecting an error *)
   let*! res = Block.bake ~operation block in
-  let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
+  let* () =
+    Assert.proto_error
+      ~loc:__LOC__
+      res
+      Error_helpers.empty_aggregation_committee
+  in
   (* Crafting a preattestations_aggregate with an empty committee *)
   let* consensus_content =
     let* block = Block.bake block in
@@ -599,7 +568,12 @@ let test_empty_committee () =
       ~operation
       block
   in
-  let* () = Assert.proto_error ~loc:__LOC__ res empty_aggregation_committee in
+  let* () =
+    Assert.proto_error
+      ~loc:__LOC__
+      res
+      Error_helpers.empty_aggregation_committee
+  in
   return_unit
 
 let test_metadata_committee_is_correctly_ordered () =
@@ -718,7 +692,7 @@ let test_preattestation_signature_for_attestation ~attested_block
     Op.check_validation_and_application
       ~loc:__LOC__
       ~predecessor:attested_block
-      ~error:signature_invalid_error
+      ~error:Error_helpers.invalid_signature
       Mempool
       op_attestation_with_preattestation_signature
   in
@@ -729,7 +703,7 @@ let test_preattestation_signature_for_attestation ~attested_block
     Op.check_validation_and_application
       ~loc:__LOC__
       ~predecessor:attested_block
-      ~error:signature_invalid_error
+      ~error:Error_helpers.invalid_signature
       Mempool
       op_preattestation_with_attestation_signature
   in
