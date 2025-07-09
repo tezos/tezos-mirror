@@ -197,32 +197,36 @@ let prepare_consensus_votes state proposal =
 let extract_pqc state (new_proposal : proposal) =
   match new_proposal.block.prequorum with
   | None -> None
-  | Some pqc ->
-      let add_voting_power acc (op : Kind.preattestation Operation.t) =
-        let open Protocol.Alpha_context.Operation in
-        let {
-          shell = _;
-          protocol_data = {contents = Single (Preattestation {slot; _}); _};
-          _;
-        } =
-          op
-        in
-        match
-          Delegate_slots.voting_power state.level_state.delegate_slots ~slot
-        with
-        | None ->
-            (* cannot happen if the map is correctly populated *)
-            acc
-        | Some attesting_power -> acc + attesting_power
-      in
+  | Some prequorum ->
       let voting_power =
-        List.fold_left add_voting_power 0 pqc.preattestations
+        let voting_power_of_slot slot =
+          match
+            Delegate_slots.voting_power state.level_state.delegate_slots ~slot
+          with
+          | Some attesting_power -> attesting_power
+          | None -> 0
+        in
+        List.fold_left
+          (fun voting_power op ->
+            let (Operation_data operation_data) = op.protocol_data in
+            match operation_data.contents with
+            | Single (Preattestation {slot; _}) ->
+                voting_power_of_slot slot + voting_power
+            | Single (Preattestations_aggregate {committee; _}) ->
+                List.fold_left
+                  (fun aggregated_voting_power slot ->
+                    voting_power_of_slot slot + aggregated_voting_power)
+                  0
+                  committee
+            | _ -> voting_power)
+          0
+          prequorum.preattestations
       in
       let consensus_threshold =
         state.global_state.constants.parametric.consensus_threshold_size
       in
       if Compare.Int.(voting_power >= consensus_threshold) then
-        Some (pqc.preattestations, pqc.round)
+        Some (prequorum.preattestations, prequorum.round)
       else None
 
 let may_update_attestable_payload_with_internal_pqc state
@@ -650,8 +654,7 @@ let propose_block_action state delegate round ~last_proposal =
           List.fold_left
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
-            (proposal.block.quorum
-            @ List.map Operation.pack prequorum.preattestations)
+            (proposal.block.quorum @ prequorum.preattestations)
         in
         let attestation_filter =
           {
@@ -929,8 +932,9 @@ let prequorum_reached_when_awaiting_preattestations state candidate
         level = latest_proposal.block.shell.level;
         round = latest_proposal.block.round;
         block_payload_hash = latest_proposal.block.payload_hash;
-        preattestations
-        (* preattestations may be nil when [consensus_threshold] is 0 *);
+        preattestations =
+          List.map Operation.pack preattestations
+          (* preattestations may be nil when [consensus_threshold] is 0 *);
       }
     in
     let new_attestable_payload = {proposal = latest_proposal; prequorum} in
