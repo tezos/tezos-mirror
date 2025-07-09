@@ -118,7 +118,7 @@ open struct
       ("network", Distributed_db_version.Name.encoding)
       ("version", Data_encoding.string)
 
-  let data_dir_not_found =
+  let config_file_not_found =
     declare_1
       ~section
       ~prefix_name_with_section:true
@@ -1210,7 +1210,7 @@ let emit_store_is_ready () = emit store_is_ready ()
 let emit_node_is_ready ~network_name ~version =
   emit node_is_ready (network_name, version)
 
-let emit_data_dir_not_found ~path = emit data_dir_not_found path
+let emit_config_file_not_found ~path = emit config_file_not_found path
 
 let emit_retry_fetching_info_from_l1 ~endpoint ~delay ~requested_info
     ~event_level =

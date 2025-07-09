@@ -198,6 +198,16 @@ module Term = struct
 
   let data_dir = arg_to_cmdliner data_dir_arg
 
+  let config_file_arg =
+    make_arg
+      ~doc:"The configuration file of the octez DAL node."
+      ~parse:Result.ok
+      ~placeholder:"FILE"
+      ~pp:Format.pp_print_string
+      "config-file"
+
+  let config_file = arg_to_cmdliner config_file_arg
+
   let rpc_addr_arg =
     let default_port = Configuration_file.default.rpc_addr |> snd in
     let parse, pp = p2p_point_format ~default_port in
@@ -566,13 +576,13 @@ module Term = struct
   let term process =
     Cmdliner.Term.(
       ret
-        (const process $ data_dir $ rpc_addr $ expected_pow $ net_addr
-       $ public_addr $ endpoint $ slots_backup_uris $ trust_slots_backup_uris
-       $ metrics_addr $ attester_profile $ operator_profile $ observer_profile
-       $ bootstrap_profile $ peers $ history_mode $ service_name
-       $ service_namespace $ fetch_trusted_setup $ disable_shard_validation
-       $ verbose $ ignore_l1_config_peers $ disable_amplification
-       $ ignore_topics))
+        (const process $ data_dir $ config_file $ rpc_addr $ expected_pow
+       $ net_addr $ public_addr $ endpoint $ slots_backup_uris
+       $ trust_slots_backup_uris $ metrics_addr $ attester_profile
+       $ operator_profile $ observer_profile $ bootstrap_profile $ peers
+       $ history_mode $ service_name $ service_namespace $ fetch_trusted_setup
+       $ disable_shard_validation $ verbose $ ignore_l1_config_peers
+       $ disable_amplification $ ignore_topics))
 end
 
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
@@ -717,6 +727,7 @@ type experimental_features = unit
 
 type options = {
   data_dir : string option;
+  config_file : string option;
   rpc_addr : P2p_point.Id.t option;
   expected_pow : float option;
   listen_addr : P2p_point.Id.t option;
@@ -739,11 +750,11 @@ type options = {
   ignore_topics : Signature.public_key_hash list;
 }
 
-let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
-    public_addr endpoint slots_backup_uris trust_slots_backup_uris metrics_addr
-    attesters operators observers bootstrap_flag peers history_mode service_name
-    service_namespace fetch_trusted_setup disable_shard_validation verbose
-    ignore_l1_config_peers disable_amplification ignore_topics =
+let cli_options_to_options data_dir config_file rpc_addr expected_pow
+    listen_addr public_addr endpoint slots_backup_uris trust_slots_backup_uris
+    metrics_addr attesters operators observers bootstrap_flag peers history_mode
+    service_name service_namespace fetch_trusted_setup disable_shard_validation
+    verbose ignore_l1_config_peers disable_amplification ignore_topics =
   let open Result_syntax in
   let profile = Controller_profiles.make ~attesters ~operators ?observers () in
   let* profile =
@@ -768,6 +779,7 @@ let cli_options_to_options data_dir rpc_addr expected_pow listen_addr
   return
     {
       data_dir;
+      config_file;
       rpc_addr;
       expected_pow;
       listen_addr;
@@ -795,6 +807,7 @@ let merge_experimental_features _ _configuration = ()
 let merge
     {
       data_dir;
+      config_file = _;
       rpc_addr;
       expected_pow;
       listen_addr;
@@ -878,13 +891,18 @@ let wrap_with_error main_promise =
 
 let run subcommand cli_options =
   let open Lwt_result_syntax in
+  let data_dir =
+    Option.value
+      ~default:Configuration_file.default.data_dir
+      cli_options.data_dir
+  in
+  let config_file =
+    Option.value
+      cli_options.config_file
+      ~default:(Configuration_file.default_config_file data_dir)
+  in
   match subcommand with
   | Run ->
-      let data_dir =
-        Option.value
-          ~default:Configuration_file.default.data_dir
-          cli_options.data_dir
-      in
       let* () =
         if disable_shard_validation && not cli_options.disable_shard_validation
         then
@@ -920,18 +938,27 @@ let run subcommand cli_options =
         ~disable_shard_validation
         ~ignore_pkhs
         ~data_dir
+        ~config_file
         ~configuration_override:(merge cli_options)
         ()
   | Config_init ->
-      Configuration_file.save (merge cli_options Configuration_file.default)
+      Configuration_file.save
+        ~config_file
+        (merge cli_options Configuration_file.default)
   | Config_update ->
-      let data_dir =
+      let config_file =
         Option.value
-          ~default:Configuration_file.default.data_dir
-          cli_options.data_dir
+          cli_options.config_file
+          ~default:
+            (let data_dir =
+               Option.value
+                 ~default:Configuration_file.default.data_dir
+                 cli_options.data_dir
+             in
+             Filename.concat data_dir "config.json")
       in
-      let* configuration = Configuration_file.load ~data_dir in
-      Configuration_file.save (merge cli_options configuration)
+      let* configuration = Configuration_file.load ~config_file in
+      Configuration_file.save ~config_file (merge cli_options configuration)
   | Debug_print_store_schemas ->
       Lwt_utils_unix.with_tempdir "store" @@ fun data_dir ->
       let* schemas = Store.Skip_list_cells.schemas data_dir in
@@ -945,14 +972,16 @@ let main_run subcommand cli_options =
   wrap_with_error @@ run subcommand cli_options
 
 let commands =
-  let run subcommand data_dir rpc_addr expected_pow listen_addr public_addr
-      endpoint slots_backup_uris trust_slots_backup_uris metrics_addr attesters
-      operators observers bootstrap_flag peers history_mode service_name
-      service_namespace fetch_trusted_setup disable_shard_validation verbose
-      ignore_l1_config_peers disable_amplification ignore_pkhs =
+  let run subcommand data_dir config_file rpc_addr expected_pow listen_addr
+      public_addr endpoint slots_backup_uris trust_slots_backup_uris
+      metrics_addr attesters operators observers bootstrap_flag peers
+      history_mode service_name service_namespace fetch_trusted_setup
+      disable_shard_validation verbose ignore_l1_config_peers
+      disable_amplification ignore_pkhs =
     match
       cli_options_to_options
         data_dir
+        config_file
         rpc_addr
         expected_pow
         listen_addr

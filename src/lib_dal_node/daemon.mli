@@ -39,6 +39,7 @@ val run :
   ?disable_shard_validation:bool ->
   ignore_pkhs:Signature.public_key_hash list ->
   data_dir:string ->
+  config_file:string ->
   configuration_override:(Configuration_file.t -> Configuration_file.t) ->
   unit ->
   unit tzresult Lwt.t

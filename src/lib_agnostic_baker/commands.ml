@@ -78,6 +78,8 @@ module Dal = struct
 
   let data_dir = arg_to_clic data_dir_arg
 
+  let config_file = arg_to_clic config_file_arg
+
   let rpc_addr = arg_to_clic rpc_addr_arg
 
   let expected_pow = arg_to_clic expected_pow_arg
@@ -123,8 +125,9 @@ module Dal = struct
   let ignore_topics = arg_list_to_clic ignore_topics_arg
 
   let args =
-    Tezos_clic.args23
+    Tezos_clic.args24
       data_dir
+      config_file
       rpc_addr
       expected_pow
       net_addr
@@ -159,6 +162,7 @@ module Dal = struct
         params
         (fun
           ( data_dir,
+            config_file,
             rpc_addr,
             expected_pow,
             net_addr,
@@ -191,6 +195,7 @@ module Dal = struct
           let options =
             Cli.cli_options_to_options
               data_dir
+              config_file
               rpc_addr
               expected_pow
               net_addr

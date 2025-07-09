@@ -56,6 +56,8 @@ module Term : sig
 
   val data_dir_arg : string arg
 
+  val config_file_arg : string arg
+
   val rpc_addr_arg : P2p_point.Id.t arg
 
   val expected_pow_arg : float arg
@@ -113,6 +115,7 @@ type experimental_features = unit
 type options = {
   data_dir : string option;
       (** Directory containing files related to the DAL node. *)
+  config_file : string option;  (** Configuration file of the DAL node. *)
   rpc_addr : P2p_point.Id.t option;
       (** The endpoint on which the DAL node can be contacted for RPCs. *)
   expected_pow : float option;
@@ -159,6 +162,7 @@ type options = {
 type t = Run | Config_init | Config_update | Debug_print_store_schemas
 
 val cli_options_to_options :
+  string option ->
   string option ->
   P2p_point.Id.t option ->
   float option ->

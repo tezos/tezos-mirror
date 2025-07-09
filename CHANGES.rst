@@ -342,6 +342,7 @@ DAL node
 
 - Added a new RPC ``/last_processed_level`` to retrieve the last (finalized) L1
   level processed by a DAL node (MR :gl:`!16420`)
+
 - A warning is emitted when registering a public key hash (as an attester
   profile) that does not correspond to that of a delegate. (MR :gl:`!16336`)
 
@@ -378,6 +379,9 @@ DAL node
   cryptographic verification of retrieved data. This is especially useful when
   replaying history or debugging. (MRs :gl:`!18059`, :gl:`!18074`, :gl:`!18124`
   and :gl:`!18181`).
+
+- A command line option ``--config-file`` as been added, allowing to have a
+  configuration file out of the data directory. (MR :gl:`!18464`)
 
 Miscellaneous
 -------------
