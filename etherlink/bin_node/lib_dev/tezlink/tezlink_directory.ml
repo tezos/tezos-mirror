@@ -184,13 +184,16 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let* hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
     let* header = tezlink_block_to_raw_block_header ~chain_id block in
     let* metadata = make_metadata ~level_info in
+    let* operations =
+      Block_services.deserialize_operations ~chain_id block.operations
+    in
     let block_info : Block_services.block_info =
       {
         chain_id;
         hash;
         header;
         metadata = Some metadata;
-        operations = Block_services.operations;
+        operations = [[]; []; []; operations];
       }
     in
     return (version, block_info)
@@ -387,10 +390,16 @@ let build_block_static_directory ~l2_chain_id
          let voting_operation_hashes = [] in
          let anonymous_operation_hashes = [] in
          let* manager_operation_hashes =
-           let+ operations = Backend.operations chain ~chain_id block in
-           List.map
-             (fun (op : Tezos_services.Block_services.operation) -> op.hash)
-             operations
+           let* block = Backend.block chain block in
+           let*? operations =
+             Tezos_services.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
+           return
+           @@ List.map
+                (fun (op : Tezos_services.Block_services.operation) -> op.hash)
+                operations
          in
          return
            [
@@ -409,7 +418,12 @@ let build_block_static_directory ~l2_chain_id
            (* All tezlink operations are manager operations *)
            return_none
          else
-           let* operations = Backend.operations ~chain_id chain block in
+           let* block = Backend.block chain block in
+           let*? operations =
+             Tezos_services.Block_services.deserialize_operations
+               ~chain_id
+               block.operations
+           in
            let operation_opt = List.nth_opt operations operation_index in
            return (Option.map (fun op -> (o#version, op)) operation_opt))
 

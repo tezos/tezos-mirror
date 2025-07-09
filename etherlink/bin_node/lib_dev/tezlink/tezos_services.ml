@@ -83,13 +83,14 @@ end
 module type BLOCK_SERVICES = sig
   include Tezos_shell_services.Block_services.S
 
+  val deserialize_operations :
+    chain_id:Chain_id.t -> bytes -> operation list tzresult
+
   val mock_block_header_data :
     chain_id:Chain_id.t -> Proto.block_header_data tzresult
 
   val mock_block_header_metadata :
     Tezos_types.level -> Proto.block_header_metadata tzresult
-
-  val operations : operation list list
 end
 
 (** We add to Imported_protocol the mocked protocol data used in headers *)
@@ -117,11 +118,52 @@ module Imported_protocol = struct
     {contents; signature}
 end
 
+module Make_block_service
+    (Proto : Tezos_shell_services.Block_services.PROTO)
+    (Next_proto : Tezos_shell_services.Block_services.PROTO) =
+struct
+  include Tezos_shell_services.Block_services.Make (Proto) (Next_proto)
+
+  let deserialize_operations ~chain_id bytes =
+    let open Result_syntax in
+    let operations =
+      Data_encoding.Binary.to_bytes_exn Data_encoding.bytes bytes
+    in
+    let operations =
+      Data_encoding.Binary.of_bytes_exn
+        Data_encoding.(
+          list
+            (tup3
+               Operation_hash.encoding
+               Tezos_base.Operation.shell_header_encoding
+               bytes))
+        operations
+    in
+    let operations =
+      List.map
+        (fun ( hash,
+               (shell_header : Tezos_base.Operation.shell_header),
+               op_receipt ) ->
+          let protocol_data, receipt =
+            Data_encoding.Binary.of_bytes_exn
+              Proto.operation_data_and_receipt_encoding
+              op_receipt
+          in
+          ({
+             chain_id;
+             hash;
+             shell = shell_header;
+             protocol_data;
+             receipt = Receipt receipt;
+           }
+            : operation))
+        operations
+    in
+    return operations
+end
+
 module Block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make
-      (Imported_protocol)
-      (Imported_protocol)
+  include Make_block_service (Imported_protocol) (Imported_protocol)
 
   let voting_period ~cycles_per_voting_period ~position ~level_info =
     let open Tezos_types in
@@ -228,13 +270,10 @@ module Block_services = struct
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
-
-  let operations = [[]; []; []; []]
 end
 
 module Zero_block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make (Zero_protocol) (Genesis_protocol)
+  include Make_block_service (Zero_protocol) (Genesis_protocol)
 
   let mock_block_header_data ~chain_id:_ : Proto.block_header_data tzresult =
     Tezos_types.convert_using_serialization
@@ -249,15 +288,10 @@ module Zero_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
-
-  let operations = []
 end
 
 module Genesis_block_services = struct
-  include
-    Tezos_shell_services.Block_services.Make
-      (Genesis_protocol)
-      (Imported_protocol)
+  include Make_block_service (Genesis_protocol) (Imported_protocol)
 
   let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
     let parameter =
@@ -292,8 +326,6 @@ module Genesis_block_services = struct
       ~dst:Proto.block_header_metadata_encoding
       ~src:Data_encoding.empty
       ()
-
-  let operations = []
 end
 
 (** [wrap conversion service_implementation] changes the output type

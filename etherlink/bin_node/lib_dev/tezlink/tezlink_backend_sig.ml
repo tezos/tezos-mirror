@@ -47,10 +47,4 @@ module type S = sig
 
   val monitor_heads :
     [> `Main] -> 'a -> L2_types.Tezos_block.t Lwt_stream.t * Lwt_watcher.stopper
-
-  val operations :
-    [`Main] ->
-    chain_id:Chain_id.t ->
-    block_param ->
-    Tezos_services.Block_services.operation list tzresult Lwt.t
 end
