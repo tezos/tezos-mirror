@@ -902,6 +902,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIs_implicit_account :
       Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
       -> (address, 'S, 'r, 'F) kinstr
+  | IIndex_address :
+      Script.location * (n num, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;
@@ -1655,6 +1658,7 @@ let kinstr_location : type a s b f. (a, s, b, f) kinstr -> Script.location =
   | IView (loc, _, _, _) -> loc
   | IImplicit_account (loc, _) -> loc
   | IIs_implicit_account (loc, _) -> loc
+  | IIndex_address (loc, _) -> loc
   | ICreate_contract {loc; _} -> loc
   | ISet_delegate (loc, _) -> loc
   | INow (loc, _) -> loc
@@ -2238,6 +2242,7 @@ let kinstr_traverse i init f =
     | ITransfer_tokens (_, k) -> (next [@ocaml.tailcall]) k
     | IImplicit_account (_, k) -> (next [@ocaml.tailcall]) k
     | IIs_implicit_account (_, k) -> (next [@ocaml.tailcall]) k
+    | IIndex_address (_, k) -> (next [@ocaml.tailcall]) k
     | ICreate_contract {k; _} -> (next [@ocaml.tailcall]) k
     | ISet_delegate (_, k) -> (next [@ocaml.tailcall]) k
     | INow (_, k) -> (next [@ocaml.tailcall]) k

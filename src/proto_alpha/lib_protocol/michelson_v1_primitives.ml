@@ -161,6 +161,7 @@ type prim =
   | I_EMIT
   | I_BYTES
   | I_NAT
+  | I_INDEX_ADDRESS
   | T_bool
   | T_contract
   | T_int
@@ -228,7 +229,7 @@ let namespace = function
   | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ | I_SWAP
   | I_TICKET | I_TICKET_DEPRECATED | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS
   | I_UNIT | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR
-  | I_OPEN_CHEST | I_EMIT | I_BYTES | I_NAT ->
+  | I_OPEN_CHEST | I_EMIT | I_BYTES | I_NAT | I_INDEX_ADDRESS ->
       Instr_namespace
   | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
   | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
@@ -376,6 +377,7 @@ let string_of_prim = function
   | I_VIEW -> "VIEW"
   | I_BYTES -> "BYTES"
   | I_NAT -> "NAT"
+  | I_INDEX_ADDRESS -> "INDEX_ADDRESS"
   | T_bool -> "bool"
   | T_contract -> "contract"
   | T_int -> "int"
@@ -539,6 +541,7 @@ let prim_of_string =
   | "EMIT" -> return I_EMIT
   | "BYTES" -> return I_BYTES
   | "NAT" -> return I_NAT
+  | "INDEX_ADDRESS" -> return I_INDEX_ADDRESS
   | "bool" -> return T_bool
   | "contract" -> return T_contract
   | "int" -> return T_int
@@ -805,6 +808,8 @@ let prim_encoding =
          (* /!\ NEW INSTRUCTIONS MUST BE ADDED AT THE END OF THE STRING_ENUM, FOR BACKWARD COMPATIBILITY OF THE ENCODING. *)
          (* Alpha_023 addition *)
          ("IS_IMPLICIT_ACCOUNT", I_IS_IMPLICIT_ACCOUNT);
+         (* Alpha_024 addition *)
+         ("INDEX_ADDRESS", I_INDEX_ADDRESS);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]
