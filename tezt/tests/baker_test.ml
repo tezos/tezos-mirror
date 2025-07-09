@@ -1159,6 +1159,100 @@ let attestations_aggregation_on_reproposal_remote_node =
   @@ fun protocol ->
   attestations_aggregation_on_reproposal ~remote_mode:true protocol
 
+let aggregated_operations_retrival_from_block_content =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Aggregated operations are retrieved from the block content"
+    ~tags:[team; "baker"; "aggregation"; "reproposal"; "retrival"]
+    ~supports:Protocol.(From_protocol 023)
+  @@ fun protocol ->
+  log_step 1 "Initialize a node and a client with protocol" ;
+  let consensus_rights_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["allow_tz4_delegate_enable"], `Bool true);
+        (["aggregate_attestation"], `Bool true);
+        (* Diminish some constants to activate consensus keys faster *)
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol `Client ~protocol ~parameter_file ()
+  in
+  log_step 2 "Wait for level 1" ;
+  let* _ = Node.wait_for_level node 1 in
+  log_step 3 "Generate fresh BLS consensus keys for bootstrap1 to bootstrap3" ;
+  let* b1 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap1 client in
+  let* b2 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap2 client in
+  let* b3 = Client.update_fresh_consensus_key ~algo:"bls" bootstrap3 client in
+  let delegates =
+    Account.Bootstrap.keys |> Array.to_list
+    |> List.append [b1; b2; b3]
+    |> List.map (fun (account : Account.key) -> account.Account.alias)
+  in
+  (* Expected committee that should be found in aggregations *)
+  let expected_aggregated_committee = [bootstrap1; bootstrap2; bootstrap3] in
+  (* Expected delegates that should be found non-aggregated *)
+  let expected_non_aggregated = [bootstrap4; bootstrap5] in
+  log_step 4 "Bake for until level 8" ;
+  (* Baking until level 8 ensures that the BLS consensus keys are activated *)
+  let* () = Client.bake_for_and_wait ~count:7 ~keys:delegates client in
+  log_step 5 "Check consensus operations" ;
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:expected_aggregated_committee
+      ~expected_attestations:expected_non_aggregated
+      client
+  in
+  (* The bake for command bakes a block with handmade (aggregated) attestations
+     that are not injected in the node. To repropose with these operations, the
+     baker must retrieve them from the block content. *)
+  let* () =
+    Client.repropose_for_and_wait ~key:delegates ~minimal_timestamp:true client
+  in
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:expected_aggregated_committee
+      ~expected_attestations:expected_non_aggregated
+      client
+  in
+  let* () =
+    Client.repropose_for_and_wait
+      ~key:delegates
+      ~force_reproposal:true
+      ~minimal_timestamp:true
+      client
+  in
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:expected_aggregated_committee
+      ~expected_attestations:expected_non_aggregated
+      ~expected_preattestations_committee:expected_aggregated_committee
+      ~expected_preattestations:expected_non_aggregated
+      client
+  in
+  (* Same as the bake_for command, the repropose_for ~force_reproposal:true
+      bakes a block with handmade (aggregated) preattestations. To include them
+     in a new reproposal, the baker must retrieve them from the block content. *)
+  let* () =
+    Client.repropose_for_and_wait ~key:delegates ~minimal_timestamp:true client
+  in
+  let* () =
+    check_consensus_operations
+      ~expected_attestations_committee:expected_aggregated_committee
+      ~expected_attestations:expected_non_aggregated
+      ~expected_preattestations_committee:expected_aggregated_committee
+      ~expected_preattestations:expected_non_aggregated
+      client
+  in
+  unit
+
 let register ~protocols =
   check_node_version_check_bypass_test protocols ;
   check_node_version_allowed_test protocols ;
@@ -1175,4 +1269,5 @@ let register ~protocols =
   simple_attestations_aggregation_remote_node protocols ;
   prequorum_check_levels protocols ;
   attestations_aggregation_on_reproposal_local_context protocols ;
-  attestations_aggregation_on_reproposal_remote_node protocols
+  attestations_aggregation_on_reproposal_remote_node protocols ;
+  aggregated_operations_retrival_from_block_content protocols
