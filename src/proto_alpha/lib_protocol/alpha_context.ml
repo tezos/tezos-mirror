@@ -450,6 +450,21 @@ end
 
 module Global_constants_storage = Global_constants_storage
 
+module Address_registry_storage = struct
+  type add_result = {ctxt : context; index : Z.t; existed : bool}
+
+  let init = Address_registry_storage.init
+
+  let find = Address_registry_storage.find
+
+  let add_if_missing ctxt address =
+    let open Lwt_result_syntax in
+    let* Address_registry_storage.{ctxt; index; existed} =
+      Address_registry_storage.add_if_missing ctxt address
+    in
+    return {ctxt; index; existed}
+end
+
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map
 
