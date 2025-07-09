@@ -85,7 +85,7 @@ let from_api_input_request : Api.input_request -> input_request =
 let with_hooks printer f =
   let open Lwt_syntax in
   let debug_log = Buffer.create 1024 in
-  let res = f (fun c -> Buffer.add_char debug_log (Char.chr c)) in
+  let res = f (fun bytes -> Buffer.add_bytes debug_log bytes) in
   let* () = printer (Buffer.contents debug_log) in
   return res
 

@@ -290,42 +290,42 @@ dependencies = [
 
 [[package]]
 name = "cranelift-assembler-x64"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ff8e35182c7372df00447cb90a04e584e032c42b9b9b6e8c50ddaaf0d7900d5"
+checksum = "93cf506bed25cb8ba3ec4430f26702863aa6329750aa65a480dceae8bdb76809"
 dependencies = [
  "cranelift-assembler-x64-meta",
 ]
 
 [[package]]
 name = "cranelift-assembler-x64-meta"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14220f9c2698015c3b94dc6b84ae045c1c45509ddc406e43c6139252757fdb7a"
+checksum = "b27f02eed9b27eb0385b5997c05084917d48194137c21f334735c5d76eec117a"
 dependencies = [
  "cranelift-srcgen",
 ]
 
 [[package]]
 name = "cranelift-bforest"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d372ef2777ceefd75829e1390211ac240e9196bc60699218f7ea2419038288ee"
+checksum = "fe6ad4b4488859c4811aa9142170d3b065bdafea7075cd4143056c046f7c72ae"
 dependencies = [
  "cranelift-entity",
 ]
 
 [[package]]
 name = "cranelift-bitset"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56323783e423818fa89ce8078e90a3913d2a6e0810399bfce8ebd7ee87baa81f"
+checksum = "0c06cd918f49011c7ceb6f8757c8f9bd32f9045e58f71b97fbe3d63892f6cf83"
 
 [[package]]
 name = "cranelift-codegen"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74ffb780aab6186c6e9ba26519654b1ac55a09c0a866f6088a4efbbd84da68ed"
+checksum = "8cdebfb6e36cb7d48f0ab297d5796b97b2b04b9b5c21a450912a211a7102da26"
 dependencies = [
  "bumpalo",
  "cranelift-assembler-x64",
@@ -348,9 +348,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-meta"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c23ef13814d3b39c869650d5961128cbbecad83fbdff4e6836a03ecf6862d7ed"
+checksum = "e605c5c2eb617ad757c75c4fbed1f0d2b1cd571db5f3da53f219efb394545493"
 dependencies = [
  "cranelift-assembler-x64-meta",
  "cranelift-codegen-shared",
@@ -359,24 +359,24 @@ dependencies = [
 
 [[package]]
 name = "cranelift-codegen-shared"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9f623300657679f847803ce80811454bfff89cea4f6bf684be5c468d4a73631"
+checksum = "955ce5cf12c08ebaf8c4850e2121de30bc6d9ff33fb27ce4a0ffe5d7746692a4"
 
 [[package]]
 name = "cranelift-control"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31f4168af69989aa6b91fab46799ed4df6096f3209f4a6c8fb4358f49c60188f"
+checksum = "46964bda6b3a6ba94727f6d0805387c1e8e5a6baf6108a52109d8e63a182e1c0"
 dependencies = [
  "arbitrary",
 ]
 
 [[package]]
 name = "cranelift-entity"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca6fa9bae1c8de26d71ac2162f069447610fd91e7780cb480ee0d76ac81eabb8"
+checksum = "e3a03bd7c094dcc97617632f0cea6c6972b06f224c2b76ac27a70fae8193000e"
 dependencies = [
  "cranelift-bitset",
 ]
@@ -395,9 +395,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-isle"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "588d0c5964f10860b04043e55aab26d7f7a206b0fd4f10c5260e8aa5773832bd"
+checksum = "12f26b56a561336d972e453d172883a82aff66a5a69d0796848c4c7cd1298555"
 
 [[package]]
 name = "cranelift-jit"
@@ -432,9 +432,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-native"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19ed3c94cb97b14f92b6a94a1d45ef8c851f6a2ad9114e5d91d233f7da638fed"
+checksum = "ac25071ffd31769ac4d19ddb7d6913c4132fe5d7a28b4e0c4fc739011e18cfa9"
 dependencies = [
  "cranelift-codegen",
  "libc",
@@ -443,9 +443,9 @@ dependencies = [
 
 [[package]]
 name = "cranelift-srcgen"
-version = "0.120.0"
+version = "0.120.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85256fac1519a7d25a040c1d850fba67478f3f021ad5fdf738ba4425ee862dbf"
+checksum = "92276fa85f9aad4204cb27b2d753b4e7bf34443e8446d650383234bb84d4d48a"
 
 [[package]]
 name = "crossbeam-utils"
@@ -1025,18 +1025,19 @@ dependencies = [
 
 [[package]]
 name = "num_enum"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02339744ee7253741199f897151b38e72257d13802d4ee837285cc2990a90845"
+checksum = "a973b4e44ce6cad84ce69d797acf9a044532e4184c4f267913d1b546a0727b7a"
 dependencies = [
  "num_enum_derive",
+ "rustversion",
 ]
 
 [[package]]
 name = "num_enum_derive"
-version = "0.7.2"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "681030a937600a36906c185595136d26abfebb4aa9c65701cefcaf8578bb982b"
+checksum = "77e878c846a8abae00dd069496dbe8751b16ac1c3d6bd2a7283a938e8228f90d"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1098,7 +1099,7 @@ dependencies = [
 [[package]]
 name = "octez-riscv"
 version = "0.0.0"
-source = "git+https://github.com/tezos/riscv-pvm.git#bea5417fd1898ccc506cda11e07f12daddbd1293"
+source = "git+https://github.com/tezos/riscv-pvm.git#ffdd7b976f9a98f3140d8080b1119354afb04356"
 dependencies = [
  "arbitrary-int",
  "bincode",
@@ -1683,7 +1684,7 @@ checksum = "e502f78cdbb8ba4718f566c418c52bc729126ffd16baee5baa718cf25dd5a69a"
 [[package]]
 name = "tezos-smart-rollup-build-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "rustc_version",
 ]
@@ -1691,12 +1692,12 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-constants"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 
 [[package]]
 name = "tezos-smart-rollup-core"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-constants",
@@ -1705,7 +1706,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-encoding"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "hex",
  "nom",
@@ -1724,7 +1725,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-host"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "tezos-smart-rollup-build-utils",
  "tezos-smart-rollup-core",
@@ -1736,7 +1737,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-mock"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "hex",
  "tezos-smart-rollup-core",
@@ -1749,7 +1750,7 @@ dependencies = [
 [[package]]
 name = "tezos-smart-rollup-utils"
 version = "0.2.2"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "clap",
  "hex",
@@ -1766,7 +1767,7 @@ dependencies = [
 [[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "anyhow",
  "bs58",
@@ -1791,7 +1792,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "bit-vec",
  "bitvec",
@@ -1808,7 +1809,7 @@ dependencies = [
 [[package]]
 name = "tezos_data_encoding_derive"
 version = "0.6.0"
-source = "git+https://gitlab.com/tezos/tezos.git#0bf7deb196e7015c4595b7bce1659796e83cdca5"
+source = "git+https://gitlab.com/tezos/tezos.git#646ce59cd891e652d69777314c44b3a48a293edd"
 dependencies = [
  "lazy_static",
  "once_cell",

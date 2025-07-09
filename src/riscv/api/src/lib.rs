@@ -17,9 +17,11 @@ use num_enum::TryFromPrimitive;
 use ocaml::Pointer;
 use ocaml::ToValue;
 use octez_riscv::pvm::InputRequest as PvmInputRequest;
-use octez_riscv::pvm::PvmHooks;
 use octez_riscv::pvm::PvmInput;
 use octez_riscv::pvm::PvmStatus;
+use octez_riscv::pvm::hooks::NoHooks;
+use octez_riscv::pvm::hooks::PvmHooks;
+use octez_riscv::pvm::hooks::StdoutDebugHooks;
 use octez_riscv::pvm::node_pvm::NodePvm;
 use octez_riscv::pvm::node_pvm::PvmStorage;
 use octez_riscv::pvm::node_pvm::PvmStorageError;
@@ -210,12 +212,27 @@ pub struct OutputProof;
 
 ocaml::custom!(OutputProof);
 
-fn pvm_hooks_from_printer(printer: ocaml::Value, gc: &ocaml::Runtime) -> PvmHooks {
-    let putchar = move |c: u8| unsafe {
-        ocaml::Value::call(&printer, gc, [ocaml::Int::from(c)])
-            .expect("compute_step: putchar error")
+/// Hooks for the PVM to call into OCaml code
+struct OCamlHooks<F> {
+    put_bytes: F,
+}
+
+impl<F: Fn(&[u8])> PvmHooks for OCamlHooks<F> {
+    fn write_debug_bytes(&mut self, bytes: &[u8]) {
+        (self.put_bytes)(bytes);
+    }
+}
+
+/// Create a PVM hooks instance that calls an OCaml function to print debug information.
+fn pvm_hooks_from_ocaml_fn(
+    printer: ocaml::Value,
+    gc: &ocaml::Runtime,
+) -> OCamlHooks<impl Fn(&[u8])> {
+    let put_bytes = move |bytes: &[u8]| unsafe {
+        ocaml::Value::call1(&printer, gc, bytes).expect("NodeHooks: put_bytes failed");
     };
-    PvmHooks::new(putchar)
+
+    OCamlHooks { put_bytes }
 }
 
 #[ocaml::func]
@@ -322,18 +339,17 @@ pub fn octez_riscv_string_of_status(status: Status) -> String {
 #[ocaml::func]
 #[ocaml::sig("state -> state")]
 pub fn octez_riscv_compute_step(state: Pointer<State>) -> Pointer<State> {
-    apply_imm(state, |pvm| pvm.compute_step(&mut PvmHooks::default())).0
+    apply_imm(state, |pvm| pvm.compute_step(StdoutDebugHooks)).0
 }
 
 #[ocaml::func]
-#[ocaml::sig("state -> (int -> unit) -> state")]
+#[ocaml::sig("state -> (bytes -> unit) -> state")]
 pub fn octez_riscv_compute_step_with_debug(
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> Pointer<State> {
-    let mut hooks = pvm_hooks_from_printer(printer, gc);
-
-    apply_imm(state, |pvm| pvm.compute_step(&mut hooks)).0
+    let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
+    apply_imm(state, |pvm| pvm.compute_step(hooks)).0
 }
 
 #[ocaml::func]
@@ -343,7 +359,7 @@ pub fn octez_riscv_compute_step_many(
     state: Pointer<State>,
 ) -> (Pointer<State>, i64) {
     apply_imm(state, |pvm| {
-        pvm.compute_step_many(&mut PvmHooks::default(), max_steps as usize)
+        pvm.compute_step_many(StdoutDebugHooks, max_steps as usize)
     })
 }
 
@@ -351,35 +367,33 @@ pub fn octez_riscv_compute_step_many(
 #[ocaml::sig("int64 -> mut_state -> int64")]
 pub fn octez_riscv_mut_compute_step_many(max_steps: u64, state: Pointer<MutState>) -> i64 {
     apply_mut(state, |pvm| {
-        pvm.compute_step_many(&mut PvmHooks::default(), max_steps as usize)
+        pvm.compute_step_many(StdoutDebugHooks, max_steps as usize)
     })
 }
 
 #[ocaml::func]
-#[ocaml::sig("int64 -> state -> (int -> unit) -> (state * int64)")]
+#[ocaml::sig("int64 -> state -> (bytes -> unit) -> (state * int64)")]
 pub fn octez_riscv_compute_step_many_with_debug(
     max_steps: u64,
     state: Pointer<State>,
     printer: ocaml::Value,
 ) -> (Pointer<State>, i64) {
-    let mut hooks = pvm_hooks_from_printer(printer, gc);
-
+    let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
     apply_imm(state, |pvm| {
-        pvm.compute_step_many(&mut hooks, max_steps as usize)
+        pvm.compute_step_many(hooks, max_steps as usize)
     })
 }
 
 #[ocaml::func]
-#[ocaml::sig("int64 -> mut_state -> (int -> unit) -> int64")]
+#[ocaml::sig("int64 -> mut_state -> (bytes -> unit) -> int64")]
 pub fn octez_riscv_mut_compute_step_many_with_debug(
     max_steps: u64,
     state: Pointer<MutState>,
     printer: ocaml::Value,
 ) -> i64 {
-    let mut hooks = pvm_hooks_from_printer(printer, gc);
-
+    let hooks = pvm_hooks_from_ocaml_fn(printer, gc);
     apply_mut(state, |pvm| {
-        pvm.compute_step_many(&mut hooks, max_steps as usize)
+        pvm.compute_step_many(hooks, max_steps as usize)
     })
 }
 
@@ -581,7 +595,7 @@ pub fn octez_riscv_produce_proof(
     state: Pointer<State>,
 ) -> Option<Pointer<Proof>> {
     let input = input.map(|i| i.into());
-    let proof = state.apply_ro(|pvm| NodePvm::produce_proof(pvm, input, &mut PvmHooks::default()));
+    let proof = state.apply_ro(|pvm| NodePvm::produce_proof(pvm, input, NoHooks));
     proof.map(|proof| Pointer::from(Proof::from(proof)))
 }
 
@@ -595,12 +609,10 @@ pub fn octez_riscv_verify_proof(
 
     let final_state_hash = proof.as_ref().final_state_hash;
     let (node_pvm, merkle_tree) = proof.as_mut().get_or_create_verifier().ok()?;
-    let input_request = node_pvm.clone().verify_proof(
-        merkle_tree,
-        &final_state_hash,
-        input,
-        &mut PvmHooks::default(),
-    )?;
+    let input_request =
+        node_pvm
+            .clone()
+            .verify_proof(merkle_tree, &final_state_hash, input, NoHooks)?;
 
     Some(InputRequest::from(input_request))
 }
