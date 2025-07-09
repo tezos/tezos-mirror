@@ -832,8 +832,8 @@ let setup_opentelemetry ~data_dir config =
     ~service_name:"rollup_node"
     config.Configuration.opentelemetry
 
-let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
-    (configuration : Configuration.t) (cctxt : Client_context.full) =
+let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
+    (cctxt : Client_context.full) =
   let open Lwt_result_syntax in
   let* () =
     Tezos_base_unix.Internal_event_unix.enable_default_daily_logs_at
@@ -921,7 +921,6 @@ let run ~data_dir ~irmin_cache_size ?log_kernel_debug_file
       cctxt
       ~data_dir
       ~irmin_cache_size
-      ?log_kernel_debug_file
       ~store_access:Read_write
       ~context_access:Read_write
       l1_ctxt
@@ -1027,6 +1026,7 @@ module Replay = struct
         ~index_buffer_size:None
         ~irmin_cache_size:None
         ~log_kernel_debug:true
+        ~log_kernel_debug_file:None
         ~unsafe_disable_wasm_kernel_checks:false
         ~no_degraded:true
         ~gc_frequency:None

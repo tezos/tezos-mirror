@@ -96,6 +96,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
@@ -536,6 +537,7 @@ let encoding default_display : t Data_encoding.t =
            index_buffer_size;
            irmin_cache_size;
            log_kernel_debug;
+           log_kernel_debug_file;
            unsafe_disable_wasm_kernel_checks;
            no_degraded;
            gc_parameters;
@@ -572,6 +574,7 @@ let encoding default_display : t Data_encoding.t =
               index_buffer_size,
               irmin_cache_size,
               log_kernel_debug,
+              log_kernel_debug_file,
               unsafe_disable_wasm_kernel_checks ),
             ( no_degraded,
               gc_parameters,
@@ -607,6 +610,7 @@ let encoding default_display : t Data_encoding.t =
                  index_buffer_size,
                  irmin_cache_size,
                  log_kernel_debug,
+                 log_kernel_debug_file,
                  unsafe_disable_wasm_kernel_checks ),
                ( no_degraded,
                  gc_parameters,
@@ -646,6 +650,7 @@ let encoding default_display : t Data_encoding.t =
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters;
@@ -741,7 +746,7 @@ let encoding default_display : t Data_encoding.t =
              (dft "l2_blocks_cache_size" int31 default_l2_blocks_cache_size)
              (opt "prefetch_blocks" int31))
           (merge_objs
-             (obj6
+             (obj7
                 (dft
                    "l1_rpc_timeout"
                    Data_encoding.float
@@ -753,6 +758,7 @@ let encoding default_display : t Data_encoding.t =
                 (opt "index_buffer_size" int31 ~description:"Deprecated")
                 (opt "irmin_cache_size" int31)
                 (dft "log-kernel-debug" Data_encoding.bool false)
+                (opt "log-kernel-debug-file" Data_encoding.string)
                 (dft
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
@@ -884,8 +890,8 @@ module Cli = struct
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
       ~force_etherlink =
     let open Lwt_result_syntax in
@@ -943,6 +949,7 @@ module Cli = struct
         index_buffer_size;
         irmin_cache_size;
         log_kernel_debug;
+        log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks;
         no_degraded;
         gc_parameters =
@@ -969,10 +976,10 @@ module Cli = struct
       ~reconnection_delay ~dal_node_endpoint ~pre_images_endpoint
       ~injector_retention_period ~injector_attempts ~injection_ttl ~mode
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
-      ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
-      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
-      ~force_etherlink =
+      ~irmin_cache_size ~log_kernel_debug ~log_kernel_debug_file ~no_degraded
+      ~gc_frequency ~history_mode ~allowed_origins ~allowed_headers
+      ~apply_unsafe_patches ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree
+      ~profiling ~force_etherlink =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -1044,6 +1051,10 @@ module Cli = struct
         irmin_cache_size =
           Option.either irmin_cache_size configuration.irmin_cache_size;
         log_kernel_debug = log_kernel_debug || configuration.log_kernel_debug;
+        log_kernel_debug_file =
+          Option.either
+            log_kernel_debug_file
+            configuration.log_kernel_debug_file;
         unsafe_disable_wasm_kernel_checks =
           unsafe_disable_wasm_kernel_checks
           || configuration.unsafe_disable_wasm_kernel_checks;
@@ -1082,8 +1093,8 @@ module Cli = struct
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
-      ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
-      ~allowed_origins ~allowed_headers ~apply_unsafe_patches
+      ~log_kernel_debug ~log_kernel_debug_file ~no_degraded ~gc_frequency
+      ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
       ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
       ~force_etherlink =
     let open Lwt_result_syntax in
@@ -1114,6 +1125,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~no_degraded
           ~gc_frequency
           ~history_mode
@@ -1167,6 +1179,7 @@ module Cli = struct
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~no_degraded
           ~gc_frequency
           ~history_mode

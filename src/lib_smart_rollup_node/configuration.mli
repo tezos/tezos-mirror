@@ -138,6 +138,7 @@ type t = {
   index_buffer_size : int option;
   irmin_cache_size : int option;
   log_kernel_debug : bool;
+  log_kernel_debug_file : string option;
   unsafe_disable_wasm_kernel_checks : bool;
   no_degraded : bool;
   gc_parameters : gc_parameters;
@@ -312,6 +313,7 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    log_kernel_debug_file:string option ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
@@ -348,6 +350,7 @@ module Cli : sig
     index_buffer_size:int option ->
     irmin_cache_size:int option ->
     log_kernel_debug:bool ->
+    log_kernel_debug_file:string option ->
     no_degraded:bool ->
     gc_frequency:int32 option ->
     history_mode:history_mode option ->
