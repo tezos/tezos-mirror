@@ -153,7 +153,6 @@ let test_overstake_different_limits =
   --> set_baker "delegate"
   (* same rights to have same block distribution *)
   --> unstake "faucet" (Amount (Tez.of_mutez 190_000_000_000L))
-  --> unstake "__bootstrap__" (Amount (Tez.of_mutez 190_000_000_000L))
   --> set_limit 5. --> wait_delegate_parameters_activation
   --> add_account_with_funds
         "staker1"
@@ -238,7 +237,6 @@ let test_static_decreasing =
   --> begin_test ~burn_rewards:true ["delegate"]
   (* We stake about 50% of the total supply *)
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
-  --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> (Tag "increase stake, decrease rate" --> next_cycle
        --> loop rate_var_lag (stake "delegate" delta --> next_cycle)
        --> loop 10 cycle_stake
@@ -279,7 +277,6 @@ let test_static_timing =
   --> begin_test ~burn_rewards:true ["delegate"]
   (* We stake about 50% of the total supply *)
   --> stake "delegate" (Amount (Tez.of_mutez 1_800_000_000_000L))
-  --> stake "__bootstrap__" (Amount (Tez.of_mutez 1_800_000_000_000L))
   --> wait_n_cycles_f (fun x -> consensus_rights_delay x + 1)
   --> save_current_rate
   --> (Tag "increase stake" --> stake "delegate" delta
@@ -302,7 +299,7 @@ let begin_test_with_rewards_checks ~init_limit =
     set_delegate_params name params
   in
   init_constants ~reward_per_block:1_000_000_000L ()
-  --> begin_test ["delegate"; "faucet"]
+  --> begin_test ["delegate"; "faucet"; "bootstrap"]
   --> set_baker "delegate"
   --> add_account_with_funds
         "staker"

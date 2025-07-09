@@ -157,6 +157,75 @@ let test_preattest_aggreg =
   --> check_delegate_didnt_preattest "delegate1"
   --> check_delegate_didnt_preattest "delegate2"
 
+let init_constants_for_attestation_rewards =
+  init_constants ()
+  --> set
+        S.issuance_weights
+        {
+          base_total_issued_per_minute = Tez_helpers.of_mutez 1_000_000_007L;
+          baking_reward_fixed_portion_weight = 0;
+          baking_reward_bonus_weight = 0;
+          attesting_reward_weight = 1;
+          seed_nonce_revelation_tip_weight = 0;
+          vdf_revelation_tip_weight = 0;
+          dal_rewards_weight = 0;
+        }
+
+let test_attestation_rewards =
+  init_constants_for_attestation_rewards
+  (* Default checks are disabled because rewards have been changed *)
+  --> (Tag "not tz4"
+       --> begin_test
+             ["delegate"]
+             ~disable_default_checks:true
+             ~force_attest_all:true
+      |+ Tag "tz4 (solo)"
+         --> begin_test
+               ["delegate"]
+               ~algo:Bls
+               ~disable_default_checks:true
+               ~force_attest_all:true
+      |+ Tag "tz4 (with others)"
+         --> begin_test
+               ["delegate"; "bozo1"; "bozo2"]
+               ~algo:Bls
+               ~disable_default_checks:true
+               ~force_attest_all:true)
+  --> dawn_of_next_cycle
+  --> exec_metadata (check_attestation_rewards "delegate")
+  --> exec_metadata
+        (check_missed_attestation_rewards ~check_not_found:true "delegate")
+
+let test_missed_attestations_rewards =
+  init_constants_for_attestation_rewards
+  (* Default checks are disabled because rewards have been changed *)
+  --> begin_test ["delegate"] ~disable_default_checks:true
+  --> snapshot_balances "init" ["delegate"]
+  --> next_block
+  --> (Tag "attest once" --> attest_with "delegate" |+ Tag "no attest" --> noop)
+  --> dawn_of_next_cycle
+  --> exec_metadata (check_missed_attestation_rewards "delegate")
+  (* Check balance of "delegate" hasn't changed *)
+  --> exec_metadata (check_attestation_rewards ~check_not_found:true "delegate")
+
+let test_missed_attestations_rewards_tz4 =
+  init_constants_for_attestation_rewards
+  (* Default checks are disabled because rewards have been changed *)
+  --> begin_test
+        ["delegate"; "bozo1"; "bozo2"]
+        ~algo:Bls
+        ~disable_default_checks:true
+  --> snapshot_balances "init" ["delegate"]
+  --> next_block
+  --> (Tag "attest once (solo)" --> attest_aggreg_with ["delegate"]
+      |+ Tag "attest once (with others)"
+         --> attest_aggreg_with ["delegate"; "bozo1"; "bozo2"]
+      |+ Tag "no attest" --> noop)
+  --> dawn_of_next_cycle
+  --> exec_metadata (check_missed_attestation_rewards "delegate")
+  (* Check balance of "delegate" hasn't changed *)
+  --> exec_metadata (check_attestation_rewards ~check_not_found:true "delegate")
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -167,6 +236,10 @@ let tests =
        ("Test preattest all", test_preattest_all);
        ("Test attest aggreg", test_attest_aggreg);
        ("Test preattest aggreg", test_preattest_aggreg);
+       ("Test attestation rewards", test_attestation_rewards);
+       ("Test missed attestation rewards", test_missed_attestations_rewards);
+       ( "Test missed attestation rewards (tz4)",
+         test_missed_attestations_rewards_tz4 );
      ]
 
 let () =
