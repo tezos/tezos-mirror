@@ -7,6 +7,7 @@ use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
 use revm::context::result::EVMError;
+use revm::context::tx::TxEnvBuilder;
 use revm::{
     context::{
         result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv, ContextTr,
@@ -113,25 +114,28 @@ fn tx_env<'a, Host: Runtime>(
         .map_err(|err| Error::Custom(err.to_string()))?;
     let nonce = storage_account.nonce(host)?;
 
-    Ok(TxEnv {
-        // Setting the transaction type from scratch seems irrelevant
-        // in the execution. We just set it to legacy be default as
-        // it's the other parameters that matter here.
-        tx_type: 0,
-        caller,
-        gas_limit,
-        gas_price,
-        kind,
-        value,
-        data,
-        nonce,
-        chain_id: Some(chain_id),
-        access_list,
-        gas_priority_fee: None,
-        blob_hashes: vec![],
-        max_fee_per_blob_gas: 0,
-        authorization_list: vec![],
-    })
+    // Using the transaction environment builder helps to
+    // derive the transaction type directly from the different
+    // fields of the transaction.
+    let tx_env = TxEnvBuilder::new()
+        .caller(caller)
+        .gas_limit(gas_limit)
+        .gas_price(gas_price)
+        .kind(kind)
+        .value(value)
+        .data(data)
+        .nonce(nonce)
+        .chain_id(Some(chain_id))
+        .access_list(access_list)
+        .build()
+        .map_err(|err| {
+            Error::Custom(format!(
+                "Building the transaction environment failed with: {:?}",
+                err
+            ))
+        })?;
+
+    Ok(tx_env)
 }
 
 type EvmContext<'a, Host> = Evm<
