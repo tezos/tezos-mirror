@@ -13,18 +13,32 @@ module Parameter = struct
   let signer =
     Tezos_clic.parameter (fun _ value ->
         let open Lwt_result_syntax in
-        let* value =
-          try
-            match String.remove_prefix ~prefix:"0x" value with
-            | Some value ->
-                let _ = Hex.show (`Hex value) in
-                return (`Hex value)
-            | None -> raise (Invalid_argument "not prefixed by 0x")
-          with _ ->
-            failwith "%s value is not a valid hexadecimal string" value
-        in
-        let*? secret_key = Signer.secret_key_from_hex value in
-        return (Signer.from_secret_key secret_key))
+        match Configuration.gcp_key_from_string_opt value with
+        | None ->
+            let* value =
+              try
+                match String.remove_prefix ~prefix:"0x" value with
+                | Some value ->
+                    let _ = Hex.show (`Hex value) in
+                    return (`Hex value)
+                | None -> raise (Invalid_argument "not prefixed by 0x")
+              with _ ->
+                failwith "%s value is not a valid hexadecimal string" value
+            in
+            let*? secret_key = Signer.secret_key_from_hex value in
+            return (Signer.from_secret_key secret_key)
+        | Some key ->
+            Signer.from_gcp_key
+              {
+                pool_size = 2;
+                authentication_method = Gcloud_auth;
+                authentication_retries = 2;
+                authentication_frequency_min = 30;
+                authentication_retry_backoff_sec = 5;
+                authentication_timeout_sec = 5;
+                gcloud_path = "gcloud";
+              }
+              key)
 
   let int =
     Tezos_clic.parameter (fun _ n ->

@@ -9,6 +9,7 @@
 let prepare_and_forge_tx ?to_ ?data ~gas_limit ~base_fee_per_gas ~chain_id
     ~nonce ~value ~signer () =
   let open Efunc_core in
+  let open Lwt_result_syntax in
   let unsigned =
     Eth.
       {
@@ -27,15 +28,17 @@ let prepare_and_forge_tx ?to_ ?data ~gas_limit ~base_fee_per_gas ~chain_id
         ti_blobs = [];
       }
   in
-  let ti_signature =
-    Some (Signer.sign signer (Rope.to_string (Forge.transaction unsigned)))
+  let+ ti_signature =
+    Signer.sign signer (Rope.to_string (Forge.transaction unsigned))
   in
-  Evm.of_rope @@ Forge.transaction {unsigned with ti_signature}
+  Evm.of_rope
+  @@ Forge.transaction {unsigned with ti_signature = Some ti_signature}
 
 let transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
+  let open Lwt_result_syntax in
   let nonce = Option.value nonce ~default:from.Account.nonce |> Z.to_int in
   let (L2_types.Chain_id chain_id) = infos.Network_info.chain_id in
-  let txn =
+  let+ txn =
     prepare_and_forge_tx
       ?to_
       ?data
@@ -48,3 +51,10 @@ let transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
       ()
   in
   Ethereum_types.Hex (txn :> string)
+
+let transfer_exn ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
+  let open Lwt_syntax in
+  let* res = transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () in
+  match res with
+  | Ok res -> return res
+  | Error _err -> Stdlib.failwith "Could not craft the transfer"

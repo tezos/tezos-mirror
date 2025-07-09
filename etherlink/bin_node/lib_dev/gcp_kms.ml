@@ -30,7 +30,7 @@ let signature_algorithm (kms : t) =
   | Secp256k1 _ -> EC_SIGN_SECP256K1_SHA256
   | _ -> assert false
 
-type hash_algorithm = Blake2B
+type hash_algorithm = Blake2B | Keccak256
 
 let signature_algorithm_of_string =
   let open Result_syntax in
@@ -261,11 +261,11 @@ let pad32 s =
   else error_with "Unexpected length for r or s: %d" (String.length s)
 
 let digest hash payload =
+  Base64.encode_string
+  @@
   match hash with
-  | Blake2B ->
-      Tezos_crypto.(
-        Base64.encode_string @@ Blake2B.to_string
-        @@ Blake2B.hash_bytes [payload])
+  | Blake2B -> Tezos_crypto.(Blake2B.to_string @@ Blake2B.hash_bytes [payload])
+  | Keccak256 -> Digestif.KECCAK_256.(to_raw_string @@ digest_bytes payload)
 
 let sign_rpc kms_handler digest =
   let open Lwt_result_syntax in
