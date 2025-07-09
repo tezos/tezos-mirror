@@ -49,7 +49,7 @@ let apply_new_cycle new_cycle state : State.t =
   apply_unslashable_for_all new_cycle state
 
 (** After baking and applying rewards in state *)
-let check_all_balances block state : unit tzresult Lwt.t =
+let check_all_balances _full_metadata (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let State.{account_map; total_supply; _} = state in
   let* actual_total_supply = Context.get_total_supply (B block) in
@@ -79,7 +79,7 @@ let check_all_balances block state : unit tzresult Lwt.t =
   Assert.join_errors r1 r2
 
 (** Misc checks at block end *)
-let check_misc block state : unit tzresult Lwt.t =
+let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   let State.{account_map; _} = state in
   String.Map.fold_s
@@ -169,7 +169,7 @@ let check_misc block state : unit tzresult Lwt.t =
     account_map
     Result.return_unit
 
-let check_issuance_rpc block : unit tzresult Lwt.t =
+let check_issuance_rpc _metadata (block, _state) : unit tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* We assume one block per minute *)
   let* rewards_per_block = Context.get_issuance_per_minute (B block) in
@@ -285,7 +285,6 @@ let finalize_payload_ ?payload_round ?baker : t -> t_incr tzresult Lwt.t =
       Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
     else Per_block_vote_pass
   in
-  let* () = check_issuance_rpc block in
   let* block' = Block.bake ?policy ~adaptive_issuance_vote block in
   let* i =
     Incremental.begin_construction
@@ -348,8 +347,16 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
     if not (Block.last_block_of_cycle block) then return state
     else apply_end_cycle current_cycle previous_block block state
   in
-  let* () = check_all_balances block state in
-  let* () = check_misc block state in
+  let* () =
+    List.iter_es
+      (fun f -> f metadata (block, state))
+      state.check_finalized_block_perm
+  in
+  let* () =
+    List.iter_es
+      (fun f -> f metadata (block, state))
+      state.check_finalized_block_temp
+  in
   (* Dawn of a new cycle: update finalizables *)
   (* Note: this is done after the checks, because it is not observable by RPCs by calling
      the previous block (which is still in the previous cycle *)
@@ -362,16 +369,6 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
         (Protocol.Alpha_context.Cycle.to_int32 new_future_current_cycle
         |> Int32.to_int) ;
       return @@ apply_new_cycle new_future_current_cycle state)
-  in
-  let* () =
-    List.iter_es
-      (fun f -> f metadata (block, state))
-      state.check_finalized_block_perm
-  in
-  let* () =
-    List.iter_es
-      (fun f -> f metadata (block, state))
-      state.check_finalized_block_temp
   in
   let state =
     {
