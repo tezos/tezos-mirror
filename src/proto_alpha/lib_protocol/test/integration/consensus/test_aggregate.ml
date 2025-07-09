@@ -189,15 +189,20 @@ let check_after_attestations_aggregate
 
 (** Tests the validation and application of a preattestations_aggregate.
 
+    When [error] is [None], performs
+    {!check_preattestations_aggregate_result} on the operation's
+    metadata, otherwise checks that the error identified by [error] is
+    returned.
+
     Unlike {!check_attestations_aggregate_validation_and_application},
     only tests in application mode because making a context that
     accepts preattestations is slightly more complicated. *)
-let check_preattestations_aggregate_validation_and_application ~attesters
-    ~preattested_block ~preattested_block_predecessor =
+let check_preattestations_aggregate_validation_and_application ~loc ~attesters
+    ~preattested_block ~preattested_block_predecessor ?error () =
   let open Lwt_result_syntax in
   let committee = List.map Op.attesting_slot_of_attester attesters in
   let* operation = Op.preattestations_aggregate ~committee preattested_block in
-  let* block_with_metadata =
+  let*! res =
     Block.bake_with_metadata
       ~policy:(By_round 1)
       ~payload_round:Alpha_context.Round.zero
@@ -205,15 +210,23 @@ let check_preattestations_aggregate_validation_and_application ~attesters
       ~operation
       preattested_block_predecessor
   in
-  check_after_preattestations_aggregate ~attesters block_with_metadata
+  match error with
+  | None ->
+      let*? block_with_metadata = res in
+      check_after_preattestations_aggregate ~attesters block_with_metadata
+  | Some error -> Assert.proto_error ~loc res error
 
 (** Tests the validation and application of an attestations_aggregate.
 
     In mempool mode, always expects
-    {!Error_helpers.aggregate_in_mempool}. In block modes, performs
-    {!check_attestations_aggregate_result}. *)
+    {!Error_helpers.aggregate_in_mempool}.
+
+    In block modes: when [error] is [None], performs
+    {!check_attestations_aggregate_result} on the operation's
+    metadata, otherwise checks that the error identified by [error] is
+    returned. *)
 let check_attestations_aggregate_validation_and_application ~loc ~attesters
-    ~attested_block =
+    ~attested_block ?error () =
   let open Lwt_result_syntax in
   let attesting_slots = List.map Op.attesting_slot_of_attester attesters in
   let committee =
@@ -222,38 +235,64 @@ let check_attestations_aggregate_validation_and_application ~loc ~attesters
     List.map (fun attesting_slot -> (attesting_slot, None)) attesting_slots
   in
   let* operation = Op.attestations_aggregate ~committee attested_block in
-  let check_after_block_mode = check_after_attestations_aggregate ~attesters in
+  let check_after_block_mode =
+    match error with
+    | None -> Some (check_after_attestations_aggregate ~attesters)
+    | Some _ -> None
+  in
   Op.check_validation_and_application_all_modes_different_outcomes
     ~loc
-    ~check_after_application:check_after_block_mode
-    ~check_after_construction:check_after_block_mode
+    ?check_after_application:check_after_block_mode
+    ?check_after_construction:check_after_block_mode
+    ?application_error:error
+    ?construction_error:error
     ~mempool_error:Error_helpers.aggregate_in_mempool
     ~predecessor:attested_block
     operation
 
 let test_aggregate_feature_flag_enabled () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
+  let* _genesis, b1 =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
-  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+  let* b2 = Block.bake b1 in
+  let* attesters = Context.get_attesters_with_bls_key (B b2) in
+  let* () =
+    check_preattestations_aggregate_validation_and_application
+      ~loc:__LOC__
+      ~attesters
+      ~preattested_block:b2
+      ~preattested_block_predecessor:b1
+      ()
+  in
+  check_attestations_aggregate_validation_and_application
     ~loc:__LOC__
-    ~attested_block
-    ~mempool_error:Error_helpers.aggregate_in_mempool
-    Aggregate
+    ~attesters
+    ~attested_block:b2
+    ()
 
 let test_aggregate_feature_flag_disabled () =
   let open Lwt_result_syntax in
-  let* _genesis, attested_block =
+  let* _genesis, b1 =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:false ()
   in
-  Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
+  let* b2 = Block.bake b1 in
+  let* attesters = Context.get_attesters_with_bls_key (B b2) in
+  let* () =
+    check_preattestations_aggregate_validation_and_application
+      ~loc:__LOC__
+      ~attesters
+      ~preattested_block:b2
+      ~preattested_block_predecessor:b1
+      ~error:Error_helpers.aggregate_disabled
+      ()
+  in
+  check_attestations_aggregate_validation_and_application
     ~loc:__LOC__
-    ~attested_block
-    ~application_error:Error_helpers.aggregate_disabled
-    ~construction_error:Error_helpers.aggregate_disabled
-    ~mempool_error:Error_helpers.aggregate_in_mempool
-    Aggregate
+    ~attesters
+    ~attested_block:b2
+    ~error:Error_helpers.aggregate_disabled
+    ()
 
 let test_attestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
@@ -265,6 +304,7 @@ let test_attestations_aggregate_with_a_single_delegate () =
     ~loc:__LOC__
     ~attesters:[attester]
     ~attested_block
+    ()
 
 let test_preattestations_aggregate_with_a_single_delegate () =
   let open Lwt_result_syntax in
@@ -274,9 +314,11 @@ let test_preattestations_aggregate_with_a_single_delegate () =
   let* preattested_block = Block.bake preattested_block_predecessor in
   let* attester = Context.get_attester_with_bls_key (B preattested_block) in
   check_preattestations_aggregate_validation_and_application
+    ~loc:__LOC__
     ~attesters:[attester]
     ~preattested_block
     ~preattested_block_predecessor
+    ()
 
 let test_attestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
@@ -288,6 +330,7 @@ let test_attestations_aggregate_with_multiple_delegates () =
     ~loc:__LOC__
     ~attesters
     ~attested_block
+    ()
 
 let test_preattestations_aggregate_with_multiple_delegates () =
   let open Lwt_result_syntax in
@@ -297,9 +340,11 @@ let test_preattestations_aggregate_with_multiple_delegates () =
   let* preattested_block = Block.bake preattested_block_predecessor in
   let* attesters = Context.get_attesters_with_bls_key (B preattested_block) in
   check_preattestations_aggregate_validation_and_application
+    ~loc:__LOC__
     ~attesters
     ~preattested_block
     ~preattested_block_predecessor
+    ()
 
 let test_attestations_aggregate_invalid_signature () =
   let open Lwt_result_syntax in
