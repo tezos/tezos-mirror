@@ -13085,6 +13085,7 @@ let test_eip2930_storage_access =
     ~title:"Check EIP-2930's semantic correctness"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let* eip2930_storage_access =
