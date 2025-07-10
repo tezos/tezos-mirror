@@ -59,7 +59,11 @@
             /* The number of Layer 1 blocks the sequencer awaits before
                sending another batch of blueprints, as part of its catchup
                mechanism. */,
-          "dal_slots"?: [ integer ∈ [-128, 127] ... ] } },
+          "dal_slots"?: [ integer ∈ [-128, 127] ... ] },
+      "sunset_sec"?:
+        integer ∈ [0, 2^30]
+        /* Number of seconds prior to a sequencer operator upgrade before
+           which the current sequencer stops producing blocks */ },
   "observer"?:
     { "evm_node_endpoint":
         $unistring

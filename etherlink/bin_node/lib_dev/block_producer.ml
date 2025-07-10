@@ -10,6 +10,7 @@ type parameters = {
   smart_rollup_address : string;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
+  sequencer_sunset_sec : int64;
 }
 
 (* The size of a delayed transaction is overapproximated to the maximum size
@@ -60,7 +61,14 @@ let minimum_ethereum_transaction_size =
 module Types = struct
   type nonrec parameters = parameters
 
-  type state = parameters
+  type state = {
+    signer : Signer.t;
+    smart_rollup_address : string;
+    maximum_number_of_chunks : int;
+    tx_container : Services_backend_sig.ex_tx_container;
+    sequencer_sunset_sec : int64;
+    mutable sunset : bool;
+  }
 end
 
 module Name = struct
@@ -364,55 +372,69 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
           Sequencer_blueprint.maximum_usable_space_in_blueprint
             maximum_number_of_chunks )
   in
-  let*! head_info = Evm_context.head_info () in
-  return (head_info, delayed_hashes, remaining_cumulative_size)
+  return (delayed_hashes, remaining_cumulative_size)
 
-let produce_block (type f) ~signer ~smart_rollup_address ~force ~timestamp
-    ~maximum_number_of_chunks ~with_delayed_transactions
-    ~(tx_container : f Services_backend_sig.tx_container) =
+let produce_block (type f) (state : Types.state) ~force ~timestamp
+    ~with_delayed_transactions =
   let open Lwt_result_syntax in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
-  in
-  let* is_locked = Tx_container.is_locked () in
-  if is_locked then
-    let*! () = Block_producer_events.production_locked () in
-    return `No_block
-  else
-    let* head_info, delayed_hashes, remaining_cumulative_size =
-      head_info_and_delayed_transactions
-        ~with_delayed_transactions
-        maximum_number_of_chunks
-    in
-    let is_going_to_upgrade =
-      match head_info.pending_upgrade with
-      | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
-          timestamp >= upgrade_timestamp
-      | None -> false
-    in
-    if is_going_to_upgrade then
-      let* hashes =
-        produce_block_with_transactions
-          ~signer
-          ~timestamp
-          ~smart_rollup_address
-          ~transactions_and_objects:None
-          ~delayed_hashes:[]
-          ~tx_container
-          head_info
+  match state.tx_container with
+  | Ex_tx_container tx_container ->
+      let (module Tx_container) =
+        Services_backend_sig.tx_container_module tx_container
       in
-      (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
-      return (`Block_produced (Seq.length hashes))
-    else
-      produce_block_if_needed
-        ~signer
-        ~timestamp
-        ~smart_rollup_address
-        ~force
-        ~delayed_hashes
-        ~remaining_cumulative_size
-        ~tx_container
-        head_info
+      let*! head_info = Evm_context.head_info () in
+      let* () =
+        when_ (not state.sunset) @@ fun () ->
+        match head_info.pending_sequencer_upgrade with
+        | Some Evm_events.Sequencer_upgrade.{timestamp = upgrade_timestamp; _}
+          when Time.Protocol.(
+                 add timestamp state.sequencer_sunset_sec >= upgrade_timestamp
+                 && timestamp < upgrade_timestamp) ->
+            (* We stop producing blocks ahead of the upgrade *)
+            let*! () = Block_producer_events.sunset () in
+            state.sunset <- true ;
+            Tx_container.lock_transactions ()
+        | _ -> return_unit
+      in
+      let* is_locked = Tx_container.is_locked () in
+      if is_locked then
+        let*! () = Block_producer_events.production_locked () in
+        return `No_block
+      else
+        let* delayed_hashes, remaining_cumulative_size =
+          head_info_and_delayed_transactions
+            ~with_delayed_transactions
+            state.maximum_number_of_chunks
+        in
+        let is_going_to_upgrade_kernel =
+          match head_info.pending_upgrade with
+          | Some Evm_events.Upgrade.{hash = _; timestamp = upgrade_timestamp} ->
+              timestamp >= upgrade_timestamp
+          | None -> false
+        in
+        if is_going_to_upgrade_kernel then
+          let* hashes =
+            produce_block_with_transactions
+              ~signer:state.signer
+              ~timestamp
+              ~smart_rollup_address:state.smart_rollup_address
+              ~transactions_and_objects:None
+              ~delayed_hashes:[]
+              ~tx_container
+              head_info
+          in
+          (* (Seq.length hashes) is always zero, this is only to be "future" proof *)
+          return (`Block_produced (Seq.length hashes))
+        else
+          produce_block_if_needed
+            ~signer:state.signer
+            ~timestamp
+            ~smart_rollup_address:state.smart_rollup_address
+            ~force
+            ~delayed_hashes
+            ~remaining_cumulative_size
+            ~tx_container
+            head_info
 
 module Handlers = struct
   type self = worker
@@ -426,27 +448,21 @@ module Handlers = struct
     match request with
     | Request.Produce_block (with_delayed_transactions, timestamp, force) ->
         protect @@ fun () ->
-        let {
-          signer;
-          smart_rollup_address;
-          maximum_number_of_chunks;
-          tx_container = Ex_tx_container tx_container;
-        } =
-          state
-        in
-        produce_block
-          ~signer
-          ~smart_rollup_address
-          ~force
-          ~timestamp
-          ~maximum_number_of_chunks
-          ~with_delayed_transactions
-          ~tx_container
+        produce_block state ~force ~timestamp ~with_delayed_transactions
 
   type launch_error = error trace
 
   let on_launch _w () (parameters : Types.parameters) =
-    Lwt_result_syntax.return parameters
+    Lwt_result_syntax.return
+      Types.
+        {
+          sunset = false;
+          signer = parameters.signer;
+          smart_rollup_address = parameters.smart_rollup_address;
+          maximum_number_of_chunks = parameters.maximum_number_of_chunks;
+          tx_container = parameters.tx_container;
+          sequencer_sunset_sec = parameters.sequencer_sunset_sec;
+        }
 
   let on_error (type a b) _w _st (_r : (a, b) Request.t) (_errs : b) :
       [`Continue | `Shutdown] tzresult Lwt.t =

@@ -53,6 +53,14 @@ module Event = struct
         Format.fprintf fmt "%10s" h)
       ("tx_hash", Ethereum_types.hash_encoding)
       ("error", Data_encoding.string)
+
+  let sunset =
+    declare_0
+      ~section
+      ~name:"block_production_sunset"
+      ~msg:"block production is sunset ahead of the change of sequencer"
+      ~level:Notice
+      ()
 end
 
 let transaction_selected ~hash =
@@ -66,3 +74,5 @@ let production_locked () = Internal_event.Simple.emit Event.production_locked ()
 
 let transaction_rejected tx_hash error =
   Internal_event.Simple.emit Event.transaction_rejected (tx_hash, error)
+
+let sunset () = Internal_event.Simple.emit Event.sunset ()

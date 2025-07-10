@@ -7,6 +7,9 @@
 ### Configuration changes
 
 - Fix encodings for sequencer key when using a remote key on GCP KMS. (!18642)
+- Add a new configuration option for the sequencer to stop block production
+  ahead of a sequencer upgrade. See `describe config` or `man run sequencer`.
+  (!18605)
 
 ### RPCs changes
 
@@ -18,6 +21,8 @@
 - Add a new command `show gcp key` which can be used to retrieve Tezos-specific
   (b58-encoded public key, Tezos implicit account) and Ethereum-specific (EOA
   address) information about a key stored in a GCP KMS. (!18617 !18618)
+- Halt blocks production five minutes before a planned upgrade of the sequencer
+  operator. (!18605)
 
 ### Storage changes
 

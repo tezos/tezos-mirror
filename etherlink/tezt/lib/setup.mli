@@ -123,6 +123,7 @@ val register_test :
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -175,6 +176,7 @@ val register_multichain_test :
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
+  ?sequencer_sunset_sec:int ->
   (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
@@ -228,6 +230,7 @@ val register_test_for_kernels :
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -280,6 +283,7 @@ val setup_sequencer :
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
   ?l2_chains:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   Protocol.t ->
   sequencer_setup Lwt.t
 
@@ -345,6 +349,7 @@ val register_all :
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
   ?l2_setups:Evm_node.l2_setup list ->
+  ?sequencer_sunset_sec:int ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->

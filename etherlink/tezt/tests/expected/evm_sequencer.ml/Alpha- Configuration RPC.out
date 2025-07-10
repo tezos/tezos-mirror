@@ -12,7 +12,8 @@
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 300
   },
   "tx_pool_timeout_limit": "3600",
   "tx_pool_addr_limit": "4000",
@@ -91,7 +92,8 @@
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 0
   },
   "tx_pool_timeout_limit": "3600",
   "tx_pool_addr_limit": "4000",
@@ -170,7 +172,8 @@
       "max_blueprints_ahead": 100,
       "max_blueprints_catchup": 50,
       "catchup_cooldown": 1
-    }
+    },
+    "sunset_sec": 300
   },
   "observer": {
     "evm_node_endpoint": "hidden",

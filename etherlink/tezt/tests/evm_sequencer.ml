@@ -345,6 +345,7 @@ let test_make_l2_kernel_installer_config chain_family =
         tx_pool_addr_limit = None;
         tx_pool_tx_per_addr_limit = None;
         dal_slots = None;
+        sequencer_sunset_sec = None;
       }
   in
   let* sequencer =
@@ -520,6 +521,7 @@ let test_observer_reset =
              tx_pool_addr_limit = None;
              tx_pool_tx_per_addr_limit = None;
              dal_slots = None;
+             sequencer_sunset_sec = None;
            })
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
@@ -563,6 +565,7 @@ let test_observer_reset =
              tx_pool_addr_limit = None;
              tx_pool_tx_per_addr_limit = None;
              dal_slots = None;
+             sequencer_sunset_sec = None;
            })
       (Sc_rollup_node.endpoint temp_sc_rollup_node)
   in
@@ -5894,6 +5897,69 @@ let test_timestamp_from_the_future =
          "Deleting invalid blueprint at path /evm/blueprints/2, error: \
           TimestampFromFuture")
     ~error_msg:"The blueprint should have been refused by TimestampFromFuture" ;
+
+  unit
+
+let test_sequencer_sunset =
+  let sequencer_key = Constant.bootstrap1 in
+  let new_sequencer_key = Constant.bootstrap2 in
+  let timestamp dt = Format.sprintf "2020-01-01T00:00:%02dZ" dt in
+  let activation_delay = 30 in
+  let genesis_timestamp = timestamp 0 in
+  let activation_timestamp = timestamp activation_delay in
+  let sunset = 10 in
+
+  register_all
+    ~__FILE__
+    ~title:
+      "The sequencer locks its transaction queue ahead of the sequencer upgrade"
+    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "sunset"; "lock"]
+    ~sequencer:sequencer_key
+    ~time_between_blocks:Nothing
+    ~sequencer_sunset_sec:sunset
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+  @@ fun {sequencer; sc_rollup_address; l1_contracts; client; sc_rollup_node; _}
+             _protocol ->
+  (* Check we can create a block *)
+  let*@ _txns_count = produce_block ~timestamp:(timestamp 1) sequencer in
+
+  let* () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:Constant.bootstrap2.alias
+      ~sequencer_governance_contract:l1_contracts.sequencer_governance
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp
+  in
+
+  let upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  and* _upgrade_info = upgrade_info in
+
+  (* Check we can still create a block before the sunset *)
+  let*@ _txns_count =
+    produce_block
+      ~timestamp:(timestamp (activation_delay - sunset - 1))
+      sequencer
+  in
+  let*@? _err =
+    produce_block
+      ~timestamp:(timestamp (activation_delay - sunset + 1))
+      sequencer
+  in
+  let*@? _err =
+    produce_block
+      ~timestamp:(timestamp (activation_delay - sunset + 2))
+      sequencer
+  in
 
   unit
 
@@ -13240,6 +13306,7 @@ let () =
   test_non_increasing_timestamp protocols ;
   test_timestamp_from_the_future protocols ;
   test_sequencer_upgrade protocols ;
+  test_sequencer_sunset protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;
   test_sequencer_dont_read_level_twice protocols ;

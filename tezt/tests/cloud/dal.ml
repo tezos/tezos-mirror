@@ -3677,6 +3677,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
         tx_pool_addr_limit = None;
         tx_pool_tx_per_addr_limit = None;
         dal_slots;
+        sequencer_sunset_sec = None;
       }
   in
   let endpoint = Sc_rollup_node.endpoint sc_rollup_node in

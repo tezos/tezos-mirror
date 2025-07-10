@@ -180,6 +180,7 @@ let prepare_and_run_sequencer rollup_node =
              tx_pool_addr_limit = None;
              tx_pool_tx_per_addr_limit = None;
              dal_slots = None;
+             sequencer_sunset_sec = None;
            })
       (Sc_rollup_node.endpoint rollup_node)
   in
