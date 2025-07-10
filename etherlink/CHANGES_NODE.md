@@ -6,23 +6,11 @@
 
 ### Configuration changes
 
-- Fix encodings for sequencer key when using a remote key on GCP KMS. (!18642)
-- Add a new configuration option for the sequencer to stop block production
-  ahead of a sequencer upgrade. See `describe config` or `man run sequencer`.
-  (!18605)
-
 ### RPCs changes
 
 ### Metrics changes
 
 ### Execution changes
-
-- Add support for GCP KMS `EC_SIGN_SECP256K1_SHA256` keys. (!18618)
-- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
-  (b58-encoded public key, Tezos implicit account) and Ethereum-specific (EOA
-  address) information about a key stored in a GCP KMS. (!18617 !18618)
-- Halt blocks production five minutes before a planned upgrade of the sequencer
-  operator. (!18605)
 
 ### Storage changes
 
@@ -34,6 +22,31 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.33 (2025-07-10)
+
+This release of the EVM node fixes an issue with the configuration for sequencer
+keys on GCP KMS and makes the sequencer stop block production ahead of a
+sequencer update.
+
+This release will not apply any migration to the node’s store (version 21),
+meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Fix encodings for sequencer key when using a remote key on GCP KMS. (!18642)
+- Add a new configuration option for the sequencer to stop block production
+  ahead of a sequencer upgrade. See `describe config` or `man run sequencer`.
+  (!18605)
+
+### Execution changes
+
+- Add support for GCP KMS `EC_SIGN_SECP256K1_SHA256` keys. (!18618)
+- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
+  (b58-encoded public key, Tezos implicit account) and Ethereum-specific (EOA
+  address) information about a key stored in a GCP KMS. (!18617 !18618)
+- Halt blocks production five minutes before a planned upgrade of the sequencer
+  operator. (!18605)
 
 ## Version 0.32 (2025-07-08)
 
