@@ -2889,29 +2889,32 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       stake
   in
   let* simulated_bakers =
-    (* Substitute consensus pkh with delegate pkh *)
-    let* yw = Node.yes_wallet agent in
-    let* ckm = Yes_wallet.load_consensus_key_mapping yw ~client in
-    List.map
-      (fun l ->
+    match configuration.simulate_network with
+    | Disabled -> return []
+    | Map _ | Scatter _ ->
+        (* Substitute consensus pkh with delegate pkh *)
+        let* yw = Node.yes_wallet agent in
+        let* ckm = Yes_wallet.load_consensus_key_mapping yw ~client in
         List.map
-          (fun a ->
-            try
-              let ck =
-                List.find
-                  (fun {Yes_wallet.public_key_hash; _} ->
-                    public_key_hash = a.Account.public_key_hash)
-                  ckm
-              in
-              {
-                a with
-                public_key_hash = ck.consensus_public_key_hash;
-                public_key = ck.consensus_public_key;
-              }
-            with Not_found -> a)
-          l)
-      simulated_delegates
-    |> return
+          (fun l ->
+            List.map
+              (fun a ->
+                try
+                  let ck =
+                    List.find
+                      (fun {Yes_wallet.public_key_hash; _} ->
+                        public_key_hash = a.Account.public_key_hash)
+                      ckm
+                  in
+                  {
+                    a with
+                    public_key_hash = ck.consensus_public_key_hash;
+                    public_key = ck.consensus_public_key;
+                  }
+                with Not_found -> a)
+              l)
+          simulated_delegates
+        |> return
   in
   (* [baker_accounts] stands for the list of keys that are actually used for
      baking. Meaning that if a baker uses a consensus key, the baker account
