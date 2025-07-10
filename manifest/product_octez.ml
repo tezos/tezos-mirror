@@ -2789,6 +2789,7 @@ let tezt_tezos =
         octez_base;
         octez_base_unix;
         cohttp_lwt_unix;
+        yaml;
       ]
     ~cram:true
     ~release_status:Released

@@ -103,7 +103,7 @@ let spawn_import_secret_key signer (key : Account.key) =
   let sk_uri =
     match key.secret_key with
     | Unencrypted sk -> "unencrypted:" ^ sk
-    | Encrypted _ ->
+    | Encrypted _ | Remote _ ->
         Test.fail "[spawn_import_secret_key] expected an unencrypted key"
   in
   spawn_command signer ["import"; "secret"; "key"; key.alias; sk_uri]

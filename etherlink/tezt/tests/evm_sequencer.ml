@@ -1033,6 +1033,27 @@ let test_publish_blueprints =
   let* () = Lwt_unix.sleep 2. in
   check_head_consistency ~left:sequencer ~right:proxy ()
 
+(** Same as {!test_publish_blueprints} with signatory. *)
+let test_publish_blueprints_signatory =
+  register_all
+    ~__FILE__
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "data"; "signatory"; "ci_disabled"]
+    ~title:"Sequencer publishes the blueprints to L1 with signatory"
+    ~use_dal:ci_enabled_dal_registration
+    ~signatory:true
+  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  let* _ =
+    repeat 5 (fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+  in
+  let timeout = if enable_dal then 50. else 5. in
+  let* () = Evm_node.wait_for_blueprint_injected ~timeout sequencer 5 in
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = Lwt_unix.sleep 2. in
+  check_head_consistency ~left:sequencer ~right:proxy ()
+
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
   register_all
@@ -13151,6 +13172,7 @@ let () =
   test_snapshots protocols ;
   test_patch_state [Protocol.Alpha] ;
   test_publish_blueprints protocols ;
+  test_publish_blueprints_signatory protocols ;
   test_sequencer_too_ahead protocols ;
   test_resilient_to_rollup_node_disconnect protocols ;
   test_can_fetch_smart_rollup_address protocols ;

@@ -31,6 +31,7 @@ type secret_key =
   | Unencrypted of string
       (** The string does NOT contain the 'encrypted:' prefix *)
   | Encrypted of string
+  | Remote of string
 
 (** Keys associated to an account. For example:
 {[
@@ -66,6 +67,9 @@ val sign_bytes :
 
 (** [require_unencrypted_secret_key ~__LOC__ key] returns [sk] if [key] is [Unencrypted sk], or fails. *)
 val require_unencrypted_secret_key : __LOC__:string -> secret_key -> string
+
+val require_unencrypted_or_remote_secret_key :
+  __LOC__:string -> secret_key -> unit
 
 (** [uri_of_secret_key secret_key] returns [secret_key] as an URI.
 
