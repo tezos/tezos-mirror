@@ -14,9 +14,10 @@
 
 ### Execution changes
 
+- Add support for GCP KMS `EC_SIGN_SECP256K1_SHA256` keys. (!18618)
 - Add a new command `show gcp key` which can be used to retrieve Tezos-specific
-  (b58-encoded public key, Tezos implicit account) information about a key
-  stored in a GCP KMS. (!18617)
+  (b58-encoded public key, Tezos implicit account) and Ethereum-specific (EOA
+  address) information about a key stored in a GCP KMS. (!18617 !18618)
 
 ### Storage changes
 

@@ -353,6 +353,18 @@ let deterministic_nonce_hash sk msg =
 
 let pop_verify _ ?msg:_ _ = false
 
+let public_key_to_bytes_uncompressed pk =
+  Bigstring.to_bytes (Key.to_bytes ~compress:false context pk)
+
+let eth_address_of_public_key s =
+  let s_bytes = public_key_to_bytes_uncompressed s in
+  (* The public key hash is the hash of pk[1..]. *)
+  let s_hash =
+    Hacl.Hash.Keccak_256.digest Bytes.(sub s_bytes 1 (length s_bytes - 1))
+  in
+  (* The ethereum address is pkhash[12..]. *)
+  Bytes.(sub s_hash 12 (length s_hash - 12))
+
 let recover signature msg =
   let open Error_monad.Result_syntax in
   (* Decode the signature. *)
@@ -361,16 +373,5 @@ let recover signature msg =
   in
   (* Recover the public key that signed the message. *)
   let* public_key = Sign.recover context ~signature (Bigstring.of_bytes msg) in
-  let public_key_bytes =
-    Key.to_bytes ~compress:false context public_key |> Bigstring.to_bytes
-  in
-  (* The public key hash is the hash of pk[1..]. *)
-  let public_key_hash =
-    Hacl.Hash.Keccak_256.digest
-      (Bytes.sub public_key_bytes 1 (Bytes.length public_key_bytes - 1))
-  in
-  (* The ethereum address is pkhash[12..]. *)
-  let address =
-    Bytes.sub public_key_hash 12 (Bytes.length public_key_hash - 12)
-  in
+  let address = eth_address_of_public_key public_key in
   return address

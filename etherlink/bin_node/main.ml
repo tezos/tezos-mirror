@@ -1427,15 +1427,24 @@ let show_kms_key_info_command =
       match gcp_key_from_string_opt key_str with
       | Some gcp_key ->
           let open Evm_node_lib_dev in
+          let open Evm_node_lib_dev_encoding in
           let* kms = Gcp_kms.from_gcp_key config.gcp_kms gcp_key in
           let pk = Gcp_kms.public_key kms in
           let pkh = Signature.Public_key.hash pk in
-          Format.printf
-            "@[<v>Public key: %a@ Public key hash: %a@ @]"
+          let eth_opt = Gcp_kms.ethereum_address_opt kms in
+          let open Format in
+          printf
+            "@[<v>Public key: %a@ Public key hash: %a%a@ @]"
             Signature.Public_key.pp
             pk
             Signature.Public_key_hash.pp
-            pkh ;
+            pkh
+            (pp_print_option (fun fmt addr ->
+                 fprintf
+                   fmt
+                   "@ Ethereum address: %s"
+                   (Ethereum_types.Address.to_string addr)))
+            eth_opt ;
           return_unit
       | None ->
           failwith "%s is not a valid URI for a key held by a GCP KMS" key_str)
