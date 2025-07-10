@@ -217,6 +217,37 @@ impl StorageAccount {
         Ok(())
     }
 
+    fn delete_code(
+        &mut self,
+        host: &mut impl Runtime,
+        code_hash: &B256,
+    ) -> Result<(), Error> {
+        if code_hash != &KECCAK_EMPTY {
+            CodeStorage::delete(host, code_hash)?;
+            let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
+            if host.store_has(&code_hash_path)?.is_some() {
+                host.store_delete(&code_hash_path)?
+            }
+        }
+        Ok(())
+    }
+
+    pub fn clear_info(
+        &mut self,
+        host: &mut impl Runtime,
+        code_hash: &B256,
+    ) -> Result<(), Error> {
+        // If nothing was ever stored state-wise, we have nothing
+        // to clear, it means the storage account was created and
+        // destructed within the same transaction.
+        if host.store_has(&self.path)?.is_some() {
+            self.set_balance(host, U256::ZERO)?;
+            self.set_nonce(host, 0)?;
+            self.delete_code(host, code_hash)?;
+        }
+        Ok(())
+    }
+
     pub fn storage_path(&self, index: &U256) -> Result<OwnedPath, Error> {
         let storage_path = concat(&self.path, &STORAGE_ROOT_PATH)?;
         let index_path = path_from_u256(index)?;
@@ -238,6 +269,14 @@ impl StorageAccount {
         let value_bytes = value.to_be_bytes::<{ U256::BYTES }>();
 
         Ok(host.store_write_all(&path, &value_bytes)?)
+    }
+
+    pub fn clear_storage(&mut self, host: &mut impl Runtime) -> Result<(), Error> {
+        let path = concat(&self.path, &STORAGE_ROOT_PATH)?;
+        if host.store_has(&path)?.is_some() {
+            host.store_delete(&path)?
+        }
+        Ok(())
     }
 
     fn read_ticket_balance(

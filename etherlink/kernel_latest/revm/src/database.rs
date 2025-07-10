@@ -17,7 +17,7 @@ use crate::{
 
 use revm::{
     primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
-    state::{Account, AccountInfo, AccountStatus, Bytecode, EvmStorageSlot},
+    state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
@@ -40,6 +40,11 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     commit_status: &'a mut bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
+}
+
+enum AccountState {
+    Touched((AccountInfo, EvmStorage)),
+    SelfDestructed(B256),
 }
 
 // See: https://github.com/rust-lang/rust-clippy/issues/5787
@@ -81,10 +86,6 @@ pub trait PrecompileDatabase: Database {
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
-    pub fn abort(&mut self) {
-        *self.commit_status = false;
-    }
-
     pub fn commit_status(&self) -> bool {
         *self.commit_status
     }
@@ -105,6 +106,79 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         self.world_state_handler
             .rollback_transaction(self.host)
             .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    fn abort(&mut self) {
+        *self.commit_status = false;
+    }
+
+    fn update_account(&mut self, address: Address, account_state: AccountState) {
+        match self.get_or_create_account(address) {
+            Ok(mut storage_account) => match account_state {
+                AccountState::Touched((info, storage)) => {
+                    if let Err(err) = storage_account.set_info(self.host, info) {
+                        self.abort();
+                        log!(
+                            self.host,
+                            LogError,
+                            "DatabaseCommit `set_info` error: {err:?}"
+                        );
+                    }
+
+                    for (
+                        key,
+                        EvmStorageSlot {
+                            original_value,
+                            present_value,
+                            ..
+                        },
+                    ) in storage
+                    {
+                        if original_value != present_value {
+                            if let Err(err) = storage_account.set_storage(
+                                self.host,
+                                &key,
+                                &present_value,
+                            ) {
+                                self.abort();
+                                log!(
+                                    self.host,
+                                    LogError,
+                                    "DatabaseCommit `set_storage` error: {err:?}"
+                                );
+                            }
+                        }
+                    }
+                }
+                AccountState::SelfDestructed(code_hash) => {
+                    if let Err(err) = storage_account.clear_info(self.host, &code_hash) {
+                        self.abort();
+                        log!(
+                            self.host,
+                            LogError,
+                            "DatabaseCommit `clear_info` error: {err:?}"
+                        );
+                    }
+
+                    if let Err(err) = storage_account.clear_storage(self.host) {
+                        self.abort();
+                        log!(
+                            self.host,
+                            LogError,
+                            "DatabaseCommit `clear_storage` error: {err:?}"
+                        );
+                    }
+                }
+            },
+            Err(err) => {
+                self.abort();
+                log!(
+                    self.host,
+                    LogError,
+                    "DatabaseCommit `get_or_create_account` error: {err:?}"
+                )
+            }
+        }
     }
 }
 
@@ -198,65 +272,28 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 
 impl<Host: Runtime> DatabaseCommit for EtherlinkVMDB<'_, Host> {
     fn commit(&mut self, changes: HashMap<Address, Account>) {
-        for (
-            address,
-            Account {
-                info,
-                storage,
-                status,
-                ..
-            },
-        ) in changes
-        {
-            // The account is marked as touched, the changes should be commited
+        for (address, account) in changes {
+            // The account isn't marked as touched, the changes are not commited
             // to the database.
-            if status.contains(AccountStatus::Touched) {
-                match self.get_or_create_account(address) {
-                    Ok(mut storage_account) => {
-                        if let Err(err) = storage_account.set_info(self.host, info) {
-                            self.abort();
-                            log!(
-                                self.host,
-                                LogError,
-                                "DatabaseCommit `set_info` error: {err:?}"
-                            );
-                        }
-
-                        for (
-                            key,
-                            EvmStorageSlot {
-                                original_value,
-                                present_value,
-                                ..
-                            },
-                        ) in storage
-                        {
-                            if original_value != present_value {
-                                if let Err(err) = storage_account.set_storage(
-                                    self.host,
-                                    &key,
-                                    &present_value,
-                                ) {
-                                    self.abort();
-                                    log!(
-                                        self.host,
-                                        LogError,
-                                        "DatabaseCommit `set_storage` error: {err:?}"
-                                    );
-                                }
-                            }
-                        }
-                    }
-                    Err(err) => {
-                        self.abort();
-                        log!(
-                            self.host,
-                            LogError,
-                            "DatabaseCommit `get_or_create_account` error: {err:?}"
-                        )
-                    }
-                }
+            if !account.is_touched() {
+                continue;
             }
+
+            // The account is touched and marked as selfdestructed, we clear the
+            // account.
+            if account.is_selfdestructed() {
+                self.update_account(
+                    address,
+                    AccountState::SelfDestructed(account.info.code_hash),
+                );
+                continue;
+            }
+
+            // The account is touched, the changes are naturally commited to the database.
+            self.update_account(
+                address,
+                AccountState::Touched((account.info, account.storage)),
+            );
         }
     }
 }

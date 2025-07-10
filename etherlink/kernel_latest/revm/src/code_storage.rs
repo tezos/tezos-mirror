@@ -101,15 +101,16 @@ impl CodeStorage {
         }
     }
 
-    #[cfg(test)]
-    pub fn decrement_code_usage(&self, host: &mut impl Runtime) -> Result<u64, Error> {
-        let number_reference = self.get_ref_count(host)?;
-        let number_reference = number_reference.saturating_sub(1u64);
-        self.set_ref_count(host, number_reference)?;
+    fn decrement_code_usage(&self, host: &mut impl Runtime) -> Result<u64, Error> {
+        let mut number_reference = self.get_ref_count(host)?;
+        if number_reference != 0 {
+            // Condition avoids an unnecessary write access
+            number_reference = number_reference.saturating_sub(1u64);
+            self.set_ref_count(host, number_reference)?;
+        }
         Ok(number_reference)
     }
 
-    #[cfg(test)]
     pub fn delete(host: &mut impl Runtime, code_hash: &B256) -> Result<(), Error> {
         let code = Self::new(code_hash)?;
         if code.exists(host)? {
