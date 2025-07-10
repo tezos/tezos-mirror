@@ -1144,7 +1144,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
     | None ->
         (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
         sequencer_disable_native_execution configuration
-    | Some Evm_node_lib_dev.Sequencer.{tezlink = Some chain_id; _} ->
+    | Some Evm_node_lib_dev.Sequencer.{tezlink = Some {chain_id; _}; _} ->
         (* We are running a tezlink sandbox, we need to activate tezlink node *)
         let configuration =
           add_tezlink_to_node_configuration chain_id configuration
@@ -2749,7 +2749,8 @@ let tezlink_sandbox_command =
             parent_chain = None;
             disable_da_fees;
             kernel_verbosity;
-            tezlink = Some tezlink_sandbox_chain_id;
+            tezlink =
+              Some {chain_id = tezlink_sandbox_chain_id; funded_addresses = []};
           }
       in
       let config_file = config_filename ~data_dir config_file in
