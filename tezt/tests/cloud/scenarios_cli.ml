@@ -28,22 +28,23 @@ end
        baking rights, in a round robin fashion, on [y] baker daemons. This is
        particularly useful to scatter the baking power across several baker
        daemons,
-     - map(x,y): maps [y-1] keys from the biggest bakers found onto [y-1] baker
-       daemons (theses daemons are handling a single key) and gives the
-       remaining keys [x-y-1] to a single baker daemon. This is particularly
-       useful to simulate the behaviour of an actual network,
+     - map(x,y,z): maps [y] keys from the biggest bakers found onto [y] baker
+       daemons (theses daemons are handling a single key) and scatters the
+       remaining [x-y] keys to [z] baker daemons. This is particularly useful to
+       simulate the behaviour of an actual network,
      - disabled: no simulation, we rely on the configuration.stake parameter.
    For example:
      - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]
-     - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]] *)
+     - map(10,3,0):[[0];[1];[2;3;4;5;6;7;8;9]]
+     - map(10,3,2):[[0];[1];[2;5;6;8];[3;5;8;9]]*)
 type network_simulation_config =
   | Scatter of int * int
-  | Map of int * int
+  | Map of int * int * int
   | Disabled
 
 let simulate_network_to_string = function
   | Scatter (x, y) -> Format.sprintf "scatter(%d,%d)" x y
-  | Map (x, y) -> Format.sprintf "map(%d,%d)" x y
+  | Map (x, y, z) -> Format.sprintf "map(%d,%d,%d)" x y z
   | Disabled -> Format.sprintf "disabled"
 
 let parse_network_simulation_config_from_args simulate_network_arg =
@@ -67,7 +68,7 @@ let parse_network_simulation_config_from_args simulate_network_arg =
         arg2
   in
   let re_scatter = Str.regexp "\\(scatter\\)(\\([^,]+\\),\\([^)]*\\))" in
-  let re_map = Str.regexp "\\(map\\)(\\([^,]+\\),\\([^)]*\\))" in
+  let re_map = Str.regexp "\\(map\\)(\\([^,]+\\),\\([^)]*\\),\\([^)]*\\))" in
   if Str.string_match re_scatter simulate_network_arg 0 then
     let arg1 =
       Str.matched_group 2 simulate_network_arg
@@ -88,8 +89,12 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       Str.matched_group 3 simulate_network_arg
       |> int_of_string |> is_positive_param
     in
-    let () = is_arg1_sup_eq_arg2 arg1 arg2 in
-    Some (Map (arg1, arg2))
+    let arg3 =
+      Str.matched_group 4 simulate_network_arg
+      |> int_of_string |> is_positive_param
+    in
+    let () = is_arg1_sup_eq_arg2 arg1 (arg2 + arg3) in
+    Some (Map (arg1, arg2, arg3))
   else
     Test.fail
       "Unexpected network simulation config (--simulation) [%s]"
