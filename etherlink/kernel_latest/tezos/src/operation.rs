@@ -3,19 +3,18 @@
 // SPDX-License-Identifier: MIT
 
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
-
-use mir::ast::michelson_address::entrypoint;
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
-use nom::combinator::map;
+use crate::enc_wrappers::{BlockHash, OperationHash};
+use mir::ast::michelson_address::entrypoint;
 use nom::error::{ErrorKind, ParseError};
-use nom::{bytes::complete::take, Finish};
+use nom::Finish;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
-    enc::{BinError, BinResult, BinWriter},
+    enc::{BinError, BinWriter},
     nom::{error::DecodeError, NomError, NomReader},
 };
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -93,10 +92,10 @@ impl Operation {
         Ok(())
     }
 
-    pub fn hash(&self) -> Result<H256, BinError> {
+    pub fn hash(&self) -> Result<OperationHash, BinError> {
         let serialized_op = self.to_bytes()?;
         let op_hash = digest_256(&serialized_op);
-        Ok(H256::from_slice(&op_hash))
+        Ok(OperationHash(H256::from_slice(&op_hash)))
     }
 }
 
@@ -105,25 +104,6 @@ impl Decodable for Operation {
         let raw: Vec<u8> = rlp.as_val()?;
         Operation::try_from_bytes(&raw)
             .map_err(|_| rlp::DecoderError::Custom("Operation::try_from_bytes failed"))
-    }
-}
-
-#[derive(PartialEq, Debug)]
-pub struct BlockHash(H256);
-
-impl NomReader<'_> for BlockHash {
-    fn nom_read(bytes: &[u8]) -> tezos_data_encoding::nom::NomResult<Self> {
-        let (bytes, hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(bytes)?;
-        Ok((bytes, Self(hash)))
-    }
-}
-
-impl BinWriter for BlockHash {
-    fn bin_write(&self, data: &mut Vec<u8>) -> BinResult {
-        let hash: [u8; 32] = self.0.to_fixed_bytes();
-        data.extend_from_slice(&hash);
-        Ok(())
     }
 }
 
@@ -223,12 +203,6 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
                 operation: OperationContent::Transfer(c),
             },
         }
-    }
-}
-
-impl From<H256> for BlockHash {
-    fn from(hash: H256) -> Self {
-        Self(hash)
     }
 }
 

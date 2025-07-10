@@ -6,12 +6,9 @@
 
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::sequence::preceded;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::UnknownSignature;
-use tezos_data_encoding::enc::{self as tezos_enc, u8};
+use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::types::Narith;
 use tezos_enc::BinWriter;
@@ -35,60 +32,17 @@ pub enum RevealError {
     InconsistentPublicKey(PublicKeyHash),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, BinWriter, NomReader)]
+pub struct BalanceTooLow {
+    pub contract: Contract,
+    pub balance: Narith,
+    pub amount: Narith,
+}
+
+#[derive(Debug, PartialEq, Eq, BinWriter, NomReader)]
 pub enum TransferError {
-    BalanceTooLow {
-        contract: Contract,
-        balance: Narith,
-        amount: Narith,
-    },
+    BalanceTooLow(BalanceTooLow),
     UnspendableContract(Contract),
-}
-
-impl BinWriter for TransferError {
-    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        match self {
-            Self::BalanceTooLow {
-                contract,
-                balance,
-                amount,
-            } => {
-                u8(&0_u8, output)?;
-                contract.bin_write(output)?;
-                balance.bin_write(output)?;
-                amount.bin_write(output)?;
-                Ok(())
-            }
-            Self::UnspendableContract(contract) => {
-                u8(&1_u8, output)?;
-                contract.bin_write(output)?;
-                Ok(())
-            }
-        }
-    }
-}
-
-impl NomReader<'_> for TransferError {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        let balance_too_low_parser = preceded(tag(0_u8.to_be_bytes()), |input| {
-            let (input, contract) = Contract::nom_read(input)?;
-            let (input, balance) = Narith::nom_read(input)?;
-            let (input, amount) = Narith::nom_read(input)?;
-            Ok((
-                input,
-                Self::BalanceTooLow {
-                    contract,
-                    balance,
-                    amount,
-                },
-            ))
-        });
-        let unspendable_contract_parser = preceded(tag(1_u8.to_be_bytes()), |input| {
-            let (input, contract) = Contract::nom_read(input)?;
-            Ok((input, Self::UnspendableContract(contract)))
-        });
-        alt((balance_too_low_parser, unspendable_contract_parser))(input)
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -186,38 +140,23 @@ impl NomReader<'_> for Empty {
     }
 }
 
-// PlaceHolder Type for temporary unused fields that encode as vectors
-#[derive(PartialEq, Debug)]
-pub struct VecEmpty;
-
-impl BinWriter for VecEmpty {
-    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        tezos_enc::u32(&0, output)
-    }
-}
-impl NomReader<'_> for VecEmpty {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        // We expect an empty vector, so we just consume the size of the vector
-        let (input, _) = tezos_nom::size(input)?;
-        Ok((input, Self))
-    }
-}
-
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
     // TODO: Placeholder for ticket receipt issue : #8018
-    pub ticket_receipt: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub ticket_receipt: Vec<u8>,
     // TODO: Placeholder for originated contracts issue : #8018
-    pub originated_contracts: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub originated_contracts: Vec<u8>,
     pub consumed_gas: Narith,
     pub storage_size: Narith,
     pub paid_storage_size_diff: Narith,
     pub allocated_destination_contract: bool,
     // TODO: Placeholder for lazy storage diff issue : #8018
-    pub lazy_storage_diff: Option<Empty>,
+    pub lazy_storage_diff: Option<()>,
 }
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
@@ -259,7 +198,8 @@ pub struct OperationResult<M: OperationKind> {
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
     //TODO Placeholder for internal operations : #8018
-    pub internal_operation_results: VecEmpty,
+    #[encoding(dynamic, bytes)]
+    pub internal_operation_results: Vec<u8>,
 }
 #[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
@@ -274,12 +214,12 @@ pub fn produce_operation_result<M: OperationKind>(
         Ok(success) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Applied(success),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         },
         Err(operation_error) => OperationResult {
             balance_updates: vec![],
             result: ContentResult::Failed(vec![operation_error]),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         },
     }
 }
@@ -349,10 +289,10 @@ mod tests {
                             TransferSuccess { storage: None, lazy_storage_diff: None, balance_updates: vec![
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap())), changes: -42000000,update_origin : UpdateOrigin::BlockApplication },
                             BalanceUpdate { balance: Balance::Account(Contract::Implicit(PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap())), changes: 42000000,update_origin : UpdateOrigin::BlockApplication}
-                            ], ticket_receipt: VecEmpty, originated_contracts: VecEmpty, consumed_gas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
+                            ], ticket_receipt: vec![], originated_contracts: vec![], consumed_gas: 2169000.into(), storage_size: 0.into(), paid_storage_size_diff: 0.into(), allocated_destination_contract: false }
                             ))
 
-                        , internal_operation_results: VecEmpty })
+                        , internal_operation_results: vec![] })
                     }],
                     signature:  UnknownSignature::from_base58_check(
                         "sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"

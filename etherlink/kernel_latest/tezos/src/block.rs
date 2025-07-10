@@ -2,127 +2,37 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::operation::BlockHash;
+use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
-use nom::bytes::complete::take;
-use nom::combinator::map;
 use nom::error::ParseError;
 use nom::Finish;
-use primitive_types::{H256, U256};
+use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc as tezos_enc;
-use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::error::DecodeError;
-use tezos_data_encoding::nom::NomError;
+use tezos_data_encoding::nom::{self as tezos_nom};
 use tezos_enc::{BinError, BinWriter};
-use tezos_nom::{NomReader, NomResult};
+use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Timestamp;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct AppliedOperation {
     // OperationHash are 32 bytes long
-    pub hash: H256,
+    pub hash: OperationHash,
     pub branch: BlockHash,
+    #[encoding(dynamic)]
     pub op_and_receipt: OperationDataAndMetadata,
 }
 
-impl NomReader<'_> for AppliedOperation {
-    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(input)?;
-
-        let (remaining, branch) = BlockHash::nom_read(remaining)?;
-        let (remaining, op_and_receipt) =
-            tezos_nom::dynamic(OperationDataAndMetadata::nom_read)(remaining)?;
-
-        Ok((
-            remaining,
-            Self {
-                hash,
-                branch,
-                op_and_receipt,
-            },
-        ))
-    }
-}
-
-impl BinWriter for AppliedOperation {
-    fn bin_write(&self, output: &mut Vec<u8>) -> Result<(), BinError> {
-        let Self {
-            hash,
-            branch,
-            op_and_receipt,
-        } = self;
-        // Encode all fields of the AppliedOperation
-        tezos_enc::put_bytes(&hash.to_fixed_bytes(), output);
-        branch.bin_write(output)?;
-        tezos_enc::dynamic(OperationDataAndMetadata::bin_write)(op_and_receipt, output)?;
-        Ok(())
-    }
-}
-
 // WIP: This structure will evolve to look like Tezos block
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TezBlock {
-    pub hash: H256,
-    pub number: U256,
+    pub hash: BlockHash,
+    pub number: BlockNumber,
+    pub previous_hash: BlockHash,
     pub timestamp: Timestamp,
-    pub previous_hash: H256,
+    #[encoding(dynamic, list)]
     pub operations: Vec<AppliedOperation>,
-}
-
-impl NomReader<'_> for TezBlock {
-    fn nom_read(input: &'_ [u8]) -> NomResult<'_, Self> {
-        let (remaining, hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(input)?;
-
-        let (remaining, number) = nom::number::complete::be_u32(remaining)?;
-        let number = U256::from(number);
-
-        let (remaining, previous_hash) =
-            map(take::<usize, &[u8], NomError>(32_usize), H256::from_slice)(remaining)?;
-
-        // Decode the timestamp
-        let (remaining, timestamp) = nom::number::complete::be_i64(remaining)?;
-        let timestamp = Timestamp::from(timestamp);
-
-        let (remaining, operations) =
-            tezos_nom::dynamic(tezos_nom::list(AppliedOperation::nom_read))(remaining)?;
-
-        Ok((
-            remaining,
-            Self {
-                hash,
-                number,
-                timestamp,
-                previous_hash,
-                operations,
-            },
-        ))
-    }
-}
-
-impl BinWriter for TezBlock {
-    // Encoded size for parameter were taken from this command:
-    // `octez-codec describe block_header binary schema`
-    fn bin_write(&self, output: &mut Vec<u8>) -> Result<(), BinError> {
-        let Self {
-            hash,
-            number,
-            timestamp,
-            previous_hash,
-            operations,
-        } = self;
-        // Encode all block fields
-        tezos_enc::put_bytes(&hash.to_fixed_bytes(), output);
-        tezos_enc::u32(&number.as_u32(), output)?;
-        tezos_enc::put_bytes(&previous_hash.to_fixed_bytes(), output);
-        tezos_enc::i64(&timestamp.i64(), output)?;
-        tezos_enc::dynamic(tezos_enc::list(AppliedOperation::bin_write))(
-            operations, output,
-        )?;
-        Ok(())
-    }
 }
 
 impl TezBlock {
@@ -138,24 +48,24 @@ impl TezBlock {
     }
 
     // This function must be used on a TezBlock whose hash field is H256::zero()
-    fn hash(&self) -> Result<H256, BinError> {
+    fn hash(&self) -> Result<BlockHash, BinError> {
         let mut encoded_data = vec![];
         self.bin_write(&mut encoded_data)?;
         let hashed_data = digest_256(&encoded_data);
-        Ok(H256::from_slice(&hashed_data))
+        Ok(BlockHash(H256::from_slice(&hashed_data)))
     }
 
     pub fn new(
-        number: U256,
+        number: BlockNumber,
         timestamp: Timestamp,
         previous_hash: H256,
         operations: Vec<AppliedOperation>,
     ) -> Result<Self, BinError> {
         let block = Self {
-            hash: H256::zero(),
+            hash: BlockHash(H256::zero()), // Placeholder, will be computed
             number,
             timestamp,
-            previous_hash,
+            previous_hash: BlockHash(previous_hash),
             operations,
         };
         Ok(Self {
@@ -184,12 +94,12 @@ impl TezBlock {
 
 #[cfg(test)]
 mod tests {
-    use primitive_types::{H256, U256};
+    use primitive_types::H256;
     use tezos_smart_rollup::types::Timestamp;
 
     use crate::operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationResult,
-        OperationResultSum, OperationWithMetadata, RevealSuccess, VecEmpty,
+        OperationResultSum, OperationWithMetadata, RevealSuccess,
     };
 
     use super::{AppliedOperation, TezBlock};
@@ -204,14 +114,14 @@ mod tests {
     }
 
     fn dummy_applied_operation() -> AppliedOperation {
-        let hash = H256::random();
+        let hash = H256::random().into();
         let data = crate::operation::make_dummy_reveal_operation();
         let receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
             result: crate::operation_result::ContentResult::Applied(RevealSuccess {
                 consumed_gas: 0u64.into(),
             }),
-            internal_operation_results: VecEmpty,
+            internal_operation_results: vec![],
         });
         AppliedOperation {
             hash,
@@ -229,7 +139,7 @@ mod tests {
     }
 
     fn dummy_tezblock(operations: Vec<AppliedOperation>) -> TezBlock {
-        let number = U256::one();
+        let number = 1u32.into();
         let timestamp = Timestamp::from(0);
         let previous_hash = TezBlock::genesis_block_hash();
         TezBlock::new(number, timestamp, previous_hash, operations)

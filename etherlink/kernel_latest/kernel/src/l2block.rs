@@ -23,7 +23,7 @@ impl L2Block {
     pub fn number(&self) -> U256 {
         match self {
             Self::Etherlink(block) => block.number,
-            Self::Tezlink(block) => block.number,
+            Self::Tezlink(block) => block.number.into(),
         }
     }
 
@@ -58,7 +58,7 @@ impl L2Block {
     pub fn hash(&self) -> H256 {
         match self {
             Self::Etherlink(block) => block.hash,
-            Self::Tezlink(block) => block.hash,
+            Self::Tezlink(block) => block.hash.0,
         }
     }
 
