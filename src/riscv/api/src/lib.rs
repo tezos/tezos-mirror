@@ -3,17 +3,18 @@
 //
 // SPDX-License-Identifier: MIT
 
+//! This module defines the OCaml API for the RISC-V PVM and serves as a basis for building the octez-riscv-api OCaml library.
+
 mod move_semantics;
 mod pointer_apply;
 
+use core::panic;
 use std::fs;
 use std::str;
 
 use arbitrary_int::u31;
 use move_semantics::ImmutableState;
 use move_semantics::MutableState;
-use num_enum::IntoPrimitive;
-use num_enum::TryFromPrimitive;
 use ocaml::Pointer;
 use ocaml::ToValue;
 use octez_riscv::pvm::InputRequest as PvmInputRequest;
@@ -56,9 +57,11 @@ pub type MutState = MutableState<NodePvm<Owned>>;
 pub struct Id(storage::Hash);
 
 ocaml::custom!(Repo);
+ocaml::custom!(State);
+ocaml::custom!(MutState);
 ocaml::custom!(Id);
 
-#[derive(ocaml::FromValue, ocaml::ToValue, IntoPrimitive, TryFromPrimitive, strum::EnumCount)]
+#[derive(ocaml::FromValue, ocaml::ToValue, strum::EnumCount)]
 #[ocaml::sig("Evaluating | Waiting_for_input | Waiting_for_reveal")]
 #[repr(u8)]
 pub enum Status {
@@ -119,9 +122,18 @@ unsafe impl ocaml::ToValue for BytesWrapper {
     }
 }
 
+unsafe impl ocaml::FromValue for BytesWrapper {
+    fn from_value(value: ocaml::Value) -> Self {
+        // SAFETY: The ToValue implementation for this type uses the OCaml bytes type.
+        // and ocaml-rs will only call this function on an OCaml value coming from BytesWrapper.
+        let bytes: &[u8] = unsafe { value.bytes_val() };
+        BytesWrapper(bytes.into())
+    }
+}
+
 /// Input values are passed into the PVM after an input request has been made.
 /// Analogous to the [`PvmInput`] type.
-#[derive(ocaml::FromValue)]
+#[derive(ocaml::FromValue, ocaml::ToValue)]
 #[ocaml::sig(
     "Inbox_message of {inbox_level: int32; message_counter: int64; payload: bytes} | Reveal of bytes"
 )]
@@ -152,7 +164,7 @@ impl<'a> From<Input<'a>> for PvmInput<'a> {
 }
 
 /// Describes possible input requests the PVM may ask for during execution.
-#[derive(ocaml::ToValue)]
+#[derive(ocaml::ToValue, ocaml::FromValue)]
 #[ocaml::sig(
     "No_input_required | Initial | First_after of {level: int32; counter: int64} | Needs_reveal of bytes"
 )]
@@ -190,8 +202,17 @@ unsafe impl ocaml::ToValue for RawLevel {
     }
 }
 
+unsafe impl ocaml::FromValue for RawLevel {
+    fn from_value(value: ocaml::Value) -> Self {
+        // SAFETY: The ToValue implementation for this type uses the OCaml int32 type
+        // and ocaml-rs will only call this function on an OCaml value coming from RawLevel.
+        let wrapped_value: u32 = unsafe { value.int32_val() as u32 };
+        RawLevel(u31::new(wrapped_value))
+    }
+}
+
 /// Metadata of an output message
-#[derive(ocaml::ToValue)]
+#[derive(ocaml::ToValue, ocaml::FromValue)]
 #[ocaml::sig("{message_index : int64; outbox_level : int32}")]
 pub struct OutputInfo {
     pub message_index: u64,
@@ -199,7 +220,7 @@ pub struct OutputInfo {
 }
 
 /// A value of this type is generated as part of successfully verifying an output proof.
-#[derive(ocaml::ToValue)]
+#[derive(ocaml::ToValue, ocaml::FromValue)]
 #[ocaml::sig("{info : output_info; encoded_message : bytes}")]
 pub struct Output {
     pub info: OutputInfo,
@@ -699,4 +720,66 @@ pub fn octez_riscv_insert_failure(state: Pointer<State>) -> Pointer<State> {
 #[ocaml::sig("mut_state -> unit")]
 pub fn octez_riscv_mut_insert_failure(state: Pointer<MutState>) {
     apply_mut(state, |pvm| pvm.insert_failure())
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("status -> status")]
+pub fn octez_riscv_test_status(status: Status) -> Status {
+    status
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("input -> input")]
+pub fn octez_riscv_test_input(input: Input) -> Input<'static> {
+    // Ideally we would want to just pass `input` as is, but due to lifetime/ocaml-rs limitations,
+    // string slices can't be easily passed. As a workaround we form a new input based on the original input,
+    // but with the string slices being hard coded - matching the ones in `test_rust_bindings.rs`.
+    // The asserts in this function test the OCaml -> Rust conversion.
+    // On the OCaml side, the hard coded inputs are tested in `test_rust_bindings.ml`.
+    match input {
+        Input::InboxMessage {
+            inbox_level,
+            message_counter,
+            payload,
+        } => {
+            assert_eq!(payload, b"inbox_payload");
+            Input::InboxMessage {
+                inbox_level,
+                message_counter,
+                payload: b"inbox_payload",
+            }
+        }
+        Input::Reveal(payload) => {
+            assert_eq!(payload, b"reveal_payload");
+            Input::Reveal(b"reveal_payload")
+        }
+    }
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("input_request -> input_request")]
+pub fn octez_riscv_test_input_request(input_request: InputRequest) -> InputRequest {
+    input_request
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("output_info -> output_info")]
+pub fn octez_riscv_test_output_info(output_info: OutputInfo) -> OutputInfo {
+    output_info
+}
+
+/// Test endpoint to check argument passing between OCaml and Rust.
+#[doc(hidden)]
+#[ocaml::func]
+#[ocaml::sig("output -> output")]
+pub fn octez_riscv_test_output(output: Output) -> Output {
+    output
 }
