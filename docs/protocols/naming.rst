@@ -42,8 +42,10 @@ sequence:
 * 016 Mumbai
 * 017 Nairobi
 * 018 Oxford
-* 019 Paris
-* 020 Quebec
+* 019 ParisB
+* 020 ParisC
+* 021 Quebec
+* 022 Rio
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol
