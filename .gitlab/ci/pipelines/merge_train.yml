@@ -205,7 +205,8 @@ oc.ocaml_fmt:
     - '**/*.mli'
     - '**/.ocamlformat'
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     when: on_success
   needs: []
   dependencies: []
@@ -239,7 +240,8 @@ oc.semgrep:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - devtools/**/*
     - scripts/semgrep/**/*
     - src/**/*
@@ -263,7 +265,8 @@ oc.misc_checks:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - client-libs/**/*
     - contrib/**/*
     - devtools/**/*
@@ -320,7 +323,8 @@ check_rust_fmt:
   - changes:
     - '**/*.rs'
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     when: on_success
   needs: []
   dependencies: []
@@ -339,7 +343,8 @@ documentation:rst-check:
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     when: on_success
   needs: []
   dependencies: []
@@ -520,7 +525,8 @@ oc.build:static-x86_64-linux-binaries:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -598,7 +604,8 @@ oc.build:static-arm64-linux-binaries:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -672,7 +679,8 @@ oc.build_x86_64-released:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -766,7 +774,8 @@ oc.build_x86_64-exp-dev-extra:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -871,7 +880,8 @@ wasm-runtime-check:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - src/lib_wasm_runtime/**/*.rs
     when: on_success
   needs:
@@ -912,7 +922,8 @@ oc.build_kernels:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -991,7 +1002,8 @@ oc.build_dsn_node:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1064,7 +1076,8 @@ oc.tezt:fetch-records:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1281,7 +1294,8 @@ etherlink.build:static-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - etherlink/**/*
     - sdk/rust/**/*
@@ -1341,7 +1355,8 @@ etherlink.build:static-arm64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - etherlink/**/*
     - sdk/rust/**/*
@@ -1396,7 +1411,8 @@ build-layer1-profiling:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1470,7 +1486,8 @@ select_tezts:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1588,7 +1605,8 @@ kaitai_checks:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - client-libs/*kaitai*/**/*
     - images/**/*
     - scripts/ci/**/*
@@ -1638,7 +1656,8 @@ kaitai_e2e_checks:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - client-libs/*kaitai*/**/*
     - images/**/*
     - scripts/ci/**/*
@@ -1667,7 +1686,8 @@ oc.check_lift_limits_patch:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - src/bin_tps_evaluation/lift_limits.patch
     - src/proto_alpha/lib_protocol/main.ml
     when: on_success
@@ -1712,7 +1732,8 @@ oc.python_check:
   - changes:
     - '**/*.py'
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - poetry.lock
     - pyproject.toml
     when: on_success
@@ -1738,7 +1759,8 @@ oc.integration:compiler-rejections:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1800,7 +1822,8 @@ oc.script:test-gen-genesis:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1845,7 +1868,8 @@ oc.script:snapshot_alpha_and_link:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - scripts/snapshot_alpha.sh
     - scripts/snapshot_alpha_and_link.sh
     - scripts/user_activated_upgrade.sh
@@ -1907,7 +1931,8 @@ oc.script:test_octez_release_versions:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -1954,7 +1979,8 @@ oc.script:b58_prefix:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - scripts/b58_prefix/b58_prefix.py
     - scripts/b58_prefix/test_b58_prefix.py
     when: on_success
@@ -1981,7 +2007,8 @@ oc.test-liquidity-baking-scripts:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - scripts/check-liquidity-baking-scripts.sh
     - scripts/ci/test_liquidity_baking_scripts.sh
     - src/**/*
@@ -2026,7 +2053,8 @@ mir_unit:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - contrib/mir/**/*
     - images/**/*
     when: on_success
@@ -2056,7 +2084,8 @@ mir_tzt:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - contrib/mir/**/*
     - images/**/*
     - tzt_reference_test_suite/**/*
@@ -2087,7 +2116,8 @@ test_sdk_rust:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - images/**/*
     - sdk/rust/**/*
     when: on_success
@@ -2127,7 +2157,8 @@ test_sdk_bindings:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - contrib/sdk-bindings
     - images/**/*
     - sdk/rust/**/*
@@ -2169,7 +2200,8 @@ test_kernels:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - images/**/*
     - kernels.mk
     - sdk/rust/**/*
@@ -2214,7 +2246,8 @@ test_etherlink_kernel:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - etherlink.mk
     - etherlink/**/*.rs
     - images/**/*
@@ -2259,7 +2292,8 @@ test_etherlink_firehose:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - etherlink/firehose/**/*
     - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
     - images/**/*
@@ -2301,7 +2335,8 @@ audit_riscv_deps:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - images/**/*
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
@@ -2341,7 +2376,8 @@ check_riscv_kernels:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - images/**/*
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
@@ -2385,7 +2421,8 @@ test_evm_compatibility:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - etherlink.mk
     - etherlink/kernel_latest/evm_evaluation/**/*
     - etherlink/kernel_latest/evm_execution/**/*
@@ -2434,7 +2471,8 @@ ocaml-check:
     - '**/*.ml'
     - '**/*.mli'
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - devtools/**/*
     - src/**/*
     - tezt/**/*
@@ -2491,7 +2529,8 @@ oc.unit:non-proto-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2577,7 +2616,8 @@ oc.unit:etherlink-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - etherlink/**/*
     - sdk/rust/**/*
@@ -2645,7 +2685,8 @@ oc.unit:other-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2731,7 +2772,8 @@ oc.unit:proto-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2817,7 +2859,8 @@ oc.unit:non-proto-arm64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2892,7 +2935,8 @@ oc.unit:webassembly-x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -2938,7 +2982,8 @@ oc.unit:protocol_compiles:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3005,7 +3050,8 @@ de.unit:x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - data-encoding/**
     when: on_success
   needs:
@@ -3029,7 +3075,8 @@ de.unit:arm64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - data-encoding/**
     when: on_success
   needs:
@@ -3053,7 +3100,8 @@ resto.unit:x86_64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - resto/**
     when: on_success
   needs:
@@ -3077,7 +3125,8 @@ resto.unit:arm64:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - resto/**
     when: on_success
   needs:
@@ -3150,7 +3199,8 @@ tezt:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3243,7 +3293,8 @@ tezt-time-sensitive:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3335,7 +3386,8 @@ tezt-slow:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3425,7 +3477,8 @@ tezt-extra:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3515,7 +3568,8 @@ tezt-flaky:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3609,7 +3663,8 @@ tezt:static-binaries:
   rules:
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3696,7 +3751,8 @@ oc.unified_coverage:
     when: never
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
@@ -3788,7 +3844,8 @@ documentation:odoc:
     when: on_success
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - brassaia/**/*
     - client-libs/**/*
     - data-encoding/**/*
@@ -3853,7 +3910,8 @@ documentation:manuals:
     when: on_success
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - brassaia/**/*
     - client-libs/**/*
     - data-encoding/**/*
@@ -3906,7 +3964,8 @@ documentation:docgen:
     when: on_success
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - brassaia/**/*
     - client-libs/**/*
     - data-encoding/**/*
@@ -3968,7 +4027,8 @@ documentation:build_all:
     when: on_success
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - brassaia/**/*
     - client-libs/**/*
     - data-encoding/**/*
@@ -4018,7 +4078,8 @@ documentation:linkcheck:
     when: on_success
   - changes:
     - .gitlab-ci.yml
-    - .gitlab/**/*
+    - .gitlab/ci/pipelines/before_merging.yml
+    - .gitlab/ci/pipelines/merge_train.yml
     - brassaia/**/*
     - client-libs/**/*
     - data-encoding/**/*
