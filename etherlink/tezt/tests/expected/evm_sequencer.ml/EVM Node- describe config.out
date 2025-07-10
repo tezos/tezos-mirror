@@ -25,17 +25,17 @@
            sequencer will not produce blueprints unable to fit in this limit. */,
       "sequencer"?:
         /* Secret key URI of the sequencer. */
-        $unistring
-        /* Wallet */
-        || /* GCP Key */
+        /* GCP Key */
         $unistring
         /* URI */
         || { /* Full */
              "project": $unistring /* GCP project hosting the key */,
+             "region": $unistring /* GCP region hosting the keyring */,
              "keyring": $unistring /* Keyring owning the key */,
              "key": $unistring /* Key name */,
-             "region": $unistring /* GCP region hosting the keyring */,
-             "version": integer ∈ [-2^30, 2^30] /* Key version number */ },
+             "version": integer ∈ [-2^30, 2^30] /* Key version number */ }
+        || $unistring
+        /* Wallet */,
       "blueprints_publisher_config"?:
         { "max_blueprints_lag"?:
             integer ∈ [1, 2^30]
