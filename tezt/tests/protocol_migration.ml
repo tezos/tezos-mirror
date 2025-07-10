@@ -1770,6 +1770,204 @@ let test_reveal_migration () =
 
   return ()
 
+let test_tz4_manager_operation ~with_empty_mempool =
+  let migrate_from = Option.get Protocol.(previous_protocol S023) in
+  let migrate_to = Protocol.S023 in
+
+  Test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "protocol migration for tz4 manager operation %s empty mempool"
+         (if with_empty_mempool then "with" else "without"))
+    ~tags:[team; "protocol"; "migration"; "tz4"]
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Left (Protocol.parameter_file migrate_from))
+      []
+  in
+  let parameters = JSON.parse_file parameter_file in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  (* Migration at the end of cycle 1 *)
+  let migration_level = 2 * blocks_per_cycle in
+  let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+  let* client, _node =
+    Local_helpers.activate_protocol
+      ~parameter_file
+      ~migrate_from
+      ~migrate_to
+      ~migration_level
+  in
+  let* tz4_account =
+    Client.gen_and_show_keys ~alias:"tz4_account" ~sig_alg:"bls" client
+  in
+  Log.info ~color:Log.Color.FG.green "Fund a new tz4 account." ;
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 10_000)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:tz4_account.alias
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let bake_for_with_checks ~num_valid_ops_before ~num_valid_ops_after
+      ?with_empty_mempool ~is_balance_eq (account : Account.key) client =
+    Log.info ~color:Log.Color.FG.green "Before baking the block." ;
+    let* mempool_before = Mempool.get_mempool ~validation_passes:[3] client in
+    Check.(
+      (List.length mempool_before.validated = num_valid_ops_before)
+        int
+        ~error_msg:
+          "validated (before) mempool should contain only %R operations, got %L") ;
+    let* balance_before =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_balance
+           ~id:account.public_key_hash
+           ()
+    in
+
+    let with_empty_mempool = Option.value ~default:false with_empty_mempool in
+    let* () =
+      if with_empty_mempool then (
+        Log.info ~color:Log.Color.FG.green "Bake a block with an empty mempool" ;
+        let empty_mempool_file = Client.empty_mempool_file () in
+        Client.bake_for_and_wait
+          ~mempool:empty_mempool_file
+          ~ignore_node_mempool:true
+          client)
+      else Client.bake_for_and_wait client
+    in
+
+    Log.info ~color:Log.Color.FG.green "After baking the block." ;
+    let* mempool_after = Mempool.get_mempool ~validation_passes:[3] client in
+    let* balance_after =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_balance
+           ~id:account.public_key_hash
+           ()
+    in
+    Check.(
+      (List.length mempool_after.validated = num_valid_ops_after)
+        int
+        ~error_msg:
+          "validated (after) mempool should contain only %R operations, got %L") ;
+
+    if is_balance_eq then
+      Check.(
+        (Tez.to_mutez balance_before = Tez.to_mutez balance_after) ~__LOC__ int)
+        ~error_msg:"Expected balance %R to be equal to %L"
+    else
+      Check.(
+        (Tez.to_mutez balance_before > Tez.to_mutez balance_after) ~__LOC__ int)
+        ~error_msg:"Expected balance %R to be less than %L" ;
+    unit
+  in
+
+  Log.info ~color:Log.Color.FG.green "Reveal tz4 account by making a transfer." ;
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 500)
+      ~giver:tz4_account.alias
+      ~receiver:Constant.bootstrap2.alias
+      client
+  in
+  (* Tz4 manager operation is included in the block and applied *)
+  let* () =
+    bake_for_with_checks
+      ~num_valid_ops_before:1
+      ~num_valid_ops_after:0
+      ~is_balance_eq:false
+      tz4_account
+      client
+  in
+
+  Log.info ~color:Log.Color.FG.green "Bake just 1 level before migration" ;
+  let* () =
+    Client.bake_until_level ~target_level:(migration_level - 1) client
+  in
+
+  Log.info
+    ~color:Log.Color.FG.green
+    "Tz4 manager operation is in a mempool just before the migration" ;
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 300)
+      ~giver:tz4_account.alias
+      ~receiver:Constant.bootstrap1.alias
+      client
+  in
+
+  let* () =
+    (* When baking with an empty mempool, tz4 manager operation is not
+       included in the block *)
+    let is_balance_eq = if with_empty_mempool then true else false in
+    bake_for_with_checks
+      ~num_valid_ops_before:1
+      ~num_valid_ops_after:0
+      ~with_empty_mempool
+      ~is_balance_eq
+      tz4_account
+      client
+  in
+  Log.info ~color:Log.Color.FG.green "Checking migration block consistency" ;
+  let* () =
+    block_check ~expected_block_type:`Migration client ~migrate_from ~migrate_to
+  in
+
+  (* After the migration, mempool is empty *)
+  let* () =
+    bake_for_with_checks
+      ~num_valid_ops_before:0
+      ~num_valid_ops_after:0
+      ~is_balance_eq:true
+      tz4_account
+      client
+  in
+  Log.info
+    ~color:Log.Color.FG.green
+    "Checking post-migration block consistency (first block of new protocol \
+     %s)."
+    (Protocol.name migrate_to) ;
+  let* () =
+    block_check
+      ~expected_block_type:`Non_migration
+      client
+      ~migrate_from
+      ~migrate_to
+  in
+
+  Log.info
+    ~color:Log.Color.FG.green
+    "New tz4 manager operation is in a mempool after the migration" ;
+  let* () =
+    Client.transfer
+      ~burn_cap:Tez.one
+      ~amount:(Tez.of_int 400)
+      ~giver:tz4_account.alias
+      ~receiver:Constant.bootstrap1.alias
+      client
+  in
+  let* mempool = Mempool.get_mempool client in
+  let op_hash = List.hd mempool.validated in
+  let* () =
+    bake_for_with_checks
+      ~num_valid_ops_before:1
+      ~num_valid_ops_after:0
+      ~is_balance_eq:false
+      tz4_account
+      client
+  in
+  let* receipt = Client.get_receipt_for ~operation:op_hash client in
+  Log.info ~color:Log.Color.FG.gray "receipt for %s:\n%s" op_hash receipt ;
+  if receipt =~ rex "Revelation of manager public key" then unit
+  else
+    Test.fail "Reveal of tz4 account is not included in the block: %s" receipt
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -1778,4 +1976,6 @@ let register ~migrate_from ~migrate_to =
   test_migration_with_snapshots ~migrate_from ~migrate_to ;
   test_unstaked_requests_many_delegates () ;
   test_unstaked_requests_and_min_delegated () ;
-  test_reveal_migration ()
+  test_reveal_migration () ;
+  test_tz4_manager_operation ~with_empty_mempool:true ;
+  test_tz4_manager_operation ~with_empty_mempool:false
