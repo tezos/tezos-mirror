@@ -43,7 +43,7 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args23
+       (args24
           force_switch
           data_dir_arg
           config_file_arg
@@ -63,6 +63,7 @@ let config_init_command =
           index_buffer_size_arg
           index_buffer_size_arg
           log_kernel_debug_arg
+          log_kernel_debug_file_arg
           boot_sector_file_arg
           no_degraded_arg
           gc_frequency_arg
@@ -98,6 +99,7 @@ let config_init_command =
              index_buffer_size,
              irmin_cache_size,
              log_kernel_debug,
+             log_kernel_debug_file,
              boot_sector_file,
              no_degraded,
              gc_frequency,
@@ -140,6 +142,7 @@ let config_init_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
@@ -266,6 +269,7 @@ let legacy_run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~no_degraded
           ~gc_frequency
@@ -280,7 +284,6 @@ let legacy_run_command =
       Rollup_node_daemon.run
         ~data_dir
         ~irmin_cache_size:Configuration.default_irmin_cache_size
-        ?log_kernel_debug_file
         configuration
         cctxt)
 
@@ -393,6 +396,7 @@ let run_command =
           ~index_buffer_size
           ~irmin_cache_size
           ~log_kernel_debug
+          ~log_kernel_debug_file
           ~unsafe_disable_wasm_kernel_checks
           ~boot_sector_file
           ~no_degraded
@@ -408,7 +412,6 @@ let run_command =
       Rollup_node_daemon.run
         ~data_dir
         ~irmin_cache_size:Configuration.default_irmin_cache_size
-        ?log_kernel_debug_file
         configuration
         cctxt)
 

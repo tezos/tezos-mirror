@@ -158,29 +158,6 @@ let processing_lockfile_path ~data_dir =
 
 let gc_lockfile_path ~data_dir = Filename.concat data_dir "gc_lock"
 
-let make_kernel_logger event ?log_kernel_debug_file logs_dir =
-  let open Lwt_syntax in
-  let path =
-    match log_kernel_debug_file with
-    | None -> Filename.concat logs_dir "kernel.log"
-    | Some path -> path
-  in
-  let path_dir = Filename.dirname path in
-  let* () = Lwt_utils_unix.create_dir path_dir in
-  let* fd =
-    Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
-  in
-  let chan =
-    Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
-  in
-  let kernel_debug msg =
-    let* () = Lwt_io.write chan msg in
-    let* () = Lwt_io.flush chan in
-    let* () = event msg in
-    return_unit
-  in
-  return (kernel_debug, fun () -> Lwt_io.close chan)
-
 let checkout_context node_ctxt block_hash =
   let open Lwt_result_syntax in
   let* context_hash = Store.L2_blocks.find_context node_ctxt.store block_hash in
@@ -1180,6 +1157,95 @@ let is_synchronized node_ctxt =
 let wait_synchronized node_ctxt =
   if is_synchronized node_ctxt then Lwt.return_unit
   else Lwt_condition.wait node_ctxt.sync.on_synchronized
+
+(** {2 Kernel tracing} *)
+
+type kernel_tracer = {
+  mutable start_time : int64;
+  mutable scope : Opentelemetry.Scope.t option;
+}
+
+let kernel_tracer =
+  {start_time = Opentelemetry.Timestamp_ns.now_unix_ns (); scope = None}
+
+let kernel_store_block_re = Re.Str.regexp ".*Storing block \\([0-9]+\\)"
+
+let reset_kernel_tracing scope =
+  kernel_tracer.start_time <- Opentelemetry.Timestamp_ns.now_unix_ns () ;
+  kernel_tracer.scope <- Some scope
+
+let kernel_tracing config event =
+  let open Lwt_syntax in
+  if not config.Configuration.etherlink then event
+  else fun msg ->
+    let* () = event msg in
+    let block_number =
+      if Re.Str.string_match kernel_store_block_re msg 0 then
+        try Re.Str.matched_group 1 msg |> int_of_string_opt with _ -> None
+      else None
+    in
+    match block_number with
+    | None -> return_unit
+    | Some block_number ->
+        let start_time = kernel_tracer.start_time in
+        let end_time = Opentelemetry.Timestamp_ns.now_unix_ns () in
+        let* () =
+          Interpreter_event.eval_etherlink_block
+            block_number
+            (Int64.sub end_time start_time)
+        in
+        if not (Opentelemetry.Collector.has_backend ()) then return_unit
+        else
+          let trace_id, parent =
+            match kernel_tracer.scope with
+            | None -> (Opentelemetry.Trace_id.create (), None)
+            | Some scope -> (scope.trace_id, Some scope.span_id)
+          in
+          let span_id = Opentelemetry.Span_id.create () in
+          let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
+          let span, _ =
+            Opentelemetry.Span.create
+              ~attrs:[("etherlink.block.number", `Int block_number)]
+              ?parent
+              ~id:scope.span_id
+              ~trace_id:scope.trace_id
+              ~start_time
+              ~end_time
+              "eval_etherlink_block"
+          in
+          Opentelemetry.Trace.emit ~service_name:"rollup_node" [span] ;
+          kernel_tracer.start_time <- end_time ;
+          return_unit
+
+let make_kernel_logger ~enable_tracing ?log_kernel_debug_file ~logs_dir
+    (config : Configuration.t) event =
+  let open Lwt_syntax in
+  let on_kernel_log =
+    if enable_tracing then kernel_tracing config event else event
+  in
+  if not config.log_kernel_debug then
+    return (on_kernel_log, fun () -> return_unit)
+  else
+    let path =
+      match log_kernel_debug_file with
+      | None -> Filename.concat logs_dir "kernel.log"
+      | Some path -> path
+    in
+    let path_dir = Filename.dirname path in
+    let* () = Lwt_utils_unix.create_dir path_dir in
+    let* fd =
+      Lwt_unix.openfile path Lwt_unix.[O_WRONLY; O_CREAT; O_APPEND] 0o0644
+    in
+    let chan =
+      Lwt_io.of_fd ~close:(fun () -> Lwt_unix.close fd) ~mode:Lwt_io.Output fd
+    in
+    let kernel_debug msg =
+      let* () = Lwt_io.write chan msg in
+      let* () = Lwt_io.flush chan in
+      let* () = on_kernel_log msg in
+      return_unit
+    in
+    return (kernel_debug, fun () -> Lwt_io.close chan)
 
 (**/**)
 

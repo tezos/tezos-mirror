@@ -64,13 +64,16 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ?log_kernel_debug_file ?last_whitelist_update
-    ~(store_access : 'store Access_mode.t)
+    ?last_whitelist_update ~(store_access : 'store Access_mode.t)
     ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
     ~lpc kind current_protocol
     Configuration.(
-      {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
-      configuration) =
+      {
+        sc_rollup_address = rollup_address;
+        dal_node_endpoint;
+        log_kernel_debug_file;
+        _;
+      } as configuration) =
   let open Lwt_result_syntax in
   let* lockfile = lock ~data_dir in
   let metadata =
@@ -112,10 +115,12 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     else Lwt.return_unit
   in
   let*! kernel_debug_logger, kernel_debug_finaliser =
-    let open Lwt_syntax in
-    if configuration.log_kernel_debug then
-      make_kernel_logger Event.kernel_debug ?log_kernel_debug_file data_dir
-    else return (Event.kernel_debug, fun () -> return_unit)
+    make_kernel_logger
+      ~enable_tracing:true
+      ?log_kernel_debug_file
+      ~logs_dir:data_dir
+      configuration
+      Event.kernel_debug
   in
   let global_block_watcher = Lwt_watcher.create_input () in
   let private_info =
@@ -240,6 +245,7 @@ module For_snapshots = struct
           irmin_cache_size = Some irmin_cache_size;
           prefetch_blocks = None;
           log_kernel_debug = false;
+          log_kernel_debug_file = None;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
@@ -357,6 +363,7 @@ module Internal_for_tests = struct
           l1_rpc_timeout;
           loop_retry_delay = 10.;
           log_kernel_debug = false;
+          log_kernel_debug_file = None;
           no_degraded = false;
           gc_parameters = Configuration.default_gc_parameters;
           history_mode = None;
