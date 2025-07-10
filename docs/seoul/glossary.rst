@@ -18,7 +18,7 @@ _`Block`
     The header itself decomposes into a :ref:`shell header<shell_header>` (common to all Tezos economic protocols), and a protocol-specific header.
     The shell header contains protocol-agnostic data such as the predecessor's block hash and the block's timestamp.
 
-.. _def_context_s023:
+.. _def_context_seoul:
 
 _`Context`
     The state of the blockchain. The context is defined by the
@@ -44,7 +44,7 @@ _`Fitness` (a.k.a. score, weight)
 _`Height`
     See level_.
 
-.. _def_level_s023:
+.. _def_level_seoul:
 
 _`Level` (a.k.a. block height)
     The position of a block_ in the blockchain, that is, the number of blocks
@@ -53,7 +53,7 @@ _`Level` (a.k.a. block height)
 _`Mempool`
    A pool (set) of operation_\ s maintained by a node_ and not yet included in a block_.
 
-.. _def_metadata_s023:
+.. _def_metadata_seoul:
 
 _`Metadata`
     A (block or operation) metadata is a piece of data
@@ -99,7 +99,7 @@ _`Weight`
 Protocol terms
 --------------
 
-.. _def_accuser_s023:
+.. _def_accuser_seoul:
 
 _`Accuser`
     When a delegate_ attempts `double signing`_ (or when it tries
@@ -111,7 +111,7 @@ _`Accuser`
     When using :ref:`Octez <octez>`, accusation operations are emitted by the
     accuser daemon. Note that this daemon is not associated to a delegate: accusation operations are anonymous, and any delegate can include them in a block.
 
-.. _def_account_s023:
+.. _def_account_seoul:
 
 _`Account`
     An account is an address managed by the protocol.
@@ -171,7 +171,7 @@ _`Burn`
 _`Constant`
     Protocols are parameterized by several parameters called protocol constants, which may vary from one protocol to another or from one network to another.
 
-.. _def_cycle_s023:
+.. _def_cycle_seoul:
 
 _`Cycle`
     A cycle is a sequence of consecutive block_\ s of fixed length (given by a protocol constant_). E.g., cycle 12 started at block
@@ -185,7 +185,7 @@ _`Cycle`
     constant_, and thus might change across different
     Tezos protocols.
 
-.. _def_delegate_s023:
+.. _def_delegate_seoul:
 
 _`Delegate`
     A `user account`_ that can participate in consensus and in governance.
@@ -199,7 +199,7 @@ _`Delegation`
     its `baking rights`_ and `attesting rights`_; it also increases its `voting power`_. However, the delegate_ does not control the funds of
     the delegating account_, e.g., it can not spend them.
 
-.. _def_double_signing_s023:
+.. _def_double_signing_seoul:
 
 _`Double signing`
     The situation when a baker_ signs two different block_\ s at the same level and same round,
@@ -208,29 +208,29 @@ _`Double signing`
     The same goes for signing two different attestations at the same level and the same round.
     As such, double signing (i.e., double baking or double attesting) is punished by the
     network: an accuser_ can provide proof of the double signing to be awarded
-    part of the double signer's deposit -- see :ref:`Slashing<slashing_s023>`.
+    part of the double signer's deposit -- see :ref:`Slashing<slashing_seoul>`.
 
 _`Failing Noop`
     The ``Failing_noop`` operation implements a *No-op*, which always
-    fails at :ref:`application time<operation_validity_s023>`, and
+    fails at :ref:`application time<operation_validity_seoul>`, and
     should never appear in :ref:`applied
-    blocks<full_application_s023>`. This operation allows end-users to
-    :ref:`sign arbitrary messages<failing_noop_s023>` which have no
+    blocks<full_application_seoul>`. This operation allows end-users to
+    :ref:`sign arbitrary messages<failing_noop_seoul>` which have no
     computational semantics.
 
-.. _def_fee_s023:
+.. _def_fee_seoul:
 
 _`Fee`
     To ensure responsible use of computation resources of other nodes, and also to encourage active participation in the consensus protocol,
     users pay fees to bakers for including their operation_\ s in block_\ s.
     For example, fees are paid to a baker for operations such as a transaction_ or a revelation of a public key.
 
-    Currently, only :ref:`manager operations<manager_operations_s023>`
+    Currently, only :ref:`manager operations<manager_operations_seoul>`
     require collecting fees from its sender account_.
 
     See also `burn`_.
 
-.. _def_gas_s023:
+.. _def_gas_seoul:
 
 _`Gas`
     A measure of the number of elementary steps performed during
@@ -257,7 +257,7 @@ _`Layer 2`
 _`Michelson`
     The built-in language used by a `smart contract`_.
 
-.. _def_minimal_stake_s023:
+.. _def_minimal_stake_seoul:
 
 _`Minimal stake`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount for a
@@ -272,7 +272,7 @@ _`Operation kinds`
 _`Originated account`
     See `smart contract`_.
 
-.. _def_origination_s023:
+.. _def_origination_seoul:
 
 _`Origination`
     A manager operation_ whose purpose is to create -- that
@@ -330,7 +330,7 @@ _`Rollup outbox`
    cemented (hence, at least two weeks after the actual execution of
    the operation).
 
-.. _def_round_s023:
+.. _def_round_seoul:
 
 _`Round`
     An attempt to reach consensus on a block at a given level.
@@ -352,13 +352,13 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
-.. _def_staker_s023:
+.. _def_staker_seoul:
 
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
     The security deposit accrues to the stake of the user account's delegate and is
-    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_s023>`.
+    subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_seoul>`.
 
 _`Tez`
     A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
@@ -368,7 +368,7 @@ _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
 
-.. _def_user_account_s023:
+.. _def_user_account_seoul:
 
 _`User account`
     An account_ that is linked to a public key. Contrary to a `smart
@@ -387,7 +387,7 @@ _`Validation pass`
     An index (a natural number) associated with a particular kind of
     operations, allowing to group them into classes. Validation passes
     enable prioritizing the :ref:`validation and
-    application<operation_validity_s023>` of certain classes of
+    application<operation_validity_seoul>` of certain classes of
     operations.
 
 _`Voting period`
@@ -399,7 +399,7 @@ _`Voting power`
     The amount of tokens that determines a delegate_'s weight in the
     voting process. A delegate's voting power is computed from the
     delegate's own tokens and the sum of tokens delegated to
-    it. See :ref:`voting_power_s023` for details.
+    it. See :ref:`voting_power_seoul` for details.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains

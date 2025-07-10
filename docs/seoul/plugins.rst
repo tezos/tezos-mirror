@@ -27,15 +27,15 @@ In turn protocol plugins may, for example:
 
 - perform protocol-dependent computations that require data not available
   in the amendable part of the protocol like accessing the current time
-  to reason on timestamps (see :ref:`consensus_filter_s023`);
+  to reason on timestamps (see :ref:`consensus_filter_seoul`);
 - preserve the opacity/abstraction barrier of the protocol's internal data
   by performing computations on internal data without revealing it:
   e.g., there are some RPCs that can introspect the protocol-dependent
   content for certain operations;
 - implement some common operations that are customized for each
-  protocol (e.g., :ref:`prevalidator_filters_s023`).
+  protocol (e.g., :ref:`prevalidator_filters_seoul`).
 
-.. _prevalidator_filters_s023:
+.. _prevalidator_filters_seoul:
 
 Prevalidator filters
 --------------------
@@ -55,7 +55,7 @@ The interface of the prevalidator plugin is described at the
 following filtering strategies are implemented in the
 :package-api:`pre_filter<octez-protocol-alpha-libs/Tezos_protocol_plugin_alpha/Mempool/index.html#val-pre_filter>`.
 
-.. _fees_filter_s023:
+.. _fees_filter_seoul:
 
 Fees filter
 ...........
@@ -66,10 +66,10 @@ prevalidator filter currently restricts operations based on their
 associated fees, to reject "too cheap" or "zero-fees" operations. This
 can be configured via the ``minimal_fees``,
 ``minimal_nanotez_per_gas_unit`` and ``minimal_nanotez_per_byte`` (see
-:ref:`filter RPCs<active_filter_rpc_s023>`) parameters of the filter
+:ref:`filter RPCs<active_filter_rpc_seoul>`) parameters of the filter
 configuration of your node.
 
-.. _consensus_filter_s023:
+.. _consensus_filter_seoul:
 
 Consensus filter
 ................
@@ -83,7 +83,7 @@ This filter will classify a consensus operation as ``Branch_refused`` if the
 operation concerns a level and round combination that is far-fetched in the
 future in regard to the latest proposal predecessor and the current timestamp.
 It can be configured via the ``clock_drift`` (see :ref:`filter
-RPCs<active_filter_rpc_s023>`) parameter of the filter configuration of your
+RPCs<active_filter_rpc_seoul>`) parameter of the filter configuration of your
 node.
 
 Operations prioritization and ordering
@@ -93,13 +93,13 @@ In addition to quick filtering of undesired operations, the
 ``prefilter`` provides a priority for each successfully filtered operation.
 Concretely, the priority is either ``High``, ``Medium`` or ``Low`` in the
 current implementation, depending on the :ref:`validation
-pass<validation_passes_s023>`. Some extra information (like the fees, or the
+pass<validation_passes_seoul>`. Some extra information (like the fees, or the
 gas/fees ratio of manager operations) are also provided along the priorities to
 enable fine-grained operations ordering. This extra information is similar to
 the one used by the baker's operations selection mechanism, that decides which
 operations will be included in the next block.
 
-.. _active_filter_rpc_s023:
+.. _active_filter_rpc_seoul:
 
 Filters RPCs
 ------------

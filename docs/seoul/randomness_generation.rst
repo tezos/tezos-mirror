@@ -46,7 +46,7 @@ if a malicious participant can make sure she is the last revealer, then she
 can choose whether to reveal its committed value, effectively choosing between
 two different predetermined seeds.
 
-.. _vdf_s023:
+.. _vdf_seoul:
 
 Verifiable Delay Function
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -77,7 +77,7 @@ cheaper and based on a weaker security assumption (low order assumption).
 Protocol
 --------
 
-.. _randomness_generation_s023:
+.. _randomness_generation_seoul:
 
 Randomness generation overview
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -114,7 +114,7 @@ iterated revealed nonce.
 
 A *nonce revelation* is an operation and multiple nonce revelations can thus be
 included in a block. A reward ``seed_nonce_revelation_tip``, :ref:`potentially adjusted
-by the adaptive issuance coefficient <adaptive_issuance_s023>`
+by the adaptive issuance coefficient <adaptive_issuance_seoul>`
 and weighted by constant ``SEED_NONCE_REVELATION_TIP_WEIGHT``, is given for
 including a revelation. Revelations are free operations which do not compete
 with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
@@ -138,11 +138,11 @@ solution.
 
 A *VDF revelation* is an operation. A reward ``seed_nonce_revelation_tip``
 :ref:`potentially adjusted by the adaptive issuance coefficient
-<adaptive_issuance_s023>` and weighted by constant ``SEED_NONCE_REVELATION_TIP_WEIGHT``,
+<adaptive_issuance_seoul>` and weighted by constant ``SEED_NONCE_REVELATION_TIP_WEIGHT``,
 is given for the first correct VDF revelation,
 subsequent VDF revelation operations being discarded.
 
-.. _rg_constants_s023:
+.. _rg_constants_seoul:
 
 Randomness generation parameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

@@ -21,13 +21,13 @@ effective, it presents two main challenges:
   as it does not allow for multiple users to manage the account
   collectively.
 
-Both problems are usually solved by using a multisig **contract**, that allows to share its ownership and its associated balance or assets, between several participants. Tezos provides specific support for multisig contracts in the form of a :doc:`builtin multisig contract <../user/multisig>` and even a set of related client commands to interact with it. However, this solution is not applicable in all use cases, and most importantly in the case of collectively staking or baking. This is because in Tezos, a smart contract cannot be a :ref:`delegate <def_delegate_s023>`, and not even a :ref:`staker <def_staker_s023>`.
+Both problems are usually solved by using a multisig **contract**, that allows to share its ownership and its associated balance or assets, between several participants. Tezos provides specific support for multisig contracts in the form of a :doc:`builtin multisig contract <../user/multisig>` and even a set of related client commands to interact with it. However, this solution is not applicable in all use cases, and most importantly in the case of collectively staking or baking. This is because in Tezos, a smart contract cannot be a :ref:`delegate <def_delegate_seoul>`, and not even a :ref:`staker <def_staker_seoul>`.
 
 Native multisig **accounts** address the above limitations with a
 cryptographic solution based on BLS multi-signature schemes. BLS
 signatures are particularly well-suited for this purpose due to their
 *aggregation* properties. Tezos supports BLS signatures
-with :ref:`tz4 address accounts <tz4_accounts_s023>`,
+with :ref:`tz4 address accounts <tz4_accounts_seoul>`,
 and starting with protocol S, these adopt a
 proof-of-possession (PoP) scheme. As a result, protocols starting with S
 can benefit from faster verification of multiple signatures of the
@@ -35,7 +35,7 @@ same message without breaking compatibility with the existing support
 for BLS (and ``tz4`` accounts).
 
 The multisig accounts implementation offers :ref:`RPCs and client
-commands <native_multisig_rpc_cli_s023>` to facilitate the signing of
+commands <native_multisig_rpc_cli_seoul>` to facilitate the signing of
 operations in a native multisig setup. As a result, the protocol does
 not need to differentiate between a ``tz4`` address belonging to a single
 user account and one associated with a multisig account.
@@ -91,7 +91,7 @@ of a multisig ``stake`` operation would look like this:
 (the source and destination are both the address of the multisig account, because staking is implemented by a pseudo-operation consisting in sending a transaction to oneself).
 
 
-.. _native_multisig_rpc_cli_s023:
+.. _native_multisig_rpc_cli_seoul:
 
 Octez CLI commands and RPC endpoints
 ------------------------------------

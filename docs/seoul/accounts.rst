@@ -17,7 +17,7 @@ addresses:
 Finally, addresses prefixed with ``sr1`` identify :doc:`Smart Rollups
 <./smart_rollups>`.
 
-.. _user_accounts_s023:
+.. _user_accounts_seoul:
 
 User accounts
 ~~~~~~~~~~~~~
@@ -36,7 +36,7 @@ briefly described below from a user point of view.
 The sizes of public keys, secret keys and signatures may differ between the
 different schemes but addresses are always 20 bytes long.
 
-.. _tz1_accounts_s023:
+.. _tz1_accounts_seoul:
 
 ``tz1``: Ed25519
 ''''''''''''''''
@@ -50,7 +50,7 @@ because it offers better security guarantees than EcDSA and has good performance
 on most hardware. It may not be available in all wallets or on all dedicated
 chips which is why Tezos supports multiple schemes.
 
-.. _tz2_accounts_s023:
+.. _tz2_accounts_seoul:
 
 ``tz2``: Secp256k1
 ''''''''''''''''''
@@ -62,7 +62,7 @@ with the `Secp256k1 curve <https://www.secg.org/sec2-v2.pdf>`_. Secp256k1 is
 notably the cryptographic scheme used by Bitcoin and Ethereum. This means that
 private keys and addresses used on Bitcoin can also be used on Tezos.
 
-.. _tz3_accounts_s023:
+.. _tz3_accounts_seoul:
 
 ``tz3``: P-256
 ''''''''''''''
@@ -76,7 +76,7 @@ Secp256r1. This is one of the curves for EcDSA recommended by NIST. It is also
 often the only cryptographic scheme supported by HSMs (Hardware Security
 Modules) of cloud providers.
 
-.. _tz4_accounts_s023:
+.. _tz4_accounts_seoul:
 
 ``tz4``: BLS
 ''''''''''''
@@ -92,7 +92,7 @@ applications like multi-signatures schemes, multi-party key exchanges,
 signatures compaction, etc. BLS is notably used by Zcash and Ethereum 2.0.
 
 Starting in protocol S, ``tz4`` addresses can be used by bakers, to forge blocks
-and :ref:`consensus operations <consensus_operations_s023>`. The aggregatable property of BLS signatures is used with
+and :ref:`consensus operations <consensus_operations_seoul>`. The aggregatable property of BLS signatures is used with
 consensus operations to reduce the size signatures take in each block. Such bakers that
 also wish to participate in the DAL are required to register a :ref:`companion key <companion_key>`,
 that is used to sign the DAL specific attestation and aggregate it with the regular attestation.
@@ -101,4 +101,4 @@ Smart contracts
 ~~~~~~~~~~~~~~~
 
 A transaction to a smart contract
-address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_s023>`.
+address can provide data and optionally some tokens, and triggers the execution of the code, which may read and update the storage. The transaction can succeed or fail, according to the :ref:`transaction semantics <transaction_semantics_seoul>`.

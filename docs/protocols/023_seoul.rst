@@ -1,7 +1,7 @@
-Protocol S023
+Protocol Seoul
 ==============
 
-This page lists the changes brought by protocol S023 with respect
+This page lists the changes brought by protocol Seoul with respect
 to Rio (see :ref:`naming_convention`).
 For the list of changes brought by Rio with respect to Quebec, see :doc:`../protocols/022_rio`.
 
@@ -9,7 +9,7 @@ For a higher-level overview of the most salient new features see the
 `announcement blog <https://research-development.nomadic-labs.com/blog.html>`__.
 
 The code can be found in directory :src:`src/proto_023_PtSeouLo` of the ``master``
-branch of Octez and the full documentation in :doc:`this page <../s023/index>`.
+branch of Octez and the full documentation in :doc:`this page <../seoul/index>`.
 
 Environment Version
 -------------------
@@ -70,17 +70,17 @@ Operations
 ----------
 
 - Added new operation kinds :ref:`Preattestations_aggregate and
-  Attestations_aggregate<consensus_operations_aggregate_s023>`. (MRs
+  Attestations_aggregate<consensus_operations_aggregate_seoul>`. (MRs
   :gl:`!15244`, :gl:`!17485`)
 
 - The ``Reveal`` operation has a new optional ``proof`` field, which
   is required if (and only if) the manager key is a :ref:`tz4 (BLS
-  key)<tz4_accounts_s023>`. This results in an increase of gas cost
+  key)<tz4_accounts>`. This results in an increase of gas cost
   per reveal of a tz4 public key. (MR :gl:`!18095`)
 
 - The optional ``proof`` field of the ``Update_consensus_key``
   operation is now required if (and only if) the new consensus key is
-  a :ref:`tz4 (BLS key)<tz4_accounts_s023>`. Its encoding now
+  a :ref:`tz4 (BLS key)<tz4_accounts>`. Its encoding now
   exclusively accepts BLS signatures. (MR :gl:`!17360`)
 
 - Added a new manager operation kind ``Update_companion_key``,
@@ -183,7 +183,7 @@ Minor Changes
 -------------
 
 - The :ref:`finalize_unstake
-  pseudo-operation<staked_funds_management_s023>` can now be performed
+  pseudo-operation<staked_funds_management>` can now be performed
   by any account, not just the owner of the unstaked funds. This
   allows finalization of unstake requests to be done automatically by
   a third party - for example a finalization bot. (MR :gl:`!17950`)
