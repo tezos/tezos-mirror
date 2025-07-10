@@ -8,6 +8,7 @@ use database::EtherlinkVMDB;
 use precompile_provider::EtherlinkPrecompiles;
 use revm::context::result::EVMError;
 use revm::context::tx::TxEnvBuilder;
+use revm::handler::EthFrame;
 use revm::{
     context::{
         result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv, ContextTr,
@@ -138,14 +139,15 @@ fn tx_env<'a, Host: Runtime>(
     Ok(tx_env)
 }
 
+type EVMInnerContext<'a, Host> =
+    Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>;
+
 type EvmContext<'a, Host> = Evm<
-    Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>,
+    EVMInnerContext<'a, Host>,
     (),
-    EthInstructions<
-        EthInterpreter,
-        Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>,
-    >,
+    EthInstructions<EthInterpreter, EVMInnerContext<'a, Host>>,
     EtherlinkPrecompiles,
+    EthFrame<EthInterpreter>,
 >;
 
 fn evm<'a, Host: Runtime>(
