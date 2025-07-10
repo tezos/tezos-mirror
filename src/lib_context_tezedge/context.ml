@@ -50,9 +50,10 @@ let find_tree ctxt key =
   Lwt.return (Tezedge.find_tree ctxt.context (data_key key))
 
 let list ctxt ?offset ?length key =
-  Lwt.return @@ Array.to_list @@ Tezedge.list ctxt.context offset length key
+  Lwt.return @@ Array.to_list
+  @@ Tezedge.list ctxt.context offset length (data_key key)
 
-let length ctxt key = Lwt.return (Tezedge.length ctxt.context key)
+let length ctxt key = Lwt.return (Tezedge.length ctxt.context (data_key key))
 
 let add_raw {context; extra} (key : key) (v : value) =
   let context = Tezedge.add context key v in
@@ -66,9 +67,11 @@ let add_tree {context; extra} key tree =
   let context = Tezedge.add_tree context (data_key key) tree in
   Lwt.return {context; extra}
 
-let remove {context; extra} key =
-  let context = Tezedge.remove context (data_key key) in
+let remove_raw {context; extra} key =
+  let context = Tezedge.remove context key in
   Lwt.return {context; extra}
+
+let remove ctxt key = remove_raw ctxt (data_key key)
 
 let config _ = assert false
 
@@ -77,18 +80,16 @@ module Tree = struct
 
   let mem_tree tree key = Lwt.return (Tezedge.tree_mem_tree tree key)
 
-  let find tree key = Lwt.return (Tezedge.tree_find tree ("data" :: key))
+  let find tree key = Lwt.return (Tezedge.tree_find tree key)
 
-  let find_tree tree key =
-    Lwt.return (Tezedge.tree_find_tree tree ("data" :: key))
+  let find_tree tree key = Lwt.return (Tezedge.tree_find_tree tree key)
 
   let list tree ?offset ?length key =
     Lwt.return @@ Array.to_list @@ Tezedge.tree_list tree offset length key
 
   let length tree key = Lwt.return (Tezedge.tree_length tree key)
 
-  let add tree key value =
-    Lwt.return (Tezedge.tree_add tree ("data" :: key) value)
+  let add tree key value = Lwt.return (Tezedge.tree_add tree key value)
 
   let add_tree tree key value =
     Lwt.return (Tezedge.tree_add_tree tree key value)
@@ -147,9 +148,11 @@ module Tree = struct
   let pp _ _ = assert false
 end
 
+let protocol_key = ["protocol"]
+
 let get_protocol ctxt =
   let open Lwt_syntax in
-  let+ v = find_raw ctxt ["protocol"] in
+  let+ v = find_raw ctxt protocol_key in
   match v with None -> assert false | Some v -> Protocol_hash.of_bytes_exn v
 
 let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
@@ -166,7 +169,7 @@ let verify_stream_proof _ _ = assert false
 
 let fold ?depth t k ~order ~init ~f =
   let tree = Tezedge.get_tree t.context in
-  Tree.fold ?depth tree k ~order ~init ~f
+  Tree.fold ?depth tree (data_key k) ~order ~init ~f
 
 let mem ctxt key = Lwt.return (Tezedge.mem ctxt.context (data_key key))
 
@@ -188,7 +191,7 @@ let commit ~time ?(message = "") context =
 
 let add_protocol ctxt protocol =
   let bytes = Protocol_hash.to_bytes protocol in
-  add_raw ctxt ["protocol"] bytes
+  add_raw ctxt protocol_key bytes
 
 let add_test_chain ctxt v =
   let bytes = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding v in
