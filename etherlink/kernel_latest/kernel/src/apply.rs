@@ -477,19 +477,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                     },
                     revm::context::result::HaltReason::CallTooDeep => {
                         evm_execution::handler::ExecutionResult::Error(evm::ExitError::CallTooDeep)
-                    },
-                    revm::context::result::HaltReason::EofAuxDataOverflow => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("EofAuxDataOverflow")))
-                    },
-                    revm::context::result::HaltReason::EofAuxDataTooSmall => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("EofAuxDataTooSmall")))
-                    },
-                    revm::context::result::HaltReason::SubRoutineStackOverflow => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::StackOverflow)
-                    },
-                    revm::context::result::HaltReason::InvalidEXTCALLTarget => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("InvalidEXTCALLTarget")))
-                    },
+                    }
                 },
             };
             Ok(Some(ExecutionOutcome {
