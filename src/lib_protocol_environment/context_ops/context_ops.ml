@@ -683,7 +683,7 @@ let gc context_index context_hash =
   | Brassaia_memory_index index -> Brassaia_memory.gc index context_hash
   | Duo_index index -> Duo_context.gc index context_hash
   | Duo_memory_index index -> Duo_memory_context.gc index context_hash
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
 
 let wait_gc_completion context_index =
   match[@profiler.span_s
@@ -696,7 +696,7 @@ let wait_gc_completion context_index =
   | Brassaia_memory_index index -> Brassaia_memory.wait_gc_completion index
   | Duo_index index -> Duo_context.wait_gc_completion index
   | Duo_memory_index index -> Duo_memory_context.wait_gc_completion index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
 
 let is_gc_allowed context_index =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "is_gc_allowed"]]
@@ -725,7 +725,7 @@ let split context_index =
   | Brassaia_memory_index index -> Brassaia_memory.split index
   | Duo_index index -> Duo_context.split index
   | Duo_memory_index index -> Duo_memory_context.split index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
 
 let sync context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "sync"]]
@@ -926,8 +926,7 @@ let close context_index =
   | Brassaia_memory_index index -> Brassaia_memory.close index
   | Duo_index index -> Duo_context.close index
   | Duo_memory_index index -> Duo_memory_context.close index
-  | Tezedge_index _ | Duo_irmin_tezedge_index _ ->
-      Lwt.return_unit (* assert false *)
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f
@@ -993,8 +992,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Brassaia_memory_index _ ->
       Fmt.failwith
         "An in memory context doesn't need to be checked for integrity"
-  | Tezedge_index _ -> Lwt.return_unit (* FIXME *)
-  | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> Lwt.return_unit (* FIXME *)
   | Duo_index _ ->
       let* () =
         Context.Checks.Pack.Integrity_check.run
