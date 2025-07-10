@@ -228,3 +228,7 @@ let wrong_slot_used_for_attestation = function
       {kind = Attestation} ->
       true
   | _ -> false
+
+let missing_companion_key_for_bls_dal = function
+  | Validate_errors.Consensus.Missing_companion_key_for_bls_dal _ -> true
+  | _ -> false

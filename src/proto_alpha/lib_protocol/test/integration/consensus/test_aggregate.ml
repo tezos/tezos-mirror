@@ -642,6 +642,28 @@ let test_attestations_aggregate_non_bls_delegate () =
   in
   List.iter_es check_non_bls_aggregate_refused Dal_helpers.various_dal_contents
 
+let test_attestations_aggregate_dal_without_companion_key () =
+  let open Lwt_result_syntax in
+  let* _genesis, attested_block =
+    init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
+  in
+  let* attesting_slot = Op.get_attesting_slot_with_bls_key ~attested_block in
+  List.iter_es
+    (fun dal_content ->
+      let* op =
+        Op.attestations_aggregate
+          ~committee:[(attesting_slot, dal_content)]
+          attested_block
+      in
+      Op.check_validation_and_application_all_modes_different_outcomes
+        ~loc:__LOC__
+        ~application_error:Error_helpers.missing_companion_key_for_bls_dal
+        ~construction_error:Error_helpers.missing_companion_key_for_bls_dal
+        ~mempool_error:Error_helpers.aggregate_in_mempool
+        ~predecessor:attested_block
+        op)
+    (List.filter Option.is_some Dal_helpers.various_dal_contents)
+
 let test_multiple_aggregates_per_block_forbidden () =
   let open Lwt_result_syntax in
   let* _genesis, block =
@@ -1047,6 +1069,10 @@ let tests =
       "test_attestations_aggregate_non_bls_delegate"
       `Quick
       test_attestations_aggregate_non_bls_delegate;
+    Tztest.tztest
+      "KO DAL without companion key"
+      `Quick
+      test_attestations_aggregate_dal_without_companion_key;
     Tztest.tztest
       "test_multiple_aggregates_per_block_forbidden"
       `Quick
