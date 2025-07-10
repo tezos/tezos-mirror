@@ -1,8 +1,13 @@
 # Changelog
 
-## Unreleased
+## Version 0.33 (2025-07-10)
 
-### Breaking changes
+This release of the EVM node fixes an issue with the configuration for sequencer
+keys on GCP KMS and makes the sequencer stop block production ahead of a
+sequencer update.
+
+This release will not apply any migration to the node’s store (version 21),
+meaning it is possible to downgrade to the previous version.
 
 ### Configuration changes
 
@@ -10,10 +15,6 @@
 - Add a new configuration option for the sequencer to stop block production
   ahead of a sequencer upgrade. See `describe config` or `man run sequencer`.
   (!18605)
-
-### RPCs changes
-
-### Metrics changes
 
 ### Execution changes
 
@@ -23,17 +24,6 @@
   address) information about a key stored in a GCP KMS. (!18617 !18618)
 - Halt blocks production five minutes before a planned upgrade of the sequencer
   operator. (!18605)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.32 (2025-07-08)
 
