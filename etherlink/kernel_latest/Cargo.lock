@@ -2026,6 +2026,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "p256"
+version = "0.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9863ad85fa8f4460f9c48cb909d38a0d689dba1f6f6988a5e3e0d31071bcd4b"
+dependencies = [
+ "ecdsa 0.16.9",
+ "elliptic-curve 0.13.8",
+ "primeorder",
+ "sha2 0.10.9",
+]
+
+[[package]]
 name = "parity-scale-codec"
 version = "3.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2161,6 +2173,15 @@ checksum = "3ae130e2f271fbc2ac3a40fb1d07180839cdbbe443c7a27e1e3c13c5cac0116d"
 dependencies = [
  "diff",
  "yansi",
+]
+
+[[package]]
+name = "primeorder"
+version = "0.13.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "353e1ca18966c16d9deb1c69278edbc5f194139612772bd9537af60ac231e1e6"
+dependencies = [
+ "elliptic-curve 0.13.8",
 ]
 
 [[package]]
@@ -2451,9 +2472,9 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "revm"
-version = "25.0.0"
+version = "27.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08fd78df29217546ddfd587fe313aff2bf86e57cfe0f18d16cb326d9f50ba54d"
+checksum = "24188978ab59b8fd508d0193f8a08848bdcd19ae0f73f2ad1d6ee3b2cd6c0903"
 dependencies = [
  "revm-bytecode",
  "revm-context",
@@ -2470,9 +2491,9 @@ dependencies = [
 
 [[package]]
 name = "revm-bytecode"
-version = "4.1.0"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "942fe4724cf552fd28db6b0a2ca5b79e884d40dd8288a4027ed1e9090e0c6f49"
+checksum = "7a685758a4f375ae9392b571014b9779cfa63f0d8eb91afb4626ddd958b23615"
 dependencies = [
  "bitvec",
  "once_cell",
@@ -2481,9 +2502,9 @@ dependencies = [
 
 [[package]]
 name = "revm-context"
-version = "6.0.0"
+version = "8.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "190f211f04c8030f5393cfcfa1569b88d5649f0f266bf4291981ba879fa6c5d1"
+checksum = "2c949e6b9d996ae5c7606cd4f82d997dabad30909f85601b5876b704d95b505b"
 dependencies = [
  "cfg-if",
  "derive-where",
@@ -2496,9 +2517,9 @@ dependencies = [
 
 [[package]]
 name = "revm-context-interface"
-version = "6.0.0"
+version = "8.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42b7e7ff1154e6460cec025fe20dfe45f3325bbb905718643b6d053ec49da6e8"
+checksum = "a303a93102fceccec628265efd550ce49f2817b38ac3a492c53f7d524f18a1ca"
 dependencies = [
  "alloy-eip2930",
  "alloy-eip7702",
@@ -2511,9 +2532,9 @@ dependencies = [
 
 [[package]]
 name = "revm-database"
-version = "5.0.0"
+version = "7.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9456d5cb165fef91c8b538d0115de50059d1cf352d160a1396894eac017a2a34"
+checksum = "7db360729b61cc347f9c2f12adb9b5e14413aea58778cf9a3b7676c6a4afa115"
 dependencies = [
  "revm-bytecode",
  "revm-database-interface",
@@ -2523,11 +2544,12 @@ dependencies = [
 
 [[package]]
 name = "revm-database-interface"
-version = "5.0.0"
+version = "7.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaeb608de31bfd0e64bf9b5b18ee70ac70094c8c045b28ae8ae8701608d17d34"
+checksum = "b8500194cad0b9b1f0567d72370795fd1a5e0de9ec719b1607fa1566a23f039a"
 dependencies = [
  "auto_impl",
+ "either",
  "revm-primitives",
  "revm-state",
 ]
@@ -2556,11 +2578,12 @@ dependencies = [
 
 [[package]]
 name = "revm-handler"
-version = "6.0.0"
+version = "8.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfeaecd909e6be655c36d21032ca932b347e60ec5849ee29e670d63aa97b6adb"
+checksum = "35b3a613d012189571b28fb13befc8c8af54e54f4f76997a0c02828cea0584a3"
 dependencies = [
  "auto_impl",
+ "derive-where",
  "revm-bytecode",
  "revm-context",
  "revm-context-interface",
@@ -2573,11 +2596,12 @@ dependencies = [
 
 [[package]]
 name = "revm-inspector"
-version = "6.0.0"
+version = "8.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4de1c6cddc7d62364dc9fa2f405c2c4637c933c5591addf09977ec8a156e4b23"
+checksum = "64aee1f5f5b07cfa73250f530edf4c8c3bb8da693d5d00fe9f94f70499978f00"
 dependencies = [
  "auto_impl",
+ "either",
  "revm-context",
  "revm-database-interface",
  "revm-handler",
@@ -2588,9 +2612,9 @@ dependencies = [
 
 [[package]]
 name = "revm-interpreter"
-version = "21.0.0"
+version = "23.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7c3ca670eee335d9268a9100932ec1e09638bdd9b31eac9e22dec4de00f2cba"
+checksum = "8d2a89c40b7c72220f3d4b753ca0ce9ae912cf5dad7d3517182e4e1473b9b55e"
 dependencies = [
  "revm-bytecode",
  "revm-context-interface",
@@ -2599,19 +2623,21 @@ dependencies = [
 
 [[package]]
 name = "revm-precompile"
-version = "22.0.0"
+version = "24.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4330c6982a2ef1d318cb10ce7e726a64e11e44fe1eac29d055de849a5e1e080e"
+checksum = "5c35a987086055a5cb368e080d1300ea853a3185b7bb9cdfebb8c05852cda24f"
 dependencies = [
  "ark-bls12-381",
  "ark-bn254",
  "ark-ec",
  "ark-ff",
  "ark-serialize",
+ "arrayref",
  "aurora-engine-modexp",
  "cfg-if",
  "k256",
  "once_cell",
+ "p256 0.13.2",
  "revm-primitives",
  "ripemd",
  "sha2 0.10.9",
@@ -2619,9 +2645,9 @@ dependencies = [
 
 [[package]]
 name = "revm-primitives"
-version = "19.2.0"
+version = "20.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c1588093530ec4442461163be49c433c07a3235d1ca6f6799fef338dacc50d3"
+checksum = "52cdf897b3418f2ee05bcade64985e5faed2dbaa349b2b5f27d3d6bfd10fff2a"
 dependencies = [
  "alloy-primitives 1.2.1",
  "num_enum",
@@ -2629,9 +2655,9 @@ dependencies = [
 
 [[package]]
 name = "revm-state"
-version = "5.0.0"
+version = "7.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44320ccf53067136a83cdbc54f4b7529e8f61497666f31d6f5cfd9035a1cc08f"
+checksum = "106fec5c634420118c7d07a6c37110186ae7f23025ceac3a5dbe182eea548363"
 dependencies = [
  "bitflags 2.9.1",
  "revm-bytecode",
@@ -3371,7 +3397,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-traits",
- "p256",
+ "p256 0.9.0",
  "rand 0.7.3",
  "serde",
  "strum 0.20.0",
