@@ -1559,7 +1559,10 @@ kaitai_checks:
     - .gitlab/ci/pipelines/merge_train.yml
     - client-libs/*kaitai*/**/*
     - images/**/*
-    - scripts/ci/**/*
+    - scripts/ci/datadog_send_job_info.sh
+    - scripts/install_build_deps.js.sh
+    - scripts/slim-mode.sh
+    - scripts/version.sh
     - src/**/*
     when: on_success
   needs:
@@ -1609,8 +1612,11 @@ kaitai_e2e_checks:
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - client-libs/*kaitai*/**/*
-    - images/**/*
-    - scripts/ci/**/*
+    - images/client-libs-dependencies/**/*
+    - scripts/ci/datadog_send_job_info.sh
+    - scripts/install_build_deps.js.sh
+    - scripts/slim-mode.sh
+    - scripts/version.sh
     - src/**/*
     when: on_success
   needs:

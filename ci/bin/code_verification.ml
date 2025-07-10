@@ -987,7 +987,7 @@ let jobs pipeline_type =
         ~image:Images.CI.build
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_kaitai_e2e_files ())
+        ~rules:(make_rules ~changes:changeset_kaitai_checks_files ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         [
           "make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez \
