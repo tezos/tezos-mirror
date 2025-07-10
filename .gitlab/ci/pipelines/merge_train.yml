@@ -1534,6 +1534,7 @@ trigger:debian_repository_partial_auto:
     PIPELINE_TYPE: debian_repository_partial_auto
   rules:
   - changes:
+    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - debian-deps-build.Dockerfile
     - docs/introduction/install-bin-deb.sh
     - docs/introduction/upgrade-bin-deb.sh
@@ -1560,6 +1561,7 @@ trigger:rpm_repository_partial_auto:
     PIPELINE_TYPE: rpm_repository_partial_auto
   rules:
   - changes:
+    - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
     - manifest/**/*.ml*
     - rpm-deps-build.Dockerfile
     - scripts/ci/build-packages-dependencies.sh
@@ -1583,6 +1585,7 @@ trigger:homebrew_auto:
     PIPELINE_TYPE: homebrew_auto
   rules:
   - changes:
+    - .gitlab/ci/pipelines/homebrew_auto.yml
     - manifest/**/*.ml*
     - scripts/ci/install-gsutil.sh
     - scripts/packaging/Formula/*
