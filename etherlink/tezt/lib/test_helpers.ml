@@ -79,7 +79,8 @@ let next_rollup_node_level ~sc_rollup_node ~client =
 
 let produce_block ?timestamp evm_node =
   match Evm_node.mode evm_node with
-  | Sandbox _ | Sequencer _ -> Rpc.produce_block ?timestamp evm_node
+  | Sandbox _ | Tezlink_sandbox _ | Sequencer _ ->
+      Rpc.produce_block ?timestamp evm_node
   | _ -> assert false
 
 let check_chain_id ~expected_chain_id ~chain_id =
@@ -171,7 +172,7 @@ let next_evm_level ~evm_node ~sc_rollup_node ~client =
   | Proxy ->
       let* _l1_level = next_rollup_node_level ~sc_rollup_node ~client in
       unit
-  | Sequencer _ | Sandbox _ ->
+  | Sequencer _ | Sandbox _ | Tezlink_sandbox _ ->
       let open Rpc.Syntax in
       let*@ _l2_level = produce_block evm_node in
       unit

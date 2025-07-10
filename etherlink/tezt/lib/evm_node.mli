@@ -103,6 +103,18 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
     }
+  | Tezlink_sandbox of {
+      initial_kernel : string;
+      preimage_dir : string option;
+      private_rpc_port : int option;
+      time_between_blocks : time_between_blocks option;
+      genesis_timestamp : Client.timestamp option;
+      max_number_of_chunks : int option;
+      wallet_dir : string option;
+      tx_pool_timeout_limit : int option;
+      tx_pool_addr_limit : int option;
+      tx_pool_tx_per_addr_limit : int option;
+    }
   | Proxy
   | Rpc of mode
 
