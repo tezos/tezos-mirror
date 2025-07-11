@@ -265,7 +265,7 @@ let attest_with ?dal_content (delegate_name : string) : (t, t) scenarios =
         let state = State.add_pending_operations [op] state in
         (* Check metadata *)
         let state =
-          State.add_temp_check
+          State.add_current_block_check
             (check_attestation_metadata ~kind delegate.pkh consensus_key.pkh)
             state
         in
@@ -322,7 +322,7 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
         let* op = Op.attestations_aggregate ~committee block in
         (* Check metadata *)
         let state =
-          State.add_temp_check
+          State.add_current_block_check
             (check_attestation_aggregate_metadata
                ~kind
                delegate_and_ck_committee)
@@ -411,7 +411,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
           in
           (* Check metadata *)
           let state =
-            State.add_temp_check
+            State.add_current_block_check
               (check_attestation_aggregate_metadata
                  ~kind
                  delegate_and_ck_committee)
@@ -430,7 +430,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
           let state = update_activity delegate_name block state in
           (* Check metadata *)
           let state =
-            State.add_temp_check
+            State.add_current_block_check
               (check_attestation_metadata ~kind delegate_pkh consensus_key_pkh)
               state
           in
@@ -498,7 +498,7 @@ let preattest_with ?payload_round (delegate_name : string) :
         in
         (* Check metadata *)
         let state =
-          State.add_temp_check
+          State.add_current_block_check
             (check_attestation_metadata ~kind delegate.pkh consensus_key.pkh)
             state
         in
@@ -561,7 +561,7 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
         let* op = Op.preattestations_aggregate ~committee fake_block in
         (* Check metadata *)
         let state =
-          State.add_temp_check
+          State.add_current_block_check
             (check_attestation_aggregate_metadata
                ~kind
                delegate_and_ck_committee)
@@ -654,7 +654,7 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
           in
           (* Check metadata *)
           let state =
-            State.add_temp_check
+            State.add_current_block_check
               (check_attestation_aggregate_metadata
                  ~kind
                  delegate_and_ck_committee)
@@ -675,7 +675,7 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
           in
           (* Check metadata *)
           let state =
-            State.add_temp_check
+            State.add_current_block_check
               (check_attestation_metadata ~kind delegate_pkh consensus_key_pkh)
               state
           in

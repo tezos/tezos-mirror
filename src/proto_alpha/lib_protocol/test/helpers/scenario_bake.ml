@@ -350,12 +350,12 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let* () =
     List.iter_es
       (fun f -> f metadata (block, state))
-      state.check_finalized_block_perm
+      state.check_finalized_every_block
   in
   let* () =
     List.iter_es
       (fun f -> f metadata (block, state))
-      state.check_finalized_block_temp
+      state.check_finalized_current_block
   in
   (* Dawn of a new cycle: update finalizables *)
   (* Note: this is done after the checks, because it is not observable by RPCs by calling
@@ -373,7 +373,7 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let state =
     {
       state with
-      check_finalized_block_temp = [];
+      check_finalized_current_block = [];
       previous_metadata = Some metadata;
       grandparent = previous_block;
     }
