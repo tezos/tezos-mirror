@@ -180,6 +180,8 @@ module type Dal = sig
   val ppx_profiling_backends : string list
 
   val enable_network_health_monitoring : bool
+
+  val tezlink : bool
 end
 
 module Dal () : Dal = struct
@@ -455,7 +457,20 @@ module Dal () : Dal = struct
   let data_dir =
     Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
 
-  let etherlink = Clap.flag ~section ~set_long:"etherlink" false
+  let tezlink =
+    Clap.flag
+      ~section
+      ~set_long:"tezlink"
+      ~unset_long:"no-tezlink"
+      ~description:"Run Tezlink"
+      false
+
+  let etherlink =
+    Clap.flag
+      ~section
+      ~set_long:"etherlink"
+      (* If --tezlink is given, there is no need to also pass --etherlink *)
+      tezlink
 
   let etherlink_sequencer =
     (* We want the sequencer to be active by default if etherlink is activated. *)

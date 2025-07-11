@@ -574,6 +574,7 @@ type etherlink_configuration = {
   (* Empty list means DAL FF is set to false. *)
   etherlink_dal_slots : int list;
   chain_id : int option;
+  tezlink : bool;
 }
 
 type configuration = {
@@ -3533,7 +3534,9 @@ let init_etherlink_dal_node
       some reverse_proxy_dal_node
 
 let init_etherlink_operator_setup cloud configuration etherlink_configuration
-    name ~bootstrap ~dal_slots account batching_operators agent next_agent =
+    name ~bootstrap ~dal_slots ~tezlink account batching_operators agent
+    next_agent =
+  let chain_id = Option.value ~default:1 etherlink_configuration.chain_id in
   let is_sequencer = etherlink_configuration.etherlink_sequencer in
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
@@ -3582,7 +3585,24 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let () = toplog "Init Etherlink: waiting for level %d: done" (l + 2) in
   (* A configuration is generated locally by the orchestrator. The resulting
      kernel will be pushed to Etherlink. *)
-  let output_config = Temp.file "config.yaml" in
+  let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
+  let tez_bootstrap_accounts = Account.Bootstrap.keys |> Array.to_list in
+  let* () =
+    if tezlink then
+      let*! () =
+        Evm_node.make_l2_kernel_installer_config
+          ~chain_id
+          ~chain_family:"Michelson"
+          ~eth_bootstrap_accounts:[]
+          ~tez_bootstrap_accounts
+          ~output:tezlink_config
+          ()
+      in
+      let* () = Process.spawn "cat" [tezlink_config] |> Process.check in
+      unit
+    else unit
+  in
+  let rollup_config = Temp.file "rollup-config.yaml" in
   let eth_bootstrap_accounts =
     Tezt_etherlink.Eth_account.bootstrap_accounts |> Array.to_list
     |> List.map (fun account -> account.Tezt_etherlink.Eth_account.address)
@@ -3593,12 +3613,15 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     Tezt_etherlink.Evm_node.make_kernel_installer_config
       ?sequencer
       ~eth_bootstrap_accounts
-      ~output:output_config
+      ~output:rollup_config
       ~enable_dal:(Option.is_some dal_slots)
-      ?chain_id:etherlink_configuration.chain_id
+      ~chain_id
       ?dal_slots
+      ~enable_multichain:tezlink
+      ?l2_chain_ids:(if tezlink then Some [chain_id] else None)
       ()
   in
+  let* () = Process.spawn "cat" [rollup_config] |> Process.check in
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
     init_etherlink_dal_node
@@ -3629,13 +3652,29 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
   let preimages_dir =
     Filename.concat (Sc_rollup_node.data_dir sc_rollup_node) "wasm_2_0_0"
   in
-  let* remote_output_config = Agent.copy agent ~source:output_config in
-  let* {output; _} =
-    Sc_rollup_helpers.Agent.prepare_installer_kernel
-      ~config:(`Path remote_output_config)
-      ~preimages_dir
-      Constant.WASM.evm_kernel
-      agent
+  let* output =
+    if tezlink then
+      let* remote_rollup_config = Agent.copy agent ~source:rollup_config in
+      let* remote_tezlink_config = Agent.copy agent ~source:tezlink_config in
+      let* {output; _} =
+        Sc_rollup_helpers.Agent
+        .prepare_installer_kernel_with_multiple_setup_file
+          ~configs:[remote_rollup_config; remote_tezlink_config]
+          ~preimages_dir
+          (Uses.path Constant.WASM.evm_kernel)
+          agent
+      in
+      return output
+    else
+      let* remote_rollup_config = Agent.copy agent ~source:rollup_config in
+      let* {output; _} =
+        Sc_rollup_helpers.Agent.prepare_installer_kernel
+          ~config:(`Path remote_rollup_config)
+          ~preimages_dir
+          Constant.WASM.evm_kernel
+          agent
+      in
+      return output
   in
   let pvm_kind = "wasm_2_0_0" in
   let l = Node.get_last_seen_level node in
@@ -3702,6 +3741,19 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
         |> Evm_node.patch_config_with_experimental_feature
              ~drop_duplicate_when_injection:true
              ~blueprints_publisher_order_enabled:true
+             ~rpc_server:Resto
+             ~spawn_rpc:(Port.fresh ())
+             ?l2_chains:
+               (if tezlink then
+                  Some
+                    [
+                      {
+                        (Evm_node.default_l2_setup ~l2_chain_id:chain_id) with
+                        l2_chain_family = "Michelson";
+                        tez_bootstrap_accounts = Some tez_bootstrap_accounts;
+                      };
+                    ]
+                else None)
              ())
       ~name:(Format.asprintf "etherlink-%s-evm-node" name)
       ~mode
@@ -3830,7 +3882,8 @@ let init_etherlink_producer_setup operator name ~bootstrap ~rpc_external cloud
   return ()
 
 let init_etherlink cloud configuration etherlink_configuration ~bootstrap
-    etherlink_rollup_operator_key batching_operators ~dal_slots next_agent =
+    etherlink_rollup_operator_key batching_operators ~dal_slots ~tezlink
+    next_agent =
   let () = toplog "Initializing an Etherlink operator" in
   let name = name_of Etherlink_operator in
   let* operator_agent = next_agent ~name in
@@ -3842,6 +3895,7 @@ let init_etherlink cloud configuration etherlink_configuration ~bootstrap
       ~dal_slots
       "operator"
       ~bootstrap
+      ~tezlink
       etherlink_rollup_operator_key
       batching_operators
       operator_agent
@@ -4094,6 +4148,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
             etherlink_batching_operator_keys
             next_agent
             ~dal_slots
+            ~tezlink:etherlink_configuration.tezlink
         in
         some etherlink
     | None ->
@@ -4553,6 +4608,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let producer_key = Cli.producer_key in
     let producers_delay = Cli.producers_delay in
     let ignore_pkhs = Cli.ignore_pkhs in
+    let tezlink = Cli.tezlink in
     let fundraiser =
       Option.fold
         ~none:(Sys.getenv_opt "TEZT_CLOUD_FUNDRAISER")
@@ -4568,6 +4624,7 @@ let register (module Cli : Scenarios_cli.Dal) =
             etherlink_producers;
             etherlink_dal_slots;
             chain_id = etherlink_chain_id;
+            tezlink;
           }
       else None
     in
