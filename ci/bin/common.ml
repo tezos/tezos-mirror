@@ -153,7 +153,7 @@ let enable_kernels =
 
     - [cache_size] sets the maximum size of the cache.
 
-    - [copy_mode], if [true] (default is [false]) sets
+   - [copy_mode], if [true] (default is [false]) sets
     {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
     Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
     used, which is typically more performant but requires that the
@@ -241,6 +241,24 @@ let changeset_base =
       ".gitlab/ci/pipelines/merge_train.yml";
       ".gitlab/ci/pipelines/before_merging.yml";
       ".gitlab-ci.yml";
+    ]
+
+let changeset_images_rust_toolchain =
+  Changeset.make
+    [
+      "images/rust-toolchain/**/*";
+      "images/create_image.sh";
+      "images/scripts/install_datadog_static.sh";
+      "scripts/version.sh";
+    ]
+
+let changeset_images_rust_sdk_bindings =
+  Changeset.make
+    [
+      "images/rust-sdk-bindings/**/*";
+      "images/create_image.sh";
+      "images/scripts/install_datadog_static.sh";
+      "scripts/version.sh";
     ]
 
 let changeset_images = Changeset.make ["images/**/*"]
@@ -498,7 +516,8 @@ let changeset_test_liquidity_baking_scripts =
 let changeset_test_sdk_rust =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ changeset_images_rust_toolchain
+      (* Run if the [rust-toolchain] image is updated *)
     @ make ["sdk/rust/**/*"])
 
 (* TODO: add sdk/rust to the changesets once the bindings code depends
@@ -506,21 +525,24 @@ let changeset_test_sdk_rust =
 let changeset_test_sdk_bindings =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ changeset_images_rust_sdk_bindings
+      (* Run if the [rust-toolchain-sdk] image is updated *)
     @ make ["sdk/rust/**/*"]
     @ make ["contrib/sdk-bindings"])
 
 let changeset_test_kernels =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ changeset_images_rust_toolchain
+      (* Run if the [rust-toolchain] image is updated *)
     @ make
         ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
 
 let changeset_test_etherlink_kernel =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ changeset_images_rust_toolchain
+      (* Run if the [rust-toolchain] image is updated *)
     @ make
         [
           "etherlink.mk";
@@ -531,23 +553,28 @@ let changeset_test_etherlink_kernel =
 
 let changeset_test_etherlink_firehose =
   Changeset.(
-    changeset_base @ changeset_images
+    changeset_base @ changeset_images_rust_toolchain
     @ make
         [
           "etherlink/firehose/**/*";
           "etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*";
         ])
 
-let changeset_riscv_kernels =
+let changeset_riscv_kernels_code =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
     @ make ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"])
+
+let changeset_riscv_kernels =
+  Changeset.(
+    changeset_riscv_kernels_code @ changeset_images_rust_toolchain
+    (* Run if the [rust-toolchain] image is updated *))
 
 let changeset_test_evm_compatibility =
   Changeset.(
     changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ changeset_images_rust_toolchain
+      (* Run if the [rust-toolchain] image is updated *)
     @ make
         [
           "etherlink.mk";
@@ -557,14 +584,12 @@ let changeset_test_evm_compatibility =
 
 let changeset_mir =
   Changeset.(
-    changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    changeset_base @ changeset_images (* Run if the test image is updated *)
     @ make ["contrib/mir/**/*"])
 
 let changeset_mir_tzt =
   Changeset.(
-    changeset_base
-    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    changeset_base @ changeset_images (* Run if the test image is updated *)
     @ make ["contrib/mir/**/*"; "tzt_reference_test_suite/**/*"])
 
 (* This version of the job builds both released and experimental executables.

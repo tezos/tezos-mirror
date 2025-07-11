@@ -1771,7 +1771,10 @@ let jobs pipeline_type =
           ~dependencies:(Dependent [])
           ~__POS__
           ~name:"audit_riscv_deps"
-          ~changes:changeset_riscv_kernels
+          ~changes:changeset_riscv_kernels_code
+          (* since we depend on the Images.rust_toolchain_master,
+             we start the job only if the code is modified, but not
+             the image itself *)
           ["make -C src/riscv audit"]
       in
       let riscv_ci_flags =
