@@ -16,6 +16,8 @@ pub enum OperationContent {
     Reveal(ManagerOperationContent<RevealContent>),
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    #[encoding(tag = 110)]
+    Delegation(ManagerOperationContent<DelegationContent>),
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -45,6 +47,11 @@ pub struct Parameter {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct DelegationContent {
+    pub delegate: Option<PublicKeyHash>,
 }
 
 #[cfg(test)]
@@ -222,6 +229,84 @@ mod tests {
         operation.bin_write(&mut encoded_operation).unwrap();
 
         let bytes = hex::decode("6c02ebfd1371b542831b4be730161d08885c5312e44207ff200000000003db557924e5a295652eff2c1f141d5a5b72b9cc91ff0400000002030b").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "delegation",
+      "source": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF",
+      "fee": "9000",
+      "counter": "59",
+      "gas_limit": "302",
+      "storage_limit": "1024",
+      "delegate": "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7"
+    }'
+    */
+    #[test]
+    fn delegation_encoding() {
+        let delegate =
+            Some(PublicKeyHash::from_b58check("tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7").unwrap());
+        let pkh = PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
+        let fee = 9000.into();
+        let counter = 59.into();
+        let gas_limit = 302.into();
+        let storage_limit = 1024.into();
+        let operation = OperationContent::Delegation(ManagerOperationContent {
+            source: pkh,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            operation: DelegationContent { delegate },
+        });
+
+        let mut encoded_operation = Vec::new();
+        operation.bin_write(&mut encoded_operation).unwrap();
+
+        let bytes = hex::decode("6e03ae7b7d713977a27ec643969f0c2e665ba9ad9aa1a8463bae028008ff004afbd2ede908e6700eb9b54352c1d2dceee8d0fe").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "delegation",
+      "source": "tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8",
+      "fee": "0",
+      "counter": "1",
+      "gas_limit": "0",
+      "storage_limit": "0"
+    }'
+    */
+    #[test]
+    fn delegation_without_delegate_encoding() {
+        let delegate = None;
+        let pkh = PublicKeyHash::from_b58check("tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8").unwrap();
+        let fee = 0.into();
+        let counter = 1.into();
+        let gas_limit = 0.into();
+        let storage_limit = 0.into();
+        let operation = OperationContent::Delegation(ManagerOperationContent {
+            source: pkh,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            operation: DelegationContent { delegate },
+        });
+
+        let mut encoded_operation = Vec::new();
+        operation.bin_write(&mut encoded_operation).unwrap();
+
+        let bytes = hex::decode("6e023f3b21e54e98db3845a2a5033d96877f7f9cea870001000000").unwrap();
         assert_eq!(bytes, encoded_operation);
 
         let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
