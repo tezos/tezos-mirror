@@ -61,9 +61,7 @@ let health_check_service =
     ~output:Data_encoding.empty
     Path.(root / "health_check")
 
-type error += Node_is_bootstrapping
-
-type error += Node_is_lagging
+type error += Node_is_bootstrapping | Node_is_lagging | Stalled_database
 
 let () =
   register_error_kind
@@ -84,7 +82,17 @@ let () =
        servers can be outdated"
     Data_encoding.empty
     (function Node_is_lagging -> Some () | _ -> None)
-    (fun () -> Node_is_lagging)
+    (fun () -> Node_is_lagging) ;
+  register_error_kind
+    `Temporary
+    ~id:"stalled_database"
+    ~title:"Database of the node is not responsive"
+    ~description:
+      "The database connections used by the node are stalled, the node needs \
+       to be restarted."
+    Data_encoding.empty
+    (function Stalled_database -> Some () | _ -> None)
+    (fun () -> Stalled_database)
 
 let client_version =
   Format.sprintf
@@ -134,16 +142,27 @@ let configuration_handler config =
     (Configuration.encoding hidden)
     config
 
-let health_check_handler ?delegate_to query =
+let health_check_handler ?delegate_to db_liveness_check query =
   match delegate_to with
   | None ->
       let open Lwt_result_syntax in
-      let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping in
-      let* () =
+      let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping
+      and* () =
         fail_when
           Z.Compare.(
             Drift_monitor.last_observed_drift () > query.drift_threshold)
           Node_is_lagging
+      and* () =
+        let* has_timeout =
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep 2. in
+               return true);
+              (let* _ = db_liveness_check () in
+               return false);
+            ]
+        in
+        fail_when has_timeout Stalled_database
       in
       return_unit
   | Some evm_node_endpoint ->
@@ -164,9 +183,9 @@ let configuration config dir =
   Evm_directory.register0 dir configuration_service (fun () () ->
       configuration_handler config |> Lwt.return_ok)
 
-let health_check ?delegate_to dir =
+let health_check ?delegate_to db_liveness_check dir =
   Evm_directory.register0 dir health_check_service (fun query () ->
-      health_check_handler ?delegate_to query)
+      health_check_handler ?delegate_to db_liveness_check query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -1461,11 +1480,29 @@ let dispatch_websocket_private (type f)
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory (type f) ~is_sequencer ~rpc_server_family
+let directory (type f) ~is_sequencer
+    ~(rpc_server_family : f Rpc_types.rpc_server_family)
     ?delegate_health_check_to rpc validation config
     (tx_container : f Services_backend_sig.tx_container) backend dir =
+  let db_liveness_check () =
+    let open Lwt_result_syntax in
+    let (module Backend : Services_backend_sig.S) = fst backend in
+    match rpc_server_family with
+    | Rpc_types.Multichain_sequencer_rpc_server -> return_unit
+    | Rpc_types.Single_chain_node_rpc_server f -> (
+        match f with
+        | EVM ->
+            let* _ = Backend.Etherlink_block_storage.current_block_number () in
+            return_unit
+        | Michelson ->
+            let* _ =
+              Backend.Tezlink.current_level `Main (`Head 0l) ~offset:0l
+            in
+            return_unit)
+  in
+
   dir |> version |> configuration config
-  |> health_check ?delegate_to:delegate_health_check_to
+  |> health_check ?delegate_to:delegate_health_check_to db_liveness_check
   |> dispatch_public
        ~is_sequencer
        rpc_server_family

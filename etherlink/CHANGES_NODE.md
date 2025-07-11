@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- `GET /health_check` will now fail if the database connections used by the EVM
+  node are stalled. (!18667)
+
 ### Metrics changes
 
 ### Execution changes
