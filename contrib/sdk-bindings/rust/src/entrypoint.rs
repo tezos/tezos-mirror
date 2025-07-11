@@ -31,3 +31,68 @@ impl ::std::fmt::Display for Entrypoint {
         write!(f, "{}", self.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use paste::paste;
+
+    macro_rules! test_conversion {
+        ($ep_name:ident) => {
+            paste! {
+
+                #[test]
+                fn [<build_ $ep_name _entrypoint>]() {
+                    let raw_entrypoint = stringify!($ep_name);
+                    let entrypoint = Entrypoint::new(raw_entrypoint).expect(&format!(
+                        "Building entrypoint `{}` should succeed",
+                        raw_entrypoint
+                    ));
+
+                    assert_eq!(
+                        entrypoint.to_string(),
+                        raw_entrypoint,
+                        "Entrypoint name must not have changed"
+                    );
+                }
+            }
+        };
+    }
+
+    test_conversion!(default);
+    test_conversion!(root);
+    test_conversion!(do);
+    test_conversion!(set_delegate);
+    test_conversion!(remove_delegate);
+    test_conversion!(deposit);
+    test_conversion!(stake);
+    test_conversion!(unstake);
+    test_conversion!(finalize_unstake);
+    test_conversion!(set_delegate_parameters);
+    test_conversion!(custom);
+
+    #[test]
+    fn build_empty_entrypoint() {
+        let entrypoint =
+            Entrypoint::new("").expect(&format!("Building empty entrypoint should succeed"));
+
+        assert_eq!(
+            entrypoint.to_string(),
+            entrypoint::DEFAULT_EP_NAME,
+            "Empty entrypoint should be converted to default"
+        );
+    }
+
+    #[test]
+    fn build_wrong_formatted_entrypoint() {
+        assert!(
+            matches!(
+                Entrypoint::new("?"),
+                Err(Error::Entrypoint(EntrypointError::Format(
+                    entrypoint::ByteReprError::WrongFormat(_)
+                )))
+            ),
+            "Wrong formatted entrypoint should fail with a WrongFormat error"
+        );
+    }
+}
