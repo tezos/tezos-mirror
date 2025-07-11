@@ -2795,42 +2795,44 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* stake = configuration.stake in
   let* client =
-    Client.Agent.create
-      ~name:(Tezt_cloud.Agent.name agent ^ "-client")
-      ~endpoint:(Client.Node bootstrap_node)
-      agent
-  in
-  let init_yes_wallet () =
-    let* yes_wallet = Node.yes_wallet agent in
-    let* snapshot_network =
-      match configuration.snapshot with
-      | Docker_embedded path | Local_file path ->
-          let* network = Node.get_snapshot_info_network bootstrap_node path in
-          (* Yes-wallet requires the config url for protocol-specific test
-             networks.*)
-          let network =
-            match network with
-            | ("ghostnet" | "mainnet" | "sandbox") as s -> s
-            | s ->
-                (* We assume that unknown networks are protocol specific ones. *)
-                "https://teztnets.com/" ^ s
-          in
-          Lwt.return network
-      | No_snapshot -> Lwt.return "ghostnet"
-    in
-    let* _filename =
-      Yes_wallet.create_from_context
-        ~node:bootstrap_node
-        ~client
-        ~network:snapshot_network
-        yes_wallet
-    in
-    unit
+    if configuration.simulate_network = Disabled then
+      Client.init ~endpoint:(Node bootstrap_node) ()
+    else
+      let* client =
+        Client.Agent.create
+          ~name:(Tezt_cloud.Agent.name agent ^ "-client")
+          ~endpoint:(Client.Node bootstrap_node)
+          agent
+      in
+      let* yes_wallet = Node.yes_wallet agent in
+      let* snapshot_network =
+        match configuration.snapshot with
+        | Docker_embedded path | Local_file path ->
+            let* network = Node.get_snapshot_info_network bootstrap_node path in
+            (* Yes-wallet requires the config url for protocol-specific test
+               networks.*)
+            let network =
+              match network with
+              | ("ghostnet" | "mainnet" | "sandbox") as s -> s
+              | s ->
+                  (* We assume that unknown networks are protocol specific ones. *)
+                  "https://teztnets.com/" ^ s
+            in
+            Lwt.return network
+        | No_snapshot -> Lwt.return "ghostnet"
+      in
+      let* _filename =
+        Yes_wallet.create_from_context
+          ~node:bootstrap_node
+          ~client
+          ~network:snapshot_network
+          yes_wallet
+      in
+      return client
   in
   let* simulated_delegates =
     match configuration.simulate_network with
     | Scatter (selected_bakers_count, baker_daemons_count) ->
-        let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
         in
@@ -2847,7 +2849,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         ( selected_bakers_count,
           single_key_baker_daemons_count,
           multiple_keys_baker_daemons_count ) ->
-        let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
         in
