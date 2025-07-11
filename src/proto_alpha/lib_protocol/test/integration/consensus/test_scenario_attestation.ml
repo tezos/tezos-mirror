@@ -76,6 +76,8 @@ let check_aggregated_wrong_committee =
 let check_aggregated_committee =
   check_aggregated_committee ~check_not_found:false
 
+(* === Simple tests ===  *)
+
 let test_attest_simple =
   init_constants ()
   --> begin_test ["delegate"; "dummy"] ~force_attest_all:false
@@ -157,6 +159,8 @@ let test_preattest_aggreg =
   --> check_delegate_didnt_preattest "delegate1"
   --> check_delegate_didnt_preattest "delegate2"
 
+(* === Reward tests === *)
+
 let init_constants_for_attestation_rewards =
   init_constants ()
   --> set
@@ -226,6 +230,107 @@ let test_missed_attestations_rewards_tz4 =
   (* Check balance of "delegate" hasn't changed *)
   --> exec_metadata (check_attestation_rewards ~check_not_found:true "delegate")
 
+(* === Forbidden tests === *)
+
+let test_forbidden_delegate_tries_to_attest_but_fails_miserably =
+  let expected_error (_, state) errs =
+    let delegate = State.find_account "delegate" state in
+    Error_helpers.expect_forbidden_delegate
+      ~loc:__LOC__
+      ~delegate:delegate.contract
+      errs
+  in
+  init_constants ()
+  --> begin_test
+        ["delegate"; "baker"]
+        ~force_preattest_all:false
+        ~force_attest_all:false
+  --> set_baker ~min_round:1 "baker"
+  --> double_attest "delegate" --> make_denunciations () --> next_block
+  (* Cannot bake *)
+  --> assert_failure ~expected_error (next_block_with_baker "delegate")
+  (* Cannot preattest *)
+  --> assert_failure
+        ~expected_error
+        (finalize_payload ~payload_round:0 ()
+        --> preattest_with ~payload_round:0 "delegate")
+  (* Cannot attest *)
+  --> assert_failure ~expected_error (attest_with "delegate" --> next_block)
+
+let test_forbidden_delegate_tries_to_attest_but_fails_miserably_tz4_edition =
+  let expected_error (_, state) errs =
+    let delegate = State.find_account "delegate" state in
+    Error_helpers.expect_forbidden_delegate
+      ~loc:__LOC__
+      ~delegate:delegate.contract
+      errs
+  in
+  init_constants ()
+  --> begin_test
+        ["delegate"; "baker"; "attester"]
+        ~algo:Bls
+        ~force_preattest_all:false
+        ~force_attest_all:false
+  --> set_baker ~min_round:1 "baker"
+  --> double_attest "delegate" --> make_denunciations () --> next_block
+  (* Cannot bake *)
+  --> assert_failure ~expected_error (next_block_with_baker "delegate")
+  (* Cannot preattest *)
+  --> assert_failure
+        ~expected_error
+        (finalize_payload ~payload_round:0 ()
+        --> preattest_aggreg_with ~payload_round:0 ["delegate"])
+  --> assert_failure
+        ~expected_error
+        (finalize_payload ~payload_round:0 ()
+        --> preattest_aggreg_with ~payload_round:0 ["delegate"; "attester"])
+  (* Cannot attest *)
+  --> assert_failure
+        ~expected_error
+        (attest_aggreg_with ["delegate"] --> next_block)
+  --> assert_failure
+        ~expected_error
+        (attest_aggreg_with ["delegate"; "attester"] --> next_block)
+
+(* === (De)activation tests === *)
+
+let test_attestations_keep_activation_status =
+  let open Lwt_result_syntax in
+  let accounts = ["delegate"; "baker"; "attester"] in
+  init_constants ()
+  --> (Tag "tz4, attest"
+       --> begin_test
+             accounts
+             ~algo:Bls
+             ~force_preattest_all:false
+             ~force_attest_all:true
+      |+ Tag "tz4, preattest"
+         --> begin_test
+               accounts
+               ~algo:Bls
+               ~force_preattest_all:true
+               ~force_attest_all:false
+      |+ Tag "non tz4, attest"
+         --> begin_test
+               accounts
+               ~force_preattest_all:false
+               ~force_attest_all:true
+      |+ Tag "non tz4, preattest"
+         --> begin_test
+               accounts
+               ~force_preattest_all:true
+               ~force_attest_all:false)
+  --> set_baker ~min_round:1 "baker"
+  --> set_payload_round (Some 0)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay
+          + state.State.constants.tolerated_inactivity_period + 2)
+  (* Check is still activated *)
+  --> exec_unit (fun (block, state) ->
+          let src = State.find_account "delegate" state in
+          let* b = Context.Delegate.deactivated (B block) src.pkh in
+          Assert.is_true ~loc:__LOC__ (not b))
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -240,6 +345,13 @@ let tests =
        ("Test missed attestation rewards", test_missed_attestations_rewards);
        ( "Test missed attestation rewards (tz4)",
          test_missed_attestations_rewards_tz4 );
+       ( "Test forbidden delegate cannot attest",
+         test_forbidden_delegate_tries_to_attest_but_fails_miserably );
+       ( "Test forbidden delegate cannot attest (tz4)",
+         test_forbidden_delegate_tries_to_attest_but_fails_miserably_tz4_edition
+       );
+       ( "Test (pre)attestations keep delegate active",
+         test_attestations_keep_activation_status );
      ]
 
 let () =

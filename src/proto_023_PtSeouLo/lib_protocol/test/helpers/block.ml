@@ -76,6 +76,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 type baking_mode = Application | Baking
 
@@ -171,10 +172,37 @@ let get_next_baker_excluding excludes block =
       round,
       WithExceptions.Option.to_exn ~none:(Failure "") timestamp )
 
+let get_next_baker_by_account_and_minimal_round pkh min_round block =
+  let open Lwt_result_wrap_syntax in
+  let* bakers =
+    Plugin.RPC.Baking_rights.get rpc_ctxt ~all:true ~delegates:[pkh] block
+  in
+  let* {delegate = pkh; consensus_key; timestamp; round; _} =
+    match
+      (* The RPC returns the list of all rounds in increasing order,
+         so `find` will find the first round after the requested minimal round
+         for the baker `pkh` to bake *)
+      List.find
+        (fun {Plugin.RPC.Baking_rights.round; _} ->
+          Round.to_int32 round >= Int32.of_int min_round)
+        bakers
+    with
+    | Some b -> return b
+    | None -> tzfail (No_slots_found_for pkh)
+  in
+  let*?@ round = Round.to_int round in
+  return
+    ( pkh,
+      consensus_key,
+      round,
+      WithExceptions.Option.to_exn ~none:(Failure __LOC__) timestamp )
+
 let dispatch_policy = function
   | By_round r -> get_next_baker_by_round r
   | By_account a -> get_next_baker_by_account a
   | Excluding al -> get_next_baker_excluding al
+  | By_account_with_minimal_round (pkh, r) ->
+      get_next_baker_by_account_and_minimal_round pkh r
 
 let get_next_baker ?(policy = By_round 0) = dispatch_policy policy
 
@@ -184,6 +212,8 @@ let get_round (b : t) =
   Fitness.(
     let+ fitness = from_raw fitness in
     round fitness)
+
+let get_payload_round (b : t) = b.header.protocol_data.contents.payload_round
 
 let block_producer block =
   let open Lwt_result_wrap_syntax in

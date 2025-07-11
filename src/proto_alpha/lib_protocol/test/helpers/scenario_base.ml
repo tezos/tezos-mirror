@@ -33,11 +33,20 @@ let log ?(level = Cli.Logs.Info) ?color format =
 (* ======== State updates ======== *)
 
 (** Sets the de facto baker for all future blocks *)
-let set_baker baker : (t, t) scenarios =
+let set_baker ?min_round baker : (t, t) scenarios =
   let open Lwt_result_syntax in
   exec_state (fun (_block, state) ->
       let {pkh; _} = State.find_account baker state in
-      return {state with State.baking_policy = Some (Block.By_account pkh)})
+      match min_round with
+      | None ->
+          return {state with State.baking_policy = Some (Block.By_account pkh)}
+      | Some min_round ->
+          return
+            {
+              state with
+              State.baking_policy =
+                Some (Block.By_account_with_minimal_round (pkh, min_round));
+            })
 
 (** Exclude a list of delegates from baking *)
 let exclude_bakers bakers : (t, t) scenarios =
@@ -58,6 +67,10 @@ let exclude_bakers bakers : (t, t) scenarios =
         (String.concat ", " log_list) ;
       return
         {state with State.baking_policy = Some (Block.Excluding bakers_pkh)})
+
+let set_payload_round (payload_round : int option) : (t, t) scenarios =
+  let open Lwt_result_syntax in
+  exec_state (fun (_block, state) -> return {state with State.payload_round})
 
 let set_baked_round ?payload_round (round : int) : (t, t) scenarios =
   let open Lwt_result_syntax in

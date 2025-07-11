@@ -59,6 +59,7 @@ type baker_policy =
   | By_round of int
   | By_account of public_key_hash
   | Excluding of public_key_hash list
+  | By_account_with_minimal_round of public_key_hash * int
 
 (**
    The default baking functions below is to use (blocks) [Application] mode.
@@ -76,6 +77,8 @@ val get_next_baker :
   (public_key_hash * public_key_hash * int * Time.Protocol.t) tzresult Lwt.t
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
+
+val get_payload_round : block -> Round.t
 
 (** Returns the consensus key that was used to bake the block. *)
 val block_producer : block -> Consensus_key.pk tzresult Lwt.t
