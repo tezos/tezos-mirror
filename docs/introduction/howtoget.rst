@@ -234,6 +234,16 @@ However, note that, by embedding all dependencies, static binary executables are
 For upgrading to a newer release, you just have to download and run the new
 versions of the binaries.
 
+Octez static binaries are signed via GPG. To verify that a binary was not tampered with,
+you can download and import our public GPG key and use ``gpg`` to verify the signature associated with the binary.
+
+::
+
+  curl -O https://packages.nomadic-labs.com/octez.asc
+  gpg --import octez.asc
+  ... # download the static binary you want to verify and the associated sig file
+  gpg --verify <bin>.sig <bin>
+
 .. _using_homebrew:
 
 Using Homebrew
