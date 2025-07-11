@@ -562,10 +562,11 @@ let may_get_dal_content state consensus_vote =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
+  let delegate_id = Delegate.delegate_id delegate in
   let promise_opt =
     List.assoc_opt
       ~equal:Delegate_id.equal
-      delegate.delegate_id
+      delegate_id
       state.level_state.dal_attestable_slots
   in
   match promise_opt with
@@ -585,7 +586,7 @@ let may_get_dal_content state consensus_vote =
              Lwt.return (`RPC_result tz_res));
           ]
       in
-      process_dal_rpc_result state delegate.delegate_id level round res
+      process_dal_rpc_result state delegate_id level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -718,7 +719,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
                       Events.(
                         emit
                           missing_companion_key_for_dal_with_bls
-                          ( delegate.delegate_id,
+                          ( Delegate.delegate_id delegate,
                             Raw_level.to_int32 vote_consensus_content.level ))
                     in
                     return (None, None)
@@ -835,7 +836,7 @@ let sign_consensus_votes (global_state : global_state)
     List.filter_map_es
       (fun ({delegate; vote_kind; vote_consensus_content; _} as
             unsigned_consensus_vote) ->
-        let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
+        let*! () = Events.emit_signing_consensus_op unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
              global_state
@@ -876,11 +877,6 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let chain_id = state.global_state.chain_id in
   let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
   let delegate = unsigned_consensus_vote.delegate in
-  let vote_consensus_content = unsigned_consensus_vote.vote_consensus_content in
-  let level, round =
-    ( Raw_level.to_int32 vote_consensus_content.level,
-      vote_consensus_content.round )
-  in
   protect
     ~on_error:(fun err ->
       let*! () =
@@ -905,10 +901,7 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.(
-          emit
-            consensus_vote_injected
-            (unsigned_consensus_vote.vote_kind, oph, delegate, level, round))
+        Events.emit_consensus_op_injected unsigned_consensus_vote oph
       in
       return_unit)
 
