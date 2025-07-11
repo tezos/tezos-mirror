@@ -18,4 +18,15 @@ val transfer :
   infos:Network_info.t ->
   from:Account.t ->
   unit ->
-  Ethereum_types.hex
+  Ethereum_types.hex tzresult Lwt.t
+
+val transfer_exn :
+  ?nonce:Z.t ->
+  ?to_:Efunc_core.Eth.address ->
+  ?data:Efunc_core.Private.b ->
+  value:Z.t ->
+  gas_limit:Z.t ->
+  infos:Network_info.t ->
+  from:Account.t ->
+  unit ->
+  Ethereum_types.hex Lwt.t

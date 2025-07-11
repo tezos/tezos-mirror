@@ -7,7 +7,7 @@
 
 type t
 
-type hash_algorithm = Blake2B
+type hash_algorithm = Blake2B | Keccak256
 
 val from_gcp_key :
   Configuration.gcp_kms -> Configuration.gcp_key -> t tzresult Lwt.t

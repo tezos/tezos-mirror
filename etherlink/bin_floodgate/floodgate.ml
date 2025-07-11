@@ -199,16 +199,16 @@ let fund_fresh_account ~infos ~relay_endpoint ~initial_balance ~gas_limit
 
            The claim is: at least one of these transactions will be accepted
            and included. *)
-        let txn =
-          Craft.transfer
+        let* txn =
+          Craft.transfer_exn
             ~infos
             ~from:node
             ~gas_limit
             ~to_:(Account.address controller)
             ~value:Z.(node.balance - fees)
             ()
-        and txn' =
-          Craft.transfer
+        and* txn' =
+          Craft.transfer_exn
             ~nonce:Z.(succ node.nonce)
             ~infos
             ~from:node

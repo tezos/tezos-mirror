@@ -357,6 +357,7 @@ let start ~relay_endpoint ~max_transaction_batch_length () =
 
 let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
     ?nonce ?data ~gas_limit ~infos ~from () =
+  let open Lwt_syntax in
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
   let callback reason =
     (match reason with
@@ -366,8 +367,8 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
     | _ -> ()) ;
     callback reason
   in
-  let txn =
-    Craft.transfer ?nonce ~infos ~from ?to_ ~gas_limit ~value ?data ()
+  let* txn =
+    Craft.transfer_exn ?nonce ~infos ~from ?to_ ~gas_limit ~value ?data ()
   in
   inject ~callback txn
 
