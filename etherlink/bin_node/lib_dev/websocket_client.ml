@@ -292,9 +292,34 @@ let monitor_connection ~ping_timeout ~ping_interval conn monitor_mbox =
 
 type monitoring = {ping_timeout : float; ping_interval : float}
 
+let is_tls_service = function "wss" | "https" | "imaps" -> true | _ -> false
+
+let system_service name =
+  let open Lwt_syntax in
+  Lwt.catch
+    (fun () ->
+      let* s =
+        (* WebSocket connections (ws:// and wss://) use HTTP ports (80
+           and 443 respectively) but aren't registered as separate TCP
+           services in the system service database. *)
+        let name' =
+          match name with "ws" -> "http" | "wss" -> "https" | _ -> name
+        in
+        Lwt_unix.getservbyname name' "tcp"
+      in
+      let tls = is_tls_service name in
+      let svc = {Resolver.name; port = s.Lwt_unix.s_port; tls} in
+      Lwt.return (Some svc))
+    (function Not_found -> Lwt.return_none | e -> Lwt.reraise e)
+
+let resolver =
+  let service = system_service in
+  let rewrites = [("", Resolver_lwt_unix.system_resolver)] in
+  Resolver_lwt.init ~service ~rewrites ()
+
 let connect ?monitoring media uri =
   let open Lwt_syntax in
-  let* endp = Resolver_lwt.resolve_uri ~uri Resolver_lwt_unix.system in
+  let* endp = Resolver_lwt.resolve_uri ~uri resolver in
   let ctx = Lazy.force Conduit_lwt_unix.default_ctx in
   let* client = Conduit_lwt_unix.endp_to_client ~ctx endp in
   let accept_header = Tezos_rpc_http.Media_type.accept_header [media] in

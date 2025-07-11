@@ -852,16 +852,49 @@ module Public_key = struct
     Ethereum_types.Address (Ethereum_types.hex_of_string addr)
 end
 
+let ws_uri uri =
+  match Uri.scheme uri with
+  | Some "ws" | Some "wss" ->
+      (* This is already a websocket URI which has the correct path so we leave
+         it as is. *)
+      uri
+  | None | Some "http" ->
+      let uri = Uri.with_scheme uri (Some "ws") in
+      Uri.with_path uri (Uri.path uri ^ "/ws")
+  | Some "https" ->
+      let uri = Uri.with_scheme uri (Some "wss") in
+      Uri.with_path uri (Uri.path uri ^ "/ws")
+  | _ -> uri
+
+let rpc_uri uri =
+  match Uri.scheme uri with
+  | None | Some "http" | Some "https" ->
+      (* This is already an RPC URI so we leave it as is. *)
+      uri
+  | Some "ws" -> (
+      let uri = Uri.with_scheme uri (Some "http") in
+      match String.remove_suffix ~suffix:"/ws" (Uri.path uri) with
+      | Some p -> Uri.with_path uri p
+      | None -> uri)
+  | Some "wss" -> (
+      let uri = Uri.with_scheme uri (Some "https") in
+      match String.remove_suffix ~suffix:"/ws" (Uri.path uri) with
+      | Some p -> Uri.with_path uri p
+      | None -> uri)
+  | _ -> uri
+
 let start db ~config ~notify_ws_change ~first_block =
   let open Lwt_result_syntax in
   let evm_node_endpoint = config.Config.evm_node_endpoint in
-  let tx_queue_endpoint = ref (Services_backend_sig.Rpc evm_node_endpoint) in
+  let tx_queue_endpoint =
+    ref (Services_backend_sig.Rpc (rpc_uri evm_node_endpoint))
+  in
   let run () =
     let*! ws_client =
       Websocket_client.connect
         ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
         Media_type.json
-        (Uri.with_path evm_node_endpoint (Uri.path evm_node_endpoint ^ "/ws"))
+        (ws_uri evm_node_endpoint)
     in
     tx_queue_endpoint := Services_backend_sig.Websocket ws_client ;
     notify_ws_change ws_client ;
