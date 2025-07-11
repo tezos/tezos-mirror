@@ -292,6 +292,45 @@ let test_forbidden_delegate_tries_to_attest_but_fails_miserably_tz4_edition =
         ~expected_error
         (attest_aggreg_with ["delegate"; "attester"] --> next_block)
 
+(* === (De)activation tests === *)
+
+let test_attestations_keep_activation_status =
+  let open Lwt_result_syntax in
+  let accounts = ["delegate"; "baker"; "attester"] in
+  init_constants ()
+  --> (Tag "tz4, attest"
+       --> begin_test
+             accounts
+             ~algo:Bls
+             ~force_preattest_all:false
+             ~force_attest_all:true
+      |+ Tag "tz4, preattest"
+         --> begin_test
+               accounts
+               ~algo:Bls
+               ~force_preattest_all:true
+               ~force_attest_all:false
+      |+ Tag "non tz4, attest"
+         --> begin_test
+               accounts
+               ~force_preattest_all:false
+               ~force_attest_all:true
+      |+ Tag "non tz4, preattest"
+         --> begin_test
+               accounts
+               ~force_preattest_all:true
+               ~force_attest_all:false)
+  --> set_baker ~min_round:1 "baker"
+  --> set_payload_round (Some 0)
+  --> wait_n_cycles_f (fun (_, state) ->
+          state.State.constants.consensus_rights_delay
+          + state.State.constants.tolerated_inactivity_period + 2)
+  (* Check is still activated *)
+  --> exec_unit (fun (block, state) ->
+          let src = State.find_account "delegate" state in
+          let* b = Context.Delegate.deactivated (B block) src.pkh in
+          Assert.is_true ~loc:__LOC__ (not b))
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -311,6 +350,8 @@ let tests =
        ( "Test forbidden delegate cannot attest (tz4)",
          test_forbidden_delegate_tries_to_attest_but_fails_miserably_tz4_edition
        );
+       ( "Test (pre)attestations keep delegate active",
+         test_attestations_keep_activation_status );
      ]
 
 let () =
