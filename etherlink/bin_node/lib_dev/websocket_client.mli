@@ -16,6 +16,8 @@ type t
 type error +=
   | No_response of JSONRPC.request
   | Request_failed of JSONRPC.request * JSONRPC.error
+  | Cannot_destruct of
+      Ethereum_types.Subscription.kind * Ethereum_types.Subscription.id * string
 
 (** Subscriptions returned by [subscribe]. *)
 type 'a subscription = {
@@ -57,23 +59,26 @@ val send_jsonrpc : t -> ('input, 'output) call -> 'output tzresult Lwt.t
 val subscribe :
   t ->
   Subscribe.input ->
-  Transaction_object.t Ethereum_types.Subscription.output subscription tzresult
+  Transaction_object.t Ethereum_types.Subscription.output tzresult subscription
+  tzresult
   Lwt.t
 
 (** [subscribe_newHeads client] is like [subscribe] but specialized for
       newHeads events. *)
 val subscribe_newHeads :
-  t -> Transaction_object.t Ethereum_types.block subscription tzresult Lwt.t
+  t ->
+  Transaction_object.t Ethereum_types.block tzresult subscription tzresult Lwt.t
 
 (** [subscribe_newPendingTransactions client] is like [subscribe] but
       specialized for newPendingTransactions events. *)
 val subscribe_newPendingTransactions :
-  t -> Ethereum_types.hash subscription tzresult Lwt.t
+  t -> Ethereum_types.hash tzresult subscription tzresult Lwt.t
 
 (** [subscribe_syncing client] is like [subscribe] but specialized for syncing
       events. *)
 val subscribe_syncing :
-  t -> Ethereum_types.Subscription.sync_output subscription tzresult Lwt.t
+  t ->
+  Ethereum_types.Subscription.sync_output tzresult subscription tzresult Lwt.t
 
 (** [subscribe_logs ?address ?topics client] is like [subscribe] but
       specialized for logs events filtered by [address] and/or [topics]. *)
@@ -81,10 +86,11 @@ val subscribe_logs :
   ?address:Ethereum_types.Filter.filter_address ->
   ?topics:Ethereum_types.Filter.topic option list ->
   t ->
-  Ethereum_types.transaction_log subscription tzresult Lwt.t
+  Ethereum_types.transaction_log tzresult subscription tzresult Lwt.t
 
 (** Subscribe to L1/L2 levels associations. *)
 val subscribe_l1_l2_levels :
   ?start_l1_level:int32 ->
   t ->
-  Ethereum_types.Subscription.l1_l2_levels_output subscription tzresult Lwt.t
+  Ethereum_types.Subscription.l1_l2_levels_output tzresult subscription tzresult
+  Lwt.t
