@@ -213,6 +213,8 @@ let get_round (b : t) =
     let+ fitness = from_raw fitness in
     round fitness)
 
+let get_payload_round (b : t) = b.header.protocol_data.contents.payload_round
+
 let block_producer block =
   let open Lwt_result_wrap_syntax in
   let* ctxt = get_alpha_ctxt block in

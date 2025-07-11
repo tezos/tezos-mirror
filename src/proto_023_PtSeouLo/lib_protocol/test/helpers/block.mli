@@ -78,6 +78,8 @@ val get_next_baker :
 
 val get_round : block -> Round.t Environment.Error_monad.tzresult
 
+val get_payload_round : block -> Round.t
+
 (** Returns the consensus key that was used to bake the block. *)
 val block_producer : block -> Consensus_key.pk tzresult Lwt.t
 
