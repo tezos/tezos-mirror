@@ -195,7 +195,5 @@ let jobs =
   ]
   (* Jobs to build and update on Docker Hub the Octez Docker image.  *)
   @ octez_distribution_docker_jobs
-  (* Stage: doc *)
-  @ jobs_documentation
   (* Stage: manual *)
   @ [job_publish_kernel_sdk]
