@@ -152,6 +152,10 @@ let protocol_key = ["protocol"]
 
 let test_chain_key = ["test_chain"]
 
+let predecessor_block_metadata_hash_key = ["predecessor_block_metadata_hash"]
+
+let predecessor_ops_metadata_hash_key = ["predecessor_ops_metadata_hash"]
+
 let get_protocol ctxt =
   match find_raw ctxt protocol_key with
   | None -> assert false
@@ -249,9 +253,19 @@ let get_test_chain t =
             re
       | Ok r -> Lwt.return r)
 
-let add_predecessor_block_metadata_hash _ _ = assert false
+let add_predecessor_block_metadata_hash t hash =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+  in
+  add_raw t predecessor_block_metadata_hash_key bytes
 
-let add_predecessor_ops_metadata_hash _ _ = assert false
+let add_predecessor_ops_metadata_hash t hash =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation_metadata_list_list_hash.encoding
+      hash
+  in
+  add_raw t predecessor_ops_metadata_hash_key bytes
 
 let compute_testchain_genesis forked_block =
   Block_hash.hash_bytes [Block_hash.to_bytes forked_block]
