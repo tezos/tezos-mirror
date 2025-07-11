@@ -10,6 +10,9 @@
 
 - `GET /health_check` will now fail if the database connections used by the EVM
   node are stalled. (!18667)
+- RPC responses now output [EIP-55 compliant addresses][eip-55]. (!18676)
+
+[eip-55]: https://eips.ethereum.org/EIPS/eip-55
 
 ### Metrics changes
 

@@ -184,7 +184,7 @@ type 'transaction_object block = {
   transactionRoot : hash;
   stateRoot : hash;
   receiptRoot : hash;
-  miner : hex;
+  miner : address;
   difficulty : quantity;
   totalDifficulty : quantity;
   extraData : hex;
