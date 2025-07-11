@@ -409,8 +409,6 @@ type forge_event =
 val forge_event_encoding_for_logging__cannot_decode :
   forge_event Data_encoding.t
 
-val pp_forge_event : Format.formatter -> forge_event -> unit
-
 (** [forge_worker_hooks] type that allows interactions with the forge worker.
     Hooks are needed in order to break a circular dependency. *)
 type forge_worker_hooks = {
@@ -551,7 +549,5 @@ type event =
     Warning: As a consequence, decoding from this encoding will always
     fail. *)
 val event_encoding_for_logging__cannot_decode : event Data_encoding.t
-
-val pp_event : Format.formatter -> event -> unit
 
 val pp_short_event : Format.formatter -> event -> unit
