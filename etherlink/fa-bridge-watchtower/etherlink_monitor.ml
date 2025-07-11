@@ -344,13 +344,12 @@ module Event = struct
       ~pp1:Format.pp_print_string
 
   let new_etherlink_head =
-    declare_2
+    declare_1
       ~section
       ~name:"new_etherlink_head"
-      ~msg:"New etherlink head {level} ({txs} txs)"
+      ~msg:"New etherlink head {level}"
       ~level:Notice
       ("level", Db.quantity_hum_encoding)
-      ("txs", Data_encoding.int31)
       ~pp1:Ethereum_types.pp_quantity
 
   let catch_up =
@@ -649,24 +648,18 @@ let claim_selector =
 
 let is_claim_input = String.starts_with ~prefix:claim_selector
 
-let handle_confirmed_txs {db; ws_client; _}
-    (b : Transaction_object.t Ethereum_types.block) =
+let handle_confirmed_txs {db; ws_client; _} number =
   let open Lwt_result_syntax in
+  let* b =
+    Websocket_client.send_jsonrpc
+      ws_client
+      (Call ((module Rpc_encodings.Get_block_by_number), (Number number, true)))
+  in
   let* txs =
     match b.transactions with
-    | TxFull [] | TxHash [] -> return_nil
+    | TxHash [] -> return []
+    | TxHash _ -> assert false
     | TxFull txs -> return txs
-    | TxHash _ -> (
-        let* block =
-          Websocket_client.send_jsonrpc
-            ws_client
-            (Call
-               ( (module Rpc_encodings.Get_block_by_number),
-                 (Number b.number, true) ))
-        in
-        match block.transactions with
-        | TxHash _ -> assert false
-        | TxFull txs -> return txs)
   in
   txs
   |> List.iteri_es @@ fun index tx ->
@@ -752,20 +745,14 @@ let claim_deposits ctx =
           claim ctx ~deposit_id)
         deposits
 
-let on_new_block ctx ~catch_up (b : _ Ethereum_types.block) =
+let on_new_block ctx ~catch_up number =
   let open Lwt_result_syntax in
-  let open Ethereum_types in
-  let nb_txs =
-    match b.transactions with
-    | TxHash l -> List.length l
-    | TxFull l -> List.length l
-  in
-  let*! () = Event.(emit new_etherlink_head) (b.number, nb_txs) in
+  let*! () = Event.(emit new_etherlink_head) number in
   (* Process logs for this block *)
-  let* () = get_logs ctx ~block:b.number in
+  let* () = get_logs ctx ~block:number in
   (* Notify tx queue and register claimed deposits in DB *)
-  let* () = handle_confirmed_txs ctx b in
-  let* () = Db.Pointers.L2_head.set ctx.db b.number in
+  let* () = handle_confirmed_txs ctx number in
+  let* () = Db.Pointers.L2_head.set ctx.db number in
   unless catch_up @@ fun () -> claim_deposits ctx
 
 let rec catch_up ctx ~from_block ~end_block =
@@ -775,14 +762,7 @@ let rec catch_up ctx ~from_block ~end_block =
   in
   if Z.gt from_ end_ then return_unit
   else
-    let* block =
-      Websocket_client.send_jsonrpc
-        ctx.ws_client
-        (Call
-           ( (module Rpc_encodings.Get_block_by_number),
-             (Number from_block, true) ))
-    in
-    let* () = on_new_block ctx block ~catch_up:true in
+    let* () = on_new_block ctx from_block ~catch_up:true in
     catch_up ctx ~from_block:(Ethereum_types.Qty.next from_block) ~end_block
 
 let monitor_heads ctx =
@@ -790,22 +770,24 @@ let monitor_heads ctx =
   let* head =
     Websocket_client.send_jsonrpc
       ctx.ws_client
-      (Call ((module Rpc_encodings.Get_block_by_number), (Latest, true)))
-  and* heads_subscription = Websocket_client.subscribe_newHeads ctx.ws_client in
+      (Call ((module Rpc_encodings.Block_number), ()))
+  and* heads_subscription =
+    Websocket_client.subscribe_newHeadNumbers ctx.ws_client
+  in
   let* () =
     lwt_stream_iter_es
-      (fun (b : Transaction_object.t Ethereum_types.block tzresult) ->
-        let*? b in
+      (fun number ->
+        let*? number in
         let* last_l2_head = Db.Pointers.L2_head.get ctx.db in
         let expected_level = Ethereum_types.Qty.next last_l2_head in
         let* () =
-          unless Ethereum_types.Qty.(b.number = expected_level) @@ fun () ->
+          unless Ethereum_types.Qty.(number = expected_level) @@ fun () ->
           catch_up
             ctx
             ~from_block:expected_level
-            ~end_block:(Ethereum_types.Qty.pred b.number)
+            ~end_block:(Ethereum_types.Qty.pred number)
         in
-        on_new_block ctx b ~catch_up:false)
+        on_new_block ctx number ~catch_up:false)
       (Lwt_stream.append
          (Lwt_stream.return (Ok head))
          heads_subscription.stream)
