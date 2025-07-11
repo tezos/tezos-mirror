@@ -122,7 +122,7 @@ let pp_forge_event fmt = function
         signed_block_header.shell.level
         Round.pp
         round
-        Delegate.pp
+        Delegate.pp_without_companion_key
         delegate
   | Preattestation_ready signed_op | Attestation_ready signed_op ->
       Format.fprintf
@@ -319,7 +319,7 @@ module State_transitions = struct
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
       ("next_round", Round.encoding)
-      ~pp4:Delegate.pp
+      ~pp4:Delegate.pp_without_companion_key
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
 
   let new_head_while_waiting_for_qc =
@@ -514,8 +514,12 @@ module State_transitions = struct
       ~section
       ~name:"preparing_fresh_block"
       ~level:Info
-      ~msg:"preparing fresh block for {delegate} at round {round}"
-      ~pp1:Delegate.pp
+      ~msg:"preparing fresh block at round {round}{delegate}"
+      ~pp1:(fun fmt ->
+        Format.fprintf
+          fmt
+          "@ for@ delegate@ %a"
+          Delegate.pp_without_companion_key)
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Round.pp
       ("round", Round.encoding)
@@ -781,15 +785,19 @@ module Scheduling = struct
       ~name:"next_potential_slot"
       ~level:Info
       ~msg:
-        "next potential slot for level {level} is at round {round} at \
-         {timestamp} for {delegate}"
+        "next potential slot for level {level} is at round \
+         {round}{timestamp}{delegate}"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
       ~pp2:Round.pp
       ("round", Round.encoding)
-      ~pp3:Timestamp.pp
+      ~pp3:(fun fmt -> Format.fprintf fmt "@ at %a" Timestamp.pp)
       ("timestamp", Timestamp.encoding)
-      ~pp4:Delegate.pp
+      ~pp4:(fun fmt ->
+        Format.fprintf
+          fmt
+          "@ for@ delegate@ %a"
+          Delegate.pp_without_companion_key)
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
 
   let waiting_end_of_round =
@@ -1104,11 +1112,15 @@ module Actions = struct
       ~name:"forging_block"
       ~level:Info
       ~msg:
-        "forging block at level {level}, round {round} for {delegate} (force \
-         apply: {force_apply})"
+        "forging block at level {level}, round {round}{delegate}(force apply: \
+         {force_apply})"
       ~pp1:pp_int32
       ~pp2:Round.pp
-      ~pp3:Delegate.pp
+      ~pp3:(fun fmt ->
+        Format.fprintf
+          fmt
+          "@ for@ delegate@ %a@ "
+          Delegate.pp_without_companion_key)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
       ("delegate", Delegate.encoding_for_logging__cannot_decode)
@@ -1151,18 +1163,22 @@ module Actions = struct
       ~name:"block_injected"
       ~level:Notice
       ~msg:
-        "block {block} at level {level}, round {round} injected for \
-         {delegate}{manager_operations_infos}"
+        "block {block} at level {level}, round {round} \
+         injected{delegate}{manager_operations_infos}"
       ~pp1:Block_hash.pp
       ~pp2:pp_int32
       ~pp3:Round.pp
-      ~pp4:Delegate.pp
+      ~pp4:(fun fmt ->
+        Format.fprintf
+          fmt
+          "@ for@ delegate@ %a"
+          Delegate.pp_without_companion_key)
       ~pp5:
         (Format.pp_print_option
            (fun fmt {manager_operation_number; total_fees} ->
              Format.fprintf
                fmt
-               " with %d manager operations summing %a μtz in fees"
+               "@ with %d manager operations@ summing up to %a μtz in fees"
                manager_operation_number
                pp_int64
                total_fees))
