@@ -144,6 +144,8 @@ end
 type error +=
   | No_response of JSONRPC.request
   | Request_failed of JSONRPC.request * JSONRPC.error
+  | Cannot_destruct of
+      Ethereum_types.Subscription.kind * Ethereum_types.Subscription.id * string
 
 let () =
   register_error_kind
@@ -178,7 +180,31 @@ let () =
         (req "request" JSONRPC.request_encoding)
         (req "error" JSONRPC.error_encoding))
     (function Request_failed (r, e) -> Some (r, e) | _ -> None)
-    (fun (r, e) -> Request_failed (r, e))
+    (fun (r, e) -> Request_failed (r, e)) ;
+  register_error_kind
+    `Temporary
+    ~id:"websocket_client.cannot_destruct"
+    ~title:"Cannot destruct subscription notification"
+    ~description:"Cannot destruct subscription notification."
+    ~pp:(fun ppf (k, id, err) ->
+      let (Ethereum_types.Subscription.Id (Hex id)) = id in
+      Format.fprintf
+        ppf
+        "Cannot destruct notification for subscription %s of id 0x%s: %s"
+        (Ezjsonm.value_to_string
+           ~minify:true
+           (Data_encoding.Json.construct
+              Ethereum_types.Subscription.kind_encoding
+              k))
+        id
+        err)
+    Data_encoding.(
+      obj3
+        (req "kind" Ethereum_types.Subscription.kind_encoding)
+        (req "id" Ethereum_types.Subscription.id_encoding)
+        (req "err" string))
+    (function Cannot_destruct (k, id, e) -> Some (k, id, e) | _ -> None)
+    (fun (k, id, e) -> Cannot_destruct (k, id, e))
 
 module Websocket_lwt_unix = struct
   include Websocket_lwt_unix
@@ -490,12 +516,28 @@ let subscribe client (kind : Ethereum_types.Subscription.kind) =
   in
   let stream, push = Lwt_stream.create () in
   let push x =
-    push
-      (Option.map
-         (Data_encoding.Json.destruct
-            (Ethereum_types.Subscription.output_encoding
-               Transaction_object.encoding))
-         x)
+    let v =
+      match x with
+      | None -> None
+      | Some x -> (
+          try
+            Data_encoding.Json.destruct
+              (Ethereum_types.Subscription.output_encoding
+                 Transaction_object.encoding)
+              x
+            |> Result.ok |> Option.some
+          with e ->
+            let err =
+              Format.asprintf
+                "%a"
+                (Json_encoding.print_error ?print_unknown:None)
+                e
+            in
+            Some
+              (Result_syntax.tzfail
+                 (Cannot_destruct (kind, subscription_id, err))))
+    in
+    push v
   in
   Subscription_table.replace client.subscriptions subscription_id push ;
   let unsubscribe () =
@@ -510,7 +552,13 @@ let subscribe client (kind : Ethereum_types.Subscription.kind) =
 let subscribe_filter client kind filter =
   let open Lwt_result_syntax in
   let+ {stream; unsubscribe} = subscribe client kind in
-  let stream = Lwt_stream.filter_map filter stream in
+  let stream =
+    Lwt_stream.filter_map
+      (function
+        | Ok x -> ( match filter x with Some x -> Some (Ok x) | None -> None)
+        | Error e -> Some (Error e))
+      stream
+  in
   {stream; unsubscribe}
 
 let subscribe_newHeads client =

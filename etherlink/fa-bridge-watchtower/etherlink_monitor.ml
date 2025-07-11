@@ -794,7 +794,8 @@ let monitor_heads ctx =
   and* heads_subscription = Websocket_client.subscribe_newHeads ctx.ws_client in
   let* () =
     lwt_stream_iter_es
-      (fun (b : Transaction_object.t Ethereum_types.block) ->
+      (fun (b : Transaction_object.t Ethereum_types.block tzresult) ->
+        let*? b in
         let* last_l2_head = Db.Pointers.L2_head.get ctx.db in
         let expected_level = Ethereum_types.Qty.next last_l2_head in
         let* () =
@@ -805,7 +806,9 @@ let monitor_heads ctx =
             ~end_block:(Ethereum_types.Qty.pred b.number)
         in
         on_new_block ctx b ~catch_up:false)
-      (Lwt_stream.append (Lwt_stream.return head) heads_subscription.stream)
+      (Lwt_stream.append
+         (Lwt_stream.return (Ok head))
+         heads_subscription.stream)
   in
   return_unit
 

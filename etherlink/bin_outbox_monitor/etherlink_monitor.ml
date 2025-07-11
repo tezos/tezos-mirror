@@ -506,8 +506,10 @@ let parse_log (log : Ethereum_types.transaction_log) =
                     (parsed_log_to_db log (Fast_FA_withdrawal withdraw_data))
               | None -> return_none)))
 
-let handle_one_log ws_client db (log : Ethereum_types.transaction_log) =
+let handle_one_log ws_client db (log : Ethereum_types.transaction_log tzresult)
+    =
   let open Lwt_result_syntax in
+  let*? log in
   let*! () = Event.(emit transaction_log) log in
   let withdrawal = parse_log log in
   match withdrawal with
@@ -610,7 +612,7 @@ let rec get_logs db ws_client ~from_block ~to_block =
           (function
             | Filter.Block_filter _ | Pending_transaction_filter _ ->
                 return_unit
-            | Log log -> handle_one_log ws_client db log)
+            | Log log -> handle_one_log ws_client db (Ok log))
           logs
     | Error (Filter_helpers.Too_many_logs {limit} :: _ as e)
       when Z.equal from_z to_z ->
@@ -694,7 +696,8 @@ let monitor_heads db ws_client =
   let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
   let* () =
     lwt_stream_iter_es
-      (fun (b : _ Ethereum_types.block) ->
+      (fun (b : _ Ethereum_types.block tzresult) ->
+        let*? b in
         let*! () = Event.(emit new_etherlink_head) b.number in
         Db.Pointers.L2_head.set db b.number)
       heads_subscription.stream
@@ -714,8 +717,8 @@ let monitor_l2_l1_levels db ws_client ~rollup_node_rpc ~l1_node_rpc
   in
   let* () =
     lwt_stream_iter_es
-      (fun ({l1_level; start_l2_level; end_l2_level} :
-             Ethereum_types.Subscription.l1_l2_levels_output) ->
+      (fun (l1l2 : Ethereum_types.Subscription.l1_l2_levels_output tzresult) ->
+        let*? {l1_level; start_l2_level; end_l2_level} = l1l2 in
         let*! () =
           if Ethereum_types.Qty.(start_l2_level = end_l2_level) then
             Event.(emit empty_l1_level) l1_level
