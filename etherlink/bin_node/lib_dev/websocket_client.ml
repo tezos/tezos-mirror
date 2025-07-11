@@ -509,7 +509,8 @@ let send_jsonrpc :
   | Ok response ->
       return @@ Data_encoding.Json.destruct M.output_encoding response
 
-let subscribe client (kind : Ethereum_types.Subscription.kind) =
+let subscribe' client ~output_encoding (kind : Ethereum_types.Subscription.kind)
+    =
   let open Lwt_result_syntax in
   let* subscription_id =
     send_jsonrpc client (Call ((module Subscribe), kind))
@@ -521,10 +522,7 @@ let subscribe client (kind : Ethereum_types.Subscription.kind) =
       | None -> None
       | Some x -> (
           try
-            Data_encoding.Json.destruct
-              (Ethereum_types.Subscription.output_encoding
-                 Transaction_object.encoding)
-              x
+            Data_encoding.Json.destruct output_encoding x
             |> Result.ok |> Option.some
           with e ->
             let err =
@@ -549,6 +547,11 @@ let subscribe client (kind : Ethereum_types.Subscription.kind) =
   in
   return {stream; unsubscribe}
 
+let subscribe =
+  subscribe'
+    ~output_encoding:
+      (Ethereum_types.Subscription.output_encoding Transaction_object.encoding)
+
 let subscribe_filter client kind filter =
   let open Lwt_result_syntax in
   let+ {stream; unsubscribe} = subscribe client kind in
@@ -565,6 +568,14 @@ let subscribe_newHeads client =
   subscribe_filter client NewHeads @@ function
   | Ethereum_types.Subscription.NewHeads h -> Some h
   | _ -> None
+
+let block_just_number_encoding =
+  let open Data_encoding in
+  conv (fun n -> (n, ())) (fun (n, ()) -> n)
+  @@ merge_objs (obj1 (req "number" Ethereum_types.quantity_encoding)) unit
+
+let subscribe_newHeadNumbers client =
+  subscribe' client NewHeads ~output_encoding:block_just_number_encoding
 
 let subscribe_newPendingTransactions client =
   subscribe_filter client NewPendingTransactions @@ function

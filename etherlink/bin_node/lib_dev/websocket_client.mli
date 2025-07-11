@@ -69,6 +69,11 @@ val subscribe_newHeads :
   t ->
   Transaction_object.t Ethereum_types.block tzresult subscription tzresult Lwt.t
 
+(** [subscribe_newHeadNumbers client] is like [subscribe_newHeads] but only
+    parses numbers in blocks. *)
+val subscribe_newHeadNumbers :
+  t -> Ethereum_types.quantity tzresult subscription tzresult Lwt.t
+
 (** [subscribe_newPendingTransactions client] is like [subscribe] but
       specialized for newPendingTransactions events. *)
 val subscribe_newPendingTransactions :
