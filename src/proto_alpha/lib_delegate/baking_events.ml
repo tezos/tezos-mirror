@@ -722,25 +722,21 @@ module Node_rpc = struct
       ("chain_id", Chain_id.encoding)
 end
 
-module Delegates = struct
+module Launch = struct
   include Internal_event.Simple
 
-  let section = section @ ["delegates"]
+  let section = section @ ["launch"]
 
-  let delegates_used =
+  let keys_used =
     declare_1
       ~section
       ~alternative_color:Internal_event.Cyan
-      ~name:"delegates_used"
+      ~name:"keys_used"
       ~level:Notice
-      ~msg:"Baker will run with the following delegates:{delegates}"
-      ~pp1:(fun ppf delegates ->
-        Format.fprintf
-          ppf
-          "@[<v 2>@,%a@]"
-          Format.(pp_print_list ~pp_sep:pp_print_cut Key.pp)
-          delegates)
-      ("delegates", Data_encoding.list Key.encoding_for_logging__cannot_decode)
+      ~msg:"Baker will run with the following keys:{keys}"
+      ~pp1:(fun ppf keys ->
+        Format.fprintf ppf "@[<v 2>@,%a@]" (Format.pp_print_list Key.pp) keys)
+      ("keys", Data_encoding.list Key.encoding_for_logging__cannot_decode)
 end
 
 module Scheduling = struct
