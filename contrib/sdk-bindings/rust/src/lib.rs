@@ -6,6 +6,7 @@ use tezos_crypto_rs::{base58, CryptoError};
 
 uniffi::setup_scaffolding!();
 
+pub mod entrypoint;
 pub mod forge;
 pub mod keys;
 
@@ -18,4 +19,6 @@ pub enum Error {
     Forge(#[from] forge::ForgingError),
     #[error("Cryptography failure: {0:?}")]
     Crypto(CryptoError),
+    #[error("Entrypoint failure: {0:?}")]
+    Entrypoint(#[from] entrypoint::EntrypointError),
 }
