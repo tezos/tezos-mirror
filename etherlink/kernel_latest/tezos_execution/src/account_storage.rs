@@ -281,6 +281,17 @@ impl TezlinkOriginatedAccount {
         Ok(host.store_read_all(&path)?)
     }
 
+    #[cfg(test)]
+    pub fn set_code(
+        &self,
+        host: &mut impl Runtime,
+        data: &[u8],
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &CODE_PATH)?;
+        host.store_write_all(&path, data)?;
+        Ok(())
+    }
+
     pub fn storage(
         &self,
         host: &impl Runtime,
