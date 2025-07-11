@@ -196,7 +196,8 @@ The baker is a daemon that executes Tezos' :doc:`consensus algorithm<../active/c
 The baker runs on behalf of one or more specified accounts or, if none is specified, on behalf of
 all accounts whose secret keys are known.
 
-A complete manual page of the baker executable is available :ref:`here <baker_manual>`.
+To learn more about how the Octez baker works see :doc:`../shell/baker`.
+Also, a complete manual page of the baker executable is available :ref:`here <baker_manual>`.
 
 During its run, the baker bakes blocks (by selecting transactions from
 the mempool and arranging them in a new block) and emits consensus

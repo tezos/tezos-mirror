@@ -183,6 +183,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    shell/the_big_picture
    shell/shell
+   shell/baker
    shell/dal
    shell/smart_rollup_node
    shell/p2p_api
