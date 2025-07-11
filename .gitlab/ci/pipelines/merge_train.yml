@@ -2118,7 +2118,10 @@ test_sdk_rust:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     - sdk/rust/**/*
     when: on_success
   needs:
@@ -2160,7 +2163,10 @@ test_sdk_bindings:
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
     - contrib/sdk-bindings
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-sdk-bindings/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     - sdk/rust/**/*
     when: on_success
   needs:
@@ -2202,8 +2208,11 @@ test_kernels:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
     - kernels.mk
+    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_*/**/*
     - src/riscv/**/*
@@ -2250,7 +2259,10 @@ test_etherlink_kernel:
     - .gitlab/ci/pipelines/merge_train.yml
     - etherlink.mk
     - etherlink/**/*.rs
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     when: on_success
@@ -2296,7 +2308,10 @@ test_etherlink_firehose:
     - .gitlab/ci/pipelines/merge_train.yml
     - etherlink/firehose/**/*
     - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
@@ -2337,7 +2352,6 @@ audit_riscv_deps:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - images/**/*
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
@@ -2378,7 +2392,10 @@ check_riscv_kernels:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     - sdk/rust/**/*
     - src/kernel_sdk/**/*
     - src/riscv/**/*
@@ -2426,7 +2443,10 @@ test_evm_compatibility:
     - etherlink.mk
     - etherlink/kernel_latest/evm_evaluation/**/*
     - etherlink/kernel_latest/evm_execution/**/*
-    - images/**/*
+    - images/create_image.sh
+    - images/rust-toolchain/**/*
+    - images/scripts/install_datadog_static.sh
+    - scripts/version.sh
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
