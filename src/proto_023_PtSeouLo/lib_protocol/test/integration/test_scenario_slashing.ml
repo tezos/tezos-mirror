@@ -195,7 +195,9 @@ let check_has_slots ~loc baker_name =
 let test_delegate_forbidden =
   let crd (_, state) = state.State.constants.consensus_rights_delay in
   init_constants ~blocks_per_cycle:32l ()
-  --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
+  --> (Tag "non tz4" --> begin_test ["delegate"; "bootstrap1"; "bootstrap2"]
+      |+ Tag "tz4"
+         --> begin_test ~algo:Bls ["delegate"; "bootstrap1"; "bootstrap2"])
   --> set_baker "bootstrap1"
   --> (Tag "Is not forbidden until first denunciation"
        --> loop 14 (double_bake "delegate")
