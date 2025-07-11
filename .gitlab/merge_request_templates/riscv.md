@@ -1,4 +1,4 @@
-<!-- 
+<!--
     Link Linear issues using magic words. Examples of these are "Closes RV-XXX", "Part of RV-YYY"
     or "Relates to RV-ZZZ".
 -->
@@ -11,7 +11,7 @@
 
 # Why
 
-<!-- 
+<!--
     Explain why this MR is needed.
 -->
 
@@ -38,6 +38,7 @@ make -C src/riscv all
   - `make -C src/riscv`
   - `dune test src/lib_riscv`
   - `dune build src/rust_deps`
+- [ ] If applicable, trigger the `tezt-riscv-slow-sequential` test job.
 - [ ] Write commit messages to reflect the changes they're about.
 - [ ] Self-review your changes to ensure they are high-quality.
 - [ ] Complete all of the above before assigning this MR to reviewers.

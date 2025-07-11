@@ -3178,7 +3178,7 @@ let test_can_stake ~kind =
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
-    ({allow_degraded; _} as scenario) =
+    ?(extra_tags = []) ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3204,7 +3204,7 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
     ~rollup_node_name:"honest"
     ~allow_degraded
     {
-      tags;
+      tags = tags @ extra_tags;
       variant = Some variant;
       description = "refutation games winning strategies";
     }
@@ -7198,9 +7198,13 @@ let register_riscv_jstz ~protocols =
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
     ~inbox_file:inbox_file_uses ;
+  (* The refutation game scenario is too long to enable in merge pipelines and currently
+   * consumes too much memory to run as a regular slow test.
+   * It can be manually run as part of the `tezt-riscv-slow-sequential` job. *)
   test_refutation_scenario
     ~kind
     ~ci_disabled:true
+    ~extra_tags:["riscv_slow_sequential"]
     ~mode:Operator
     ~challenge_window:400
     ~timeout:400
@@ -7355,7 +7359,7 @@ let register ~protocols =
     ~kernel_name:"no_parse_bad_fingerprint"
     ~internal:false ;
 
-  (* Specific riscv PVM tezt *)
+  (* Specific RISC-V PVM tezts *)
   register_riscv ~protocols:[Protocol.Alpha] ;
   register_riscv_jstz ~protocols:[Protocol.Alpha] ;
   (* Shared tezts - will be executed for each PVMs. *)
