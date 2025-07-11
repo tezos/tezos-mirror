@@ -19,13 +19,9 @@ mkdir -p %{buildroot}/usr/bin/
 install -m 0755 $HOME/rpmbuild/SPECS/binaries/octez-dal-node %{buildroot}/usr/bin/
 install -D -m 644 $HOME/rpmbuild/SPECS/manpages/octez-dal-node.1 %{buildroot}%{_mandir}/man1/octez-dal-node.1
 gzip %{buildroot}%{_mandir}/man1/octez-dal-node.1
-install -D -m 644 $HOME/rpmbuild/SPECS/octez-dal-node.service %{buildroot}/usr/lib/systemd/system/octez-dal-node.service
-install -D -m 644  $HOME/rpmbuild/SPECS/octez-dal-node.default %{buildroot}/etc/default/octez-dal-node
 %files
 /usr/bin/octez-dal-node
 %{_mandir}/man1/octez-dal-node.1*
-/usr/lib/systemd/system/octez-dal-node.service
-/etc/default/octez-dal-node
 %postun
 %post
 %preun
