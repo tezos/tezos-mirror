@@ -42,9 +42,9 @@ let equal_config _ _ = assert false
 let mem_tree ctxt key =
   Lwt.return (Tezedge.mem_tree ctxt.context (data_key key))
 
-let find_raw ctxt key = Lwt.return (Tezedge.find ctxt.context key)
+let find_raw ctxt key = Tezedge.find ctxt.context key
 
-let find ctxt key = find_raw ctxt (data_key key)
+let find ctxt key = Lwt.return (find_raw ctxt (data_key key))
 
 let find_tree ctxt key =
   Lwt.return (Tezedge.find_tree ctxt.context (data_key key))
@@ -150,12 +150,12 @@ end
 
 let protocol_key = ["protocol"]
 
-let get_protocol ctxt =
-  let open Lwt_syntax in
-  let+ v = find_raw ctxt protocol_key in
-  match v with None -> assert false | Some v -> Protocol_hash.of_bytes_exn v
+let test_chain_key = ["test_chain"]
 
-let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
+let get_protocol ctxt =
+  match find_raw ctxt protocol_key with
+  | None -> assert false
+  | Some v -> Lwt.return (Protocol_hash.of_bytes_exn v)
 
 let set_hash_version _ _ = assert false
 
@@ -181,13 +181,11 @@ let init ?patch_context dir =
   let index = Tezedge.index_init dir in
   {index; extra = {patch_context; base_path = dir}}
 
-let commit ~time ?(message = "") context =
-  Lwt.return @@ Context_hash.of_bytes_exn
-  @@ Tezedge.commit
-       context.context
-       (Time.Protocol.to_seconds time)
-       "Tezos"
-       message
+let raw_commit ~time ?(message = "") context =
+  Tezedge.commit context.context (Time.Protocol.to_seconds time) "Tezos" message
+
+let commit ~time ?message context =
+  Lwt.return @@ Context_hash.of_bytes_exn @@ raw_commit ~time ?message context
 
 let add_protocol ctxt protocol =
   let bytes = Protocol_hash.to_bytes protocol in
@@ -195,7 +193,10 @@ let add_protocol ctxt protocol =
 
 let add_test_chain ctxt v =
   let bytes = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding v in
-  add_raw ctxt ["test_chain"] bytes
+  add_raw ctxt test_chain_key bytes
+
+let fork_test_chain t ~protocol ~expiration =
+  add_test_chain t (Test_chain_status.Forking {protocol; expiration})
 
 let hash ~time ?(message = "") {context; _} =
   let hash =
@@ -235,19 +236,32 @@ let checkout_exn index context_hash =
 
 let set_protocol = add_protocol
 
-let get_test_chain _ctxt = Lwt.return Test_chain_status.Not_running
+let get_test_chain t =
+  match find_raw t test_chain_key with
+  | None -> assert false
+  | Some data -> (
+      match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+      | Error re ->
+          Format.kasprintf
+            (fun s -> Lwt.fail (Failure s))
+            "Error in Context.get_test_chain: %a"
+            Data_encoding.Binary.pp_read_error
+            re
+      | Ok r -> Lwt.return r)
 
 let add_predecessor_block_metadata_hash _ _ = assert false
 
 let add_predecessor_ops_metadata_hash _ _ = assert false
 
+let compute_testchain_genesis forked_block =
+  Block_hash.hash_bytes [Block_hash.to_bytes forked_block]
+
+let compute_testchain_chain_id genesis =
+  Chain_id.of_block_hash (Block_hash.hash_bytes [Block_hash.to_bytes genesis])
+
 let commit_test_chain_genesis _ _ = assert false
 
-let compute_testchain_genesis _ = assert false
-
 let merkle_tree_v2 _ctx _leaf_kind _key = assert false
-
-let compute_testchain_chain_id _ = assert false
 
 let export_snapshot {index = _; extra = {base_path; _}} context_hash ~path =
   Tezedge.export_snapshot base_path context_hash path
