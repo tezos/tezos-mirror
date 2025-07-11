@@ -22,13 +22,13 @@ use thiserror::Error;
 
 use crate::operation::ManagerOperationContent;
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
 pub struct CounterError {
     pub expected: Narith,
     pub found: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
 pub enum ValidityError {
     #[error("Counter in the past: {0:?}.")]
     CounterInThePast(CounterError),
@@ -64,7 +64,7 @@ pub enum ValidityError {
     FailedToIncrementCounter,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
 pub enum RevealError {
     #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
@@ -78,7 +78,7 @@ pub enum RevealError {
     FailedToWriteManager,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader, Clone)]
 #[error("{contract:?} cannot spend {amount:?} as its balance is {balance:?}")]
 pub struct BalanceTooLow {
     pub contract: Contract,
@@ -86,7 +86,7 @@ pub struct BalanceTooLow {
     pub amount: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader, Clone)]
 pub enum TransferError {
     #[error(transparent)]
     BalanceTooLow(BalanceTooLow),
@@ -145,7 +145,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Clone, Error, Debug, PartialEq, Eq, NomReader)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -155,7 +155,7 @@ pub enum ApplyOperationError {
     UnSupportedOperation(String),
 }
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq, Clone)]
 pub enum OperationError {
     #[error("Validation error: {0}")]
     Validation(#[from] ValidityError),
@@ -230,15 +230,15 @@ impl NomReader<'_> for OperationError {
 }
 
 pub trait OperationKind {
-    type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
+    type Success: PartialEq + Debug + BinWriter + Clone + for<'a> NomReader<'a>;
 }
 
 /// Empty struct to implement [OperationKind] trait for Reveal
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Reveal;
 
 /// Empty struct to implement [OperationKind] trait for Transfer
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct Transfer;
 
 impl OperationKind for Transfer {
@@ -250,12 +250,12 @@ impl OperationKind for Reveal {
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 pub struct RevealSuccess {
     pub consumed_gas: Narith,
 }
@@ -276,7 +276,7 @@ impl NomReader<'_> for Empty {
     }
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
@@ -298,7 +298,7 @@ pub struct TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -312,7 +312,7 @@ impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, BinWriter, NomReader)]
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -320,7 +320,7 @@ pub enum ContentResult<M: OperationKind> {
 
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 #[encoding(tags = "u8")]
 pub enum Balance {
     #[encoding(tag = 0)]
@@ -332,14 +332,14 @@ pub enum Balance {
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 pub enum UpdateOrigin {
     BlockApplication,
 }
 
 /// Depending of the sign of [changes], the balance is credited or debited
 /// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 pub struct BalanceUpdate {
     pub balance: Balance,
     pub changes: i64,
@@ -349,7 +349,7 @@ pub struct BalanceUpdate {
 // Inspired from `Manager_operation_result` case in 'kind contents_result type
 // from `src/proto_alpha/lib_protocol/apply_results.ml` file.
 // Still need to implement internal_results
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
 pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -358,7 +358,7 @@ pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, bytes)]
     pub internal_operation_results: Vec<u8>,
 }
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
     Transfer(OperationResult<Transfer>),

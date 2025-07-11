@@ -43,6 +43,7 @@ pub struct TransferContent {
     pub parameters: Option<Parameter>,
 }
 
+#[derive(Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
     Transfer(TransferContent),
