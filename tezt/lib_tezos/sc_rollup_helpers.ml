@@ -220,9 +220,13 @@ let merge_setup_files ?smart_rollup_installer_path ?runner ?output configs =
   let output =
     match output with
     | None ->
-        Temp.file (String.concat "_" (List.map name_of_file configs) ^ ".yaml")
+        Temp.file
+          ?runner
+          (String.concat "_" (List.map name_of_file configs) ^ ".yaml")
     | Some output -> output
   in
+  let dirname = Filename.dirname output in
+  let* () = Process.spawn ?runner "mkdir" ["-p"; dirname] |> Process.check in
   let* process =
     let smart_rollup_installer_path =
       match smart_rollup_installer_path with

@@ -798,3 +798,27 @@ module Layer1 () = struct
         "JSON file optionally describing options for the test scenario"
       ()
 end
+
+module type Tezlink = sig
+  val proxy_localhost : bool
+end
+
+module Tezlink () : Tezlink = struct
+  let section =
+    Clap.section
+      ~description:
+        "All the options related to running Tezlink sandbox scenarios onto the \
+         cloud"
+      "Tezlink"
+
+  let proxy_localhost =
+    Clap.flag
+      ~section
+      ~set_long:"proxy-localhost"
+      ~unset_long:"no-proxy-localhost"
+      ~description:
+        "All agents run on the proxy VM if the proxy mode is activated. This \
+         can be used to solve a bug with the Tezt Cloud library. This option \
+         will be removed once the bug is fixed"
+      false
+end
