@@ -15,6 +15,8 @@
 
 ### Execution changes
 
+- Supports executing Dionysus R1 (Etherlink 4.1) natively. (!18683)
+
 ### Storage changes
 
 ### Documentation changes

@@ -110,6 +110,7 @@ enum NativeKernel {
     Calypso,
     Calypso2,
     Dionysus,
+    DionysusR1,
 }
 
 impl NativeKernel {
@@ -119,6 +120,7 @@ impl NativeKernel {
             Self::Calypso => RuntimeVersion::V1,
             Self::Calypso2 => RuntimeVersion::V1,
             Self::Dionysus => RuntimeVersion::V1,
+            Self::DionysusR1 => RuntimeVersion::V1,
         }
     }
 }
@@ -131,6 +133,8 @@ const CALYPSO2_ROOT_HASH_HEX: &'static str =
     "7b42577597504d6a705cdd56e59c770125223a0ffda471d70b463a2dc2d5f84f";
 const DIONYSUS_ROOT_HASH_HEX: &'static str =
     "2214b77edf321b0ed41cc3a1028934299c4b94e0687b06e5239cc0b4eb31417f";
+const DIONYSUS_R1_ROOT_HASH_HEX: &'static str =
+    "1f533dbc6404cf6b05c8df6b6b879f96299fb0d6b661d26152ce3297bc22d550";
 
 impl NativeKernel {
     fn of_root_hash(root_hash: &ContextHash) -> Option<NativeKernel> {
@@ -142,6 +146,7 @@ impl NativeKernel {
             CALYPSO_ROOT_HASH_HEX => Some(NativeKernel::Calypso),
             CALYPSO2_ROOT_HASH_HEX => Some(NativeKernel::Calypso2),
             DIONYSUS_ROOT_HASH_HEX => Some(NativeKernel::Dionysus),
+            DIONYSUS_R1_ROOT_HASH_HEX => Some(NativeKernel::DionysusR1),
             _ => None,
         }
     }
@@ -202,6 +207,16 @@ impl Runtime for NativeRuntime {
             ("populate_delayed_inbox", NativeKernel::Dionysus) => {
                 trace!("dionysus::populate_delayed_inbox");
                 kernel_dionysus::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
+                Ok(())
+            }
+            ("kernel_run", NativeKernel::DionysusR1) => {
+                trace!("dionysus_r1::kernel_loop");
+                kernel_dionysus_r1::kernel_loop(self.mut_host());
+                Ok(())
+            }
+            ("populate_delayed_inbox", NativeKernel::DionysusR1) => {
+                trace!("dionysus_r1::populate_delayed_inbox");
+                kernel_dionysus_r1::evm_node_entrypoint::populate_delayed_inbox(self.mut_host());
                 Ok(())
             }
             (missing_entrypoint, _) => todo!("entrypoint {missing_entrypoint} not covered yet"),
