@@ -15,17 +15,7 @@ module Parameter = struct
         let open Lwt_result_syntax in
         match Configuration.gcp_key_from_string_opt value with
         | None ->
-            let* value =
-              try
-                match String.remove_prefix ~prefix:"0x" value with
-                | Some value ->
-                    let _ = Hex.show (`Hex value) in
-                    return (`Hex value)
-                | None -> raise (Invalid_argument "not prefixed by 0x")
-              with _ ->
-                failwith "%s value is not a valid hexadecimal string" value
-            in
-            let*? secret_key = Signer.secret_key_from_hex value in
+            let*? secret_key = Signer.secret_key_from_hex (`Hex value) in
             return (Signer.from_secret_key secret_key)
         | Some key ->
             Signer.from_gcp_key
