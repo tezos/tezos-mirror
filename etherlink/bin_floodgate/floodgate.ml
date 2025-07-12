@@ -281,8 +281,74 @@ let prepare_scenario ~rpc_endpoint ~scenario infos simple_gas_limit controller =
       in
       return (`ERC20 (Efunc_core.Private.a contract), gas_limit)
 
-let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
-    ~max_transaction_batch_length ~spawn_interval ~tick_interval
+let lwt_stream_iter_es f stream =
+  let open Lwt_result_syntax in
+  let rec loop () =
+    let*! elt = Lwt_stream.get stream in
+    match elt with
+    | None -> return_unit
+    | Some elt ->
+        let* () = f elt in
+        loop ()
+  in
+  loop ()
+
+let start_new_head_monitor ~ws_uri =
+  let open Lwt_result_syntax in
+  let*! ws_client =
+    Websocket_client.connect
+      ~monitoring:{ping_timeout = 60.; ping_interval = 10.}
+      Media_type.json
+      ws_uri
+  in
+  let* heads_subscription = Websocket_client.subscribe_newHeads ws_client in
+  lwt_stream_iter_es
+    (fun head ->
+      let*? block = head in
+      let*! () =
+        Floodgate_events.received_blueprint block.Ethereum_types.number
+      in
+      match block.Ethereum_types.transactions with
+      | TxHash hashes ->
+          transactions_count := !transactions_count + List.length hashes ;
+          List.iter_es Tx_queue.confirm hashes
+      | TxFull _ -> return_unit)
+    heads_subscription.stream
+
+let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
+  let open Lwt_result_syntax in
+  let* next_blueprint_number =
+    Batch.call
+      (module Rpc_encodings.Block_number)
+      ~keep_alive:true
+      ~evm_node_endpoint:relay_endpoint
+      ()
+  in
+  let* time_between_blocks =
+    Evm_services.get_time_between_blocks ~evm_node_endpoint:rpc_endpoint ()
+  in
+  Blueprints_follower.start
+    ~multichain:false
+    ~ping_tx_pool:false
+    ~time_between_blocks
+    ~evm_node_endpoint:relay_endpoint
+    ~next_blueprint_number
+    ~on_new_blueprint:(fun number blueprint ->
+      let*! () = Floodgate_events.received_blueprint number in
+      let* () =
+        match Blueprint_decoder.transaction_hashes blueprint with
+        | Ok hashes ->
+            transactions_count := !transactions_count + List.length hashes ;
+            List.iter_es Tx_queue.confirm hashes
+        | Error _ -> return_unit
+      in
+      return `Continue)
+    ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
+      return_unit)
+    ()
+
+let run ~scenario ~relay_endpoint ~rpc_endpoint ~ws_endpoint ~controller
+    ~max_active_eoa ~max_transaction_batch_length ~spawn_interval ~tick_interval
     ~base_fee_factor ~initial_balance ~txs_per_salvo
     ~elapsed_time_between_report =
   let open Lwt_result_syntax in
@@ -294,17 +360,6 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
   let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
-  let* time_between_blocks =
-    Evm_services.get_time_between_blocks ~evm_node_endpoint:rpc_endpoint ()
-  in
-  let* next_blueprint_number =
-    Batch.call
-      (module Rpc_encodings.Block_number)
-      ~keep_alive:true
-      ~evm_node_endpoint:relay_endpoint
-      ()
-  in
-
   let* simple_gas_limit =
     Network_info.get_gas_limit
       ~rpc_endpoint
@@ -313,28 +368,11 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
       ~to_:(Account.address_et controller)
       ()
   in
-
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
-    Blueprints_follower.start
-      ~multichain:false
-      ~ping_tx_pool:false
-      ~time_between_blocks
-      ~evm_node_endpoint:relay_endpoint
-      ~next_blueprint_number
-      ~on_new_blueprint:(fun number blueprint ->
-        let*! () = Floodgate_events.received_blueprint number in
-        let* () =
-          match Blueprint_decoder.transaction_hashes blueprint with
-          | Ok hashes ->
-              transactions_count := !transactions_count + List.length hashes ;
-              List.iter_es Tx_queue.confirm hashes
-          | Error _ -> return_unit
-        in
-        return `Continue)
-      ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
-        return_unit)
-      ()
+    match ws_endpoint with
+    | Some ws_uri -> start_new_head_monitor ~ws_uri
+    | None -> start_blueprint_follower ~relay_endpoint ~rpc_endpoint
   and* () = Tx_queue.beacon ~tick_interval
   and* () =
     let* token, gas_limit =
