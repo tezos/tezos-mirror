@@ -25,8 +25,8 @@ depends: [
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
-  "octez-protocol-022-PsRiotum-libs"
-  "tezos-protocol-022-PsRiotum"
+  "octez-protocol-023-PtSeouLo-libs"
+  "tezos-protocol-023-PtSeouLo"
   "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }

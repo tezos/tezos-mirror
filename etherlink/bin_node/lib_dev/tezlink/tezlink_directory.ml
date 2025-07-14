@@ -80,6 +80,7 @@ let make_contract_info contract contract_balance counter_z =
       delegate = None;
       counter = Some counter;
       script;
+      revealed = None;
     }
 
 let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
@@ -360,6 +361,8 @@ let build_block_static_directory ~l2_chain_id
                delegate = bootstrap_account.public_key_hash;
                consensus_pk = public_key;
                consensus_pkh = bootstrap_account.public_key_hash;
+               companion_pk = None;
+               companion_pkh = None;
              }
          in
          let delegate_sampler_state =

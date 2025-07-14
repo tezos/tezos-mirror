@@ -377,7 +377,7 @@ pub fn apply_operation<Host: Runtime>(
         .map_err(ApplyKernelError::BigIntError)?;
 
     let receipt = match operation.operation {
-        OperationContent::Reveal(RevealContent { pk }) => {
+        OperationContent::Reveal(RevealContent { pk, proof: _ }) => {
             let reveal_result = reveal(host, source, &mut account, &pk)?;
             let manager_result =
                 produce_operation_result(vec![src_delta, block_fees], reveal_result);
@@ -469,7 +469,7 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Reveal(RevealContent { pk }),
+            OperationContent::Reveal(RevealContent { pk, proof: None }),
         )
     }
 

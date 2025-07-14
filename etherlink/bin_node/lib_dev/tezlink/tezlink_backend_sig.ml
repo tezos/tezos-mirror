@@ -32,7 +32,7 @@ module type S = sig
     [`Main] ->
     block_param ->
     Tezos_types.Contract.t ->
-    Signature.V1.Public_key.t option tzresult Lwt.t
+    Signature.Public_key.t option tzresult Lwt.t
 
   val counter :
     [`Main] -> block_param -> Tezos_types.Contract.t -> Z.t tzresult Lwt.t

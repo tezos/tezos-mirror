@@ -114,7 +114,7 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
           (fun manager ->
             let make_account_field key value converter =
               let path_prefix =
-                manager |> Signature.V1.Public_key.hash
+                manager |> Signature.Public_key.hash
                 |> Tezos_types.Contract.of_implicit
                 |> Tezlink_durable_storage.Path.account
                 |> String.split_on_char '/' |> clean_path

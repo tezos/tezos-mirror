@@ -247,7 +247,7 @@ let evm_node_lib_dev_encoding =
 
 let evm_node_lib_dev_tezlink =
   let tezlink_target_proto =
-    List.find (fun proto -> Protocol.short_hash proto = "PsRiotum") Protocol.all
+    List.find (fun proto -> Protocol.short_hash proto = "PtSeouLo") Protocol.all
   in
   let tezlink_protocol_plugin =
     match Protocol.plugin tezlink_target_proto with
