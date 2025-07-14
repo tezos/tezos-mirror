@@ -368,23 +368,10 @@ module Tezlink_protocols = struct
       }
 end
 
-(* Copied from src/proto_alpha/lib_plugin/adaptive_issuance_services.ml. *)
-(* TODO: #7875
-   It's exposed in proto_alpha, but not in the plugin of Rio. Import when we
-   move to a protocol that exposes it. *)
 module Adaptive_issuance_services = struct
+  include Imported_protocol_plugin.Adaptive_issuance_services
   module Cycle = Protocol_types.Cycle
   module Tez = Tezos_types.Tez
-
-  type expected_rewards = {
-    cycle : Cycle.t;
-    baking_reward_fixed_portion : Tez.t;
-    baking_reward_bonus_per_slot : Tez.t;
-    attesting_reward_per_slot : Tez.t;
-    dal_attesting_reward_per_shard : Tez.t;
-    seed_nonce_revelation_tip : Tez.t;
-    vdf_revelation_tip : Tez.t;
-  }
 
   let dummy_reward i =
     {
@@ -403,66 +390,17 @@ module Adaptive_issuance_services = struct
   let dummy_rewards current_cycle =
     List.init ~when_negative_length:[] (consensus_rights_delay + 1) (fun i ->
         dummy_reward Cycle.(add (of_int32_exn current_cycle) i))
-
-  let expected_rewards_encoding : expected_rewards Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {
-             cycle;
-             baking_reward_fixed_portion;
-             baking_reward_bonus_per_slot;
-             attesting_reward_per_slot;
-             dal_attesting_reward_per_shard;
-             seed_nonce_revelation_tip;
-             vdf_revelation_tip;
-           } ->
-        ( cycle,
-          baking_reward_fixed_portion,
-          baking_reward_bonus_per_slot,
-          attesting_reward_per_slot,
-          seed_nonce_revelation_tip,
-          vdf_revelation_tip,
-          dal_attesting_reward_per_shard ))
-      (fun ( cycle,
-             baking_reward_fixed_portion,
-             baking_reward_bonus_per_slot,
-             attesting_reward_per_slot,
-             seed_nonce_revelation_tip,
-             vdf_revelation_tip,
-             dal_attesting_reward_per_shard ) ->
-        {
-          cycle;
-          baking_reward_fixed_portion;
-          baking_reward_bonus_per_slot;
-          attesting_reward_per_slot;
-          dal_attesting_reward_per_shard;
-          seed_nonce_revelation_tip;
-          vdf_revelation_tip;
-        })
-      (obj7
-         (req "cycle" Cycle.encoding)
-         (req "baking_reward_fixed_portion" Tez.encoding)
-         (req "baking_reward_bonus_per_slot" Tez.encoding)
-         (req "attesting_reward_per_slot" Tez.encoding)
-         (req "seed_nonce_revelation_tip" Tez.encoding)
-         (req "vdf_revelation_tip" Tez.encoding)
-         (req "dal_attesting_reward_per_shard" Tez.encoding))
-
-  let expected_issuance_path =
-    let open Tezos_rpc in
-    (Path.(open_root / "context" / "issuance" / "expected_issuance")
-      : tezlink_rpc_context Path.context)
-
-  let expected_issuance =
-    let open Tezos_rpc in
-    Service.get_service
-      ~description:
-        "Returns the expected issued tez for the provided block and the next \
-         'consensus_rights_delay' cycles (in mutez)"
-      ~query:Query.empty
-      ~output:(Data_encoding.list expected_rewards_encoding)
-      expected_issuance_path
 end
+
+let expected_issuance :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context,
+      unit,
+      unit,
+      Adaptive_issuance_services.expected_rewards list )
+    Tezos_rpc.Service.t =
+  import_service Adaptive_issuance_services.S.expected_issuance
 
 (* Raw services normally represents the context of the Tezos blockchain.
    But because context in Tezlink is different, we need to mock some rpcs

@@ -302,12 +302,13 @@ let build_block_static_directory ~l2_chain_id
          Backend.block_hash chain block)
        ~convert_output:ethereum_to_tezos_block_hash
   |> register
-       ~service:Adaptive_issuance_services.expected_issuance
+       ~service:Tezos_services.expected_issuance
        ~impl:(fun {block; chain} () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* level = Backend.current_level chain block ~offset:0l in
-         Lwt.return @@ Adaptive_issuance_services.dummy_rewards level.cycle)
+         Lwt.return
+         @@ Tezos_services.Adaptive_issuance_services.dummy_rewards level.cycle)
   |> register
      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
      (* We need a proper implementation *)
