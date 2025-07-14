@@ -368,22 +368,6 @@ module Tezlink_protocols = struct
       }
 end
 
-(* Copied from src/proto_alpha/lib_protocol/constants_services.ml. *)
-(* TODO: #7875
-   Import from the protocol once it is exposed instead of copying it here. *)
-module Constants_services = struct
-  let custom_root : tezlink_rpc_context Tezos_rpc.Path.context =
-    Tezos_rpc.Path.(open_root / "context" / "constants")
-
-  let all =
-    let open Tezos_rpc in
-    Service.get_service
-      ~description:"All constants"
-      ~query:Query.empty
-      ~output:Alpha_context.Constants.encoding
-      custom_root
-end
-
 (* Copied from src/proto_alpha/lib_plugin/adaptive_issuance_services.ml. *)
 (* TODO: #7875
    It's exposed in proto_alpha, but not in the plugin of Rio. Import when we
@@ -584,7 +568,7 @@ let constants :
       unit,
       Protocol_types.Alpha_context.Constants.t )
     Tezos_rpc.Service.t =
-  import_service Constants_services.all
+  import_service Imported_protocol_plugin.Constants_services.S.all
 
 let hash :
     ( [`GET],
