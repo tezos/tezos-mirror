@@ -66,6 +66,8 @@ Run the following commands:
    by this project. This can be useful if you plan to push docker
    images without tezt cloud.
 
+8. `terraform  '-chdir=tezt/lib_cloud/terraform/vm' init`: For initializing the `terraform` configuration. TODO: this should already be part of the scripts run by Tezt-cloud ([#8024](https://gitlab.com/tezos/tezos/-/issues/8024)).
+
 # Tezt cloud variable
 
 Any time you use the Tezt cloud library, a namespace for your
