@@ -100,6 +100,33 @@ module Stage = struct
   let index (Stage {name = _; index}) = index
 end
 
+(* Define [stages:]
+
+   The "manual" stage exists to fix a UI problem that occurs when mixing
+   manual and non-manual jobs. *)
+module Stages = struct
+  let start = Stage.register "start"
+
+  (* All automatic image creation is done in the stage [images]. *)
+  let images = Stage.register "images"
+
+  let sanity = Stage.register "sanity"
+
+  let build = Stage.register "build"
+
+  let test = Stage.register "test"
+
+  let test_coverage = Stage.register "test_coverage"
+
+  let packaging = Stage.register "packaging"
+
+  let publish = Stage.register "publish"
+
+  let publishing_tests = Stage.register "publishing_tests"
+
+  let manual = Stage.register "manual"
+end
+
 let templates_to_config (templates : Gitlab_ci.Types.template list) =
   match templates with
   | [] -> [] (* empty includes are forbidden *)
@@ -1031,7 +1058,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
     template;
   }
 
-let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
+let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__
     Pipeline.
       {
         name = child_pipeline_name;
@@ -1052,7 +1079,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       ?needs
       ?inherit_
       ?rules
-      ~stage:(Stage.name stage)
+      ~stage:(Stage.name Stages.start)
       ~variables:[("PIPELINE_TYPE", child_pipeline_name)]
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
@@ -1061,7 +1088,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
     job = Trigger_job trigger_job;
     description;
     source_position = __POS__;
-    stage;
+    stage = Stages.start;
     image_builders = [];
     template = None;
   }
@@ -1302,33 +1329,6 @@ let append_after_script script tezos_job =
 let with_interruptible value tezos_job =
   map_non_trigger_job tezos_job @@ fun job ->
   {job with interruptible = Some value}
-
-(* Define [stages:]
-
-   The "manual" stage exists to fix a UI problem that occurs when mixing
-   manual and non-manual jobs. *)
-module Stages = struct
-  let start = Stage.register "start"
-
-  (* All automatic image creation is done in the stage [images]. *)
-  let images = Stage.register "images"
-
-  let sanity = Stage.register "sanity"
-
-  let build = Stage.register "build"
-
-  let test = Stage.register "test"
-
-  let test_coverage = Stage.register "test_coverage"
-
-  let packaging = Stage.register "packaging"
-
-  let publish = Stage.register "publish"
-
-  let publishing_tests = Stage.register "publishing_tests"
-
-  let manual = Stage.register "manual"
-end
 
 (* Register external images.
 

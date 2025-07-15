@@ -931,7 +931,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_debian_packages ())
-        ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         Debian_repository.child_pipeline_partial_auto
     in
@@ -939,7 +938,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~dependencies:(Dependent [])
-        ~stage:Stages.test
         Debian_repository.child_pipeline_full
     in
 
@@ -948,7 +946,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_rpm_packages ())
-        ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         Rpm_repository.child_pipeline_partial_auto
     in
@@ -956,7 +953,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~dependencies:(Dependent [])
-        ~stage:Stages.test
         Rpm_repository.child_pipeline_full
     in
 
@@ -964,7 +960,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~stage:Stages.test
         ~dependencies:dependencies_needs_start
         Homebrew.child_pipeline_full_auto
     in
@@ -972,7 +967,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
-        ~stage:Stages.test
         ~dependencies:(Dependent [])
         Homebrew.child_pipeline_full
     in
@@ -981,7 +975,6 @@ let jobs pipeline_type =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_base_images ())
-        ~stage:Stages.images
         ~dependencies:(Dependent [])
         Base_images.child_pipeline
     in
@@ -2081,7 +2074,6 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
-        ~stage:Stages.manual
         Debian_repository.child_pipeline_partial
     in
     let job_rpm_repository_trigger_partial : tezos_job =
@@ -2092,7 +2084,6 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
-        ~stage:Stages.manual
         Rpm_repository.child_pipeline_partial
     in
     let job_homebrew_repository_trigger : tezos_job =
@@ -2102,14 +2093,12 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~dependencies:(Dependent [])
-        ~stage:Stages.manual
         Homebrew.child_pipeline_full
     in
     let job_base_images_trigger =
       trigger_job
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
-        ~stage:Stages.manual
         ~dependencies:(Dependent [])
         Base_images.child_pipeline
     in

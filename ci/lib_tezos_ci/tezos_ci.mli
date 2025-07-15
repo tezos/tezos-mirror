@@ -469,13 +469,15 @@ val job :
 
 (** Define a trigger job for a child pipeline.
 
-    The trigger job will be named [trigger:CHILD_PIPELINE_NAME]. *)
+    The trigger job will be named [trigger:CHILD_PIPELINE_NAME].
+
+    Trigger jobs are by construction in the [Stages.start] stage.
+ *)
 val trigger_job :
   ?dependencies:dependencies ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?description:string ->
   __POS__:string * int * int * int ->
-  stage:Stage.t ->
   Pipeline.child_pipeline ->
   tezos_job
 
