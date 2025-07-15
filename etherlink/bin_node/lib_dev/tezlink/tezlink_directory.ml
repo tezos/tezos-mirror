@@ -110,6 +110,7 @@ module type HEADER = sig
 
   val tezlink_block_to_block_info :
     l2_chain_id:L2_types.chain_id ->
+    (module Tezlink_backend_sig.S) ->
     Tezos_types.level
     * Tezos_shell_services.Block_services.version
     * [`Main]
@@ -178,7 +179,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
           operation_list_quota = [];
         }
 
-  let tezlink_block_to_block_info ~l2_chain_id
+  let tezlink_block_to_block_info ~l2_chain_id _backend
       (level_info, version, chain, block) =
     let open Result_syntax in
     let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
@@ -418,7 +419,10 @@ let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
          let* tezlink_block = Backend.block chain block in
          let* level = Backend.current_level chain block ~offset:0l in
          Lwt_result_syntax.return (level, q#version, chain, tezlink_block))
-       ~convert_output:(Block_header.tezlink_block_to_block_info ~l2_chain_id)
+       ~convert_output:
+         (Block_header.tezlink_block_to_block_info
+            ~l2_chain_id
+            (module Backend))
 
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
