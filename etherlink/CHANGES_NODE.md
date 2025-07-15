@@ -14,6 +14,9 @@
 
 ### Execution changes
 
+- Forces the installation of the full kernel on new data directory creation.
+  (!18709)
+
 ### Storage changes
 
 ### Documentation changes

@@ -1679,6 +1679,43 @@ module State = struct
             return (evm_state, context)
           else
             let* evm_state = Evm_state.init ~kernel in
+            (* By executing the kernel with a minimal inbox, we preemptively
+               setup Etherlink (in case an installer is used). *)
+            let config =
+              Wasm_debugger.config
+                ~preimage_directory:configuration.kernel_execution.preimages
+                ?preimage_endpoint:
+                  configuration.kernel_execution.preimages_endpoint
+                ~kernel_debug:true
+                ~destination:smart_rollup_address
+                ()
+            in
+            (* We write the expected sequencer in the state ahead of time.
+               This is necessary to support the sandbox mode, which is
+               typically not set up with an installer and therefore would
+               execute this first call in proxy mode (leading to an unwanted
+               block creation).
+
+               For production setup, the installer will rewrite this value. *)
+            let* evm_state =
+              match signer with
+              | Some signer ->
+                  let* sequencer = Signer.public_key signer in
+                  Lwt_result.ok
+                  @@ Evm_state.modify
+                       ~key:Durable_storage_path.sequencer_key
+                       ~value:(Signature.Public_key.to_b58check sequencer)
+                       evm_state
+              | None -> return evm_state
+            in
+            let* evm_state =
+              Evm_state.execute
+                ~data_dir
+                ~config
+                ~native_execution:false
+                evm_state
+                []
+            in
             let (Qty next) = next_blueprint_number in
             let* context = commit conn context evm_state (Qty Z.(pred next)) in
             return (evm_state, context)
