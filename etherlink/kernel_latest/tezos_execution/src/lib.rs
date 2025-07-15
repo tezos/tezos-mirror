@@ -293,12 +293,10 @@ fn apply_balance_changes(
     dest_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), ApplyKernelError> {
+    src_account.set_balance(host, &new_src_balance.into())?;
     let dest_balance = dest_account.balance(host)?.0;
     let new_dest_balance = &dest_balance + amount;
-
-    src_account.set_balance(host, &new_src_balance.into())?;
     dest_account.set_balance(host, &new_dest_balance.into())?;
-
     Ok(())
 }
 
@@ -921,6 +919,74 @@ mod tests {
         // Verify that source and destination balances changed
         assert_eq!(source.balance(&host).unwrap(), 20_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    // Bootstrap 1 successfully transfers 30 mutez to itself
+    #[test]
+    fn apply_successful_self_transfer() {
+        let mut host = MockKernelHost::default();
+
+        let src = PublicKeyHash::from_b58check(BOOTSTRAP_1)
+            .expect("PublicKeyHash b58 conversion should have succeeded");
+
+        let dest = src.clone();
+
+        // Setup account with 50 mutez in its balance
+        let source = init_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src,
+            30_u64.into(),
+            Contract::Implicit(dest),
+            None,
+        );
+
+        let receipt = apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation.content.into(),
+        )
+        .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![],
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                storage: None,
+                lazy_storage_diff: None,
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                        ),
+                        changes: -30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(BOOTSTRAP_1).unwrap(),
+                        ),
+                        changes: 30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                ticket_receipt: vec![],
+                originated_contracts: vec![],
+                consumed_gas: 0_u64.into(),
+                storage_size: 0_u64.into(),
+                paid_storage_size_diff: 0_u64.into(),
+                allocated_destination_contract: true,
+            })),
+            internal_operation_results: vec![],
+        });
+
+        // Verify that balance did not change
+        assert_eq!(source.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
     }
