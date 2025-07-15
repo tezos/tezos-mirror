@@ -46,6 +46,11 @@ type code_verification_pipeline =
   | Schedule_extended_test
   | Merge_train
 
+let code_verification_pipeline_name = function
+  | Before_merging -> "before_merging"
+  | Schedule_extended_test -> "schedule_extended_test"
+  | Merge_train -> "merge_train"
+
 (** Jobs testing the installability of the Octez opam packages.
 
     The opam packages are split into two {i groups}: those installing
@@ -360,6 +365,20 @@ let jobs pipeline_type =
           before_merging job_start
         in
         ([job_start], make_dependencies)
+  in
+
+  (* Used in trigger job definitions. For code verification pipelines,
+     add type of parent pipeline. This definition shadows
+     [Tezos_ci.trigger_job]. *)
+  let trigger_job ~__POS__ ?rules ?dependencies ?description child_pipeline_path
+      =
+    trigger_job
+      ~__POS__
+      ?rules
+      ?dependencies
+      ?description
+      ~parent_pipeline_name:(code_verification_pipeline_name pipeline_type)
+      child_pipeline_path
   in
   (* Sanity jobs *)
   let sanity =
