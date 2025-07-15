@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos-evm-logging-dionysus-r1"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+num-traits.workspace = true
+num-derive.workspace = true
+tezos-smart-rollup-debug.workspace = true
+
+[features]
+default = ["alloc"]
+alloc = []
+debug = []
+benchmark = []

@@ -1829,6 +1829,41 @@ dependencies = [
 ]
 
 [[package]]
+name = "evm-execution-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
+ "aurora-engine-modexp",
+ "const-decoder",
+ "enum_dispatch",
+ "evm",
+ "hex",
+ "libsecp256k1",
+ "num-bigint",
+ "num-traits",
+ "primitive-types 0.12.2",
+ "ripemd",
+ "rlp",
+ "sha2 0.10.9",
+ "sha3",
+ "substrate-bn",
+ "tezos-evm-logging-dionysus-r1",
+ "tezos-evm-runtime-dionysus-r1",
+ "tezos-indexable-storage-dionysus-r1",
+ "tezos-smart-rollup-core 0.2.2",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-encoding 0.2.2",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-smart-rollup-storage",
+ "tezos-storage-dionysus-r1",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
+ "tezos_ethereum_dionysus_r1",
+ "thiserror",
+]
+
+[[package]]
 name = "evm-gasometer"
 version = "0.39.0"
 dependencies = [
@@ -1991,6 +2026,45 @@ dependencies = [
  "tezos_data_encoding 0.6.0",
  "tezos_ethereum_dionysus",
  "tezos_tezlink_dionysus",
+ "thiserror",
+]
+
+[[package]]
+name = "evm_kernel_dionysus_r1"
+version = "0.1.0"
+dependencies = [
+ "alloy-sol-types",
+ "anyhow",
+ "bytes",
+ "ethbloom",
+ "ethereum",
+ "evm",
+ "evm-execution-dionysus-r1",
+ "hex",
+ "libsecp256k1",
+ "num-derive",
+ "num-traits",
+ "primitive-types 0.12.2",
+ "rlp",
+ "sha3",
+ "softfloat",
+ "tezos-evm-logging-dionysus-r1",
+ "tezos-evm-runtime-dionysus-r1",
+ "tezos-execution-dionysus-r1",
+ "tezos-indexable-storage-dionysus-r1",
+ "tezos-smart-rollup",
+ "tezos-smart-rollup-core 0.2.2",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-encoding 0.2.2",
+ "tezos-smart-rollup-entrypoint",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-smart-rollup-installer-config",
+ "tezos-smart-rollup-storage",
+ "tezos-storage-dionysus-r1",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
+ "tezos_ethereum_dionysus_r1",
+ "tezos_tezlink_dionysus_r1",
  "thiserror",
 ]
 
@@ -3351,6 +3425,7 @@ dependencies = [
  "evm_kernel_calypso",
  "evm_kernel_calypso2",
  "evm_kernel_dionysus",
+ "evm_kernel_dionysus_r1",
  "hex",
  "librustzcash",
  "log",
@@ -3361,6 +3436,7 @@ dependencies = [
  "tezos-evm-runtime-calypso",
  "tezos-evm-runtime-calypso2",
  "tezos-evm-runtime-dionysus",
+ "tezos-evm-runtime-dionysus-r1",
  "tezos-smart-rollup-core 0.2.2",
  "tezos-smart-rollup-host 0.2.2",
  "tezos_crypto_rs 0.6.0",
@@ -4861,6 +4937,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-evm-logging-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "num-derive",
+ "num-traits",
+ "tezos-smart-rollup-debug",
+]
+
+[[package]]
 name = "tezos-evm-runtime-bifrost"
 version = "0.1.0"
 dependencies = [
@@ -4913,6 +4998,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-evm-runtime-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "sha3",
+ "tezos-evm-logging-dionysus-r1",
+ "tezos-smart-rollup-core 0.2.2",
+ "tezos-smart-rollup-debug",
+ "tezos-smart-rollup-encoding 0.2.2",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-smart-rollup-mock 0.2.2",
+]
+
+[[package]]
 name = "tezos-execution-dionysus"
 version = "0.1.0"
 dependencies = [
@@ -4922,6 +5020,20 @@ dependencies = [
  "tezos-smart-rollup",
  "tezos-smart-rollup-host 0.2.2",
  "tezos-storage-dionysus",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
+]
+
+[[package]]
+name = "tezos-execution-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "primitive-types 0.12.2",
+ "tezos-evm-runtime-dionysus-r1",
+ "tezos-smart-rollup",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-storage-dionysus-r1",
  "tezos_crypto_rs 0.6.0",
  "tezos_data_encoding 0.6.0",
 ]
@@ -4979,6 +5091,20 @@ dependencies = [
  "tezos-smart-rollup-mock 0.2.2",
  "tezos-smart-rollup-storage",
  "tezos-storage-dionysus",
+ "thiserror",
+]
+
+[[package]]
+name = "tezos-indexable-storage-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "rlp",
+ "tezos-evm-logging-dionysus-r1",
+ "tezos-evm-runtime-dionysus-r1",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-smart-rollup-mock 0.2.2",
+ "tezos-smart-rollup-storage",
+ "tezos-storage-dionysus-r1",
  "thiserror",
 ]
 
@@ -5282,6 +5408,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos-storage-dionysus-r1"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "hex",
+ "primitive-types 0.12.2",
+ "rlp",
+ "sha3",
+ "tezos-evm-runtime-dionysus-r1",
+ "tezos-smart-rollup-host 0.2.2",
+ "tezos-smart-rollup-storage",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_ethereum_dionysus_r1",
+ "thiserror",
+]
+
+[[package]]
 name = "tezos_crypto_rs"
 version = "0.6.0"
 dependencies = [
@@ -5461,7 +5604,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "tezos_ethereum_dionysus_r1"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "ethbloom",
+ "ethereum",
+ "hex",
+ "libsecp256k1",
+ "primitive-types 0.12.2",
+ "rlp",
+ "sha3",
+ "tezos-smart-rollup-encoding 0.2.2",
+ "tezos_crypto_rs 0.6.0",
+ "thiserror",
+]
+
+[[package]]
 name = "tezos_tezlink_dionysus"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "nom 7.1.3",
+ "num-bigint",
+ "primitive-types 0.12.2",
+ "tezos-smart-rollup",
+ "tezos_crypto_rs 0.6.0",
+ "tezos_data_encoding 0.6.0",
+]
+
+[[package]]
+name = "tezos_tezlink_dionysus_r1"
 version = "0.1.0"
 dependencies = [
  "hex",

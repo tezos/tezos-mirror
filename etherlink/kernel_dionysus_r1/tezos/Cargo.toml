@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = "tezos_tezlink_dionysus_r1"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+tezos_crypto_rs.workspace = true
+hex.workspace = true
+
+primitive-types.workspace = true
+tezos-smart-rollup.workspace = true
+num-bigint.workspace = true
+tezos_data_encoding.workspace = true
+nom.workspace = true
