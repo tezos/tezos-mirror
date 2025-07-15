@@ -269,7 +269,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
     trigger_job
       ~__POS__
       ~dependencies:(Dependent [])
-      ~stage:Stages.start
+      ~stage:Stages.build
       monitoring_child_pipeline
   in
   [

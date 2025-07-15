@@ -1529,7 +1529,7 @@ select_tezts:
     when: always
 
 trigger:debian_repository_partial_auto:
-  stage: start
+  stage: test
   variables:
     PIPELINE_TYPE: debian_repository_partial_auto
   rules:
@@ -1556,7 +1556,7 @@ trigger:debian_repository_partial_auto:
     strategy: depend
 
 trigger:rpm_repository_partial_auto:
-  stage: start
+  stage: test
   variables:
     PIPELINE_TYPE: rpm_repository_partial_auto
   rules:
@@ -1580,7 +1580,7 @@ trigger:rpm_repository_partial_auto:
     strategy: depend
 
 trigger:homebrew_auto:
-  stage: start
+  stage: test
   variables:
     PIPELINE_TYPE: homebrew_auto
   rules:
@@ -4338,7 +4338,7 @@ oc.script.docker_verify_image_amd64:
     IMAGE_ARCH_PREFIX: amd64_
 
 trigger:base_images:
-  stage: start
+  stage: manual
   variables:
     PIPELINE_TYPE: base_images
   rules:
