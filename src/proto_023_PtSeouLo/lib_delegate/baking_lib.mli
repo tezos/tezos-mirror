@@ -81,5 +81,6 @@ val repropose :
   ?force:bool ->
   ?force_round:Round.t ->
   ?minimal_timestamp:bool ->
+  ?force_reproposal:bool ->
   Baking_state_types.Key.t list ->
   unit tzresult Lwt.t
