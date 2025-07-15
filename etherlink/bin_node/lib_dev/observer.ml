@@ -218,11 +218,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       init_from_snapshot
   in
 
-  let* l2_chain_id, Ex_chain_family chain_family =
-    match config.experimental_features.l2_chains with
-    | None -> return (None, L2_types.Ex_chain_family EVM)
-    | Some [l2_chain] -> return (Some l2_chain.chain_id, l2_chain.chain_family)
-    | _ -> tzfail Node_error.Unexpected_multichain
+  let (Ex_chain_family chain_family) =
+    Configuration.retrieve_chain_family
+      ~l2_chains:config.experimental_features.l2_chains
   in
 
   let*? start_tx_container, tx_container, ping_tx_pool =
@@ -276,7 +274,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   (* Check that the multichain configuration is consistent with the
      kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* _l2_chain_id, _chain_family =
+  let* l2_chain_id, _chain_family =
     let (module Backend) = observer_backend in
     Backend.single_chain_id_and_family ~config ~enable_multichain
   in
