@@ -285,7 +285,7 @@ module State_transitions = struct
     declare_1
       ~section
       ~name:"new_forge_event"
-      ~level:Notice
+      ~level:Info
       ~msg:"received new forge event: {event}"
       ~pp1:pp_forge_event
       ("event", forge_event_encoding_for_logging__cannot_decode)
