@@ -117,6 +117,7 @@ module type HEADER = sig
     * L2_types.Tezos_block.t ->
     (Tezos_shell_services.Block_services.version * Block_services.block_info)
     tzresult
+    Lwt.t
 end
 
 module Make_block_header (Block_services : BLOCK_SERVICES) :
@@ -181,12 +182,12 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
 
   let tezlink_block_to_block_info ~l2_chain_id _backend
       (level_info, version, chain, block) =
-    let open Result_syntax in
-    let* chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
-    let* hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
-    let* header = tezlink_block_to_raw_block_header ~chain_id block in
-    let* metadata = make_metadata ~level_info in
-    let* operations =
+    let open Lwt_result_syntax in
+    let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
+    let*? hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
+    let*? header = tezlink_block_to_raw_block_header ~chain_id block in
+    let*? metadata = make_metadata ~level_info in
+    let*? operations =
       Block_services.deserialize_operations ~chain_id block.operations
     in
     let block_info : Block_services.block_info =
@@ -411,18 +412,20 @@ let register_block_info ~l2_chain_id (module Backend : Tezlink_backend_sig.S)
     (module Block_header : HEADER) base_dir =
   let open Lwt_result_syntax in
   base_dir
-  |> register_with_conversion
+  |> register
        ~service:(import_service Block_header.Block_services.S.info)
        ~impl:(fun {block; chain} q () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* tezlink_block = Backend.block chain block in
          let* level = Backend.current_level chain block ~offset:0l in
-         Lwt_result_syntax.return (level, q#version, chain, tezlink_block))
-       ~convert_output:
-         (Block_header.tezlink_block_to_block_info
-            ~l2_chain_id
-            (module Backend))
+         let* block_info =
+           Block_header.tezlink_block_to_block_info
+             ~l2_chain_id
+             (module Backend)
+             (level, q#version, chain, tezlink_block)
+         in
+         return block_info)
 
 (** We currently support a single target protocol version but we need to handle early blocks (blocks at
     levels 0 and 1) specifically because TzKT expects the `protocol` and `next_protocol` fields of the
