@@ -169,7 +169,7 @@ depends: [
   "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}
   "ocaml-syntax-shims" {= "1.0.0"}
-  "ocaml-version" {= "4.0.0"}
+  "ocaml-version" {= "4.0.1"}
   "ocamlbuild" {= "0.16.1"}
   "ocamlfind" {= "1.9.8"}
   "ocamlformat" {= "0.26.2"}
