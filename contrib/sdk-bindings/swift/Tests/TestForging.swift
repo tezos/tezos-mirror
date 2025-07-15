@@ -10,6 +10,7 @@ class TestForging: XCTestCase {
     public static var allTests = [
       ("messageForging", messageForging),
       ("revealForging", revealForging),
+      ("transactionForging", transactionForging),
       ("originationForging", originationForging),
       ("delegationForging", delegationForging),
     ]
@@ -59,6 +60,48 @@ class TestForging: XCTestCase {
           0x42, 0x00
         ]
         XCTAssertEqual(Array(rawReveal), expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p",
+      "fee": "0",
+      "counter": "14",
+      "gas_limit": "0",
+      "storage_limit": "0",
+      "amount": "0",
+      "destination": "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p",
+      "parameters": {
+        "entrypoint": "finalize_unstake",
+        "value": { "prim": "Unit" }
+      }
+    }'
+    */
+    func transactionForging() {
+        let source = try! PublicKeyHash.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
+        let destination = try! Contract.fromB58check(data: "tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p")
+        let entrypoint = try! Entrypoint(name: "finalize_unstake")
+        let transaction = Transaction(
+          source: source,
+          fee: 0,
+          counter: 14,
+          gasLimit: 0,
+          storageLimit: 0,
+          amount: 0,
+          destination: destination,
+          entrypoint: entrypoint
+        )
+        let rawTransaction = try! transaction.forge()
+        let expectedBytes: [UInt8] = [
+          0x6c, 0x01, 0x58, 0x5a, 0x32, 0x14, 0x26, 0xfb, 0xb1, 0x30,
+          0x3d, 0x16, 0xb5, 0x69, 0xe5, 0x71, 0x10, 0x9e, 0xb6, 0x8d,
+          0x8c, 0x1b, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x01, 0x58,
+          0x5a, 0x32, 0x14, 0x26, 0xfb, 0xb1, 0x30, 0x3d, 0x16, 0xb5,
+          0x69, 0xe5, 0x71, 0x10, 0x9e, 0xb6, 0x8d, 0x8c, 0x1b, 0xff,
+          0x08, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0b
+        ]
+        XCTAssertEqual(Array(rawTransaction), expectedBytes)
     }
 
     /*

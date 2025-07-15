@@ -311,7 +311,8 @@ pub mod operation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::{BlsSignature, PublicKey, PublicKeyHash};
+    use crate::entrypoint::Entrypoint;
+    use crate::keys::{BlsSignature, Contract, PublicKey, PublicKeyHash};
     use operation::*;
 
     // All messages bytes were generated using `octez-codec encode "alpha.script.expr" from '{ "string": "$MSG" }'`
@@ -429,6 +430,143 @@ mod tests {
         assert_eq!(
             bytes, raw_reveal,
             "Reveal must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U",
+      "fee": "8318",
+      "counter": "72014",
+      "gas_limit": "145000",
+      "storage_limit": "1204",
+      "amount": "34",
+      "destination": "KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4",
+      "parameters": {
+        "entrypoint": "foo",
+        "value": {
+          "prim": "Pair", "args": [
+            { "int": "1" },
+            { "string": "a" }
+          ]
+        }
+      }
+    }'
+    */
+    #[test]
+    fn transaction_forging() {
+        let source = PublicKeyHash::from_b58check("tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U").unwrap();
+        let (fee, counter, gas_limit, storage_limit, amount) = (8318, 72014, 145000, 1204, 34);
+        let destination = Contract::from_b58check("KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4").unwrap();
+        let entrypoint = Entrypoint::new("foo").unwrap();
+        let value = hex::decode("07070001010000000161").unwrap();
+        let transaction = Transaction::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            amount,
+            &destination,
+            Some(Arc::new(entrypoint)),
+            // octez-client convert data 'Pair 1 "a"' from Michelson to binary
+            Some(value),
+        );
+        let raw_transaction = transaction.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            transaction
+        ));
+
+        let bytes = hex::decode("6c00760f1b125362fdf15f0e1093b1c6555b2dfdb8e4fe40ceb204e8ec08b409220151f9612eb937431bcb785af89f3aae78d4e03f8200ffff03666f6f0000000a07070001010000000161").unwrap();
+        assert_eq!(
+            bytes, raw_transaction,
+            "Transaction must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz2WU9XW86EdgVQZrbPphjUZiRfXXssY9wEP",
+      "fee": "332",
+      "counter": "24",
+      "gas_limit": "4631",
+      "storage_limit": "11",
+      "amount": "0",
+      "destination": "KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT",
+      "parameters": {
+        "entrypoint": "stake",
+        "value": { "prim": "Unit" }
+      }
+    }'
+    */
+    #[test]
+    fn transaction_stake_forging() {
+        let source = PublicKeyHash::from_b58check("tz2WU9XW86EdgVQZrbPphjUZiRfXXssY9wEP").unwrap();
+        let (fee, counter, gas_limit, storage_limit, amount) = (332, 24, 4631, 11, 0);
+        let destination = Contract::from_b58check("KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT").unwrap();
+        let entrypoint = Entrypoint::new("stake").unwrap();
+        let transaction = Transaction::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            amount,
+            &destination,
+            Some(Arc::new(entrypoint)),
+            None,
+        );
+        let raw_transaction = transaction.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            transaction
+        ));
+
+        let bytes = hex::decode("6c01f3023970264e14502daa1db4324527bc464fe0fdcc021897240b0001bfee8f130c31aeab88080bf2265b2a7980da5d6800ff0600000002030b").unwrap();
+        assert_eq!(
+            bytes, raw_transaction,
+            "Transaction must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif",
+      "fee": "99",
+      "counter": "1401",
+      "gas_limit": "1",
+      "storage_limit": "0",
+      "amount": "200",
+      "destination": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF"
+    }'
+    */
+    #[test]
+    fn transaction_transfer_forging() {
+        let source = PublicKeyHash::from_b58check("tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif").unwrap();
+        let (fee, counter, gas_limit, storage_limit, amount) = (99, 1401, 1, 0, 200);
+        let destination = Contract::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
+        let transaction = Transaction::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            amount,
+            &destination,
+            None,
+            None,
+        );
+        let raw_transaction = transaction.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            transaction
+        ));
+
+        let bytes = hex::decode("6c00499e3772f0fd50e62d325ad12ca9e54fde8b4f1f63f90a0100c8010003ae7b7d713977a27ec643969f0c2e665ba9ad9aa100").unwrap();
+        assert_eq!(
+            bytes, raw_transaction,
+            "Transaction must be forged into the expected bytes"
         );
     }
 

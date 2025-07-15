@@ -5,11 +5,13 @@
 from tezos import (
     forge_message,
     Reveal,
+    Transaction,
     Origination,
     Delegation,
     PublicKey,
     PublicKeyHash,
     BlsSignature,
+    Contract,
 )
 
 def test_message_forging():
@@ -51,6 +53,35 @@ def test_reveal_forging():
     raw_reveal = reveal.forge()
     expected_bytes = bytes.fromhex('6b035d4586d123b894f9d7cd1b28fff62e6b4bb8dd1103ce05df1c1903883927221f890dd4873e2296498a888d79b8020fe15b47c52547da05e73197fa21a44d87ef2ac7e69e91238031d9e531ff00000060a592dd097f55fa1df1598f577e8005413e822489bba23114cd9ed8bd2dd66891ecd52ec0ca3ff250badb9b3261f36ee9127847540ec6600e38013757c07ef249f6cf6270519a101bf143e232a1e9390952e8699a16999ef21efa267aac2e54cc')
     assert raw_reveal == expected_bytes
+
+
+def test_transaction_forging():
+    """
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8",
+      "fee": "1000000000",
+      "counter": "123456",
+      "gas_limit": "0",
+      "storage_limit": "0",
+      "amount": "1",
+      "destination": "tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn"
+    }'
+    """
+    source = PublicKeyHash.from_b58check("tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8")
+    destination = Contract.from_b58check("tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn")
+    transaction = Transaction(
+        source=source,
+        fee=1000000000,
+        counter=123456,
+        gas_limit=0,
+        storage_limit=0,
+        amount=1,
+        destination=destination,
+    )
+    raw_transaction = transaction.forge()
+    expected_bytes = bytes.fromhex('6c023f3b21e54e98db3845a2a5033d96877f7f9cea878094ebdc03c0c4070000010002ebfd1371b542831b4be730161d08885c5312e44200')
+    assert raw_transaction == expected_bytes
 
 
 def test_origination_forging():

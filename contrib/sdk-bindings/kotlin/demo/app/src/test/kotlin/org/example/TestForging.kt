@@ -45,6 +45,44 @@ class ForgingTest {
 
     /*
     octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
+      "fee": "30",
+      "counter": "20",
+      "gas_limit": "54",
+      "storage_limit": "45",
+      "amount": "0",
+      "destination": "KT1WtTP1yGNfJLvBSubDV1H5z1zsKKXzAyGS",
+      "parameters": {
+        "entrypoint": "add_liquidity",
+        "value": {
+          "prim": "Pair",
+          "args": [
+            { "int": "93735" },
+            { "prim": "Pair", "args": [
+              { "int": "0" },
+              { "string": "tz3c2XcRc6PhNuFwH1EhYcXtv7gBgdsx8k6J" }
+            ] }
+          ]
+        }
+      }
+    }'
+    */
+    @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
+    @Test fun transactionForging() {
+        val source = PublicKeyHash.fromB58check("tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ")
+        val destination = Contract.fromB58check("KT1WtTP1yGNfJLvBSubDV1H5z1zsKKXzAyGS")
+        val entrypoint = Entrypoint("add_liquidity")
+	// octez-client convert data '(Pair 93735 (Pair 0 "tz3c2XcRc6PhNuFwH1EhYcXtv7gBgdsx8k6J"))' from Michelson to binary
+	val value = "070700a7b80b070700000100000024747a336332586352633650684e75467748314568596358747637674267647378386b364a".hexToByteArray()
+        val transaction = Transaction(source = source, fee = 30UL, counter = 20UL, gasLimit = 54UL, storageLimit = 45UL, amount = 0UL, destination = destination, entrypoint = entrypoint, value = value)
+        val rawTransaction = transaction.forge()
+        val expectedBytes = "6c03db557924e5a295652eff2c1f141d5a5b72b9cc911e14362d0001f4ab1300637efe3616ab27663ee0e4be07d80e4c00ffff0d6164645f6c697175696469747900000033070700a7b80b070700000100000024747a336332586352633650684e75467748314568596358747637674267647378386b364a".hexToByteArray()
+        assertContentEquals(rawTransaction, expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "origination",
       "source": "tz4F2fxv7sKQx9wyoRMteoJwZEZnV9WFU2wL",
       "fee": "72",
