@@ -714,6 +714,11 @@ module Health = struct
         return {status = Up; checks}
 end
 
+module Synchronized = struct
+  let get_synchronized ctxt () () =
+    Lwt_result_syntax.return @@ Node_context.get_l1_crawler_status ctxt
+end
+
 let add_service registerer service handler directory =
   registerer directory service handler
 
@@ -858,6 +863,10 @@ let register :
        Tezos_rpc.Directory.register0
        Services.health
        (Health.get_health ctxt)
+  |> add_service
+       Tezos_rpc.Directory.register0
+       Services.synchronized
+       (Synchronized.get_synchronized ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register0
        Services.get_last_processed_level

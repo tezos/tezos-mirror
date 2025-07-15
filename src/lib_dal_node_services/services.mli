@@ -39,12 +39,22 @@ type 'rpc service =
     ; output : 'output >
 
 (* This RPC aims to be used by a user to check whether its DAL node
-   behaves as expected. It does not aim to provide a clear diagnostic,
-   this is left to another RPC (not implemented yet). *)
+   behaves as expected. *)
 val health :
   < meth : [`GET]
   ; input : unit
   ; output : Types.Health.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
+(* This RPC reports the current synchronization status of the DAL node
+   with respect to the L1 node. *)
+val synchronized :
+  < meth : [`GET]
+  ; input : unit
+  ; output : L1_crawler_status.t
   ; prefix : unit
   ; params : unit
   ; query : unit >

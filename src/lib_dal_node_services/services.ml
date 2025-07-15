@@ -135,6 +135,22 @@ let health :
     ~output:Health.encoding
     Tezos_rpc.Path.(open_root / "health")
 
+let synchronized :
+    < meth : [`GET]
+    ; input : unit
+    ; output : L1_crawler_status.t
+    ; prefix : unit
+    ; params : unit
+    ; query : unit >
+    service =
+  Tezos_rpc.Service.get_service
+    ~description:
+      "Returns the current synchronization status of the DAL node with the L1 \
+       node."
+    ~query:Tezos_rpc.Query.empty
+    ~output:L1_crawler_status.encoding
+    Tezos_rpc.Path.(open_root / "synchronized")
+
 let post_slot :
     < meth : [`POST]
     ; input : string
