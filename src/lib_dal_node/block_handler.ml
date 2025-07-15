@@ -545,20 +545,21 @@ let rec try_process_block ~retries ctxt cctxt l1_crawler proto_parameters
    a block with at least two other blocks on top of it, as guaranteed by
    Tenderbake. Note that this means that shard propagation is delayed by two
    levels with respect to the publication level of the corresponding slot
-   header. *)
+   header. However, plugin registration is based on the latest L1 head not
+   on the finalized block. This ensures new plugins are registered
+   immediately after migration, rather than waiting for finalization. *)
 let new_finalized_head ctxt cctxt l1_crawler cryptobox finalized_block_hash
     finalized_shell_header ~launch_time =
   let open Lwt_result_syntax in
   let level = finalized_shell_header.Block_header.level in
   let () = Node_context.set_last_finalized_level ctxt level in
   let* () =
-    (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7291
-       We should use the head level instead. *)
-    Node_context.may_add_plugin
-      ctxt
-      cctxt
-      ~proto_level:finalized_shell_header.proto_level
-      ~block_level:level
+    let block_level, proto_level =
+      match Crawler.last_seen_head l1_crawler with
+      | Some (_hash, head) -> Block_header.(head.level, head.proto_level)
+      | None -> assert false (* Not reachable *)
+    in
+    Node_context.may_add_plugin ctxt cctxt ~proto_level ~block_level
   in
   let*? proto_parameters =
     Node_context.get_proto_parameters ctxt ~level:(`Level level)

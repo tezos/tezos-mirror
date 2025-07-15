@@ -4473,9 +4473,8 @@ let test_migration_plugin ~migrate_from ~migrate_to =
     let* () = repeat blocks_till_migration (fun () -> bake_for client) in
 
     Log.info "Migrated to %s" (Protocol.name migrate_to) ;
-    (* The plugin will change after the two blocks, as the migration block
-       is not yet finalized. *)
-    let* () = bake_for ~count:2 client in
+    (* Even though the migration block is not yet finalized, the new plugin
+       should have been registered, as the DAL node listens to the last L1 head. *)
     wait_for_plugin
   in
   test_l1_migration_scenario
