@@ -26,6 +26,8 @@ val unsafe_drop_signature : t -> unsigned_chunk
     verification and just get the unsigned content. *)
 val check_signature : Signature.public_key -> t -> unsigned_chunk tzresult
 
+val unsigned_chunk_encoding : unsigned_chunk Data_encoding.t
+
 val chunk_encoding : t Data_encoding.t
 
 (** [chunk_to_rlp chunk] encodes a chunk into its RLP format. *)

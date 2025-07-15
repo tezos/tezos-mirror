@@ -457,7 +457,6 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Block_producer.start
       {
         signer;
-        smart_rollup_address = smart_rollup_address_b58;
         maximum_number_of_chunks = sequencer_config.max_number_of_chunks;
         tx_container = Ex_tx_container tx_container;
         sequencer_sunset_sec = sequencer_config.sunset_sec;

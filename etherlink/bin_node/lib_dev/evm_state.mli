@@ -96,13 +96,13 @@ type apply_result =
   | Apply_failure
 
 (** [apply_unsigned_chunks ~data-dir ~config state chunks] applies the
-    blueprint [chunks] on top of [evm_state]. If the payload produces
-    a block, the new updated EVM state is returned along with the new
-    block’s height.
+    blueprint [chunks] on top of [evm_state]. If the operation results in the
+    production of a block, the new updated EVM state is returned along with the
+    new block’s height. {e It is the responsibility of the caller to ensure
+    the correctness of the chunks.}
 
     The [data-dir] is used to store the kernel logs in the
-    {!kernel_logs_directory}.
-*)
+    {!kernel_logs_directory}. *)
 val apply_unsigned_chunks :
   ?wasm_pvm_fallback:bool ->
   ?log_file:string ->
