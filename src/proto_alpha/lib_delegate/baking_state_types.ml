@@ -151,19 +151,21 @@ module Delegate = struct
     | Some companion_key ->
         Format.fprintf fmt "@ and@ companion key@ %a" Key.pp companion_key
 
-  let companion_key_is_not_in_wallet =
+  let companion_key_not_provided_to_the_baker =
     let open Internal_event.Simple in
     declare_2
       ~section:[Protocol.name; "baker"; "delegates"]
-      ~name:"companion_key_is_not_in_wallet"
+      ~name:"companion_key_not_provided_to_the_baker"
       ~level:Error
       ~msg:
-        "Companion key {companion_key} for {delegate} is absent from the \
-         client wallet. The baker will only be able to issue attestations \
-         without DAL for this delegate, and the delegate will lose DAL \
-         rewards."
+        "Companion key {companion_key} for delegate {delegate} has not been \
+         provided to the baker. The baker will only be able to issue \
+         attestations without DAL content for this delegate, and the delegate \
+         will lose DAL rewards."
+      ("companion_key", Signature.Bls.Public_key_hash.encoding)
+      ~pp1:Signature.Bls.Public_key_hash.pp
       ("delegate", encoding_for_logging__cannot_decode)
-      ("companion_key", Environment.Bls.Public_key_hash.encoding)
+      ~pp2:pp
 
   let of_validator ~known_keys
       {
@@ -192,9 +194,9 @@ module Delegate = struct
                 then
                   Events.(
                     emit
-                      companion_key_is_not_in_wallet
-                      ( {manager_key; consensus_key; companion_key},
-                        companion_bls_pkh ))
+                      companion_key_not_provided_to_the_baker
+                      ( companion_bls_pkh,
+                        {manager_key; consensus_key; companion_key} ))
                 else return_unit
               in
               return companion_key
