@@ -331,22 +331,16 @@ let extract_operations_of_list_list = function
           (fun ( (preattestations : packed_operation list),
                  (attestations : packed_operation list) )
                packed_op ->
-            let {shell; protocol_data = Operation_data data} = packed_op in
-            match data with
-            | {contents = Single (Preattestation _); _} ->
-                ( Operation.pack {shell; protocol_data = data} :: preattestations,
-                  attestations )
-            | {contents = Single (Preattestations_aggregate _); _} ->
-                ( Operation.pack {shell; protocol_data = data} :: preattestations,
-                  attestations )
-            | {contents = Single (Attestation _); _} ->
-                ( preattestations,
-                  Operation.pack {shell; protocol_data = data} :: attestations
-                )
-            | {contents = Single (Attestations_aggregate _); _} ->
-                ( preattestations,
-                  Operation.pack {shell; protocol_data = data} :: attestations
-                )
+            let (Operation_data protocol_data) = packed_op.protocol_data in
+            match protocol_data.contents with
+            | Single (Preattestation _) ->
+                (packed_op :: preattestations, attestations)
+            | Single (Preattestations_aggregate _) ->
+                (packed_op :: preattestations, attestations)
+            | Single (Attestation _) ->
+                (preattestations, packed_op :: attestations)
+            | Single (Attestations_aggregate _) ->
+                (preattestations, packed_op :: attestations)
             | _ ->
                 (* unreachable *)
                 (preattestations, attestations))
