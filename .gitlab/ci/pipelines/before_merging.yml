@@ -4264,6 +4264,18 @@ trigger:debian_repository_partial:
     include: .gitlab/ci/pipelines/debian_repository_partial.yml
     strategy: depend
 
+trigger:base_images:
+  stage: manual
+  variables:
+    PIPELINE_TYPE: before_merging:base_images
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/base_images.yml
+    strategy: depend
+
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
@@ -4373,15 +4385,3 @@ oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
-
-trigger:base_images:
-  stage: manual
-  variables:
-    PIPELINE_TYPE: before_merging:base_images
-  rules:
-  - when: manual
-    allow_failure: true
-  needs: []
-  trigger:
-    include: .gitlab/ci/pipelines/base_images.yml
-    strategy: depend
