@@ -329,14 +329,20 @@ let extract_operations_of_list_list = function
       let preattestations, attestations =
         List.fold_left
           (fun ( (preattestations : Kind.preattestation Operation.t list),
-                 (attestations : Kind.attestation Operation.t list) )
+                 (attestations : packed_operation list) )
                packed_op ->
             let {shell; protocol_data = Operation_data data} = packed_op in
             match data with
             | {contents = Single (Preattestation _); _} ->
                 ({shell; protocol_data = data} :: preattestations, attestations)
             | {contents = Single (Attestation _); _} ->
-                (preattestations, {shell; protocol_data = data} :: attestations)
+                ( preattestations,
+                  Operation.pack {shell; protocol_data = data} :: attestations
+                )
+            | {contents = Single (Attestations_aggregate _); _} ->
+                ( preattestations,
+                  Operation.pack {shell; protocol_data = data} :: attestations
+                )
             | _ ->
                 (* unreachable *)
                 (preattestations, attestations))
