@@ -868,11 +868,21 @@ module State = struct
         ctxt.session.next_blueprint_number
     in
 
+    let* sequencer = Durable_storage.sequencer (read_from_state evm_state) in
+    let*? chunks =
+      List.map_e
+        (fun chunk ->
+          let open Result_syntax in
+          let* chunk = Sequencer_blueprint.chunk_of_external_message chunk in
+          Sequencer_blueprint.check_signature sequencer chunk)
+        payload
+    in
+
     let* try_apply =
       Misc.with_timing
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
-          Evm_state.apply_blueprint
+          Evm_state.apply_unsigned_chunks
             ~native_execution_policy:
               ctxt.configuration.kernel_execution.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
@@ -880,7 +890,7 @@ module State = struct
             ~chain_family
             ~config
             evm_state
-            payload)
+            chunks)
     in
 
     match try_apply with

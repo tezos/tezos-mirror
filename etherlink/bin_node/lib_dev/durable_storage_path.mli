@@ -89,6 +89,12 @@ module Code : sig
   val code : hash -> path
 end
 
+module Blueprint : sig
+  val chunk : blueprint_number:Z.t -> chunk_index:int -> path
+
+  val nb_chunks : blueprint_number:Z.t -> path
+end
+
 (** Paths related to blocks. *)
 module Block : sig
   (** Block number is either the current head or a specific height. *)

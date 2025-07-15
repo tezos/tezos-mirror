@@ -232,9 +232,9 @@ let current_block_height ~root evm_state =
   match current_block_number with
   | None ->
       (* No block has been created yet and we are waiting for genesis,
-         whose number will be [zero]. Since the semantics of [apply_blueprint]
-         is to verify the block height has been incremented once, we default to
-         [-1]. *)
+         whose number will be [zero]. Since the semantics of
+         [apply_unsigned_chunks] is to verify the block height has been
+         incremented once, we default to [-1]. *)
       return (Qty Z.(pred zero))
   | Some current_block_number ->
       let (Qty current_block_number) = decode_number_le current_block_number in
@@ -318,6 +318,39 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
 
+let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
+    =
+  let open Lwt_result_syntax in
+  let (Qty number) = chunk.number in
+  let key =
+    Durable_storage_path.Blueprint.chunk
+      ~blueprint_number:number
+      ~chunk_index:chunk.chunk_index
+  in
+  let value =
+    (* We want to encode a [StoreBlueprint] (see blueprint_storage.rs in
+       kernel_latest/kernel). The [StoreBlueprint] has two variants, and we
+       want to store a [SequencerChunk] whose tag is 0. [Value ""] is the
+       RLP-encoded for 0. *)
+    Rlp.List [Rlp.Value (Bytes.of_string ""); Value chunk.value]
+    |> Rlp.encode |> Bytes.to_string
+  in
+  let*! evm_state = modify ~key ~value evm_state in
+  return evm_state
+
+let store_blueprint_chunks ~blueprint_number evm_state
+    (chunks : Sequencer_blueprint.unsigned_chunk list) =
+  let open Lwt_result_syntax in
+  let nb_chunks = List.length chunks in
+  let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
+  let*! evm_state =
+    modify
+      ~key:(Durable_storage_path.Blueprint.nb_chunks ~blueprint_number)
+      ~value:(Z.to_bits (Z.of_int nb_chunks))
+      evm_state
+  in
+  return evm_state
+
 type apply_result =
   | Apply_success of {
       evm_state : t;
@@ -325,17 +358,18 @@ type apply_result =
     }
   | Apply_failure
 
-let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
+let apply_unsigned_chunks ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
-    (blueprint : Blueprint_types.payload) =
+    (chunks : Sequencer_blueprint.unsigned_chunk list) =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
-  let exec_inputs =
-    List.map
-      (function `External payload -> `Input ("\001" ^ payload))
-      blueprint
-  in
   let*! (Qty before_height) = current_block_height ~root evm_state in
+  let* evm_state =
+    store_blueprint_chunks
+      ~blueprint_number:(Z.succ before_height)
+      evm_state
+      chunks
+  in
   let* evm_state =
     execute
       ~native_execution:(native_execution_policy = Configuration.Always)
@@ -346,7 +380,7 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       ~config
       ?log_file
       evm_state
-      exec_inputs
+      []
   in
   let* block_hash = current_block_hash ~chain_family evm_state in
   let root = Durable_storage_path.root_of_chain_family chain_family in

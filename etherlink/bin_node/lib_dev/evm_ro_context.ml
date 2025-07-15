@@ -509,7 +509,16 @@ let replay ctxt ?(log_file = "replay") ?profile
         process_time := dt ;
         Lwt.return_unit)
     @@ fun () ->
-    Evm_state.apply_blueprint
+    let*? chunks =
+      List.map_e
+        (fun chunk ->
+          let open Result_syntax in
+          let+ chunk = Sequencer_blueprint.chunk_of_external_message chunk in
+          (* We are replaying, so we can assume the signature is correct *)
+          Sequencer_blueprint.unsafe_drop_signature chunk)
+        blueprint.blueprint.payload
+    in
+    Evm_state.apply_unsigned_chunks
       ~log_file
       ?profile
       ~data_dir:ctxt.data_dir
@@ -517,7 +526,7 @@ let replay ctxt ?(log_file = "replay") ?profile
       ~config:(pvm_config ctxt)
       ~native_execution_policy:ctxt.native_execution_policy
       evm_state
-      blueprint.blueprint.payload
+      chunks
   in
   match apply_result with
   | Apply_success {block; evm_state} ->
