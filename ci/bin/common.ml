@@ -349,6 +349,7 @@ let changeset_debian_packages =
   Changeset.(
     make
       [
+        ".gitlab/ci/pipelines/debian_repository_partial_auto.yml";
         "scripts/packaging/build-deb-local.sh";
         "scripts/packaging/Release.conf";
         "scripts/packaging/octez/debian/*";
@@ -368,6 +369,7 @@ let changeset_rpm_packages =
   Changeset.(
     make
       [
+        ".gitlab/ci/pipelines/rpm_repository_partial_auto.yml";
         "scripts/packaging/build-rpm-local.sh";
         "scripts/packaging/octez/rpm/*";
         "scripts/packaging/tests/rpm/*";
@@ -384,6 +386,7 @@ let changeset_homebrew =
   Changeset.(
     make
       [
+        ".gitlab/ci/pipelines/homebrew_auto.yml";
         "scripts/packaging/test_homebrew_install.sh";
         "scripts/packaging/homebrew_release.sh";
         "scripts/ci/install-gsutil.sh";
