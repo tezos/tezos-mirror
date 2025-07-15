@@ -361,7 +361,7 @@ let transfer ?(callback = fun _ -> Lwt.return_unit) ?to_ ?(value = Z.zero)
   let fees = Z.(gas_limit * infos.Network_info.base_fee_per_gas) in
   let callback reason =
     (match reason with
-    | `Accepted _ ->
+    | `Confirmed ->
         Account.debit from Z.(value + fees) ;
         Account.increment_nonce from
     | _ -> ()) ;
