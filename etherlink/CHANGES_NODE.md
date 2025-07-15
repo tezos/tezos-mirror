@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## Version 0.34 (2025-07-15)
 
-### Breaking changes
-
-### Configuration changes
+This release of the EVM node notably adds support for executing natively the
+Etherlink 4.1 release (also known as Dionysus first revision). It is the
+recommended version to use for networks running this version of the Etherlink
+kernel, and we advise all node providers to upgrade ahead of Etherlink Mainnet
+and Etherlink Testnet upgrades.
 
 ### RPCs changes
 
@@ -14,22 +16,9 @@
 
 [eip-55]: https://eips.ethereum.org/EIPS/eip-55
 
-### Metrics changes
-
 ### Execution changes
 
 - Supports executing Dionysus R1 (Etherlink 4.1) natively. (!18683)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
 
 ## Version 0.33 (2025-07-10)
 
