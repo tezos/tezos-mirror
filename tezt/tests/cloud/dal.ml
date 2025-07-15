@@ -36,7 +36,7 @@ type agent_kind =
   | Etherlink_dal_observer of {slot_index : int}
   | Etherlink_producer of int
   | Echo_rollup_operator
-  | Echo_rollup_dal_observer
+  | Echo_rollup_dal_observer of {slot_index : int}
 
 let name_of = function
   | Bootstrap -> "bootstrap"
@@ -53,7 +53,8 @@ let name_of = function
       Format.asprintf "etherlink-dal-operator-%d" slot_index
   | Etherlink_producer i -> Format.asprintf "etherlink-producer-%d" i
   | Echo_rollup_operator -> "echo-rollup-operator"
-  | Echo_rollup_dal_observer -> "echo-rollup-dal-node"
+  | Echo_rollup_dal_observer {slot_index} ->
+      Format.sprintf "echo-rollup-dal-node-%d" slot_index
 
 type snapshot_config =
   | Docker_embedded of string
@@ -552,7 +553,21 @@ module Dal_reverse_proxy = struct
 
     (* Start the NginX service *)
     let* () =
-      Process.spawn ?runner "service" ["nginx"; "restart"] |> Process.check
+      (* If the service can be stopped (i.e. the command doesn't fail), we
+         probably are in a SysV system. Nginx will run as a service natively.
+         Otherwise, we need to start it manually. *)
+      let* service_cmd =
+        Process.spawn ?runner "service" ["nginx"; "stop"] |> Process.wait
+      in
+      match Process.validate_status service_cmd with
+      | Ok () ->
+          Process.spawn ?runner "service" ["nginx"; "start"] |> Process.check
+      | Error _ ->
+          (* Runs the process as a daemon, and don't bind the process, otherwise
+             Tezt will wait for it to finish.
+          *)
+          let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
+          unit
     in
     (* In order to pass the reverse proxy to the various Tezt helpers we
        need to pretend to be a DAL node. The simplest way to do so is to
@@ -563,7 +578,7 @@ module Dal_reverse_proxy = struct
     let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
     let* dal_node =
       Dal_node.Agent.create_from_endpoint
-        ~name:"bootstrap-dal-node"
+        ~name:"reverse-proxy-dal-node"
         ~rpc_port:port
         cloud
         agent
@@ -3438,7 +3453,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
   in
   Lwt.return {node; dal_node; topic}
 
-let init_etherlink_dal_node
+let init_dal_reverse_proxy_observers
     {
       external_rpc;
       network;
@@ -3448,7 +3463,73 @@ let init_etherlink_dal_node
       memtrace;
       simulate_network;
       _;
-    } ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
+    } ~name_of ~default_endpoint ~bootstrap ~dal_slots ~next_agent ~otel ~cloud
+    =
+  if dal_slots = [] then failwith "Expected at least a DAL slot." ;
+  let* dal_slots_and_nodes =
+    dal_slots
+    |> Lwt_list.map_p (fun slot_index ->
+           let name = name_of slot_index in
+           let* agent = next_agent ~name in
+           let env, with_yes_crypto = may_set_yes_crypto simulate_network in
+           let* node =
+             Node.init
+               ?env
+               ~name
+               ~arguments:
+                 [
+                   Peer bootstrap.node_p2p_endpoint;
+                   History_mode (Rolling (Some 79));
+                 ]
+               ~rpc_external:external_rpc
+               network
+               ~with_yes_crypto
+               ~snapshot
+               cloud
+               agent
+           in
+           let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+           let* () =
+             Dal_node.init_config
+               ~expected_pow:(Network.expected_pow network)
+               ~operator_profiles:[slot_index]
+               ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
+               dal_node
+           in
+           let* () =
+             Dal_node.Agent.run
+               ?otel
+               ~memtrace
+               ~ppx_profiling
+               ~ppx_profiling_backends
+               dal_node
+           in
+           return (slot_index, Dal_node.rpc_endpoint dal_node))
+  in
+  let default_endpoint =
+    match default_endpoint with
+    | Some e -> e
+    | None ->
+        let _, first_observer_endpoint = List.hd dal_slots_and_nodes in
+        first_observer_endpoint
+  in
+  Dal_reverse_proxy.init_reverse_proxy
+    cloud
+    ~next_agent
+    ~default_endpoint
+    (List.to_seq dal_slots_and_nodes)
+
+let init_etherlink_dal_node
+    ({
+       external_rpc;
+       network;
+       snapshot;
+       ppx_profiling;
+       ppx_profiling_backends;
+       memtrace;
+       simulate_network;
+       _;
+     } as configuration) ~bootstrap ~dal_slots ~next_agent ~otel ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -3531,53 +3612,17 @@ let init_etherlink_dal_node
           default_dal_node
       in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
-
-      let* dal_slots_and_nodes =
-        dal_slots
-        |> Lwt_list.map_p (fun slot_index ->
-               let name = name_of (Etherlink_dal_observer {slot_index}) in
-               let* agent = next_agent ~name in
-               let env, with_yes_crypto = may_set_yes_crypto simulate_network in
-               let* node =
-                 Node.init
-                   ?env
-                   ~name
-                   ~arguments:
-                     [
-                       Peer bootstrap.node_p2p_endpoint;
-                       History_mode (Rolling (Some 79));
-                     ]
-                   ~rpc_external:external_rpc
-                   network
-                   ~with_yes_crypto
-                   ~snapshot
-                   cloud
-                   agent
-               in
-               let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
-               let* () =
-                 Dal_node.init_config
-                   ~expected_pow:(Network.expected_pow network)
-                   ~operator_profiles:[slot_index]
-                   ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-                   dal_node
-               in
-               let* () =
-                 Dal_node.Agent.run
-                   ?otel
-                   ~memtrace
-                   ~ppx_profiling
-                   ~ppx_profiling_backends
-                   dal_node
-               in
-               return (slot_index, Dal_node.rpc_endpoint dal_node))
-      in
       let* reverse_proxy_dal_node =
-        Dal_reverse_proxy.init_reverse_proxy
-          cloud
+        init_dal_reverse_proxy_observers
+          configuration
+          ~name_of:(fun slot_index ->
+            name_of (Etherlink_dal_observer {slot_index}))
+          ~default_endpoint:(Some default_endpoint)
+          ~bootstrap
+          ~dal_slots
           ~next_agent
-          ~default_endpoint
-          (List.to_seq dal_slots_and_nodes)
+          ~otel
+          ~cloud
       in
       some reverse_proxy_dal_node
 
@@ -4017,24 +4062,43 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
 
   let otel = Cloud.open_telemetry_endpoint cloud in
   let* dal_node =
-    let name = name_of Echo_rollup_dal_observer in
-    let* agent = next_agent ~name in
-    let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
-    let* () =
-      Dal_node.init_config
-        ~expected_pow:(Network.expected_pow configuration.network)
-        ~observer_profiles:dal_slots
-        ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-        dal_node
-    in
-    let* () =
-      Dal_node.Agent.run
-        ?otel
-        ~ppx_profiling:configuration.ppx_profiling
-        ~ppx_profiling_backends:configuration.ppx_profiling_backends
-        dal_node
-    in
-    some dal_node
+    match dal_slots with
+    | [] ->
+        toplog "Echo rollup doesn't follow any slot" ;
+        none
+    | [slot_index] ->
+        let name = name_of (Echo_rollup_dal_observer {slot_index}) in
+        let* agent = next_agent ~name in
+        let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
+        let* () =
+          Dal_node.init_config
+            ~expected_pow:(Network.expected_pow configuration.network)
+            ~observer_profiles:dal_slots
+            ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
+            dal_node
+        in
+        let* () =
+          Dal_node.Agent.run
+            ?otel
+            ~ppx_profiling:configuration.ppx_profiling
+            ~ppx_profiling_backends:configuration.ppx_profiling_backends
+            dal_node
+        in
+        some dal_node
+    | _ ->
+        let* dal_reverse_proxy_with_observers =
+          init_dal_reverse_proxy_observers
+            configuration
+            ~name_of:(fun slot_index ->
+              name_of (Echo_rollup_dal_observer {slot_index}))
+            ~default_endpoint:None
+            ~bootstrap
+            ~dal_slots
+            ~next_agent
+            ~otel
+            ~cloud
+        in
+        some dal_reverse_proxy_with_observers
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
@@ -4923,7 +4987,10 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Some {etherlink_producers; _} ->
                List.init etherlink_producers (fun i -> Etherlink_producer i));
            (if configuration.echo_rollup then
-              [Echo_rollup_operator; Echo_rollup_dal_observer]
+              Echo_rollup_operator :: Reverse_proxy
+              :: List.map
+                   (fun slot_index -> Echo_rollup_dal_observer {slot_index})
+                   configuration.dal_node_producers
             else []);
          ]
   in
@@ -4959,7 +5026,7 @@ let register (module Cli : Scenarios_cli.Dal) =
                let machine_type = configuration.producer_machine_type in
                Agent.Configuration.make ?docker_image ?machine_type ~name ()
            | Observer _ | Etherlink_dal_operator | Etherlink_dal_observer _
-           | Echo_rollup_dal_observer ->
+           | Echo_rollup_dal_observer _ ->
                Agent.Configuration.make ?docker_image ~name ()
            | Echo_rollup_operator -> default_vm_configuration ~name
            | Etherlink_operator -> default_vm_configuration ~name
