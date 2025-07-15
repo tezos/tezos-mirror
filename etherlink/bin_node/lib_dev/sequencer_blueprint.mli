@@ -15,10 +15,18 @@ type unsigned_chunk = private {
 (* A signed blueprint chunk *)
 type t
 
+(** [unsafe_drop_signature chunk] gives back the content of [chunk]
+    {e without checking if its signature is valid}. *)
+val unsafe_drop_signature : t -> unsigned_chunk
+
 val chunk_encoding : t Data_encoding.t
 
 (** [chunk_to_rlp chunk] encodes a chunk into its RLP format. *)
 val chunk_to_rlp : t -> Rlp.item
+
+(** [chunk_of_external_message msg] attempts to decode [msg] as a blueprint
+    chunk. *)
+val chunk_of_external_message : [`External of string] -> t tzresult
 
 (** [sign ~signer ~chunks] serializes and signs a list of chunks. *)
 val sign :
@@ -63,3 +71,5 @@ val kernel_blueprint_parent_hash_of_payload :
   Signature.public_key ->
   Blueprint_types.payload ->
   Ethereum_types.block_hash option
+
+type error += Not_a_blueprint

@@ -94,9 +94,7 @@ type unsigned_chunk = {
   chunk_index : int;
 }
 
-type chunk = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
-
-type t = chunk
+type t = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
 
 let chunk_encoding =
   Data_encoding.(
@@ -135,7 +133,7 @@ let chunk_to_rlp
         Value (Signature.to_bytes signature);
       ])
 
-let chunk_of_rlp s =
+let chunk_of_rlp_opt s =
   match Rlp.decode s with
   | Ok
       Rlp.(
@@ -156,6 +154,31 @@ let chunk_of_rlp s =
         (Signature.of_bytes_opt signature)
   | _ -> None
 
+let chunk_of_external_message_opt (`External chunk) =
+  let len = String.length chunk in
+  if len <= Message_format.header_size then None
+  else
+    let chunk_bytes =
+      String.(
+        sub
+          chunk
+          Message_format.header_size
+          (length chunk - Message_format.header_size))
+    in
+    chunk_of_rlp_opt (Bytes.unsafe_of_string chunk_bytes)
+
+type error += Not_a_blueprint
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_not_a_blueprint"
+    ~title:"Not a blueprint"
+    ~description:"Tried to decode a payload that is not a valid blueprint"
+    Data_encoding.empty
+    (function Not_a_blueprint -> Some () | _ -> None)
+    (fun () -> Not_a_blueprint)
+
 let make_blueprint_chunks ~number kernel_blueprint =
   let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
   match String.chunk_bytes max_chunk_size blueprint with
@@ -171,6 +194,12 @@ let make_blueprint_chunks ~number kernel_blueprint =
          argument [error_on_partial_chunk] is passed. As this is not
          the case in this call, this branch is impossible. *)
       assert false
+
+let chunk_of_external_message s =
+  let open Result_syntax in
+  match chunk_of_external_message_opt s with
+  | Some c -> return c
+  | None -> tzfail Not_a_blueprint
 
 let sign ~signer ~chunks =
   let open Lwt_result_syntax in
@@ -199,28 +228,23 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
       |> prepare_message smart_rollup_address Message_format.Blueprint_chunk)
     chunks
 
+let unsafe_drop_signature chunk = chunk.unsigned_chunk
+
+let check_signature_opt sequencer chunk =
+  let unsigned_chunk_bytes =
+    Rlp.encode (unsigned_chunk_to_rlp chunk.unsigned_chunk)
+  in
+  let correctly_signed =
+    Signature.check sequencer chunk.signature unsigned_chunk_bytes
+  in
+  if correctly_signed then Some chunk else None
+
 let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
   List.filter_map
-    (fun (`External chunk) ->
+    (fun chunk ->
       let open Option_syntax in
-      let len = String.length chunk in
-      if len <= Message_format.header_size then fail
-      else
-        let chunk_bytes =
-          String.(
-            sub
-              chunk
-              Message_format.header_size
-              (length chunk - Message_format.header_size))
-        in
-        let* chunk = chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes) in
-        let unsigned_chunk_bytes =
-          Rlp.encode (unsigned_chunk_to_rlp chunk.unsigned_chunk)
-        in
-        let correctly_signed =
-          Signature.check sequencer chunk.signature unsigned_chunk_bytes
-        in
-        if correctly_signed then return chunk else fail)
+      let* chunk = chunk_of_external_message_opt chunk in
+      check_signature_opt sequencer chunk)
     payload
   |> List.sort
        (fun
