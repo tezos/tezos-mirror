@@ -27,12 +27,8 @@ let on_new_blueprint (type f)
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
-  let*? (module Tx_container) =
-    let open Result_syntax in
-    match tx_container with
-    | Evm_tx_container m -> return m
-    | Michelson_tx_container _ ->
-        error_with "Observer mode is not supported for Tezlink"
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
   in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
