@@ -46,7 +46,7 @@ type block_info = {
   payload_round : Round.t;
   round : Round.t;
   prequorum : prequorum option;
-  quorum : Kind.attestation operation list;
+  quorum : packed_operation list;
   payload : Operation_pool.payload;
   grandparent : Block_hash.t;
 }
@@ -94,7 +94,7 @@ let block_info_encoding =
         payload_round,
         round,
         prequorum,
-        List.map Operation.pack quorum,
+        quorum,
         payload,
         grandparent ))
     (fun ( hash,
@@ -114,7 +114,7 @@ let block_info_encoding =
         payload_round;
         round;
         prequorum;
-        quorum = List.filter_map Operation_pool.unpack_attestation quorum;
+        quorum;
         payload;
       })
     (obj9

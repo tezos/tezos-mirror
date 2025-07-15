@@ -572,9 +572,7 @@ let prepare_block_to_bake ~attestations ?last_proposal
     in
     (* 3. Add the additional given [attestations].
          N.b. this is a set: there won't be duplicates *)
-    Operation_pool.add_operations
-      filtered_mempool
-      (List.map Operation.pack attestations)
+    Operation_pool.add_operations filtered_mempool attestations
   in
   let kind = Fresh operation_pool in
   let* () = Events.(emit preparing_fresh_block (delegate, round)) in
@@ -652,7 +650,7 @@ let propose_block_action state delegate round ~last_proposal =
           List.fold_left
             (fun set op -> Operation_pool.Operation_set.add op set)
             mempool_consensus_operations
-            (List.map Operation.pack proposal.block.quorum
+            (proposal.block.quorum
             @ List.map Operation.pack prequorum.preattestations)
         in
         let attestation_filter =
@@ -781,7 +779,7 @@ let time_to_prepare_next_level_block state at_round =
          triggered when we have a slot and an elected block *)
       assert false
   | Some elected_block, Some {delegate; _} ->
-      let attestations = elected_block.attestation_qc in
+      let attestations = List.map Operation.pack elected_block.attestation_qc in
       let new_level_state =
         {state.level_state with next_level_latest_forge_request = Some at_round}
       in
