@@ -580,6 +580,90 @@ let unexpected_protocol protocol_hash =
       (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
       @@ Known_protocols.get_all ())
 
+exception
+  Done of (Signature.public_key_hash * Signature.public_key * int64) list
+
+let get_rich_accounts (module P : Sigs.PROTOCOL) context
+    (header : Block_header.shell_header) ~count ~min_threshold =
+  let open Lwt_result_syntax in
+  let level = header.Block_header.level in
+  let predecessor_timestamp = header.timestamp in
+  let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
+  let* context =
+    P.prepare_context context ~level ~predecessor_timestamp ~timestamp
+  in
+  Format.printf "Searching %d accounts over %Ld tez@." count min_threshold ;
+  (* Convert to mutez *)
+  let min_threshold_tz =
+    P.Tez.of_mutez_exn (Int64.mul min_threshold 1_000_000L)
+  in
+  let* accounts =
+    Lwt.catch
+      (fun () ->
+        P.Contract.fold context ~init:(Ok []) ~f:(fun acc contract ->
+            let*? acc in
+            let* balance = P.Contract.balance context contract in
+            if balance >= min_threshold_tz then
+              let pkh = P.Contract.contract_address contract in
+              match
+                Tezos_crypto.Signature.V_latest.Public_key_hash.of_b58check_opt
+                  pkh
+              with
+              | None -> return acc
+              | Some k -> (
+                  let pkh =
+                    match P.Signature.Of_latest.public_key_hash k with
+                    | None ->
+                        (* Not expected at all. *)
+                        assert false
+                    | Some k -> k
+                  in
+                  let*! pk = P.Contract.get_manager_key context pkh in
+                  match pk with
+                  | Error _ ->
+                      (* Can fail for missing_manager_contract or
+                         Unrevealed_manager_key errors. Ignoring these
+                         accounts. *)
+                      return acc
+                  | Ok pk ->
+                      let res =
+                        ( P.Signature.To_latest.public_key_hash pkh,
+                          P.Signature.To_latest.public_key pk,
+                          P.Tez.to_mutez balance )
+                        :: acc
+                      in
+                      if List.length res >= count then raise (Done res)
+                      else return res)
+            else return acc))
+      (function
+        | Done res -> return res
+        | e -> failwith "Unexpected error: %s@." (Printexc.to_string e))
+  in
+  let sorted_accounts =
+    List.sort (fun (_, _, x) (_, _, y) -> Int64.compare y x) accounts
+  in
+  let selected_accounts = Tezos_stdlib.TzList.take_n count sorted_accounts in
+  let res =
+    List.mapi
+      (fun i (pkh, pk, tez) ->
+        let alias = Format.sprintf "rich_%d" i in
+        (alias, pkh, pk, tez))
+      selected_accounts
+  in
+  Format.printf
+    "Extracted the %d accounts with a spendable balance over %Ldꜩ:@."
+    count
+    min_threshold ;
+  List.iter
+    (fun (alias, pkh, _, tez) ->
+      Format.printf
+        "%s (%s): %Ldꜩ@."
+        alias
+        (Signature.Public_key_hash.to_b58check pkh)
+        (Int64.div tez 1_000_000L))
+    res ;
+  return res
+
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
     ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context
     at the given [base_dir] and computes a list of [(alias, pkh, pk, stake,
@@ -592,7 +676,8 @@ let unexpected_protocol protocol_hash =
     context from this level instead of head, if it exists.
 *)
 let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
-    ~active_bakers_only base_dir alias_pkh_pk_list other_accounts_pkh =
+    ?rich_accounts_over ~active_bakers_only base_dir alias_pkh_pk_list
+    other_accounts_pkh =
   let open Lwt_result_syntax in
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
@@ -649,6 +734,27 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
             (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits))
           delegates
       in
+      let* rich_accounts =
+        match rich_accounts_over with
+        | Some (count, min) ->
+            let* r =
+              get_rich_accounts
+                protocol
+                context
+                header
+                ~count
+                ~min_threshold:min
+            in
+            List.map
+              (fun (alias, pkh, pk, tez) ->
+                ( alias,
+                  Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
+                  Tezos_crypto.Signature.Public_key.to_b58check pk,
+                  tez ))
+              r
+            |> return
+        | None -> return []
+      in
       let other_accounts =
         List.map
           (fun (pkh, pk) ->
@@ -665,7 +771,7 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           other_accounts
       in
       let*! () = Tezos_store.Store.close_store store in
-      return (with_alias, other_accounts)
+      return (with_alias, rich_accounts, other_accounts)
 
 (** [load_contracts ?dump_contracts ?network ?level base_dir] checkouts the block
     context at the given [base_dir] (at level [?level] or defaulting
@@ -690,13 +796,14 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   let*! () = Tezos_store.Store.close_store store in
   return contracts
 
-let build_yes_wallet ?staking_share_opt ?network_opt base_dir
-    ~active_bakers_only ~aliases ~other_accounts_pkh =
+let build_yes_wallet ?staking_share_opt ?network_opt ?rich_accounts_over
+    base_dir ~active_bakers_only ~aliases ~other_accounts_pkh =
   let open Lwt_result_syntax in
-  let+ bakers, other_accounts =
+  let+ bakers, rich_accounts, other_accounts =
     load_bakers_public_keys
       ?staking_share_opt
       ?network_opt
+      ?rich_accounts_over
       base_dir
       ~active_bakers_only
       aliases
@@ -706,6 +813,12 @@ let build_yes_wallet ?staking_share_opt ?network_opt base_dir
   List.map
     (fun (alias, pkh, pk, ck, _stake, _, _) -> (alias, pkh, pk, ck))
     bakers
+  @ List.map
+      (fun (alias, pkh, pk, _) ->
+        (* Consensus keys are not supported in [rich_accounts]. Setting it to
+           None. *)
+        (alias, pkh, pk, None))
+      rich_accounts
   @ List.map
       (fun (alias, pkh, pk) ->
         (* Consensus keys are not supported in [other_accounts]. Setting it to
