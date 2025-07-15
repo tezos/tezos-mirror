@@ -6,7 +6,7 @@
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
-use tezos_crypto_rs::{public_key::PublicKey, public_key_hash::PublicKeyHash};
+use tezos_crypto_rs::{hash::BlsSignature, public_key::PublicKey, public_key_hash::PublicKeyHash};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -33,6 +33,8 @@ pub struct ManagerOperationContent<Op> {
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct RevealContent {
     pub pk: PublicKey,
+    #[encoding(dynamic)]
+    pub proof: Option<BlsSignature>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -57,9 +59,10 @@ pub struct DelegationContent {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_crypto_rs::hash::HashTrait;
 
     /*
-    octez-codec encode "022-PsRiotum.operation.contents" from '{
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "reveal",
       "source": "tz2WU9XW86EdgVQZrbPphjUZiRfXXssY9wEP",
       "fee": "31",
@@ -85,13 +88,58 @@ mod tests {
             counter,
             gas_limit,
             storage_limit,
-            operation: RevealContent { pk },
+            operation: RevealContent { pk, proof: None },
         });
 
-        let mut encoded_operation = Vec::new();
-        operation.bin_write(&mut encoded_operation).unwrap();
+        let encoded_operation = operation.to_bytes().unwrap();
 
-        let bytes = hex::decode("6b01f3023970264e14502daa1db4324527bc464fe0fd1fed0759070103480fcf4241d5903bd5b9a71db63fc6784dc9e686acf0dac9b4305d54cb642946").unwrap();
+        let bytes = hex::decode("6b01f3023970264e14502daa1db4324527bc464fe0fd1fed0759070103480fcf4241d5903bd5b9a71db63fc6784dc9e686acf0dac9b4305d54cb64294600").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "reveal",
+      "source": "tz4N581kB4vkDANA7WTN6tcnBeCDawv1k4Cy",
+      "fee": "127",
+      "counter": "91",
+      "gas_limit": "3250",
+      "storage_limit": "0",
+      "public_key": "BLpk1qUhA8WwcwKavKJb3nkPVeKj5FGCsruWQXyRpwypxe7ocbq6Npe4cjA2TLfqzgBKfRAtBajV",
+      "proof": "BLsigAKrfg6QLipEvWQrhPRHbWo7x8YLFvteATg65gbvpfo9qKSabb5j92nozhecDkxvnvocv6q2WUUFvoKxkZuCaTNUUGpJPbc7igdf7MUi8fSovaLbWzZEDVGLjon7ZNPZPDpwf6h9jT"
+    }'
+    */
+    #[test]
+    fn reveal_with_proof_encoding() {
+        let pk = PublicKey::from_b58check(
+            "BLpk1qUhA8WwcwKavKJb3nkPVeKj5FGCsruWQXyRpwypxe7ocbq6Npe4cjA2TLfqzgBKfRAtBajV",
+        )
+        .unwrap();
+        let pkh = PublicKeyHash::from_b58check("tz4N581kB4vkDANA7WTN6tcnBeCDawv1k4Cy").unwrap();
+        let proof = BlsSignature::from_b58check("BLsigAKrfg6QLipEvWQrhPRHbWo7x8YLFvteATg65gbvpfo9qKSabb5j92nozhecDkxvnvocv6q2WUUFvoKxkZuCaTNUUGpJPbc7igdf7MUi8fSovaLbWzZEDVGLjon7ZNPZPDpwf6h9jT").unwrap();
+        let fee = 127.into();
+        let counter = 91.into();
+        let gas_limit = 3250.into();
+        let storage_limit = 0.into();
+        let operation = OperationContent::Reveal(ManagerOperationContent {
+            source: pkh,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            operation: RevealContent {
+                pk,
+                proof: Some(proof),
+            },
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6b038f54fa9607db6d164b42bd23f3bfedc99460d4bc7f5bb21900039423b322ccff9b945501d28f743a0369583c1552d47dc69fa5d624bde1034df571103c62a969d5998d4682be60ca3e83ff000000609517ce0faabbf099b46a3b786f3ae0ef81cfdf4d89a8b0d1ff9216bf092a8e90987549cbc3234f21af4b29fe0a5f217c16d56336cdc26d5c364c961ca1f7ac44e9a778f9bab5695dd88f0a7cfbfa0582cb8cd7b5ef158b6b59abd576eb181ddc").unwrap();
         assert_eq!(bytes, encoded_operation);
 
         let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();

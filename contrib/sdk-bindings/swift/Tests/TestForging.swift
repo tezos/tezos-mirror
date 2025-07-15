@@ -9,6 +9,7 @@ class TestForging: XCTestCase {
 
     public static var allTests = [
       ("messageForging", messageForging),
+      ("revealForging", revealForging),
       ("delegationForging", delegationForging),
     ]
 
@@ -22,6 +23,41 @@ class TestForging: XCTestCase {
           UInt8(ascii: "e")
         ]
         XCTAssertEqual(Array(rawMsg), expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "reveal",
+      "source": "tz28peirZbqKQR1udNdaL4fWtRGggHygyF9D",
+      "fee": "47",
+      "counter": "5",
+      "gas_limit": "78",
+      "storage_limit": "7932",
+      "public_key": "sppk7aDfaJGufpeUHY36yeuRu3YLrZqeroqF755SV33mxsZ14psWg9D"
+    }'
+    */
+    func revealForging() {
+        let publicKey = try! PublicKey.fromB58check(data: "sppk7aDfaJGufpeUHY36yeuRu3YLrZqeroqF755SV33mxsZ14psWg9D")
+        let source = try! PublicKeyHash.fromB58check(data: "tz28peirZbqKQR1udNdaL4fWtRGggHygyF9D")
+        let reveal = Reveal(
+          source: source,
+          fee: 47,
+          counter: 5,
+          gasLimit: 78,
+          storageLimit: 7932,
+          publicKey: publicKey
+        )
+        let rawReveal = try! reveal.forge()
+        let expectedBytes: [UInt8] = [
+          0x6b, 0x01, 0x05, 0x90, 0x25, 0xd1, 0x96, 0x25, 0xd3, 0x6b,
+          0x7d, 0xe3, 0x3b, 0x2a, 0xb0, 0xbf, 0x29, 0x54, 0x97, 0x5e,
+          0xba, 0xb2, 0x2f, 0x05, 0x4e, 0xfc, 0x3d, 0x01, 0x02, 0x78,
+          0x69, 0x09, 0x45, 0x5d, 0xa1, 0x64, 0x20, 0x60, 0x7a, 0x9c,
+          0xff, 0xf3, 0xde, 0xce, 0x5f, 0x69, 0xf7, 0x98, 0x00, 0x2d,
+          0x6d, 0x21, 0xdb, 0xa2, 0x96, 0x26, 0x6d, 0x53, 0x90, 0x23,
+          0x42, 0x00
+        ]
+        XCTAssertEqual(Array(rawReveal), expectedBytes)
     }
 
     /*

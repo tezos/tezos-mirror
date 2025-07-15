@@ -24,6 +24,27 @@ class ForgingTest {
 
     /*
     octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "reveal",
+      "source": "tz3NGKzVp8ezNnu5qx8mY3iioSUXKfC1d8Yc",
+      "fee": "1000",
+      "counter": "34",
+      "gas_limit": "1",
+      "storage_limit": "16",
+      "public_key": "p2pk66qj2rKg5s6NCHprzPHheLK1dV3ZmGJbfBJEAizxsz2o3qms8vF"
+    }'
+    */
+    @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
+    @Test fun revealForging() {
+        val publicKey = PublicKey.fromB58check("p2pk66qj2rKg5s6NCHprzPHheLK1dV3ZmGJbfBJEAizxsz2o3qms8vF")
+        val source = PublicKeyHash.fromB58check("tz3NGKzVp8ezNnu5qx8mY3iioSUXKfC1d8Yc")
+        val reveal = Reveal(source = source, fee = 1000UL, counter = 34UL, gasLimit = 1UL, storageLimit = 16UL, publicKey = publicKey)
+        val rawReveal = reveal.forge()
+        val expectedBytes = "6b02153c42139fbbe509e9023bb85eac281709766070e80722011002032abac5ad6fc0fbe8e9a0beb3bbbc7481318f8b686b366ceb00ee0b3b51e40c4900".hexToByteArray()
+        assertContentEquals(rawReveal, expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "delegation",
       "source": "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
       "fee": "0",
