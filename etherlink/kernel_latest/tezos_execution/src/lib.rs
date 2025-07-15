@@ -293,12 +293,10 @@ fn apply_balance_changes(
     dest_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
 ) -> Result<(), ApplyKernelError> {
+    src_account.set_balance(host, &new_src_balance.into())?;
     let dest_balance = dest_account.balance(host)?.0;
     let new_dest_balance = &dest_balance + amount;
-
-    src_account.set_balance(host, &new_src_balance.into())?;
     dest_account.set_balance(host, &new_dest_balance.into())?;
-
     Ok(())
 }
 
