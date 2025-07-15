@@ -39,9 +39,13 @@ module Contract : sig
 
   val encoding : t Data_encoding.t
 
+  val implicit_encoding : Signature.public_key_hash Data_encoding.t
+
   val of_b58check : string -> t tzresult
 
   val of_implicit : Signature.public_key_hash -> t
+
+  val of_hex : string -> Signature.public_key_hash tzresult Lwt.t
 end
 
 module Operation : sig

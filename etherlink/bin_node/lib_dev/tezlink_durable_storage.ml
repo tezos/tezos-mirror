@@ -17,8 +17,10 @@ module Path = struct
     let (`Hex s) = Hex.of_bytes raw_key in
     s
 
+  let accounts_index = "/tezlink/context/contracts/index"
+
   let account contract =
-    "/tezlink/context/contracts/index/" ^ to_path Contract.encoding contract
+    accounts_index ^ "/" ^ to_path Contract.encoding contract
 
   let balance contract = account contract ^ "/balance"
 
@@ -28,6 +30,8 @@ module Path = struct
 
   let storage contract = account contract ^ "/data/storage"
 end
+
+let contract_of_path = Contract.of_hex
 
 let balance read c =
   Durable_storage.inspect_durable_and_decode_default

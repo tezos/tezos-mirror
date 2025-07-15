@@ -52,11 +52,24 @@ module Contract = struct
 
   let encoding = Tezlink_imports.Alpha_context.Contract.encoding
 
+  let implicit_encoding =
+    Tezlink_imports.Alpha_context.Contract.implicit_encoding
+
   let of_implicit c = Tezlink_imports.Alpha_context.Contract.Implicit c
 
   let of_b58check s =
     Tezlink_imports.Imported_env.wrap_tzresult
     @@ Tezlink_imports.Alpha_context.Contract.of_b58check s
+
+  let of_hex contract =
+    let bytes = Hex.to_bytes_exn (`Hex contract) in
+    match Data_encoding.Binary.of_bytes_opt implicit_encoding bytes with
+    | None ->
+        failwith
+          "subkey %s is not a contract root, expected a public key hash in \
+           hexadecimal representation"
+          contract
+    | Some contract -> Lwt_result_syntax.return contract
 end
 
 module Operation = struct

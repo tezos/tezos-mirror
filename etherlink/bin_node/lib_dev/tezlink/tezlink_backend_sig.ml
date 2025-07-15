@@ -47,4 +47,12 @@ module type S = sig
 
   val monitor_heads :
     [> `Main] -> 'a -> L2_types.Tezos_block.t Lwt_stream.t * Lwt_watcher.stopper
+
+  val bootstrap_accounts :
+    unit ->
+    (Tezlink_imports.Imported_protocol.Alpha_context.public_key_hash
+    * Tezos_types.Tez.t)
+    list
+    tzresult
+    Lwt.t
 end
