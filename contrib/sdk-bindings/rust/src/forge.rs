@@ -56,12 +56,13 @@ pub fn forge_message(msg: &str) -> Result<Vec<u8>, Error> {
 
 pub mod operation {
     use super::*;
-    use crate::keys::{BlsSignature, PublicKey, PublicKeyHash};
+    use crate::entrypoint::Entrypoint;
+    use crate::keys::{BlsSignature, Contract, PublicKey, PublicKeyHash};
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_protocol::operation::{
         DelegationContent, ManagerOperationContent, OperationContent, OriginationContent,
-        RevealContent, Script,
+        Parameters, RevealContent, Script, TransactionContent,
     };
 
     #[derive(uniffi::Object, Debug)]
@@ -113,6 +114,75 @@ pub mod operation {
                 },
             });
             reveal
+                .to_bytes()
+                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
+        }
+    }
+
+    #[derive(uniffi::Object, Debug)]
+    pub struct Transaction {
+        pub source: PublicKeyHash,
+        pub fee: u64,
+        pub counter: u64,
+        pub gas_limit: u64,
+        pub storage_limit: u64,
+        pub amount: u64,
+        pub destination: Contract,
+        pub entrypoint: Entrypoint,
+        pub value: Vec<u8>,
+    }
+
+    #[uniffi::export]
+    impl Transaction {
+        #[allow(clippy::too_many_arguments)]
+        #[doc = "Build a transaction operation."]
+        #[uniffi::constructor(default(entrypoint = None, value = None))]
+        pub fn new(
+            source: &PublicKeyHash,
+            fee: u64,
+            counter: u64,
+            gas_limit: u64,
+            storage_limit: u64,
+            amount: u64,
+            destination: &Contract,
+            entrypoint: Option<Arc<Entrypoint>>,
+            value: Option<Vec<u8>>,
+        ) -> Self {
+            Self {
+                source: source.clone(),
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                amount,
+                destination: destination.clone(),
+                entrypoint: entrypoint.map_or_else(Entrypoint::default, |entrypoint| {
+                    entrypoint.as_ref().clone()
+                }),
+                // octez-client convert data "Unit" from Michelson to binary
+                value: value.unwrap_or(vec![0x03, 0x0b]),
+            }
+        }
+
+        #[doc = "Forge the operation."]
+        pub fn forge(&self) -> Result<Vec<u8>, Error> {
+            let transaction = OperationContent::Transaction(ManagerOperationContent {
+                source: self.source.0.clone(),
+                fee: self.fee.into(),
+                counter: self.counter.into(),
+                gas_limit: self.gas_limit.into(),
+                storage_limit: self.storage_limit.into(),
+                operation: TransactionContent {
+                    amount: self.amount.into(),
+                    destination: self.destination.0.clone(),
+                    parameters: Parameters {
+                        entrypoint: self.entrypoint.0.clone(),
+                        value: self.value.clone(),
+                    }
+                    .into(),
+                },
+            });
+            transaction
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }

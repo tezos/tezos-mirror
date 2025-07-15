@@ -12,7 +12,7 @@ pub enum EntrypointError {
     Format(#[from] entrypoint::ByteReprError),
 }
 
-#[derive(uniffi::Object, Debug, Clone, PartialEq, Eq)]
+#[derive(uniffi::Object, Debug, Clone, PartialEq, Default, Eq)]
 #[uniffi::export(Debug, Display, Eq)]
 pub struct Entrypoint(pub(crate) entrypoint::Entrypoint);
 
