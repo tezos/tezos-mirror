@@ -305,7 +305,7 @@ gitlab:publish:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
 
 trigger:octez_monitoring:
-  stage: build
+  stage: start
   variables:
     PIPELINE_TYPE: octez_monitoring
   inherit:

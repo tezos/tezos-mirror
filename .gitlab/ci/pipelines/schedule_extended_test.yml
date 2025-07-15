@@ -1801,7 +1801,7 @@ opam:all_7:
       - bls12-381
 
 trigger:debian_repository_full:
-  stage: test
+  stage: start
   variables:
     PIPELINE_TYPE: debian_repository_full
   needs: []
@@ -1810,7 +1810,7 @@ trigger:debian_repository_full:
     strategy: depend
 
 trigger:rpm_repository_full:
-  stage: test
+  stage: start
   variables:
     PIPELINE_TYPE: rpm_repository_full
   needs: []
@@ -1819,7 +1819,7 @@ trigger:rpm_repository_full:
     strategy: depend
 
 trigger:homebrew:
-  stage: test
+  stage: start
   variables:
     PIPELINE_TYPE: homebrew
   rules:
@@ -1830,7 +1830,7 @@ trigger:homebrew:
     strategy: depend
 
 trigger:base_images:
-  stage: images
+  stage: start
   variables:
     PIPELINE_TYPE: base_images
   rules:
