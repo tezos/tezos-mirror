@@ -1794,6 +1794,15 @@ module Make
         Prevalidation_t.create chain_store ~head ~timestamp
       in
       let fetching = mempool.known_valid in
+      let* () =
+        (* We clear the shared mempool datatype to ensure that at protocol
+           change, every signature operation is checked at block validation
+           time. *)
+        Store.Chain.set_mempool
+          chain_store
+          ~head:(Store.Block.hash head)
+          Mempool.empty
+      in
       let classification_parameters =
         Classification.
           {
