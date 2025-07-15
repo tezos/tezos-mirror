@@ -553,6 +553,33 @@ let get_context ?level ~network_opt base_dir =
   let header = header.shell in
   return (protocol_hash, context, header, store)
 
+let unexpected_protocol protocol_hash =
+  if
+    protocol_hash
+    = Protocol_hash.of_b58check_exn
+        "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
+  then
+    Error_monad.failwith
+      "Context was probably ill loaded, found Genesis protocol.@;\
+       Known protocols are: %a"
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+          Protocol_hash.pp)
+      (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+      @@ Known_protocols.get_all ())
+  else
+    Error_monad.failwith
+      "Unknown protocol hash: %a.@;Known protocols are: %a"
+      Protocol_hash.pp
+      protocol_hash
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+          Protocol_hash.pp)
+      (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
+      @@ Known_protocols.get_all ())
+
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
     ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context
     at the given [base_dir] and computes a list of [(alias, pkh, pk, stake,
@@ -570,43 +597,18 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
   let* protocol_hash, context, header, store =
     get_context ?level ~network_opt base_dir
   in
-  let* ( (delegates :
-           (Signature.public_key_hash
-           * Signature.public_key
-           * (Signature.public_key_hash * Signature.public_key) option
-           * int64
-           * int64
-           * int64)
-           list),
-         other_accounts ) =
-    match protocol_of_hash protocol_hash with
-    | None ->
-        if
-          protocol_hash
-          = Protocol_hash.of_b58check_exn
-              "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-        then
-          Error_monad.failwith
-            "Context was probably ill loaded, found Genesis protocol.@;\
-             Known protocols are: %a"
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-        else
-          Error_monad.failwith
-            "Unknown protocol hash: %a.@;Known protocols are: %a"
-            Protocol_hash.pp
-            protocol_hash
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-    | Some protocol ->
+  match protocol_of_hash protocol_hash with
+  | None -> unexpected_protocol protocol_hash
+  | Some protocol ->
+      let* ( (delegates :
+               (Signature.public_key_hash
+               * Signature.public_key
+               * (Signature.public_key_hash * Signature.public_key) option
+               * int64
+               * int64
+               * int64)
+               list),
+             other_accounts ) =
         Format.printf
           "@[<h>Detected protocol:@;<10 0>%a@]@."
           pp_protocol
@@ -618,51 +620,52 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           active_bakers_only
           staking_share_opt
           other_accounts_pkh
-  in
-  let*! () = Tezos_store.Store.close_store store in
-  let with_alias =
-    List.mapi
-      (fun i (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
-        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-        let ck =
-          match ck with
-          | Some (cpkh, cpk) ->
-              let cpkh =
-                Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
-              in
-              let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
-              Some (cpkh, cpk)
-          | None -> None
-        in
-        let alias =
-          List.find_map
-            (fun (alias, pkh', _) ->
-              if String.equal pkh' pkh then Some alias else None)
-            alias_pkh_pk_list
-        in
-        let alias =
-          Option.value_f alias ~default:(fun () -> Format.asprintf "baker_%d" i)
-        in
-        (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits))
-      delegates
-  in
-  let other_accounts =
-    List.map
-      (fun (pkh, pk) ->
-        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-        let alias =
-          List.find_map
-            (fun (alias, pkh', _) ->
-              if String.equal pkh' pkh then Some alias else None)
-            alias_pkh_pk_list
-        in
-        let alias = Option.value alias ~default:pkh in
-        (alias, pkh, pk))
-      other_accounts
-  in
-  return (with_alias, other_accounts)
+      in
+      let with_alias =
+        List.mapi
+          (fun i (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
+            let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+            let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+            let ck =
+              match ck with
+              | Some (cpkh, cpk) ->
+                  let cpkh =
+                    Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
+                  in
+                  let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
+                  Some (cpkh, cpk)
+              | None -> None
+            in
+            let alias =
+              List.find_map
+                (fun (alias, pkh', _) ->
+                  if String.equal pkh' pkh then Some alias else None)
+                alias_pkh_pk_list
+            in
+            let alias =
+              Option.value_f alias ~default:(fun () ->
+                  Format.asprintf "baker_%d" i)
+            in
+            (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits))
+          delegates
+      in
+      let other_accounts =
+        List.map
+          (fun (pkh, pk) ->
+            let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+            let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+            let alias =
+              List.find_map
+                (fun (alias, pkh', _) ->
+                  if String.equal pkh' pkh then Some alias else None)
+                alias_pkh_pk_list
+            in
+            let alias = Option.value alias ~default:pkh in
+            (alias, pkh, pk))
+          other_accounts
+      in
+      let*! () = Tezos_store.Store.close_store store in
+      return (with_alias, other_accounts)
 
 (** [load_contracts ?dump_contracts ?network ?level base_dir] checkouts the block
     context at the given [base_dir] (at level [?level] or defaulting
@@ -676,32 +679,7 @@ let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   in
   let* (contracts : contract_info list) =
     match protocol_of_hash protocol_hash with
-    | None ->
-        if
-          protocol_hash
-          = Protocol_hash.of_b58check_exn
-              "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P"
-        then
-          Error_monad.failwith
-            "Context was probably ill loaded, found Genesis protocol.@;\
-             Known protocols are: %a"
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
-        else
-          Error_monad.failwith
-            "Unknown protocol hash: %a.@;Known protocols are: %a"
-            Protocol_hash.pp
-            protocol_hash
-            Format.(
-              pp_print_list
-                ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
-                Protocol_hash.pp)
-            (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
-            @@ Known_protocols.get_all ())
+    | None -> unexpected_protocol protocol_hash
     | Some protocol ->
         Format.printf
           "@[<h>Detected protocol:@;<10 0>%a@]@."
