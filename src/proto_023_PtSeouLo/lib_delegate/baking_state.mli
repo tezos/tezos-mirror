@@ -199,7 +199,7 @@ type prequorum = {
   level : int32;
   round : Round.t;
   block_payload_hash : Block_payload_hash.t;
-  preattestations : Kind.preattestation operation list;
+  preattestations : packed_operation list;
 }
 
 type block_info = {
