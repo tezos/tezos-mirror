@@ -266,7 +266,11 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ()
   in
   let job_trigger_monitoring =
-    trigger_job ~__POS__ ~dependencies:(Dependent []) monitoring_child_pipeline
+    trigger_job
+      ~__POS__
+      ~dependencies:(Dependent [])
+      ~stage:Stages.build
+      monitoring_child_pipeline
   in
   [
     (* Stage: start *)
