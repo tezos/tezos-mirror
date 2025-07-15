@@ -44,6 +44,8 @@ end = struct
   let wrap ?l1_timestamp inbox = (sol :: ipl ?l1_timestamp () :: inbox) @ [eol]
 end
 
+type kernel_input = [`Inbox of string trace | `Skip_stage_one]
+
 let run ~pool ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
     ~entrypoint tree rollup_address inbox : Irmin_context.tree Lwt.t =
   Lwt_domain.detach
@@ -58,7 +60,9 @@ let run ~pool ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
         tree
         (Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address)
         0l
-        Shared_inbox.(wrap ?l1_timestamp inbox))
+        (match inbox with
+        | `Skip_stage_one -> []
+        | `Inbox inbox -> Shared_inbox.(wrap ?l1_timestamp inbox)))
     ()
 
 let preload_kernel ~pool tree =

@@ -582,9 +582,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         | Always | Rpcs_only -> true
         | Never -> false
       in
-      let message =
-        List.map (fun s -> `Input s) Simulation.Encodings.(input.messages)
-      in
+      let message = Simulation.Encodings.(input.messages) in
       let* hash = find_irmin_hash ctxt block in
       let* evm_state = get_evm_state ctxt hash in
       let* evm_state = alter_evm_state evm_state in
@@ -595,7 +593,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         ~config:pvm_config
         ~native_execution
         evm_state
-        message
+        (`Inbox message)
   end in
   let module Backend = Make (struct
     module Executor = Executor

@@ -447,12 +447,12 @@ module State = struct
         ~config
         ~native_execution
         evm_state
-        [
-          `Input
-            ("\254"
+        (`Inbox
+          [
+            "\254"
             ^ Bytes.to_string
-                (Evm_events.Delayed_transaction.to_rlp delayed_transaction));
-        ]
+                (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
+          ])
     else
       let*! evm_state =
         Evm_state.modify
@@ -469,7 +469,7 @@ module State = struct
         ~data_dir
         ~config
         evm_state
-        []
+        `Skip_stage_one
 
   let background_preemptive_download
       (kernel_execution : Configuration.kernel_execution_config) upgrade_event =
@@ -873,7 +873,7 @@ module State = struct
               ~data_dir
               ~config
               ctxt.session.evm_state
-              []
+              (`Inbox [])
           in
           let* applied_sequencer_upgrade =
             check_sequencer_upgrade ctxt evm_state sequencer_upgrade
@@ -1736,7 +1736,7 @@ module State = struct
                 ~config
                 ~native_execution:false
                 evm_state
-                []
+                (`Inbox [])
             in
             let (Qty next) = next_blueprint_number in
             let* context = commit conn context evm_state (Qty Z.(pred next)) in

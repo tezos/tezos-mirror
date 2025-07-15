@@ -37,11 +37,13 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
+  let to_pvm_inbox = function
+    | `Skip_stage_one -> List.to_seq [[]]
+    | `Inbox inbox -> List.to_seq [inbox]
+  in
   Octez_telemetry.Trace.with_tzresult ~service_name:"Evm_state" "execute"
   @@ fun _ ->
   let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
-  let inbox = List.map (function `Input s -> s) inbox in
-  let inbox = List.to_seq [inbox] in
   let messages = ref [] in
   let write_debug =
     Tezos_scoru_wasm.Builtins.Printer
@@ -68,6 +70,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
                    let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
                    Lwt_io.flush oc))
         in
+        let inbox = to_pvm_inbox inbox in
         let* evm_state, _ticks, _inboxes, _level =
           Wasm_debugger.eval
             ~hooks
@@ -83,6 +86,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
         return evm_state
     | Some Configuration.Flamegraph ->
         let* function_symbols = Wasm_debugger.get_function_symbols evm_state in
+        let inbox = to_pvm_inbox inbox in
         let* evm_state, _, _ =
           Wasm_debugger.profile
             ~migrate_to:Proto_alpha
@@ -107,9 +111,6 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
         let*! evm_state =
           Lwt.catch
             (fun () ->
-              let inbox =
-                match Seq.uncons inbox with Some (x, _) -> x | _ -> []
-              in
               Wasm_runtime.run
                 ~pool
                 ?l1_timestamp:execution_timestamp
@@ -123,6 +124,7 @@ let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
             (fun exn ->
               if wasm_pvm_fallback then
                 let*! () = Events.wasm_pvm_fallback () in
+                let inbox = to_pvm_inbox inbox in
                 let*! res =
                   Wasm_debugger.eval
                     ~migrate_to:Proto_alpha
@@ -272,7 +274,6 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
       insight_requests
   in
   (* Messages from simulation requests are already valid inputs. *)
-  let messages = List.map (fun s -> `Input s) messages in
   let* evm_state =
     execute
       ~pool
@@ -284,7 +285,7 @@ let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
       ?wasm_entrypoint
       ~config
       ctxt
-      messages
+      (`Inbox messages)
   in
   let*! values = List.map_p (fun key -> inspect evm_state key) keys in
   return values
@@ -352,7 +353,7 @@ let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
       ~config
       ?log_file
       evm_state
-      []
+      `Skip_stage_one
   in
   let* block_hash = current_block_hash ~chain_family evm_state in
   let root = Durable_storage_path.root_of_chain_family chain_family in
