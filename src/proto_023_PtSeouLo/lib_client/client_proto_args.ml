@@ -360,6 +360,23 @@ let force_switch =
        of block without a fitness greater than the  current head."
     ()
 
+let force_reproposal =
+  Tezos_clic.switch
+    ~long:"force-reproposal"
+    ~doc:
+      "Force baking a reproposal by crafting a prequorum proof with the \
+       available delegates"
+    ()
+
+let force_round_arg =
+  Tezos_clic.arg
+    ~long:"force-round"
+    ~placeholder:"round"
+    ~doc:
+      "Bake exactly at the given round assuming that it is held by one of your \
+       delegates"
+    int_parameter
+
 let minimal_timestamp_switch =
   Tezos_clic.switch
     ~long:"minimal-timestamp"
