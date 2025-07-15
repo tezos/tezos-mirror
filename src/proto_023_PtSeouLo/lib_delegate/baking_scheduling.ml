@@ -288,13 +288,9 @@ let rec wait_next_event ~timeout loop_state =
       return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
-let first_potential_round_at_next_level state ~earliest_round =
+let first_potential_round ~committee_size ~owned_slots ~earliest_round =
   let open Option_syntax in
   let ( let*? ) res f = match res with Error _ -> None | Ok x -> f x in
-  let committee_size =
-    state.global_state.constants.Constants.parametric.consensus_committee_size
-  in
-  let owned_slots = state.level_state.next_level_delegate_slots in
   (* Rounds attribution cycles with a period of [committee_size].
      To find the next owned round, we translate [earliest_round] into a slot
      within the range [0 ... committee_size], look for the first subsequent slot
@@ -317,6 +313,20 @@ let first_potential_round_at_next_level state ~earliest_round =
         Round.of_int (slot + (committee_size * (1 + period_offset)))
       in
       Some (round, delegate.delegate)
+
+let first_potential_round_at_next_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.next_level_delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
+
+let first_potential_round_at_current_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 (** [current_round_at_next_level] converts the current system timestamp
     into the first non-expired round at the next level *)

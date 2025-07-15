@@ -856,7 +856,7 @@ let preattestation_and_aggregation_wrong_payload_hash =
     ~__FILE__
     ~title:"preattestation and aggregation wrong payload_hash"
     ~tags:[Tag.layer1; "preattestation"; "aggregation"]
-    ~supports:Protocol.(From_protocol 024)
+    ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
   let consensus_rights_delay = 1 in
@@ -997,7 +997,7 @@ let double_preattestation_aggregation_wrong_payload_hash =
     ~__FILE__
     ~title:"double preattestation aggregation wrong payload hash"
     ~tags:[Tag.layer1; "double"; "preattestation"; "aggregation"]
-    ~supports:Protocol.(From_protocol 024)
+    ~supports:Protocol.(From_protocol 023)
     ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
   let consensus_rights_delay = 1 in
