@@ -70,7 +70,27 @@ type address = Address of hex [@@ocaml.unboxed]
 
 let address_of_string s = Address (hex_of_string (String.lowercase_ascii s))
 
-let address_to_string (Address a) = hex_to_string a
+let address_to_string (Address (Hex address)) =
+  (* Implementation compliant with EIP-55
+     See https://eips.ethereum.org/EIPS/eip-55 *)
+  let hexchar_to_int c =
+    if '0' <= c && c <= '9' then Char.code c - Char.code '0'
+    else if 'A' <= c && c <= 'F' then Char.code c - Char.code 'A' + 10
+    else if 'a' <= c && c <= 'f' then Char.code c - Char.code 'a' + 10
+    else raise (Invalid_argument "address_to_string: not a valid address")
+  in
+
+  let hash = Digestif.KECCAK_256.(to_hex @@ digest_string address) in
+  let address = Bytes.of_string address in
+
+  Bytes.iteri
+    (fun i c ->
+      if 'a' <= c && c <= 'f' then
+        let hash_nibble = hexchar_to_int (String.get hash i) in
+        if hash_nibble >= 8 then Bytes.set address i (Char.uppercase_ascii c))
+    address ;
+
+  "0x" ^ Bytes.to_string address
 
 let address_encoding =
   Data_encoding.(conv address_to_string address_of_string string)
@@ -544,7 +564,7 @@ type 'transaction_object block = {
   transactionRoot : hash;
   stateRoot : hash;
   receiptRoot : hash;
-  miner : hex;
+  miner : address;
   difficulty : quantity;
   totalDifficulty : quantity;
   extraData : hex;
@@ -606,8 +626,8 @@ let block_from_rlp_v0 bytes =
          have that, potentially this could be the sequencer. *)
       let miner =
         decode_option
-          ~default:(Hex "0000000000000000000000000000000000000000")
-          decode_hex
+          ~default:(Address (Hex "0000000000000000000000000000000000000000"))
+          decode_address
           miner
       in
       let transactionRoot =
@@ -706,8 +726,8 @@ let block_from_rlp_v1 bytes =
          have that, potentially this could be the sequencer. *)
       let miner =
         decode_option
-          ~default:(Hex "0000000000000000000000000000000000000000")
-          decode_hex
+          ~default:(Address (Hex "0000000000000000000000000000000000000000"))
+          decode_address
           miner
       in
       let transactionRoot =
@@ -928,7 +948,7 @@ let block_encoding transaction_object_encoding =
              (req "transactionsRoot" hash_encoding)
              (req "stateRoot" hash_encoding)
              (req "receiptsRoot" hash_encoding)
-             (req "miner" hex_encoding))
+             (req "miner" address_encoding))
           (obj10
              (req "difficulty" quantity_encoding)
              (req "totalDifficulty" quantity_encoding)

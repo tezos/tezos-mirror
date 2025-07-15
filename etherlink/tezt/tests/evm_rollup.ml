@@ -770,9 +770,8 @@ let deploy_with_base_checks {contract; expected_address} full_evm_setup =
   let endpoint = Evm_node.endpoint evm_node in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* contract_address, tx = deploy ~contract ~sender full_evm_setup in
-  let address = String.lowercase_ascii contract_address in
   Check.(
-    (address = expected_address)
+    (contract_address = expected_address)
       string
       ~error_msg:"Expected address to be %R but was %L.") ;
   let* code_in_kernel =
@@ -1236,7 +1235,7 @@ let test_l2_deploy_simple_storage =
   deploy_with_base_checks
     {
       contract = simple_storage_resolved;
-      expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
+      expected_address = "0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344";
     }
     evm_setup
 
@@ -1370,8 +1369,7 @@ let test_l2_deploy_erc20 =
   (* deploy the contract *)
   let* address, tx = deploy ~contract:erc20_resolved ~sender evm_setup in
   Check.(
-    (String.lowercase_ascii address
-    = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+    (address = "0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344")
       string
       ~error_msg:"Expected address to be %R but was %L.") ;
 
@@ -1490,7 +1488,7 @@ let test_deploy_contract_with_push0 =
   deploy_with_base_checks
     {
       contract = shanghai_storage_resolved;
-      expected_address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344";
+      expected_address = "0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344";
     }
     evm_setup
 
@@ -1539,7 +1537,7 @@ let test_log_index =
       ~gas_price:1_000_000_000
       ~gas:27_638
       ~value:Wei.zero
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~address:"0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344"
       ~signature:"emitBoth(uint256)"
       ~arguments:["100"]
       ()
@@ -1552,7 +1550,7 @@ let test_log_index =
       ~gas_price:1_000_000_000
       ~gas:25_664
       ~value:Wei.zero
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~address:"0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344"
       ~signature:"emitA(uint256)"
       ~arguments:["10"]
       ()
@@ -1917,7 +1915,7 @@ let test_rpc_txpool_content =
       ~gas_price:100_000
       ~gas:23_300
       ~value:(Wei.of_string "100")
-      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~address:"0x11D3C9168db9d12a3C591061D555870969b43dC9"
       ()
   in
   let* tx2 =
@@ -1928,7 +1926,7 @@ let test_rpc_txpool_content =
       ~gas_price:100_000
       ~gas:23_300
       ~value:(Wei.of_string "100")
-      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~address:"0x11D3C9168db9d12a3C591061D555870969b43dC9"
       ()
   in
   let*@ tx_hash1 = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
@@ -1961,12 +1959,12 @@ let test_rpc_txpool_content =
   let transaction_addr_queued = List.nth txpool_queued 0 in
   Check.(
     (transaction_addr_pending.address
-   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
+   = "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c")
       string)
     ~error_msg:"Expected caller of transaction_1 to be %R, got %L." ;
   Check.(
     (transaction_addr_queued.address
-   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
+   = "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c")
       string)
     ~error_msg:"Expected caller of transaction_2 to be %R, got %L." ;
   let num_pending_transaction_addr_1 =
@@ -1996,13 +1994,13 @@ let test_rpc_txpool_content =
       ~transaction_content:pending_transaction_addr_1_content
       ~blockHash:"null"
       ~blockNumber:"null"
-      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+      ~from:"0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c"
       ~gas:"0x5b04"
       ~gasPrice:"0x186a0"
       ~hash:"0xed148f664807dfcb3c7095de22a6c63e72ae4f9d503549c525f5014327b51693"
       ~input:"0x"
       ~nonce:"0x0"
-      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~to_:"0x11D3C9168db9d12a3C591061D555870969b43dC9"
       ~transactionIndex:"null"
       ~value:"0x64"
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
@@ -2018,13 +2016,13 @@ let test_rpc_txpool_content =
       ~transaction_content:queued_transaction_addr_1_content
       ~blockHash:"null"
       ~blockNumber:"null"
-      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+      ~from:"0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c"
       ~gas:"0x5b04"
       ~gasPrice:"0x186a0"
       ~hash:"0x38b2831803a0f9a82bcc68f79bf167311b0adfe9e3d111a7f9579cdfcbae0f0f"
       ~input:"0x"
       ~nonce:"0x1"
-      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
+      ~to_:"0x11D3C9168db9d12a3C591061D555870969b43dC9"
       ~transactionIndex:"null"
       ~value:"0x64"
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
@@ -2371,7 +2369,7 @@ let test_estimate_gas_additionnal_field =
     let eth_call =
       [
         ( "from",
-          Ezjsonm.encode_string @@ "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
+          Ezjsonm.encode_string @@ "0x6ce4d79d4E77402e1ef3417Fdda433aA744C6e1c"
         );
         ("data", Ezjsonm.encode_string @@ "0x" ^ data);
         ("value", Ezjsonm.encode_string @@ "0x0");
@@ -2400,8 +2398,7 @@ let test_eth_call_storage_contract =
     in
     let* () = check_tx_succeeded ~endpoint ~tx in
     Check.(
-      (String.lowercase_ascii address
-      = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+      (address = "0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344")
         string
         ~error_msg:"Expected address to be %R but was %L.") ;
 
@@ -4373,9 +4370,8 @@ let test_rpc_getLogs =
   let* erc20_resolved = erc20 evm_version in
   (* deploy the contract *)
   let* address, _tx = deploy ~contract:erc20_resolved ~sender evm_setup in
-  let address = String.lowercase_ascii address in
   Check.(
-    (address = "0xd77420f73b4612a7a99dba8c2afd30a1886b0344")
+    (address = "0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344")
       string
       ~error_msg:"Expected address to be %R but was %L.") ;
   (* minting / burning *)
@@ -4619,7 +4615,7 @@ let test_l2_revert_returns_unused_gas =
       ~gas_price:65_536
       ~gas:100_000
       ~value:Wei.zero
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~address:"0xd77420F73B4612a7A99DBA8c2AFd30a1886b0344"
       ~signature:"run()"
       ()
   in
