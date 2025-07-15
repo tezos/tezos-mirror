@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::Error;
+use num_bigint::{BigInt, Sign};
 use revm::primitives::{alloy_primitives::Keccak256, B256, U256};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
@@ -116,6 +117,10 @@ pub fn u256_to_le_bytes(value: primitive_types::U256) -> Vec<u8> {
     let mut bytes = vec![0u8; 32];
     value.to_little_endian(&mut bytes);
     bytes
+}
+
+pub fn u256_to_bigint(value: U256) -> BigInt {
+    BigInt::from_bytes_be(Sign::Plus, &value.to_be_bytes::<{ U256::BYTES }>())
 }
 
 pub mod legacy {

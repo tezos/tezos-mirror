@@ -73,6 +73,7 @@ impl EtherlinkPrecompiles {
                     is_static,
                     inputs,
                     address,
+                    gas_limit,
                 )?;
                 Ok(Some(result))
             }
