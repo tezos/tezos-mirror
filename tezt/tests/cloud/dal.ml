@@ -2795,42 +2795,44 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
   in
   let* stake = configuration.stake in
   let* client =
-    Client.Agent.create
-      ~name:(Tezt_cloud.Agent.name agent ^ "-client")
-      ~endpoint:(Client.Node bootstrap_node)
-      agent
-  in
-  let init_yes_wallet () =
-    let* yes_wallet = Node.yes_wallet agent in
-    let* snapshot_network =
-      match configuration.snapshot with
-      | Docker_embedded path | Local_file path ->
-          let* network = Node.get_snapshot_info_network bootstrap_node path in
-          (* Yes-wallet requires the config url for protocol-specific test
-             networks.*)
-          let network =
-            match network with
-            | ("ghostnet" | "mainnet" | "sandbox") as s -> s
-            | s ->
-                (* We assume that unknown networks are protocol specific ones. *)
-                "https://teztnets.com/" ^ s
-          in
-          Lwt.return network
-      | No_snapshot -> Lwt.return "ghostnet"
-    in
-    let* _filename =
-      Yes_wallet.create_from_context
-        ~node:bootstrap_node
-        ~client
-        ~network:snapshot_network
-        yes_wallet
-    in
-    unit
+    if configuration.simulate_network = Disabled then
+      Client.init ~endpoint:(Node bootstrap_node) ()
+    else
+      let* client =
+        Client.Agent.create
+          ~name:(Tezt_cloud.Agent.name agent ^ "-client")
+          ~endpoint:(Client.Node bootstrap_node)
+          agent
+      in
+      let* yes_wallet = Node.yes_wallet agent in
+      let* snapshot_network =
+        match configuration.snapshot with
+        | Docker_embedded path | Local_file path ->
+            let* network = Node.get_snapshot_info_network bootstrap_node path in
+            (* Yes-wallet requires the config url for protocol-specific test
+               networks.*)
+            let network =
+              match network with
+              | ("ghostnet" | "mainnet" | "sandbox") as s -> s
+              | s ->
+                  (* We assume that unknown networks are protocol specific ones. *)
+                  "https://teztnets.com/" ^ s
+            in
+            Lwt.return network
+        | No_snapshot -> Lwt.return "ghostnet"
+      in
+      let* _filename =
+        Yes_wallet.create_from_context
+          ~node:bootstrap_node
+          ~client
+          ~network:snapshot_network
+          yes_wallet
+      in
+      return client
   in
   let* simulated_delegates =
     match configuration.simulate_network with
     | Scatter (selected_bakers_count, baker_daemons_count) ->
-        let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
         in
@@ -2847,7 +2849,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         ( selected_bakers_count,
           single_key_baker_daemons_count,
           multiple_keys_baker_daemons_count ) ->
-        let* () = init_yes_wallet () in
         let* all_delegates_aliases =
           Client.list_known_addresses client |> Lwt.map (List.map fst)
         in
@@ -2888,29 +2889,32 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       stake
   in
   let* simulated_bakers =
-    (* Substitute consensus pkh with delegate pkh *)
-    let* yw = Node.yes_wallet agent in
-    let* ckm = Yes_wallet.load_consensus_key_mapping yw ~client in
-    List.map
-      (fun l ->
+    match configuration.simulate_network with
+    | Disabled -> return []
+    | Map _ | Scatter _ ->
+        (* Substitute consensus pkh with delegate pkh *)
+        let* yw = Node.yes_wallet agent in
+        let* ckm = Yes_wallet.load_consensus_key_mapping yw ~client in
         List.map
-          (fun a ->
-            try
-              let ck =
-                List.find
-                  (fun {Yes_wallet.public_key_hash; _} ->
-                    public_key_hash = a.Account.public_key_hash)
-                  ckm
-              in
-              {
-                a with
-                public_key_hash = ck.consensus_public_key_hash;
-                public_key = ck.consensus_public_key;
-              }
-            with Not_found -> a)
-          l)
-      simulated_delegates
-    |> return
+          (fun l ->
+            List.map
+              (fun a ->
+                try
+                  let ck =
+                    List.find
+                      (fun {Yes_wallet.public_key_hash; _} ->
+                        public_key_hash = a.Account.public_key_hash)
+                      ckm
+                  in
+                  {
+                    a with
+                    public_key_hash = ck.consensus_public_key_hash;
+                    public_key = ck.consensus_public_key;
+                  }
+                with Not_found -> a)
+              l)
+          simulated_delegates
+        |> return
   in
   (* [baker_accounts] stands for the list of keys that are actually used for
      baking. Meaning that if a baker uses a consensus key, the baker account
