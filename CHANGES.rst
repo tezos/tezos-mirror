@@ -154,6 +154,10 @@ Baker
   Please remove it from your CLI and configuration, as the support will be
   removed in the next release. (MR :gl:`!18138`)
 
+- Updates many baker events to better display information related to
+  consensus operations, delegates, and keys. Note that these changes
+  may break automatic event parsing. (MR :gl:`!18330`)
+
 Agnostic Baker
 --------------
 

@@ -53,6 +53,12 @@ include
      and type prefix := prefix
      and type t = signature
 
+module Public_key_hash : sig
+  include module type of Public_key_hash
+
+  val is_bls : t -> bool
+end
+
 (** [append sk buf] is the concatenation of [buf] and the
     serialization of the signature of [buf] signed by [sk]. *)
 val append : ?watermark:watermark -> secret_key -> Bytes.t -> Bytes.t

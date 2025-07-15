@@ -209,7 +209,7 @@ let load_client_context (cctxt : ctxt_kind) =
 let get_delegates (cctxt : Protocol_client_context.full) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
     Baking_state_types.Key.make
-      ~alias:(Some alias)
+      ~alias
       ~public_key_hash
       ~public_key
       ~secret_key_uri
@@ -220,10 +220,8 @@ let get_delegates (cctxt : Protocol_client_context.full) =
   let* () =
     Tezos_signer_backends.Encrypted.decrypt_list
       cctxt
-      (List.filter_map
-         (function
-           | {Baking_state_types.Key.alias = Some alias; _} -> Some alias
-           | _ -> None)
+      (List.map
+         (function {Baking_state_types.Key.alias; _} -> alias)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in
