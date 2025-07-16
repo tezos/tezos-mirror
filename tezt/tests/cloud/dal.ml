@@ -2882,7 +2882,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       in
       return client
   in
-  let* simulated_delegates =
+  (* [delegate_accounts] stands for the list of delegates keys (registered
+     baking account) that will be used by the producers daemons. These producers
+     need accounts with funds in order to inject DAL publish commitment
+     operations. *)
+  let* delegate_accounts =
     match configuration.simulate_network with
     | Scatter (selected_bakers_count, baker_daemons_count) ->
         let* all_delegates_aliases =
@@ -2928,21 +2932,28 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           round_robin_split multiple_keys_baker_daemons_count r |> Lwt.return
         in
         Lwt.return (single_key_bakers @ remaining_bakers)
-    | Disabled -> Lwt.return_nil
+    | Disabled ->
+        Lwt_list.mapi_s
+          (fun i _stake ->
+            (* We assume that a baker holds only one key. *)
+            Client.stresstest_gen_keys
+              ~alias_prefix:(Format.sprintf "baker-%d" i)
+              1
+              client)
+          stake
   in
-  let* generated_delegate_accounts =
-    Lwt_list.mapi_s
-      (fun i _stake ->
-        (* We assume that a baker holds only one key. *)
-        Client.stresstest_gen_keys
-          ~alias_prefix:(Format.sprintf "baker-%d" i)
-          1
-          client)
-      stake
-  in
-  let* simulated_bakers =
+  (* [baker_accounts] stands for the list of [baker_account] that are actually
+     used for baking. Meaning that if a baker uses a consensus key, the
+     [baker_account.consensus_key] will hold the associated consensus key. *)
+  let* baker_accounts =
     match configuration.simulate_network with
-    | Disabled -> return []
+    | Disabled ->
+        (* Generated baker accounts are not using any consensus key. *)
+        List.map
+          (fun l ->
+            List.map (fun delegate -> {delegate; consensus_key = None}) l)
+          delegate_accounts
+        |> return
     | Map _ | Scatter _ ->
         (* Substitute consensus pkh with delegate pkh *)
         let* yw = Node.yes_wallet agent in
@@ -2973,25 +2984,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                   {delegate; consensus_key}
                 with Not_found -> {delegate; consensus_key = None})
               l)
-          simulated_delegates
+          delegate_accounts
         |> return
   in
-  (* Generated baker accounts are not using any consensus key. *)
-  let generated_baker_accounts =
-    List.map
-      (fun l -> List.map (fun delegate -> {delegate; consensus_key = None}) l)
-      generated_delegate_accounts
-  in
-  (* [baker_accounts] stands for the list of keys that are actually used for
-     baking. Meaning that if a baker uses a consensus key, the baker account
-     will be that consensus key (and not the registered baker one). This aims to
-     be used by bakers and attesters daemons. *)
-  let baker_accounts = generated_baker_accounts @ simulated_bakers in
-  (* [delegate_accounts] stands for the list of delegates keys (registered
-     baking account) that will be used by the producers daemons. Indeed, the
-     producers requires an account holding funds as they aim to inject
-     publishments. *)
-  let delegate_accounts = generated_delegate_accounts @ simulated_delegates in
   List.iteri
     (fun i l ->
       toplog
