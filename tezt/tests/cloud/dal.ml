@@ -156,38 +156,6 @@ module Node = struct
       Tezos_crypto.Helpers.yes_crypto_environment_variable
       "y"
 
-  let import_snapshot ?(delete_snapshot_file = false) ~name node
-      snapshot_file_path =
-    toplog "Importing the snapshot for %s" name ;
-    let* () =
-      try
-        let* () = Node.snapshot_import ~no_check:true node snapshot_file_path in
-        let () = toplog "Snapshot import succeeded for %s." name in
-        let* () =
-          if delete_snapshot_file then (
-            (* Delete the snapshot downloaded locally *)
-            toplog "Deleting downloaded snapshot (%s)" snapshot_file_path ;
-            let* (_ignored_exit_status : Unix.process_status) =
-              Process.wait (Process.spawn "rm" [snapshot_file_path])
-            in
-            Lwt.return_unit)
-          else Lwt.return_unit
-        in
-        Lwt.return_unit
-      with _ ->
-        (* Failing to import the snapshot could happen on a very young
-           Weeklynet, before the first snapshot is available. In this
-           case bootstrapping from the genesis block is OK. *)
-        let () =
-          toplog
-            "Snapshot import failed for %s, the node will be bootstrapped from \
-             genesis."
-            name
-        in
-        Lwt.return_unit
-    in
-    Lwt.return_unit
-
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling
       cloud agent =
@@ -249,6 +217,7 @@ module Node = struct
             let* () =
               import_snapshot
                 ~delete_snapshot_file:(snapshot = No_snapshot)
+                ~no_check:true
                 ~name
                 node
                 snapshot_file_path
@@ -315,7 +284,8 @@ module Node = struct
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               match snapshot_path with
-              | Some snapshot_path -> import_snapshot ~name node snapshot_path
+              | Some snapshot_path ->
+                  import_snapshot ~no_check:true ~name node snapshot_path
               | None -> Lwt.return_unit
             in
             let* () =

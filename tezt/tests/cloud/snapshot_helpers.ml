@@ -138,3 +138,35 @@ let ensure_snapshot_opt ~agent = function
       let* path = Tezt_cloud.Agent.copy agent ~destination:path ~source:path in
       Lwt.return_some path
   | Url _ | No_snapshot -> Lwt.return_none
+
+let import_snapshot ?(delete_snapshot_file = false) ~no_check ~name node
+    snapshot_file_path =
+  toplog "Importing the snapshot for %s" name ;
+  let* () =
+    try
+      let* () = Node.snapshot_import ~no_check node snapshot_file_path in
+      let () = toplog "Snapshot import succeeded for %s." name in
+      let* () =
+        if delete_snapshot_file then (
+          (* Delete the snapshot downloaded locally *)
+          toplog "Deleting downloaded snapshot (%s)" snapshot_file_path ;
+          let* (_ignored_exit_status : Unix.process_status) =
+            Process.wait (Process.spawn "rm" [snapshot_file_path])
+          in
+          Lwt.return_unit)
+        else Lwt.return_unit
+      in
+      Lwt.return_unit
+    with _ ->
+      (* Failing to import the snapshot could happen on a very young
+         Weeklynet, before the first snapshot is available. In this
+         case bootstrapping from the genesis block is OK. *)
+      let () =
+        toplog
+          "Snapshot import failed for %s, the node will be bootstrapped from \
+           genesis."
+          name
+      in
+      Lwt.return_unit
+  in
+  Lwt.return_unit

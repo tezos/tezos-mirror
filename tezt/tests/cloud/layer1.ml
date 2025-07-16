@@ -146,7 +146,7 @@ module Node = struct
         ]
       in
       let* () = Node.config_init node config in
-      let* () = Node.snapshot_import ~no_check:true node snapshot in
+      let* () = import_snapshot ~no_check:true ~name node snapshot in
       let* () =
         (* When bootstrapping from the real network, we want to use the real time. *)
         let env = String_map.(add "FAKETIME" "+0" empty) in
@@ -182,7 +182,7 @@ module Node = struct
     let* () =
       add_migration_offset_to_config node snapshot ~migration_offset ~network
     in
-    let* () = Node.snapshot_import ~no_check:true node snapshot in
+    let* () = import_snapshot ~no_check:true ~name node snapshot in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     let* () = wait_for_ready node in
@@ -614,7 +614,9 @@ let number_of_bakers ~snapshot ~network cloud agent name =
   let* () =
     Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
   in
-  let* () = Node.snapshot_import ~no_check:true node snapshot in
+  let* () =
+    Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
+  in
   let* () = Node.Agent.run node (Node.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
