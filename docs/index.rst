@@ -215,6 +215,7 @@ You may also access this whole documentation as a single `text file <https://oct
 
    releases/releases
    releases/version-22
+   releases/version-23
    releases/history
 
 .. toctree::
