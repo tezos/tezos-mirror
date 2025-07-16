@@ -16,6 +16,8 @@ pub enum OperationContent {
     Reveal(ManagerOperationContent<RevealContent>),
     #[encoding(tag = 108)]
     Transaction(ManagerOperationContent<TransactionContent>),
+    #[encoding(tag = 109)]
+    Origination(ManagerOperationContent<OriginationContent>),
     #[encoding(tag = 110)]
     Delegation(ManagerOperationContent<DelegationContent>),
 }
@@ -49,6 +51,21 @@ pub struct Parameter {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct OriginationContent {
+    pub balance: Narith,
+    pub delegate: Option<PublicKeyHash>,
+    pub script: Script,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct Script {
+    #[encoding(dynamic, bytes)]
+    pub code: Vec<u8>,
+    #[encoding(dynamic, bytes)]
+    pub storage: Vec<u8>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -277,6 +294,146 @@ mod tests {
         operation.bin_write(&mut encoded_operation).unwrap();
 
         let bytes = hex::decode("6c02ebfd1371b542831b4be730161d08885c5312e44207ff200000000003db557924e5a295652eff2c1f141d5a5b72b9cc91ff0400000002030b").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U",
+      "fee": "52",
+      "counter": "703",
+      "gas_limit": "5",
+      "storage_limit": "36",
+      "balance": "1924",
+      "script": {
+        "code": [
+          { "prim": "parameter", "args": [ { "prim": "nat" } ] },
+          { "prim": "storage", "args": [ { "prim": "nat" } ] },
+          {
+            "prim": "code",
+            "args": [
+              [
+                { "prim": "UNPAIR" },
+                { "prim": "ADD" },
+                { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                { "prim": "PAIR" }
+              ]
+            ]
+          }
+        ],
+        "storage": { "int": "0" }
+      }
+    }'
+    */
+    #[test]
+    fn origination_encoding() {
+        let operation = OperationContent::Origination(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U").unwrap(),
+            fee: 52.into(),
+            counter: 703.into(),
+            operation: OriginationContent {
+                balance: 1924.into(),
+                delegate: None,
+                script: Script {
+                    /*
+                    octez-client convert script "
+                              parameter nat;
+                              storage nat;
+                              code { UNPAIR; ADD; NIL operation; PAIR }
+                            " from Michelson to binary
+                     */
+                    code: hex::decode(
+                        "020000001905000362050103620502020000000a037a0312053d036d0342",
+                    )
+                    .unwrap(),
+                    // octez-client convert data "0" from Michelson to binary
+                    storage: hex::decode("0000").unwrap(),
+                },
+            },
+            gas_limit: 5.into(),
+            storage_limit: 36.into(),
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6d00760f1b125362fdf15f0e1093b1c6555b2dfdb8e434bf050524840f000000001e020000001905000362050103620502020000000a037a0312053d036d0342000000020000").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz3dvgoUnnXoAP9MDqAwiZwRtvTFHcuDMxTR",
+      "fee": "537",
+      "counter": "63",
+      "gas_limit": "2491",
+      "storage_limit": "2",
+      "balance": "25",
+      "delegate": "tz4KAEXbRNNbgK2UqYrAsHXPmwFponv1mnXC",
+      "script": {
+        "code": [
+          { "prim": "parameter", "args": [ { "prim": "unit" } ] },
+          { "prim": "storage", "args": [ { "prim": "bool" } ] },
+          {
+            "prim": "code",
+            "args": [
+              [
+                { "prim": "DROP" },
+                { "prim": "SELF_ADDRESS" },
+                { "prim": "SELF" },
+                { "prim": "ADDRESS" },
+                { "prim": "COMPARE" },
+                { "prim": "EQ" },
+                { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                { "prim": "PAIR" }
+              ]
+            ]
+          }
+        ],
+        "storage": { "prim": "False" }
+      }
+    }'
+    */
+    #[test]
+    fn origination_delegated_contract_encoding() {
+        let operation = OperationContent::Origination(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz3dvgoUnnXoAP9MDqAwiZwRtvTFHcuDMxTR").unwrap(),
+            fee: 537.into(),
+            counter: 63_u64.into(),
+            operation: OriginationContent {
+                balance: 25_u64.into(),
+                delegate: Some(
+                    PublicKeyHash::from_b58check("tz4KAEXbRNNbgK2UqYrAsHXPmwFponv1mnXC").unwrap(),
+                ),
+                script: Script {
+                    /*
+                    octez-client convert script "
+                              parameter unit;
+                              storage bool;
+                              code { DROP; SELF_ADDRESS; SELF; ADDRESS; COMPARE; EQ ; NIL operation; PAIR }
+                            " from Michelson to binary
+                     */
+                    code: hex::decode("02000000210500036c0501035905020200000012032003770349035403190325053d036d0342").unwrap(),
+                    // octez-client convert data "False" from Michelson to binary
+                    storage: hex::decode("0303").unwrap(),
+                },
+            },
+            gas_limit: 2491_u64.into(),
+            storage_limit: 2_u64.into(),
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6d02c10752a0a4ac42262999b3f7300ae60ee62f963499043fbb130219ff036f641e94b212a840099872f3982315f2961a2d380000002602000000210500036c0501035905020200000012032003770349035403190325053d036d0342000000020303").unwrap();
         assert_eq!(bytes, encoded_operation);
 
         let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
