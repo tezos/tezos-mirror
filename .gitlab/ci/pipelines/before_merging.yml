@@ -1532,7 +1532,7 @@ select_tezts:
 trigger:debian_repository_partial_auto:
   stage: test
   variables:
-    PIPELINE_TYPE: debian_repository_partial_auto
+    PIPELINE_TYPE: before_merging:debian_repository_partial_auto
   rules:
   - changes:
     - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
@@ -1559,7 +1559,7 @@ trigger:debian_repository_partial_auto:
 trigger:rpm_repository_partial_auto:
   stage: test
   variables:
-    PIPELINE_TYPE: rpm_repository_partial_auto
+    PIPELINE_TYPE: before_merging:rpm_repository_partial_auto
   rules:
   - changes:
     - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
@@ -1583,7 +1583,7 @@ trigger:rpm_repository_partial_auto:
 trigger:homebrew_auto:
   stage: test
   variables:
-    PIPELINE_TYPE: homebrew_auto
+    PIPELINE_TYPE: before_merging:homebrew_auto
   rules:
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
@@ -4231,7 +4231,7 @@ documentation:linkcheck:
 trigger:homebrew:
   stage: manual
   variables:
-    PIPELINE_TYPE: homebrew
+    PIPELINE_TYPE: before_merging:homebrew
   rules:
   - when: manual
     allow_failure: true
@@ -4243,7 +4243,7 @@ trigger:homebrew:
 trigger:rpm_repository_partial:
   stage: manual
   variables:
-    PIPELINE_TYPE: rpm_repository_partial
+    PIPELINE_TYPE: before_merging:rpm_repository_partial
   rules:
   - when: manual
     allow_failure: true
@@ -4255,7 +4255,7 @@ trigger:rpm_repository_partial:
 trigger:debian_repository_partial:
   stage: manual
   variables:
-    PIPELINE_TYPE: debian_repository_partial
+    PIPELINE_TYPE: before_merging:debian_repository_partial
   rules:
   - when: manual
     allow_failure: true
@@ -4377,7 +4377,7 @@ oc.script.docker_verify_image_amd64:
 trigger:base_images:
   stage: manual
   variables:
-    PIPELINE_TYPE: base_images
+    PIPELINE_TYPE: before_merging:base_images
   rules:
   - when: manual
     allow_failure: true

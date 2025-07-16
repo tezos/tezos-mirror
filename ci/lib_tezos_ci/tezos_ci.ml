@@ -1032,6 +1032,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
   }
 
 let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
+    ?parent_pipeline_name
     Pipeline.
       {
         name = child_pipeline_name;
@@ -1047,13 +1048,18 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       "[trigger_job] trigger job '%s' has artifact-dependencies, which is not \
        allowed by GitLab CI."
       job_name ;
+  let pipeline_type =
+    match parent_pipeline_name with
+    | None -> child_pipeline_name
+    | Some parent_name -> parent_name ^ ":" ^ child_pipeline_name
+  in
   let trigger_job =
     Gitlab_ci.Util.trigger_job
       ?needs
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
-      ~variables:[("PIPELINE_TYPE", child_pipeline_name)]
+      ~variables:[("PIPELINE_TYPE", pipeline_type)]
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
