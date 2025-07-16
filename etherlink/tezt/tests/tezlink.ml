@@ -95,6 +95,18 @@ let register_tezlink_test ~title ~tags ?bootstrap_accounts ?bootstrap_contracts
     scenario
     protocols
 
+let test_observer_starts =
+  register_tezlink_test
+    ~title:"Test Tezlink observer does not crash at startup"
+    ~tags:["observer"]
+  @@ fun {sequencer; observer; _} _protocol ->
+  let observer_promise = Evm_node.wait_for_blueprint_applied observer 1 in
+  let* () =
+    let*@ _ = Rpc.produce_block sequencer in
+    unit
+  and* () = observer_promise in
+  unit
+
 let test_tezlink_current_level =
   register_tezlink_test
     ~title:"Test of the current_level rpc"
@@ -1047,6 +1059,7 @@ let test_tezlink_sandbox () =
   unit
 
 let () =
+  test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_contract_info [Alpha] ;

@@ -27,12 +27,8 @@ let on_new_blueprint (type f)
     (({delayed_transactions; blueprint; _} : Blueprint_types.with_events) as
      blueprint_with_events) =
   let open Lwt_result_syntax in
-  let*? (module Tx_container) =
-    let open Result_syntax in
-    match tx_container with
-    | Evm_tx_container m -> return m
-    | Michelson_tx_container _ ->
-        error_with "Observer mode is not supported for Tezlink"
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
   in
   let (Qty level) = blueprint.number in
   let (Qty number) = next_blueprint_number in
@@ -222,11 +218,9 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       init_from_snapshot
   in
 
-  let* l2_chain_id, Ex_chain_family chain_family =
-    match config.experimental_features.l2_chains with
-    | None -> return (None, L2_types.Ex_chain_family EVM)
-    | Some [l2_chain] -> return (Some l2_chain.chain_id, l2_chain.chain_family)
-    | _ -> tzfail Node_error.Unexpected_multichain
+  let (Ex_chain_family chain_family) =
+    Configuration.retrieve_chain_family
+      ~l2_chains:config.experimental_features.l2_chains
   in
 
   let*? start_tx_container, tx_container, ping_tx_pool =
@@ -280,7 +274,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   (* Check that the multichain configuration is consistent with the
      kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
-  let* _l2_chain_id, _chain_family =
+  let* l2_chain_id, _chain_family =
     let (module Backend) = observer_backend in
     Backend.single_chain_id_and_family ~config ~enable_multichain
   in
