@@ -17,7 +17,8 @@ use tezos_smart_rollup_storage::storage::Storage;
 
 use crate::{
     code_storage::CodeStorage,
-    storage_helpers::{
+    helpers::legacy::FaDepositWithProxy,
+    helpers::{
         concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
         read_u64_le_default, write_u256_le,
     },
@@ -59,6 +60,9 @@ const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
 
 /// Path where global ticket table is stored.
 const TICKET_STORAGE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
+
+/// Path where global deposit table is stored.
+const DEPOSIT_QUEUE_TABLE: RefPath = RefPath::assert_from(b"/deposits_table");
 
 /// If a contract tries to read a value from storage and it has previously not written
 /// anything to this location or if it wrote the default value, then it gets this
@@ -336,6 +340,32 @@ impl StorageAccount {
         } else {
             Ok(false)
         }
+    }
+
+    fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, Error> {
+        concat(
+            &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
+            &RefPath::assert_from(format!("/{}", withdrawal_id).as_bytes()),
+        )
+    }
+
+    pub(crate) fn read_deposit_from_queue(
+        &self,
+        host: &impl Runtime,
+        deposit_id: &U256,
+    ) -> Result<FaDepositWithProxy, Error> {
+        let deposit_path = self.deposit_path(deposit_id)?;
+        let raw_deposit = host.store_read_all(&deposit_path)?;
+        FaDepositWithProxy::from_raw(raw_deposit)
+    }
+
+    pub(crate) fn remove_deposit_from_queue(
+        &self,
+        host: &mut impl Runtime,
+        deposit_id: &U256,
+    ) -> Result<(), Error> {
+        let deposit_path = self.deposit_path(deposit_id)?;
+        Ok(host.store_delete(&deposit_path)?)
     }
 }
 

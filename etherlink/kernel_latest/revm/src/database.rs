@@ -8,6 +8,7 @@ use std::mem;
 use crate::{
     block_storage::{get_block_hash, BLOCKS_STORED},
     code_storage::CodeStorage,
+    helpers::legacy::FaDepositWithProxy,
     send_outbox_message::Withdrawal,
     world_state_handler::{
         account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
@@ -15,6 +16,7 @@ use crate::{
     Error,
 };
 
+use alloy_primitives::KECCAK256_EMPTY;
 use revm::{
     primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
@@ -40,6 +42,10 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     commit_status: &'a mut bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
+    /// HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
+    /// This is used in order to avoid the problem of EIP-3607 for address
+    /// zero which contains the forwarder code.
+    caller: Address,
 }
 
 enum AccountState {
@@ -55,6 +61,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
         commit_status: &'a mut bool,
+        caller: Address,
     ) -> Self {
         EtherlinkVMDB {
             host,
@@ -62,11 +69,12 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             world_state_handler,
             commit_status,
             withdrawals: vec![],
+            caller,
         }
     }
 }
 
-pub trait PrecompileDatabase: Database {
+pub(crate) trait PrecompileDatabase: Database {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn push_withdrawal(&mut self, withdrawal: Withdrawal);
@@ -83,6 +91,11 @@ pub trait PrecompileDatabase: Database {
         owner: &Address,
         amount: U256,
     ) -> Result<bool, Error>;
+    fn read_deposit_from_queue(
+        &self,
+        deposit_id: &U256,
+    ) -> Result<FaDepositWithProxy, Error>;
+    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
@@ -225,6 +238,19 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         let mut account_zero = self.get_or_create_account(Address::ZERO)?;
         account_zero.ticket_balance_remove(self.host, ticket_hash, owner, amount)
     }
+
+    fn read_deposit_from_queue(
+        &self,
+        deposit_id: &U256,
+    ) -> Result<FaDepositWithProxy, Error> {
+        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.read_deposit_from_queue(self.host, deposit_id)
+    }
+
+    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error> {
+        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        account_zero.remove_deposit_from_queue(self.host, deposit_id)
+    }
 }
 
 impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
@@ -233,6 +259,19 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         let storage_account = self.get_or_create_account(address)?;
         let account_info = storage_account.info(self.host)?;
+
+        if self.caller == Address::ZERO && address == Address::ZERO {
+            // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
+            // This can only happen in a simulation case only.
+            // The zero address contains code for legacy reasons related to precompiles.
+            // We must return empty code here otherwise the simulation will fail because
+            // of EIP-3607.
+            return Ok(Some(AccountInfo {
+                code_hash: KECCAK256_EMPTY,
+                code: None,
+                ..account_info
+            }));
+        }
 
         Ok(Some(account_info))
     }

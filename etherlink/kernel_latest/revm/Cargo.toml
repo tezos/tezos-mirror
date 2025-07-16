@@ -20,7 +20,9 @@ tezos_ethereum.workspace = true
 alloy-sol-types = { version = "1.2.0", default-features = false, features = [
     "json",
 ] }
+alloy-primitives = { version = "1.2.0", default-features = false }
 num-bigint.workspace = true
+rlp.workspace = true
 
 # SDK
 tezos-evm-runtime.workspace = true

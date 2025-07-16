@@ -13140,6 +13140,7 @@ let test_fa_deposit_can_be_claimed =
     ~enable_fa_bridge:true
     ~use_multichain:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
+    ~use_revm:activate_revm_registration
     ~title:"Claims are operational"
   @@ fun {
            client;
@@ -13239,13 +13240,10 @@ let test_fa_deposit_can_be_claimed =
     Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" sequencer
   in
 
-  let*@ _json =
+  let*@ _receipt =
     match block.transactions with
     | Block.Full (tx :: _) ->
-        Rpc.trace_transaction
-          ~transaction_hash:tx.Transaction.hash
-          ~tracer:"callTracer"
-          sequencer
+        Rpc.get_transaction_receipt ~tx_hash:tx.Transaction.hash sequencer
     | _ -> Test.fail "Inconsistent result"
   in
 

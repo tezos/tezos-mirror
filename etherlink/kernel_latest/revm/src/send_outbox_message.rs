@@ -126,7 +126,7 @@ fn parse_l1_routing_info(routing_info: &[u8]) -> Result<(Contract, Contract), St
     Ok((receiver, proxy))
 }
 
-pub fn send_outbox_message_precompile<CTX>(
+pub(crate) fn send_outbox_message_precompile<CTX>(
     input: &[u8],
     context: &mut CTX,
     is_static: bool,
