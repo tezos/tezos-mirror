@@ -316,14 +316,16 @@ module Test_map_instr_on_options = struct
     assertions storage_before new_storage input
 end
 
-let test_contract path storage param ~entrypoint_str ~ok ~ko =
+let test_contract ?initial_ctx path storage param ~entrypoint_str ~ok ~ko =
   let open Lwt_result_syntax in
   let entrypoint =
     match entrypoint_str with
     | None -> Entrypoint.default
     | Some str -> Entrypoint.of_string_strict_exn str
   in
-  let* ctx = test_context () in
+  let* ctx =
+    match initial_ctx with None -> test_context () | Some ctx -> return ctx
+  in
   let read_file filename =
     let ch = open_in filename in
     let s = really_input_string ch (in_channel_length ch) in
@@ -345,11 +347,12 @@ let test_contract path storage param ~entrypoint_str ~ok ~ko =
 let fail_with_trace trace =
   Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace trace
 
-let test_contract_success path storage param expected_storage_str
+let test_contract_success ?initial_ctx path storage param expected_storage_str
     ?entrypoint_str () =
   let open Lwt_result_syntax in
   let expected_storage = Expr.from_string expected_storage_str in
   test_contract
+    ?initial_ctx
     path
     storage
     param
@@ -359,9 +362,10 @@ let test_contract_success path storage param expected_storage_str
     ~ko:fail_with_trace
     ~entrypoint_str
 
-let test_contract_fail path storage param ?entrypoint_str () =
+let test_contract_fail ?initial_ctx path storage param ?entrypoint_str () =
   let open Lwt_result_syntax in
   test_contract
+    ?initial_ctx
     path
     storage
     param
@@ -479,6 +483,38 @@ let tests =
          ~entrypoint_str_2:"exec"
          ~param_2:"5"
          ~expected_storage_str_2:"Left 120");
+    Tztest.tztest
+      "index_address instruction from empty context"
+      `Quick
+      (test_contract_success
+         (path // "contracts/index_address.tz")
+         "None"
+         "\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\""
+         "Some 1");
+    Tztest.tztest
+      "index_address instruction with already registered address"
+      `Quick
+      (test_contract_success
+         (path // "contracts/index_address.tz")
+         "None"
+         ("\"" ^ Signature.Public_key_hash.(to_b58check zero) ^ "\"")
+         "Some 0");
+    Tztest.tztest
+      "index_address instruction with contract address"
+      `Quick
+      (test_contract_success
+         (path // "contracts/index_address.tz")
+         "None"
+         "\"KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x\""
+         "Some 1");
+    Tztest.tztest
+      "index_address instruction with smart rollup address"
+      `Quick
+      (test_contract_success
+         (path // "contracts/index_address.tz")
+         "None"
+         "\"sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg\""
+         "Some 1");
   ]
   @ error_encoding_tests
 

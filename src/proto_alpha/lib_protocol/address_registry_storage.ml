@@ -32,3 +32,10 @@ let init ctxt =
     add_if_missing ctxt (Destination_repr.Contract Contract_repr.zero)
   in
   return ctxt
+
+module Internal_for_tests = struct
+  let set_counter ctxt index =
+    Storage.Contract.Address_registry.Next.update ctxt index
+
+  let get_counter ctxt = Storage.Contract.Address_registry.Next.get ctxt
+end
