@@ -597,72 +597,78 @@ let get_rich_accounts (module P : Sigs.PROTOCOL) context
   let min_threshold_tz =
     P.Tez.of_mutez_exn (Int64.mul min_threshold 1_000_000L)
   in
-  let* accounts =
-    Lwt.catch
-      (fun () ->
-        P.Contract.fold context ~init:(Ok []) ~f:(fun acc contract ->
-            let*? acc in
-            let* balance = P.Contract.balance context contract in
-            if balance >= min_threshold_tz then
-              let pkh = P.Contract.contract_address contract in
-              match
-                Tezos_crypto.Signature.V_latest.Public_key_hash.of_b58check_opt
-                  pkh
-              with
-              | None -> return acc
-              | Some k -> (
-                  let pkh =
-                    match P.Signature.Of_latest.public_key_hash k with
-                    | None ->
-                        (* Not expected at all. *)
-                        assert false
-                    | Some k -> k
-                  in
-                  let*! pk = P.Contract.get_manager_key context pkh in
-                  match pk with
-                  | Error _ ->
-                      (* Can fail for missing_manager_contract or
-                         Unrevealed_manager_key errors. Ignoring these
-                         accounts. *)
-                      return acc
-                  | Ok pk ->
-                      let res =
-                        ( P.Signature.To_latest.public_key_hash pkh,
-                          P.Signature.To_latest.public_key pk,
-                          P.Tez.to_mutez balance )
-                        :: acc
+  Tezos_stdlib_unix.Animation.(
+    three_dots ~progress_display_mode:Auto ~msg:"Loading rich accounts")
+    (fun () ->
+      let* accounts =
+        Lwt.catch
+          (fun () ->
+            P.Contract.fold context ~init:(Ok []) ~f:(fun acc contract ->
+                let*? acc in
+                let* balance = P.Contract.balance context contract in
+                if balance >= min_threshold_tz then
+                  let pkh = P.Contract.contract_address contract in
+                  match
+                    Tezos_crypto.Signature.V_latest.Public_key_hash
+                    .of_b58check_opt
+                      pkh
+                  with
+                  | None -> return acc
+                  | Some k -> (
+                      let pkh =
+                        match P.Signature.Of_latest.public_key_hash k with
+                        | None ->
+                            (* Not expected at all. *)
+                            assert false
+                        | Some k -> k
                       in
-                      if List.length res >= count then raise (Done res)
-                      else return res)
-            else return acc))
-      (function
-        | Done res -> return res
-        | e -> failwith "Unexpected error: %s@." (Printexc.to_string e))
-  in
-  let sorted_accounts =
-    List.sort (fun (_, _, x) (_, _, y) -> Int64.compare y x) accounts
-  in
-  let selected_accounts = Tezos_stdlib.TzList.take_n count sorted_accounts in
-  let res =
-    List.mapi
-      (fun i (pkh, pk, tez) ->
-        let alias = Format.sprintf "rich_%d" i in
-        (alias, pkh, pk, tez))
-      selected_accounts
-  in
-  Format.printf
-    "Extracted the %d accounts with a spendable balance over %Ldꜩ:@."
-    count
-    min_threshold ;
-  List.iter
-    (fun (alias, pkh, _, tez) ->
+                      let*! pk = P.Contract.get_manager_key context pkh in
+                      match pk with
+                      | Error _ ->
+                          (* Can fail for missing_manager_contract or
+                             Unrevealed_manager_key errors. Ignoring these
+                             accounts. *)
+                          return acc
+                      | Ok pk ->
+                          let res =
+                            ( P.Signature.To_latest.public_key_hash pkh,
+                              P.Signature.To_latest.public_key pk,
+                              P.Tez.to_mutez balance )
+                            :: acc
+                          in
+                          if List.length res >= count then raise (Done res)
+                          else return res)
+                else return acc))
+          (function
+            | Done res -> return res
+            | e -> failwith "Unexpected error: %s@." (Printexc.to_string e))
+      in
+      let sorted_accounts =
+        List.sort (fun (_, _, x) (_, _, y) -> Int64.compare y x) accounts
+      in
+      let selected_accounts =
+        Tezos_stdlib.TzList.take_n count sorted_accounts
+      in
+      let res =
+        List.mapi
+          (fun i (pkh, pk, tez) ->
+            let alias = Format.sprintf "rich_%d" i in
+            (alias, pkh, pk, tez))
+          selected_accounts
+      in
       Format.printf
-        "%s (%s): %Ldꜩ@."
-        alias
-        (Signature.Public_key_hash.to_b58check pkh)
-        (Int64.div tez 1_000_000L))
-    res ;
-  return res
+        "Extracted the %d accounts with a spendable balance over %Ldꜩ:@."
+        count
+        min_threshold ;
+      List.iter
+        (fun (alias, pkh, _, tez) ->
+          Format.printf
+            "%s (%s): %Ldꜩ@."
+            alias
+            (Signature.Public_key_hash.to_b58check pkh)
+            (Int64.div tez 1_000_000L))
+        res ;
+      return res)
 
 (** [load_bakers_public_keys ?staking_share_opt ?network_opt ?level
     ~active_backers_only base_dir alias_phk_pk_list] checkouts the head context
