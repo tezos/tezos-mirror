@@ -34,6 +34,9 @@ val to_string : [< t] -> string
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t
 
+(** Block time value for the network *)
+val block_time : t -> int
+
 (** Endpoint publicly available with RPC opened *)
 val public_rpc_endpoint : public -> Endpoint.t
 

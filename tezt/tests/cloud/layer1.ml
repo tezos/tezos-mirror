@@ -32,22 +32,6 @@ let get_snapshot_info_level node snapshot_path =
   let json = JSON.parse ~origin:"snapshot_info" info in
   Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
 
-module Network = struct
-  include Network
-
-  type t = [`Mainnet | `Ghostnet]
-
-  let to_string (t : t) = Network.to_string (t :> Network.t)
-
-  let to_octez_network_options (t : t) =
-    Network.to_octez_network_options (t :> Network.public)
-
-  let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
-
-  (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
-  let migrate_to _network = Protocol.Alpha
-end
-
 let yes_crypto_env =
   String_map.add
     Tezos_crypto.Helpers.yes_crypto_environment_variable
@@ -101,7 +85,7 @@ module Node = struct
       No_bootstrap_peers;
       Connections (List.length peers);
       Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network (Network.to_octez_network_options network);
+      Network Network.(to_octez_network_options @@ to_public network);
       Expected_pow 0;
       Cors_origin "*";
       Storage_maintenance_delay (string_of_int delay);
@@ -129,10 +113,14 @@ module Node = struct
     match migration_offset with
     | None -> Lwt.return_unit
     | Some migration_offset ->
-        let network_config =
+        let* network_config =
           match network with
-          | `Mainnet -> Node.Config_file.mainnet_network_config
-          | `Ghostnet -> Node.Config_file.ghostnet_network_config
+          | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config
+          | `Ghostnet -> Lwt.return Node.Config_file.ghostnet_network_config
+          | _ ->
+              Lwt.fail_with
+                "Migration scenarios are only supported for Mainnet and \
+                 Ghostnet."
         in
         let migration_level = level + migration_offset in
         toplog "Add UAU entry for level : %d" migration_level ;
@@ -144,7 +132,7 @@ module Node = struct
                   network_config )
               json
             |> Node.Config_file.update_network_with_user_activated_upgrades
-                 [(migration_level, Network.migrate_to network)])
+                 [(migration_level, Protocol.Alpha)])
 
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
@@ -171,7 +159,7 @@ module Node = struct
       toplog "Bootstrapping node using the real world" ;
       let config =
         [
-          Network (Network.to_octez_network_options network);
+          Network Network.(to_octez_network_options @@ to_public network);
           Expected_pow 26;
           Cors_origin "*";
           Synchronisation_threshold 1;

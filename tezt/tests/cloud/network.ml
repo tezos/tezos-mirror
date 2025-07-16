@@ -41,6 +41,11 @@ let default_protocol : t -> Protocol.t = function
   | `Rionet -> R022
   | `Seoulnet -> S023
 
+let block_time : t -> int = function
+  | `Mainnet -> 8
+  | `Ghostnet -> 5
+  | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
+
 let public_rpc_endpoint testnet =
   Endpoint.make
     ~scheme:"https"

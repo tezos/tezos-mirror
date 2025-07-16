@@ -100,14 +100,35 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       "Unexpected network simulation config (--simulation) [%s]"
       simulate_network_arg
 
+let parse_network = function
+  | "mainnet" -> Some `Mainnet
+  | "ghostnet" -> Some `Ghostnet
+  | "rionet" -> Some `Rionet
+  | "seoulnet" -> Some `Seoulnet
+  | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+      (* format: weeklynet-2025-01-29 (with dashes) *)
+      let date = String.sub s 10 10 in
+      Some (`Weeklynet date)
+  | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
+      (* format: nextnet-20250203 (without dashes) *)
+      let date = String.sub s 8 8 in
+      Some (`Nextnet date)
+  | "sandbox" -> Some `Sandbox
+  | _ -> None
+
+let network_typ : Network.t Clap.typ =
+  Clap.typ
+    ~name:"network"
+    ~dummy:`Ghostnet
+    ~parse:parse_network
+    ~show:Network.to_string
+
 module type Dal = sig
   val blocks_history : int
 
   val producer_key : string option
 
   val fundraiser : string option
-
-  val network_typ : Network.t Clap.typ
 
   val network : Network.t
 
@@ -222,29 +243,6 @@ module Dal () : Dal = struct
         "Delay in levels between two slot productions. Default is 1 meaning \
          \"produce every level\"."
       1
-
-  let parse_network = function
-    | "mainnet" -> Some `Mainnet
-    | "ghostnet" -> Some `Ghostnet
-    | "rionet" -> Some `Rionet
-    | "seoulnet" -> Some `Seoulnet
-    | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
-        (* format:  weeklynet-2025-01-29 (with dashes) *)
-        let date = String.sub s 10 10 in
-        Some (`Weeklynet date)
-    | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
-        (* format: nextnet-20250203  (without dashes) *)
-        let date = String.sub s 8 8 in
-        Some (`Nextnet date)
-    | "sandbox" -> Some `Sandbox
-    | _ -> None
-
-  let network_typ : Network.t Clap.typ =
-    Clap.typ
-      ~name:"network"
-      ~dummy:`Ghostnet
-      ~parse:parse_network
-      ~show:Network.to_string
 
   let network =
     Clap.default
@@ -648,7 +646,7 @@ module Dal () : Dal = struct
 end
 
 module type Layer1 = sig
-  val network : [`Mainnet | `Ghostnet] option
+  val network : Network.t option
 
   val stake : int list option
 
@@ -682,23 +680,13 @@ module Layer1 () = struct
          [cloud] and [layer1] tags on the command line"
       "LAYER1"
 
-  let network : [`Mainnet | `Ghostnet] option =
-    let typ =
-      Clap.typ
-        ~name:"network"
-        ~dummy:`Ghostnet
-        ~parse:(function
-          | "mainnet" -> Some `Mainnet
-          | "ghostnet" -> Some `Ghostnet
-          | _ -> None)
-        ~show:(fun n -> Network.to_string (n :> Network.t))
-    in
+  let network : Network.t option =
     Clap.optional
       ~section
       ~long:"network"
       ~placeholder:"<ghostnet|mainnet>"
       ~description:"Allow to specify a network to use for the scenario"
-      typ
+      network_typ
       ()
 
   let stake =
