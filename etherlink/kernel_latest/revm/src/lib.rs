@@ -214,6 +214,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants,
         world_state_handler,
         &mut commit_status,
+        caller,
     );
 
     let mut evm = evm(

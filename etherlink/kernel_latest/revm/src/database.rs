@@ -16,6 +16,7 @@ use crate::{
     Error,
 };
 
+use alloy_primitives::KECCAK256_EMPTY;
 use revm::{
     primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
@@ -41,6 +42,10 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     commit_status: &'a mut bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
+    /// HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
+    /// This is used in order to avoid the problem of EIP-3607 for address
+    /// zero which contains the forwarder code.
+    caller: Address,
 }
 
 enum AccountState {
@@ -56,6 +61,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
         commit_status: &'a mut bool,
+        caller: Address,
     ) -> Self {
         EtherlinkVMDB {
             host,
@@ -63,6 +69,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
             world_state_handler,
             commit_status,
             withdrawals: vec![],
+            caller,
         }
     }
 }
@@ -252,6 +259,19 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
         let storage_account = self.get_or_create_account(address)?;
         let account_info = storage_account.info(self.host)?;
+
+        if self.caller == Address::ZERO && address == Address::ZERO {
+            // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
+            // This can only happen in a simulation case only.
+            // The zero address contains code for legacy reasons related to precompiles.
+            // We must return empty code here otherwise the simulation will fail because
+            // of EIP-3607.
+            return Ok(Some(AccountInfo {
+                code_hash: KECCAK256_EMPTY,
+                code: None,
+                ..account_info
+            }));
+        }
 
         Ok(Some(account_info))
     }
