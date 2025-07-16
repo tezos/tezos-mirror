@@ -134,8 +134,6 @@ module Disconnect = struct
 end
 
 module Node = struct
-  let runner_of_agent = Agent.runner
-
   open Snapshot_helpers
 
   let may_copy_node_identity_file agent node = function
@@ -157,58 +155,6 @@ module Node = struct
     String_map.singleton
       Tezos_crypto.Helpers.yes_crypto_environment_variable
       "y"
-
-  let download_snapshot ~agent ~url ~name =
-    let downloaded_snapshot_file_path = "snapshot_file" in
-    toplog "Trying to download snapshot for %s from %s" name url ;
-    let* exit_status =
-      Process.spawn
-        ?runner:(runner_of_agent agent)
-        "wget"
-        ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
-      |> Process.wait
-    in
-    let* () =
-      match exit_status with
-      | WEXITED 0 -> Lwt.return_unit
-      | WEXITED code ->
-          toplog
-            "Could not download the snapshot for %s: wget exit code: %d\n\
-             Starting without snapshot. It could last long before the node is \
-             bootstrapped"
-            name
-            code ;
-          Lwt.return_unit
-      | status -> (
-          match Process.validate_status status with
-          | Ok () -> Lwt.return_unit
-          | Error (`Invalid_status reason) ->
-              failwith @@ Format.sprintf "wget: %s" reason)
-    in
-    Lwt.return downloaded_snapshot_file_path
-
-  let ensure_snapshot ~agent ~name ~network = function
-    | Docker_embedded path ->
-        toplog "Using locally stored snapshot file: %s" path ;
-        Lwt.return path
-    | Local_file path ->
-        toplog "Copying snapshot to destination" ;
-        Tezt_cloud.Agent.copy agent ~destination:path ~source:path
-    | Url url -> download_snapshot ~agent ~url ~name
-    | No_snapshot ->
-        download_snapshot ~agent ~url:(Network.snapshot_service network) ~name
-
-  let ensure_snapshot_opt ~agent = function
-    | Docker_embedded path ->
-        toplog "Using locally stored snapshot file: %s" path ;
-        Lwt.return_some path
-    | Local_file path ->
-        toplog "Copying snapshot to destination" ;
-        let* path =
-          Tezt_cloud.Agent.copy agent ~destination:path ~source:path
-        in
-        Lwt.return_some path
-    | Url _ | No_snapshot -> Lwt.return_none
 
   let import_snapshot ?(delete_snapshot_file = false) ~name node
       snapshot_file_path =
@@ -241,17 +187,6 @@ module Node = struct
         Lwt.return_unit
     in
     Lwt.return_unit
-
-  let get_snapshot_info_network node snapshot_path =
-    let* info = Node.snapshot_info node ~json:true snapshot_path in
-    let json = JSON.parse ~origin:"snapshot_info" info in
-    (match JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string) with
-    | "TEZOS_ITHACANET_2022-01-25T15:00:00Z" -> "ghostnet"
-    | "TEZOS_RIONET_2025-02-19T12:45:00Z" -> "rionet"
-    | "TEZOS_SEOULNET_2025-07-11T08:00:00Z" -> "seoulnet"
-    | "TEZOS_MAINNET" -> "mainnet"
-    | "TEZOS" | _ -> "sandbox")
-    |> Lwt.return
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling
@@ -2855,7 +2790,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       let* snapshot_network =
         match configuration.snapshot with
         | Docker_embedded path | Local_file path ->
-            let* network = Node.get_snapshot_info_network bootstrap_node path in
+            let* network =
+              Snapshot_helpers.get_snapshot_info_network bootstrap_node path
+            in
             (* Yes-wallet requires the config url for protocol-specific test
                networks.*)
             let network =

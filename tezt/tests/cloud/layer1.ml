@@ -27,11 +27,6 @@ type baker_account = {pk : string; pkh : string}
 let add_prometheus_source node cloud agent =
   Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
 
-let get_snapshot_info_level node snapshot_path =
-  let* info = Node.snapshot_info node ~json:true snapshot_path in
-  let json = JSON.parse ~origin:"snapshot_info" info in
-  Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
-
 let yes_crypto_env =
   String_map.add
     Tezos_crypto.Helpers.yes_crypto_environment_variable
@@ -57,50 +52,8 @@ let nb_stresstester network tps =
   max n1 n2
 
 module Node = struct
-  let runner_of_agent = Agent.runner
-
   open Snapshot_helpers
   include Node
-
-  let download_snapshot ~agent ~url ~name =
-    let downloaded_snapshot_file_path = "snapshot_file" in
-    toplog "Trying to download snapshot for %s from %s" name url ;
-    let* exit_status =
-      Process.spawn
-        ?runner:(runner_of_agent agent)
-        "wget"
-        ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
-      |> Process.wait
-    in
-    let* () =
-      match exit_status with
-      | WEXITED 0 -> Lwt.return_unit
-      | WEXITED code ->
-          toplog
-            "Could not download the snapshot for %s: wget exit code: %d\n\
-             Starting without snapshot. It could last long before the node is \
-             bootstrapped"
-            name
-            code ;
-          Lwt.return_unit
-      | status -> (
-          match Process.validate_status status with
-          | Ok () -> Lwt.return_unit
-          | Error (`Invalid_status reason) ->
-              failwith @@ Format.sprintf "wget: %s" reason)
-    in
-    Lwt.return downloaded_snapshot_file_path
-
-  let ensure_snapshot ~agent ~name ~network = function
-    | Docker_embedded path ->
-        toplog "Using locally stored snapshot file: %s" path ;
-        Lwt.return path
-    | Local_file path ->
-        toplog "Copying snapshot to destination" ;
-        Tezt_cloud.Agent.copy agent ~destination:path ~source:path
-    | Url url -> download_snapshot ~agent ~url ~name
-    | No_snapshot ->
-        download_snapshot ~agent ~url:(Network.snapshot_service network) ~name
 
   (** We are running a private network with yes-crypto enabled.
       We don't want to connect with the real network.
@@ -652,7 +605,7 @@ let number_of_bakers ~snapshot ~network cloud agent name =
     Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
   in
   let* snapshot =
-    Node.ensure_snapshot
+    Snapshot_helpers.ensure_snapshot
       ~agent
       ~name
       ~network:(Network.to_public network)
