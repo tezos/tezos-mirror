@@ -61,6 +61,12 @@ type snapshot_config =
   | Local_file of string
   | No_snapshot
 
+(* Some DAL nodes (those in operator mode) refuse to start unless they are
+   connected to an Octez node keeping enough history to play refutation
+   games. *)
+let refutation_game_minimal_rolling_history_mode =
+  Node.(History_mode (Rolling (Some 79)))
+
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -318,6 +324,10 @@ module Node = struct
                 ?ppx_profiling
                 ?env
                 node
+                (* We've just imported a rolling snapshot keeping few history.
+                   To switch to the configured history mode, which may have
+                   longer history, we need the --force-history-mode-switch
+                   option. *)
                 (Force_history_mode_switch :: Synchronisation_threshold 1
                :: arguments)
             in
@@ -401,6 +411,10 @@ module Node = struct
                    No_bootstrap_peers;
                    Synchronisation_threshold 0;
                    Cors_origin "*";
+                   (* We've just imported a rolling snapshot keeping few
+                      history. To switch to the configured history mode, which
+                      may have longer history, we need the
+                      --force-history-mode-switch option. *)
                    Force_history_mode_switch;
                  ]
                 @ yes_crypto_arg @ arguments)
@@ -3507,7 +3521,7 @@ let init_dal_reverse_proxy_observers
                ~arguments:
                  [
                    Peer bootstrap.node_p2p_endpoint;
-                   History_mode (Rolling (Some 79));
+                   refutation_game_minimal_rolling_history_mode;
                  ]
                ~rpc_external:external_rpc
                network
@@ -3575,7 +3589,10 @@ let init_etherlink_dal_node
           ?env
           ~name
           ~arguments:
-            [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+            [
+              Peer bootstrap.node_p2p_endpoint;
+              refutation_game_minimal_rolling_history_mode;
+            ]
           ~rpc_external:external_rpc
           network
           ~with_yes_crypto
@@ -3616,7 +3633,10 @@ let init_etherlink_dal_node
           ?env
           ~name
           ~arguments:
-            [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+            [
+              Peer bootstrap.node_p2p_endpoint;
+              refutation_game_minimal_rolling_history_mode;
+            ]
           ~rpc_external:external_rpc
           network
           ~with_yes_crypto
@@ -3671,7 +3691,10 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
       ?data_dir
       ~name
       ~arguments:
-        [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+        [
+          Peer bootstrap.node_p2p_endpoint;
+          refutation_game_minimal_rolling_history_mode;
+        ]
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~with_yes_crypto
@@ -4060,8 +4083,10 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
       ?data_dir
       ~name
       ~arguments:
-        (* Keeping enough data for refutation games -- might be adjusted if need. *)
-        [Peer bootstrap.node_p2p_endpoint; History_mode (Rolling (Some 79))]
+        [
+          Peer bootstrap.node_p2p_endpoint;
+          refutation_game_minimal_rolling_history_mode;
+        ]
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~snapshot:configuration.snapshot
