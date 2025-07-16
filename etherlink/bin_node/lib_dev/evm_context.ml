@@ -1089,15 +1089,17 @@ module State = struct
           failwith "Only sequencer is capable to handle the flushed blueprint"
       | Some signer -> return signer
     in
-    let* blueprint_chunks =
-      Sequencer_blueprint.prepare
-        ~signer
-        ~timestamp
-        ~transactions:[]
-        ~delayed_transactions:hashes
-        ~parent_hash
+    let chunks =
+      Sequencer_blueprint.make_blueprint_chunks
         ~number:flushed_level
+        {
+          parent_hash;
+          delayed_transactions = hashes;
+          transactions = [];
+          timestamp;
+        }
     in
+    let* blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
     let payload =
       Sequencer_blueprint.create_inbox_payload
         ~smart_rollup_address:

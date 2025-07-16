@@ -1375,15 +1375,17 @@ let make_dev_messages ~kind ~smart_rollup_address data =
   let* messages =
     match kind with
     | `Blueprint (signer, timestamp, number, parent_hash) ->
-        let* blueprint_chunks =
-          Sequencer_blueprint.prepare
-            ~signer
-            ~timestamp
+        let chunks =
+          Sequencer_blueprint.make_blueprint_chunks
             ~number:(Ethereum_types.quantity_of_z number)
-            ~parent_hash:(Ethereum_types.block_hash_of_string parent_hash)
-            ~transactions
-            ~delayed_transactions:[]
+            {
+              parent_hash = Ethereum_types.block_hash_of_string parent_hash;
+              delayed_transactions = [];
+              transactions;
+              timestamp;
+            }
         in
+        let* blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
         let blueprint_payload =
           Sequencer_blueprint.create_inbox_payload
             ~smart_rollup_address
