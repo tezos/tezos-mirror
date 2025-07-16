@@ -3,6 +3,27 @@
 // SPDX-License-Identifier: MIT
 
 use crate::Error;
+/*
+Parameters of exported functions need to implement the `Lift<UniFfiTag>` trait.
+Only uniffi primitive types and a few other types implement it:
+- `Option<T>` and `Vec<T>` implement it if `T` also implements it.
+- `HashMap<K, V>` implements it if `K` and `V` also implement it.
+- `Arc<T>` implements it if `T` implements the `FfiConverterArc<UniFfiTag>` trait.
+- enums deriving `uniffi::Enum` and structs deriving `uniffi::Record` implement it.
+
+struct deriving `uniffi::Object` does not implement the `Lift<UniFfiTag>` trait.
+But since it implements `FfiConverterArc<UniFfiTag>` trait, using Arc<> allows it to be derived.
+So to pass a struct deriving `uniffi::Object` as optional in an exported function parameter, an Arc<T> is required:
+```
+#[derive(uniffi::Object)]
+pub struct MyStruct;
+
+#[uniffi::export]
+pub fn my_function(my_struct: Option<Arc<MyStruct>>) -> ...
+```
+Notice that `&MyStruct` can also be passed as parameters of exported functions because it implements the `LiftRef<UniFfiTag>` trait.
+This does not help for optional struct deriving `uniffi::Object` because `Option<T>` implements this trait only if `T` implements the `Lift<UniFfiTag>` trait.
+*/
 use std::sync::Arc;
 use tezos_data_encoding::enc;
 
@@ -39,7 +60,8 @@ pub mod operation {
     use crate::Error;
     use tezos_data_encoding::enc::BinWriter;
     use tezos_protocol::operation::{
-        DelegationContent, ManagerOperationContent, OperationContent, RevealContent,
+        DelegationContent, ManagerOperationContent, OperationContent, OriginationContent,
+        RevealContent, Script,
     };
 
     #[derive(uniffi::Object, Debug)]
@@ -91,6 +113,73 @@ pub mod operation {
                 },
             });
             reveal
+                .to_bytes()
+                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
+        }
+    }
+
+    #[derive(uniffi::Object, Debug)]
+    pub struct Origination {
+        pub source: PublicKeyHash,
+        pub fee: u64,
+        pub counter: u64,
+        pub gas_limit: u64,
+        pub storage_limit: u64,
+        pub balance: u64,
+        pub delegate: Option<PublicKeyHash>,
+        // Its script is always as follows:
+        // "script": {
+        //   "code": [],
+        //   "storage": {
+        //     "prim": "unit"
+        //   }
+        // }
+    }
+
+    #[uniffi::export]
+    impl Origination {
+        #[doc = "Build a origination operation."]
+        #[uniffi::constructor]
+        pub fn new(
+            source: &PublicKeyHash,
+            fee: u64,
+            counter: u64,
+            gas_limit: u64,
+            storage_limit: u64,
+            balance: u64,
+            delegate: Option<Arc<PublicKeyHash>>,
+        ) -> Self {
+            Self {
+                source: source.clone(),
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                balance,
+                delegate: delegate.map(|delegate| delegate.as_ref().clone()),
+            }
+        }
+
+        #[doc = "Forge the operation."]
+        pub fn forge(&self) -> Result<Vec<u8>, Error> {
+            let origination = OperationContent::Origination(ManagerOperationContent {
+                source: self.source.0.clone(),
+                fee: self.fee.into(),
+                counter: self.counter.into(),
+                gas_limit: self.gas_limit.into(),
+                storage_limit: self.storage_limit.into(),
+                operation: OriginationContent {
+                    balance: self.balance.into(),
+                    delegate: self.delegate.clone().map(|delegate| delegate.0),
+                    script: Script {
+                        // Seq(&[]).encode(),
+                        code: vec![0x02, 0x00, 0x00, 0x00, 0x00],
+                        // Micheline::App(Prim::unit, &[], NO_ANNS).encode(),
+                        storage: vec![0x03, 0x6c],
+                    },
+                },
+            });
+            origination
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
@@ -270,6 +359,92 @@ mod tests {
         assert_eq!(
             bytes, raw_reveal,
             "Reveal must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF",
+      "fee": "0",
+      "counter": "812",
+      "gas_limit": "74",
+      "storage_limit": "98",
+      "balance": "0",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn origination_forging() {
+        let source = PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
+        let (balance, fee, counter, gas_limit, storage_limit) = (0, 0, 812, 74, 98);
+        let origination = Origination::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            balance,
+            None,
+        );
+        let raw_origination = origination.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            origination
+        ));
+
+        let bytes = hex::decode("6d03ae7b7d713977a27ec643969f0c2e665ba9ad9aa100ac064a62000000000005020000000000000002036c").unwrap();
+        assert_eq!(
+            bytes, raw_origination,
+            "Origination must be forged into the expected bytes"
+        );
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+      "fee": "1722",
+      "counter": "461",
+      "gas_limit": "67000",
+      "storage_limit": "1",
+      "balance": "1000000",
+      "delegate": "tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn origination_delegated_contract_forging() {
+        let source = PublicKeyHash::from_b58check("tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7").unwrap();
+        let (balance, fee, counter, gas_limit, storage_limit) = (1_000_000, 1722, 461, 67_000, 1);
+        let origination = Origination::new(
+            &source,
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            balance,
+            Some(Arc::new(source.clone())),
+        );
+        let raw_origination = origination.forge().expect(&format!(
+            "Forging operation {:?} should succeed",
+            origination
+        ));
+
+        let bytes =
+            hex::decode("6d004afbd2ede908e6700eb9b54352c1d2dceee8d0feba0dcd03b88b0401c0843dff004afbd2ede908e6700eb9b54352c1d2dceee8d0fe00000005020000000000000002036c").unwrap();
+        assert_eq!(
+            bytes, raw_origination,
+            "Origination must be forged into the expected bytes"
         );
     }
 

@@ -45,6 +45,33 @@ class ForgingTest {
 
     /*
     octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz4F2fxv7sKQx9wyoRMteoJwZEZnV9WFU2wL",
+      "fee": "72",
+      "counter": "41",
+      "gas_limit": "8017",
+      "storage_limit": "77",
+      "balance": "400",
+      "delegate": "tz4F2fxv7sKQx9wyoRMteoJwZEZnV9WFU2wL",
+      "script": {
+        "code": [],
+        "storage": {
+          "prim": "unit"
+        }
+      }
+    }'
+    */
+    @OptIn(kotlin.ExperimentalStdlibApi::class) // `hexToByteArray` is experimental
+    @Test fun OriginationForging() {
+        val source = PublicKeyHash.fromB58check("tz4F2fxv7sKQx9wyoRMteoJwZEZnV9WFU2wL")
+        val origination = Origination(source = source, fee = 72UL, counter = 41UL, gasLimit = 8017UL, storageLimit = 77UL, balance = 400UL, delegate = source)
+        val rawOrigination = origination.forge()
+        val expectedBytes = "6d03421585a37470f6cbba7aeb70d11bc40b2b23dd684829d13e4d9003ff03421585a37470f6cbba7aeb70d11bc40b2b23dd6800000005020000000000000002036c".hexToByteArray()
+        assertContentEquals(rawOrigination, expectedBytes)
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "delegation",
       "source": "tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ",
       "fee": "0",
