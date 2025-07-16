@@ -6328,6 +6328,143 @@ let test_sequencer_upgrade =
   in
   unit
 
+(** This tests the scenario where two identical sequencer upgrade
+    transactions are sent to the L1 contract. The test verifies that
+    the system handles duplicate upgrades correctly without duplicated
+    insertions. This is mostly [test_sequencer_upgrade] with less
+    checks but two identical sequencer upgrades. *)
+let test_duplicate_sequencer_upgrade =
+  let genesis_timestamp =
+    "2020-01-01T00:00:00Z"
+    (* timestamp used for the genesis of the l1 and the l2 *)
+  in
+  (* 30 sec later. *)
+  let activation_timestamp = "2020-01-01T00:00:30Z" in
+
+  let sequencer_key = Constant.bootstrap1 in
+  let new_sequencer_key = Constant.bootstrap2 in
+
+  register_all
+    ~__FILE__
+    ~sequencer:sequencer_key
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
+    ~title:"Duplicated sequencer upgrade."
+    ~use_multichain:Register_without_feature
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+  @@ fun {
+           sc_rollup_node;
+           l1_contracts;
+           sc_rollup_address;
+           client;
+           sequencer;
+           proxy;
+           observer;
+           _;
+         }
+             _protocol ->
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+
+  Log.info "Sending two sequencer upgrades to the L1 contract" ;
+
+  let send_sequencer_upgrade () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:Constant.bootstrap2.alias
+      ~sequencer_governance_contract:l1_contracts.sequencer_governance
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp
+  in
+
+  Log.info
+    "Send two identical sequencer upgrade transactions to the L1 contract" ;
+  let* () = send_sequencer_upgrade () in
+  let* () = send_sequencer_upgrade () in
+
+  Log.info "Baking until the sequencer upgrade is triggered in the l1" ;
+  let has_sequencer_changed () =
+    let* current_sequencer_in_rollup_hex =
+      Sc_rollup_node.RPC.call
+        sc_rollup_node
+        ~rpc_hooks:Tezos_regression.rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:Durable_storage_path.sequencer
+           ()
+    in
+    let current_sequencer_in_rollup =
+      match current_sequencer_in_rollup_hex with
+      | Some s -> Hex.to_string (`Hex s)
+      | None -> Test.fail "missing sequencer"
+    in
+    if String.equal current_sequencer_in_rollup new_sequencer_key.public_key
+    then return (Some ())
+    else return None
+  in
+  let* () =
+    bake_until
+      ~__LOC__
+      ~timeout_in_blocks:100
+      ~timeout:60.
+      ~bake:(fun () -> next_rollup_node_level ~client ~sc_rollup_node)
+      ~result_f:has_sequencer_changed
+      ()
+  in
+
+  Log.info
+    "Stopping current sequencer and starting a new one with new sequencer key" ;
+  let* () = Evm_node.terminate sequencer
+  and* () = Evm_node.wait_termination sequencer in
+  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+
+  let* new_sequencer =
+    let mode =
+      match Evm_node.mode sequencer with
+      | Sequencer config ->
+          Evm_node.Sequencer
+            {
+              config with
+              sequencer = new_sequencer_key.alias;
+              private_rpc_port = Some (Port.fresh ());
+            }
+      | _ -> Test.fail "impossible case, it's a sequencer"
+    in
+    let new_sequencer =
+      Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    in
+    let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+    let* () =
+      Runnable.run @@ Evm_node.import_snapshot new_sequencer ~snapshot_file
+    in
+    let* () = Evm_node.run new_sequencer in
+    return new_sequencer
+  in
+
+  Log.info "Producing a block with the new sequencer." ;
+  let*@ _ = produce_block ~timestamp:activation_timestamp new_sequencer in
+  Log.info "Baking to check the block is accepted by the rollup node." ;
+  let* () =
+    bake_until_sync ~sequencer:new_sequencer ~proxy ~sc_rollup_node ~client ()
+  in
+
+  Log.info
+    "Bootstrapping an observer to make sure it applied the sequencer upgrade \
+     as well." ;
+  let* observer_bootstrap =
+    match Evm_node.mode observer with
+    | Observer mode ->
+        Evm_node.init
+          ~mode:(Observer {mode with private_rpc_port = Some (Port.fresh ())})
+          (Evm_node.endpoint new_sequencer)
+    | _ -> Test.fail "impossible, it's an observer"
+  in
+  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade observer_bootstrap in
+  unit
+
 (** this test the situation where a sequencer diverged from it
     source. To obtain that we create two sequencers, one is going to
     diverged from the other. *)
@@ -13292,6 +13429,7 @@ let () =
   test_non_increasing_timestamp protocols ;
   test_timestamp_from_the_future protocols ;
   test_sequencer_upgrade protocols ;
+  test_duplicate_sequencer_upgrade [Protocol.Alpha] ;
   test_sequencer_sunset protocols ;
   test_sequencer_diverge protocols ;
   test_sequencer_can_catch_up_on_event protocols ;

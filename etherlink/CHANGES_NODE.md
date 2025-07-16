@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+The node will apply one migration to its internal store (version 22),
+meaning it is not possible to downgrade to the previous version. This
+migration is necessary to avoid duplicated sequencer upgrade events in
+the store (!18713).
+
 ### Breaking changes
 
 ### Configuration changes
