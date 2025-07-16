@@ -171,12 +171,38 @@ pub struct TransferSuccess {
     pub lazy_storage_diff: Option<()>,
 }
 
+// An operation error in a Tezos receipt has no specific format
+// It should just be encoded as a JSON, so we can't derive
+// NomReader and BinWriter if we want to be Tezos compatible
+#[derive(PartialEq, Debug)]
+pub struct OperationErrors {
+    pub errors: Vec<OperationError>,
+}
+
+impl From<Vec<OperationError>> for OperationErrors {
+    fn from(value: Vec<OperationError>) -> Self {
+        OperationErrors { errors: value }
+    }
+}
+
+impl BinWriter for OperationErrors {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        tezos_enc::dynamic(tezos_enc::unit)(&(), output)
+    }
+}
+
+impl NomReader<'_> for OperationErrors {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        tezos_nom::dynamic(|input| Ok((input, vec![].into())))(input)
+    }
+}
+
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
-    Failed(Vec<OperationError>),
+    Failed(OperationErrors),
 }
 
 /// A [Balance] updates can be triggered on different target
@@ -237,7 +263,7 @@ pub fn produce_operation_result<M: OperationKind>(
         },
         Err(operation_error) => OperationResult {
             balance_updates,
-            result: ContentResult::Failed(vec![operation_error]),
+            result: ContentResult::Failed(vec![operation_error].into()),
             internal_operation_results: vec![],
         },
     }

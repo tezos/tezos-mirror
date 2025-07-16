@@ -673,9 +673,12 @@ mod tests {
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::EmptyImplicitContract,
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Validation(
+                    ValidityError::EmptyImplicitContract,
+                )]
+                .into(),
+            ),
             internal_operation_results: vec![],
         });
 
@@ -700,9 +703,12 @@ mod tests {
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::CantPayFees(100_u64.into()),
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Validation(ValidityError::CantPayFees(
+                    100_u64.into(),
+                ))]
+                .into(),
+            ),
             internal_operation_results: vec![],
         });
 
@@ -727,12 +733,15 @@ mod tests {
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::CounterInTheFuture(CounterError {
-                    expected: 1_u64.into(),
-                    found: 15_u64.into(),
-                }),
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Validation(
+                    ValidityError::CounterInTheFuture(CounterError {
+                        expected: 1_u64.into(),
+                        found: 15_u64.into(),
+                    }),
+                )]
+                .into(),
+            ),
             internal_operation_results: vec![],
         });
         assert_eq!(receipt, expected_receipt);
@@ -779,9 +788,12 @@ mod tests {
                     update_origin: UpdateOrigin::BlockApplication,
                 },
             ],
-            result: ContentResult::Failed(vec![OperationError::Apply(
-                RevealError::PreviouslyRevealedKey(pk).into(),
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(
+                    RevealError::PreviouslyRevealedKey(pk).into(),
+                )]
+                .into(),
+            ),
             internal_operation_results: vec![],
         });
         assert_eq!(receipt, expected_receipt);
@@ -825,9 +837,12 @@ mod tests {
                     update_origin: UpdateOrigin::BlockApplication,
                 },
             ],
-            result: ContentResult::Failed(vec![OperationError::Apply(
-                RevealError::InconsistentHash(inconsistent_pkh).into(),
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(
+                    RevealError::InconsistentHash(inconsistent_pkh).into(),
+                )]
+                .into(),
+            ),
             internal_operation_results: vec![],
         });
 
@@ -858,9 +873,9 @@ mod tests {
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
-            result: ContentResult::Failed(vec![OperationError::Validation(
-                ValidityError::InvalidSignature,
-            )]),
+            result: ContentResult::Failed(
+                vec![OperationError::Validation(ValidityError::InvalidSignature)].into(),
+            ),
             internal_operation_results: vec![],
         });
 
@@ -964,14 +979,17 @@ mod tests {
                     update_origin: UpdateOrigin::BlockApplication,
                 },
             ],
-            result: ContentResult::Failed(vec![OperationError::Apply(
-                TransferError::BalanceTooLow(BalanceTooLow {
-                    contract: Contract::Implicit(source.pkh),
-                    balance: 35_u64.into(),
-                    amount: 100_u64.into(),
-                })
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(
+                    TransferError::BalanceTooLow(BalanceTooLow {
+                        contract: Contract::Implicit(source.pkh),
+                        balance: 35_u64.into(),
+                        amount: 100_u64.into(),
+                    })
+                    .into(),
+                )]
                 .into(),
-            )]),
+            ),
             internal_operation_results: vec![],
         });
 
