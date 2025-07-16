@@ -6522,6 +6522,7 @@ end = struct
             ("test_slashing_percentage", N.(number >= 019));
             ("test_staking_operations", N.(number >= 021));
             ("test_consecutive_round_zero", N.(number >= 022));
+            ("test_address_registry", N.(number >= 024));
           ]
           |> conditional_list
         in
