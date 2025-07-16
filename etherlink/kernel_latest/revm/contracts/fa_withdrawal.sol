@@ -107,6 +107,18 @@ contract FAWithdrawal {
         require(removeSuccess, "Could not remove deposit");
     }
 
+    event SolFastWithdrawalEvent(
+        address indexed sender,
+        address indexed ticketOwner,
+        // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
+        // bytes22 receiver,
+        // bytes22 proxy,
+        uint256 amount,
+        uint256 withdrawalId,
+        uint256 timestamp,
+        bytes payload
+    );
+
     function withdraw(
         address ticketOwner,
         bytes memory routingInfo,
@@ -149,14 +161,14 @@ contract FAWithdrawal {
         require(proxySuccess, "Proxy call failed");
 
         // Call outboxSender.push_fa_withdrawal_to_outbox
-        bytes memory payload = abi.encodeWithSignature(
+        bytes memory outboxData = abi.encodeWithSignature(
             "push_fa_withdrawal_to_outbox(bytes,uint256,bytes22,bytes)",
             routingInfo,
             amount,
             ticketer,
             content
         );
-        (bool ok, ) = outboxSender.call(payload);
+        (bool ok, ) = outboxSender.call(outboxData);
         require(
             ok,
             "Failed to produce message: push_fa_withdrawal_to_outbox call unsuccessful"
@@ -168,6 +180,80 @@ contract FAWithdrawal {
             ticketOwner,
             amount,
             withdrawalCounter
+        );
+
+        // Increment withdrawal counter
+        withdrawalCounter++;
+    }
+
+    function fa_fast_withdraw(
+        address ticketOwner,
+        bytes memory routingInfo,
+        uint256 amount,
+        bytes22 ticketer,
+        bytes memory content,
+        string memory fastWithdrawalContract,
+        bytes memory payload
+    ) external payable {
+                address outboxSender = 0xFF00000000000000000000000000000000000003;
+        address ticketTable = 0xFf00000000000000000000000000000000000004;
+
+        // Revert if amount is zero
+        require(amount > 0, "Empty withdrawals are not allowed");
+
+        // Compute ticket hash
+        uint256 ticketHash = uint256(
+            keccak256(abi.encodePacked(ticketer, content))
+        );
+
+        // Call ticketTable.ticket_balance_remove
+        bytes memory ticketData = abi.encodeWithSignature(
+            "ticket_balance_remove(uint256,address,uint256)",
+            ticketHash,
+            ticketOwner,
+            amount
+        );
+        (bool ticketSuccess, ) = ticketTable.call(ticketData);
+        require(
+            ticketSuccess,
+            "Failed to decrement ticket balance: ticket_balance_remove call was unsuccessful"
+        );
+
+        // Call proxy
+        bytes memory proxyData = abi.encodeWithSignature(
+            "withdraw(address,uint256,uint256)",
+            msg.sender,
+            amount,
+            ticketHash
+        );
+        (bool proxySuccess, ) = ticketOwner.call(proxyData);
+        require(proxySuccess, "Proxy call failed");
+
+        // Call outboxSender.push_fast_fa_withdrawal_to_outbox
+        bytes memory outboxData = abi.encodeWithSignature(
+            "push_fast_fa_withdrawal_to_outbox(bytes,uint256,bytes22,bytes,string,bytes,uint256)",
+            routingInfo,
+            amount,
+            ticketer,
+            content,
+            fastWithdrawalContract,
+            payload,
+            withdrawalCounter
+        );
+        (bool ok, ) = outboxSender.call(outboxData);
+        require(
+            ok,
+            "Failed to produce message: push_fast_fa_withdrawal_to_outbox call unsuccessful"
+        );
+
+        // Emit withdrawal event
+        emit SolFastWithdrawalEvent(
+            msg.sender,
+            ticketOwner,
+            amount,
+            withdrawalCounter,
+            block.timestamp,
+            payload
         );
 
         // Increment withdrawal counter
