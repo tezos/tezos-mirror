@@ -60,5 +60,6 @@ ENTRYPOINT ["/usr/sbin/sshd"]
 FROM base AS full
 # Path where binaries should be stored on the docker container
 ARG BINARIES_DESTINATION_PATH
-COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
-# Feel free to complete with the binaries you need
+COPY ./smart-rollup-installer $BINARIES_DESTINATION_PATH/smart-rollup-installer
+COPY ./evm_kernel.wasm $BINARIES_DESTINATION_PATH/evm_kernel.wasm
+COPY ./octez-evm-node  $BINARIES_DESTINATION_PATH/octez-evm-node
