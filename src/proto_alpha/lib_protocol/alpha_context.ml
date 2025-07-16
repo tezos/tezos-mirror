@@ -463,6 +463,8 @@ module Address_registry_storage = struct
       Address_registry_storage.add_if_missing ctxt address
     in
     return {ctxt; index; existed}
+
+  module Internal_for_tests = Address_registry_storage.Internal_for_tests
 end
 
 module Big_map = struct

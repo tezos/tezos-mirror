@@ -56,3 +56,9 @@ type add_result = {ctxt : Raw_context.t; index : Z.t; existed : bool}
 *)
 val add_if_missing :
   Raw_context.t -> Destination_repr.t -> add_result tzresult Lwt.t
+
+module Internal_for_tests : sig
+  val set_counter : Raw_context.t -> Z.t -> Raw_context.t tzresult Lwt.t
+
+  val get_counter : Raw_context.t -> Z.t tzresult Lwt.t
+end

@@ -993,6 +993,10 @@ let tests =
       `Quick
       (test_forbidden_op_in_view "CREATE_CONTRACT");
     Tztest.tztest
+      "forbidden INDEX_ADDRESS in view"
+      `Quick
+      (test_forbidden_op_in_view "INDEX_ADDRESS");
+    Tztest.tztest
       "parse contract data for rollup"
       `Quick
       test_parse_contract_data_for_unit_rollup;

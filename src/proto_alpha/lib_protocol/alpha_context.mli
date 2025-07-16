@@ -4428,6 +4428,11 @@ module Address_registry_storage : sig
 
   val add_if_missing : context -> Destination.t -> add_result tzresult Lwt.t
 
+  module Internal_for_tests : sig
+    val set_counter : context -> Z.t -> context tzresult Lwt.t
+
+    val get_counter : context -> Z.t tzresult Lwt.t
+  end
 end
 
 (** See {!Block_payload_repr}. *)
