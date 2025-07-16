@@ -53,6 +53,13 @@ class Base58CheckTest {
         assertEquals(baseB58Sig, b58Sig)
     }
 
+    @Test fun contractDecodeEncode() {
+        val baseB58Contract = "tz3dvgoUnnXoAP9MDqAwiZwRtvTFHcuDMxTR"
+        val contract = Contract.fromB58check(baseB58Contract)
+        val b58Contract = contract.toB58check()
+        assertEquals(baseB58Contract, b58Contract)
+    }
+
     @Test fun decodeInvalidChecksum() {
         val exception = assertFailsWith<Exception.Base58>(
             "Converting hash with invalid checksum must fail"

@@ -9,6 +9,7 @@ use tezos_crypto_rs::{
     public_key, public_key_hash, signature, CryptoError, PublicKeySignatureVerifier,
     PublicKeyWithHash,
 };
+use tezos_protocol::contract;
 
 macro_rules! bind_hash {
     ($bind_name:ident, $name:ty) => {
@@ -59,6 +60,10 @@ bind_hash!(Ed25519Signature, hash::Ed25519Signature);
 bind_hash!(Secp256k1Signature, hash::Secp256k1Signature);
 bind_hash!(P256Signature, hash::P256Signature);
 bind_hash!(BlsSignature, hash::BlsSignature);
+
+bind_hash!(ContractKt1Hash, hash::ContractKt1Hash);
+
+bind_hash!(Contract, contract::Contract);
 
 // TODO: https://linear.app/tezos/issue/SDK-73.
 // Unable use the `bind_hash!` macro because the `signature::Signature` struct does not implement `from_b58check` and `to_b58check` but `from_base58_check` and `to_base58_check`

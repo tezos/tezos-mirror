@@ -9,6 +9,7 @@ from tezos import (
     PublicKey,
     Ed25519Signature,
     UnknownSignature,
+    Contract,
 )
 
 
@@ -52,6 +53,13 @@ def test_unknown_sig_decode_encode():
     sig = UnknownSignature.from_b58check(base_b58_sig)
     b58_sig = sig.to_b58check()
     assert b58_sig == base_b58_sig
+
+
+def test_contract_decode_encode():
+    base_b58_contract = "KT1GXhrsLWSZN3hAm3y7CxUr68LzaV57piJi"
+    contract = Contract.from_b58check(base_b58_contract)
+    b58_contract = contract.to_b58check()
+    assert b58_contract == base_b58_contract
 
 
 def test_decode_invalid_checksum():
