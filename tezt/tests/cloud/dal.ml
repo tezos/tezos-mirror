@@ -162,6 +162,58 @@ module Node = struct
       Tezos_crypto.Helpers.yes_crypto_environment_variable
       "y"
 
+  let download_snapshot ~agent ~url ~name =
+    let downloaded_snapshot_file_path = "snapshot_file" in
+    toplog "Trying to download snapshot for %s from %s" name url ;
+    let* exit_status =
+      Process.spawn
+        ?runner:(runner_of_agent agent)
+        "wget"
+        ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
+      |> Process.wait
+    in
+    let* () =
+      match exit_status with
+      | WEXITED 0 -> Lwt.return_unit
+      | WEXITED code ->
+          toplog
+            "Could not download the snapshot for %s: wget exit code: %d\n\
+             Starting without snapshot. It could last long before the node is \
+             bootstrapped"
+            name
+            code ;
+          Lwt.return_unit
+      | status -> (
+          match Process.validate_status status with
+          | Ok () -> Lwt.return_unit
+          | Error (`Invalid_status reason) ->
+              failwith @@ Format.sprintf "wget: %s" reason)
+    in
+    Lwt.return downloaded_snapshot_file_path
+
+  let ensure_snapshot ~agent ~name ~network = function
+    | Docker_embedded path ->
+        toplog "Using locally stored snapshot file: %s" path ;
+        Lwt.return path
+    | Local_file path ->
+        toplog "Copying snapshot to destination" ;
+        Tezt_cloud.Agent.copy agent ~destination:path ~source:path
+    | Url url -> download_snapshot ~agent ~url ~name
+    | No_snapshot ->
+        download_snapshot ~agent ~url:(Network.snapshot_service network) ~name
+
+  let ensure_snapshot_opt ~agent = function
+    | Docker_embedded path ->
+        toplog "Using locally stored snapshot file: %s" path ;
+        Lwt.return_some path
+    | Local_file path ->
+        toplog "Copying snapshot to destination" ;
+        let* path =
+          Tezt_cloud.Agent.copy agent ~destination:path ~source:path
+        in
+        Lwt.return_some path
+    | Url _ | No_snapshot -> Lwt.return_none
+
   let import_snapshot ?(delete_snapshot_file = false) ~name node
       snapshot_file_path =
     toplog "Importing the snapshot for %s" name ;
@@ -261,85 +313,7 @@ module Node = struct
             toplog "Initializing node configuration for %s" name ;
             let* () = Node.config_init node [] in
             let* snapshot_file_path =
-              match snapshot with
-              | Docker_embedded snapshot_path ->
-                  let () =
-                    toplog
-                      "Using locally stored snapshot file: %s"
-                      snapshot_path
-                  in
-                  Lwt.return snapshot_path
-              | Local_file snapshot_path ->
-                  let () = toplog "Copying snapshot to destination" in
-                  let* snapshot_path =
-                    Tezt_cloud.Agent.copy
-                      agent
-                      ~destination:snapshot_path
-                      ~source:snapshot_path
-                  in
-                  Lwt.return snapshot_path
-              | Url url ->
-                  toplog "Trying to download snapshot for %s from %s" name url ;
-                  let downloaded_snapshot_file_path = "snapshot_file" in
-                  let* exit_status =
-                    Process.spawn
-                      ?runner:(runner_of_agent agent)
-                      "wget"
-                      ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
-                    |> Process.wait
-                  in
-                  let* () =
-                    match exit_status with
-                    | WEXITED 0 -> Lwt.return_unit
-                    | WEXITED code ->
-                        toplog
-                          "Could not download the snapshot for %s: wget exit \
-                           code: %d\n\
-                           Starting without snapshot. It could last long \
-                           before the node is bootstrapped"
-                          name
-                          code ;
-                        Lwt.return_unit
-                    | status -> (
-                        match Process.validate_status status with
-                        | Ok () -> Lwt.return_unit
-                        | Error (`Invalid_status reason) ->
-                            failwith @@ Format.sprintf "wget: %s" reason)
-                  in
-                  Lwt.return downloaded_snapshot_file_path
-              | No_snapshot ->
-                  toplog "Trying to download a rolling snapshot for %s" name ;
-                  let downloaded_snapshot_file_path = "snapshot_file" in
-                  let* exit_status =
-                    Process.spawn
-                      ?runner:(runner_of_agent agent)
-                      "wget"
-                      [
-                        "-O";
-                        downloaded_snapshot_file_path;
-                        sf "%s/rolling" (Network.snapshot_service network);
-                      ]
-                    |> Process.wait
-                  in
-                  let* () =
-                    match exit_status with
-                    | WEXITED 0 -> Lwt.return_unit
-                    | WEXITED code ->
-                        toplog
-                          "Could not download the snapshot for %s: wget exit \
-                           code: %d\n\
-                           Starting without snapshot. It could last long \
-                           before the node is bootstrapped"
-                          name
-                          code ;
-                        Lwt.return_unit
-                    | status -> (
-                        match Process.validate_status status with
-                        | Ok () -> Lwt.return_unit
-                        | Error (`Invalid_status reason) ->
-                            failwith @@ Format.sprintf "wget: %s" reason)
-                  in
-                  Lwt.return downloaded_snapshot_file_path
+              ensure_snapshot ~agent ~name ~network snapshot
             in
             let* () =
               import_snapshot
@@ -380,55 +354,7 @@ module Node = struct
               Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
             in
             let* () = Node.config_init node [Cors_origin "*"] in
-            let* snapshot_path =
-              match snapshot with
-              | Docker_embedded snapshot_path ->
-                  let () =
-                    toplog
-                      "Using locally stored snapshot file: %s"
-                      snapshot_path
-                  in
-                  Lwt.return_some snapshot_path
-              | Local_file snapshot_path ->
-                  let () = toplog "Copying snapshot to destination" in
-                  let* snapshot_path =
-                    Tezt_cloud.Agent.copy
-                      agent
-                      ~destination:snapshot_path
-                      ~source:snapshot_path
-                  in
-                  Lwt.return_some snapshot_path
-              | Url url ->
-                  toplog "Trying to download snapshot for %s from %s" name url ;
-                  let downloaded_snapshot_file_path = "snapshot_file" in
-                  let* exit_status =
-                    Process.spawn
-                      ?runner:(runner_of_agent agent)
-                      "wget"
-                      ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
-                    |> Process.wait
-                  in
-                  let* () =
-                    match exit_status with
-                    | WEXITED 0 -> Lwt.return_unit
-                    | WEXITED code ->
-                        toplog
-                          "Could not download the snapshot for %s: wget exit \
-                           code: %d\n\
-                           Starting without snapshot. It could last long \
-                           before the node is bootstrapped"
-                          name
-                          code ;
-                        Lwt.return_unit
-                    | status -> (
-                        match Process.validate_status status with
-                        | Ok () -> Lwt.return_unit
-                        | Error (`Invalid_status reason) ->
-                            failwith @@ Format.sprintf "wget: %s" reason)
-                  in
-                  Lwt.return_some downloaded_snapshot_file_path
-              | No_snapshot -> Lwt.return_none
-            in
+            let* snapshot_path = ensure_snapshot_opt ~agent snapshot in
             let* snapshot_network =
               match snapshot_path with
               | Some path ->
