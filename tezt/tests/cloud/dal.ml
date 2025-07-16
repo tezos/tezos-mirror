@@ -59,6 +59,7 @@ let name_of = function
 type snapshot_config =
   | Docker_embedded of string
   | Local_file of string
+  | Url of string
   | No_snapshot
 
 (* Some DAL nodes (those in operator mode) refuse to start unless they are
@@ -277,6 +278,35 @@ module Node = struct
                       ~source:snapshot_path
                   in
                   Lwt.return snapshot_path
+              | Url url ->
+                  toplog "Trying to download snapshot for %s from %s" name url ;
+                  let downloaded_snapshot_file_path = "snapshot_file" in
+                  let* exit_status =
+                    Process.spawn
+                      ?runner:(runner_of_agent agent)
+                      "wget"
+                      ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
+                    |> Process.wait
+                  in
+                  let* () =
+                    match exit_status with
+                    | WEXITED 0 -> Lwt.return_unit
+                    | WEXITED code ->
+                        toplog
+                          "Could not download the snapshot for %s: wget exit \
+                           code: %d\n\
+                           Starting without snapshot. It could last long \
+                           before the node is bootstrapped"
+                          name
+                          code ;
+                        Lwt.return_unit
+                    | status -> (
+                        match Process.validate_status status with
+                        | Ok () -> Lwt.return_unit
+                        | Error (`Invalid_status reason) ->
+                            failwith @@ Format.sprintf "wget: %s" reason)
+                  in
+                  Lwt.return downloaded_snapshot_file_path
               | No_snapshot ->
                   toplog "Trying to download a rolling snapshot for %s" name ;
                   let downloaded_snapshot_file_path = "snapshot_file" in
@@ -309,7 +339,7 @@ module Node = struct
                         | Error (`Invalid_status reason) ->
                             failwith @@ Format.sprintf "wget: %s" reason)
                   in
-                  return downloaded_snapshot_file_path
+                  Lwt.return downloaded_snapshot_file_path
             in
             let* () =
               import_snapshot
@@ -368,6 +398,35 @@ module Node = struct
                       ~source:snapshot_path
                   in
                   Lwt.return_some snapshot_path
+              | Url url ->
+                  toplog "Trying to download snapshot for %s from %s" name url ;
+                  let downloaded_snapshot_file_path = "snapshot_file" in
+                  let* exit_status =
+                    Process.spawn
+                      ?runner:(runner_of_agent agent)
+                      "wget"
+                      ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
+                    |> Process.wait
+                  in
+                  let* () =
+                    match exit_status with
+                    | WEXITED 0 -> Lwt.return_unit
+                    | WEXITED code ->
+                        toplog
+                          "Could not download the snapshot for %s: wget exit \
+                           code: %d\n\
+                           Starting without snapshot. It could last long \
+                           before the node is bootstrapped"
+                          name
+                          code ;
+                        Lwt.return_unit
+                    | status -> (
+                        match Process.validate_status status with
+                        | Ok () -> Lwt.return_unit
+                        | Error (`Invalid_status reason) ->
+                            failwith @@ Format.sprintf "wget: %s" reason)
+                  in
+                  Lwt.return_some downloaded_snapshot_file_path
               | No_snapshot -> Lwt.return_none
             in
             let* snapshot_network =
@@ -2885,6 +2944,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                   "https://teztnets.com/" ^ s
             in
             Lwt.return network
+        | Url _url ->
+            (* FIXME: We can overcome this by either downloading the snapshot, or by
+               retrieving the name of the network from the URL. I am not sure how much
+               of a priority this is. *)
+            Lwt.fail_with "URL snapshot not available for sandbox case"
         | No_snapshot -> Lwt.return "ghostnet"
       in
       let* _filename =
