@@ -971,34 +971,21 @@ let test_tezlink_sandbox () =
         Constant.smart_rollup_installer;
       ]
   @@ fun () ->
-  let l2_chain_id = 12 in
   let wallet_dir = Temp.dir "wallet" in
-  let l2_config = Temp.file (Format.sprintf "l2-%d-config.yaml" l2_chain_id) in
   let preimages_dir = Temp.dir "wasm_2_0_0" in
   let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
-
-  let*! () =
-    Evm_node.make_l2_kernel_installer_config
-      ~chain_id:l2_chain_id
-      ~chain_family:"Michelson"
-      ?tez_bootstrap_balance:(Some bootstrap_balance)
-      ~tez_bootstrap_accounts:[Constant.bootstrap1; Constant.bootstrap2]
-      ~output:l2_config
-      ()
-  in
-
+  let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
   let* {output; _} =
     prepare_installer_kernel_with_arbitrary_file
       ~preimages_dir
-      ~config:(`Path l2_config)
       (Uses.path Constant.WASM.evm_kernel)
   in
-
-  let () = Account.write Constant.all_secret_keys ~base_dir:wallet_dir in
   let sequencer_mode =
     Evm_node.Tezlink_sandbox
       {
         initial_kernel = output;
+        funded_addresses =
+          [Constant.bootstrap1.public_key; Constant.bootstrap2.public_key];
         preimage_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         time_between_blocks = Some Nothing;
