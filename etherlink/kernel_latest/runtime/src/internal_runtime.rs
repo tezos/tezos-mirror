@@ -9,7 +9,7 @@ use tezos_smart_rollup_host::{path::Path, runtime::RuntimeError, Error};
 
 const STORE_HASH_SIZE: usize = 32;
 
-#[cfg(not(target_arch = "riscv64"))]
+#[cfg(not(any(target_arch = "riscv64", feature = "dummy-store-get-hash")))]
 #[link(wasm_import_module = "smart_rollup_core")]
 extern "C" {
     pub fn __internal_store_get_hash(
@@ -20,10 +20,13 @@ extern "C" {
     ) -> i32;
 }
 
-// The RISC-V PVM does not have a `storage_get_hash` host function.
-// To enable compilation to RISC-V, this stand in implementation
+// The RISC-V PVM does not have a `store_get_hash` host function.
+// To enable compilation to RISC-V, this stand-in implementation
 // deterministically returns dummy hash values.
-#[cfg(target_arch = "riscv64")]
+// This implementation is also used when the kernel is compiled to
+// a different target but needs to be behaviourly equivalent to the
+// RISC-V kernel.
+#[cfg(any(target_arch = "riscv64", feature = "dummy-store-get-hash"))]
 pub unsafe extern "C" fn __internal_store_get_hash(
     _path: *const u8,
     _path_len: usize,

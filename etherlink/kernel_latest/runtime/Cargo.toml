@@ -17,3 +17,7 @@ tezos-evm-logging.workspace = true
 sha3.workspace = true
 
 [dev-dependencies]
+
+[features]
+default = []
+dummy-store-get-hash = []
