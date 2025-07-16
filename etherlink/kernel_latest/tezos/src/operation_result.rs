@@ -20,7 +20,7 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-use crate::operation::ManagerOperationContent;
+use crate::operation::{ManagerOperation, ManagerOperationContent, OperationContent};
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
 pub struct CounterError {
@@ -320,6 +320,8 @@ impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
+    Skipped,
+    BackTracked(M::Success),
 }
 
 /// A [Balance] updates can be triggered on different target
@@ -379,6 +381,25 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
     }
 }
 
+pub fn transform_result_backtrack(op: OperationResultSum) -> OperationResultSum {
+    match op {
+        OperationResultSum::Reveal(mut op_result) => {
+            op_result.result = match op_result.result {
+                ContentResult::Applied(success) => ContentResult::BackTracked(success),
+                other => other,
+            };
+            OperationResultSum::Reveal(op_result)
+        }
+        OperationResultSum::Transfer(mut op_result) => {
+            op_result.result = match op_result.result {
+                ContentResult::Applied(success) => ContentResult::BackTracked(success),
+                other => other,
+            };
+            OperationResultSum::Transfer(op_result)
+        }
+    }
+}
+
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, ApplyOperationError>,
@@ -394,6 +415,27 @@ pub fn produce_operation_result<M: OperationKind>(
             result: ContentResult::Failed(vec![operation_error].into()),
             internal_operation_results: vec![],
         },
+    }
+}
+
+pub fn produce_skipped_receipt(
+    op: &ManagerOperation<OperationContent>,
+) -> OperationResultSum {
+    match op.operation {
+        OperationContent::Reveal(_) => {
+            OperationResultSum::Reveal(produce_skipped_result())
+        }
+        OperationContent::Transfer(_) => {
+            OperationResultSum::Transfer(produce_skipped_result())
+        }
+    }
+}
+
+fn produce_skipped_result<M: OperationKind>() -> OperationResult<M> {
+    OperationResult {
+        balance_updates: vec![],
+        result: ContentResult::Skipped,
+        internal_operation_results: vec![],
     }
 }
 
