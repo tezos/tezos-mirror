@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -641,8 +623,46 @@ let test_import_snapshot_force =
   in
   unit
 
+let test_import_snapshot_with_nonempty_dir () =
+  Test.register
+    ~__FILE__
+    ~title:"snapshot import nonempty dir"
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"]
+  @@ fun () ->
+  let* node = Node.init [] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol_and_wait ~protocol:Protocol.Alpha client in
+  (* Bake a few blocks to have non-empty storage. *)
+  let* () = bake_blocks node client ~blocks_to_bake:5 in
+  let* () = Node.terminate node in
+  (* Create a 2nd node, we will extract a snapshot in its directory. *)
+  let node_ok = Node.create [] in
+  let* () = Node.config_init node_ok [] in
+  let snapshot_file = Node.data_dir node_ok // "snapshot.rolling" in
+  let* () =
+    Node.snapshot_export ~history_mode:Node.Rolling_history node snapshot_file
+  in
+  (* Import the snapshot inside the directory. *)
+  let* () = Node.snapshot_import ~no_check:true node_ok snapshot_file in
+  (* Now do the same but an invalid name, it gets rejected. *)
+  let node_ko = Node.create [] in
+  let* () = Node.config_init node_ko [] in
+  let snapshot_file = Node.data_dir node_ko // "rolling.snapshot" in
+  let* () =
+    Node.snapshot_export ~history_mode:Node.Rolling_history node snapshot_file
+  in
+  let process =
+    Node.spawn_snapshot_import ~no_check:true node_ko snapshot_file
+  in
+  let* () =
+    Process.check_error ~msg:(rex "Please provide a clean directory") process
+  in
+  unit
+
 let register ~protocols =
   test_export_import_snapshots protocols ;
   test_drag_after_rolling_import protocols ;
   test_info_command protocols ;
   test_import_snapshot_force protocols
+
+let register_protocol_independent () = test_import_snapshot_with_nonempty_dir ()
