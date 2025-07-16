@@ -642,11 +642,16 @@ type bootstrap = {
   client : Client.t;
 }
 
+type baker_account = {
+  delegate : Account.key;
+  consensus_key : Account.key option;
+}
+
 type baker = {
   node : Node.t;
   dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
-  accounts : Account.key list;
+  accounts : baker_account list;
   stake : int;
 }
 
@@ -856,15 +861,15 @@ let pp_metrics t
       let baker_name = Agnostic_baker.name baker in
       List.iter
         (fun account ->
-          let pkh = account.Account.public_key_hash in
+          let pkh = account.delegate.public_key_hash in
           match
             Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
           with
           | None -> Log.info "We lack information about %s" pkh
           | Some {attestable_slots; attested_slots; _} ->
               let alias =
-                Hashtbl.find_opt aliases account.Account.public_key_hash
-                |> Option.value ~default:account.Account.public_key_hash
+                Hashtbl.find_opt aliases account.delegate.public_key_hash
+                |> Option.value ~default:account.delegate.public_key_hash
               in
               Log.info
                 "%s: Ratio for %s (with stake %d): %a"
@@ -2733,11 +2738,15 @@ let init_public_network cloud (configuration : configuration)
   let* baker_accounts =
     Lwt_list.mapi_s
       (fun i _stake ->
-        (* We assume that a baker holds only one key. *)
-        Client.stresstest_gen_keys
-          ~alias_prefix:(Format.sprintf "baker-%d" i)
-          1
-          bootstrap.client)
+        let* delegates =
+          (* We assume that a baker holds only one key. *)
+          Client.stresstest_gen_keys
+            ~alias_prefix:(Format.sprintf "baker-%d" i)
+            1
+            bootstrap.client
+        in
+        List.map (fun delegate -> {delegate; consensus_key = None}) delegates
+        |> return)
       stake
   in
   let* producer_accounts = init_producer_accounts bootstrap configuration in
@@ -2921,7 +2930,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         Lwt.return (single_key_bakers @ remaining_bakers)
     | Disabled -> Lwt.return_nil
   in
-  let* generated_baker_accounts =
+  let* generated_delegate_accounts =
     Lwt_list.mapi_s
       (fun i _stake ->
         (* We assume that a baker holds only one key. *)
@@ -2941,23 +2950,37 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         List.map
           (fun l ->
             List.map
-              (fun a ->
+              (fun (delegate : Account.key) ->
                 try
                   let ck =
                     List.find
                       (fun {Yes_wallet.public_key_hash; _} ->
-                        public_key_hash = a.Account.public_key_hash)
+                        public_key_hash = delegate.public_key_hash)
                       ckm
                   in
-                  {
-                    a with
-                    public_key_hash = ck.consensus_public_key_hash;
-                    public_key = ck.consensus_public_key;
-                  }
-                with Not_found -> a)
+                  let consensus_key =
+                    Some
+                      {
+                        Account.alias = delegate.alias;
+                        public_key_hash = ck.consensus_public_key_hash;
+                        public_key = ck.consensus_public_key;
+                        secret_key =
+                          (* That's ok, because we're using yes-crypto. *)
+                          Account.Unencrypted
+                            Tezos_crypto.Signature.(to_b58check zero);
+                      }
+                  in
+                  {delegate; consensus_key}
+                with Not_found -> {delegate; consensus_key = None})
               l)
           simulated_delegates
         |> return
+  in
+  (* Generated baker accounts are not using any consensus key. *)
+  let generated_baker_accounts =
+    List.map
+      (fun l -> List.map (fun delegate -> {delegate; consensus_key = None}) l)
+      generated_delegate_accounts
   in
   (* [baker_accounts] stands for the list of keys that are actually used for
      baking. Meaning that if a baker uses a consensus key, the baker account
@@ -2968,15 +2991,15 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
      baking account) that will be used by the producers daemons. Indeed, the
      producers requires an account holding funds as they aim to inject
      publishments. *)
-  let delegate_accounts = generated_baker_accounts @ simulated_delegates in
+  let delegate_accounts = generated_delegate_accounts @ simulated_delegates in
   List.iteri
     (fun i l ->
       toplog
-        "Baker agent %d will run with: %a"
+        "Baker agent %d will run for the following delegates: %a"
         i
         (Format.pp_print_list
            ~pp_sep:(fun out () -> Format.fprintf out ",")
-           (fun fmt (a : Account.key) -> Format.fprintf fmt "%s" a.alias))
+           (fun fmt {delegate; _} -> Format.fprintf fmt "%s" delegate.alias))
         l)
     baker_accounts ;
   let* producer_accounts =
@@ -3019,7 +3042,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         in
         let bootstrap_accounts =
           List.mapi
-            (fun i key -> (key, Some (List.nth stake i * 1_000_000_000_000)))
+            (fun i {delegate; _} ->
+              (delegate, Some (List.nth stake i * 1_000_000_000_000)))
             (List.flatten baker_accounts)
         in
         let additional_bootstrap_accounts =
@@ -3113,7 +3137,21 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       echo_rollup_key )
 
 let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
-    ~baker_accounts i agent =
+    ~(baker_accounts : baker_account list) i agent =
+  (* Use the consensus keys when available. *)
+  let baking_keys =
+    List.map
+      (fun {delegate; consensus_key} ->
+        match consensus_key with
+        | Some ck ->
+            {
+              delegate with
+              public_key_hash = ck.public_key_hash;
+              public_key = ck.public_key;
+            }
+        | None -> delegate)
+      baker_accounts
+  in
   let* stake =
     (* As simulate_network and stake are mutually exclusive, the stake is used
        only when the simulation is Disabled. *)
@@ -3159,7 +3197,9 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
           agent
       in
       let attester_profiles =
-        List.map (fun account -> account.Account.public_key_hash) baker_accounts
+        List.map
+          (fun {delegate; _} -> delegate.Account.public_key_hash)
+          baker_accounts
       in
       let* () =
         Dal_node.init_config
@@ -3196,11 +3236,11 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
             ~node_port:(Node.rpc_port node)
         in
         Lwt_list.iter_s
-          (fun account ->
+          (fun {delegate; _} ->
             Teztale.update_alias
               teztale
-              ~address:account.Account.public_key_hash
-              ~alias:account.Account.alias)
+              ~address:delegate.public_key_hash
+              ~alias:delegate.alias)
           baker_accounts
   in
   let* client = Client.Agent.create ~endpoint:(Node node) agent in
@@ -3210,12 +3250,12 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
         let* yes_wallet = Node.yes_wallet agent in
         let* () =
           Lwt_list.iter_s
-            (fun (account : Account.key) ->
+            (fun account ->
               Client.import_public_key
                 client
-                ~public_key:account.public_key
+                ~public_key:account.Account.public_key
                 ~alias:account.alias)
-            baker_accounts
+            baking_keys
         in
         let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
         Lwt.return_unit
@@ -3226,11 +3266,9 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
               client
               account.Account.secret_key
               ~alias:account.alias)
-          baker_accounts
+          baking_keys
   in
-  let delegates =
-    List.map (fun account -> account.Account.alias) baker_accounts
-  in
+  let delegates = List.map (fun account -> account.Account.alias) baking_keys in
   let* baker =
     let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     Agnostic_baker.Agent.init
@@ -4327,7 +4365,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
               let* accounts =
                 let* addresses = Client.list_known_addresses client in
                 Lwt_list.map_s
-                  (fun (alias, _) -> Client.show_address ~alias client)
+                  (fun (alias, _) ->
+                    let* delegate = Client.show_address ~alias client in
+                    return {delegate; consensus_key = None})
                   addresses
               in
               (* A bit random, to fix later. *)
@@ -4462,7 +4502,10 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* init_aliases =
     let accounts =
-      List.concat_map (fun ({accounts; _} : baker) -> accounts) bakers
+      List.concat_map
+        (fun ({accounts; _} : baker) ->
+          List.map (fun {delegate; _} -> delegate) accounts)
+        bakers
     in
     Network.aliases ~accounts configuration.network
   in
@@ -4516,7 +4559,11 @@ let clean_up t level =
 let update_bakers_infos t =
   let* new_aliases =
     let accounts =
-      List.(concat_map (fun ({accounts; _} : baker) -> accounts) t.bakers)
+      List.(
+        concat_map
+          (fun ({accounts; _} : baker) ->
+            List.map (fun {delegate; _} -> delegate) accounts)
+          t.bakers)
     in
     Network.aliases ~accounts t.configuration.network
   in
