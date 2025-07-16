@@ -154,7 +154,12 @@ module Baker = struct
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        ~retry:
+          (Baking_scheduling.retry
+             cctxt
+             ~delay:1.
+             ~factor:1.5
+             ?tries:(if keep_alive then None else Some 5))
         cctxt
     in
     let* () = await_protocol_start cctxt ~chain in
@@ -197,7 +202,12 @@ module Accuser = struct
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        ~retry:
+          (Baking_scheduling.retry
+             cctxt
+             ~delay:1.
+             ~factor:1.5
+             ?tries:(if keep_alive then None else Some 5))
         cctxt
     in
     let* () = await_protocol_start cctxt ~chain in
@@ -241,7 +251,12 @@ module VDF = struct
     in
     let* () =
       Client_confirmations.wait_for_bootstrapped
-        ~retry:(Baking_scheduling.retry cctxt ~delay:1. ~factor:1.5 ~tries:5)
+        ~retry:
+          (Baking_scheduling.retry
+             cctxt
+             ~delay:1.
+             ~factor:1.5
+             ?tries:(if keep_alive then None else Some 5))
         cctxt
     in
     let* () = await_protocol_start cctxt ~chain in
