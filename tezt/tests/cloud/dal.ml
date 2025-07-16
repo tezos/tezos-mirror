@@ -56,12 +56,6 @@ let name_of = function
   | Echo_rollup_dal_observer {slot_index} ->
       Format.sprintf "echo-rollup-dal-node-%d" slot_index
 
-type snapshot_config =
-  | Docker_embedded of string
-  | Local_file of string
-  | Url of string
-  | No_snapshot
-
 (* Some DAL nodes (those in operator mode) refuse to start unless they are
    connected to an Octez node keeping enough history to play refutation
    games. *)
@@ -141,6 +135,8 @@ end
 
 module Node = struct
   let runner_of_agent = Agent.runner
+
+  open Snapshot_helpers
 
   let may_copy_node_identity_file agent node = function
     | None -> Lwt.return_unit
@@ -613,7 +609,7 @@ type configuration = {
   disconnect : (int * int) option;
   network : Network.t;
   simulate_network : Cli.network_simulation_config;
-  snapshot : snapshot_config;
+  snapshot : Snapshot_helpers.t;
   bootstrap : bool;
   teztale : bool;
   memtrace : bool;
@@ -4778,30 +4774,6 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
-let parse_snapshot_arg snapshot_arg =
-  let fail path =
-    Test.fail
-      "wrong snapshot argument (--snapshot) [%s].@.Use:@.- \
-       \"file:path/to/file\" to use a local file that will be uploaded to each \
-       agent,@.- \"docker\" to use the docker_embedded_snapshot_file, that \
-       must be located in the local path, to embed the snapshot file into the \
-       docker image."
-      path
-  in
-  match snapshot_arg with
-  | Some v -> (
-      match v with
-      | "docker" ->
-          (* This hardcoded path must be defined as the location path of the snapshot
-             embedded in the docker image. See the associated dockerfile. *)
-          Docker_embedded "/tmp/docker_embedded_snapshot_file"
-      | s when String.starts_with ~prefix:"file:" s -> (
-          match String.split_on_char ':' s with
-          | [_; path] -> Local_file path
-          | _ -> fail s)
-      | _ -> fail v)
-  | None -> No_snapshot
-
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
 let parse_stake_arg ~stake_arg ~simulation_arg =
@@ -4923,7 +4895,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let echo_rollup = Cli.echo_rollup in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
-    let snapshot = parse_snapshot_arg Cli.snapshot in
+    let snapshot = Cli.snapshot in
     let bootstrap = Cli.bootstrap in
     let etherlink_dal_slots = Cli.etherlink_dal_slots in
     let teztale = Cli.teztale in

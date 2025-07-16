@@ -123,6 +123,15 @@ let network_typ : Network.t Clap.typ =
     ~parse:parse_network
     ~show:Network.to_string
 
+let snapshot_typ : Snapshot_helpers.t Clap.typ =
+  let open Snapshot_helpers in
+  Clap.typ
+    ~name:"snapshot"
+    ~dummy:No_snapshot
+    ~parse:(fun snapshot ->
+      try Some (parse_snapshot (Some snapshot)) with _exn -> None)
+    ~show:to_string
+
 module type Dal = sig
   val blocks_history : int
 
@@ -136,7 +145,7 @@ module type Dal = sig
 
   val simulate_network : network_simulation_config
 
-  val snapshot : string option
+  val snapshot : Snapshot_helpers.t
 
   val bootstrap : bool
 
@@ -290,13 +299,14 @@ module Dal () : Dal = struct
       Disabled
 
   let snapshot =
-    Clap.optional_string
+    Clap.default
       ~section
       ~long:"snapshot"
       ~description:
         "Snapshot file, which is stored locally, to initiate the scenario with \
          some data"
-      ()
+      snapshot_typ
+      No_snapshot
 
   let bootstrap =
     Clap.flag
@@ -658,7 +668,7 @@ module type Layer1 = sig
 
   val migration_offset : int option
 
-  val snapshot : string option
+  val snapshot : Snapshot_helpers.t option
 
   val octez_release : string option
 
@@ -757,12 +767,13 @@ module Layer1 () = struct
       ()
 
   let snapshot =
-    Clap.optional_string
+    Clap.optional
       ~section
       ~long:"snapshot"
       ~description:
         "Either a path the a local file or url of the snapshot to use for \
          bootstrapping the experiment"
+      snapshot_typ
       ()
 
   let octez_release =
