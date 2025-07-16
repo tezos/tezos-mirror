@@ -799,10 +799,12 @@ let test_tezlink_transfer =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   let amount = Tez.one in
+  let fee = Tez.one in
   let* () =
     Client.transfer
       ~endpoint
       ~amount
+      ~fee
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
@@ -817,7 +819,7 @@ let test_tezlink_transfer =
   in
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
@@ -839,6 +841,7 @@ let test_tezlink_transfer_and_wait =
           {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
   in
   let amount = Tez.one in
+  let fee = Tez.one in
   (* The branch of the operation injected by the client is the
      grand-parent of the current block. Looking for operation hashes
      relies on the operation_hashes RPC which is not implemented for
@@ -850,6 +853,7 @@ let test_tezlink_transfer_and_wait =
     Client.transfer
       ~wait:"2"
       ~endpoint
+      ~fee
       ~amount
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
@@ -864,7 +868,7 @@ let test_tezlink_transfer_and_wait =
   in
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.((Tez.to_mutez balance2 = Tez.to_mutez amount) int)
@@ -1012,9 +1016,11 @@ let test_tezlink_sandbox () =
   let client = Client.create ~endpoint ~base_dir:wallet_dir () in
 
   let amount = Tez.one in
+  let fee = Tez.one in
   let* () =
     Client.transfer
       ~amount
+      ~fee
       ~giver:Constant.bootstrap1.alias
       ~receiver:Constant.bootstrap2.alias
       ~burn_cap:Tez.one
@@ -1030,7 +1036,7 @@ let test_tezlink_sandbox () =
 
   Check.(
     (Tez.to_mutez balance1
-    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount)
+    = Tez.to_mutez bootstrap_balance - Tez.to_mutez amount - Tez.to_mutez fee)
       int)
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   Check.(

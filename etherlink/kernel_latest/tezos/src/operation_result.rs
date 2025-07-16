@@ -19,10 +19,19 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use crate::operation::ManagerOperationContent;
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+pub struct CounterError {
+    pub expected: Narith,
+    pub found: Narith,
+}
+
+#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ValidityError {
-    InvalidCounter(Narith),
+    CounterInThePast(CounterError),
+    CounterInTheFuture(CounterError),
     CantPayFees(Narith),
     EmptyImplicitContract,
+    GasLimitTooHigh,
+    StorageLimitTooHigh,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -168,10 +177,16 @@ pub enum ContentResult<M: OperationKind> {
 }
 
 /// A [Balance] updates can be triggered on different target
+/// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[encoding(tags = "u8")]
 pub enum Balance {
+    #[encoding(tag = 0)]
     Account(Contract),
-    Block,
+    // Don't know why but in balance_and_update in receipt_repr.ml,
+    // the tag 1 doesn't exist
+    #[encoding(tag = 2)]
+    BlockFees,
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
@@ -208,16 +223,17 @@ pub enum OperationResultSum {
 }
 
 pub fn produce_operation_result<M: OperationKind>(
+    balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, OperationError>,
 ) -> OperationResult<M> {
     match result {
         Ok(success) => OperationResult {
-            balance_updates: vec![],
+            balance_updates,
             result: ContentResult::Applied(success),
             internal_operation_results: vec![],
         },
         Err(operation_error) => OperationResult {
-            balance_updates: vec![],
+            balance_updates,
             result: ContentResult::Failed(vec![operation_error]),
             internal_operation_results: vec![],
         },
