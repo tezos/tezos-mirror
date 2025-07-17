@@ -2185,7 +2185,6 @@ let jobs pipeline_type =
             job_docker_arm64_test_manual;
             job_docker_verify_test_arm64;
             job_docker_verify_test_amd64;
-            job_base_images_trigger;
           ]
         in
         if pipeline_type = Merge_train then jobs
@@ -2194,6 +2193,7 @@ let jobs pipeline_type =
             job_homebrew_repository_trigger;
             job_rpm_repository_trigger_partial;
             job_debian_repository_trigger_partial;
+            job_base_images_trigger;
           ]
           @ jobs
     (* No manual jobs on the scheduled pipeline *)
