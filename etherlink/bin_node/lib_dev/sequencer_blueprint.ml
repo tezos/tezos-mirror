@@ -122,6 +122,9 @@ let unsigned_chunk_encoding =
          (req "nb_chunks" int31)
          (req "chunk_index" int31)))
 
+let unsigned_chunked_blueprint_encoding =
+  Data_encoding.list unsigned_chunk_encoding
+
 let chunk_encoding =
   Data_encoding.(
     conv
@@ -130,6 +133,9 @@ let chunk_encoding =
       (merge_objs
          unsigned_chunk_encoding
          (obj1 (req "signature" Signature.encoding))))
+
+let chunked_blueprint_encoding =
+  Data_encoding.(list (dynamic_size chunk_encoding))
 
 let unsigned_chunk_to_rlp {value; number; nb_chunks; chunk_index} =
   Rlp.(

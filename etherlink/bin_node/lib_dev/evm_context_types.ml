@@ -81,7 +81,9 @@ module Request = struct
              (req "request" (constant "apply_blueprint"))
              (opt "events" (list Evm_events.encoding))
              (req "timestamp" Time.Protocol.encoding)
-             (req "chunks" (list Sequencer_blueprint.unsigned_chunk_encoding))
+             (req
+                "chunks"
+                Sequencer_blueprint.unsigned_chunked_blueprint_encoding)
              (req
                 "delayed_transactions"
                 (list Evm_events.Delayed_transaction.encoding)))
