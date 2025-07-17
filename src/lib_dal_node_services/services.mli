@@ -60,6 +60,17 @@ val synchronized :
   ; query : unit >
   service
 
+(* This RPC monitors the  synchronization statuses of the DAL node
+   with respect to the L1 node. *)
+val monitor_synchronized :
+  < meth : [`GET]
+  ; input : unit
+  ; output : L1_crawler_status.t
+  ; prefix : unit
+  ; params : unit
+  ; query : unit >
+  service
+
 (** This RPC should be used by a slot producer. It allows to produce a
     commitment, a commitment proof and the shards from a slot. A
     padding is added if the slot is not of the expected size

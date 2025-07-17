@@ -717,6 +717,15 @@ end
 module Synchronized = struct
   let get_synchronized ctxt () () =
     Lwt_result_syntax.return @@ Node_context.get_l1_crawler_status ctxt
+
+  let get_monitor_synchronized ctxt () () =
+    let l1_crawler_status_input =
+      Node_context.get_l1_crawler_status_input ctxt
+    in
+    let stream, stopper = Lwt_watcher.create_stream l1_crawler_status_input in
+    let next () = Lwt_stream.get stream in
+    let shutdown () = Lwt_watcher.shutdown stopper in
+    Tezos_rpc.Answer.return_stream {next; shutdown}
 end
 
 let add_service registerer service handler directory =
@@ -867,6 +876,10 @@ let register :
        Tezos_rpc.Directory.register0
        Services.synchronized
        (Synchronized.get_synchronized ctxt)
+  |> add_service
+       Tezos_rpc.Directory.gen_register0
+       Services.monitor_synchronized
+       (Synchronized.get_monitor_synchronized ctxt)
   |> add_service
        Tezos_rpc.Directory.opt_register0
        Services.get_last_processed_level

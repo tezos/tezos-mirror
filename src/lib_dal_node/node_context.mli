@@ -105,6 +105,16 @@ val may_reconstruct :
     context. *)
 val get_l1_crawler_status : t -> L1_crawler_status.t
 
+(** [get_l1_crawler_status_input ctxt] returns the watcher input used to
+    broadcast L1 crawler status updates.
+
+    This input can be used with [Lwt_watcher.notify] to push new
+    [L1_crawler_status.t] values to all subscribers (e.g., RPC clients
+    monitoring synchronization status). Each call to the monitoring RPC
+    creates a new stream from this watcher, and receives updates pushed
+    through this input. *)
+val get_l1_crawler_status_input : t -> L1_crawler_status.t Lwt_watcher.input
+
 (** Updates the status of the L1 crawler with the given value. *)
 val set_l1_crawler_status : t -> L1_crawler_status.t -> unit
 
