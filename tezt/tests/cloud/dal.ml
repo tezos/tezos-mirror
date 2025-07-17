@@ -4051,13 +4051,12 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
   let data_dir =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
-  let with_yes_crypto =
-    match configuration.simulate_network with
-    | Scatter _ | Map _ -> true
-    | Disabled -> false
+  let env, with_yes_crypto =
+    may_set_yes_crypto configuration.simulate_network
   in
   let* node =
     Node.init
+      ?env
       ?data_dir
       ~name
       ~arguments:
