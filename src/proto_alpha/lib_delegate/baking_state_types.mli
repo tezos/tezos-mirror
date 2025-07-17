@@ -5,9 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** {2 Key type and functions}
-
-    Used for both consensus keys and companion keys. *)
+(** Unique identifier for a key. *)
 module Key_id : sig
   type t
 
@@ -29,6 +27,16 @@ module Key_id : sig
   end
 end
 
+(** A key that is fully known to the baker.
+
+    This means that the alias has both an associated public key and
+    secret key uri in the client wallet, and also that the key was
+    provided to the baker command line (or no keys were provided at
+    all, so that the baker defaulted to using all keys in the client
+    wallet).
+
+    May be used as a delegate's manager key, consensus key, and/or
+    companion key. *)
 module Key : sig
   type t = private {
     alias : string;
@@ -59,9 +67,24 @@ module Key : sig
   module Set : Set.S with type elt = t
 end
 
-(** {2 Delegates slots type and functions} *)
+(** Unique identifier for a delegate. *)
 module Delegate_id : module type of Key_id
 
+(** A delegate on behalf of which the baker should bake and attest.
+
+    The consensus key must be fully known.
+
+    The companion key may be [None] for multiple reasons:
+    - if the delegate has not registered any companion key
+    - if the companion key is not needed for the current cycle because
+      either aggregations are disabled or the consensus key is not a BLS
+      key
+    - if the companion key is not known to the client wallet or has
+      not been provided to the baker command line
+
+    The manager key may or may not be known to the baker; this does
+    not affect the baker's functionalities, but is tracked in the
+    [manager_key] type for logging purposes. *)
 module Delegate : sig
   type manager_key
 

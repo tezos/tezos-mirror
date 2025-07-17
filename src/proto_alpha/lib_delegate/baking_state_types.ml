@@ -22,8 +22,6 @@ module Key_id = struct
 end
 
 module Key = struct
-  (** A consensus key (aka, a validator) is identified by its alias name, its
-    public key, its public key hash, and its secret key. *)
   type t = {
     alias : string;
     id : Key_id.t;
