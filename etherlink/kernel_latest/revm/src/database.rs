@@ -15,10 +15,8 @@ use crate::{
     },
     Error,
 };
-
-use alloy_primitives::KECCAK256_EMPTY;
 use revm::{
-    primitives::{Address, HashMap, StorageKey, StorageValue, B256, U256},
+    primitives::{Address, HashMap, StorageKey, StorageValue, B256, KECCAK_EMPTY, U256},
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
@@ -267,7 +265,7 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
             // We must return empty code here otherwise the simulation will fail because
             // of EIP-3607.
             return Ok(Some(AccountInfo {
-                code_hash: KECCAK256_EMPTY,
+                code_hash: KECCAK_EMPTY,
                 code: None,
                 ..account_info
             }));
