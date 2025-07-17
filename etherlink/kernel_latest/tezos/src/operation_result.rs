@@ -251,6 +251,17 @@ pub enum OperationResultSum {
     Transfer(OperationResult<Transfer>),
 }
 
+pub fn is_applied(res: &OperationResultSum) -> bool {
+    match res {
+        OperationResultSum::Reveal(op_res) => {
+            matches!(op_res.result, ContentResult::Applied(_))
+        }
+        OperationResultSum::Transfer(op_res) => {
+            matches!(op_res.result, ContentResult::Applied(_))
+        }
+    }
+}
+
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, OperationError>,
