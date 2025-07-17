@@ -287,11 +287,25 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   ]
   @ jobs_debian_repository @ jobs_dnf_repository
   (* Include components release jobs only if this is a major release. *)
-  @ (if major then
-       let dry_run = test && release_tag_pipeline_type == Schedule_test in
-       Grafazos.Release.jobs ~test ~dry_run ()
-       @ Teztale.Release.jobs ~test ~dry_run ()
-     else [])
+  @ (if not major then []
+     else
+       match (test, release_tag_pipeline_type) with
+       | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
+           !Tezos_ci.Hooks.global_release
+           @ Grafazos.Release.jobs ~test:false ~dry_run:false ()
+           @ Teztale.Release.jobs ~test:false ~dry_run:false ()
+       | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
+           !Tezos_ci.Hooks.global_test_release
+           @ Grafazos.Release.jobs ~test:true ~dry_run:false ()
+           @ Teztale.Release.jobs ~test:true ~dry_run:false ()
+       | true, Schedule_test ->
+           !Tezos_ci.Hooks.global_scheduled_test_release
+           @ Grafazos.Release.jobs ~test:true ~dry_run:true ()
+           @ Teztale.Release.jobs ~test:true ~dry_run:true ()
+       | false, Schedule_test ->
+           failwith
+             "test = false is inconsistent with release_tag_pipeline_type = \
+              Schedule_test")
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
