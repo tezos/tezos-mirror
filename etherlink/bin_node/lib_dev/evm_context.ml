@@ -2112,6 +2112,15 @@ module Handlers = struct
     | Apply_blueprint {events; timestamp; chunks; payload; delayed_transactions}
       ->
         protect @@ fun () ->
+        (* As defined in [blueprint_storage.rs] *)
+        let maximum_number_of_chunks = 128 in
+        let* () =
+          (* As assessed in [check_unsigned_blueprint_chunk] in [parsing.rs] *)
+          when_ (maximum_number_of_chunks < List.length chunks) @@ fun () ->
+          failwith
+            "Blueprint exceeds the maximum number of chunks allowed by the \
+             kernel"
+        in
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
         let* block =

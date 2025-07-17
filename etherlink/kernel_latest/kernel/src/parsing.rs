@@ -312,6 +312,11 @@ fn check_unsigned_blueprint_chunk(
     unsigned_seq_blueprint: UnsignedSequencerBlueprint,
     next_blueprint_number: &U256,
 ) -> SequencerBlueprintRes {
+    // Important: These checks need to be replicated in the `Evm_context` worker
+    // of the EVM node. If a change is not backward compatible, then a storage
+    // version will have to be added so that the EVM node can distinguish between
+    // the past and new behavior.
+
     if MAXIMUM_NUMBER_OF_CHUNKS < unsigned_seq_blueprint.nb_chunks {
         return SequencerBlueprintRes::InvalidNumberOfChunks;
     }
