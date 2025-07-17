@@ -362,6 +362,16 @@ DAL node
 - A command line option ``--config-file`` has been added, allowing to have a
   configuration file out of the data directory. (MR :gl:`!18464`)
 
+- Added two new RPCs to track the synchronization status between the DAL node and the L1 node:
+
+  + ``GET /synchronized``: returns the current synchronization status.
+
+  + ``GET /monitor/synchronized``: provides a streamed view of the status as it changes
+    over time.
+
+  These endpoints help operators monitor whether the DAL node is catching up, lagging,
+  or fully synchronized with the L1 chain. (MR :gl:`!18686`)
+
 Grafazos
 --------
 
