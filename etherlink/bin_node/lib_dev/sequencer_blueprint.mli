@@ -17,10 +17,7 @@ type unsigned_chunk = private {
   chunk_index : int;
 }
 
-(* A signed blueprint chunk *)
-type t
-
-type chunked_blueprint = private t list
+type chunked_blueprint
 
 (** [nb_chunks blueprint] computes in constant time the number of
     chunks of [blueprint]. *)
