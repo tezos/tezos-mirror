@@ -153,7 +153,8 @@ let chunk_to_rlp
         Value (Signature.to_bytes signature);
       ])
 
-let chunk_of_rlp_opt s =
+let chunk_of_rlp s =
+  let open Result_syntax in
   match Rlp.decode s with
   | Ok
       Rlp.(
@@ -168,15 +169,19 @@ let chunk_of_rlp_opt s =
       let number = decode_number_le number in
       let nb_chunks = decode_u16_le nb_chunks in
       let chunk_index = decode_u16_le chunk_index in
-      Option.map
-        (fun signature ->
-          {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature})
-        (Signature.of_bytes_opt signature)
-  | _ -> None
+      let* signature =
+        match Signature.of_bytes_opt signature with
+        | Some signature -> return signature
+        | None -> tzfail Not_a_blueprint
+      in
+      return
+        {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature}
+  | _ -> tzfail Not_a_blueprint
 
-let chunk_of_external_message_opt (`External chunk) =
+let chunk_of_external_message (`External chunk) =
+  let open Result_syntax in
   let len = String.length chunk in
-  if len <= Message_format.header_size then None
+  if len <= Message_format.header_size then tzfail Not_a_blueprint
   else
     let chunk_bytes =
       String.(
@@ -185,7 +190,7 @@ let chunk_of_external_message_opt (`External chunk) =
           Message_format.header_size
           (length chunk - Message_format.header_size))
     in
-    chunk_of_rlp_opt (Bytes.unsafe_of_string chunk_bytes)
+    chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes)
 
 let make_blueprint_chunks ~number kernel_blueprint =
   let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
@@ -202,12 +207,6 @@ let make_blueprint_chunks ~number kernel_blueprint =
          argument [error_on_partial_chunk] is passed. As this is not
          the case in this call, this branch is impossible. *)
       assert false
-
-let chunk_of_external_message s =
-  let open Result_syntax in
-  match chunk_of_external_message_opt s with
-  | Some c -> return c
-  | None -> tzfail Not_a_blueprint
 
 let sign ~signer ~chunks =
   let open Lwt_result_syntax in
@@ -261,7 +260,7 @@ let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
   List.filter_map
     (fun chunk ->
       let open Option_syntax in
-      let* chunk = chunk_of_external_message_opt chunk in
+      let* chunk = Result.to_option @@ chunk_of_external_message chunk in
       check_signature_opt sequencer chunk)
     payload
   |> List.sort
