@@ -40,6 +40,8 @@ type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyKernelError {
+    #[error("Host failed with a runtime error {0}")]
+    HostRuntimeError(#[from] tezos_smart_rollup_host::runtime::RuntimeError),
     #[error("Apply operation failed on a storage manipulation {0}")]
     StorageError(tezos_storage::error::Error),
     #[error("Apply operation failed because of a b58 conversion {0}")]
