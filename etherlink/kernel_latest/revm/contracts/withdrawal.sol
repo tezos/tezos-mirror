@@ -7,22 +7,20 @@ pragma solidity ^0.8.24;
 contract XTZWithdrawal {
     uint256 public withdrawalCounter;
 
-    event StandardWithdrawalEvent(
+    event Withdrawal(
         uint256 amount,
-        address indexed sender,
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
-        // bytes22 receiver,
+        address sender,
+        bytes22 receiver,
         uint256 withdrawalId
     );
 
-    event FastWithdrawalEvent(
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
-        // bytes22 receiver,
+    event FastWithdrawal(
+        bytes22 receiver,
         uint256 withdrawalId,
         uint256 amount,
         uint256 timestamp,
         bytes payload,
-        address indexed l2Caller
+        address l2Caller
     );
 
     // Convert wei to mutez (1 mutez = 10^12 Wei)
@@ -53,7 +51,7 @@ contract XTZWithdrawal {
             target,
             mutezAmount
         );
-        (bool ok, ) = outboxSender.call(outboxData);
+        (bool ok, bytes memory receiver) = outboxSender.call(outboxData);
         require(ok, "Call to the outbox sender failed");
 
         // Burn (send to address(0))
@@ -61,7 +59,12 @@ contract XTZWithdrawal {
         require(sent, "Failed to burn");
 
         // Emit withdrawal event
-        emit StandardWithdrawalEvent(weiAmount, msg.sender, withdrawalCounter);
+        emit Withdrawal(
+            weiAmount,
+            msg.sender,
+            bytes22(receiver),
+            withdrawalCounter
+        );
 
         // Increment ID counter
         withdrawalCounter++;
@@ -88,7 +91,7 @@ contract XTZWithdrawal {
             mutezAmount,
             withdrawalCounter
         );
-        (bool ok, ) = outboxSender.call(outboxData);
+        (bool ok, bytes memory receiver) = outboxSender.call(outboxData);
         require(ok, "Call to the outbox sender failed");
 
         // Burn (send to address(0))
@@ -96,11 +99,10 @@ contract XTZWithdrawal {
         require(sent, "Failed to burn");
 
         // Emit fast withdrawal event
-        emit FastWithdrawalEvent(
+        emit FastWithdrawal(
+            bytes22(receiver),
             withdrawalCounter,
             weiAmount,
-            // TODO: unifying might be worth considering here
-            // push_fast_withdrawal_to_outbox currently also computes timestamp from revm context
             block.timestamp,
             payload,
             msg.sender
