@@ -7,17 +7,38 @@ pragma solidity ^0.8.24;
 contract FAWithdrawal {
     uint256 public withdrawalCounter;
 
-    event SolStandardWithdrawalEvent(
-        address indexed sender,
-        address indexed ticketOwner,
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
-        // bytes22 receiver,
-        // bytes22 proxy,
+    // TODO: Warn tooling maintainers about these event changes, previously:
+    // - Keccak256 of Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
+    // - First uint256 is a signature mistake!!
+    event Withdrawal(
+        uint256 indexed ticketHash,
+        address sender,
+        address ticketOwner,
+        bytes22 receiver,
+        bytes22 proxy,
         uint256 amount,
         uint256 withdrawalId
     );
 
-    event ClaimDepositEvent(
+    event FastFaWithdrawal(
+        uint256 indexed ticketHash,
+        address sender,
+        address ticketOwner,
+        bytes22 receiver,
+        bytes22 proxy,
+        uint256 amount,
+        uint256 withdrawalId,
+        uint256 timestamp,
+        bytes payload
+    );
+
+    struct RoutingInfo {
+        bytes22 target;
+        bytes22 proxy;
+    }
+
+    event Deposit(
+        uint256 indexed ticketHash,
         address ticketOwner,
         address receiver,
         uint256 amount,
@@ -87,10 +108,9 @@ contract FAWithdrawal {
             "Failed to decrement ticket balance: ticket_balance_remove call was unsuccessful"
         );
 
-        // TODO: Warn tooling maintainers about these event changes, previously:
-        // - Emitted from addr zero
-        // - Keccak256 of Deposit(uint256,address,address,uint256,uint256,uint256) as topic
-        emit ClaimDepositEvent(
+        // Emit claimed deposit event
+        emit Deposit(
+            deposit.ticketHash,
             ticketOwner,
             deposit.receiver,
             deposit.amount,
@@ -106,18 +126,6 @@ contract FAWithdrawal {
         (bool removeSuccess, ) = ticketTable.call(remove);
         require(removeSuccess, "Could not remove deposit");
     }
-
-    event SolFastWithdrawalEvent(
-        address indexed sender,
-        address indexed ticketOwner,
-        // TODO: https://gitlab.com/tezos/tezos/-/issues/8021
-        // bytes22 receiver,
-        // bytes22 proxy,
-        uint256 amount,
-        uint256 withdrawalId,
-        uint256 timestamp,
-        bytes payload
-    );
 
     function withdraw(
         address ticketOwner,
@@ -168,16 +176,20 @@ contract FAWithdrawal {
             ticketer,
             content
         );
-        (bool ok, ) = outboxSender.call(outboxData);
+        (bool ok, bytes memory encoded) = outboxSender.call(outboxData);
         require(
             ok,
             "Failed to produce message: push_fa_withdrawal_to_outbox call unsuccessful"
         );
+        RoutingInfo memory decoded = abi.decode(encoded, (RoutingInfo));
 
         // Emit withdrawal event
-        emit SolStandardWithdrawalEvent(
+        emit Withdrawal(
+            ticketHash,
             msg.sender,
             ticketOwner,
+            decoded.target,
+            decoded.proxy,
             amount,
             withdrawalCounter
         );
@@ -195,7 +207,7 @@ contract FAWithdrawal {
         string memory fastWithdrawalContract,
         bytes memory payload
     ) external payable {
-                address outboxSender = 0xFF00000000000000000000000000000000000003;
+        address outboxSender = 0xFF00000000000000000000000000000000000003;
         address ticketTable = 0xFf00000000000000000000000000000000000004;
 
         // Revert if amount is zero
@@ -240,16 +252,20 @@ contract FAWithdrawal {
             payload,
             withdrawalCounter
         );
-        (bool ok, ) = outboxSender.call(outboxData);
+        (bool ok, bytes memory encoded) = outboxSender.call(outboxData);
         require(
             ok,
             "Failed to produce message: push_fast_fa_withdrawal_to_outbox call unsuccessful"
         );
+        RoutingInfo memory decoded = abi.decode(encoded, (RoutingInfo));
 
         // Emit withdrawal event
-        emit SolFastWithdrawalEvent(
+        emit FastFaWithdrawal(
+            ticketHash,
             msg.sender,
             ticketOwner,
+            decoded.target,
+            decoded.proxy,
             amount,
             withdrawalCounter,
             block.timestamp,
