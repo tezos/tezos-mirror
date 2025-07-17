@@ -131,7 +131,7 @@ module Worker = struct
   let publish_on_dal state level chunks =
     let open Lwt_result_syntax in
     let payloads = Sequencer_blueprint.create_dal_payloads chunks in
-    let nb_chunks = List.length chunks in
+    let nb_chunks = List.length (chunks :> Sequencer_blueprint.t list) in
     let*! () = Blueprint_events.blueprint_injected_on_DAL ~level ~nb_chunks in
     Metrics.record_blueprint_chunks_sent_on_dal nb_chunks ;
     Rollup_services.publish_on_dal

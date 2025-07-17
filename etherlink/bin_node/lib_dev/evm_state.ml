@@ -325,8 +325,9 @@ let store_blueprint_chunk evm_state (chunk : Sequencer_blueprint.unsigned_chunk)
   return evm_state
 
 let store_blueprint_chunks ~blueprint_number evm_state
-    (chunks : Sequencer_blueprint.unsigned_chunk list) =
+    (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
+  let chunks = (chunks :> Sequencer_blueprint.unsigned_chunk list) in
   let nb_chunks = List.length chunks in
   let* evm_state = List.fold_left_es store_blueprint_chunk evm_state chunks in
   let*! evm_state =
@@ -346,7 +347,7 @@ type apply_result =
 
 let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
-    (chunks : Sequencer_blueprint.unsigned_chunk list) =
+    (chunks : Sequencer_blueprint.unsigned_chunked_blueprint) =
   let open Lwt_result_syntax in
   let root = Durable_storage_path.root_of_chain_family chain_family in
   let*! (Qty before_height) = current_block_height ~root evm_state in

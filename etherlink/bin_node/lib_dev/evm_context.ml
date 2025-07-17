@@ -1913,15 +1913,10 @@ module State = struct
           Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
         in
         let*? chunks =
-          List.map_e
-            (fun chunk ->
-              let open Result_syntax in
-              let* chunk =
-                Sequencer_blueprint.chunk_of_external_message chunk
-              in
-              Sequencer_blueprint.check_signature sequencer chunk)
+          Sequencer_blueprint.chunks_of_external_messages
             blueprint_with_events.blueprint.payload
         in
+        let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
         let* _block =
           apply_blueprint
             ~events
@@ -2115,7 +2110,10 @@ module Handlers = struct
         let maximum_number_of_chunks = 128 in
         let* () =
           (* As assessed in [check_unsigned_blueprint_chunk] in [parsing.rs] *)
-          when_ (maximum_number_of_chunks < List.length chunks) @@ fun () ->
+          when_
+            (maximum_number_of_chunks
+            < List.length (chunks :> Sequencer_blueprint.unsigned_chunk list))
+          @@ fun () ->
           failwith
             "Blueprint exceeds the maximum number of chunks allowed by the \
              kernel"
@@ -2535,14 +2533,8 @@ let apply_blueprint ?events timestamp payload delayed_transactions =
         return sequencer
     | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
   in
-  let*? chunks =
-    List.map_e
-      (fun chunk ->
-        let open Result_syntax in
-        let* chunk = Sequencer_blueprint.chunk_of_external_message chunk in
-        Sequencer_blueprint.check_signature sequencer chunk)
-      payload
-  in
+  let*? chunks = Sequencer_blueprint.chunks_of_external_messages payload in
+  let*? chunks = Sequencer_blueprint.check_signatures sequencer chunks in
   worker_wait_for_request
     (Apply_blueprint
        {

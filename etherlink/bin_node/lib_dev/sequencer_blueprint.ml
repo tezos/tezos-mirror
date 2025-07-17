@@ -106,7 +106,11 @@ type unsigned_chunk = {
   chunk_index : int;
 }
 
+type unsigned_chunked_blueprint = unsigned_chunk list
+
 type t = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
+
+type chunked_blueprint = t list
 
 let unsigned_chunk_encoding =
   Data_encoding.(
@@ -198,6 +202,9 @@ let chunk_of_external_message (`External chunk) =
     in
     chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes)
 
+let chunks_of_external_messages payload =
+  List.map_e chunk_of_external_message payload
+
 let to_rlp payload =
   let open Result_syntax in
   let* bytes =
@@ -254,6 +261,8 @@ let create_inbox_payload ~smart_rollup_address ~chunks : Blueprint_types.payload
 
 let unsafe_drop_signature chunk = chunk.unsigned_chunk
 
+let unsafe_drop_signatures l = List.map unsafe_drop_signature l
+
 let check_signature_opt sequencer chunk =
   let unsigned_chunk_bytes =
     Rlp.encode (unsigned_chunk_to_rlp chunk.unsigned_chunk)
@@ -272,6 +281,8 @@ let check_signature sequencer chunk =
         "Signature check failed for the provided blueprint with public key %a"
         Signature.Public_key.pp
         sequencer
+
+let check_signatures signer l = List.map_e (check_signature signer) l
 
 let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
   List.filter_map
