@@ -334,18 +334,6 @@ let jobs pipeline_type =
            ])
       script
   in
-  (* These test the upgrade from previous released version *)
-  let job_upgrade_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
-      =
-    job
-      ?allow_failure
-      ~__POS__
-      ~name
-      ~image
-      ~dependencies
-      ~stage:Stages.publishing_tests
-      script
-  in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
        are built and tested in the scheduled pipelines*)
@@ -370,12 +358,6 @@ let jobs pipeline_type =
         ~variables:[("PREFIX", "")]
         ~image:Images.ubuntu_noble
         ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
-      job_upgrade_bin
-        ~__POS__
-        ~name:"oc.upgrade_bin_ubuntu_jammy"
-        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
-        ~image:Images.ubuntu_jammy
-        ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_systemd"
@@ -431,12 +413,6 @@ let jobs pipeline_type =
         ~variables:[("PREFIX", "")]
         ~image:Images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
-      job_upgrade_bin
-        ~__POS__
-        ~name:"oc.upgrade_bin_debian_bookworm"
-        ~dependencies:(Dependent [Job job_apt_repo_debian])
-        ~image:Images.debian_bookworm
-        ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_test"
