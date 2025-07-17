@@ -22,6 +22,10 @@ type t
 
 type chunked_blueprint = private t list
 
+(** [nb_chunks blueprint] computes in constant time the number of
+    chunks of [blueprint]. *)
+val nb_chunks : chunked_blueprint -> int
+
 (* Invariants:
    - the nb_chunks field of each unsigned chunk is the length of the list,
    - the chunk_index field of the ith chunk of the list is i.

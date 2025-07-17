@@ -151,11 +151,22 @@ type unsigned_chunk = {
   chunk_index : int;
 }
 
+(* Invariants:
+   - the nb_chunks field of each unsigned chunk is the length of the list,
+   - the chunk_index field of the ith chunk of the list is i.
+*)
 type unsigned_chunked_blueprint = unsigned_chunk list
 
 type t = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
 
 type chunked_blueprint = t list
+
+(* We have the invariant that the nb_chunks field is the same for all
+   chunks and is the length of the list. This lets us compute the
+   length of the list in constant time. *)
+let nb_chunks = function
+  | [] -> 0
+  | {unsigned_chunk = {nb_chunks; _}; _} :: _ -> nb_chunks
 
 let unsigned_chunk_encoding =
   Data_encoding.(
