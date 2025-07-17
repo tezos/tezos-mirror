@@ -198,6 +198,17 @@ let chunk_of_external_message (`External chunk) =
     in
     chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes)
 
+let to_rlp payload =
+  let open Result_syntax in
+  let* bytes =
+    List.map_e
+      (fun chunk ->
+        let+ chunk = chunk_of_external_message chunk in
+        chunk.unsigned_chunk.value)
+      payload
+  in
+  Rlp.decode Bytes.(concat empty bytes)
+
 let make_blueprint_chunks ~number kernel_blueprint =
   let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in
   match String.chunk_bytes max_chunk_size blueprint with

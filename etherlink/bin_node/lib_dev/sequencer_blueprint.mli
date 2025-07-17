@@ -82,3 +82,5 @@ val kernel_blueprint_parent_hash_of_payload :
   Signature.public_key ->
   Blueprint_types.payload ->
   Ethereum_types.block_hash option
+
+val to_rlp : Blueprint_types.payload -> Rlp.item tzresult
