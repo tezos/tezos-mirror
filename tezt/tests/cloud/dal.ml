@@ -2834,13 +2834,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       Lwt.return_some dal_node
     else Lwt.return_none
   in
-  let* () =
-    Cloud.add_service
-      cloud
-      ~name:"Explorus"
-      ~url:
-        (sf "http://explorus.io?network=%s" (Node.rpc_endpoint bootstrap_node))
-  in
   let* stake = configuration.stake in
   let* client =
     if configuration.simulate_network = Disabled then
