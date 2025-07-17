@@ -4845,7 +4845,7 @@ let register (module Cli : Scenarios_cli.Dal) =
   let configuration, etherlink_configuration =
     let stake_machine_type = Cli.stake_machine_type in
     let dal_node_producers =
-      let last_index = ref 0 in
+      let last_index = ref (-1) in
       List.init Cli.producers (fun i ->
           match List.nth_opt Cli.dal_producers_slot_indices i with
           | None ->
