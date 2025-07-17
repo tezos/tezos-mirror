@@ -13,6 +13,97 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
+let init_tzkt ~agent ~tezlink_sandbox_endpoint =
+  let spawn_run ?name cmd args =
+    Agent.docker_run_command ?name agent cmd args
+  in
+  let run ?name cmd args = spawn_run ?name cmd args |> Process.check in
+
+  (* Start and initialize TZKT's PGSQL database *)
+  let* () = run "psql" ["--version"] in
+  let* () = run "service" ["postgresql"; "start"] in
+  (* For some reason, postgres is not immediatly available after the
+     service start command. *)
+  let* () = Lwt_unix.sleep 1. in
+  let psql ?db command =
+    run
+      "sudo"
+      (["-u"; "postgres"; "--"; "psql"]
+      @ (match db with None -> [] | Some db -> [db])
+      @ ["-c"; command])
+  in
+
+  (* Remove the tzkt repo if it already exists. *)
+  let* () = run "rm" ["-rf"; "tzkt"] in
+  (* Drop everything related to the database if it already exists. *)
+  let* () = psql "DROP DATABASE IF EXISTS tzkt_db;" in
+  let* () = psql "DROP USER IF EXISTS tzkt;" in
+
+  (* Setup the database for Tzkt indexer. *)
+  let* () = psql "CREATE DATABASE tzkt_db;" in
+  let* () = psql "CREATE USER tzkt WITH ENCRYPTED PASSWORD 'qwerty';" in
+  let* () = psql "GRANT ALL PRIVILEGES ON DATABASE tzkt_db TO tzkt;" in
+  let* () = psql ~db:"tzkt_db" "GRANT ALL ON SCHEMA public TO tzkt;" in
+
+  (* Clone TZKT sources on `proto23` branch as it supports Seoul. *)
+  let* () =
+    run
+      "git"
+      ["clone"; "-b"; "proto23"; "https://github.com/baking-bad/tzkt"; "tzkt"]
+  in
+  (* Replace the regexp [origin] by the string [replacement] in all
+     files under "./tzkt" except in the ".git" and ".github"
+     directories. *)
+  let sed origin replacement =
+    run
+      "find"
+      [
+        "tzkt";
+        "-type";
+        "f";
+        "-not";
+        "-path";
+        "'*/\\.git/*'";
+        "-not";
+        "-path";
+        "'*/\\.github/*'";
+        "-exec";
+        "sed";
+        "-i";
+        sf "s|%s|%s|g" origin replacement;
+        "{}";
+        "+";
+      ]
+  in
+  (* We use sed to patch TZKT sources. We change:
+     - the RPC endpoint, to use the local tezlink endpoint instead of TZKT's mainnet node,
+     - the database server to use localhost.
+     Alternatively, we could generate a configuration file to set the TZKT_TezosNode__Endpoint
+     and TZKT_ConnectionStrings__DefaultConnection configuration variables. *)
+  let* () =
+    sed
+      "https://rpc\\.tzkt\\.io/mainnet"
+      (Client.string_of_endpoint tezlink_sandbox_endpoint)
+  in
+  let* () = sed "host=db" "host=localhost" in
+  (* Compile and publish the Tzkt indexer along the API *)
+  let compile_tzkt target dir =
+    run "dotnet" ["publish"; sf "tzkt/%s" target; "-o"; dir]
+  in
+  let* () = compile_tzkt "Tzkt.Sync" "tzkt-sync" in
+  let* () = compile_tzkt "Tzkt.Api" "tzkt-api" in
+  (* Run the Tzkt indexer and Tzkt API *)
+  let* () =
+    run
+      ~name:"tzkt-indexer"
+      "sh"
+      ["-c"; "cd /root/tzkt-sync && dotnet Tzkt.Sync.dll"]
+  and* () =
+    run ~name:"tzkt-api" "sh" ["-c"; "cd /root/tzkt-api && dotnet Tzkt.Api.dll"]
+  in
+  let* () = run "rm" ["-rf"; "tzkt"] in
+  unit
+
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
     (rpc_port : int option) agent =
   let chain_id = 1 in
@@ -98,9 +189,15 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
       cloud
       agent
   in
+  let tezlink_sandbox_endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record evm_node) with path = "/tezlink"})
+  in
   let () = toplog "Launching the sandbox L2 node: done" in
   let* () = add_prometheus_source ~evm_node cloud agent name in
-  unit
+  return tezlink_sandbox_endpoint
 
 let rec loop n =
   let n = n + 1 in
@@ -134,12 +231,15 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         Lwt.return agent
       in
       let* tezlink_sequencer_agent = next_agent ~name in
-      let* () =
+      let* tezlink_sandbox_endpoint =
         init_tezlink_sequencer
           cloud
           name
           Cli.public_rpc_port
           tezlink_sequencer_agent
+      in
+      let* () =
+        init_tzkt ~agent:tezlink_sequencer_agent ~tezlink_sandbox_endpoint
       in
       let () = toplog "Starting main loop" in
       loop 0)
