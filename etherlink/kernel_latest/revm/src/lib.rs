@@ -3,23 +3,24 @@
 //
 // SPDX-License-Identifier: MIT
 
+use crate::inspectors::noop::NoInspector;
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::u256_to_le_bytes;
+use inspectors::{EtherlinkInspector, EvmInspection, TracerConfig};
 use precompile_provider::EtherlinkPrecompiles;
-use revm::context::result::EVMError;
-use revm::context::tx::TxEnvBuilder;
-use revm::handler::EthFrame;
 use revm::{
     context::{
-        result::ExecutionResult, transaction::AccessList, BlockEnv, CfgEnv, ContextTr,
-        DBErrorMarker, Evm, LocalContext, TxEnv,
+        result::{EVMError, ExecResultAndState, ExecutionResult},
+        transaction::AccessList,
+        tx::TxEnvBuilder,
+        BlockEnv, CfgEnv, ContextTr, DBErrorMarker, Evm, TxEnv,
     },
     context_interface::block::BlobExcessGasAndPrice,
-    handler::instructions::EthInstructions,
+    handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
-    Context, ExecuteCommitEvm, Journal, MainBuilder,
+    Context, ExecuteCommitEvm, InspectEvm, Journal, MainBuilder,
 };
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime::Runtime;
@@ -37,6 +38,7 @@ mod code_storage;
 mod constants;
 mod database;
 mod helpers;
+mod inspectors;
 mod table;
 
 #[derive(Error, Debug)]
@@ -139,6 +141,12 @@ fn tx_env<'a, Host: Runtime>(
     Ok(tx_env)
 }
 
+fn get_inspector_from(tracer_config: TracerConfig) -> EtherlinkInspector {
+    match tracer_config {
+        TracerConfig::NoOp => EtherlinkInspector::NoOp(NoInspector),
+    }
+}
+
 type EVMInnerContext<'a, Host> =
     Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>;
 
@@ -150,6 +158,31 @@ type EvmContext<'a, Host> = Evm<
     EthFrame<EthInterpreter>,
 >;
 
+fn evm_inspect<'a, Host: Runtime>(
+    db: EtherlinkVMDB<'a, Host>,
+    block: &'a BlockEnv,
+    tx: &'a TxEnv,
+    precompiles: EtherlinkPrecompiles,
+    chain_id: u64,
+    spec_id: SpecId,
+    inspector: EtherlinkInspector,
+) -> EvmInspection<'a, Host> {
+    let cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
+
+    Context::<
+        BlockEnv,
+        TxEnv,
+        CfgEnv,
+        EtherlinkVMDB<'a, Host>,
+        Journal<EtherlinkVMDB<'a, Host>>,
+    >::new(db, spec_id)
+    .with_block(block)
+    .with_tx(tx)
+    .with_cfg(cfg)
+    .build_mainnet_with_inspector(inspector)
+    .with_precompiles(precompiles)
+}
+
 fn evm<'a, Host: Runtime>(
     db: EtherlinkVMDB<'a, Host>,
     block: &'a BlockEnv,
@@ -160,23 +193,18 @@ fn evm<'a, Host: Runtime>(
 ) -> EvmContext<'a, Host> {
     let cfg = CfgEnv::new().with_chain_id(chain_id).with_spec(spec_id);
 
-    let context: Context<
+    Context::<
         BlockEnv,
         TxEnv,
         CfgEnv,
         EtherlinkVMDB<'a, Host>,
         Journal<EtherlinkVMDB<'a, Host>>,
-        (),
-        LocalContext,
-    > = Context::new(db, spec_id);
-
-    let evm = context
-        .with_block(block)
-        .with_tx(tx)
-        .with_cfg(cfg)
-        .build_mainnet();
-
-    evm.with_precompiles(precompiles)
+    >::new(db, spec_id)
+    .with_block(block)
+    .with_tx(tx)
+    .with_cfg(cfg)
+    .build_mainnet()
+    .with_precompiles(precompiles)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -193,6 +221,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
+    tracer_config: Option<TracerConfig>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let mut commit_status = true;
     let block_env = block_env(block_constants)?;
@@ -217,37 +246,60 @@ pub fn run_transaction<'a, Host: Runtime>(
         caller,
     );
 
-    let mut evm = evm(
-        db,
-        &block_env,
-        &tx,
-        precompiles,
-        block_constants.chain_id.as_u64(),
-        spec_id,
-    );
+    if let Some(tracer_config) = tracer_config {
+        let inspector = get_inspector_from(tracer_config);
 
-    evm.db_mut().initialize_storage()?;
+        let mut evm = evm_inspect(
+            db,
+            &block_env,
+            &tx,
+            precompiles,
+            block_constants.chain_id.as_u64(),
+            spec_id,
+            inspector,
+        );
 
-    let execution_result = evm.transact_commit(&tx)?;
+        let ExecResultAndState { result, .. } = evm.inspect_tx(&tx)?;
 
-    let withdrawals = evm.db_mut().take_withdrawals();
+        let withdrawals = evm.db_mut().take_withdrawals();
 
-    if !evm.db_mut().commit_status() {
-        // If something went wrong while commiting we drop the state changes
-        // made to the durable storage to avoid ending up in inconsistent state.
-        evm.db_mut().drop_storage()?;
-
-        return Err(EVMError::Custom(
-            "Comitting ended up in an incorrect state change: reverting.".to_owned(),
-        ));
+        Ok(ExecutionOutcome {
+            result,
+            withdrawals,
+        })
     } else {
-        evm.db_mut().commit_storage()?;
-    }
+        let mut evm = evm(
+            db,
+            &block_env,
+            &tx,
+            precompiles,
+            block_constants.chain_id.as_u64(),
+            spec_id,
+        );
 
-    Ok(ExecutionOutcome {
-        result: execution_result, // contains logs and gas_used.
-        withdrawals,
-    })
+        evm.db_mut().initialize_storage()?;
+
+        let execution_result = evm.transact_commit(&tx)?;
+
+        let withdrawals = evm.db_mut().take_withdrawals();
+
+        if !evm.db_mut().commit_status() {
+            // If something went wrong while commiting we drop the state changes
+            // made to the durable storage to avoid ending up in inconsistent state.
+            evm.db_mut().drop_storage()?;
+
+            return Err(EVMError::Custom(
+                "Comitting ended up in an incorrect state change: reverting.".to_owned(),
+            ));
+        } else {
+            evm.db_mut().commit_storage()?;
+        }
+
+        Ok(ExecutionOutcome {
+            result: execution_result,
+            withdrawals,
+        })
+    }
 }
 
 #[cfg(test)]
@@ -359,6 +411,7 @@ mod test {
             0,
             value_sent,
             AccessList(vec![]),
+            None,
         )
         .unwrap();
 
@@ -439,6 +492,7 @@ mod test {
             1,
             value_sent,
             AccessList(vec![]),
+            None,
         )
         .unwrap();
 
@@ -505,6 +559,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            None,
         );
 
         match result {
@@ -583,6 +638,7 @@ mod test {
             0,
             withdrawn_amount,
             AccessList(vec![]),
+            None,
         )
         .unwrap();
 
@@ -666,6 +722,7 @@ mod test {
             0,
             U256::ZERO,
             AccessList(vec![]),
+            None,
         )
         .unwrap();
 
@@ -714,6 +771,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            None,
         );
 
         let contract_address = match result_create {
@@ -742,6 +800,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            None,
         );
 
         match result_call {

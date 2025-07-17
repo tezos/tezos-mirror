@@ -328,6 +328,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     effective_gas_price: U256,
     access_list: AccessList,
     config: &Config,
+    _tracer_input: Option<TracerInput>,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -397,6 +398,8 @@ pub fn revm_run_transaction<Host: Runtime>(
                 )
                 .collect::<Vec<revm::context::transaction::AccessListItem>>(),
         ),
+        // TODO: Provide [tracer_input: Option<TracerInput>] when relevant.
+        None,
     ) {
         Ok(outcome) => {
             let gas_used = outcome.result.gas_used();
@@ -557,6 +560,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
             effective_gas_price,
             transaction.access_list.clone(),
             evm_configuration,
+            tracer_input,
         ) {
             Ok(outcome) => outcome,
             Err(err) => {
