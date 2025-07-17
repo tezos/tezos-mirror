@@ -11,7 +11,7 @@ use revm::{
 };
 
 use crate::{
-    constants::FA_WITHDRAWAL_SOL_ADDR,
+    constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST},
     database::PrecompileDatabase,
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     send_outbox_message::revert,
@@ -80,7 +80,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -102,7 +102,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -135,7 +135,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output,
             };
             Ok(result)
@@ -152,7 +152,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)

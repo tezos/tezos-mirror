@@ -22,7 +22,7 @@ use tezos_smart_rollup_encoding::{
 };
 
 use crate::{
-    constants::{FA_WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_ADDR},
+    constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, WITHDRAWAL_SOL_ADDR},
     database::PrecompileDatabase,
     helpers::u256_to_bigint,
 };
@@ -255,7 +255,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -295,7 +295,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -335,7 +335,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -387,7 +387,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit),
+                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
