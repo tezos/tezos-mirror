@@ -6,6 +6,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type tezlink_sandbox = {
+  chain_id : int;
+  funded_addresses : Signature.V1.public_key list;
+}
+
 type sandbox_config = {
   init_from_snapshot : string option;
   network : Configuration.supported_network option;
@@ -13,7 +18,7 @@ type sandbox_config = {
   parent_chain : Uri.t option;
   disable_da_fees : bool;
   kernel_verbosity : Events.kernel_log_level option;
-  tezlink : int option;
+  tezlink : tezlink_sandbox option;
 }
 
 let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
@@ -307,7 +312,55 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
             ()
         in
         let* () =
-          Option.iter_es (fun chain_id -> activate_tezlink chain_id) tezlink
+          Option.iter_es
+            (fun (tezlink : tezlink_sandbox) ->
+              let* () = activate_tezlink tezlink.chain_id in
+              let bootstrap_balances =
+                Data_encoding.Binary.to_string_exn
+                  Tezos_types.Tez.encoding
+                  Tezos_types.Tez.(mul_exn one 3_800_000)
+              in
+              let* () =
+                List.iter_es
+                  (fun pk ->
+                    let contract =
+                      Tezos_types.Contract.of_implicit
+                        (Signature.V1.Public_key.hash pk)
+                    in
+                    (* Patch the balance of bootstrap accounts *)
+                    let* () =
+                      Evm_context.patch_state
+                        ~key:(Tezlink_durable_storage.Path.balance contract)
+                        ~value:bootstrap_balances
+                        ()
+                    in
+                    let manager =
+                      Data_encoding.Binary.to_string_exn
+                        Tezos_types.Manager.encoding
+                        (Tezos_types.Manager.Public_key pk)
+                    in
+                    (* Patch the manager field of bootstrap accounts to make operations *)
+                    let* () =
+                      Evm_context.patch_state
+                        ~key:(Tezlink_durable_storage.Path.manager contract)
+                        ~value:manager
+                        ()
+                    in
+                    (* Patch the counter field of bootstrap accounts to make operations *)
+                    let* () =
+                      Evm_context.patch_state
+                        ~key:(Tezlink_durable_storage.Path.counter contract)
+                        ~value:
+                          (Data_encoding.Binary.to_string_exn
+                             Data_encoding.n
+                             Z.zero)
+                        ()
+                    in
+                    return ())
+                  tezlink.funded_addresses
+              in
+              return ())
+            tezlink
         in
         return_unit
     | None -> return_unit

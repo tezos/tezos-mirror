@@ -158,7 +158,7 @@ Run commands:
       [--genesis-timestamp <[TIMESTAMP]>]
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees]
-      [--kernel-verbosity <info>]
+      [--kernel-verbosity <info>] [--fund <edp...>]
     Start the EVM node in tezlink sandbox mode. The sandbox mode is a
     sequencer-like mode that produces blocks with a fake key and no rollup
     node connection.
@@ -233,6 +233,8 @@ Run commands:
     --disable-da-fees: Disable DA fees for this replay.
     --kernel-verbosity <info>: Sets kernel's logging verbosity, either
       `fatal`, `error`, `info`, `debug`.
+    --fund <edp...>: The address of an account to provide with funds in
+      Tezlink sandbox (can be repeated to fund multiple accounts)
   
   run proxy [--data-dir <data-dir>] [--config-file <path>]
       [--rpc-addr <ADDR>] [--rpc-port <PORT>] [--rpc-batch-limit <PORT>]

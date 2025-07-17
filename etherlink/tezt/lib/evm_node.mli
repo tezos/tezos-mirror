@@ -106,6 +106,7 @@ type mode =
     }
   | Tezlink_sandbox of {
       initial_kernel : string;
+      funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;

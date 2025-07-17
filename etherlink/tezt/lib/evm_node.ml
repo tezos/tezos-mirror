@@ -106,6 +106,7 @@ type mode =
     }
   | Tezlink_sandbox of {
       initial_kernel : string;
+      funded_addresses : string list;
       preimage_dir : string option;
       private_rpc_port : int option;
       time_between_blocks : time_between_blocks option;
@@ -871,7 +872,8 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Tezlink_sandbox {initial_kernel; genesis_timestamp; wallet_dir; _} ->
+    | Tezlink_sandbox
+        {initial_kernel; genesis_timestamp; wallet_dir; funded_addresses; _} ->
         ["run"; "tezlink"; "sandbox"; "--kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
@@ -879,6 +881,10 @@ let run_args evm_node =
               Client.time_of_timestamp timestamp |> Client.Time.to_notation)
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
+        @ List.fold_left
+            (fun acc pk -> Cli_arg.optional_arg "fund" Fun.id (Some pk) @ acc)
+            []
+            funded_addresses
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
     | Rpc _ -> ["experimental"; "run"; "rpc"]
@@ -1147,6 +1153,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
     | Tezlink_sandbox
         {
           initial_kernel = _;
+          funded_addresses = _;
           preimage_dir;
           private_rpc_port;
           time_between_blocks;

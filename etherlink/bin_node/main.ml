@@ -1144,7 +1144,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
     | None ->
         (* We are running in sequencer mode (not in sandbox mode), we need to disable native execution *)
         sequencer_disable_native_execution configuration
-    | Some Evm_node_lib_dev.Sequencer.{tezlink = Some chain_id; _} ->
+    | Some Evm_node_lib_dev.Sequencer.{tezlink = Some {chain_id; _}; _} ->
         (* We are running a tezlink sandbox, we need to activate tezlink node *)
         let configuration =
           add_tezlink_to_node_configuration chain_id configuration
@@ -2461,6 +2461,17 @@ let sandbox_config_args =
     disable_da_fees_arg
     kernel_verbosity_arg
 
+let tezlink_fund_arg =
+  let long = "fund" in
+  let doc =
+    Format.sprintf
+      "The address of an account to provide with funds in Tezlink sandbox (can \
+       be repeated to fund multiple accounts)"
+  in
+  Tezos_clic.multiple_arg ~long ~doc ~placeholder:"edp..." Params.tez_account
+
+let tezlink_sandbox_command_args = Tezos_clic.args1 tezlink_fund_arg
+
 let etherlink_sandbox_config_args =
   Tezos_clic.args4
     (supported_network_arg ())
@@ -2693,7 +2704,9 @@ let tezlink_sandbox_command =
       "Start the EVM node in tezlink sandbox mode. The sandbox mode is a \
        sequencer-like mode that produces blocks with a fake key and no rollup \
        node connection."
-    (merge_options common_config_args sandbox_config_args)
+    (merge_options
+       common_config_args
+       (merge_options sandbox_config_args tezlink_sandbox_command_args))
     (prefixes ["run"; "tezlink"; "sandbox"] stop)
     (fun ( ( data_dir,
              config_file,
@@ -2717,19 +2730,20 @@ let tezlink_sandbox_command =
              whitelisted_rpcs,
              finalized_view,
              profiling ),
-           ( preimages,
-             preimages_endpoint,
-             native_execution_policy,
-             time_between_blocks,
-             max_number_of_chunks,
-             private_rpc_port,
-             sequencer_str,
-             genesis_timestamp,
-             kernel,
-             wallet_dir,
-             password_filename,
-             disable_da_fees,
-             kernel_verbosity ) )
+           ( ( preimages,
+               preimages_endpoint,
+               native_execution_policy,
+               time_between_blocks,
+               max_number_of_chunks,
+               private_rpc_port,
+               sequencer_str,
+               genesis_timestamp,
+               kernel,
+               wallet_dir,
+               password_filename,
+               disable_da_fees,
+               kernel_verbosity ),
+             tezlink_funded_addresses ) )
          () ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
@@ -2749,7 +2763,13 @@ let tezlink_sandbox_command =
             parent_chain = None;
             disable_da_fees;
             kernel_verbosity;
-            tezlink = Some tezlink_sandbox_chain_id;
+            tezlink =
+              Some
+                {
+                  chain_id = tezlink_sandbox_chain_id;
+                  funded_addresses =
+                    Option.value ~default:[] tezlink_funded_addresses;
+                };
           }
       in
       let config_file = config_filename ~data_dir config_file in

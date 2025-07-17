@@ -47,6 +47,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string) agent =
     Evm_node.Tezlink_sandbox
       {
         initial_kernel = output;
+        funded_addresses = [];
         preimage_dir = Some preimages_dir;
         private_rpc_port;
         time_between_blocks;
