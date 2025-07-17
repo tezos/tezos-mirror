@@ -50,9 +50,10 @@ val download_snapshot :
 val ensure_snapshot :
   agent:Agent.t -> name:string -> network:Network.public -> t -> string Lwt.t
 
-(** Like [ensure_snapshot], but returns [None] for [Url] or [No_snapshot]
-    cases instead of downloading. Useful when downloading is optional. *)
-val ensure_snapshot_opt : agent:Agent.t -> t -> string option Lwt.t
+(** Like [ensure_snapshot], but returns [None] for [No_snapshot]
+    cases instead of downloading. *)
+val ensure_snapshot_opt :
+  agent:Agent.t -> name:string -> t -> string option Lwt.t
 
 (** [import_snapshot ?delete_snapshot_file ~no_check ~name node snapshot_path] imports
     a snapshot into a Tezos [node] at [snapshot_path], using [~name] for logging purposes. 

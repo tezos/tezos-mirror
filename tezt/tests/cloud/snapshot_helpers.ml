@@ -129,7 +129,7 @@ let ensure_snapshot ~agent ~name ~network = function
   | No_snapshot ->
       download_snapshot ~agent ~url:(Network.snapshot_service network) ~name
 
-let ensure_snapshot_opt ~agent = function
+let ensure_snapshot_opt ~agent ~name = function
   | Docker_embedded path ->
       toplog "Using locally stored snapshot file: %s" path ;
       Lwt.return_some path
@@ -137,7 +137,10 @@ let ensure_snapshot_opt ~agent = function
       toplog "Copying snapshot to destination" ;
       let* path = Tezt_cloud.Agent.copy agent ~destination:path ~source:path in
       Lwt.return_some path
-  | Url _ | No_snapshot -> Lwt.return_none
+  | Url url ->
+      let* path = download_snapshot ~agent ~url ~name in
+      Lwt.return_some path
+  | No_snapshot -> Lwt.return_none
 
 let import_snapshot ?(delete_snapshot_file = false) ~no_check ~name node
     snapshot_file_path =

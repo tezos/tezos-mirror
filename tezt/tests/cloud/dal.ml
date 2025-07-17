@@ -254,7 +254,7 @@ module Node = struct
               Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
             in
             let* () = Node.config_init node [Cors_origin "*"] in
-            let* snapshot_path = ensure_snapshot_opt ~agent snapshot in
+            let* snapshot_path = ensure_snapshot_opt ~agent ~name snapshot in
             let* snapshot_network =
               match snapshot_path with
               | Some path ->
