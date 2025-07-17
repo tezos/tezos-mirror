@@ -36,7 +36,7 @@ type prequorum = {
   level : int32;
   round : Round.t;
   block_payload_hash : Block_payload_hash.t;
-  preattestations : Kind.preattestation operation list;
+  preattestations : packed_operation list;
 }
 
 type block_info = {
@@ -46,7 +46,7 @@ type block_info = {
   payload_round : Round.t;
   round : Round.t;
   prequorum : prequorum option;
-  quorum : Kind.attestation operation list;
+  quorum : packed_operation list;
   payload : Operation_pool.payload;
   grandparent : Block_hash.t;
 }
@@ -59,15 +59,9 @@ let prequorum_encoding =
   let open Data_encoding in
   conv
     (fun {level; round; block_payload_hash; preattestations} ->
-      (level, round, block_payload_hash, List.map Operation.pack preattestations))
+      (level, round, block_payload_hash, preattestations))
     (fun (level, round, block_payload_hash, preattestations) ->
-      {
-        level;
-        round;
-        block_payload_hash;
-        preattestations =
-          List.filter_map Operation_pool.unpack_preattestation preattestations;
-      })
+      {level; round; block_payload_hash; preattestations})
     (obj4
        (req "level" int32)
        (req "round" Round.encoding)
@@ -94,7 +88,7 @@ let block_info_encoding =
         payload_round,
         round,
         prequorum,
-        List.map Operation.pack quorum,
+        quorum,
         payload,
         grandparent ))
     (fun ( hash,
@@ -114,7 +108,7 @@ let block_info_encoding =
         payload_round;
         round;
         prequorum;
-        quorum = List.filter_map Operation_pool.unpack_attestation quorum;
+        quorum;
         payload;
       })
     (obj9

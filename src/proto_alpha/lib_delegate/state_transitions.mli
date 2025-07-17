@@ -47,8 +47,7 @@ val may_update_proposal :
 
 val preattest : state -> proposal -> (state * action) Lwt.t
 
-val extract_pqc :
-  state -> proposal -> (Kind.preattestation operation list * Round.t) option
+val extract_pqc : state -> proposal -> (packed_operation list * Round.t) option
 
 val handle_proposal :
   is_proposal_applied:bool -> state -> proposal -> (state * action) Lwt.t

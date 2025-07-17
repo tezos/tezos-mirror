@@ -522,20 +522,8 @@ let mk_prequorum state latest_proposal =
   let {level; round; block_payload_hash} : batch_content =
     batch.batch_content
   in
-  let preattestations : Kind.preattestation operation list =
-    List.filter_map
-      (fun op ->
-        let (Operation_data protocol_data) =
-          op.signed_operation.protocol_data
-        in
-        match protocol_data.contents with
-        | Single (Preattestation _) ->
-            let op : Kind.preattestation operation =
-              {shell = {branch = batch.batch_branch}; protocol_data}
-            in
-            Some op
-        | _ -> assert false)
-      batch.signed_consensus_votes
+  let preattestations =
+    List.map (fun op -> op.signed_operation) batch.signed_consensus_votes
   in
   return
     {

@@ -72,19 +72,28 @@ let preapply_block cctxt ~chain ~head ~timestamp ~protocol_data operations =
     operations
     ~protocol_data
 
-let extract_prequorum preattestations =
+let extract_prequorum (preattestations : packed_operation list) =
   match preattestations with
-  | h :: _ ->
-      let {protocol_data = {contents = Single (Preattestation content); _}; _} =
-        (h : Kind.preattestation Operation.t)
-      in
-      Some
-        {
-          level = Raw_level.to_int32 content.level;
-          round = content.round;
-          block_payload_hash = content.block_payload_hash;
-          preattestations;
-        }
+  | packed_op :: _ -> (
+      let (Operation_data protocol_data) = packed_op.protocol_data in
+      match protocol_data.contents with
+      | Single (Preattestation content) ->
+          Some
+            {
+              level = Raw_level.to_int32 content.level;
+              round = content.round;
+              block_payload_hash = content.block_payload_hash;
+              preattestations;
+            }
+      | Single (Preattestations_aggregate {consensus_content; _}) ->
+          Some
+            {
+              level = Raw_level.to_int32 consensus_content.level;
+              round = consensus_content.round;
+              block_payload_hash = consensus_content.block_payload_hash;
+              preattestations;
+            }
+      | _ -> None)
   | _ -> None
 
 let info_of_header_and_ops ~in_protocol ~grandparent block_hash block_header
