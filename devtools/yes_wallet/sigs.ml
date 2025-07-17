@@ -38,6 +38,10 @@ module type PROTOCOL = sig
     val ( +? ) : t -> t -> t tzresult
 
     val to_mutez : t -> int64
+
+    val of_mutez_exn : int64 -> t
+
+    val ( >= ) : t -> t -> bool
   end
 
   module Signature : sig
