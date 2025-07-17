@@ -33,7 +33,9 @@ Starting from version 8.0, compiling Tezos requires the Rust compiler,
 version 1.44.0, and the Cargo package manager to be installed.
 See :ref:`instructions to set up Rust<setup_rust>`.
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v8.3

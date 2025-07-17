@@ -92,6 +92,8 @@ If you are installing Ubuntu and Debian packages from scratch, follow :ref:`thei
 From sources
 ~~~~~~~~~~~~
 
+.. code-block:: shell
+
   git fetch
   git checkout octez-v23.0-rc2
   make clean
