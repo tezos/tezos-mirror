@@ -231,23 +231,6 @@ blueprint_production:
       /* A span of time, as seen by the local computer. */
       number
   
-blueprint_proposal:
-  description: crafted a blueprint proposal for level {level} in {process_time}
-  level: debug
-  section: evm_node.dev
-  json format:
-    { /* blueprint_proposal version 0 */
-      "blueprint_proposal.v0":
-        { "level": $positive_bignum,
-          "process_time": $timespan.system } }
-    $positive_bignum:
-      /* Positive big number
-         Decimal representation of a positive big number */
-      string
-    $timespan.system:
-      /* A span of time, as seen by the local computer. */
-      number
-  
 blueprint_publisher_is_ready:
   description: blueprint publisher is ready
   level: info
@@ -690,7 +673,11 @@ evm_context_request_failed:
                               $timestamp.protocol,
                               $positive_bignum ] } ... ],
                  "timestamp": $timestamp.protocol,
-                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+                 "chunks":
+                   [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                       "number": $unistring,
+                       "nb_chunks": integer ∈ [-2^30, 2^30],
+                       "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit",
                        $unistring,
@@ -2500,7 +2487,11 @@ evm_context_request_failed:
                               $timestamp.protocol,
                               $positive_bignum ] } ... ],
                  "timestamp": $timestamp.protocol,
-                 "payload": [ /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ... ],
+                 "chunks":
+                   [ { "value": /^([a-zA-Z0-9][a-zA-Z0-9])*$/,
+                       "number": $unistring,
+                       "nb_chunks": integer ∈ [-2^30, 2^30],
+                       "chunk_index": integer ∈ [-2^30, 2^30] } ... ],
                  "delayed_transactions":
                    [ [ "transaction" || "deposit" || "fa_deposit",
                        $unistring,

@@ -7,7 +7,6 @@
 
 type parameters = {
   signer : Signer.t;
-  smart_rollup_address : string;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;
@@ -63,7 +62,6 @@ module Types = struct
 
   type state = {
     signer : Signer.t;
-    smart_rollup_address : string;
     maximum_number_of_chunks : int;
     tx_container : Services_backend_sig.ex_tx_container;
     sequencer_sunset_sec : int64;
@@ -141,8 +139,8 @@ let take_delayed_transactions maximum_number_of_chunks =
   in
   return (delayed_transactions, remaining_cumulative_size)
 
-let produce_block_with_transactions ~signer ~timestamp ~smart_rollup_address
-    ~transactions_and_objects ~delayed_hashes ~hash_of_tx_object head_info =
+let produce_block_with_transactions ~signer ~timestamp ~transactions_and_objects
+    ~delayed_hashes ~hash_of_tx_object head_info =
   let open Lwt_result_syntax in
   let transactions, tx_hashes =
     List.to_seq transactions_and_objects
@@ -154,27 +152,15 @@ let produce_block_with_transactions ~signer ~timestamp ~smart_rollup_address
     (Blueprint_events.blueprint_production
        head_info.Evm_context.next_blueprint_number)
   @@ fun () ->
-  let* blueprint_chunks =
-    Misc.with_timing
-      (Blueprint_events.blueprint_proposal
-         head_info.Evm_context.next_blueprint_number)
-    @@ fun () ->
-    let chunks =
-      Sequencer_blueprint.make_blueprint_chunks
-        ~number:head_info.next_blueprint_number
-        {
-          parent_hash = head_info.current_block_hash;
-          delayed_transactions = delayed_hashes;
-          transactions;
-          timestamp;
-        }
-    in
-    Sequencer_blueprint.sign ~signer ~chunks
-  in
-  let blueprint_payload =
-    Sequencer_blueprint.create_inbox_payload
-      ~smart_rollup_address
-      ~chunks:blueprint_chunks
+  let chunks =
+    Sequencer_blueprint.make_blueprint_chunks
+      ~number:head_info.next_blueprint_number
+      {
+        parent_hash = head_info.current_block_hash;
+        delayed_transactions = delayed_hashes;
+        transactions;
+        timestamp;
+      }
   in
   (* Resolve the content of delayed transactions. *)
   let* delayed_transactions =
@@ -183,15 +169,15 @@ let produce_block_with_transactions ~signer ~timestamp ~smart_rollup_address
         Evm_state.get_delayed_inbox_item head_info.evm_state delayed_hash)
       delayed_hashes
   in
-  let* confirmed_txs =
-    Evm_context.apply_blueprint timestamp blueprint_payload delayed_transactions
+  let* blueprint_chunks, payload, confirmed_txs =
+    Evm_context.apply_chunks ~signer timestamp chunks delayed_transactions
   in
   let (Qty number) = head_info.next_blueprint_number in
   let* () =
     Blueprints_publisher.publish
       number
       (Blueprints_publisher_types.Request.Blueprint
-         {chunks = blueprint_chunks; inbox_payload = blueprint_payload})
+         {chunks = blueprint_chunks; inbox_payload = payload})
   in
   let*! () =
     List.iter_p
@@ -323,8 +309,8 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
 
 (** Produces a block if we find at least one valid transaction in the transaction
     pool or if [force] is true. *)
-let produce_block_if_needed (type f) ~signer ~smart_rollup_address ~force
-    ~timestamp ~delayed_hashes ~remaining_cumulative_size
+let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
+    ~remaining_cumulative_size
     ~(tx_container : f Services_backend_sig.tx_container) head_info =
   let open Lwt_result_syntax in
   let* transactions_and_objects =
@@ -344,7 +330,6 @@ let produce_block_if_needed (type f) ~signer ~smart_rollup_address ~force
       produce_block_with_transactions
         ~signer
         ~timestamp
-        ~smart_rollup_address
         ~transactions_and_objects:(Some transactions_and_objects)
         ~delayed_hashes
         ~tx_container
@@ -421,7 +406,6 @@ let produce_block (type f) (state : Types.state) ~force ~timestamp
             produce_block_with_transactions
               ~signer:state.signer
               ~timestamp
-              ~smart_rollup_address:state.smart_rollup_address
               ~transactions_and_objects:None
               ~delayed_hashes:[]
               ~tx_container
@@ -433,7 +417,6 @@ let produce_block (type f) (state : Types.state) ~force ~timestamp
           produce_block_if_needed
             ~signer:state.signer
             ~timestamp
-            ~smart_rollup_address:state.smart_rollup_address
             ~force
             ~delayed_hashes
             ~remaining_cumulative_size
@@ -462,7 +445,6 @@ module Handlers = struct
         {
           sunset = false;
           signer = parameters.signer;
-          smart_rollup_address = parameters.smart_rollup_address;
           maximum_number_of_chunks = parameters.maximum_number_of_chunks;
           tx_container = parameters.tx_container;
           sequencer_sunset_sec = parameters.sequencer_sunset_sec;

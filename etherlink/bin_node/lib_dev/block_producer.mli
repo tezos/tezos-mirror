@@ -7,7 +7,6 @@
 
 type parameters = {
   signer : Signer.t;
-  smart_rollup_address : string;
   maximum_number_of_chunks : int;
   tx_container : Services_backend_sig.ex_tx_container;
   sequencer_sunset_sec : int64;

@@ -96,20 +96,28 @@ type unsigned_chunk = {
 
 type t = {unsigned_chunk : unsigned_chunk; signature : Signature.t}
 
-let chunk_encoding =
+let unsigned_chunk_encoding =
   Data_encoding.(
     let bytes_hex = bytes' Hex in
     conv
-      (fun {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature} ->
-        (value, number, nb_chunks, chunk_index, signature))
-      (fun (value, number, nb_chunks, chunk_index, signature) ->
-        {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature})
-      (obj5
+      (fun {value; number; nb_chunks; chunk_index} ->
+        (value, number, nb_chunks, chunk_index))
+      (fun (value, number, nb_chunks, chunk_index) ->
+        {value; number; nb_chunks; chunk_index})
+      (obj4
          (req "value" bytes_hex)
          (req "number" quantity_encoding)
          (req "nb_chunks" int31)
-         (req "chunk_index" int31)
-         (req "signature" Signature.encoding)))
+         (req "chunk_index" int31)))
+
+let chunk_encoding =
+  Data_encoding.(
+    conv
+      (fun {unsigned_chunk; signature} -> (unsigned_chunk, signature))
+      (fun (unsigned_chunk, signature) -> {unsigned_chunk; signature})
+      (merge_objs
+         unsigned_chunk_encoding
+         (obj1 (req "signature" Signature.encoding))))
 
 let unsigned_chunk_to_rlp {value; number; nb_chunks; chunk_index} =
   Rlp.(

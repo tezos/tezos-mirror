@@ -95,6 +95,21 @@ val apply_blueprint :
   Evm_events.Delayed_transaction.t list ->
   Ethereum_types.hash Seq.t tzresult Lwt.t
 
+(** [apply_chunks ~signer chunks delayed_transactions] works similarly to
+    {!apply_blueprint}, with the notable difference that it allows to start
+    applying the [chunks] of a blueprint {e before} their signatures (computed
+    by [signer]) are ready. *)
+val apply_chunks :
+  signer:Signer.t ->
+  Time.Protocol.t ->
+  Sequencer_blueprint.unsigned_chunk list ->
+  Evm_events.Delayed_transaction.t list ->
+  (Sequencer_blueprint.t list
+  * Blueprint_types.payload
+  * Ethereum_types.hash Seq.t)
+  tzresult
+  Lwt.t
+
 (** [apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level]
     stores the finalization relationship between L1 level [l1_level]
     and the L2 level range from [start_l2_level] to [end_l2_level]. It

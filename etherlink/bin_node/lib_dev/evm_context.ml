@@ -792,15 +792,14 @@ module State = struct
       {l1_level; start_l2_level; end_l2_level} ;
     return_unit
 
-  (** [apply_blueprint_store_unsafe ctxt payload delayed_transactions] applies
-      the blueprint [payload] on the head of [ctxt], and commit the resulting
-      state to Irmin and the node’s store.
+  (** [apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
+      delayed_transactions] applies the blueprint [chunks] on the head of
+      [ctxt], and commit the resulting state and the blueprint signed [payload]
+      (when the promise is fulfilled) to Irmin and the node’s store.
 
-      However, it does not modifies [ctxt] to make it aware of the new state.
-      This is because [apply_blueprint_store_unsafe] is expected to be called
-      within a SQL transaction to make sure the node’s store is not left in an
-      inconsistent state in case of error. *)
-  let apply_blueprint_store_unsafe ctxt conn timestamp payload
+      This function expects its connection to the store [conn] to be wrapped in
+      a SQL transaction. *)
+  let apply_blueprint_store_unsafe ctxt conn timestamp chunks payload
       delayed_transactions =
     let open Lwt_result_syntax in
     Evm_store.assert_in_transaction conn ;
@@ -866,16 +865,6 @@ module State = struct
       Evm_store.Sequencer_upgrades.record_apply
         conn
         ctxt.session.next_blueprint_number
-    in
-
-    let* sequencer = Durable_storage.sequencer (read_from_state evm_state) in
-    let*? chunks =
-      List.map_e
-        (fun chunk ->
-          let open Result_syntax in
-          let* chunk = Sequencer_blueprint.chunk_of_external_message chunk in
-          Sequencer_blueprint.check_signature sequencer chunk)
-        payload
     in
 
     let* try_apply =
@@ -963,6 +952,7 @@ module State = struct
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
               ()
         in
+        let* payload in
         let* () =
           Evm_store.Blueprints.store
             conn
@@ -1090,6 +1080,14 @@ module State = struct
       Evm_events.Flushed_blueprint.
         {transactions; timestamp; level = flushed_level} =
     let open Lwt_result_syntax in
+    let sign ~signer chunks =
+      let+ blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
+      Sequencer_blueprint.create_inbox_payload
+        ~smart_rollup_address:
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+             ctxt.smart_rollup_address)
+        ~chunks:blueprint_chunks
+    in
     let hashes =
       List.map (fun tx -> tx.Evm_events.Delayed_transaction.hash) transactions
     in
@@ -1109,15 +1107,8 @@ module State = struct
           timestamp;
         }
     in
-    let* blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
-    let payload =
-      Sequencer_blueprint.create_inbox_payload
-        ~smart_rollup_address:
-          (Tezos_crypto.Hashed.Smart_rollup_address.to_string
-             ctxt.smart_rollup_address)
-        ~chunks:blueprint_chunks
-    in
-    return payload
+
+    return (chunks, sign ~signer chunks)
 
   let clear_head_delayed_inbox ctxt =
     let open Lwt_result_syntax in
@@ -1127,7 +1118,7 @@ module State = struct
     ctxt.session.evm_state <- cleaned_evm_state ;
     return_unit
 
-  let rec apply_blueprint ?(events = []) ctxt conn timestamp payload
+  let rec apply_blueprint ?(events = []) ctxt conn timestamp chunks payload
       delayed_transactions : 'a L2_types.block tzresult Lwt.t =
     let open Lwt_result_syntax in
     let+ current_block, _execution_gas =
@@ -1146,6 +1137,7 @@ module State = struct
           ctxt
           conn
           timestamp
+          chunks
           payload
           delayed_transactions
       in
@@ -1164,6 +1156,8 @@ module State = struct
             Some sequencer_upgrade
         | _ -> None
       in
+
+      let* payload in
 
       let* current_block =
         match current_block with
@@ -1411,12 +1405,19 @@ module State = struct
     let* parent_hash =
       Evm_state.current_block_hash ~chain_family ctxt.session.evm_state
     in
-    let* payload =
+    let* chunks, payload =
       prepare_local_flushed_blueprint ctxt parent_hash flushed_blueprint
     in
     (* Apply the blueprint. *)
     let* _block =
-      apply_blueprint ~events ctxt conn timestamp payload delayed_transactions
+      apply_blueprint
+        ~events
+        ctxt
+        conn
+        timestamp
+        chunks
+        payload
+        delayed_transactions
     in
     return ctxt.session.evm_state
 
@@ -1839,14 +1840,13 @@ module State = struct
 
   let perform_commit = commit
 
-  let patch_state (ctxt : t) ?block_number ~commit ~key patch () =
+  let patch_state (ctxt : t) conn ?block_number ~commit ~key patch () =
     let open Lwt_result_syntax in
     let block_number = canonical_block_number ctxt block_number in
     let* evm_state =
       match block_number with
       | None -> return ctxt.session.evm_state
       | Some block_number -> (
-          Evm_store.use ctxt.store @@ fun conn ->
           let* hash = Evm_store.Context_hashes.find conn block_number in
           match hash with
           | Some hash ->
@@ -1872,7 +1872,6 @@ module State = struct
       match block_number with
       | None ->
           if commit then (
-            Evm_store.use ctxt.store @@ fun conn ->
             let* commit = replace_current_commit ctxt conn evm_state in
             on_modified_head ctxt evm_state commit ;
             return (current_blueprint_number ctxt))
@@ -1881,7 +1880,6 @@ module State = struct
             return (current_blueprint_number ctxt))
       | Some block_number ->
           if commit then (
-            Evm_store.use ctxt.store @@ fun conn ->
             let* context =
               perform_commit conn ctxt.session.context evm_state block_number
             in
@@ -1910,13 +1908,27 @@ module State = struct
         let events =
           Blueprint_types.events_of_blueprint_with_events blueprint_with_events
         in
+        let* sequencer =
+          Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
+        in
+        let*? chunks =
+          List.map_e
+            (fun chunk ->
+              let open Result_syntax in
+              let* chunk =
+                Sequencer_blueprint.chunk_of_external_message chunk
+              in
+              Sequencer_blueprint.check_signature sequencer chunk)
+            blueprint_with_events.blueprint.payload
+        in
         let* _block =
           apply_blueprint
             ~events
             ctxt
             conn
             blueprint_with_events.blueprint.timestamp
-            blueprint_with_events.blueprint.payload
+            chunks
+            (return blueprint_with_events.blueprint.payload)
             blueprint_with_events.delayed_transactions
         in
 
@@ -2097,7 +2109,8 @@ module Handlers = struct
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
         State.apply_evm_events ?finalized_level conn ctxt events
-    | Apply_blueprint {events; timestamp; payload; delayed_transactions} ->
+    | Apply_blueprint {events; timestamp; chunks; payload; delayed_transactions}
+      ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
         State.Transaction.run ctxt @@ fun ctxt conn ->
@@ -2107,6 +2120,7 @@ module Handlers = struct
             ctxt
             conn
             timestamp
+            chunks
             payload
             delayed_transactions
         in
@@ -2134,7 +2148,8 @@ module Handlers = struct
     | Patch_state {commit; key; patch; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
-        State.patch_state ?block_number ctxt ~commit ~key patch ()
+        State.Transaction.run ctxt @@ fun ctxt conn ->
+        State.patch_state ?block_number ctxt conn ~commit ~key patch ()
     | Wasm_pvm_version ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -2251,6 +2266,11 @@ let return_ : (_, _ Worker.message_error) result -> _ =
         "Cannot interact with the EVM context worker because it is closed"
   | Error (Request_error err) -> Lwt.return (Error err)
   | Error (Any exn) -> fail_with_exn exn
+
+let smart_rollup_address () =
+  let open Lwt_result_syntax in
+  let*? w = Lazy.force worker in
+  return (Worker.state w).smart_rollup_address
 
 let worker_wait_for_request req =
   let open Lwt_result_syntax in
@@ -2477,18 +2497,89 @@ let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     (Apply_evm_events
        {finalized_level = Some finalized_level; events = evm_events})
 
-let apply_blueprint ?events timestamp payload delayed_transactions =
-  worker_wait_for_request
-    (Apply_blueprint {events; timestamp; payload; delayed_transactions})
-
-let apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
-  worker_wait_for_request
-    (Finalized_levels {l1_level; start_l2_level; end_l2_level})
-
 let head_info () =
   let open Lwt_syntax in
   let+ head_info in
   !head_info
+
+let apply_blueprint ?events timestamp payload delayed_transactions =
+  let open Lwt_result_syntax in
+  let*! head = head_info () in
+  let* sequencer =
+    (* To guess the identity of the sequencer public key to use, we need to
+       cover the edge case were a bleuprint contains the sequencer upgrade that
+       needs to be triggered to get the correct sequencer. *)
+    let incoming_sequencer_upgrade =
+      List.find_map
+        (function
+          | Evm_events.Sequencer_upgrade_event upgrade -> Some upgrade
+          | _ -> None)
+        (Option.value ~default:[] events)
+    in
+    match
+      Option.either incoming_sequencer_upgrade head.pending_sequencer_upgrade
+    with
+    | Some {sequencer; timestamp = upgrade_timestamp; _}
+      when Time.Protocol.(timestamp >= upgrade_timestamp) ->
+        return sequencer
+    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+  in
+  let*? chunks =
+    List.map_e
+      (fun chunk ->
+        let open Result_syntax in
+        let* chunk = Sequencer_blueprint.chunk_of_external_message chunk in
+        Sequencer_blueprint.check_signature sequencer chunk)
+      payload
+  in
+  worker_wait_for_request
+    (Apply_blueprint
+       {
+         events;
+         timestamp;
+         chunks;
+         payload = return payload;
+         delayed_transactions;
+       })
+
+let apply_chunks ~signer timestamp chunks delayed_transactions =
+  let open Lwt_result_syntax in
+  let blueprint_chunks = Sequencer_blueprint.sign ~signer ~chunks in
+  let payload =
+    let* blueprint_chunks in
+    let+ smart_rollup_address = smart_rollup_address () in
+    Sequencer_blueprint.create_inbox_payload
+      ~smart_rollup_address:
+        (Tezos_crypto.Hashed.Smart_rollup_address.to_string
+           smart_rollup_address)
+      ~chunks:blueprint_chunks
+  in
+  let* sequencer = Signer.public_key signer in
+  let*! head = head_info () in
+  let* expected_sequencer =
+    match head.pending_sequencer_upgrade with
+    | Some {sequencer; timestamp = upgrade_timestamp; _}
+      when Time.Protocol.(timestamp >= upgrade_timestamp) ->
+        return sequencer
+    | _ -> Durable_storage.sequencer (State.read_from_state head.evm_state)
+  in
+  if Signature.Public_key.(sequencer = expected_sequencer) then
+    let* confirmed_txs =
+      worker_wait_for_request
+        (Apply_blueprint
+           {events = None; timestamp; chunks; payload; delayed_transactions})
+    and* blueprint_chunks
+    and* payload in
+    return (blueprint_chunks, payload, confirmed_txs)
+  else
+    failwith
+      "Cannot apply a blueprint produced by sequencer %a"
+      Signature.Public_key.pp
+      sequencer
+
+let apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level =
+  worker_wait_for_request
+    (Finalized_levels {l1_level; start_l2_level; end_l2_level})
 
 let next_blueprint_number () =
   let open Lwt_syntax in

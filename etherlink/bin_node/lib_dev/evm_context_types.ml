@@ -17,7 +17,8 @@ module Request = struct
     | Apply_blueprint : {
         events : Evm_events.t list option;
         timestamp : Time.Protocol.t;
-        payload : Blueprint_types.payload;
+        chunks : Sequencer_blueprint.unsigned_chunk list;
+        payload : Blueprint_types.payload tzresult Lwt.t;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
         -> (Ethereum_types.hash Seq.t, tztrace) t
@@ -82,20 +83,18 @@ module Request = struct
              (req "request" (constant "apply_blueprint"))
              (opt "events" (list Evm_events.encoding))
              (req "timestamp" Time.Protocol.encoding)
-             (req "payload" Blueprint_types.payload_encoding)
+             (req "chunks" (list Sequencer_blueprint.unsigned_chunk_encoding))
              (req
                 "delayed_transactions"
                 (list Evm_events.Delayed_transaction.encoding)))
           (function
             | View
                 (Apply_blueprint
-                  {events; timestamp; payload; delayed_transactions}) ->
-                Some ((), events, timestamp, payload, delayed_transactions)
+                  {events; timestamp; chunks; payload = _; delayed_transactions})
+              ->
+                Some ((), events, timestamp, chunks, delayed_transactions)
             | _ -> None)
-          (fun ((), events, timestamp, payload, delayed_transactions) ->
-            View
-              (Apply_blueprint
-                 {events; timestamp; payload; delayed_transactions}));
+          (fun _ -> assert false);
         case
           (Tag 2)
           ~title:"Last_known_L1_level"
