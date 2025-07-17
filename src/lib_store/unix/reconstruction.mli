@@ -56,6 +56,7 @@ type failure_kind =
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
   | Cannot_read_resulting_context_hash of Block_hash.t
+  | Cannot_read_block_metadata of Block_hash.t
 
 type error += Reconstruction_failure of failure_kind
 

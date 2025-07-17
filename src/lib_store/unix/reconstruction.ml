@@ -28,6 +28,7 @@ type failure_kind =
   | Cannot_read_block_hash of Block_hash.t
   | Cannot_read_block_level of Int32.t
   | Cannot_read_resulting_context_hash of Block_hash.t
+  | Cannot_read_block_metadata of Block_hash.t
 
 let failure_kind_encoding =
   let open Data_encoding in
@@ -51,6 +52,12 @@ let failure_kind_encoding =
         int32
         (function Cannot_read_block_level l -> Some l | _ -> None)
         (fun l -> Cannot_read_block_level l);
+      case
+        (Tag 3)
+        ~title:"cannot_read_block_metadata"
+        Block_hash.encoding
+        (function Cannot_read_block_metadata h -> Some h | _ -> None)
+        (fun h -> Cannot_read_block_metadata h);
     ]
 
 let failure_kind_pp ppf = function
@@ -63,6 +70,12 @@ let failure_kind_pp ppf = function
       Format.fprintf
         ppf
         "Unexpected missing resulting context hash in store for block %a"
+        Block_hash.pp
+        h
+  | Cannot_read_block_metadata h ->
+      Format.fprintf
+        ppf
+        "Unexpected missing block metadata in store: %a"
         Block_hash.pp
         h
 
@@ -169,7 +182,8 @@ let compute_all_operations_metadata_hash block =
 let apply_context context_index chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~operation_metadata_size_limit
     ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
-    ~predecessor_block ~expected_context_hash block =
+    ~predecessor_max_operations_ttl ~predecessor_block ~expected_context_hash
+    block =
   let open Lwt_result_syntax in
   let block_header = Store.Block.header block in
   let operations = Store.Block.operations block in
@@ -186,8 +200,7 @@ let apply_context context_index chain_id ~user_activated_upgrades
   in
   let apply_environment =
     {
-      Block_validation.max_operations_ttl =
-        Int32.to_int (Store.Block.level predecessor_block);
+      Block_validation.max_operations_ttl = predecessor_max_operations_ttl;
       chain_id;
       predecessor_block_header;
       predecessor_context;
@@ -313,7 +326,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
     ~start_level ~end_level =
   let open Lwt_result_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
-  let rec loop level acc =
+  let rec loop level predecessor_max_operations_ttl acc =
     if level > end_level then return List.(rev acc)
     else
       let* block =
@@ -340,6 +353,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
           reconstruct_genesis_operations_metadata chain_store
         else
           let* ( predecessor_block,
+                 predecessor_max_operations_ttl,
                  predecessor_block_metadata_hash,
                  predecessor_ops_metadata_hash ) =
             match acc with
@@ -350,8 +364,27 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
                 let* predecessor_block =
                   Store.Block.read_predecessor chain_store block
                 in
+                let block_store = Store.Unsafe.get_block_store chain_store in
+                let cemented_block_store =
+                  Block_store.cemented_block_store block_store
+                in
+                let* predecessor_metadata =
+                  Cemented_block_store.read_block_metadata
+                    cemented_block_store
+                    (Store.Block.level predecessor_block)
+                in
+                let* predecessor_max_operations_ttl =
+                  match predecessor_metadata with
+                  | Some m -> return (Store.Block.max_operations_ttl m)
+                  | None ->
+                      tzfail
+                        (Reconstruction_failure
+                           (Cannot_read_block_metadata
+                              (Store.Block.hash predecessor_block)))
+                in
                 return
                   ( predecessor_block,
+                    predecessor_max_operations_ttl,
                     Store.Block.block_metadata_hash predecessor_block,
                     Store.Block.all_operations_metadata_hash predecessor_block
                   )
@@ -363,6 +396,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
                 let predecessor_block = Store.Unsafe.block_of_repr pred in
                 return
                   ( predecessor_block,
+                    predecessor_max_operations_ttl,
                     Block_repr.block_metadata_hash pred,
                     compute_all_operations_metadata_hash pred )
           in
@@ -374,6 +408,7 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
             ~operation_metadata_size_limit
             ~predecessor_block_metadata_hash
             ~predecessor_ops_metadata_hash
+            ~predecessor_max_operations_ttl
             ~predecessor_block
             ~expected_context_hash:Proto.expected_context_hash
             block
@@ -393,9 +428,12 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
           last_preserved_block_level
           (Store.Unsafe.repr_of_block block)
       in
-      loop (Int32.succ level) ((reconstructed_block, block_protocol_env) :: acc)
+      loop
+        (Int32.succ level)
+        max_operations_ttl
+        ((reconstructed_block, block_protocol_env) :: acc)
   in
-  loop start_level []
+  loop start_level 0 []
 
 let store_chunk cemented_store chunk =
   let open Lwt_result_syntax in
@@ -757,6 +795,15 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                                 | Some b ->
                                     return (Store.Unsafe.block_of_repr b))
                           in
+                          let* predecessor_block_metadata =
+                            Store.Block.get_block_metadata
+                              chain_store
+                              predecessor_block
+                          in
+                          let predecessor_max_operations_ttl =
+                            Store.Block.max_operations_ttl
+                              predecessor_block_metadata
+                          in
                           let* res =
                             apply_context
                               context_index
@@ -770,6 +817,7 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                               ~predecessor_ops_metadata_hash:
                                 (Store.Block.all_operations_metadata_hash
                                    predecessor_block)
+                              ~predecessor_max_operations_ttl
                               ~predecessor_block
                               ~expected_context_hash:Proto.expected_context_hash
                               block
