@@ -303,4 +303,32 @@ module DNS = struct
     | Some name ->
         Log.report "Removing subdomain '%s'" name ;
         Transaction.(try_update ~zone @@ remove ~zone ~name ~value) ()
+
+  let set_subdomain ~agent_ip ~domain =
+    let* res = find_zone_for_subdomain domain in
+    match res with
+    | None ->
+        let () =
+          Log.report
+            ~color:Log.Color.FG.yellow
+            "The domain '%s' is not a subdomain of an authorized GCP zone. \
+             Skipping."
+            domain
+        in
+        Lwt.return_unit
+    | Some (zone, _) ->
+        let* ip = get_value ~zone ~domain in
+        let* () =
+          match ip with
+          | None -> Lwt.return_unit
+          | Some ip -> remove_subdomain ~zone ~name:domain ~value:ip
+        in
+        let* () = add_subdomain ~zone ~name:domain ~value:agent_ip in
+        let () =
+          Log.report
+            ~color:Log.Color.FG.green
+            "DNS registered successfully: '%s'"
+            domain
+        in
+        Lwt.return_unit
 end
