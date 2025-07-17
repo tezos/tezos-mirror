@@ -244,12 +244,12 @@ let check_signature_opt sequencer chunk =
   let correctly_signed =
     Signature.check sequencer chunk.signature unsigned_chunk_bytes
   in
-  if correctly_signed then Some chunk else None
+  if correctly_signed then Some chunk.unsigned_chunk else None
 
 let check_signature sequencer chunk =
   let open Result_syntax in
   match check_signature_opt sequencer chunk with
-  | Some chunk -> return chunk.unsigned_chunk
+  | Some chunk -> return chunk
   | None ->
       error_with
         "Signature check failed for the provided blueprint with public key %a"
@@ -263,11 +263,7 @@ let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
       let* chunk = Result.to_option @@ chunk_of_external_message chunk in
       check_signature_opt sequencer chunk)
     payload
-  |> List.sort
-       (fun
-         {unsigned_chunk = {chunk_index = x; _}; _}
-         {unsigned_chunk = {chunk_index = y; _}; _}
-       -> compare x y)
+  |> List.sort (fun {chunk_index = x; _} {chunk_index = y; _} -> compare x y)
 
 let create_dal_payloads chunks =
   List.map
@@ -281,7 +277,7 @@ let kernel_blueprint_parent_hash_of_payload sequencer payload =
   let chunks = decode_inbox_payload sequencer payload in
   let bytes =
     List.fold_left
-      (fun buffer {unsigned_chunk = {value; _}; _} -> Bytes.cat buffer value)
+      (fun buffer {value; _} -> Bytes.cat buffer value)
       Bytes.empty
       chunks
   in
