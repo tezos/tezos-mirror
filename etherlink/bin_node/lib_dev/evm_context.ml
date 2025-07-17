@@ -1982,7 +1982,7 @@ module State = struct
       let* sequencer =
         Durable_storage.sequencer (read_from_state ctxt.session.evm_state)
       in
-      let blueprint_parent_hash =
+      let*? blueprint_parent_hash =
         Sequencer_blueprint.kernel_blueprint_parent_hash_of_payload
           sequencer
           blueprint_with_events.blueprint.payload

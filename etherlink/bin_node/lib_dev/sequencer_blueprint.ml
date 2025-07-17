@@ -8,7 +8,10 @@
 
 open Ethereum_types
 
-type error += Not_a_blueprint
+type error +=
+  | Not_a_blueprint
+  | Bad_chunk_index of {expected : int; actual : int}
+  | Bad_nb_chunks of {expected : int; actual : int; chunk_index : int}
 
 let () =
   register_error_kind
@@ -18,7 +21,49 @@ let () =
     ~description:"Tried to decode a payload that is not a valid blueprint"
     Data_encoding.empty
     (function Not_a_blueprint -> Some () | _ -> None)
-    (fun () -> Not_a_blueprint)
+    (fun () -> Not_a_blueprint) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_bad_chunk_index"
+    ~title:"Bad chunk index"
+    ~description:
+      "When decoding a blueprint chunk, got an unexpected value for the \
+       chunk_index field"
+    ~pp:(fun ppf (expected, actual) ->
+      Format.fprintf
+        ppf
+        "When decoding a blueprint chunk, got an unexpected value for the \
+         chunk_index field, expected %d, got %d"
+        expected
+        actual)
+    Data_encoding.(obj2 (req "expected" int31) (req "actual" int31))
+    (function
+      | Bad_chunk_index {expected; actual} -> Some (expected, actual)
+      | _ -> None)
+    (fun (expected, actual) -> Bad_chunk_index {expected; actual}) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_bad_nb_chunks"
+    ~title:"Bad nb_chunks field"
+    ~description:
+      "When decoding a blueprint chunk, got an unexpected value for the \
+       nb_chunks field"
+    ~pp:(fun ppf (expected, actual, chunk_index) ->
+      Format.fprintf
+        ppf
+        "When decoding a blueprint chunk, got an unexpected value for the \
+         nb_chunks field for the chunk at index %d, expected %d, got %d"
+        chunk_index
+        expected
+        actual)
+    Data_encoding.(
+      obj3 (req "expected" int31) (req "actual" int31) (req "chunk_index" int31))
+    (function
+      | Bad_nb_chunks {expected; actual; chunk_index} ->
+          Some (expected, actual, chunk_index)
+      | _ -> None)
+    (fun (expected, actual, chunk_index) ->
+      Bad_nb_chunks {expected; actual; chunk_index})
 
 (* U256 *)
 let blueprint_number_size = 32
@@ -163,7 +208,7 @@ let chunk_to_rlp
         Value (Signature.to_bytes signature);
       ])
 
-let chunk_of_rlp s =
+let chunk_of_rlp ~expected_chunk_index ~expected_nb_chunks s =
   let open Result_syntax in
   match Rlp.decode s with
   | Ok
@@ -177,8 +222,22 @@ let chunk_of_rlp s =
             Value signature;
           ]) ->
       let number = decode_number_le number in
-      let nb_chunks = decode_u16_le nb_chunks in
       let chunk_index = decode_u16_le chunk_index in
+      let* () =
+        if chunk_index <> expected_chunk_index then
+          tzfail
+          @@ Bad_chunk_index
+               {expected = expected_chunk_index; actual = chunk_index}
+        else return_unit
+      in
+      let nb_chunks = decode_u16_le nb_chunks in
+      let* () =
+        if nb_chunks <> expected_nb_chunks then
+          tzfail
+          @@ Bad_nb_chunks
+               {expected = expected_nb_chunks; actual = nb_chunks; chunk_index}
+        else return_unit
+      in
       let* signature =
         match Signature.of_bytes_opt signature with
         | Some signature -> return signature
@@ -188,7 +247,8 @@ let chunk_of_rlp s =
         {unsigned_chunk = {value; number; nb_chunks; chunk_index}; signature}
   | _ -> tzfail Not_a_blueprint
 
-let chunk_of_external_message (`External chunk) =
+let chunk_of_external_message ~expected_chunk_index ~expected_nb_chunks
+    (`External chunk) =
   let open Result_syntax in
   let len = String.length chunk in
   if len <= Message_format.header_size then tzfail Not_a_blueprint
@@ -200,17 +260,30 @@ let chunk_of_external_message (`External chunk) =
           Message_format.header_size
           (length chunk - Message_format.header_size))
     in
-    chunk_of_rlp (Bytes.unsafe_of_string chunk_bytes)
+    chunk_of_rlp
+      ~expected_chunk_index
+      ~expected_nb_chunks
+      (Bytes.unsafe_of_string chunk_bytes)
 
 let chunks_of_external_messages payload =
-  List.map_e chunk_of_external_message payload
+  let expected_nb_chunks = List.length payload in
+  List.mapi_e
+    (fun expected_chunk_index chunk ->
+      chunk_of_external_message ~expected_nb_chunks ~expected_chunk_index chunk)
+    payload
 
 let to_rlp payload =
   let open Result_syntax in
+  let expected_nb_chunks = List.length payload in
   let* bytes =
-    List.map_e
-      (fun chunk ->
-        let+ chunk = chunk_of_external_message chunk in
+    List.mapi_e
+      (fun expected_chunk_index chunk ->
+        let+ chunk =
+          chunk_of_external_message
+            ~expected_nb_chunks
+            ~expected_chunk_index
+            chunk
+        in
         chunk.unsigned_chunk.value)
       payload
   in
@@ -285,13 +358,18 @@ let check_signature sequencer chunk =
 let check_signatures signer l = List.map_e (check_signature signer) l
 
 let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
-  List.filter_map
-    (fun chunk ->
-      let open Option_syntax in
-      let* chunk = Result.to_option @@ chunk_of_external_message chunk in
-      check_signature_opt sequencer chunk)
+  let open Result_syntax in
+  let expected_nb_chunks = List.length payload in
+  List.mapi_e
+    (fun expected_chunk_index chunk ->
+      let* chunk =
+        chunk_of_external_message
+          ~expected_nb_chunks
+          ~expected_chunk_index
+          chunk
+      in
+      check_signature sequencer chunk)
     payload
-  |> List.sort (fun {chunk_index = x; _} {chunk_index = y; _} -> compare x y)
 
 let create_dal_payloads chunks =
   List.map
@@ -302,11 +380,12 @@ let create_dal_payloads chunks =
     chunks
 
 let kernel_blueprint_parent_hash_of_payload sequencer payload =
-  let chunks = decode_inbox_payload sequencer payload in
+  let open Result_syntax in
+  let* chunks = decode_inbox_payload sequencer payload in
   let bytes =
     List.fold_left
       (fun buffer {value; _} -> Bytes.cat buffer value)
       Bytes.empty
       chunks
   in
-  kernel_blueprint_parent_hash_of_rlp bytes
+  return (kernel_blueprint_parent_hash_of_rlp bytes)

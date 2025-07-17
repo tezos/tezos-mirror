@@ -5,7 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Not_a_blueprint
+type error +=
+  | Not_a_blueprint
+  | Bad_chunk_index of {expected : int; actual : int}
+  | Bad_nb_chunks of {expected : int; actual : int; chunk_index : int}
 
 type unsigned_chunk = private {
   value : bytes;
@@ -97,6 +100,6 @@ val make_blueprint_chunks :
 val kernel_blueprint_parent_hash_of_payload :
   Signature.public_key ->
   Blueprint_types.payload ->
-  Ethereum_types.block_hash option
+  Ethereum_types.block_hash option tzresult
 
 val to_rlp : Blueprint_types.payload -> Rlp.item tzresult
