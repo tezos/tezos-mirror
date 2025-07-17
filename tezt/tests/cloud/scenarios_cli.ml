@@ -227,6 +227,7 @@ module Dal () : Dal = struct
     | "mainnet" -> Some `Mainnet
     | "ghostnet" -> Some `Ghostnet
     | "rionet" -> Some `Rionet
+    | "seoulnet" -> Some `Seoulnet
     | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
         (* format:  weeklynet-2025-01-29 (with dashes) *)
         let date = String.sub s 10 10 in

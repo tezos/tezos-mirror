@@ -6,7 +6,12 @@
 (*****************************************************************************)
 
 type public =
-  [`Mainnet | `Ghostnet | `Nextnet of string | `Weeklynet of string | `Rionet]
+  [ `Mainnet
+  | `Ghostnet
+  | `Nextnet of string
+  | `Weeklynet of string
+  | `Rionet
+  | `Seoulnet ]
 
 type t = [public | `Sandbox]
 
@@ -25,6 +30,7 @@ let to_string = function
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
   | `Rionet -> "rionet"
+  | `Seoulnet -> "seoulnet"
 
 let default_protocol : t -> Protocol.t = function
   | `Mainnet -> R022
@@ -33,6 +39,7 @@ let default_protocol : t -> Protocol.t = function
   | `Sandbox -> Alpha
   | `Nextnet _ -> S023
   | `Rionet -> R022
+  | `Seoulnet -> S023
 
 let public_rpc_endpoint testnet =
   Endpoint.make
@@ -43,7 +50,8 @@ let public_rpc_endpoint testnet =
       | `Ghostnet -> "rpc.ghostnet.teztnets.com"
       | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
       | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
-      | `Rionet -> "rpc.rionet.teztnets.com")
+      | `Rionet -> "rpc.rionet.teztnets.com"
+      | `Seoulnet -> "rpc.seoulnet.teztnets.com")
     ~port:443
     ()
 
@@ -53,6 +61,7 @@ let snapshot_service = function
   | `Nextnet _ -> "https://snapshots.eu.tzinit.org/nextnet"
   | `Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
   | `Rionet -> "https://snapshots.eu.tzinit.org/rionet"
+  | `Seoulnet -> "https://snapshots.eu.tzinit.org/seoulnet"
 
 (* Argument to give to the --network option of `octez-node config init`. *)
 let to_octez_network_options = function
@@ -61,6 +70,7 @@ let to_octez_network_options = function
   | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
   | `Rionet -> "https://teztnets.com/rionet"
+  | `Seoulnet -> "https://teztnets.com/seoulnet"
 
 let default_bootstrap = function
   | `Mainnet -> "boot.tzinit.org"
@@ -68,6 +78,7 @@ let default_bootstrap = function
   | `Nextnet date -> sf "nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
   | `Rionet -> "rionet.teztnets.com"
+  | `Seoulnet -> "seoulnet.teztnets.com"
 
 let default_dal_bootstrap = function
   | `Mainnet -> "dalboot.mainnet.tzboot.net"
@@ -76,6 +87,7 @@ let default_dal_bootstrap = function
   | `Nextnet date -> sf "dal.nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
   | `Rionet -> "dal.rionet.teztnets.com"
+  | `Seoulnet -> "dal.seoulnet.teztnets.com"
 
 let get_level endpoint =
   let* json = RPC_core.call endpoint (RPC.get_chain_block_header_shell ()) in
@@ -122,7 +134,7 @@ let versions network =
           response.code
           (Printexc.to_string exn) ;
         Lwt.return_none)
-  | `Weeklynet _ | `Rionet ->
+  | `Weeklynet _ | `Rionet | `Seoulnet ->
       (* No easy way to get this information. *)
       Lwt.return_some (Hashtbl.create 0)
   | `Sandbox ->
@@ -132,7 +144,7 @@ let versions network =
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet | `Rionet) as network -> (
+  | (`Mainnet | `Ghostnet | `Rionet | `Seoulnet) as network -> (
       let decoder json =
         json |> JSON.as_list
         |> List.map (fun json_account ->
