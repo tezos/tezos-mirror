@@ -416,10 +416,10 @@ let record_signals_sent signals =
 let inc_confirm_gas_needed () =
   Counter.inc_one metrics.simulation.confirm_gas_needed
 
-let record_blueprint_chunks_sent_on_dal chunks =
+let record_blueprint_chunks_sent_on_dal nb_chunks =
   Counter.inc
     Blueprint_chunk_sent.on_dal
-    (Float.of_int (List.length chunks))
+    (Float.of_int nb_chunks)
     "record_blueprint_chunks_sent_on_dal"
 
 let record_blueprint_chunks_sent_on_inbox chunks =
