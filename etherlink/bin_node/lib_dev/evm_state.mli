@@ -95,15 +95,15 @@ type apply_result =
     }
   | Apply_failure
 
-(** [apply_blueprint ~data-dir ~config state payload] applies the
-    blueprint [payload] on top of [evm_state]. If the payload produces
+(** [apply_unsigned_chunks ~data-dir ~config state chunks] applies the
+    blueprint [chunks] on top of [evm_state]. If the payload produces
     a block, the new updated EVM state is returned along with the new
     block’s height.
 
     The [data-dir] is used to store the kernel logs in the
     {!kernel_logs_directory}.
 *)
-val apply_blueprint :
+val apply_unsigned_chunks :
   ?wasm_pvm_fallback:bool ->
   ?log_file:string ->
   ?profile:Configuration.profile_mode ->
@@ -112,7 +112,7 @@ val apply_blueprint :
   config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
-  Blueprint_types.payload ->
+  Sequencer_blueprint.unsigned_chunk list ->
   apply_result tzresult Lwt.t
 
 (** [flag_local_exec evm_state] adds a flag telling the kernel it is executed

@@ -16,8 +16,15 @@ type unsigned_chunk = private {
 type t
 
 (** [unsafe_drop_signature chunk] gives back the content of [chunk]
-    {e without checking if its signature is valid}. *)
+    {e without checking if its signature is valid}.  See {!check_signature} if
+    you want to get the unsigned content iff the signature is correct. *)
 val unsafe_drop_signature : t -> unsigned_chunk
+
+(** [check_signature pubkey chunk] will return the (unsigned) chunk content in
+    the case that it was indeed signed for [pubkey]. Otherwise it returns an
+    error. See {!unsafe_drop_signature} if you want to skip the signature
+    verification and just get the unsigned content. *)
+val check_signature : Signature.public_key -> t -> unsigned_chunk tzresult
 
 val chunk_encoding : t Data_encoding.t
 

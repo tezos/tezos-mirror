@@ -239,6 +239,16 @@ let check_signature_opt sequencer chunk =
   in
   if correctly_signed then Some chunk else None
 
+let check_signature sequencer chunk =
+  let open Result_syntax in
+  match check_signature_opt sequencer chunk with
+  | Some chunk -> return chunk.unsigned_chunk
+  | None ->
+      error_with
+        "Signature check failed for the provided blueprint with public key %a"
+        Signature.Public_key.pp
+        sequencer
+
 let decode_inbox_payload sequencer (payload : Blueprint_types.payload) =
   List.filter_map
     (fun chunk ->

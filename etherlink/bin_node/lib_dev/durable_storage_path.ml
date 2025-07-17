@@ -152,6 +152,16 @@ module Code = struct
   let code code_hash = code_storage code_hash ^ code
 end
 
+module Blueprint = struct
+  let blueprint blueprint_number =
+    EVM.make "/blueprints/" ^ Z.to_string blueprint_number
+
+  let chunk ~blueprint_number ~chunk_index =
+    blueprint blueprint_number ^ "/" ^ string_of_int chunk_index
+
+  let nb_chunks ~blueprint_number = blueprint blueprint_number ^ "/nb_chunks"
+end
+
 module Block = struct
   type number = Current | Nth of Z.t
 
