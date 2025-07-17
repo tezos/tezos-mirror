@@ -8,6 +8,18 @@
 
 open Ethereum_types
 
+type error += Not_a_blueprint
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_not_a_blueprint"
+    ~title:"Not a blueprint"
+    ~description:"Tried to decode a payload that is not a valid blueprint"
+    Data_encoding.empty
+    (function Not_a_blueprint -> Some () | _ -> None)
+    (fun () -> Not_a_blueprint)
+
 (* U256 *)
 let blueprint_number_size = 32
 
@@ -174,18 +186,6 @@ let chunk_of_external_message_opt (`External chunk) =
           (length chunk - Message_format.header_size))
     in
     chunk_of_rlp_opt (Bytes.unsafe_of_string chunk_bytes)
-
-type error += Not_a_blueprint
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"evm_node_not_a_blueprint"
-    ~title:"Not a blueprint"
-    ~description:"Tried to decode a payload that is not a valid blueprint"
-    Data_encoding.empty
-    (function Not_a_blueprint -> Some () | _ -> None)
-    (fun () -> Not_a_blueprint)
 
 let make_blueprint_chunks ~number kernel_blueprint =
   let blueprint = Rlp.encode @@ kernel_blueprint_to_rlp kernel_blueprint in

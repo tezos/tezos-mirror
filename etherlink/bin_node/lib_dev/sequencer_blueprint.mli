@@ -5,6 +5,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error += Not_a_blueprint
+
 type unsigned_chunk = private {
   value : bytes;
   number : Ethereum_types.quantity;
@@ -80,5 +82,3 @@ val kernel_blueprint_parent_hash_of_payload :
   Signature.public_key ->
   Blueprint_types.payload ->
   Ethereum_types.block_hash option
-
-type error += Not_a_blueprint
