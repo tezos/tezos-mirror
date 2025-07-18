@@ -61,6 +61,7 @@ val init :
   ?uri:Uri.t ->
   ?runner:Runner.t ->
   ?keys:Account.key list ->
+  ?check_highwatermark:bool ->
   ?magic_byte:string ->
   ?allow_list_known_keys:bool ->
   ?allow_to_prove_possession:bool ->
@@ -109,3 +110,9 @@ val restart : t -> unit Lwt.t
 
 (* Get the [uri] that was passed to [init]. *)
 val uri : t -> Uri.t
+
+(** Get the base directory of a signer.
+
+    The base directory is the location where signers store their keys, logs and
+    highwatermarks. It corresponds to the [--base-dir] option. *)
+val base_dir : t -> string
