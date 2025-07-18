@@ -607,7 +607,9 @@ pub fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+    use crate::{account_storage::TezlinkOriginatedAccount, TezlinkImplicitAccount};
+    use mir::ast::{Entrypoint, Micheline};
+    use pretty_assertions::assert_eq;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -1335,6 +1337,68 @@ mod tests {
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+    }
+
+    #[test]
+    fn apply_transfer_to_originated_faucet() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
+        let src = bootstrap1();
+        let desthash =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+        // Setup accounts with 50 mutez in their balance
+        let requester = init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+        let (code, storage) = (
+            r#"
+                        parameter (mutez %fund);
+                        storage unit;
+                        code
+                        {
+                            UNPAIR;
+                            SENDER;
+                            CONTRACT unit;
+                            IF_NONE { FAILWITH } {};
+                            SWAP;
+                            UNIT;
+                            TRANSFER_TOKENS;
+                            NIL operation;
+                            SWAP;
+                            CONS;
+                            PAIR
+                        }
+            "#,
+            "Unit",
+        );
+        let faucet = init_contract(&mut host, &desthash, code, storage, &1000.into());
+        let requested_amount = 100;
+        let operation = make_transfer_operation(
+            fees,
+            1,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(desthash).clone(),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("fund")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(requested_amount as i128).encode(),
+            }),
+        );
+        let res = apply_operation(&mut host, &context, operation)
+            .expect("apply_operation should not have failed with a kernel error");
+        println!("Result: {:?}", res);
+        assert_eq!(
+            faucet.balance(&host).unwrap(),
+            (faucet_balance - requested_amount).into()
+        );
+        assert_eq!(
+            requester.balance(&host).unwrap(),
+            (requester_balance + requested_amount - fees).into()
+        ); // The faucet should have transferred 100 mutez to the source
     }
 
     #[test]

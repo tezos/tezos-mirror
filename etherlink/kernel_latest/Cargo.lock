@@ -3061,6 +3061,7 @@ dependencies = [
  "nom",
  "num-bigint",
  "num-traits",
+ "pretty_assertions",
  "primitive-types",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
