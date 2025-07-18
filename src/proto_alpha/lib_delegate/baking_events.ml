@@ -36,139 +36,6 @@ let pp_int64 fmt n = Format.fprintf fmt "%Ld" n
 
 let waiting_color = Internal_event.Magenta
 
-module Op_info_for_logging = struct
-  type kind = Preattestation | Attestation_without_dal | Attestation_with_dal
-
-  type t = {
-    kind : kind;
-    level : Protocol.Alpha_context.Raw_level.t;
-    round : Protocol.Alpha_context.Round.t;
-    delegate : Delegate.t;
-  }
-
-  let pp_kind fmt = function
-    | Preattestation -> Format.fprintf fmt "preattestation"
-    | Attestation_without_dal -> Format.fprintf fmt "attestation (without DAL)"
-    | Attestation_with_dal -> Format.fprintf fmt "attestation (with DAL)"
-
-  let pp fmt {kind; delegate; level; round} =
-    let companion_key_is_relevant =
-      match kind with
-      | Attestation_with_dal -> Key.is_bls delegate.consensus_key
-      | Attestation_without_dal | Preattestation -> false
-    in
-    Format.fprintf
-      fmt
-      "%a@ for level %a, round %a@ for delegate@ %a"
-      pp_kind
-      kind
-      Protocol.Alpha_context.Raw_level.pp
-      level
-      Protocol.Alpha_context.Round.pp
-      round
-      (if companion_key_is_relevant then Delegate.pp
-       else Delegate.pp_without_companion_key)
-      delegate
-
-  let kind_encoding =
-    Data_encoding.string_enum
-      [
-        ("preattestation", Preattestation);
-        ("attestation_without_dal", Attestation_without_dal);
-        ("attestation_with_dal", Attestation_with_dal);
-      ]
-
-  let encoding : t Data_encoding.t =
-    let open Data_encoding in
-    conv
-      (fun {kind; level; round; delegate} -> (kind, level, round, delegate))
-      (fun (kind, level, round, delegate) -> {kind; level; round; delegate})
-      (obj4
-         (req "op_kind" kind_encoding)
-         (req "level" Protocol.Alpha_context.Raw_level.encoding)
-         (req "round" Protocol.Alpha_context.Round.encoding)
-         (req "delegate" Delegate.encoding_for_logging__cannot_decode))
-
-  let of_unsigned_consensus_vote
-      (unsigned_consensus_vote : unsigned_consensus_vote) =
-    let kind =
-      match unsigned_consensus_vote.vote_kind with
-      | Preattestation -> Preattestation
-      | Attestation ->
-          if Option.is_some unsigned_consensus_vote.dal_content then
-            Attestation_with_dal
-          else Attestation_without_dal
-    in
-    {
-      kind;
-      delegate = unsigned_consensus_vote.delegate;
-      level = unsigned_consensus_vote.vote_consensus_content.level;
-      round = unsigned_consensus_vote.vote_consensus_content.round;
-    }
-end
-
-let pp_unsigned_consensus_vote fmt unsigned_consensus_vote =
-  Op_info_for_logging.(
-    pp fmt (of_unsigned_consensus_vote unsigned_consensus_vote))
-
-let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
-  pp_unsigned_consensus_vote fmt unsigned_consensus_vote
-
-let pp_forge_event fmt = function
-  | Block_ready {signed_block_header; round; delegate; _} ->
-      Format.fprintf
-        fmt
-        "block ready@ at level %ld, round %a@ for@ delegate@ %a "
-        signed_block_header.shell.level
-        Round.pp
-        round
-        Delegate.pp_without_companion_key
-        delegate
-  | Preattestation_ready signed_op | Attestation_ready signed_op ->
-      Format.fprintf
-        fmt
-        "operation ready:@ %a"
-        pp_signed_consensus_vote
-        signed_op
-
-let pp_event fmt =
-  let open Baking_state in
-  function
-  | New_valid_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new valid proposal received: %a"
-        pp_block_info
-        proposal.block
-  | New_head_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new head proposal received: %a"
-        pp_block_info
-        proposal.block
-  | Prequorum_reached (candidate, preattestations) ->
-      Format.fprintf
-        fmt
-        "prequorum reached with %d preattestations for %a at round %a"
-        (List.length preattestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | Quorum_reached (candidate, attestations) ->
-      Format.fprintf
-        fmt
-        "quorum reached with %d attestations for %a at round %a"
-        (List.length attestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | New_forge_event forge_event ->
-      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
-  | Timeout kind ->
-      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
-
 module Commands = struct
   include Internal_event.Simple
 
@@ -1030,17 +897,12 @@ module Actions = struct
       ~name:"consensus_operation_injected"
       ~level:Notice
       ~msg:"injected {operation_information}{operation_hash}"
-      ~pp1:Op_info_for_logging.pp
-      ("operation_information", Op_info_for_logging.encoding)
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:(fun fmt oph ->
         Format.fprintf fmt "@ (operation hash: %a)" Operation_hash.pp oph)
       ("operation_hash", Operation_hash.encoding)
-
-  let emit_consensus_op_injected unsigned_consensus_op ophash =
-    emit
-      consensus_op_injected
-      ( Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op,
-        ophash )
 
   let attach_dal_attestation =
     declare_5
@@ -1202,13 +1064,9 @@ module Actions = struct
       ~name:"signing_consensus_operation"
       ~level:Info
       ~msg:"signing {operation_information}"
-      ~pp1:Op_info_for_logging.pp
-      ("operation_information", Op_info_for_logging.encoding)
-
-  let emit_signing_consensus_op unsigned_consensus_op =
-    emit
-      signing_consensus_op
-      (Op_info_for_logging.of_unsigned_consensus_vote unsigned_consensus_op)
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
 
   let invalid_json_file =
     declare_1

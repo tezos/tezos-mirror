@@ -852,7 +852,7 @@ let sign_consensus_votes (global_state : global_state)
     List.filter_map_es
       (fun ({delegate; vote_kind; vote_consensus_content; _} as
             unsigned_consensus_vote) ->
-        let*! () = Events.emit_signing_consensus_op unsigned_consensus_vote in
+        let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
              global_state
@@ -917,7 +917,7 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.emit_consensus_op_injected unsigned_consensus_vote oph
+        Events.(emit consensus_op_injected) (signed_consensus_vote, oph)
       in
       return_unit)
 
