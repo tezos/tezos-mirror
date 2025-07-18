@@ -1077,50 +1077,31 @@ let handle_expected_applied_proposal (state : Baking_state.t) =
 
 let handle_forged_preattestation state signed_preattestation =
   let open Lwt_syntax in
-  let {
-    vote_consensus_content =
-      {
-        level;
-        round = att_round;
-        block_payload_hash = att_payload_hash;
-        slot = _;
-      };
-    delegate;
-    _;
-  } =
-    signed_preattestation.unsigned_consensus_vote
-  in
-  let att_level = Raw_level.to_int32 level in
-  let check_payload state preattestation do_action =
+  let check_payload state do_action =
     match state.level_state.attestable_payload with
     | None ->
         (* No attestable payload set, we are free to inject the
            preattestations *)
         do_action
     | Some payload ->
-        if
-          not
-            Block_payload_hash.(
-              payload.proposal.block.payload_hash
-              = preattestation.unsigned_consensus_vote.vote_consensus_content
-                  .block_payload_hash)
-        then
+        let preattestation_payload =
+          signed_preattestation.unsigned_consensus_vote.vote_consensus_content
+            .block_payload_hash
+        in
+        let state_payload = payload.proposal.block.payload_hash in
+        if not Block_payload_hash.(preattestation_payload = state_payload) then
           (* The preattestation payload does not match the one set in the
              state, we cannot inject the preattestation. *)
           let* () =
-            Events.(
-              emit
-                discarding_unexpected_preattestation_with_different_payload
-                ( delegate,
-                  att_payload_hash,
-                  att_level,
-                  att_round,
-                  payload.proposal.block.payload_hash ))
+            Events
+            .emit_discarding_unexpected_preattestation_with_different_payload
+              signed_preattestation
+              ~state_payload
           in
           do_nothing state
         else do_action
   in
-  (check_payload state signed_preattestation
+  (check_payload state
   @@ Lwt.return (state, Inject_preattestation {signed_preattestation}))
   [@profiler.record_s {verbosity = Debug} "check payload"]
 

@@ -456,24 +456,31 @@ module State_transitions = struct
         signed_consensus_vote_encoding_for_logging__cannot_decode )
 
   let discarding_unexpected_preattestation_with_different_payload =
-    declare_5
+    declare_3
       ~section
       ~name:"discarding_unexpected_preattestation_with_different_payload"
       ~level:Warning
       ~msg:
-        "discarding preattestation for {delegate} with payload {payload} at \
-         level {level}, round {round} where the prequorum was locked on a \
-         different payload {state_payload}."
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
+        "discarding {operation_information} with payload {operation_payload} \
+         where the prequorum was locked on a different payload \
+         {state_payload}."
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
       ~pp2:Block_payload_hash.pp
-      ("payload", Block_payload_hash.encoding)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-      ~pp5:Block_payload_hash.pp
+      ("operation_payload", Block_payload_hash.encoding)
+      ~pp3:Block_payload_hash.pp
       ("state_payload", Block_payload_hash.encoding)
+
+  let emit_discarding_unexpected_preattestation_with_different_payload
+      signed_preattestation ~state_payload =
+    let op_payload =
+      signed_preattestation.unsigned_consensus_vote.vote_consensus_content
+        .block_payload_hash
+    in
+    emit
+      discarding_unexpected_preattestation_with_different_payload
+      (signed_preattestation, op_payload, state_payload)
 
   let discarding_unexpected_attestation_without_prequorum_payload =
     declare_3
