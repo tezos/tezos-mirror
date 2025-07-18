@@ -1,40 +1,35 @@
 # Changelog
 
-## Unreleased
+## Version 0.35 (2025-07-18)
 
-The node will apply one migration to its internal store (version 22),
-meaning it is not possible to downgrade to the previous version. This
-migration is necessary to avoid duplicated sequencer upgrade events in
-the store (!18713).
+This is a bug fix release that addresses two known issues in the latest
+version.
+
+First, the node now correctly handles receiving duplicated sequencer upgrade
+events. There are several scenarios in which this can occur, so this fix is
+necessary to ensure smooth transitions for the sequencer operator. Second, the
+node will no longer format addresses in its RPC responses using the EIP-55
+checksum format. This change, introduced in the previous version, was not
+consistent with the behavior of Ethereum nodes and has therefore been reverted.
+
+We strongly recommend that node providers upgrade to this version.
+
+This release includes a single migration to the internal store (version 22),
+which means it is not possible to downgrade to the previous version.
 
 ### Breaking changes
 
-### Configuration changes
-
-### RPCs changes
-
-- Revert outputting EIP-55 encoded addresses in the RPC responses. This is not
+- Revert outputting EIP-55 encoded addresses in the RPC responses. This was not
   a standard behavior for nodes of EVM-compatible chains. (!18757)
-
-### Metrics changes
-
-### Command-line interface changes
 
 ### Execution changes
 
+- Makes the node resilient to receiving a sequencer upgrade event twice.
+  (!18713)
 - Forces the installation of the full kernel on new data directory creation.
   (!18709)
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- The sequencer now performs signing and applying the blueprints concurrently.
+  (!18711 !18712)
 
 ## Version 0.34 (2025-07-15)
 
