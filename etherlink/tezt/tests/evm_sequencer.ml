@@ -9183,6 +9183,7 @@ let test_fast_withdrawal_l2_caller =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
     ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {sequencer; evm_version; _} _protocol ->
   let fast_withdrawal_contract_address =
@@ -9257,6 +9258,7 @@ let test_deposit_and_fast_withdraw =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
     ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {
            sequencer;
