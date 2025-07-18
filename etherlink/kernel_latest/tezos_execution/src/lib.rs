@@ -778,6 +778,8 @@ mod tests {
 
     const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
 
+    const CONTRACT_2: &str = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
+
     static SCRIPT: &str = r#"
         parameter string;
         storage string;
@@ -798,7 +800,7 @@ mod tests {
 
     fn make_operation(
         fee: u64,
-        counter: u64,
+        first_counter: u64,
         gas_limit: u64,
         storage_limit: u64,
         source: Bootstrap,
@@ -807,11 +809,12 @@ mod tests {
         let branch = TezBlock::genesis_block_hash().into();
         let content = content
             .into_iter()
-            .map(|c| -> ManagerOperationContent {
+            .enumerate()
+            .map(|(i, c)| -> ManagerOperationContent {
                 ManagerOperation {
                     source: source.pkh.clone(),
                     fee: fee.into(),
-                    counter: counter.into(),
+                    counter: (first_counter + i as u64).into(),
                     operation: c,
                     gas_limit: gas_limit.into(),
                     storage_limit: storage_limit.into(),
@@ -1880,5 +1883,340 @@ mod tests {
         })];
 
         assert_eq!(receipt, expected_receipt);
+    }
+
+    #[test]
+    fn apply_three_valid_operations() {
+        let mut host = MockKernelHost::default();
+        let ctx = context::Context::init_context();
+
+        let src = bootstrap1();
+        let dest = bootstrap2();
+
+        // src & dest each credited with 50ꜩ
+        let src_acc = init_account(&mut host, &src.pkh);
+        let dest_acc = init_account(&mut host, &dest.pkh);
+
+        // op‑1: reveal
+        let reveal_content = OperationContent::Reveal(RevealContent {
+            pk: src.pk.clone(),
+            proof: None,
+        });
+
+        println!("Balance: {:?}", src_acc.balance(&host).unwrap());
+
+        // op‑2: transfer 10ꜩ to dest
+        let transfer_content_1 = OperationContent::Transfer(TransferContent {
+            amount: 10.into(),
+            destination: Contract::Implicit(dest.pkh.clone()),
+            parameters: None,
+        });
+
+        // op‑3: transfer 20ꜩ to dest
+        let transfer_content_2 = OperationContent::Transfer(TransferContent {
+            amount: 20.into(),
+            destination: Contract::Implicit(dest.pkh.clone()),
+            parameters: None,
+        });
+
+        let batch = make_operation(
+            5,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![reveal_content, transfer_content_1, transfer_content_2],
+        );
+
+        let receipts = validate_and_apply_operation(&mut host, &ctx, batch).unwrap();
+
+        let expected_receipts = vec![
+            OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(RevealSuccess {
+                    consumed_gas: 0_u64.into(),
+                }),
+                internal_operation_results: vec![],
+            }),
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone(),
+                                )),
+                                changes: -10,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    dest.pkh.clone(),
+                                )),
+                                changes: 10,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_gas: 0_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: None,
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(src.pkh)),
+                                changes: -20,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(dest.pkh)),
+                                changes: 20,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_gas: 0_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    },
+                )),
+                internal_operation_results: vec![],
+            }),
+        ];
+
+        assert_eq!(receipts, expected_receipts);
+
+        // counter updated, balances moved
+        // initial_balance: 50 tez, fee amount: (3*5)tez, transfer amount: (10 + 20)tez
+        assert_eq!(src_acc.balance(&host).unwrap(), 5u64.into());
+        assert_eq!(dest_acc.balance(&host).unwrap(), 80u64.into());
+
+        assert_eq!(
+            src_acc.counter(&host).unwrap(),
+            3.into(),
+            "Counter should have been incremented three times."
+        );
+    }
+
+    #[test]
+    fn apply_valid_then_invalid_operation_is_atomic() {
+        let mut host = MockKernelHost::default();
+        let ctx = context::Context::init_context();
+
+        let src = bootstrap1();
+        let dest = bootstrap2();
+
+        // src & dest each credited with 50ꜩ
+        let src_acc = init_account(&mut host, &src.pkh);
+        let _dst_acc = init_account(&mut host, &dest.pkh);
+
+        // op‑1: reveal
+        let reveal_content = OperationContent::Reveal(RevealContent {
+            pk: src.pk.clone(),
+            proof: None,
+        });
+
+        // op‑2: transfer 10ꜩ to dest
+        let transfer_content = OperationContent::Transfer(TransferContent {
+            amount: 10.into(),
+            destination: Contract::Implicit(dest.pkh.clone()),
+            parameters: None,
+        });
+
+        let batch = make_operation(
+            100,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![reveal_content, transfer_content],
+        );
+
+        let receipts = validate_and_apply_operation(&mut host, &ctx, batch);
+
+        let expected_error =
+            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
+
+        assert_eq!(receipts, Err(expected_error));
+
+        assert_eq!(
+            TezlinkImplicitAccount::from_public_key_hash(&ctx, &src.pkh)
+                .unwrap()
+                .balance(&host)
+                .unwrap(),
+            50u64.into()
+        );
+
+        assert_eq!(
+            TezlinkImplicitAccount::from_public_key_hash(&ctx, &src.pkh)
+                .unwrap()
+                .manager(&host)
+                .unwrap(),
+            Manager::NotRevealed(src.pkh.clone())
+        );
+
+        assert_eq!(
+            src_acc.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented."
+        );
+    }
+
+    #[test]
+    fn apply_smart_contract_failure_reverts_batch() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+        let src_acc = init_account(&mut host, &src.pkh);
+
+        let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
+        let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
+
+        init_contract(&mut host, &fail_dest, FAILING_SCRIPT, "Unit", &0_u64.into());
+        let succ_account =
+            init_contract(&mut host, &succ_dest, SCRIPT, "\"initial\"", &0_u64.into());
+
+        let reveal_content = OperationContent::Reveal(RevealContent {
+            pk: src.pk.clone(),
+            proof: None,
+        });
+
+        let succ_transfer = OperationContent::Transfer(TransferContent {
+            amount: 1.into(),
+            destination: Contract::Originated(succ_dest.clone()),
+            parameters: Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: parser.parse("\"Hello world\"").unwrap().encode(),
+            }),
+        });
+
+        let fail_transfer = OperationContent::Transfer(TransferContent {
+            amount: 1.into(),
+            destination: Contract::Originated(fail_dest.clone()),
+            parameters: Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: parser.parse("Unit").unwrap().encode(),
+            }),
+        });
+
+        let batch = make_operation(
+            10_u64,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![reveal_content, succ_transfer, fail_transfer],
+        );
+
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            batch,
+        )
+        .unwrap();
+
+        println!("{:?}", receipts);
+
+        assert!(
+            matches!(
+                &receipts[0],
+                OperationResultSum::Reveal(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "First receipt should be BackTracked Reveal"
+        );
+
+        assert!(
+            matches!(
+                &receipts[1],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "Second receipt should be BackTracked Transfer"
+        );
+
+        assert!(
+            matches!(
+                &receipts[2],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Failed(_),
+                    ..
+                })
+            ),
+            "Third receipt should be Failed Transfer"
+        );
+
+        // Storage must have reverted
+        assert!(
+            succ_account.storage(&host).unwrap()
+                == parser.parse("\"initial\"").unwrap().encode()
+        );
+
+        assert_eq!(
+            src_acc.counter(&host).unwrap(),
+            3.into(),
+            "Counter should have been incremented three times."
+        );
+
+        // Initial balance: 50 tez, paid in fees: (3*10)tez, transfer reverted
+        assert_eq!(
+            src_acc.balance(&host).unwrap(),
+            20.into(),
+            "Fees should have been paid for failed operation"
+        )
     }
 }
