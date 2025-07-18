@@ -67,11 +67,19 @@ module High_watermark = struct
         "Failed to retrieve level and round of a Tenderbake block: %s"
         (Printexc.to_string exn)
 
-  let get_level_and_round_for_tenderbake_attestation bytes =
+  let get_level_and_round_for_tenderbake_attestation
+      (pkh : Signature.public_key_hash) bytes =
     (* <watermark(1)><chain_id(4)><branch(32)><kind(1)><slot(2)><level(4)><round(4)>... *)
     let open Lwt_result_syntax in
     try
-      let level_offset = 1 + 4 + 32 + 1 + 2 in
+      let level_offset =
+        match pkh with
+        | Bls _ ->
+            (* Slot is not part of the signed payload when
+               signing with a tz4 address *)
+            1 + 4 + 32 + 1
+        | Ed25519 _ | Secp256k1 _ | P256 _ -> 1 + 4 + 32 + 1 + 2
+      in
       let level = Bytes.get_int32_be bytes level_offset in
       let round = Bytes.get_int32_be bytes (level_offset + 4) in
       return (level, Some round)
@@ -215,11 +223,11 @@ module High_watermark = struct
       | 0x12 ->
           (* tenderbake preattestation *)
           mark "a" "preattestation" (fun () ->
-              get_level_and_round_for_tenderbake_attestation bytes)
+              get_level_and_round_for_tenderbake_attestation pkh bytes)
       | 0x13 ->
           (* tenderbake attestation *)
           mark "an" "attestation" (fun () ->
-              get_level_and_round_for_tenderbake_attestation bytes)
+              get_level_and_round_for_tenderbake_attestation pkh bytes)
       | _ -> sign bytes
 end
 
