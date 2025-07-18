@@ -43,6 +43,7 @@ type t = {
   (* the highest finalized level the DAL node is aware of (except at start-up, where
      it is the highest level the node is aware of) *)
   mutable l1_crawler_status : L1_crawler_status.t;
+  l1_crawler_status_input : L1_crawler_status.t Lwt_watcher.input;
   disable_shard_validation : bool;
   ignore_pkhs : Signature.Public_key_hash.Set.t;
 }
@@ -68,15 +69,21 @@ let init config ~network_name profile_ctxt cryptobox
     profile_ctxt;
     last_finalized_level;
     l1_crawler_status = Unknown;
+    l1_crawler_status_input = Lwt_watcher.create_input ();
     disable_shard_validation;
     ignore_pkhs;
   }
 
 let get_tezos_node_cctxt ctxt = ctxt.tezos_node_cctxt
 
-let set_l1_crawler_status ctxt status = ctxt.l1_crawler_status <- status
+let set_l1_crawler_status ctxt status =
+  if ctxt.l1_crawler_status <> status then (
+    ctxt.l1_crawler_status <- status ;
+    Lwt_watcher.notify ctxt.l1_crawler_status_input status)
 
 let get_l1_crawler_status ctxt = ctxt.l1_crawler_status
+
+let get_l1_crawler_status_input ctxt = ctxt.l1_crawler_status_input
 
 let may_reconstruct ~reconstruct slot_id t =
   let open Lwt_result_syntax in

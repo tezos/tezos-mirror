@@ -24,6 +24,9 @@ type t =
   | L1_unreachable  (** The DAL node is unable to reach the L1 node. *)
   | Unknown  (** The crawler's status is unknown. *)
 
+(** Encoding of the L1 crawler status. *)
+val encoding : t Data_encoding.t
+
 (** [catching_up_or_synced_status ~head_level ~last_processed_level] returns the
     appropriate status of the crawler: [Catching_up] if the
     [last_processed_level] is more than 2 levels behind [head_level],

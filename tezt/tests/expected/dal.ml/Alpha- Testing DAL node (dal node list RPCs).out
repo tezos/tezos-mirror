@@ -24,6 +24,9 @@ Available services:
         Fetch shard as bytes 
     - GET /levels/<int32>/slots/<int>/status
         Return the status for the given slot. 
+  - GET /monitor/synchronized
+      Returns the stream of synchronization statuses of the DAL node with the
+      L1 node. 
   + p2p/
     - POST /p2p/connect
         Connect to a new peer. 
@@ -123,6 +126,9 @@ Available services:
       the character provided as padding query parameter (defaults to \000).
       If the slot_index query parameter is provided, the DAL node checks that
       its profile allows to publish data on the given slot index. 
+  - GET /synchronized
+      Returns the current synchronization status of the DAL node with the L1
+      node. 
   - GET /version
       version 
 

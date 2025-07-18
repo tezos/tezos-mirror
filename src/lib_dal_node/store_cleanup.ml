@@ -187,6 +187,10 @@ let clean_up_store_and_catch_up_for_no_refutation_support ctxt
       let*! () =
         Block_handler.remove_old_level_stored_data proto_parameters ctxt level
       in
+      L1_crawler_status.catching_up_or_synced_status
+        ~head_level
+        ~last_processed_level:level
+      |> Node_context.set_l1_crawler_status ctxt ;
       cleanup @@ Int32.succ level
   in
   let start_level = Int32.succ last_processed_level in
