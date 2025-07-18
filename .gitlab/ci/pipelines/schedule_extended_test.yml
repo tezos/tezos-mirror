@@ -2510,7 +2510,7 @@ ocaml-check:
   - dune build @check --stop-on-first-error
   after_script:
   - eval $(opam env)
-  - dune cache trim --size=5GB
+  - dune cache trim --size=3GB
   variables:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
