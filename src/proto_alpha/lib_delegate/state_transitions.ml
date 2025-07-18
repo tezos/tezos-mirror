@@ -1134,7 +1134,6 @@ let handle_forged_attestation state signed_attestation =
         block_payload_hash = att_payload_hash;
         slot = _;
       };
-    delegate;
     _;
   } =
     signed_attestation.unsigned_consensus_vote
@@ -1149,9 +1148,7 @@ let handle_forged_attestation state signed_attestation =
     && Compare.Int32.(shell.level = att_level)
   in
   if not attestation_matches_proposal then
-    let* () =
-      Events.(emit discarding_attestation (delegate, att_level, att_round))
-    in
+    let* () = Events.(emit discarding_attestation) signed_attestation in
     (do_nothing
        state [@profiler.record_s {verbosity = Debug} "discarding attestation"])
   else

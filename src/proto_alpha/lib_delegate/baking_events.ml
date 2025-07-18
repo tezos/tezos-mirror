@@ -446,19 +446,14 @@ module State_transitions = struct
       ("event", event_encoding_for_logging__cannot_decode)
 
   let discarding_attestation =
-    declare_3
+    declare_1
       ~section
       ~name:"discarding_attestation"
       ~level:Info
-      ~msg:
-        "discarding outdated attestation for {delegate} at level {level}, \
-         round {round}"
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
+      ~msg:"discarding outdated {operation_information}"
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
 
   let discarding_unexpected_preattestation_with_different_payload =
     declare_5
