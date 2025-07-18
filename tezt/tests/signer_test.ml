@@ -272,10 +272,129 @@ let signer_prove_possession_test =
   in
   Process.check process
 
+let signer_highwatermark_test =
+  register_signer_test
+    ~__FILE__
+    ~title:"Check highwatermark consistency"
+    ~tags:[team; "signer"; "highwatermark"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+    ~supports:Protocol.(From_protocol (number S023))
+  @@ fun launch_mode protocol ->
+  let consensus_rights_delay = 1 in
+  let consensus_committee_size = 256 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (protocol, None))
+      [
+        (["consensus_committee_size"], `Int consensus_committee_size);
+        (["consensus_threshold_size"], `Int 200);
+        (["minimal_block_delay"], `String "2");
+        (["delay_increment_per_round"], `String "0");
+        (["blocks_per_cycle"], `Int 2);
+        (["nonce_revelation_threshold"], `Int 1);
+        (["consensus_rights_delay"], `Int consensus_rights_delay);
+        (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
+        (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
+      ]
+  in
+  let* node, client =
+    Client.init_with_protocol
+      `Client
+      ~protocol
+      ~parameter_file
+      ~timestamp:Now
+      ()
+  in
+  let* consensus_key1 = Client.gen_and_show_keys ~sig_alg:"p256" client in
+  let keys = [Constant.tz4_account; consensus_key1] in
+  let* signer =
+    Signer.init
+      ~launch_mode
+      ~keys
+      ~check_highwatermark:true
+      ~allow_to_prove_possession:true
+      ()
+  in
+  let* () =
+    Client.import_signer_key
+      ~force:true
+      ~alias:Constant.tz4_account.alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:Constant.tz4_account.public_key_hash
+  in
+  let* () =
+    Client.update_consensus_key
+      ~src:Constant.bootstrap1.alias
+      ~pk:Constant.tz4_account.alias
+      client
+  in
+  let* () =
+    Client.import_signer_key
+      ~force:true
+      ~alias:consensus_key1.alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:consensus_key1.public_key_hash
+  in
+  let* () =
+    Client.update_consensus_key
+      ~src:Constant.bootstrap2.alias
+      ~pk:consensus_key1.alias
+      client
+  in
+  let keys =
+    List.map
+      (fun (account : Account.key) -> account.public_key_hash)
+      [
+        consensus_key1;
+        Constant.tz4_account;
+        Constant.bootstrap1;
+        Constant.bootstrap2;
+        Constant.bootstrap3;
+        Constant.bootstrap4;
+        Constant.bootstrap5;
+      ]
+  in
+  Log.info "Bake until BLS consensus keys are activated" ;
+  let* _ = Client.bake_for_and_wait ~keys ~count:8 client in
+
+  Log.info "Preattest with all the keys to update the highwatermarks" ;
+  let* _ = Client.preattest_for ~key:keys client in
+
+  let* current_lvl = Node.get_level node in
+  let base_dir = Signer.base_dir signer in
+  let preattestation_highwatermarks =
+    JSON.parse_file (base_dir // "preattestation_high_watermarks")
+  in
+  let attestation_highwatermarks =
+    JSON.parse_file (base_dir // "attestation_high_watermarks")
+  in
+  let check_highwatermark pkh lvl json =
+    let u = JSON.unannotate json in
+    match u with
+    | `O [(_, x)] ->
+        let x = JSON.annotate ~origin:"" x in
+        let level = JSON.(x |-> pkh |-> "level" |> as_int) in
+        Check.(
+          (lvl = level)
+            int
+            ~error_msg:"Highwatermark Level expected was %L, got %R")
+    | _ -> assert false
+  in
+  Log.info "Check that highwatermark level are correct for the signer keys" ;
+  List.iter
+    (fun pkh ->
+      check_highwatermark pkh current_lvl preattestation_highwatermarks ;
+      check_highwatermark pkh (current_lvl - 1) attestation_highwatermarks)
+    [consensus_key1.public_key_hash; Constant.tz4_account.public_key_hash] ;
+  unit
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
   signer_bls_test protocols ;
   signer_known_remote_keys_test protocols ;
   signer_prove_possession_test
-    (List.filter (fun p -> Protocol.number p > 022) protocols)
+    (List.filter (fun p -> Protocol.number p > 022) protocols) ;
+  signer_highwatermark_test protocols
