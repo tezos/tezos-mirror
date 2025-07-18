@@ -13,7 +13,7 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
-let init_tezlink_sequencer (cloud : Cloud.t) (name : string) agent =
+let init_tezlink_sequencer (cloud : Cloud.t) (name : string) (rpc_port : int option) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -92,6 +92,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string) agent =
              ())
       ~name:"tezlink-sandboxed-sequencer"
       ~mode
+      ?rpc_port
       "http://dummy_rollup_endpoint"
       cloud
       agent
@@ -132,6 +133,6 @@ let register (module Cli : Scenarios_cli.Tezlink) =
         Lwt.return agent
       in
       let* tezlink_sequencer_agent = next_agent ~name in
-      let* () = init_tezlink_sequencer cloud name tezlink_sequencer_agent in
+      let* () = init_tezlink_sequencer cloud name Cli.public_rpc_port tezlink_sequencer_agent in
       let () = toplog "Starting main loop" in
       loop 0)
