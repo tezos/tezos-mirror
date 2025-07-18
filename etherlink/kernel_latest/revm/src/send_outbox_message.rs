@@ -3,14 +3,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use alloy_sol_types::{sol, SolEvent};
+use alloy_sol_types::{sol, SolEvent, SolValue};
 use num_bigint::{BigInt, Sign};
 use revm::{
     context::{Block, ContextTr, Transaction},
     interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
-    primitives::{Address, Bytes, U256},
+    primitives::{Address, Bytes, FixedBytes, U256},
 };
-use tezos_data_encoding::{nom::NomReader, types::Zarith};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Zarith};
 use tezos_smart_rollup_encoding::michelson::{
     MichelsonBytes, MichelsonContract, MichelsonNat, MichelsonOption, MichelsonPair,
     MichelsonTimestamp,
@@ -63,6 +63,13 @@ sol! {
         bytes   payload,
         uint256 withdrawal_id,
     );
+}
+
+sol! {
+    struct RoutingInfo {
+        bytes22 target;
+        bytes22 proxy;
+    }
 }
 
 /// Withdrawal interface of the ticketer contract
@@ -235,6 +242,8 @@ where
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
+            let fixed_target: FixedBytes<22> =
+                FixedBytes::new(target.to_bytes().unwrap().try_into().unwrap());
 
             // Build
             let ticketer = Contract::Originated(context.db().ticketer().unwrap());
@@ -256,7 +265,7 @@ where
             let result = InterpreterResult {
                 result: InstructionResult::Return,
                 gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
-                output: Bytes::new(),
+                output: Bytes::from(fixed_target),
             };
             Ok(result)
         }
@@ -274,6 +283,8 @@ where
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
+            let fixed_target: FixedBytes<22> =
+                FixedBytes::new(target.to_bytes().unwrap().try_into().unwrap());
 
             // Build
             let ticketer = Contract::Originated(context.db().ticketer().unwrap());
@@ -296,7 +307,7 @@ where
             let result = InterpreterResult {
                 result: InstructionResult::Return,
                 gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
-                output: Bytes::new(),
+                output: Bytes::from(fixed_target),
             };
             Ok(result)
         }
@@ -306,7 +317,7 @@ where
             let (routing_info, amount, ticketer, content) =
                 SendFAWithdrawalInput::abi_decode_data(input_data)
                     .map_err(|e| e.to_string())?;
-            let (target, destination) = parse_l1_routing_info(&routing_info)?;
+            let (target, proxy) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) =
                 Contract::nom_read(ticketer.as_slice()).map_err(|e| e.to_string())?;
             let amount = BigInt::from_bytes_be(
@@ -318,25 +329,30 @@ where
                 MichelsonOption<MichelsonBytes>,
             >::nom_read(&content)
             .map_err(|e| e.to_string())?;
+            let fixed_target =
+                FixedBytes::new(target.to_bytes().unwrap().try_into().unwrap());
+            let fixed_proxy =
+                FixedBytes::new(proxy.to_bytes().unwrap().try_into().unwrap());
 
-            // Build
+            // Build message
             let entrypoint = Entrypoint::try_from(String::from("withdraw")).unwrap();
             let withdrawal = prepare_standard_message(
-                target,
-                ticketer,
-                content,
-                amount,
-                entrypoint,
-                destination,
+                target, ticketer, content, amount, entrypoint, proxy,
             );
 
             // Push
             context.db_mut().push_withdrawal(withdrawal);
 
+            // Build output
+            let routing_info = RoutingInfo {
+                target: fixed_target,
+                proxy: fixed_proxy,
+            };
+
             let result = InterpreterResult {
                 result: InstructionResult::Return,
                 gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
-                output: Bytes::new(),
+                output: Bytes::copy_from_slice(&routing_info.abi_encode()),
             };
             Ok(result)
         }
@@ -353,7 +369,7 @@ where
                 withdrawal_id,
             ) = SendFastFAWithdrawalInput::abi_decode_data(input_data)
                 .map_err(|e| e.to_string())?;
-            let (target, _proxy) = parse_l1_routing_info(&routing_info)?;
+            let (target, proxy) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) =
                 Contract::nom_read(ticketer.as_slice()).map_err(|e| e.to_string())?;
             let amount = BigInt::from_bytes_be(
@@ -368,8 +384,12 @@ where
             let fast_withdrawal_contract =
                 Contract::from_b58check(&fast_withdrawal_contract_address)
                     .map_err(|e| e.to_string())?;
+            let fixed_target =
+                FixedBytes::new(target.to_bytes().unwrap().try_into().unwrap());
+            let fixed_proxy =
+                FixedBytes::new(proxy.to_bytes().unwrap().try_into().unwrap());
 
-            // Build
+            // Build message
             let withdrawal = prepare_fast_message(
                 target,
                 fast_withdrawal_contract,
@@ -385,10 +405,16 @@ where
             // Push
             context.db_mut().push_withdrawal(withdrawal);
 
+            // Build output
+            let routing_info = RoutingInfo {
+                target: fixed_target,
+                proxy: fixed_proxy,
+            };
+
             let result = InterpreterResult {
                 result: InstructionResult::Return,
                 gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
-                output: Bytes::new(),
+                output: Bytes::copy_from_slice(&routing_info.abi_encode()),
             };
             Ok(result)
         }
