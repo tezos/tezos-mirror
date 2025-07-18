@@ -120,6 +120,14 @@ module Delegate = struct
 
   let delegate_id t = Maybe_known_key.key_id t.manager_key
 
+  let consensus_key_is_manager_key t =
+    match t.manager_key with
+    | Known_key key -> Key_id.equal key.id t.consensus_key.id
+    | Id_only _ ->
+        (* The consensus key is always known. If the manager key is
+           unknown then they're not the same key. *)
+        false
+
   let encoding_for_logging__cannot_decode =
     let open Data_encoding in
     conv
@@ -132,22 +140,26 @@ module Delegate = struct
          (req "consensus_key" Key.encoding_for_logging__cannot_decode)
          (opt "companion_key" Key.encoding_for_logging__cannot_decode))
 
-  let pp_without_companion_key fmt
-      {manager_key; consensus_key; companion_key = _} =
-    Format.fprintf
-      fmt
-      "%a@ with@ consensus key@ %a"
-      Maybe_known_key.pp
-      manager_key
-      Key.pp
-      consensus_key
+  let pp_aux ~should_print_companion_key fmt
+      ({manager_key; consensus_key; companion_key} as t) =
+    Format.fprintf fmt "%a" Maybe_known_key.pp manager_key ;
+    let should_print_consensus_key = not (consensus_key_is_manager_key t) in
+    if should_print_consensus_key then
+      Format.fprintf fmt "@ with@ consensus key@ %a" Key.pp consensus_key ;
+    if should_print_companion_key then
+      match companion_key with
+      | None -> ()
+      | Some companion_key ->
+          Format.fprintf
+            fmt
+            "@ %s@ companion key@ %a"
+            (if should_print_consensus_key then "and" else "with")
+            Key.pp
+            companion_key
 
-  let pp fmt ({manager_key = _; consensus_key = _; companion_key} as t) =
-    pp_without_companion_key fmt t ;
-    match companion_key with
-    | None -> ()
-    | Some companion_key ->
-        Format.fprintf fmt "@ and@ companion key@ %a" Key.pp companion_key
+  let pp = pp_aux ~should_print_companion_key:true
+
+  let pp_without_companion_key = pp_aux ~should_print_companion_key:false
 
   let companion_key_not_provided_to_the_baker =
     let open Internal_event.Simple in

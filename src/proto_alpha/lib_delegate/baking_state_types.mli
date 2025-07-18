@@ -104,10 +104,13 @@ module Delegate : sig
       always fail. *)
   val encoding_for_logging__cannot_decode : t Data_encoding.t
 
+  (** Prints the delegate's manager key (with its alias if known,
+      otherwise just the pkh), consensus key if it is different from
+      the manager key, and companion key if there is one. *)
   val pp : Format.formatter -> t -> unit
 
-  (** Prints the manager key and consensus key but not the companion
-      key. *)
+  (** Same as {!pp} except that the companion key is omitted even if
+      there is one. *)
   val pp_without_companion_key : Format.formatter -> t -> unit
 
   (** Builds a {!t} from an element of the output of
