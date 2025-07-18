@@ -8075,7 +8075,8 @@ let test_trace_delegate_call =
       sequencer
   in
   Check.(
-    JSON.(top_call |-> "to" |> as_string = delegator_address)
+    JSON.(
+      top_call |-> "to" |> as_string = String.lowercase_ascii delegator_address)
       string
       ~error_msg:"Top call should have been traced as coming from %R but was %L") ;
   Check.(
@@ -8084,11 +8085,15 @@ let test_trace_delegate_call =
       ~error_msg:"Top call should have some subcalls") ;
   let delegatecall = JSON.(top_call |-> "calls" |> as_list |> List.hd) in
   Check.(
-    JSON.(delegatecall |-> "from" |> as_string = delegator_address)
+    JSON.(
+      delegatecall |-> "from" |> as_string
+      = String.lowercase_ascii delegator_address)
       string
       ~error_msg:"Delegate call should be traced as coming from %R but was %L") ;
   Check.(
-    JSON.(delegatecall |-> "to" |> as_string = delegated_address)
+    JSON.(
+      delegatecall |-> "to" |> as_string
+      = String.lowercase_ascii delegated_address)
       string
       ~error_msg:
         "Delegate call should be traced as going to delegated contract %R but \
@@ -8767,7 +8772,9 @@ let test_trace_transaction_calltracer_deposit =
   unit
 
 let test_miner =
-  let sequencer_pool_address = "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70" in
+  let sequencer_pool_address =
+    String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
+  in
   register_all
     ~__FILE__
     ~tags:["evm"; "miner"; "coinbase"]
@@ -8775,7 +8782,7 @@ let test_miner =
     ~sequencer_pool_address
   @@ fun {sequencer; evm_version; _} _protocol ->
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
-  Check.((block.miner = sequencer_pool_address) string)
+  Check.((String.lowercase_ascii block.miner = sequencer_pool_address) string)
     ~error_msg:
       "Block miner should be the sequencer pool address, expected %R got %L" ;
   (* We deploy a contract that stores the block coinbase in its storage, and
@@ -8801,7 +8808,10 @@ let test_miner =
       ~method_call:"getStorageCoinbase()"
       ()
   in
-  Check.((String.trim storage_coinbase = sequencer_pool_address) string)
+  Check.(
+    (String.lowercase_ascii @@ String.trim storage_coinbase
+    = sequencer_pool_address)
+      string)
     ~error_msg:
       "Stored coinbase should be the sequencer pool address, expected %R got %L" ;
   let* view_coinbase =
@@ -8812,7 +8822,10 @@ let test_miner =
       ~method_call:"getStorageCoinbase()"
       ()
   in
-  Check.((String.trim view_coinbase = sequencer_pool_address) string)
+  Check.(
+    (String.lowercase_ascii @@ String.trim view_coinbase
+    = sequencer_pool_address)
+      string)
     ~error_msg:
       "Viewed coinbase should be the sequencer pool address, expected %R got %L" ;
 
@@ -10452,11 +10465,11 @@ let test_tx_pool_replacing_transactions_on_limit () =
   in
   let txpool_content () =
     let*@ pending, queued = Rpc.txpool_content sequencer in
-    let sender = sender.address in
+    let sender = String.lowercase_ascii sender.address in
     let pending =
       List.find_map
         (fun Rpc.{address; transactions} ->
-          if address = sender then
+          if String.lowercase_ascii address = sender then
             Some (List.map fst transactions |> List.sort compare)
           else None)
         pending
@@ -10464,7 +10477,7 @@ let test_tx_pool_replacing_transactions_on_limit () =
     let queued =
       List.find_map
         (fun Rpc.{address; transactions} ->
-          if address = sender then
+          if String.lowercase_ascii address = sender then
             Some (List.map fst transactions |> List.sort compare)
           else None)
         queued
@@ -11237,6 +11250,7 @@ let test_websocket_logs_event =
            ~bin:erc20.bin)
         sequencer
     in
+    let address = String.lowercase_ascii address in
     let transfer_event_topic =
       let h =
         Tezos_crypto.Hacl.Hash.Keccak_256.digest
