@@ -879,15 +879,11 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
-  let delegate = unsigned_consensus_vote.delegate in
   protect
     ~on_error:(fun err ->
       let*! () =
         Events.(
-          emit
-            failed_to_inject_consensus_vote
-            (unsigned_consensus_vote.vote_kind, delegate, err))
+          emit failed_to_inject_consensus_vote (signed_consensus_vote, err))
       in
       return_unit)
     (fun () ->

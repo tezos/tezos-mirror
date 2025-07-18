@@ -850,16 +850,15 @@ module Actions = struct
       ("delegate", Delegate_id.encoding)
 
   let failed_to_inject_consensus_vote =
-    declare_3
+    declare_2
       ~section
       ~name:"failed_to_inject_consensus_vote"
       ~level:Error
-      ~msg:"failed to inject {vote_kind} for {delegate} -- {trace}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp3:Error_monad.pp_print_trace
+      ~msg:"failed to inject {operation_information} -- {trace}"
+      ~pp1:pp_signed_consensus_vote
+      ( "operation_information",
+        signed_consensus_vote_encoding_for_logging__cannot_decode )
+      ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_forge_block =
