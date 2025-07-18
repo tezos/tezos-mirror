@@ -580,14 +580,14 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
+let dal_content_encoding =
+  Data_encoding.conv
+    (fun {attestation} -> attestation)
+    (fun attestation -> {attestation})
+    Dal.Attestation.encoding
+
 let unsigned_consensus_vote_encoding_for_logging__cannot_decode =
   let open Data_encoding in
-  let dal_content_encoding : dal_content encoding =
-    conv
-      (fun {attestation} -> attestation)
-      (fun attestation -> {attestation})
-      Dal.Attestation.encoding
-  in
   conv
     (fun {vote_kind; vote_consensus_content; delegate; dal_content} ->
       (vote_kind, vote_consensus_content, delegate, dal_content))
@@ -1291,11 +1291,19 @@ let pp_timeout_kind fmt = function
         Round.pp
         at_round
 
-let pp_kind fmt {vote_kind; dal_content; _} =
+let pp_dal_content fmt {attestation} =
+  Z.pp_print fmt (Environment.Bitset.to_z (attestation :> Environment.Bitset.t))
+
+let pp_kind_and_dal fmt {vote_kind; dal_content; _} =
   match (vote_kind, dal_content) with
   | Preattestation, _ -> Format.fprintf fmt "preattestation"
-  | Attestation, None -> Format.fprintf fmt "attestation (without DAL)"
-  | Attestation, Some _ -> Format.fprintf fmt "attestation (with DAL)"
+  | Attestation, None -> Format.fprintf fmt "attestation (without DAL content)"
+  | Attestation, Some dal_attestation ->
+      Format.fprintf
+        fmt
+        "attestation (with DAL bitset %a)"
+        pp_dal_content
+        dal_attestation
 
 let pp_unsigned_consensus_vote fmt
     ({
@@ -1312,7 +1320,7 @@ let pp_unsigned_consensus_vote fmt
   Format.fprintf
     fmt
     "%a@ for level %a, round %a@ for delegate@ %a"
-    pp_kind
+    pp_kind_and_dal
     t
     Protocol.Alpha_context.Raw_level.pp
     level

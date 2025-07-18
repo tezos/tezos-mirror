@@ -100,6 +100,10 @@ val consensus_vote_kind_encoding : consensus_vote_kind Data_encoding.t
 
 val pp_consensus_vote_kind : Format.formatter -> consensus_vote_kind -> unit
 
+val pp_dal_content : Format.formatter -> dal_content -> unit
+
+val dal_content_encoding : dal_content Data_encoding.t
+
 (** An unsigned consensus vote consists of the consensus vote kind, either an
     attestation or a preattestation, the delegate keys and its protocol and dal
     content. *)

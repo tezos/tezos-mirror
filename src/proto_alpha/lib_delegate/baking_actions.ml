@@ -544,16 +544,14 @@ let process_dal_rpc_result state delegate level round =
               Dal.Attestation.empty
               slots
           in
+          let dal_content = {attestation = dal_attestation} in
           let*! () =
-            let bitset_int =
-              Environment.Bitset.to_z (dal_attestation :> Environment.Bitset.t)
-            in
             Events.(
               emit
                 attach_dal_attestation
-                (delegate, bitset_int, published_level, level, round))
+                (delegate, dal_content, published_level, level, round))
           in
-          return_some {attestation = dal_attestation})
+          return_some dal_content)
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in

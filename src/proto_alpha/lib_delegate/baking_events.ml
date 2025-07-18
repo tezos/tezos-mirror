@@ -908,14 +908,14 @@ module Actions = struct
     declare_5
       ~section
       ~name:"attach_dal_attestation"
-      ~level:Notice
+      ~level:Info
       ~msg:
         "ready to attach DAL attestation for level {attestation_level}, round \
          {round}, with bitset {bitset} for {delegate} to attest slots \
          published at level {published_level}"
       ("delegate", Delegate_id.encoding)
-      ~pp2:Z.pp_print
-      ("bitset", Data_encoding.n)
+      ~pp2:pp_dal_content
+      ("bitset", dal_content_encoding)
       ("published_level", Data_encoding.int32)
       ("attestation_level", Data_encoding.int32)
       ("round", Round.encoding)
