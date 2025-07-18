@@ -1051,7 +1051,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
   let pipeline_type =
     match parent_pipeline_name with
     | None -> child_pipeline_name
-    | Some parent_name -> parent_name ^ ":" ^ child_pipeline_name
+    | Some parent_name -> parent_name ^ "-" ^ child_pipeline_name
   in
   let trigger_job =
     Gitlab_ci.Util.trigger_job
