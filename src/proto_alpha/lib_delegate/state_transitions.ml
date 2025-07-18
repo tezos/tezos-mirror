@@ -814,44 +814,25 @@ let prepare_attest_action state proposal =
 let may_inject_attestations state ~first_signed_attestation
     ~other_signed_attestations =
   let open Lwt_syntax in
-  let emit_discarding_unexpected_attestation_event
-      ?(payload : attestable_payload option) attestation =
-    let {
-      vote_consensus_content = {level; round = att_round; block_payload_hash; _};
-      delegate;
-      _;
-    } =
-      attestation.unsigned_consensus_vote
-    in
-    let att_level = Raw_level.to_int32 level in
-    match payload with
-    | None ->
-        Events.(
-          emit
-            discarding_unexpected_attestation_without_prequorum_payload
-            (delegate, att_level, att_round))
-    | Some payload ->
-        Events.(
-          emit
-            discarding_unexpected_attestation_with_different_prequorum_payload
-            ( delegate,
-              block_payload_hash,
-              att_level,
-              att_round,
-              payload.proposal.block.payload_hash ))
-  in
   let check_payload state attestation do_action =
     match state.level_state.attestable_payload with
     | None ->
         (* No attestable payload, either the prequorum has not been reached yet,
            or an other issue occurred, we cannot inject the attestations. *)
-        let* () = emit_discarding_unexpected_attestation_event attestation in
+        let* () =
+          Events.emit_discarding_unexpected_attestation_not_matching_prequorum
+            attestation
+            ~attestable_payload_hash_opt:None
+        in
         do_nothing state
-    | Some payload ->
+    | Some attestable_payload ->
+        let attestable_payload_hash =
+          attestable_payload.proposal.block.payload_hash
+        in
         if
           not
             Block_payload_hash.(
-              payload.proposal.block.payload_hash
+              attestable_payload_hash
               = attestation.unsigned_consensus_vote.vote_consensus_content
                   .block_payload_hash)
         then
@@ -859,7 +840,9 @@ let may_inject_attestations state ~first_signed_attestation
              one in the attestation operation, we cannot inject the
              attestation. *)
           let* () =
-            emit_discarding_unexpected_attestation_event ~payload attestation
+            Events.emit_discarding_unexpected_attestation_not_matching_prequorum
+              attestation
+              ~attestable_payload_hash_opt:(Some attestable_payload_hash)
           in
           do_nothing state
         else do_action
