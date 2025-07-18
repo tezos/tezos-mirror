@@ -44,3 +44,6 @@ pub(crate) const CUSTOMS: [Address; 4] = [
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
     TABLE_PRECOMPILE_ADDRESS,
 ];
+
+// TODO: Properly estimate execution cost for table and outbox precompiles
+pub(crate) const PRECOMPILE_BASE_COST: u64 = 2000;
