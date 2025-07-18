@@ -2569,6 +2569,7 @@ dependencies = [
  "serde_json",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
+ "tezos-indexable-storage-latest",
  "tezos-smart-rollup-encoding",
  "tezos-smart-rollup-host",
  "tezos-smart-rollup-storage",
