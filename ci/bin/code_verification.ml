@@ -933,7 +933,7 @@ let jobs pipeline_type =
            the log and to reduce time to merge of other MRs further
            down the merge train. *)
         ["dune build @check --stop-on-first-error"]
-      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
+      |> enable_dune_cache
     in
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
