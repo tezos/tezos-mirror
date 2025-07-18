@@ -1456,7 +1456,7 @@ let show_kms_key_info_command =
                  fprintf
                    fmt
                    "@ Ethereum address: %s"
-                   (Ethereum_types.Address.to_string addr)))
+                   (Ethereum_types.Address.to_eip55_string addr)))
             eth_opt ;
           return_unit
       | None ->

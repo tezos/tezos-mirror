@@ -125,7 +125,7 @@ module Legacy_encodings = struct
                (req "transactionsRoot" hash_encoding)
                (req "stateRoot" hash_encoding)
                (req "receiptsRoot" hash_encoding)
-               (req "miner" address_encoding))
+               (req "miner" hex_encoding))
             (obj10
                (req "difficulty" quantity_encoding)
                (req "totalDifficulty" quantity_encoding)

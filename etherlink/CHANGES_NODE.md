@@ -13,6 +13,9 @@ the store (!18713).
 
 ### RPCs changes
 
+- Revert outputting EIP-55 encoded addresses in the RPC responses. This is not
+  a standard behavior for nodes of EVM-compatible chains. (!18757)
+
 ### Metrics changes
 
 ### Command-line interface changes

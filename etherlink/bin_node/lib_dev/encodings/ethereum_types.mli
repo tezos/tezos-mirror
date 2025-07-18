@@ -184,7 +184,7 @@ type 'transaction_object block = {
   transactionRoot : hash;
   stateRoot : hash;
   receiptRoot : hash;
-  miner : address;
+  miner : hex;
   difficulty : quantity;
   totalDifficulty : quantity;
   extraData : hex;
@@ -302,6 +302,8 @@ module Address : sig
   val to_string : t -> string
 
   val of_string : string -> t
+
+  val to_eip55_string : t -> string
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
