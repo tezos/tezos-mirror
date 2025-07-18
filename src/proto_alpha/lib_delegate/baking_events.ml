@@ -820,22 +820,15 @@ module Actions = struct
   let section = section @ ["actions"]
 
   let skipping_consensus_vote =
-    declare_5
+    declare_2
       ~section
       ~name:"skipping_consensus_vote"
       ~level:Error
-      ~msg:
-        "unable to sign {vote_kind} for {delegate} at level {level}, round \
-         {round} -- {trace}"
-      ~pp1:pp_consensus_vote_kind
-      ("vote_kind", consensus_vote_kind_encoding)
-      ~pp2:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp3:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp4:Round.pp
-      ("round", Round.encoding)
-      ~pp5:Error_monad.pp_print_trace
+      ~msg:"unable to sign {operation_information} -- {trace}"
+      ~pp1:pp_unsigned_consensus_vote
+      ( "operation_information",
+        unsigned_consensus_vote_encoding_for_logging__cannot_decode )
+      ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
   let failed_to_get_dal_attestations =

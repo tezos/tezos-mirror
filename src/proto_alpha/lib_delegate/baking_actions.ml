@@ -664,18 +664,15 @@ let authorized_consensus_votes global_state
   in
   let*! () =
     List.iter_s
-      (fun {vote_kind; delegate; _} ->
+      (fun unsigned_consensus_vote ->
         let error =
-          match vote_kind with
+          match unsigned_consensus_vote.vote_kind with
           | Preattestation ->
               Baking_highwatermarks.Block_previously_preattested {round; level}
           | Attestation ->
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.(
-          emit
-            skipping_consensus_vote
-            (vote_kind, delegate, level, round, [error])))
+        Events.(emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
       unauthorized_votes
   in
   return authorized_votes
@@ -848,8 +845,7 @@ let sign_consensus_votes (global_state : global_state)
   in
   let* signed_consensus_votes =
     List.filter_map_es
-      (fun ({delegate; vote_kind; vote_consensus_content; _} as
-            unsigned_consensus_vote) ->
+      (fun unsigned_consensus_vote ->
         let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
@@ -861,15 +857,9 @@ let sign_consensus_votes (global_state : global_state)
         in
         match signed_consensus_vote_r with
         | Error err ->
-            let level, round =
-              ( Raw_level.to_int32 vote_consensus_content.level,
-                vote_consensus_content.round )
-            in
             let*! () =
               Events.(
-                emit
-                  skipping_consensus_vote
-                  (vote_kind, delegate, level, round, err))
+                emit skipping_consensus_vote (unsigned_consensus_vote, err))
             in
             return_none
         | Ok signed_consensus_vote -> return_some signed_consensus_vote)
