@@ -4,6 +4,7 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use mir::ast::Entrypoint;
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::Ctx,
@@ -193,8 +194,22 @@ pub fn transfer<Host: Runtime>(
             let code = dest_contract.code(host)?;
             let storage = dest_contract.storage(host)?;
 
-            let new_storage = execute_smart_contract(code, storage, &parameter);
-
+            // Init MIR parser and context
+            let parser = Parser::default();
+            let mut ctx = Ctx::default();
+            let (entrypoint, value) = match parameter {
+                Some(param) => (
+                    Some(param.entrypoint),
+                    match Micheline::decode_raw(&parser.arena, &param.value) {
+                        Ok(value) => value,
+                        Err(err) => return Ok(Err(TransferError::from(err).into())),
+                    },
+                ),
+                None => (None, Micheline::from(())),
+            };
+            let new_storage = execute_smart_contract(
+                code, storage, entrypoint, value, &parser, &mut ctx,
+            );
             match new_storage {
                 Ok(new_storage) => {
                     let _ = dest_contract.set_storage(host, &new_storage);
@@ -288,36 +303,30 @@ fn apply_balance_changes(
     Ok(())
 }
 
-/// Executes the entrypoint logic of an originated smart contract and returns the new storage and consumed gas.
-fn execute_smart_contract(
+/// Executes the entrypoint logic of an originated smart contract and returns the new storage.
+fn execute_smart_contract<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
-    parameter: &Option<Parameter>,
+    entrypoint: Option<Entrypoint>,
+    value: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
 ) -> Result<Vec<u8>, TransferError> {
-    let parser = Parser::new();
+    // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
+    let contract_typechecked = contract_micheline.typecheck_script(ctx)?;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, &storage)?;
 
-    let (entrypoint, value) = match parameter {
-        Some(param) => (
-            Some(param.entrypoint.clone()),
-            Micheline::decode_raw(&parser.arena, &param.value)?,
-        ),
-        None => (None, Micheline::from(())),
-    };
-
-    let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx)?;
-
-    let storage = Micheline::decode_raw(&parser.arena, &storage)?;
-
-    let (_, new_storage) = contract_typechecked.interpret(
-        &mut ctx,
+    // Execute the contract
+    let (_internal_operations, new_storage) = contract_typechecked.interpret(
+        ctx,
         &parser.arena,
         value,
         entrypoint,
-        storage,
+        storage_micheline,
     )?;
 
+    // Encode the new storage
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
