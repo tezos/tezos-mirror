@@ -4,13 +4,13 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
-use mir::ast::Entrypoint;
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinError;
@@ -19,6 +19,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
+use tezos_tezlink::operation_result::{ApplyOperationError, TransferTarget};
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -26,7 +27,7 @@ use tezos_tezlink::{
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
         OperationError, OperationResultSum, Reveal, RevealError, RevealSuccess,
-        TransferError, TransferSuccess, TransferTarget, UpdateOrigin,
+        TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 use thiserror::Error;
@@ -50,6 +51,8 @@ pub enum ApplyKernelError {
     BigIntError(num_bigint::TryFromBigIntError<num_bigint::BigInt>),
     #[error("Serialization failed because of {0}")]
     BinaryError(String),
+    #[error("Apply operation failed because of an unsupported address error")]
+    MirAddressUnsupportedError,
 }
 
 // 'FromBase58CheckError' doesn't implement PartialEq and Eq
@@ -110,6 +113,15 @@ fn reveal<Host: Runtime>(
         consumed_gas: 0_u64.into(),
     }))
 }
+
+fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
+    match address {
+        AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
+        AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
+        AddressHash::Sr1(_) => Err(ApplyKernelError::MirAddressUnsupportedError),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
@@ -167,6 +179,86 @@ pub fn transfer_tez<Host: Runtime>(
     }))
 }
 
+pub fn execute_internal_operations<'a, Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    internal_operations: impl Iterator<Item = OperationInfo<'a>>,
+    sender_contract: &Contract,
+    sender_account: &mut TezlinkOriginatedAccount,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
+) -> ExecutionResult<()> {
+    for internal_op in internal_operations {
+        log!(
+            host,
+            Debug,
+            "Executing internal operation: {:?}",
+            internal_op
+        );
+        let internal_receipt = match internal_op.operation {
+            mir::ast::Operation::TransferTokens(TransferTokens {
+                param,
+                destination_address,
+                amount,
+            }) => {
+                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let dest_contract = contract_from_address(destination_address.hash)?;
+                match &dest_contract {
+                    Contract::Implicit(_) => transfer_tez(
+                        host,
+                        context,
+                        sender_contract,
+                        sender_account,
+                        &amount,
+                        &dest_contract,
+                        &mut TezlinkImplicitAccount::from_contract(
+                            context,
+                            &dest_contract,
+                        )?,
+                        &param.into_micheline_optimized_legacy(&parser.arena),
+                    ),
+                    Contract::Originated(_) => transfer(
+                        host,
+                        context,
+                        sender_contract,
+                        sender_account,
+                        &amount,
+                        &dest_contract,
+                        &mut TezlinkOriginatedAccount::from_contract(
+                            context,
+                            &dest_contract,
+                        )?,
+                        Some(destination_address.entrypoint),
+                        param.into_micheline_optimized_legacy(&parser.arena),
+                        parser,
+                        ctx,
+                    ),
+                }
+            }
+            _ => {
+                return Ok(Err(ApplyOperationError::UnSupportedOperation(
+                    "Unsupported internal operation".to_string(),
+                )
+                .into()));
+            }
+        }?;
+        match internal_receipt {
+            Ok(receipt) => {
+                log!(
+                    host,
+                    Debug,
+                    "Internal operation executed successfully: {:?}",
+                    receipt
+                );
+            }
+            Err(error) => {
+                return Ok(Err(error));
+            }
+        }
+    }
+    Ok(Ok(()))
+}
+
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
 pub fn transfer<'a, Host: Runtime>(
@@ -196,15 +288,24 @@ pub fn transfer<'a, Host: Runtime>(
         Err(error) => return Ok(Err(error)),
     };
     if let Contract::Originated(_) = dest_contract {
-        let dest_account =
+        let mut dest_account =
             TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
         let code = dest_account.code(host)?;
         let storage = dest_account.storage(host)?;
-        let new_storage =
+        let result =
             execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
-        match new_storage {
-            Ok(new_storage) => {
+        match result {
+            Ok((internal_operations, new_storage)) => {
                 dest_account.set_storage(host, &new_storage)?;
+                let _internal_receipt = execute_internal_operations(
+                    host,
+                    context,
+                    internal_operations,
+                    dest_contract,
+                    &mut dest_account,
+                    parser,
+                    ctx,
+                )?;
                 Ok(Ok(TransferSuccess {
                     storage: Some(new_storage),
                     ..receipt
@@ -367,14 +468,14 @@ fn execute_smart_contract<'a>(
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> Result<Vec<u8>, TransferError> {
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
     let contract_typechecked = contract_micheline.typecheck_script(ctx)?;
     let storage_micheline = Micheline::decode_raw(&parser.arena, &storage)?;
 
     // Execute the contract
-    let (_internal_operations, new_storage) = contract_typechecked.interpret(
+    let (internal_operations, new_storage) = contract_typechecked.interpret(
         ctx,
         &parser.arena,
         value,
@@ -386,7 +487,8 @@ fn execute_smart_contract<'a>(
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    Ok(new_storage)
+
+    Ok((internal_operations, new_storage))
 }
 
 pub fn apply_operation<Host: Runtime>(

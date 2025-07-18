@@ -96,6 +96,7 @@ impl From<mir::typechecker::TcError> for TransferError {
 pub enum ApplyOperationError {
     Reveal(RevealError),
     Transfer(TransferError),
+    UnSupportedOperation(String),
 }
 
 impl From<RevealError> for ApplyOperationError {
