@@ -445,21 +445,6 @@ module State_transitions = struct
       ~pp2:pp_event
       ("event", event_encoding_for_logging__cannot_decode)
 
-  let discarding_preattestation =
-    declare_3
-      ~section
-      ~name:"discarding_preattestation"
-      ~level:Info
-      ~msg:
-        "discarding outdated preattestation for {delegate} at level {level}, \
-         round {round}"
-      ~pp1:Delegate.pp
-      ("delegate", Delegate.encoding_for_logging__cannot_decode)
-      ~pp2:pp_int32
-      ("level", Data_encoding.int32)
-      ~pp3:Round.pp
-      ("round", Round.encoding)
-
   let discarding_attestation =
     declare_3
       ~section
