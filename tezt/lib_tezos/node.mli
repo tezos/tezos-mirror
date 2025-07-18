@@ -453,6 +453,12 @@ module Config_file : sig
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_rionet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Seoulnet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_seoulnet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)

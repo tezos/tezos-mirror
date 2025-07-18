@@ -193,6 +193,7 @@ module Node = struct
     (match JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string) with
     | "TEZOS_ITHACANET_2022-01-25T15:00:00Z" -> "ghostnet"
     | "TEZOS_RIONET_2025-02-19T12:45:00Z" -> "rionet"
+    | "TEZOS_SEOULNET_2025-07-11T08:00:00Z" -> "seoulnet"
     | "TEZOS_MAINNET" -> "mainnet"
     | "TEZOS" | _ -> "sandbox")
     |> Lwt.return
@@ -374,6 +375,7 @@ module Node = struct
                 | Some "mainnet" -> Node.Config_file.set_mainnet_network ()
                 | Some "ghostnet" -> Node.Config_file.set_ghostnet_network ()
                 | Some "rionet" -> Node.Config_file.set_rionet_network ()
+                | Some "seoulnet" -> Node.Config_file.set_seoulnet_network ()
                 | _ -> Node.Config_file.set_sandbox_network)
             in
             let* () =
@@ -1335,7 +1337,7 @@ module Monitoring_app = struct
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/mainnet.png"
     | `Ghostnet ->
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/ghostnet.png"
-    | `Nextnet _ ->
+    | `Nextnet _ | `Seoulnet ->
         "https://gitlab.com/tezos/tezos/-/raw/master/tezt/lib_cloud/assets/seoulnet.png"
     | `Sandbox | `Weeklynet _ -> "no_image_yet"
 
@@ -4755,7 +4757,7 @@ let parse_stake_arg ~stake_arg ~simulation_arg =
       | Mimic {network; max_nb_bakers} ->
           let network_string =
             match network with
-            | `Mainnet | `Ghostnet | `Rionet -> to_string network
+            | `Mainnet | `Ghostnet | `Rionet | `Seoulnet -> to_string network
             | _ ->
                 failwith
                   (Format.sprintf
