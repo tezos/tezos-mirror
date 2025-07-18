@@ -806,6 +806,8 @@ end
 
 module type Tezlink = sig
   val proxy_localhost : bool
+
+  val public_rpc_port : int option
 end
 
 module Tezlink () : Tezlink = struct
@@ -826,4 +828,11 @@ module Tezlink () : Tezlink = struct
          can be used to solve a bug with the Tezt Cloud library. This option \
          will be removed once the bug is fixed"
       false
+
+  let public_rpc_port =
+    Clap.optional_int
+      ~section
+      ~long:"public-rpc-port"
+      ~description:"Set the port number of the RPC server"
+      ()
 end
