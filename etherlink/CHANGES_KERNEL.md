@@ -24,6 +24,22 @@ Its storage version is 36.
 
 ### Bug fixes
 
+- REVM precompile contract implementation fixed incoherent FA bridge events, locked behind the REVM feature flag (!18722):
+  - Fast FA withdrawal
+    - Previous signature : `FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)`
+    - New signature : `FastFaWithdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)`
+    - First topic changed : Keccak256 of new signature
+    - Second topic unchanged : ticket hash
+    - Emitter address unchanged : `0xff00000000000000000000000000000000000002`
+    - Fixes topics incoherence, ticket hash was missing from the signature
+  - Claimed deposit
+    - Signature unchanged : `Deposit(uint256,address,address,uint256,uint256,uint256)`
+    - First topic unchanged : Keccak256 of signature
+    - Second topic unchanged : ticket hash
+    - Previous emitter address : `0x0000000000000000000000000000000000000000`
+    - New emitter address : `0xff00000000000000000000000000000000000002`
+    - Fixes emitter incoherence, there is no reason to justify emitting this event from the system address
+
 ### Internal
 
 ## Dionysus (1f47de0)
