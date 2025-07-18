@@ -364,11 +364,17 @@ let signer_highwatermark_test =
 
   let* current_lvl = Node.get_level node in
   let base_dir = Signer.base_dir signer in
+  let preattestation_highwatermarks_file =
+    base_dir // "preattestation_high_watermarks"
+  in
   let preattestation_highwatermarks =
-    JSON.parse_file (base_dir // "preattestation_high_watermarks")
+    JSON.parse_file preattestation_highwatermarks_file
+  in
+  let attestation_highwatermarks_file =
+    base_dir // "attestation_high_watermarks"
   in
   let attestation_highwatermarks =
-    JSON.parse_file (base_dir // "attestation_high_watermarks")
+    JSON.parse_file attestation_highwatermarks_file
   in
   let check_highwatermark pkh lvl json =
     let u = JSON.unannotate json in
@@ -388,6 +394,64 @@ let signer_highwatermark_test =
       check_highwatermark pkh current_lvl preattestation_highwatermarks ;
       check_highwatermark pkh (current_lvl - 1) attestation_highwatermarks)
     [consensus_key1.public_key_hash; Constant.tz4_account.public_key_hash] ;
+
+  Log.info "Rewrite highwatermarks level to a higher value" ;
+  let* _ = Client.bake_for_and_wait ~keys ~count:2 client in
+  let reset_highwatermark_level file highwatermarks level =
+    let highwatermarks_s = JSON.encode highwatermarks in
+    let contents =
+      Re.replace_string
+        (Re.compile (Re.Perl.re (sf {|"level": %d|} level)))
+        ~by:{|"level": 100|}
+        highwatermarks_s
+    in
+    write_file file ~contents
+  in
+  let () =
+    reset_highwatermark_level
+      preattestation_highwatermarks_file
+      preattestation_highwatermarks
+      current_lvl ;
+    reset_highwatermark_level
+      attestation_highwatermarks_file
+      attestation_highwatermarks
+      (current_lvl - 1)
+  in
+
+  Log.info
+    "Check that signing a preattestation with a lower level than the \
+     highwatermark fails" ;
+  let preattest =
+    Client.spawn_preattest_for ~key:[consensus_key1.public_key_hash] client
+  in
+  let* stdout = Process.check_and_read_stdout preattest in
+  let* () =
+    if
+      stdout
+      =~! rex {|preattestation level ([\d]+) below high watermark ([\d]+)|}
+    then unit
+    else
+      Test.fail
+        "The preattest call should have returned a level below high watermark \
+         error"
+  in
+
+  Log.info
+    "Check that signing an attestation with a lower level than the \
+     highwatermark fails" ;
+  let attest =
+    Client.spawn_attest_for ~key:[Constant.tz4_account.public_key_hash] client
+  in
+  let* stdout = Process.check_and_read_stdout attest in
+  let* () =
+    if stdout =~! rex {|attestation level ([\d]+) below high watermark ([\d]+)|}
+    then unit
+    else
+      Test.fail
+        "The attest call should have returned a level below high watermark \
+         error"
+  in
+
   unit
 
 let register ~protocols =
