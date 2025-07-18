@@ -537,8 +537,7 @@ impl Evaluation {
                 // TODO: Replace this by the decoded access lists if any.
                 empty_access_list(),
                 evm_configuration,
-                // TODO: Provide [tracer_input: Option<TracerInput>] when relevant.
-                None,
+                tracer_input,
             ) {
                 Ok(Some(outcome)) if !self.with_da_fees => {
                     let result: SimulationResult<CallResult, String> =

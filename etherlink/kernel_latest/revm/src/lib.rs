@@ -3,11 +3,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::inspectors::noop::NoInspector;
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::u256_to_le_bytes;
-use inspectors::{EtherlinkInspector, EvmInspection, TracerConfig};
+use inspectors::{
+    call_tracer::CallTracer, noop::NoInspector, CallTracerInput, EtherlinkInspector,
+    EvmInspection, TracerInput,
+};
 use precompile_provider::EtherlinkPrecompiles;
 use revm::{
     context::{
@@ -28,6 +30,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 use world_state_handler::{account_path, WorldStateHandler};
 
+pub mod inspectors;
 pub mod precompile_init;
 pub mod precompile_provider;
 pub mod send_outbox_message;
@@ -38,7 +41,6 @@ mod code_storage;
 mod constants;
 mod database;
 mod helpers;
-mod inspectors;
 mod table;
 
 #[derive(Error, Debug)]
@@ -141,9 +143,17 @@ fn tx_env<'a, Host: Runtime>(
     Ok(tx_env)
 }
 
-fn get_inspector_from(tracer_config: TracerConfig) -> EtherlinkInspector {
-    match tracer_config {
-        TracerConfig::NoOp => EtherlinkInspector::NoOp(NoInspector),
+fn get_inspector_from(tracer_input: TracerInput, spec_id: SpecId) -> EtherlinkInspector {
+    match tracer_input {
+        TracerInput::CallTracer(CallTracerInput {
+            config,
+            transaction_hash,
+        }) => EtherlinkInspector::CallTracer(Box::new(CallTracer::new(
+            config,
+            spec_id,
+            transaction_hash,
+        ))),
+        TracerInput::NoOp => EtherlinkInspector::NoOp(NoInspector),
     }
 }
 
@@ -221,7 +231,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
-    tracer_config: Option<TracerConfig>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let mut commit_status = true;
     let block_env = block_env(block_constants)?;
@@ -246,8 +256,8 @@ pub fn run_transaction<'a, Host: Runtime>(
         caller,
     );
 
-    if let Some(tracer_config) = tracer_config {
-        let inspector = get_inspector_from(tracer_config);
+    if let Some(tracer_input) = tracer_input {
+        let inspector = get_inspector_from(tracer_input, spec_id);
 
         let mut evm = evm_inspect(
             db,
