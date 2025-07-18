@@ -167,8 +167,8 @@ pub fn transfer_tez<Host: Runtime>(
     }))
 }
 
-/// Handles manager transfer operations for both implicit and originated contracts.
-pub fn transfer<Host: Runtime>(
+// Handles manager transfer operations.
+pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     src: &PublicKeyHash,
@@ -444,7 +444,7 @@ pub fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            let transfer_result = transfer(
+            let transfer_result = transfer_external(
                 &mut safe_host,
                 context,
                 source,
