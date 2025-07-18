@@ -7,9 +7,6 @@ pragma solidity ^0.8.24;
 contract FAWithdrawal {
     uint256 public withdrawalCounter;
 
-    // TODO: Warn tooling maintainers about these event changes, previously:
-    // - Keccak256 of Withdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256)
-    // - First uint256 is a signature mistake!!
     event Withdrawal(
         uint256 indexed ticketHash,
         address sender,
@@ -20,6 +17,9 @@ contract FAWithdrawal {
         uint256 withdrawalId
     );
 
+    // TODO: Warn tooling maintainers about these event changes, previously:
+    // - Keccak256 of FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)
+    // - First uint256 is missing and required for ticket hash topic
     event FastFaWithdrawal(
         uint256 indexed ticketHash,
         address sender,
@@ -90,7 +90,11 @@ contract FAWithdrawal {
             deposit.proxy,
             proxyCallData
         );
-        (bool proxySuccess, ) = system.call(systemInput);
+        (bool forwarderSuccess, bytes memory proxyReturn) = system.call(
+            systemInput
+        );
+        require(forwarderSuccess, "System forwarder failed");
+        (bool proxySuccess, ) = abi.decode(proxyReturn, (bool, bytes));
 
         // If proxy succeeds it becomes the ticketOwner if not fallback on the receiver
         address ticketOwner = proxySuccess ? deposit.proxy : deposit.receiver;

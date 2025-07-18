@@ -2226,6 +2226,7 @@ let test_fa_reentrant_deposit_reverts =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -9045,6 +9046,9 @@ let fast_withdrawal_tez_event_signature =
 let fast_withdrawal_fa_token_event_signature =
   "FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
 
+let revm_fast_withdrawal_fa_token_event_signature =
+  "FastFaWithdrawal(uint256,address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
+
 let fast_withdrawal_event_topic ~event_signature =
   Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string event_signature)
   |> Hex.of_bytes |> Hex.show |> add_0x
@@ -9057,8 +9061,12 @@ let fast_withdrawal_fa_token_event_topic =
   fast_withdrawal_event_topic
     ~event_signature:fast_withdrawal_fa_token_event_signature
 
-let find_and_decode_fast_withdrawal_event ?(fa_tokens = false) receipt :
-    fast_withdrawal_event Lwt.t =
+let revm_fast_withdrawal_fa_token_event_topic =
+  fast_withdrawal_event_topic
+    ~event_signature:revm_fast_withdrawal_fa_token_event_signature
+
+let find_and_decode_fast_withdrawal_event ?(fa_tokens = false)
+    ?(enable_revm = false) receipt : fast_withdrawal_event Lwt.t =
   (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
      This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
   let fast_withdrawal_event_signature, fast_withdrawal_event_topic =
@@ -9070,13 +9078,18 @@ let find_and_decode_fast_withdrawal_event ?(fa_tokens = false) receipt :
 
   (* Extract the event data from the EVM logs based on the provided topic.
      This searches the transaction logs for the specified topic and returns the corresponding data. *)
+  (* If REVM is enabled we want to match the topic containing ticket hash at the start of the signature.
+     Ticket hash is an indexed uint256 and will not appear in the encoded data.
+     Indexed fields is the standard way to create a topic in solidity, previous signature and topics pair were incorrect. *)
+  let queried_topic =
+    if fa_tokens && enable_revm then revm_fast_withdrawal_fa_token_event_topic
+    else fast_withdrawal_event_topic
+  in
   let log =
     let tx_log =
       List.find_opt
         (fun tx ->
-          List.exists
-            (String.equal fast_withdrawal_event_topic)
-            tx.Transaction.topics)
+          List.exists (String.equal queried_topic) tx.Transaction.topics)
         receipt.Transaction.logs
       |> Option.get
     in
@@ -9138,9 +9151,9 @@ let find_and_decode_fast_withdrawal_event ?(fa_tokens = false) receipt :
 
 let execute_payout ~service_provider_pkh ~exchanger
     ~fast_withdrawal_contract_address ~service_provider_proxy
-    ?(fa_tokens = false) client receipt =
+    ?(fa_tokens = false) ?(enable_revm = false) client receipt =
   let* fast_withdrawal_event =
-    find_and_decode_fast_withdrawal_event ~fa_tokens receipt
+    find_and_decode_fast_withdrawal_event ~fa_tokens ~enable_revm receipt
   in
   let withdraw_amount, withdrawal_id, target, timestamp, payload, l2_caller =
     match fast_withdrawal_event with
@@ -9442,6 +9455,7 @@ let test_deposit_and_fa_fast_withdraw =
     ~additional_uses:[Constant.octez_codec]
     ~enable_fa_bridge:true
     ~enable_fast_fa_withdrawal:true
+    ~use_revm:activate_revm_registration
   @@ fun {
            sequencer;
            sc_rollup_address;
@@ -9449,6 +9463,7 @@ let test_deposit_and_fa_fast_withdraw =
            l1_contracts;
            proxy;
            sc_rollup_node;
+           enable_revm;
            _;
          }
              _protocol ->
@@ -9584,6 +9599,7 @@ let test_deposit_and_fa_fast_withdraw =
       ~fast_withdrawal_contract_address
       ~service_provider_proxy
       ~fa_tokens:true
+      ~enable_revm
       client
       receipt
   in
