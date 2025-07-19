@@ -313,11 +313,16 @@ let test_baking_nonce_migration =
 
   Log.info "Concat old nonces contents with the new one" ;
   let new_nonces_contents = Base.read_file nonces_file in
-  let () =
-    Base.write_file
-      nonces_file
-      ~contents:(old_nonces_contents ^ new_nonces_contents)
+  let merged_nonces_contents =
+    match
+      ( Data_encoding.Json.from_string old_nonces_contents,
+        Data_encoding.Json.from_string new_nonces_contents )
+    with
+    | Ok (`A old), Ok (`A new_) ->
+        Data_encoding.Json.to_string (`A (old @ new_))
+    | _ -> Test.fail "Incorrectly formatted nonces files"
   in
+  let () = Base.write_file nonces_file ~contents:merged_nonces_contents in
 
   Log.info
     "Restart the baker and wait for ignore failed nonce migration event then \
