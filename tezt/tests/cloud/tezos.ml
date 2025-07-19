@@ -601,7 +601,7 @@ module Evm_node = struct
     (* Use for compatibility with `tezt-cloud`. *)
     let create ?(group = "Etherlink")
         ?(path = Uses.path Constant.octez_evm_node) ?name ?data_dir ?mode
-        ?websockets endpoint cloud agent =
+        ?rpc_port ?websockets endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -612,14 +612,26 @@ module Evm_node = struct
           ()
       in
       let runner = Agent.runner agent in
-      let rpc_port = Agent.next_available_port agent in
+      let rpc_port =
+        match rpc_port with
+        | None -> Agent.next_available_port agent
+        | Some port -> port
+      in
       create ?name ~path ?runner ?data_dir ~rpc_port ?mode ?websockets endpoint
       |> Lwt.return
 
-    let init ?patch_config ?name ?mode ?websockets ?data_dir rollup_node cloud
-        agent =
+    let init ?patch_config ?name ?mode ?websockets ?data_dir ?rpc_port
+        rollup_node cloud agent =
       let* evm_node =
-        create ?name ?mode ?websockets ?data_dir rollup_node cloud agent
+        create
+          ?name
+          ?mode
+          ?rpc_port
+          ?websockets
+          ?data_dir
+          rollup_node
+          cloud
+          agent
       in
       let* () = Process.check @@ spawn_init_config evm_node in
       let* () =
