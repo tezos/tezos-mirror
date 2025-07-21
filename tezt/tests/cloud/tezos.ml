@@ -124,7 +124,8 @@ let service_manager_receiver notifier =
         ()
 
 module Alerts = struct
-  let service_manager_process_down agent executable receiver metric_name name =
+  let service_manager_process_down ~(agent : string) executable receiver
+      metric_name name =
     Alert.make
       ~name:"ServiceManagerProcessDown"
       ~description:
@@ -132,7 +133,7 @@ module Alerts = struct
       ~summary:
         (Format.asprintf
            "'[%s.service_manager] the process [%s] is down'"
-           (Agent.name agent)
+           agent
            executable)
       ~route:(Alert.route receiver)
       ~severity:Alert.Critical
@@ -209,7 +210,7 @@ module Node = struct
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let alert =
         Alerts.service_manager_process_down
-          agent
+          ~agent:(Agent.name agent)
           executable
           receiver
           metric_name
@@ -391,7 +392,7 @@ module Dal_node = struct
       in
       let alert =
         Alerts.service_manager_process_down
-          agent
+          ~agent:(Agent.name agent)
           executable
           receiver
           metric_name
