@@ -100,6 +100,11 @@ impl<'a> FieldAnnotation<'a> {
     pub fn from_str_unchecked(s: &'a str) -> Self {
         FieldAnnotation(Cow::Borrowed(s))
     }
+
+    /// Get the field annotation from a string. This will allocate a new
+    pub fn from_string(s: String) -> Self {
+        FieldAnnotation(Cow::Owned(s))
+    }
 }
 
 impl<'a> Annotations<'a> {

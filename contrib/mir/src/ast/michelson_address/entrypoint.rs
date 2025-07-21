@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 
-use crate::ast::annotations::FieldAnnotation;
 use crate::ast::Type;
+use crate::ast::annotations::FieldAnnotation;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, map_res, verify};
@@ -238,6 +238,12 @@ impl TryFrom<FieldAnnotation<'_>> for Entrypoint {
         // annotation, so here we only check length.
         check_ep_name_len(s.as_bytes())?;
         Ok(Entrypoint(s.to_owned()))
+    }
+}
+
+impl From<Entrypoint> for FieldAnnotation<'_> {
+    fn from(entrypoint: Entrypoint) -> Self {
+        FieldAnnotation::from_string(entrypoint.0)
     }
 }
 

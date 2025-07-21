@@ -5,7 +5,7 @@
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
 use mir::{
-    ast::{annotations::FieldAnnotation, entrypoint, IntoMicheline, Micheline},
+    ast::{IntoMicheline, Micheline},
     context::Ctx,
     parser::Parser,
 };
@@ -134,7 +134,7 @@ pub fn transfer<Host: Runtime>(
     src: &PublicKeyHash,
     amount: &Narith,
     dest: &Contract,
-    parameter: &Option<Parameter>,
+    parameter: Option<Parameter>,
 ) -> ExecutionResult<TransferTarget> {
     log!(
         host,
@@ -300,7 +300,7 @@ fn apply_balance_changes(
 fn execute_smart_contract<Host: Runtime>(
     host: &mut Host,
     destination: &mut TezlinkOriginatedAccount,
-    parameter: &Option<Parameter>,
+    parameter: Option<Parameter>,
 ) -> Result<Vec<u8>, ApplyKernelError> {
     let parser = Parser::new();
     let code = destination.code(host)?;
@@ -309,10 +309,10 @@ fn execute_smart_contract<Host: Runtime>(
 
     let (entrypoint, value) = match parameter {
         Some(param) => (
-            param.entrypoint.clone(),
+            Some(param.entrypoint),
             Micheline::decode_raw(&parser.arena, &param.value)?,
         ),
-        None => (entrypoint::Entrypoint::default(), Micheline::from(())),
+        None => (None, Micheline::from(())),
     };
 
     let mut ctx = Ctx::default();
@@ -324,7 +324,7 @@ fn execute_smart_contract<Host: Runtime>(
         &mut ctx,
         &parser.arena,
         value,
-        Some(FieldAnnotation::from_str_unchecked(entrypoint.as_str())),
+        entrypoint,
         storage,
     )?;
 
@@ -389,7 +389,7 @@ pub fn apply_operation<Host: Runtime>(
             parameters,
         }) => {
             let transfer_result =
-                transfer(host, context, source, &amount, &destination, &parameters)?;
+                transfer(host, context, source, &amount, &destination, parameters)?;
             let manager_result =
                 produce_operation_result(vec![src_delta, block_fees], transfer_result);
             OperationResultSum::Transfer(manager_result)
