@@ -31,6 +31,7 @@ type multichain_sequencer_setup = {
   evm_version : Evm_version.t;
   enable_multichain : bool;
   l2_chains : Evm_node.l2_setup list;
+  enable_revm : bool;
 }
 
 type sequencer_setup = {
@@ -48,6 +49,7 @@ type sequencer_setup = {
   evm_version : Evm_version.t;
   enable_multichain : bool;
   l2_chains : Evm_node.l2_setup list;
+  enable_revm : bool;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
