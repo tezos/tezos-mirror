@@ -32,6 +32,9 @@ val to_public : t -> public
 (** ["mainnet" | "ghostnet" | "rionet" | "seoulnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : [< t] -> string
 
+(** Parse the given [string] into an available network option. *)
+val parse : string -> t option
+
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t
 

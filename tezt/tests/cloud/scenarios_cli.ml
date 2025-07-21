@@ -101,27 +101,11 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       "Unexpected network simulation config (--simulation) [%s]"
       simulate_network_arg
 
-let parse_network = function
-  | "mainnet" -> Some `Mainnet
-  | "ghostnet" -> Some `Ghostnet
-  | "rionet" -> Some `Rionet
-  | "seoulnet" -> Some `Seoulnet
-  | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
-      (* format: weeklynet-2025-01-29 (with dashes) *)
-      let date = String.sub s 10 10 in
-      Some (`Weeklynet date)
-  | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
-      (* format: nextnet-20250203 (without dashes) *)
-      let date = String.sub s 8 8 in
-      Some (`Nextnet date)
-  | "sandbox" -> Some `Sandbox
-  | _ -> None
-
 let network_typ : Network.t Clap.typ =
   Clap.typ
     ~name:"network"
     ~dummy:`Ghostnet
-    ~parse:parse_network
+    ~parse:Network.parse
     ~show:Network.to_string
 
 let snapshot_typ : Snapshot_helpers.t Clap.typ =
@@ -318,7 +302,7 @@ module Dal () : Dal = struct
   let stake_repartition_typ : Network.stake_repartition Clap.typ =
     let open Network in
     let parse_public_network (net : string) : public option =
-      try Option.map to_public (parse_network net) with _ -> None
+      try Option.map to_public (parse net) with _ -> None
     in
     Clap.typ
       ~name:"stake_repartition"
