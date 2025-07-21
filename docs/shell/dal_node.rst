@@ -129,6 +129,22 @@ By default, the DAL node runs in controller mode without any profile.
 When a baker starts with the ``--dal-node`` argument, it checks the DAL node's configuration.
 If the DAL node is not in bootstrap mode and not already set up with the ``attester`` profile, the baker configures the DAL node to use the attester profile associated with the keys that it is using.
 
+Routing
+~~~~~~~
+
+DAL nodes must be able to initiate connections outside their local network and accept connections from outside their local network.
+By default, the DAL node accepts P2P connections on port 11732, but you can change the address and port that the node listens on by setting the ``--net-addr`` argument.
+In simple setups with a single DAL node, routing configuration is usually not necessary.
+However, if you are using a load balancer or running multiple DAL nodes, you may need to configure port forwarding on your router and the ports and addresses that the DAL nodes use.
+
+The ``--net-addr`` argument sets the address and port that the node listens for incoming connections on.
+For example, setting ``--net-addr 0.0.0.0:11733`` makes the node listen on port 11733 on all network interfaces.
+
+The ``--public-addr`` argument sets the address and port at which other nodes can reach the node, such as if you are using a load balancer, firewall rule, or router to forward traffic to the node from another port.
+The node does not actually bind to this port or listen on it.
+
+If you change the defaults with the ``--net-addr`` or ``--public-addr`` arguments, you must configure your firewall to permit incoming and outgoing TCP connections on the ports that you specify in the arguments.
+
 Storage
 ^^^^^^^
 
