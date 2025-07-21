@@ -18,7 +18,7 @@ After a successful compilation, you should have the following binaries:
 - ``octez-node``: the Octez daemon itself (see `Node`_);
 - ``octez-client``: a command-line client and basic wallet (see `Client`_);
 - ``octez-admin-client``: administration tool for the node (see :ref:`octez-admin-client`);
-- ``octez-{baker,accuser}*``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
+- ``octez-{baker,accuser}``: daemons to bake and accuse on the Tezos network (see :doc:`howtorun`);
 - ``octez-signer``: a client to remotely sign operations or blocks
   (see :ref:`signer`);
 - ``octez-smart-rollup-node``: executable for using and running a smart rollup node as Layer 2 (see :doc:`../shell/smart_rollup_node`);
