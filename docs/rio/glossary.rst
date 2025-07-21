@@ -71,8 +71,9 @@ _`Metadata`
     the prefix ``../<block_id>/metadata``.
 
 _`Node`
-    A peer in the P2P network. It maintains a local state and propagates block_\ s
-    and operation_\ s.
+    A peer in a Tezos P2P network.
+    The general term "node" can refer to a few different kinds of nodes, including Tezos layer 1 nodes, `Data Availability Layer node`_\ s, and `Smart Rollup`_ nodes.
+    Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
 
 _`Operation`
     An operation transforms the context_; this is what makes the state of the chain
@@ -124,6 +125,13 @@ _`Account`
     tez available).
 
     An account can be either a `user account`_ or a `smart contract`_.
+
+_`Attestation lag`
+    A delay of a certain number of blocks that gives DAL nodes time to verify that DAL data is available.
+    DAL nodes post their attestations immediately after the attestation lag has passed.
+
+_`Attestation threshold`
+    The minimum percentage (between 0 and 1) of DAL shard_\ s that must be attested by DAL nodes before the data is considered to be attested and therefore available to Smart Rollups.
 
 _`Attesting`
     When a block_ is created and propagated on the network, delegates that have
@@ -190,6 +198,13 @@ _`Cycle`
     The length of a cycle is a (parametric) protocol
     constant_, and thus might change across different
     Tezos protocols.
+
+_`Data Availability Layer`
+    The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
+    See :doc:`../shell/dal`.
+
+_`Data Availability Layer node`
+    DAL nodes (instances of the ``octez-dal-node`` binary) are responsible for distributing the data that users submit to the DAL.
 
 .. _def_delegate:
 .. _def_delegate_rio:
@@ -292,6 +307,10 @@ _`Origination`
     A manager operation_ whose purpose is to create -- that
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
+_`Page`
+    A portion of the data in a slot_ that is small enough to fit in a layer 1 block.
+    The DAL splits the data in each slot into pages so refutation games can run properly.
+
 _`PVM`
    A PVM (Proof-generating Virtual Machine) is a reference
    implementation for a device on top of which a `smart rollup`_ can be
@@ -299,6 +318,10 @@ _`PVM`
    protocol`_ and is the unique source of truth regarding the semantics
    of rollups. The PVM is able to produce proofs enforcing this truth.
    This ability is used during the final step of a `refutation game`_.
+
+_`Redundancy factor`
+    The amount of redundancy that the protocol uses when splitting DAL data into shard_\ s.
+    THe higher the redundancy factor, the fewer shards are needed to reconstruct a single piece of DAL data.
 
 _`Refutation game`
    A process by which the `economic protocol`_ solves a conflict between two
@@ -355,6 +378,11 @@ _`Round`
     the round's corresponding time span. Baking_ outside of one's designated
     round results in an invalid block_.
 
+_`Shard`
+    A piece of data that represents part of a piece of DAL data.
+    The DAL splits data into shards and distributes these shards to DAL nodes to attest.
+    The shards are redundant based on the redundancy factor so the DAL nodes do not need to attest every shard for the full data to become available.
+
 _`Smart contract`
     Account_ which is associated to a Michelson_ script.
     They are created with an
@@ -367,11 +395,17 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
+_`Slot`
+    Each block has a certain number of slots to which Data Availability Layer users can post raw data to distribute via the DAL.
+
 _`Staker`
     A `user account`_ that made a security deposit.
     The user account must have set a delegate.
     The security deposit accrues to the stake of the user account's delegate and is
     subject to slashing in case the delegate misbehaves -- see :ref:`Slashing<slashing_rio>`.
+
+_`Tenderbake`
+   The algorithm that Tezos uses to create consensus from bakers' proposals and attestations of blocks.
 
 _`Tez`
     A unit of the cryptocurrency native to a Tezos_ chain, such as in "I sent you 2 tez." Tez is invariable. It is not capitalized except at the beginning of a sentence or when you would otherwise capitalize a noun.
@@ -380,6 +414,10 @@ _`Tez`
 _`Transaction`
     An operation_ to transfer tez between two accounts, or to run the code of a
     `smart contract`_.
+
+_`Trap`
+   A false DAL shard_ that the protocol generates to ensure that DAL nodes are honestly downloading and attesting to data.
+   If a DAL node attests to a trap, that node is punished.
 
 .. _def_user_account:
 .. _def_user_account_rio:
