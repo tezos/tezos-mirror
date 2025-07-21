@@ -340,7 +340,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and baker configuration
 ------------------------------
 
-Both ``octez-client`` and ``octez-{baker,accuser}*`` can be configured either
+Both ``octez-client`` and ``octez-{baker,accuser}`` can be configured either
 using environment variables or using ``internal-events`` in the client configuration
 file, with the file-descriptor sinks described above.
 
