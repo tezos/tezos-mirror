@@ -150,8 +150,11 @@ let make_l2 ~eth_bootstrap_balance ~tez_bootstrap_balance
                let make_account_field key value converter =
                  make_instr ~path_prefix (Some (key, converter value))
                in
-
-               make_account_field "data/code" script encode_hexa
+               make_account_field
+                 "balance"
+                 tez_bootstrap_balance
+                 (Data_encoding.Binary.to_string_exn Tezos_types.Tez.encoding)
+               @ make_account_field "data/code" script encode_hexa
                @ make_account_field "data/storage" storage encode_hexa)
         |> List.flatten
   in
