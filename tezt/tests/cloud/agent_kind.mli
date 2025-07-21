@@ -1,0 +1,37 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Here are defined various roles that agents (like L1 nodes, DAL nodes,
+    Bakers etc.) can assume in the tezt-cloud test scenarios.
+
+    These roles are used to systematically name and distinguish
+    agents and their responsibilities across different configurations.
+*)
+
+type t =
+  | Bootstrap
+      (** The main bootstrap node and client, typically the entry point of the network. *)
+  | Baker of int
+      (** A node responsible for block production, identified by index. *)
+  | Producer of int  (** A DAL slot producer node, identified by index. *)
+  | Observer of [`Index of int | `Pkh of string]
+      (** A DAL observer node, either indexed or associated with a public key hash. *)
+  | Reverse_proxy
+      (** A reverse proxy between rollup nodes and multiple DAL nodes. *)
+  | Etherlink_operator  (** The main Etherlink rollup operator node. *)
+  | Etherlink_dal_operator
+      (** A DAL node running alongside the Etherlink operator. *)
+  | Etherlink_dal_observer of {slot_index : int}
+      (** An Etherlink DAL observer responsible for a specific slot index. *)
+  | Etherlink_producer of int  (** A DAL slot producer used by Etherlink. *)
+  | Echo_rollup_operator  (** The main rollup operator for the Echo rollup. *)
+  | Echo_rollup_dal_observer of {slot_index : int}
+      (** A DAL observer node for the Echo rollup, indexed by slot. *)
+
+(** [name_of agent] returns the standard name associated with a given [agent].
+    Used for consistent naming of VMs, logs and artifacts. *)
+val name_of : t -> string
