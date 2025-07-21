@@ -1611,8 +1611,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                testnet_dictator;
                initial_seed;
                cache_script_size;
-               cache_stake_distribution_cycles;
-               cache_sampler_state_cycles;
+               cache_stake_distribution_cycles = _;
+               cache_sampler_state_cycles = _;
                dal = _;
                sc_rollup = _;
                zk_rollup = _;
@@ -1716,8 +1716,10 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             testnet_dictator;
             initial_seed;
             cache_script_size;
-            cache_stake_distribution_cycles;
-            cache_sampler_state_cycles;
+            cache_stake_distribution_cycles =
+              consensus_rights_delay + Constants_repr.slashing_delay + 2;
+            cache_sampler_state_cycles =
+              consensus_rights_delay + Constants_repr.slashing_delay + 2;
             dal;
             sc_rollup;
             zk_rollup;

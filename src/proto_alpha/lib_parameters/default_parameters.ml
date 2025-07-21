@@ -379,11 +379,15 @@ let constants_mainnet : Constants.Parametric.t =
        chosen not too exceed 100 000 000 bytes. *)
     cache_script_size = 100_000_000;
     (* A cache for the stake distribution for all cycles stored at any moment:
-       consensus_rights_delay + max_slashing_period + 1 = 2 + 2 + 1 = 5
-       currently. *)
-    cache_stake_distribution_cycles = 5;
-    (* One for the sampler state for all cycles stored at any moment (as above). *)
-    cache_sampler_state_cycles = 5;
+       consensus_rights_delay + slashing_delay + 2 = 1 + 1 + 2 = 4
+       currently.
+
+       Last updated in protocol T. *)
+    cache_stake_distribution_cycles = 4;
+    (* One for the sampler state for all cycles stored at any moment (as above).
+
+       Last updated in protocol T. *)
+    cache_sampler_state_cycles = 4;
     dal = default_dal;
     sc_rollup;
     zk_rollup =
