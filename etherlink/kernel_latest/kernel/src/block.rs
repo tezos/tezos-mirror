@@ -687,7 +687,7 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Reveal(RevealContent { pk }),
+            OperationContent::Reveal(RevealContent { pk, proof: None }),
         )
     }
 

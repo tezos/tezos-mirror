@@ -176,7 +176,7 @@ module Params = struct
 
   let tez_account =
     Tezos_clic.parameter (fun _ public_key ->
-        Lwt.return (Signature.V1.Public_key.of_b58check public_key))
+        Lwt.return (Signature.Public_key.of_b58check public_key))
 
   let l2_level =
     Tezos_clic.parameter (fun () s ->

@@ -63,7 +63,7 @@ module Operation = struct
   module ImportedOperation = Tezlink_imports.Alpha_context.Operation
 
   type t = {
-    source : Signature.V1.public_key_hash;
+    source : Signature.public_key_hash;
     counter : Z.t;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
@@ -110,7 +110,7 @@ module Operation = struct
       (fun {source; counter; op; raw} -> (source, counter, op, raw))
       (fun (source, counter, op, raw) -> {source; counter; op; raw})
       (tup4
-         Signature.V1.Public_key_hash.encoding
+         Signature.Public_key_hash.encoding
          z
          (dynamic_size Tezlink_imports.Alpha_context.Operation.encoding)
          bytes)

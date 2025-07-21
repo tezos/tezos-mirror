@@ -80,6 +80,7 @@ let make_contract_info contract contract_balance counter_z =
       delegate = None;
       counter = Some counter;
       script;
+      revealed = None;
     }
 
 let tezlink_to_tezos_chain_id ~l2_chain_id _chain =
@@ -301,12 +302,13 @@ let build_block_static_directory ~l2_chain_id
          Backend.block_hash chain block)
        ~convert_output:ethereum_to_tezos_block_hash
   |> register
-       ~service:Adaptive_issuance_services.expected_issuance
+       ~service:Tezos_services.expected_issuance
        ~impl:(fun {block; chain} () () ->
          let*? chain = check_chain chain in
          let*? block = check_block block in
          let* level = Backend.current_level chain block ~offset:0l in
-         Lwt.return @@ Adaptive_issuance_services.dummy_rewards level.cycle)
+         Lwt.return
+         @@ Tezos_services.Adaptive_issuance_services.dummy_rewards level.cycle)
   |> register
      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
      (* We need a proper implementation *)
@@ -360,6 +362,8 @@ let build_block_static_directory ~l2_chain_id
                delegate = bootstrap_account.public_key_hash;
                consensus_pk = public_key;
                consensus_pkh = bootstrap_account.public_key_hash;
+               companion_pk = None;
+               companion_pkh = None;
              }
          in
          let delegate_sampler_state =

@@ -5,7 +5,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let tezlink_protocol = Protocol.R022
+let tezlink_protocol = Protocol.S023
 
 let concat_hello () =
   Evm_node.

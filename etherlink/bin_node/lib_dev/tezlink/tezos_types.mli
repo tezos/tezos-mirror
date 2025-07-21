@@ -41,12 +41,12 @@ module Contract : sig
 
   val of_b58check : string -> t tzresult
 
-  val of_implicit : Signature.V1.public_key_hash -> t
+  val of_implicit : Signature.public_key_hash -> t
 end
 
 module Operation : sig
   type t = {
-    source : Signature.V1.public_key_hash;
+    source : Signature.public_key_hash;
     counter : Z.t;
     op : Tezlink_imports.Alpha_context.packed_operation;
     raw : bytes;
