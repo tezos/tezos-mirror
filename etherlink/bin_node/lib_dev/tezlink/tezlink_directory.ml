@@ -187,7 +187,11 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     let*? hash = ethereum_to_tezos_block_hash block.L2_types.Tezos_block.hash in
     let*? header = tezlink_block_to_raw_block_header ~chain_id block in
     let*? metadata = make_metadata ~level_info in
-    let*? operations =
+    let consensus_opperations = [] in
+    let voting_operations = [] in
+    let anonymous_operations = [] in
+
+    let*? manager_operations =
       Block_services.deserialize_operations ~chain_id block.operations
     in
     let block_info : Block_services.block_info =
@@ -196,7 +200,13 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
         hash;
         header;
         metadata = Some metadata;
-        operations = [[]; []; []; operations];
+        operations =
+          [
+            consensus_opperations;
+            voting_operations;
+            anonymous_operations;
+            manager_operations;
+          ];
       }
     in
     return (version, block_info)
