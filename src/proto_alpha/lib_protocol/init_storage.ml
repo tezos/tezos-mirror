@@ -126,6 +126,34 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
 
 (* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
+let cleanup_values_for_protocol_t ctxt
+    (previous_proto_constants : Constants_parametric_previous_repr.t) level =
+  let open Lwt_result_syntax in
+  let previous_consensus_rights_delay =
+    previous_proto_constants.consensus_rights_delay
+  in
+  let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
+  let new_cycle =
+    let next_level = Raw_level_repr.succ level in
+    let cycle_eras = Raw_context.cycle_eras ctxt in
+    (Level_repr.level_from_raw ~cycle_eras next_level).cycle
+  in
+  let* ctxt =
+    Stake_storage.cleanup_values_for_protocol_t
+      ctxt
+      ~previous_consensus_rights_delay
+      ~consensus_rights_delay
+      ~new_cycle
+  in
+  let* ctxt =
+    Delegate_sampler.cleanup_values_for_protocol_t
+      ctxt
+      ~previous_consensus_rights_delay
+      ~consensus_rights_delay
+      ~new_cycle
+  in
+  return ctxt
+
 (* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -234,6 +262,14 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         (* Migration of refutation games needs to be kept for each protocol. *)
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
+        in
+        let* ctxt =
+          match previous_proto_constants with
+          | Some previous_proto_constants ->
+              cleanup_values_for_protocol_t ctxt previous_proto_constants level
+          | None ->
+              (* this can happen iff the previous protocol is Genesis *)
+              return ctxt
         in
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)

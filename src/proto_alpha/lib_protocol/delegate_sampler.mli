@@ -97,6 +97,13 @@ val attesting_rights_count :
     level, all bakers were allowed (and expected) to attest. *)
 val check_all_bakers_attest_at_level : Raw_context.t -> Level_repr.t -> bool
 
+val cleanup_values_for_protocol_t :
+  Raw_context.t ->
+  previous_consensus_rights_delay:int ->
+  consensus_rights_delay:int ->
+  new_cycle:Cycle_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
 module For_RPC : sig
   (** The baking power for a given delegate computed from its current
     stake. *)
