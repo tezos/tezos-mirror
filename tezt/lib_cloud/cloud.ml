@@ -484,6 +484,10 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
       let rec filter_ssh acc args =
         match args with
         | [] -> List.rev acc
+        (* We need to remove the private key argument. This permanent key
+           is only used to connect to the proxy. The key that is generated
+           and uploaded to the proxy allow to connect to the containers. *)
+        | "--ssh-private-key" :: _priv :: args -> filter_ssh acc args
         (* FIXME: remove proxy-localhost when agent name bug is fixed *)
         | "--ssh-host" :: _host :: args ->
             filter_ssh ("--proxy-localhost" :: "--proxy" :: acc) args

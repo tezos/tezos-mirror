@@ -147,6 +147,9 @@ val log_rotation : int
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
 
+(** The ssh private key to use for the initial deployment *)
+val ssh_private_key : string option
+
 (** Slack channel id to send notifications on *)
 val slack_channel_id : string option
 

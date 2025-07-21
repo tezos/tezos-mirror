@@ -33,7 +33,9 @@ let mode =
       `Ssh_host (user, host, port)
 
 let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
-  home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
+  match Cli.ssh_private_key with
+  | None -> home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
+  | Some key -> key
 
 let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
