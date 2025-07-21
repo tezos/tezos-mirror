@@ -360,7 +360,6 @@ let changeset_debian_packages =
         "scripts/ci/prepare-apt-repo.sh";
         "scripts/ci/create_debian_repo.sh";
         "docs/introduction/install-bin-deb.sh";
-        "docs/introduction/upgrade-bin-deb.sh";
         "scripts/version.sh";
         "manifest/**/*.ml*";
       ])

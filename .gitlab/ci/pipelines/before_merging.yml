@@ -1538,7 +1538,6 @@ trigger:debian_repository_partial_auto:
     - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - debian-deps-build.Dockerfile
     - docs/introduction/install-bin-deb.sh
-    - docs/introduction/upgrade-bin-deb.sh
     - manifest/**/*.ml*
     - scripts/ci/build-debian-packages.sh
     - scripts/ci/build-debian-packages_current.sh
