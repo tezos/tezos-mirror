@@ -100,6 +100,9 @@ val process_monitor : t -> Process_monitor.t option
 (** Returns the service manager if any *)
 val service_manager : t -> Service_manager.t option
 
+(** Returns the path in which the agent aims it's data. *)
+val temp_execution_path : unit -> string
+
 (** Run a command on the docker image run by the agent.
 
     This command should not be used outside of the [tezt-cloud]

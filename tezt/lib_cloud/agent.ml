@@ -213,6 +213,11 @@ let process_monitor agent = agent.process_monitor
 
 let service_manager t = t.service_manager
 
+let temp_execution_path () =
+  (* This assumes that Tezt.Temp.file always returns the same result for the
+     same process. *)
+  Temp.dir ""
+
 let host_run_command agent cmd args =
   match cmd_wrapper agent with
   | None -> Process.spawn cmd args
