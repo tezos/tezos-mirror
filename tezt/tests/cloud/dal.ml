@@ -25,6 +25,7 @@ module Helpers = Dal_common.Helpers
 module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
+open Yes_crypto
 
 type agent_kind =
   | Bootstrap
@@ -151,11 +152,6 @@ module Node = struct
   let yes_wallet agent =
     let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
     Yes_wallet.Agent.create ~name agent
-
-  let yes_crypto_env =
-    String_map.singleton
-      Tezos_crypto.Helpers.yes_crypto_environment_variable
-      "y"
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling
@@ -2540,9 +2536,7 @@ let init_public_network cloud (configuration : configuration)
         let () = toplog "Some agent given (%s)" (Agent.name agent) in
         let () = toplog "Initializing the bootstrap node agent" in
         let with_yes_crypto =
-          match configuration.simulate_network with
-          | Scatter _ | Map _ -> true
-          | Disabled -> false
+          should_enable_yes_crypto configuration.simulate_network
         in
         let* node =
           Node.init
@@ -2694,10 +2688,6 @@ let round_robin_split m lst =
     (List.rev lst) ;
   Array.to_list buckets |> List.rev
 
-let may_set_yes_crypto = function
-  | Cli.Scatter _ | Map _ -> (Some Node.yes_crypto_env, true)
-  | Disabled -> (None, false)
-
 let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     ?(etherlink_configuration : etherlink_configuration option) agent =
   let dal_bootstrap_node_net_port = Agent.next_available_port agent in
@@ -2713,7 +2703,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* bootstrap_node =
     Node.init
@@ -3072,7 +3062,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* node =
     Node.init
@@ -3204,7 +3194,7 @@ let init_producer cloud configuration ~bootstrap teztale account i slot_index
   in
   let () = toplog "Init producer %s: init L1 node" name in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* node =
     Node.init
@@ -3317,7 +3307,7 @@ let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* node =
     Node.init
@@ -3407,7 +3397,7 @@ let init_dal_reverse_proxy_observers
     |> Lwt_list.map_p (fun slot_index ->
            let name = name_of slot_index in
            let* agent = next_agent ~name in
-           let env, with_yes_crypto = may_set_yes_crypto simulate_network in
+           let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
            let* node =
              Node.init
                ?env
@@ -3477,7 +3467,7 @@ let init_etherlink_dal_node
       toplog "Etherlink sequencer will run its own DAL node" ;
       let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
-      let env, with_yes_crypto = may_set_yes_crypto simulate_network in
+      let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
       let* node =
         Node.init
           ?env
@@ -3521,7 +3511,7 @@ let init_etherlink_dal_node
       toplog "Etherlink sequencer will use a reverse proxy" ;
       let name = name_of Etherlink_dal_operator in
       let* agent = next_agent ~name in
-      let env, with_yes_crypto = may_set_yes_crypto simulate_network in
+      let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
       let* node =
         Node.init
           ?env
@@ -3577,7 +3567,7 @@ let init_etherlink_operator_setup cloud configuration etherlink_configuration
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* node =
     Node.init
@@ -3969,7 +3959,7 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
     configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
   in
   let env, with_yes_crypto =
-    may_set_yes_crypto configuration.simulate_network
+    may_set_yes_crypto_env configuration.simulate_network
   in
   let* node =
     Node.init
