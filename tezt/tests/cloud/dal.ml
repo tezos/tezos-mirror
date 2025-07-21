@@ -72,19 +72,6 @@ type bootstrap = {
   client : Client.t;
 }
 
-type baker_account = {
-  delegate : Account.key;
-  consensus_key : Account.key option;
-}
-
-type baker = {
-  node : Node.t;
-  dal_node : Dal_node.t option;
-  baker : Agnostic_baker.t;
-  accounts : baker_account list;
-  stake : int;
-}
-
 type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
@@ -95,13 +82,6 @@ type per_level_info = {
   attestations : (public_key_hash, Dal_node_helpers.dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
-}
-
-type per_baker_dal_summary = {
-  attestable_slots : int;
-  attested_slots : int;
-  in_committee : bool;
-  attestation_with_dal : bool;
 }
 
 type metrics = {
@@ -120,7 +100,7 @@ type metrics = {
   ratio_attested_commitments : float;
   ratio_published_commitments_last_level : float;
   ratio_attested_commitments_per_baker :
-    (public_key_hash, per_baker_dal_summary) Hashtbl.t;
+    (public_key_hash, Baker_helpers.per_baker_dal_summary) Hashtbl.t;
   etherlink_operator_balance_sum : Tez.t;
 }
 
@@ -149,7 +129,7 @@ type t = {
      is a public endpoint only if no L1 node is run by the scenario, in contrast
      to [bootstrap.node_rpc_endpoint] which is a public endpoint when the
      '--bootstrap' argument is not provided *)
-  bakers : baker list;
+  bakers : Baker_helpers.baker list;
   producers : Dal_node_helpers.producer list;
       (* NOTE: they have the observer profile*)
   observers : Dal_node_helpers.observer list;
@@ -230,11 +210,11 @@ let pp_metrics t
     "Ratio published commitments last level: %f"
     ratio_published_commitments_last_level ;
   List.iter
-    (fun {accounts; stake; baker; _} ->
+    (fun Baker_helpers.{accounts; stake; baker; _} ->
       let baker_name = Agnostic_baker.name baker in
       List.iter
         (fun account ->
-          let pkh = account.delegate.public_key_hash in
+          let pkh = account.Baker_helpers.delegate.public_key_hash in
           match
             Hashtbl.find_opt ratio_attested_commitments_per_baker (PKH pkh)
           with
@@ -336,7 +316,13 @@ let push_metrics t
   in
   Hashtbl.iter
     (fun (PKH public_key_hash)
-         {attested_slots; attestable_slots; in_committee; attestation_with_dal} ->
+         Baker_helpers.
+           {
+             attested_slots;
+             attestable_slots;
+             in_committee;
+             attestation_with_dal;
+           } ->
       if in_committee then (
         let labels = get_labels public_key_hash in
         push_attested ~labels attested_slots ;
@@ -600,12 +586,13 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                  match status with
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
                  | Dal_node_helpers.With_DAL attestation_bitset ->
-                     {
-                       attestable_slots;
-                       attested_slots = Z.popcount attestation_bitset;
-                       in_committee = true;
-                       attestation_with_dal = true;
-                     }
+                     Baker_helpers.
+                       {
+                         attestable_slots;
+                         attested_slots = Z.popcount attestation_bitset;
+                         in_committee = true;
+                         attestation_with_dal = true;
+                       }
                  (* The baker is out of the DAL committee and sent an attestation_with_dal. *)
                  | Out_of_committee ->
                      {
@@ -1987,7 +1974,9 @@ let init_public_network cloud (configuration : configuration)
             1
             bootstrap.client
         in
-        List.map (fun delegate -> {delegate; consensus_key = None}) delegates
+        List.map
+          (fun delegate -> Baker_helpers.{delegate; consensus_key = None})
+          delegates
         |> return)
       stake
   in
@@ -2214,7 +2203,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         (* Generated baker accounts are not using any consensus key. *)
         List.map
           (fun l ->
-            List.map (fun delegate -> {delegate; consensus_key = None}) l)
+            List.map
+              (fun delegate -> Baker_helpers.{delegate; consensus_key = None})
+              l)
           delegate_accounts
         |> return
     | Map _ | Scatter _ ->
@@ -2244,7 +2235,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                             Tezos_crypto.Signature.(to_b58check zero);
                       }
                   in
-                  {delegate; consensus_key}
+                  Baker_helpers.{delegate; consensus_key}
                 with Not_found -> {delegate; consensus_key = None})
               l)
           delegate_accounts
@@ -2257,7 +2248,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         i
         (Format.pp_print_list
            ~pp_sep:(fun out () -> Format.fprintf out ",")
-           (fun fmt {delegate; _} -> Format.fprintf fmt "%s" delegate.alias))
+           (fun fmt Baker_helpers.{delegate; _} ->
+             Format.fprintf fmt "%s" delegate.alias))
         l)
     baker_accounts ;
   let* producer_accounts =
@@ -2290,7 +2282,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         in
         let bootstrap_accounts =
           List.mapi
-            (fun i {delegate; _} ->
+            (fun i Baker_helpers.{delegate; _} ->
               (delegate, Some (List.nth stake i * 1_000_000_000_000)))
             (List.flatten baker_accounts)
         in
@@ -2384,164 +2376,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       etherlink_batching_operator_keys,
       echo_rollup_key )
 
-let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
-    ~(baker_accounts : baker_account list) i agent =
-  (* Use the consensus keys when available. *)
-  let baking_keys =
-    List.map
-      (fun {delegate; consensus_key} ->
-        match consensus_key with
-        | Some ck ->
-            {
-              delegate with
-              public_key_hash = ck.public_key_hash;
-              public_key = ck.public_key;
-            }
-        | None -> delegate)
-      baker_accounts
-  in
-  let* stake =
-    (* As simulate_network and stake are mutually exclusive, the stake is used
-       only when the simulation is Disabled. *)
-    match configuration.simulate_network with
-    | Disabled -> (
-        match stake with
-        | None ->
-            let* stake = configuration.stake in
-            return (List.nth stake i)
-        | Some stake -> return stake)
-    | Scatter _ | Map _ -> Lwt.return 0
-  in
-  let name = Format.asprintf "baker-node-%d" i in
-  let data_dir =
-    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
-  in
-  let env, with_yes_crypto =
-    may_set_yes_crypto_env configuration.simulate_network
-  in
-  let* node =
-    Node_helpers.init
-      ?env
-      ?data_dir
-      ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
-      ~name:(name_of_daemon (Baker_l1_node i))
-      ~rpc_external:configuration.external_rpc
-      configuration.network
-      ~with_yes_crypto
-      ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
-      cloud
-      agent
-  in
-  let* dal_node =
-    if not configuration.with_dal then Lwt.return_none
-    else
-      let* dal_node =
-        Dal_node.Agent.create
-          ~name:(name_of_daemon (Baker_dal_node i))
-          ~node
-          ~disable_shard_validation:configuration.disable_shard_validation
-          cloud
-          agent
-      in
-      let attester_profiles =
-        List.map
-          (fun {delegate; _} -> delegate.Account.public_key_hash)
-          baker_accounts
-      in
-      let* () =
-        Dal_node.init_config
-          ~expected_pow:(Network.expected_pow configuration.network)
-          ~attester_profiles
-          ~peers:[bootstrap.dal_node_p2p_endpoint |> Option.get]
-          (* Invariant: Option.get don't fail because t.configuration.dal is true *)
-          dal_node
-      in
-      let otel = Cloud.open_telemetry_endpoint cloud in
-      let* () =
-        Dal_node.Agent.run
-          ~prometheus:Tezt_cloud_cli.prometheus
-          ?otel
-          ~memtrace:configuration.memtrace
-          ~event_level:`Notice
-          ~disable_shard_validation:configuration.disable_shard_validation
-          ~ppx_profiling:configuration.ppx_profiling
-          ~ppx_profiling_backends:configuration.ppx_profiling_backends
-          dal_node
-      in
-      Lwt.return_some dal_node
-  in
-  let* () =
-    match teztale with
-    | None -> Lwt.return_unit
-    | Some teztale ->
-        let* () =
-          Teztale.add_archiver
-            teztale
-            cloud
-            agent
-            ~node_name:(Node.name node)
-            ~node_port:(Node.rpc_port node)
-        in
-        Lwt_list.iter_s
-          (fun {delegate; _} ->
-            Teztale.update_alias
-              teztale
-              ~address:delegate.public_key_hash
-              ~alias:delegate.alias)
-          baker_accounts
-  in
-  let* client = Client.Agent.create ~endpoint:(Node node) agent in
-  let* () =
-    match configuration.simulate_network with
-    | Scatter _ | Map _ ->
-        let* yes_wallet = Node_helpers.yes_wallet agent in
-        let* () =
-          Lwt_list.iter_s
-            (fun account ->
-              Client.import_public_key
-                client
-                ~public_key:account.Account.public_key
-                ~alias:account.alias)
-            baking_keys
-        in
-        let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
-        Lwt.return_unit
-    | Disabled ->
-        Lwt_list.iter_s
-          (fun account ->
-            Client.import_secret_key
-              client
-              account.Account.secret_key
-              ~alias:account.alias)
-          baking_keys
-  in
-  let delegates = List.map (fun account -> account.Account.alias) baking_keys in
-  let* baker =
-    let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
-    Agnostic_baker.Agent.init
-      ?env
-      ~name:(Format.asprintf "baker-%d" i)
-      ~delegates
-      ~client
-      ?dal_node_rpc_endpoint
-      ~ppx_profiling:configuration.ppx_profiling
-      node
-      cloud
-      agent
-  in
-  let* () =
-    add_prometheus_source
-      ~node
-      ?dal_node
-      cloud
-      agent
-      (Format.asprintf "baker-%d" i)
-  in
-  Lwt.return {node; dal_node; baker; accounts = baker_accounts; stake}
-
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
-    (bakers : baker list) (producers : Dal_node_helpers.producer list)
+    (bakers : Baker_helpers.baker list)
+    (producers : Dal_node_helpers.producer list)
     (observers : Dal_node_helpers.observer list) etherlink =
   match (agent, network) with
   | None, #Network.public -> (
@@ -2564,47 +2401,6 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       let* agent = next_agent ~name in
       Lwt.return_some agent
     else Lwt.return_none
-  in
-  let* stake = configuration.stake in
-  let* attesters_agents =
-    (* As simulate_network and stake are mutually exclusive, the stake is used
-       only when the simulation is Disabled. *)
-    match configuration.simulate_network with
-    | Scatter (_, baker_count) ->
-        Lwt_list.mapi_s
-          (fun i _ ->
-            let name = name_of (Baker i) in
-            next_agent ~name)
-          (List.init baker_count Fun.id)
-    | Map (_, single_baker_count, multiple_baker_count) ->
-        Lwt_list.mapi_s
-          (fun i _ ->
-            let name = name_of (Baker i) in
-            next_agent ~name)
-          (List.init (single_baker_count + multiple_baker_count) Fun.id)
-    | Disabled ->
-        Lwt_list.mapi_s
-          (fun i _stake ->
-            let name = name_of (Baker i) in
-            next_agent ~name)
-          stake
-  in
-  let* bakers_agents =
-    Lwt_list.mapi_s
-      (fun i _stake ->
-        let name = name_of (Baker i) in
-        next_agent ~name)
-      (match configuration.simulate_network with
-      | Scatter (_selected_baker_count, baker_daemon_count) ->
-          List.init baker_daemon_count string_of_int
-      | Map
-          ( _selected_baker_count,
-            single_baker_daemon_count,
-            multiple_baker_daemon_count ) ->
-          List.init
-            (single_baker_daemon_count + multiple_baker_daemon_count)
-            string_of_int
-      | Disabled -> configuration.bakers)
   in
   let* producers_agents =
     Lwt_list.map_s
@@ -2660,62 +2456,25 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           network
   in
   let* bakers =
-    match configuration.simulate_network with
-    | Scatter _ | Map _ ->
-        Lwt_list.mapi_p
-          (fun i (agent, accounts) ->
-            init_baker
-              cloud
-              configuration
-              ~bootstrap
-              teztale
-              ~baker_accounts:accounts
-              i
-              agent)
-          (List.combine attesters_agents baker_accounts)
-    | Disabled ->
-        let* fresh_bakers =
-          Lwt_list.mapi_p
-            (fun i (agent, accounts) ->
-              init_baker
-                cloud
-                configuration
-                ~bootstrap
-                teztale
-                ~baker_accounts:accounts
-                i
-                agent)
-            (List.combine attesters_agents baker_accounts)
-        in
-        let* bakers_with_secret_keys =
-          Lwt_list.mapi_p
-            (fun i (agent, sk) ->
-              let sk = Account.Unencrypted sk in
-              let client = Client.create () in
-              let alias = Format.asprintf "baker-%02d" i in
-              let* () = Client.import_secret_key client sk ~alias in
-              let* accounts =
-                let* addresses = Client.list_known_addresses client in
-                Lwt_list.map_s
-                  (fun (alias, _) ->
-                    let* delegate = Client.show_address ~alias client in
-                    return {delegate; consensus_key = None})
-                  addresses
-              in
-              (* A bit random, to fix later. *)
-              let stake = 1 in
-              init_baker
-                ~stake
-                cloud
-                configuration
-                ~bootstrap
-                teztale
-                ~baker_accounts:accounts
-                i
-                agent)
-            (List.combine bakers_agents configuration.bakers)
-        in
-        Lwt.return (fresh_bakers @ bakers_with_secret_keys)
+    Baker_helpers.init_bakers
+      ~bakers:configuration.bakers
+      ~stake:configuration.stake
+      ~data_dir:configuration.data_dir
+      ~simulate_network:configuration.simulate_network
+      ~external_rpc:configuration.external_rpc
+      ~network:configuration.network
+      ~snapshot:configuration.snapshot
+      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
+      ~memtrace:configuration.memtrace
+      ~with_dal:configuration.with_dal
+      ~disable_shard_validation:configuration.disable_shard_validation
+      ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+      ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+      cloud
+      teztale
+      ~baker_accounts
+      next_agent
   in
   let () = toplog "Init: initializing producers and observers" in
   let* producers =
@@ -2836,6 +2595,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   in
   let* init_aliases =
     let accounts =
+      let open Baker_helpers in
       List.concat_map
         (fun ({accounts; _} : baker) ->
           List.map (fun {delegate; _} -> delegate) accounts)
@@ -2891,6 +2651,7 @@ let clean_up t level =
   Hashtbl.remove t.metrics level
 
 let update_bakers_infos t =
+  let open Baker_helpers in
   let* new_aliases =
     let accounts =
       List.(
