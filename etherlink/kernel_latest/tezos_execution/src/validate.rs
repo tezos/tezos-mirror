@@ -5,6 +5,7 @@
 use tezos_crypto_rs::{hash::UnknownSignature, PublicKeySignatureVerifier};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_data_encoding::{enc::BinError, types::Narith};
+use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::BlockHash;
@@ -40,12 +41,22 @@ impl TezlinkImplicitAccount {
                 expected: expected_counter,
                 found: counter.clone(),
             };
+            log!(
+                host,
+                tezos_evm_logging::Level::Debug,
+                "Invalid operation: Source counter is in the past"
+            );
             Ok(Err(ValidityError::CounterInThePast(error)))
         } else {
             let error = CounterError {
                 expected: expected_counter,
                 found: counter.clone(),
             };
+            log!(
+                host,
+                tezos_evm_logging::Level::Debug,
+                "Invalid operation: Source counter is in the future"
+            );
             Ok(Err(ValidityError::CounterInTheFuture(error)))
         }
     }
@@ -144,6 +155,11 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
 ) -> Result<Result<Narith, ValidityError>, ApplyKernelError> {
     // Account must exist in the durable storage
     if !account.allocated(host)? {
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Source is not allocated"
+        );
         return Ok(Err(ValidityError::EmptyImplicitContract));
     }
 
@@ -163,12 +179,22 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     if let Err(err) = check_gas_limit(&1040000_u64.into(), &operation.gas_limit) {
         // Gas limit verification failed, return the error
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Gas limit is too high"
+        );
         return Ok(Err(err));
     }
 
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
     if let Err(err) = check_storage_limit(&60000_u64.into(), &operation.storage_limit) {
         // Storage limit verification failed, return the error
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Storage limit is too high"
+        );
         return Ok(Err(err));
     }
 
@@ -176,6 +202,11 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     let new_balance = match account.simulate_spending(host, &operation.fee)? {
         Some(new_balance) => new_balance,
         None => {
+            log!(
+                host,
+                tezos_evm_logging::Level::Debug,
+                "Invalid operation: Can't pay the fees"
+            );
             return Ok(Err(ValidityError::CantPayFees(operation.fee)));
         }
     };
@@ -185,6 +216,11 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     if verify {
         Ok(Ok(new_balance))
     } else {
+        log!(
+            host,
+            tezos_evm_logging::Level::Debug,
+            "Invalid operation: Signature is invalid"
+        );
         Ok(Err(ValidityError::InvalidSignature))
     }
 }
