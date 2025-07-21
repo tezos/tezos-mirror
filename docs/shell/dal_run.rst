@@ -51,15 +51,19 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
    If you need to explicitly connect your node to running DAL nodes, pass the ``--peers`` argument with a comma-separated list of DAL node host names and ports.
    The default P2P port is 11732, so the argument might look like this: ``--peers=host1.example.com:11732,host2.example.com:11732``.
 
-#. Recommended: Ensure that the P2P port that the DAL node runs on is accessible from outside its system.
+#. Ensure that the P2P port that the DAL node runs on is accessible from outside its local network.
 
-   By default, the DAL node accepts P2P connections on port 11732, but you can change the port and address that the node listens on by setting the ``--net-addr`` argument, as in ``--net-addr 0.0.0.0:11732``.
+   DAL nodes must be able to initiate connections outside their local network and accept connections from outside their local network.
+   By default, the DAL node accepts P2P connections on port 11732, but you can change the address and port that the node listens on by setting the ``--net-addr`` argument.
+   In simple setups with a single DAL node, routing configuration is usually not necessary.
+
    Depending on your network, you may need to adapt your firewall rules or set up network address translation (NAT) to direct external traffic to the DAL node.
-   For example, you might need to redirect external traffic on TCP port ``<external_port>`` to your node at ``<local_ip_address>:<port>`` where ``<local_ip_address>`` is the IP address of the node on your local network and ``<port>`` is the port given in the ``--net-addr`` argument.
+   For example, if you are running more than one DAL node, each node needs a unique socket (combination of IP address and port) to listen on.
+   In this case, use the ``--net-addr`` argument to set a different IP address and port for one of the nodes to listen on, as in ``--net-addr 0.0.0.0:11733`` to make the node listen on port 11733 on all network interfaces.
+   Then you must configure your firewall to permit incoming and outgoing TCP connections on port 11733.
 
-   If ``<external_port>`` is different from ``<port>``, then you should set the public address of your node via its configuration or the CLI option ``--public-addr <external_ip_address>:<external_port>``.
-
-   This setup assumes that ``<external_ip_address>`` is fixed and won't change during the lifetime of the node.
+   If a firewall rule directs traffic from an external port that is different from the port that you set in the ``--net-addr`` argument, use the ``--public-addr`` argument to set the port from which the node can be reached by other nodes.
+   You may also need to set ``--public-addr`` if you are directing traffic from a load balancer to the DAL node.
 
 #. Start the DAL node by running its ``run`` command, passing the directory that you set in the ``config init`` command if you changed the default.
    You can also pass any other parameters that you did not set in that command:
