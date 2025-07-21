@@ -229,13 +229,10 @@ module Block_services = struct
         }
     in
     let balance_updates =
-      if Int32.equal level_info.Tezos_types.level 2l then
-        Tezlink_mock.balance_udpdate_bootstrap ()
-      else
-        let amount = Alpha_context.Tez.of_mutez_exn 0L in
-        Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.baker_account.public_key_hash
-          ~amount
+      let amount = Alpha_context.Tez.of_mutez_exn 0L in
+      Tezlink_mock.balance_udpdate_rewards
+        ~baker:Tezlink_mock.baker_account.public_key_hash
+        ~amount
     in
 
     let constant = Tezlink_constants.all_constants.parametric in

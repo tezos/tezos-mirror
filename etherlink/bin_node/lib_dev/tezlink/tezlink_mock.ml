@@ -390,18 +390,6 @@ module Voting_period = struct
       ~dst:Alpha_context.Voting_period.encoding
 end
 
-let balance_udpdate_bootstrap () =
-  let open Alpha_context.Receipt in
-  let migration =
-    item Bootstrap (Debited baker_initial_deposit) Protocol_migration
-  in
-  let baker = frozen_baker baker_account.public_key_hash in
-  (* deposit for baker *)
-  let deposit =
-    item (Deposits baker) (Credited baker_initial_deposit) Protocol_migration
-  in
-  [migration; deposit]
-
 let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
   let open Alpha_context.Receipt in
   let debited_rewards =
