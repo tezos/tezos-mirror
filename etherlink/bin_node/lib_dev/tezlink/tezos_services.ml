@@ -265,6 +265,100 @@ module Current_block_services = struct
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
+
+  let transfer_receipt account balance : operation_receipt =
+    let open Alpha_context.Receipt in
+    let open Imported_protocol.Apply_results in
+    let contract = Tezos_types.Contract.of_implicit account in
+    let mint =
+      item
+        (Contract
+           (Alpha_context.Contract.Implicit Tezlink_mock.faucet_public_key_hash))
+        (Debited balance)
+        Block_application
+    in
+    let bootstrap =
+      item (Contract contract) (Credited balance) Block_application
+    in
+    let balance_updates = [mint; bootstrap] in
+    let operation_result =
+      Transaction_result
+        (Transaction_to_contract_result
+           {
+             storage = None;
+             lazy_storage_diff = None;
+             balance_updates;
+             ticket_receipt = [];
+             originated_contracts = [];
+             consumed_gas = Alpha_context.Gas.Arith.zero;
+             storage_size = Z.zero;
+             paid_storage_size_diff = Z.zero;
+             allocated_destination_contract = false;
+           })
+    in
+    let internal_operation_results = [] in
+    let operation_result =
+      Imported_protocol.Apply_operation_result.Applied operation_result
+    in
+    let contents =
+      Single_result
+        (Manager_operation_result
+           {balance_updates = []; operation_result; internal_operation_results})
+    in
+    Receipt (Operation_metadata {contents})
+
+  let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"faucet_counter"
+      ~src:Data_encoding.z
+      ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      Z.zero
+
+  let create_transfer ~chain_id (account : Alpha_context.public_key_hash)
+      (balance : Alpha_context.Tez.t) : operation tzresult =
+    let open Result_syntax in
+    let open Imported_protocol.Alpha_context in
+    let operation =
+      Transaction
+        {
+          amount = balance;
+          parameters = Alpha_context.Script.unit_parameter;
+          entrypoint = Entrypoint.default;
+          destination = Implicit account;
+        }
+    in
+    let* counter = faucet_counter () in
+    let contents =
+      Single
+        (Manager_operation
+           {
+             source = Tezlink_mock.faucet_public_key_hash;
+             fee = Tez.zero;
+             counter;
+             operation;
+             gas_limit = Gas.Arith.zero;
+             storage_limit = Z.zero;
+           })
+    in
+    let signature = None in
+    let protocol_data = Operation_data {contents; signature} in
+    let shell : Tezos_base.Operation.shell_header =
+      {branch = Tezos_crypto.Hashed.Block_hash.zero}
+    in
+    let receipt = transfer_receipt account balance in
+    let hash = Operation_hash.zero in
+    return {chain_id; hash; receipt; shell; protocol_data}
+
+  let activate_bootstraps_with_transfers ~chain_id
+      (module Backend : Tezlink_backend_sig.S) =
+    let open Lwt_result_syntax in
+    let* bootstrap_accounts = Backend.bootstrap_accounts () in
+    let*? ops =
+      List.map_e
+        (fun (account, balance) -> create_transfer ~chain_id account balance)
+        bootstrap_accounts
+    in
+    return ops
 end
 
 module Zero_block_services = struct

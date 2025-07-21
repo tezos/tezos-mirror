@@ -212,7 +212,52 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     return (version, block_info)
 end
 
-module Current_block_header = Make_block_header (Current_block_services)
+module Current_block_header = struct
+  include Make_block_header (Current_block_services)
+
+  let tezlink_block_to_block_info ~l2_chain_id backend
+      (level_info, version, chain, block) =
+    let open Lwt_result_syntax in
+    let* version, block_info =
+      tezlink_block_to_block_info
+        ~l2_chain_id
+        backend
+        (level_info, version, chain, block)
+    in
+    (* To allow tzkt to index the bootstrap accounts, we add dummy transfers
+       from a faucet address to all the accounts present in durable storage at
+       block 0 (ie accounts added by an installer kernel). *)
+    if level_info.Tezos_types.level = 2l then
+      let* block_info =
+        match block_info.operations with
+        | [
+         consensus_opperations;
+         voting_operations;
+         anonymous_operations;
+         manager_operations;
+        ] ->
+            let* bootstrap_transfers =
+              Current_block_services.activate_bootstraps_with_transfers
+                ~chain_id:block_info.chain_id
+                backend
+            in
+            return
+              {
+                block_info with
+                operations =
+                  [
+                    consensus_opperations;
+                    voting_operations;
+                    anonymous_operations;
+                    bootstrap_transfers @ manager_operations;
+                  ];
+              }
+        | _ -> assert false
+      in
+      return (version, block_info)
+    else return (version, block_info)
+end
+
 module Zero_block_header = Make_block_header (Zero_block_services)
 module Genesis_block_header = Make_block_header (Genesis_block_services)
 
