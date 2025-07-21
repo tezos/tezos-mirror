@@ -30,6 +30,8 @@ Once it is done, you also need to have some tools installed locally:
   the script deploying VM onto GCP
 - [`docker`](https://docs.docker.com/desktop/): to build and run images that
   will be used on VMs
+- [`docker-buildx`](https://github.com/docker/buildx): to install extra
+  dependencies to use `docker`
 
 Check out the different project pages to know how to install those tools on your
 machine.
