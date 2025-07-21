@@ -212,7 +212,7 @@ module Make_block_header (Block_services : BLOCK_SERVICES) :
     return (version, block_info)
 end
 
-module Current_block_header = Make_block_header (Block_services)
+module Current_block_header = Make_block_header (Current_block_services)
 module Zero_block_header = Make_block_header (Zero_block_services)
 module Genesis_block_header = Make_block_header (Genesis_block_services)
 
@@ -383,13 +383,14 @@ let build_block_static_directory ~l2_chain_id
          let* manager_operation_hashes =
            let* block = Backend.block chain block in
            let*? operations =
-             Tezos_services.Block_services.deserialize_operations
+             Tezos_services.Current_block_services.deserialize_operations
                ~chain_id
                block.operations
            in
            return
            @@ List.map
-                (fun (op : Tezos_services.Block_services.operation) -> op.hash)
+                (fun (op : Tezos_services.Current_block_services.operation) ->
+                  op.hash)
                 operations
          in
          return
@@ -411,7 +412,7 @@ let build_block_static_directory ~l2_chain_id
          else
            let* block = Backend.block chain block in
            let*? operations =
-             Tezos_services.Block_services.deserialize_operations
+             Tezos_services.Current_block_services.deserialize_operations
                ~chain_id
                block.operations
            in

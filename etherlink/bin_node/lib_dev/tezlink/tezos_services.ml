@@ -162,7 +162,7 @@ struct
     return operations
 end
 
-module Block_services = struct
+module Current_block_services = struct
   include Make_block_service (Imported_protocol) (Imported_protocol)
 
   let voting_period ~cycles_per_voting_period ~position ~level_info =
@@ -511,7 +511,7 @@ let hash :
       unit,
       Block_hash.t )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.hash
+  import_service Current_block_services.S.hash
 
 let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
@@ -523,9 +523,9 @@ let header :
       tezlink_rpc_context,
       unit,
       unit,
-      Block_services.block_header )
+      Current_block_services.block_header )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.header
+  import_service Current_block_services.S.header
 
 let shell_header :
     ( [`GET],
@@ -535,7 +535,7 @@ let shell_header :
       unit,
       Block_header.shell_header )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Header.shell_header
+  import_service Current_block_services.S.Header.shell_header
 
 let operation_hashes :
     ( [`GET],
@@ -545,7 +545,7 @@ let operation_hashes :
       unit,
       Operation_hash.t list list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Operation_hashes.operation_hashes
+  import_service Current_block_services.S.Operation_hashes.operation_hashes
 
 let operation :
     ( [`GET],
@@ -555,9 +555,10 @@ let operation :
       ; metadata : [`Always | `Never] option
       ; version : Tezos_shell_services.Block_services.version >,
       unit,
-      Tezos_shell_services.Block_services.version * Block_services.operation )
+      Tezos_shell_services.Block_services.version
+      * Current_block_services.operation )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst2 Block_services.S.Operations.operation
+  Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
 
 let bootstrapped :
     ( [`GET],
@@ -626,7 +627,7 @@ let preapply_operations :
         * Imported_protocol.operation_receipt)
         list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Helpers.Preapply.operations
+  import_service Current_block_services.S.Helpers.Preapply.operations
 
 let raw_json_cycle :
     ( [`GET],
