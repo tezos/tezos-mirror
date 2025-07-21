@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -32,6 +33,22 @@ let to_string = function
   | `Rionet -> "rionet"
   | `Seoulnet -> "seoulnet"
 
+let parse = function
+  | "mainnet" -> Some `Mainnet
+  | "ghostnet" -> Some `Ghostnet
+  | "rionet" -> Some `Rionet
+  | "seoulnet" -> Some `Seoulnet
+  | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+      (* format: weeklynet-2025-01-29 (with dashes) *)
+      let date = String.sub s 10 10 in
+      Some (`Weeklynet date)
+  | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
+      (* format: nextnet-20250203 (without dashes) *)
+      let date = String.sub s 8 8 in
+      Some (`Nextnet date)
+  | "sandbox" -> Some `Sandbox
+  | _ -> None
+
 let default_protocol : t -> Protocol.t = function
   | `Mainnet -> R022
   | `Ghostnet -> R022
@@ -40,6 +57,11 @@ let default_protocol : t -> Protocol.t = function
   | `Nextnet _ -> S023
   | `Rionet -> R022
   | `Seoulnet -> S023
+
+let block_time : t -> int = function
+  | `Mainnet -> 8
+  | `Ghostnet -> 5
+  | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
 
 let public_rpc_endpoint testnet =
   Endpoint.make

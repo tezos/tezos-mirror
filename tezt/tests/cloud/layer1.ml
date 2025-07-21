@@ -27,27 +27,6 @@ type baker_account = {pk : string; pkh : string}
 let add_prometheus_source node cloud agent =
   Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
 
-let get_snapshot_info_level node snapshot_path =
-  let* info = Node.snapshot_info node ~json:true snapshot_path in
-  let json = JSON.parse ~origin:"snapshot_info" info in
-  Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
-
-module Network = struct
-  include Network
-
-  type t = [`Mainnet | `Ghostnet]
-
-  let to_string (t : t) = Network.to_string (t :> Network.t)
-
-  let to_octez_network_options (t : t) =
-    Network.to_octez_network_options (t :> Network.public)
-
-  let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
-
-  (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
-  let migrate_to _network = Protocol.Alpha
-end
-
 let yes_crypto_env =
   String_map.add
     Tezos_crypto.Helpers.yes_crypto_environment_variable
@@ -73,25 +52,8 @@ let nb_stresstester network tps =
   max n1 n2
 
 module Node = struct
-  let runner_of_agent = Agent.runner
-
+  open Snapshot_helpers
   include Node
-
-  (** If snapshot is an URL, download it on the agent's runner.
-      If it is a filename, copy it to the agent's runner if needed. *)
-  let ensure_snapshot agent snapshot =
-    if Re.Str.(string_match (regexp "^https?://.+$") snapshot 0) then
-      let url = snapshot in
-      let filename = "snapshot" in
-      let* () =
-        Process.spawn
-          ?runner:(runner_of_agent agent)
-          "wget"
-          ["-q"; "-O"; filename; url]
-        |> Process.check
-      in
-      Lwt.return filename
-    else Tezt_cloud.Agent.copy agent ~destination:snapshot ~source:snapshot
 
   (** We are running a private network with yes-crypto enabled.
       We don't want to connect with the real network.
@@ -101,7 +63,7 @@ module Node = struct
       No_bootstrap_peers;
       Connections (List.length peers);
       Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network (Network.to_octez_network_options network);
+      Network Network.(to_octez_network_options @@ to_public network);
       Expected_pow 0;
       Cors_origin "*";
       Storage_maintenance_delay (string_of_int delay);
@@ -129,10 +91,14 @@ module Node = struct
     match migration_offset with
     | None -> Lwt.return_unit
     | Some migration_offset ->
-        let network_config =
+        let* network_config =
           match network with
-          | `Mainnet -> Node.Config_file.mainnet_network_config
-          | `Ghostnet -> Node.Config_file.ghostnet_network_config
+          | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config
+          | `Ghostnet -> Lwt.return Node.Config_file.ghostnet_network_config
+          | _ ->
+              Lwt.fail_with
+                "Migration scenarios are only supported for Mainnet and \
+                 Ghostnet."
         in
         let migration_level = level + migration_offset in
         toplog "Add UAU entry for level : %d" migration_level ;
@@ -144,7 +110,7 @@ module Node = struct
                   network_config )
               json
             |> Node.Config_file.update_network_with_user_activated_upgrades
-                 [(migration_level, Network.migrate_to network)])
+                 [(migration_level, Protocol.Alpha)])
 
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
@@ -163,22 +129,24 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
-      migration_offset =
-    let* snapshot = ensure_snapshot agent snapshot in
+  let init_bootstrap_node_from_snapshot ~peers (agent, node, name) snapshot
+      network migration_offset =
+    let* snapshot =
+      ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
+    in
     let* () =
       let toplog s = toplog "/!\\ %s /!\\" s in
       toplog "Bootstrapping node using the real world" ;
       let config =
         [
-          Network (Network.to_octez_network_options network);
+          Network Network.(to_octez_network_options @@ to_public network);
           Expected_pow 26;
           Cors_origin "*";
           Synchronisation_threshold 1;
         ]
       in
       let* () = Node.config_init node config in
-      let* () = Node.snapshot_import ~no_check:true node snapshot in
+      let* () = import_snapshot ~no_check:true ~name node snapshot in
       let* () =
         (* When bootstrapping from the real network, we want to use the real time. *)
         let env = String_map.(add "FAKETIME" "+0" empty) in
@@ -205,14 +173,16 @@ module Node = struct
       - run it with yes-crypto enabled and allowed peer lists
   *)
   let init_node_from_snapshot ~delay ~peers ~snapshot ~network ~migration_offset
-      (agent, node) =
-    let* snapshot = ensure_snapshot agent snapshot in
+      (agent, node, name) =
+    let* snapshot =
+      ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
+    in
     let config = isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
     let* () =
       add_migration_offset_to_config node snapshot ~migration_offset ~network
     in
-    let* () = Node.snapshot_import ~no_check:true node snapshot in
+    let* () = import_snapshot ~no_check:true ~name node snapshot in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     let* () = wait_for_ready node in
@@ -240,7 +210,7 @@ module Node = struct
     let* () =
       init_bootstrap_node_from_snapshot
         ~peers
-        (agent, node)
+        (agent, node, name)
         snapshot
         network
         migration_offset
@@ -274,7 +244,7 @@ module Node = struct
         ~snapshot
         ~network
         ~migration_offset
-        (agent, node)
+        (agent, node, name)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -297,7 +267,7 @@ module Node = struct
         ~snapshot
         ~network
         ~migration_offset
-        (agent, node)
+        (agent, node, name)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -353,7 +323,7 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
 type configuration = {
   stake : int list;
   network : Network.t;
-  snapshot : string;
+  snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
   maintenance_delay : int;
   migration_offset : int option;
@@ -363,7 +333,7 @@ type configuration = {
 type partial_configuration = {
   stake : int list option;
   network : Network.t option;
-  snapshot : string option;
+  snapshot : Snapshot_helpers.t option;
   stresstest : stresstest_conf option;
   maintenance_delay : int option;
   migration_offset : int option;
@@ -412,7 +382,7 @@ let configuration_encoding =
     (obj6
        (opt "stake" @@ list int31)
        (opt "network" network_encoding)
-       (opt "snapshot" string)
+       (opt "snapshot" Snapshot_helpers.encoding)
        (opt "stresstest" stresstest_encoding)
        (opt "maintenance_delay" int31)
        (opt "migration_offset" int31))
@@ -630,15 +600,23 @@ let distribute_delegates stake baker_accounts =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network cloud agent =
+let number_of_bakers ~snapshot ~network cloud agent name =
   let* node =
     Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
   in
-  let* snapshot = Node.ensure_snapshot agent snapshot in
+  let* snapshot =
+    Snapshot_helpers.ensure_snapshot
+      ~agent
+      ~name
+      ~network:(Network.to_public network)
+      snapshot
+  in
   let* () =
     Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
   in
-  let* () = Node.snapshot_import ~no_check:true node snapshot in
+  let* () =
+    Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
+  in
   let* () = Node.Agent.run node (Node.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
@@ -657,7 +635,7 @@ let init ~(configuration : configuration) cloud next_agent =
   let () = toplog "Init" in
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
-  let* ((bootstrap_agent, bootstrap_node, _) as bootstrap) =
+  let* ((bootstrap_agent, bootstrap_node, bootstrap_name) as bootstrap) =
     agent_and_node next_agent cloud ~name:"bootstrap"
   in
   let* stresstest_agents =
@@ -676,6 +654,7 @@ let init ~(configuration : configuration) cloud next_agent =
           ~network:configuration.network
           cloud
           bootstrap_agent
+          bootstrap_name
       else Lwt.return (List.length configuration.stake)
     in
     let () = toplog "Preparing agents for bakers (%d)" n in
@@ -1093,7 +1072,10 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~proxy_files:
       ([yes_wallet_exe]
       @
-      match configuration0.snapshot with Some snapshot -> [snapshot] | _ -> [])
+      match configuration0.snapshot with
+      | Some snapshot -> (
+          match snapshot with Local_file snapshot -> [snapshot] | _ -> [])
+      | _ -> [])
     ~__FILE__
     ~title:"L1 simulation"
     ~tags:[]
@@ -1110,7 +1092,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
     in
     let migration_offset = configuration0.migration_offset in
     if stake = [] then Test.fail "stake parameter can not be empty" ;
-    if snapshot = "" then Test.fail "snapshot parameter can not be empty" ;
+    if snapshot = Snapshot_helpers.No_snapshot then
+      Test.fail "snapshot parameter can not be empty" ;
     {stake; network; snapshot; stresstest; maintenance_delay; migration_offset}
   in
   toplog "Creating the agents" ;

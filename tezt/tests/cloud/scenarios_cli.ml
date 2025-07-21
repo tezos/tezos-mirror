@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -100,6 +101,22 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       "Unexpected network simulation config (--simulation) [%s]"
       simulate_network_arg
 
+let network_typ : Network.t Clap.typ =
+  Clap.typ
+    ~name:"network"
+    ~dummy:`Ghostnet
+    ~parse:Network.parse
+    ~show:Network.to_string
+
+let snapshot_typ : Snapshot_helpers.t Clap.typ =
+  let open Snapshot_helpers in
+  Clap.typ
+    ~name:"snapshot"
+    ~dummy:No_snapshot
+    ~parse:(fun snapshot ->
+      try Some (parse_snapshot (Some snapshot)) with _exn -> None)
+    ~show:to_string
+
 module type Dal = sig
   val blocks_history : int
 
@@ -107,15 +124,13 @@ module type Dal = sig
 
   val fundraiser : string option
 
-  val network_typ : Network.t Clap.typ
-
   val network : Network.t
 
   val simulate_network_typ : network_simulation_config Clap.typ
 
   val simulate_network : network_simulation_config
 
-  val snapshot : string option
+  val snapshot : Snapshot_helpers.t
 
   val bootstrap : bool
 
@@ -223,29 +238,6 @@ module Dal () : Dal = struct
          \"produce every level\"."
       1
 
-  let parse_network = function
-    | "mainnet" -> Some `Mainnet
-    | "ghostnet" -> Some `Ghostnet
-    | "rionet" -> Some `Rionet
-    | "seoulnet" -> Some `Seoulnet
-    | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
-        (* format:  weeklynet-2025-01-29 (with dashes) *)
-        let date = String.sub s 10 10 in
-        Some (`Weeklynet date)
-    | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
-        (* format: nextnet-20250203  (without dashes) *)
-        let date = String.sub s 8 8 in
-        Some (`Nextnet date)
-    | "sandbox" -> Some `Sandbox
-    | _ -> None
-
-  let network_typ : Network.t Clap.typ =
-    Clap.typ
-      ~name:"network"
-      ~dummy:`Ghostnet
-      ~parse:parse_network
-      ~show:Network.to_string
-
   let network =
     Clap.default
       ~section
@@ -292,13 +284,14 @@ module Dal () : Dal = struct
       Disabled
 
   let snapshot =
-    Clap.optional_string
+    Clap.default
       ~section
       ~long:"snapshot"
       ~description:
         "Snapshot file, which is stored locally, to initiate the scenario with \
          some data"
-      ()
+      snapshot_typ
+      No_snapshot
 
   let bootstrap =
     Clap.flag
@@ -309,7 +302,7 @@ module Dal () : Dal = struct
   let stake_repartition_typ : Network.stake_repartition Clap.typ =
     let open Network in
     let parse_public_network (net : string) : public option =
-      try Option.map to_public (parse_network net) with _ -> None
+      try Option.map to_public (parse net) with _ -> None
     in
     Clap.typ
       ~name:"stake_repartition"
@@ -648,7 +641,7 @@ module Dal () : Dal = struct
 end
 
 module type Layer1 = sig
-  val network : [`Mainnet | `Ghostnet] option
+  val network : Network.t option
 
   val stake : int list option
 
@@ -660,7 +653,7 @@ module type Layer1 = sig
 
   val migration_offset : int option
 
-  val snapshot : string option
+  val snapshot : Snapshot_helpers.t option
 
   val octez_release : string option
 
@@ -682,23 +675,13 @@ module Layer1 () = struct
          [cloud] and [layer1] tags on the command line"
       "LAYER1"
 
-  let network : [`Mainnet | `Ghostnet] option =
-    let typ =
-      Clap.typ
-        ~name:"network"
-        ~dummy:`Ghostnet
-        ~parse:(function
-          | "mainnet" -> Some `Mainnet
-          | "ghostnet" -> Some `Ghostnet
-          | _ -> None)
-        ~show:(fun n -> Network.to_string (n :> Network.t))
-    in
+  let network : Network.t option =
     Clap.optional
       ~section
       ~long:"network"
       ~placeholder:"<ghostnet|mainnet>"
       ~description:"Allow to specify a network to use for the scenario"
-      typ
+      network_typ
       ()
 
   let stake =
@@ -769,12 +752,13 @@ module Layer1 () = struct
       ()
 
   let snapshot =
-    Clap.optional_string
+    Clap.optional
       ~section
       ~long:"snapshot"
       ~description:
         "Either a path the a local file or url of the snapshot to use for \
          bootstrapping the experiment"
+      snapshot_typ
       ()
 
   let octez_release =

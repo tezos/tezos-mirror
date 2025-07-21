@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -31,8 +32,14 @@ val to_public : t -> public
 (** ["mainnet" | "ghostnet" | "rionet" | "seoulnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : [< t] -> string
 
+(** Parse the given [string] into an available network option. *)
+val parse : string -> t option
+
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t
+
+(** Block time value for the network *)
+val block_time : t -> int
 
 (** Endpoint publicly available with RPC opened *)
 val public_rpc_endpoint : public -> Endpoint.t

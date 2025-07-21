@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>      *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -55,11 +56,6 @@ let name_of = function
   | Echo_rollup_operator -> "echo-rollup-operator"
   | Echo_rollup_dal_observer {slot_index} ->
       Format.sprintf "echo-rollup-dal-node-%d" slot_index
-
-type snapshot_config =
-  | Docker_embedded of string
-  | Local_file of string
-  | No_snapshot
 
 (* Some DAL nodes (those in operator mode) refuse to start unless they are
    connected to an Octez node keeping enough history to play refutation
@@ -139,7 +135,7 @@ module Disconnect = struct
 end
 
 module Node = struct
-  let runner_of_agent = Agent.runner
+  open Snapshot_helpers
 
   let may_copy_node_identity_file agent node = function
     | None -> Lwt.return_unit
@@ -160,49 +156,6 @@ module Node = struct
     String_map.singleton
       Tezos_crypto.Helpers.yes_crypto_environment_variable
       "y"
-
-  let import_snapshot ?(delete_snapshot_file = false) ~name node
-      snapshot_file_path =
-    toplog "Importing the snapshot for %s" name ;
-    let* () =
-      try
-        let* () = Node.snapshot_import ~no_check:true node snapshot_file_path in
-        let () = toplog "Snapshot import succeeded for %s." name in
-        let* () =
-          if delete_snapshot_file then (
-            (* Delete the snapshot downloaded locally *)
-            toplog "Deleting downloaded snapshot (%s)" snapshot_file_path ;
-            let* (_ignored_exit_status : Unix.process_status) =
-              Process.wait (Process.spawn "rm" [snapshot_file_path])
-            in
-            Lwt.return_unit)
-          else Lwt.return_unit
-        in
-        Lwt.return_unit
-      with _ ->
-        (* Failing to import the snapshot could happen on a very young
-           Weeklynet, before the first snapshot is available. In this
-           case bootstrapping from the genesis block is OK. *)
-        let () =
-          toplog
-            "Snapshot import failed for %s, the node will be bootstrapped from \
-             genesis."
-            name
-        in
-        Lwt.return_unit
-    in
-    Lwt.return_unit
-
-  let get_snapshot_info_network node snapshot_path =
-    let* info = Node.snapshot_info node ~json:true snapshot_path in
-    let json = JSON.parse ~origin:"snapshot_info" info in
-    (match JSON.(json |-> "snapshot_header" |-> "chain_name" |> as_string) with
-    | "TEZOS_ITHACANET_2022-01-25T15:00:00Z" -> "ghostnet"
-    | "TEZOS_RIONET_2025-02-19T12:45:00Z" -> "rionet"
-    | "TEZOS_SEOULNET_2025-07-11T08:00:00Z" -> "seoulnet"
-    | "TEZOS_MAINNET" -> "mainnet"
-    | "TEZOS" | _ -> "sandbox")
-    |> Lwt.return
 
   let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling
@@ -260,60 +213,12 @@ module Node = struct
             toplog "Initializing node configuration for %s" name ;
             let* () = Node.config_init node [] in
             let* snapshot_file_path =
-              match snapshot with
-              | Docker_embedded snapshot_path ->
-                  let () =
-                    toplog
-                      "Using locally stored snapshot file: %s"
-                      snapshot_path
-                  in
-                  Lwt.return snapshot_path
-              | Local_file snapshot_path ->
-                  let () = toplog "Copying snapshot to destination" in
-                  let* snapshot_path =
-                    Tezt_cloud.Agent.copy
-                      agent
-                      ~destination:snapshot_path
-                      ~source:snapshot_path
-                  in
-                  Lwt.return snapshot_path
-              | No_snapshot ->
-                  toplog "Trying to download a rolling snapshot for %s" name ;
-                  let downloaded_snapshot_file_path = "snapshot_file" in
-                  let* exit_status =
-                    Process.spawn
-                      ?runner:(runner_of_agent agent)
-                      "wget"
-                      [
-                        "-O";
-                        downloaded_snapshot_file_path;
-                        sf "%s/rolling" (Network.snapshot_service network);
-                      ]
-                    |> Process.wait
-                  in
-                  let* () =
-                    match exit_status with
-                    | WEXITED 0 -> Lwt.return_unit
-                    | WEXITED code ->
-                        toplog
-                          "Could not download the snapshot for %s: wget exit \
-                           code: %d\n\
-                           Starting without snapshot. It could last long \
-                           before the node is bootstrapped"
-                          name
-                          code ;
-                        Lwt.return_unit
-                    | status -> (
-                        match Process.validate_status status with
-                        | Ok () -> Lwt.return_unit
-                        | Error (`Invalid_status reason) ->
-                            failwith @@ Format.sprintf "wget: %s" reason)
-                  in
-                  return downloaded_snapshot_file_path
+              ensure_snapshot ~agent ~name ~network snapshot
             in
             let* () =
               import_snapshot
                 ~delete_snapshot_file:(snapshot = No_snapshot)
+                ~no_check:true
                 ~name
                 node
                 snapshot_file_path
@@ -350,26 +255,7 @@ module Node = struct
               Node.Agent.create ~net_addr ~rpc_external ~name cloud agent
             in
             let* () = Node.config_init node [Cors_origin "*"] in
-            let* snapshot_path =
-              match snapshot with
-              | Docker_embedded snapshot_path ->
-                  let () =
-                    toplog
-                      "Using locally stored snapshot file: %s"
-                      snapshot_path
-                  in
-                  Lwt.return_some snapshot_path
-              | Local_file snapshot_path ->
-                  let () = toplog "Copying snapshot to destination" in
-                  let* snapshot_path =
-                    Tezt_cloud.Agent.copy
-                      agent
-                      ~destination:snapshot_path
-                      ~source:snapshot_path
-                  in
-                  Lwt.return_some snapshot_path
-              | No_snapshot -> Lwt.return_none
-            in
+            let* snapshot_path = ensure_snapshot_opt ~agent ~name snapshot in
             let* snapshot_network =
               match snapshot_path with
               | Some path ->
@@ -399,7 +285,8 @@ module Node = struct
             let* () = may_copy_node_identity_file agent node identity_file in
             let* () =
               match snapshot_path with
-              | Some snapshot_path -> import_snapshot ~name node snapshot_path
+              | Some snapshot_path ->
+                  import_snapshot ~no_check:true ~name node snapshot_path
               | None -> Lwt.return_unit
             in
             let* () =
@@ -628,7 +515,7 @@ type configuration = {
   disconnect : (int * int) option;
   network : Network.t;
   simulate_network : Cli.network_simulation_config;
-  snapshot : snapshot_config;
+  snapshot : Snapshot_helpers.t;
   bootstrap : bool;
   teztale : bool;
   memtrace : bool;
@@ -2874,7 +2761,9 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       let* snapshot_network =
         match configuration.snapshot with
         | Docker_embedded path | Local_file path ->
-            let* network = Node.get_snapshot_info_network bootstrap_node path in
+            let* network =
+              Snapshot_helpers.get_snapshot_info_network bootstrap_node path
+            in
             (* Yes-wallet requires the config url for protocol-specific test
                networks.*)
             let network =
@@ -2885,6 +2774,11 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
                   "https://teztnets.com/" ^ s
             in
             Lwt.return network
+        | Url _url ->
+            (* FIXME: We can overcome this by either downloading the snapshot, or by
+               retrieving the name of the network from the URL. I am not sure how much
+               of a priority this is. *)
+            Lwt.fail_with "URL snapshot not available for sandbox case"
         | No_snapshot -> Lwt.return "ghostnet"
       in
       let* _filename =
@@ -4788,30 +4682,6 @@ let rec loop t level =
   let* t = p in
   loop t (level + 1)
 
-let parse_snapshot_arg snapshot_arg =
-  let fail path =
-    Test.fail
-      "wrong snapshot argument (--snapshot) [%s].@.Use:@.- \
-       \"file:path/to/file\" to use a local file that will be uploaded to each \
-       agent,@.- \"docker\" to use the docker_embedded_snapshot_file, that \
-       must be located in the local path, to embed the snapshot file into the \
-       docker image."
-      path
-  in
-  match snapshot_arg with
-  | Some v -> (
-      match v with
-      | "docker" ->
-          (* This hardcoded path must be defined as the location path of the snapshot
-             embedded in the docker image. See the associated dockerfile. *)
-          Docker_embedded "/tmp/docker_embedded_snapshot_file"
-      | s when String.starts_with ~prefix:"file:" s -> (
-          match String.split_on_char ':' s with
-          | [_; path] -> Local_file path
-          | _ -> fail s)
-      | _ -> fail v)
-  | None -> No_snapshot
-
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
 let parse_stake_arg ~stake_arg ~simulation_arg =
@@ -4933,7 +4803,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let echo_rollup = Cli.echo_rollup in
     let disconnect = Cli.disconnect in
     let network = Cli.network in
-    let snapshot = parse_snapshot_arg Cli.snapshot in
+    let snapshot = Cli.snapshot in
     let bootstrap = Cli.bootstrap in
     let etherlink_dal_slots = Cli.etherlink_dal_slots in
     let teztale = Cli.teztale in
