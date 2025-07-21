@@ -40,13 +40,15 @@ static SCRIPT: &str = r#" parameter (or (or (or (or (int %decrement) (int %incre
 fn run_contract<'a>(
     parameter: Micheline<'a>,
     storage: Micheline<'a>,
-    annotation: FieldAnnotation<'a>,
+    entrypoint: &str,
     contract_typechecked: &ContractScript<'a>,
     ctx: &mut Ctx<'a>,
     parser: &'a Parser<'a>,
 ) {
+    let entrypoint = Entrypoint::try_from(entrypoint)
+        .expect("Entrypoint should be valid, check the string");
     let (_, new_storage) = contract_typechecked
-        .interpret(ctx, &parser.arena, parameter, Some(annotation), storage)
+        .interpret(ctx, &parser.arena, parameter, Some(entrypoint), storage)
         .unwrap();
     let TypedValue::Int(storage_int) = &new_storage else {
         unreachable!()
@@ -62,7 +64,7 @@ fn main() {
     run_contract(
         30.into(),
         20.into(),
-        FieldAnnotation::from_str_unchecked("increment"),
+        "increment",
         &contract_typechecked,
         &mut ctx,
         &parser,
@@ -70,7 +72,7 @@ fn main() {
     run_contract(
         100.into(),
         80.into(),
-        FieldAnnotation::from_str_unchecked("decrement"),
+        "decrement",
         &contract_typechecked,
         &mut ctx,
         &parser,
@@ -78,7 +80,7 @@ fn main() {
     run_contract(
         7.into(),
         123.into(),
-        FieldAnnotation::from_str_unchecked("set"),
+        "set",
         &contract_typechecked,
         &mut ctx,
         &parser,
@@ -86,7 +88,7 @@ fn main() {
     run_contract(
         ().into(),
         9.into(),
-        FieldAnnotation::from_str_unchecked("double"),
+        "double",
         &contract_typechecked,
         &mut ctx,
         &parser,
@@ -94,7 +96,7 @@ fn main() {
     run_contract(
         ().into(),
         27.into(),
-        FieldAnnotation::from_str_unchecked("reset"),
+        "reset",
         &contract_typechecked,
         &mut ctx,
         &parser,
