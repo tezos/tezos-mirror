@@ -100,8 +100,7 @@ When baking on a testnet, you may skip the following section on configuring the 
 Configuring the signer
 ~~~~~~~~~~~~~~~~~~~~~~
 
-If you rather intend to bake on mainnet, we highly recommend using the Octez signer, because of the sensitive nature of the private keys needed by the baker to function.
-You may of course use the signer on a testnet, too, although this is less crucial.
+If you envision to bake on mainnet some day, we highly recommend to train yourself using the Octez signer, because of the sensitive nature of the private keys needed by the baker to function (note that we still show the instructions for a testnet in this training).
 
 To configure the octez-signer, first, logged as the user chosen to run the
 signer, we must create a set of keys. These are the private keys that will be
