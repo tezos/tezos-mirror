@@ -123,6 +123,23 @@ let service_manager_receiver notifier =
       {{ end }}|}
         ()
 
+module Alerts = struct
+  let service_manager_process_down agent executable receiver metric_name name =
+    Alert.make
+      ~name:"ServiceManagerProcessDown"
+      ~description:
+        {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+      ~summary:
+        (Format.asprintf
+           "'[%s.service_manager] the process [%s] is down'"
+           (Agent.name agent)
+           executable)
+      ~route:(Alert.route receiver)
+      ~severity:Alert.Critical
+      ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+      ()
+end
+
 module Node = struct
   include Tezt_tezos.Node
 
@@ -191,19 +208,12 @@ module Node = struct
       let metric_name = "service_manager_process_alive" in
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let alert =
-        Alert.make
-          ~name:"ServiceManagerProcessDown"
-          ~description:
-            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
-          ~summary:
-            (Format.asprintf
-               "'[%s.service_manager] the process [%s] is down'"
-               (Agent.name agent)
-               executable)
-          ~route:(Alert.route receiver)
-          ~severity:Alert.Critical
-          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
-          ()
+        Alerts.service_manager_process_down
+          agent
+          executable
+          receiver
+          metric_name
+          name
       in
       let* () = Cloud.add_alert cloud ~alert in
       let on_alive_callback ~alive =
@@ -380,19 +390,12 @@ module Dal_node = struct
           (if alive then 1.0 else 0.0)
       in
       let alert =
-        Alert.make
-          ~name:"ServiceManagerProcessDown"
-          ~description:
-            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
-          ~summary:
-            (Format.asprintf
-               "'[%s.service_manager] the process [%s] is down'"
-               (Agent.name agent)
-               executable)
-          ~route:(Alert.route receiver)
-          ~severity:Alert.Critical
-          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
-          ()
+        Alerts.service_manager_process_down
+          agent
+          executable
+          receiver
+          metric_name
+          name
       in
       let* () = Cloud.add_alert cloud ~alert in
       Cloud.service_register ~name ~executable ~on_alive_callback agent ;
