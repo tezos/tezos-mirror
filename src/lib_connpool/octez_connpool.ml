@@ -84,7 +84,7 @@ let make_pool ?(ctx = Cohttp_lwt_unix.Net.default_ctx) ~pool_len uri =
       close_conn conn)
     (fun () ->
       let open Lwt_syntax in
-      Opentelemetry.Trace.with_
+      Opentelemetry_lwt.Trace.with_
         ~service_name:"Octez_connpool"
         "create_new_connection"
       @@ fun _ ->
@@ -124,7 +124,8 @@ let pre_heat t =
 
 let warm t =
   let open Lwt_syntax in
-  Opentelemetry.Trace.with_ ~service_name:"Octez_connpool" "warm" @@ fun _ ->
+  Opentelemetry_lwt.Trace.with_ ~service_name:"Octez_connpool" "warm"
+  @@ fun _ ->
   let rec re_warm n pool =
     Lwt_pool.use pool @@ fun _conn ->
     if n > 1 then re_warm (n - 1) pool else return_unit
@@ -201,7 +202,7 @@ let call_exn ?(headers = Cohttp.Header.init ()) ?(sensitive_headers = []) ?body
     ]
     @ http_server_attr @ http_port_attr @ headers_attrs @ retry_attr
   in
-  Opentelemetry.Trace.with_
+  Opentelemetry_lwt.Trace.with_
     ~service_name:"Octez_connpool"
     ~kind:Span_kind_client
     Format.(sprintf "%s %s" (Cohttp.Code.string_of_method meth) route)

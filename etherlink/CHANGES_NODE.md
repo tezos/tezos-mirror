@@ -10,6 +10,8 @@
 
 ### Metrics changes
 
+- Fixes the traces generated for HTTP requests performed to a GCP KMS. (!18771)
+
 ### Command-line interface changes
 
 ### Execution changes
