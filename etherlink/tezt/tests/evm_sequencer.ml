@@ -7867,6 +7867,7 @@ let test_trace_transaction_call_trace =
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
@@ -7975,6 +7976,7 @@ let test_trace_transaction_calltracer_failed_create =
        creation reverts but is included"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8030,6 +8032,7 @@ let test_trace_delegate_call =
     ~title:"calltracer correctly display delegate call infos"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8110,6 +8113,7 @@ let test_trace_transaction_calltracer_all_types =
       "debug_traceTransaction with calltracer can produce all the call types"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8200,6 +8204,7 @@ let test_trace_transaction_call_tracer_with_logs =
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8257,9 +8262,10 @@ let test_trace_transaction_call_trace_certain_depth =
     ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "depth"]
-    ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
+    ~title:"debug_traceTransaction with calltracer to see difficult depth"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8339,6 +8345,7 @@ let test_trace_transaction_call_revert =
        handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8378,12 +8385,12 @@ let test_trace_transaction_call_revert =
   Check.(
     (JSON.(trace_result |-> "error" |> as_string) = "execution reverted")
       string
-      ~error_msg:"Unexpected error") ;
+      ~error_msg:"Unexpected error got %L but %R was expected") ;
   Check.(
     (JSON.(trace_result |-> "revertReason" |> as_string)
     = "This function reverts")
       string
-      ~error_msg:"Unexpected revert reason") ;
+      ~error_msg:"Unexpected revert reason got %L but %R was expected") ;
   unit
 
 let test_trace_transaction_call_trace_revert =
@@ -8394,7 +8401,8 @@ let test_trace_transaction_call_trace_revert =
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; evm_version; _} _protocol ->
+    ~use_revm:activate_revm_registration
+  @@ fun {sequencer; evm_version; enable_revm; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_tracer_revert = Solidity_contracts.call_tracer_revert evm_version in
@@ -8470,9 +8478,13 @@ let test_trace_transaction_call_trace_revert =
   (* Skip item 1 in call_list, it's a create *)
   let call = List.nth call_list 2 in
   let call = List.hd JSON.(call |-> "calls" |> as_list) in
-  check_error_and_revert_reason ~error:"OutOfGas" call ;
+  if enable_revm then
+    check_error_and_revert_reason ~error:"ReentrancySentryOOG" call
+  else check_error_and_revert_reason ~error:"OutOfGas" call ;
   let call = List.nth call_list 3 in
-  check_error_and_revert_reason ~error:"InvalidCode(Opcode(254))" call ;
+  if enable_revm then
+    check_error_and_revert_reason ~error:"InvalidFEOpcode" call
+  else check_error_and_revert_reason ~error:"InvalidCode(Opcode(254))" call ;
   let call = List.nth call_list 4 in
   check_error_and_revert_reason
     ~error:"execution reverted"
@@ -8491,6 +8503,7 @@ let test_trace_transaction_calltracer_multiple_txs =
       "debug_traceTransaction handles blocks containing several transactions"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
@@ -8709,6 +8722,7 @@ let test_trace_transaction_calltracer_deposit =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "deposit"]
     ~title:"debug_traceTransaction with calltracer can trace deposits"
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
