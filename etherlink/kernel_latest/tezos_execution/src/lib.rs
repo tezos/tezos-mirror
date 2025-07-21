@@ -497,6 +497,15 @@ mod tests {
             PAIR
         }"#;
 
+    static FAILING_SCRIPT: &str = r#"
+        parameter unit;
+        storage unit;
+        code {
+            DROP;
+            PUSH string "This contract always fails";
+            FAILWITH
+        }"#;
+
     fn make_operation(
         fee: u64,
         counter: u64,
@@ -1216,6 +1225,77 @@ mod tests {
         // 30 for transfer + 15 for fees, 5 should be left
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    #[test]
+    fn apply_transfer_with_failed_execution() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let initial_storage = "Unit";
+
+        let source = init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let destination = init_contract(
+            &mut host,
+            &dest,
+            FAILING_SCRIPT,
+            initial_storage,
+            &50_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(dest),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: parser.parse("Unit").unwrap().encode(),
+            }),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result:  ContentResult::Failed(vec![
+        OperationError::Apply(ApplyOperationError::Transfer(
+            TransferError::MichelsonContractInterpretError(
+                "runtime failure while running the script: failed with: String(\"This contract always fails\") of type String".into()
+            )
+        ))].into()),
+            internal_operation_results: vec![],
+        });
+
+        // Verify that source and destination balances changed
+        // Transfer should be free as it got reverted + 15 for fees, 5 should be left
+        assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
+        assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
     }
