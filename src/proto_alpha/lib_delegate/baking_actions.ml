@@ -562,10 +562,11 @@ let may_get_dal_content state consensus_vote =
     ( Raw_level.to_int32 vote_consensus_content.level,
       vote_consensus_content.round )
   in
+  let delegate_id = Delegate.delegate_id delegate in
   let promise_opt =
     List.assoc_opt
       ~equal:Delegate_id.equal
-      delegate.delegate_id
+      delegate_id
       state.level_state.dal_attestable_slots
   in
   match promise_opt with
@@ -585,7 +586,7 @@ let may_get_dal_content state consensus_vote =
              Lwt.return (`RPC_result tz_res));
           ]
       in
-      process_dal_rpc_result state delegate.delegate_id level round res
+      process_dal_rpc_result state delegate_id level round res
 
 let is_authorized (global_state : global_state) highwatermarks consensus_vote =
   let {delegate; vote_consensus_content; _} = consensus_vote in
@@ -696,54 +697,67 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
     | Attestation -> Operation.(to_watermark (Attestation chain_id))
   in
   let bls_mode =
-    match delegate.consensus_key.public_key with
-    | Bls _ -> global_state.constants.parametric.aggregate_attestation
-    | _ -> false
+    Key.is_bls delegate.consensus_key
+    && global_state.constants.parametric.aggregate_attestation
   in
-  let* Contents_list contents, companion_key_opt =
+  let* dal_content, companion_key_opt =
     match vote_kind with
     | Preattestation ->
-        return
-          (Contents_list (Single (Preattestation vote_consensus_content)), None)
-    | Attestation ->
-        let* dal_content, companion_key_opt =
-          if not bls_mode then return (dal_content, None)
-          else
-            match dal_content with
-            | None -> return (dal_content, None)
-            | Some _ -> (
-                match delegate.companion_key with
-                | None ->
-                    let*! () =
-                      Events.(
-                        emit
-                          missing_companion_key_for_dal_with_bls
-                          ( delegate.delegate_id,
-                            Raw_level.to_int32 vote_consensus_content.level ))
-                    in
-                    return (None, None)
-                | Some companion_key -> return (dal_content, Some companion_key)
-                )
-        in
-        return
-          ( Contents_list
-              (Single
-                 (Attestation
-                    {consensus_content = vote_consensus_content; dal_content})),
-            companion_key_opt )
+        (* Preattestations cannot have a dal_content and do not use
+           the companion key. *)
+        return (None, None)
+    | Attestation -> (
+        if not bls_mode then
+          (* If not in BLS mode, leave the dal_content unchanged and do
+             not use the companion key. *)
+          return (dal_content, None)
+        else if Option.is_none dal_content then
+          (* No dal_content: the companion key will not be used. *)
+          return (dal_content, None)
+        else
+          match delegate.companion_key with
+          | None ->
+              (* There is an available dal_content, but the BLS
+                 consensus key does not have an associated companion
+                 key (whether because the delegate has not registered
+                 any companion key, or because it has not been
+                 provided to the baker): signing an attestation with
+                 DAL is not possible. Set the dal_content to None and
+                 issue a warning. *)
+              let*! () =
+                Events.(
+                  emit
+                    missing_companion_key_for_dal_with_bls
+                    ( Delegate.delegate_id delegate,
+                      Raw_level.to_int32 vote_consensus_content.level ))
+              in
+              return (None, None)
+          | Some companion_key ->
+              (* We have everything we need to issue a BLS attestation with DAL. *)
+              return (dal_content, Some companion_key))
   in
-  let signing_request =
+  let (Contents_list contents as packed_contents_list) =
     match vote_kind with
-    | Preattestation -> `Preattestation
-    | Attestation -> `Attestation
+    | Preattestation ->
+        Contents_list (Single (Preattestation vote_consensus_content))
+    | Attestation ->
+        Contents_list
+          (Single
+             (Attestation
+                {consensus_content = vote_consensus_content; dal_content}))
   in
-  let unsigned_operation = (shell, Contents_list contents) in
+  let unsigned_operation = (shell, packed_contents_list) in
   let encoding =
     if bls_mode then Operation.bls_mode_unsigned_encoding
     else Operation.unsigned_encoding
   in
   let unsigned_operation_bytes =
     Data_encoding.Binary.to_bytes_exn encoding unsigned_operation
+  in
+  let signing_request =
+    match vote_kind with
+    | Preattestation -> `Preattestation
+    | Attestation -> `Attestation
   in
   let sk_consensus_uri = delegate.consensus_key.secret_key_uri in
   let* consensus_sig =
@@ -763,7 +777,7 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
            companion_key_opt *)
         return consensus_sig
     | Some _, None ->
-        (* dal_content has been discarded from contents *)
+        (* only possible in non-BLS mode *)
         return consensus_sig
     | Some {attestation = dal_attestation}, Some companion_key -> (
         let sk_companion_uri = companion_key.secret_key_uri in
@@ -818,6 +832,9 @@ let forge_and_sign_consensus_vote global_state ~branch unsigned_consensus_vote :
   in
   let protocol_data = Operation_data {contents; signature = Some signature} in
   let signed_operation : Operation.packed = {shell; protocol_data} in
+  (* Also update unsigned_consensus_vote: dal_content may have been
+     set to None. *)
+  let unsigned_consensus_vote = {unsigned_consensus_vote with dal_content} in
   return {unsigned_consensus_vote; signed_operation}
 
 let sign_consensus_votes (global_state : global_state)
@@ -835,7 +852,7 @@ let sign_consensus_votes (global_state : global_state)
     List.filter_map_es
       (fun ({delegate; vote_kind; vote_consensus_content; _} as
             unsigned_consensus_vote) ->
-        let*! () = Events.(emit signing_consensus_vote (vote_kind, delegate)) in
+        let*! () = Events.emit_signing_consensus_op unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
              global_state
@@ -876,11 +893,6 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let chain_id = state.global_state.chain_id in
   let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
   let delegate = unsigned_consensus_vote.delegate in
-  let vote_consensus_content = unsigned_consensus_vote.vote_consensus_content in
-  let level, round =
-    ( Raw_level.to_int32 vote_consensus_content.level,
-      vote_consensus_content.round )
-  in
   protect
     ~on_error:(fun err ->
       let*! () =
@@ -905,10 +917,7 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.(
-          emit
-            consensus_vote_injected
-            (unsigned_consensus_vote.vote_kind, oph, delegate, level, round))
+        Events.emit_consensus_op_injected unsigned_consensus_vote oph
       in
       return_unit)
 

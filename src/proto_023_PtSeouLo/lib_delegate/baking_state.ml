@@ -803,17 +803,6 @@ module Events = struct
       ~level:Warning
       ~msg:"found an outdated or corrupted baking state: discarding it"
       ()
-
-  let companion_key_is_not_in_wallet =
-    declare_2
-      ~section:[Protocol.name; "baker"; "delegates"]
-      ~name:"companion_key_is_not_in_wallet"
-      ~level:Error
-      ~msg:
-        "Companion key {companion_key} is not provided in the wallet but \
-         registered in the protocol for {delegate}"
-      ("delegate", Baking_state_types.Delegate_id.encoding)
-      ("companion_key", Environment.Bls.Public_key_hash.encoding)
 end
 
 type state_data = {
@@ -975,81 +964,22 @@ let may_load_attestable_data state =
 
 (* Helpers *)
 
-module DelegateSet = struct
-  include Set.Make (struct
-    type t = Baking_state_types.Key.t
-
-    let compare Baking_state_types.Key.{id = pkh; _}
-        Baking_state_types.Key.{id = pkh'; _} =
-      Baking_state_types.Key_id.compare pkh pkh'
-  end)
-
-  let find_pkh pkh s =
-    let exception Found of elt in
-    try
-      iter
-        (fun ({id; _} as delegate) ->
-          if
-            Signature.Public_key_hash.equal
-              pkh
-              (Baking_state_types.Key_id.to_pkh id)
-          then raise (Found delegate)
-          else ())
-        s ;
-      None
-    with Found d -> Some d
-end
-
 let delegate_slots attesting_rights delegates =
   let open Lwt_syntax in
-  let own_delegates = DelegateSet.of_list delegates in
+  let known_keys = Key.Set.of_list delegates in
   let* own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
     Lwt_list.fold_left_s
-      (fun (own_list, own_map, all_map) slot ->
-        let {
-          Plugin.RPC.Validators.consensus_key;
-          companion_key;
-          delegate;
-          slots;
-          level = _;
-        } =
-          slot
-        in
+      (fun (own_list, own_map, all_map) validator ->
+        let {Plugin.RPC.Validators.slots; _} = validator in
         let first_slot = Stdlib.List.hd slots in
         let attesting_power = List.length slots in
         let all_map = SlotMap.add first_slot attesting_power all_map in
         let* own_list, own_map =
-          match DelegateSet.find_pkh consensus_key own_delegates with
-          | Some consensus_key ->
-              let* companion_key =
-                match companion_key with
-                | None -> return None
-                | Some companion_key -> (
-                    match
-                      DelegateSet.find_pkh (Bls companion_key) own_delegates
-                    with
-                    | None ->
-                        let* () =
-                          Events.(
-                            emit
-                              companion_key_is_not_in_wallet
-                              (Delegate_id.of_pkh delegate, companion_key))
-                        in
-                        return None
-                    | Some companion_key -> return (Some companion_key))
-              in
-              let attesting_slot =
-                {
-                  delegate =
-                    {
-                      consensus_key;
-                      delegate_id = Delegate_id.of_pkh delegate;
-                      companion_key;
-                    };
-                  first_slot;
-                  attesting_power;
-                }
-              in
+          let* delegate_opt = Delegate.of_validator ~known_keys validator in
+          match delegate_opt with
+          | None -> return (own_list, own_map)
+          | Some delegate ->
+              let attesting_slot = {delegate; first_slot; attesting_power} in
               return
                 ( attesting_slot :: own_list,
                   List.fold_left
@@ -1057,7 +987,6 @@ let delegate_slots attesting_rights delegates =
                       SlotMap.add slot attesting_slot own_map)
                     own_map
                     slots )
-          | None -> return (own_list, own_map)
         in
         return (own_list, own_map, all_map))
       ([], SlotMap.empty, SlotMap.empty)
@@ -1393,77 +1322,6 @@ let pp_timeout_kind fmt = function
         "time to prepare next level block at round %a"
         Round.pp
         at_round
-
-let pp_forge_event fmt =
-  let open Format in
-  let pp_signed_consensus_vote fmt {unsigned_consensus_vote; _} =
-    fprintf
-      fmt
-      "for delegate %a at level %ld (round %a)"
-      Delegate.pp
-      unsigned_consensus_vote.delegate
-      (Raw_level.to_int32 unsigned_consensus_vote.vote_consensus_content.level)
-      Round.pp
-      unsigned_consensus_vote.vote_consensus_content.round
-  in
-  function
-  | Block_ready {signed_block_header; round; delegate; _} ->
-      fprintf
-        fmt
-        "block ready for delegate: %a at level %ld (round: %a)"
-        Delegate.pp
-        delegate
-        signed_block_header.shell.level
-        Round.pp
-        round
-  | Preattestation_ready signed_preattestation ->
-      fprintf
-        fmt
-        "preattestation ready %a"
-        pp_signed_consensus_vote
-        signed_preattestation
-  | Attestation_ready signed_attestation ->
-      fprintf
-        fmt
-        "attestation ready %a"
-        pp_signed_consensus_vote
-        signed_attestation
-
-let pp_event fmt = function
-  | New_valid_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new valid proposal received: %a"
-        pp_block_info
-        proposal.block
-  | New_head_proposal proposal ->
-      Format.fprintf
-        fmt
-        "new head proposal received: %a"
-        pp_block_info
-        proposal.block
-  | Prequorum_reached (candidate, preattestations) ->
-      Format.fprintf
-        fmt
-        "prequorum reached with %d preattestations for %a at round %a"
-        (List.length preattestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | Quorum_reached (candidate, attestations) ->
-      Format.fprintf
-        fmt
-        "quorum reached with %d attestations for %a at round %a"
-        (List.length attestations)
-        Block_hash.pp
-        candidate.Operation_worker.hash
-        Round.pp
-        candidate.round_watched
-  | New_forge_event forge_event ->
-      Format.fprintf fmt "new forge event: %a" pp_forge_event forge_event
-  | Timeout kind ->
-      Format.fprintf fmt "timeout reached: %a" pp_timeout_kind kind
 
 let pp_short_event fmt =
   let open Format in

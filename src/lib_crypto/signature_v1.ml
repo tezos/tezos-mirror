@@ -62,6 +62,10 @@ module Public_key_hash = struct
 
   let title = "A Ed25519, Secp256k1, P256, or BLS public key hash"
 
+  let is_bls : t -> bool = function
+    | Bls _ -> true
+    | Ed25519 _ | Secp256k1 _ | P256 _ -> false
+
   type Base58.data += Data of t (* unused *)
 
   let b58check_encoding =
