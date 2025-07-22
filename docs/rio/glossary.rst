@@ -128,10 +128,10 @@ _`Account`
 
 _`Attestation lag`
     A delay of a certain number of blocks that gives DAL nodes time to verify that DAL data is available.
-    DAL nodes post their attestations immediately after the attestation lag has passed.
+    Attesters (via their DAL nodes) include their DAL attestations in their attestation operations immediately after the attestation lag has passed.
 
 _`Attestation threshold`
-    The minimum percentage (between 0 and 1) of DAL shard_\ s that must be attested by DAL nodes before the data is considered to be attested and therefore available to Smart Rollups.
+    The minimum percentage of DAL shard_\ s that must be attested by attesters before the data is considered to be attested and therefore available to Smart Rollups.
 
 _`Attesting`
     When a block_ is created and propagated on the network, delegates that have
@@ -308,7 +308,7 @@ _`Origination`
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
 _`Page`
-    A portion of the data in a slot_ that is small enough to fit in a layer 1 block.
+    A portion of the data in a slot_ that is small enough to fit in a layer 1 operation.
     The DAL splits the data in each slot into pages so refutation games can run properly.
 
 _`PVM`
@@ -321,7 +321,7 @@ _`PVM`
 
 _`Redundancy factor`
     The amount of redundancy that the protocol uses when splitting DAL data into shard_\ s.
-    THe higher the redundancy factor, the fewer shards are needed to reconstruct a single piece of DAL data.
+    The higher the redundancy factor, the fewer shards are needed to reconstruct the initial data.
 
 _`Refutation game`
    A process by which the `economic protocol`_ solves a conflict between two
@@ -381,7 +381,10 @@ _`Round`
 _`Shard`
     A piece of data that represents part of a piece of DAL data.
     The DAL splits data into shards and distributes these shards to DAL nodes to attest.
-    The shards are redundant based on the redundancy factor so the DAL nodes do not need to attest every shard for the full data to become available.
+    A piece of data distributed by the DAL.
+    Data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards. 
+    The DAL distributes these shards to DAL nodes. Attesters are assigned shards to download (via DAL nodes) and attest.
+    Thanks to redundancy, not every shard needs to be attested for the full data to be considered available.
 
 _`Smart contract`
     Account_ which is associated to a Michelson_ script.
@@ -395,7 +398,7 @@ _`Smart Rollup`
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
 
-_`Slot`
+_`DAL slot`
     Each block has a certain number of slots to which Data Availability Layer users can post raw data to distribute via the DAL.
 
 _`Staker`
@@ -416,8 +419,8 @@ _`Transaction`
     `smart contract`_.
 
 _`Trap`
-   A false DAL shard_ that the protocol generates to ensure that DAL nodes are honestly downloading and attesting to data.
-   If a DAL node attests to a trap, that node is punished.
+   A DAL shard_ that is treated specially by the protocol for a particular attester, to ensure that attesters are honestly downloading and attesting to data:
+   If a DAL attester attests to a trap, that attester will not receive DAL rewards.
 
 .. _def_user_account:
 .. _def_user_account_rio:
