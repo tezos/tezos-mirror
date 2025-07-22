@@ -995,8 +995,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     template;
   }
 
-let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
-    ?parent_pipeline_name
+let trigger_job ?(dependencies = Staged []) ?rules ?description
+    ?(variables = []) ~__POS__ ~stage ?parent_pipeline_name
     Pipeline.
       {
         name = child_pipeline_name;
@@ -1024,7 +1024,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
-      ~variables:[("PIPELINE_TYPE", pipeline_type)]
+      ~variables:(("PIPELINE_TYPE", pipeline_type) :: variables)
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
