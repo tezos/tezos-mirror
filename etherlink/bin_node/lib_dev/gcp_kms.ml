@@ -376,11 +376,12 @@ let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
   (* We fetch the necessary information which will allow us to interpret the
      KMS response and wrap them into the correct Signature.t constructor. *)
   let* public_key = public_key kms_handler in
+  let kms_handler = {kms_handler with public_key} in
   let*! () = Gcp_kms_events.is_ready public_key in
   Lwt.dont_wait (fun () -> Octez_connpool.warm kms_handler.pool) ignore ;
   Lwt.dont_wait (fun () -> wait_and_refresh config kms_handler) ignore ;
   (* We return the full handler *)
-  return {kms_handler with public_key}
+  return kms_handler
 
 let public_key t = t.public_key
 
