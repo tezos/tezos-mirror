@@ -116,23 +116,23 @@ impl CallTrace {
         }
     }
 
-    fn add_to(&mut self, to: Option<Address>) {
+    pub fn add_to(&mut self, to: Option<Address>) {
         self.to = to;
     }
 
-    fn add_gas(&mut self, gas: Option<u64>) {
+    pub fn add_gas(&mut self, gas: Option<u64>) {
         self.gas = gas;
     }
 
-    fn add_gas_used(&mut self, gas_used: u64) {
+    pub fn add_gas_used(&mut self, gas_used: u64) {
         self.gas_used = gas_used;
     }
 
-    fn add_output(&mut self, output: Option<Vec<u8>>) {
+    pub fn add_output(&mut self, output: Option<Vec<u8>>) {
         self.output = output;
     }
 
-    fn add_error(&mut self, error: Option<Vec<u8>>) {
+    pub fn add_error(&mut self, error: Option<Vec<u8>>) {
         self.error = error;
     }
 
@@ -162,7 +162,7 @@ impl CallTrace {
         self.logs = logs;
     }
 
-    fn store(&self, host: &mut impl Runtime, transaction_hash: &Option<B256>) {
+    pub fn store(&self, host: &mut impl Runtime, transaction_hash: &Option<B256>) {
         store_call_trace(host, self, transaction_hash)
             .inspect_err(|err| {
                 log!(host, Debug, "Storing call trace failed with: {err:?}")
@@ -195,6 +195,11 @@ impl CallTracer {
             initial_gas: 0,
             spec_id,
         }
+    }
+
+    #[inline]
+    pub fn tx_hash(&self) -> Option<B256> {
+        self.transaction_hash
     }
 
     #[inline]

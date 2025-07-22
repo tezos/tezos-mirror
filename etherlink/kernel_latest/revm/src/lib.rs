@@ -7,8 +7,10 @@ use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
-    call_tracer::CallTracer, noop::NoInspector, CallTracerInput, EtherlinkInspector,
-    EvmInspection, TracerInput,
+    call_tracer::CallTracer,
+    noop::NoInspector,
+    plain::{is_plain_transaction, minimal_plain_trace},
+    CallTracerInput, EtherlinkInspector, EvmInspection, TracerInput,
 };
 use precompile_provider::EtherlinkPrecompiles;
 use revm::{
@@ -277,6 +279,20 @@ pub fn run_transaction<'a, Host: Runtime>(
         let ExecResultAndState { result, .. } = evm.inspect_tx(&tx)?;
 
         let withdrawals = evm.db_mut().take_withdrawals();
+
+        if is_plain_transaction(evm.ctx.db_mut().host, &destination) {
+            // Nothing was stored during inspection as no bytecode was executed, we
+            // need to store the minimal plain trace w.r.t. the given inspector.
+            minimal_plain_trace(
+                evm.ctx.db_mut().host,
+                evm.inspector,
+                caller,
+                destination,
+                value,
+                gas_limit,
+                &result,
+            );
+        }
 
         Ok(ExecutionOutcome {
             result,
