@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use super::call_tracer::CallTrace;
-use crate::{helpers::concat, Error};
+use crate::{helpers::storage::concat, Error};
 
 use revm::primitives::B256;
 use tezos_evm_logging::{log, Level::Debug};

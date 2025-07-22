@@ -18,7 +18,7 @@ use tezos_smart_rollup_storage::storage::Storage;
 use crate::{
     code_storage::CodeStorage,
     helpers::legacy::FaDepositWithProxy,
-    helpers::{
+    helpers::storage::{
         concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
         read_u64_le_default, write_u256_le,
     },

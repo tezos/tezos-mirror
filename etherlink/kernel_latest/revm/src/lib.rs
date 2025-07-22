@@ -5,7 +5,7 @@
 
 use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
-use helpers::u256_to_le_bytes;
+use helpers::storage::u256_to_le_bytes;
 use inspectors::{
     call_tracer::CallTracer, noop::NoInspector, CallTracerInput, EtherlinkInspector,
     EvmInspection, TracerInput,
