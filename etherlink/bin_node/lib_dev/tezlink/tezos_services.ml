@@ -162,7 +162,7 @@ struct
     return operations
 end
 
-module Block_services = struct
+module Current_block_services = struct
   include Make_block_service (Imported_protocol) (Imported_protocol)
 
   let voting_period ~cycles_per_voting_period ~position ~level_info =
@@ -224,20 +224,15 @@ module Block_services = struct
     let proposer =
       Imported_protocol.Alpha_context.Consensus_key.
         {
-          delegate = Tezlink_mock.bootstrap_account.public_key_hash;
-          consensus_pkh = Tezlink_mock.bootstrap_account.public_key_hash;
+          delegate = Tezlink_mock.baker_account.public_key_hash;
+          consensus_pkh = Tezlink_mock.baker_account.public_key_hash;
         }
     in
     let balance_updates =
-      if Int32.equal level_info.Tezos_types.level 2l then
-        Tezlink_mock.balance_udpdate_bootstrap
-          ~amount:200_000_000_000L
-          ~bootstrap:Tezlink_mock.bootstrap_account.public_key_hash
-      else
-        let amount = Alpha_context.Tez.of_mutez_exn 0L in
-        Tezlink_mock.balance_udpdate_rewards
-          ~baker:Tezlink_mock.bootstrap_account.public_key_hash
-          ~amount
+      let amount = Alpha_context.Tez.of_mutez_exn 0L in
+      Tezlink_mock.balance_udpdate_rewards
+        ~baker:Tezlink_mock.baker_account.public_key_hash
+        ~amount
     in
 
     let constant = Tezlink_constants.all_constants.parametric in
@@ -270,6 +265,100 @@ module Block_services = struct
         implicit_operations_results = [];
         dal_attestation = Imported_protocol.Alpha_context.Dal.Attestation.empty;
       }
+
+  let transfer_receipt account balance : operation_receipt =
+    let open Alpha_context.Receipt in
+    let open Imported_protocol.Apply_results in
+    let contract = Tezos_types.Contract.of_implicit account in
+    let mint =
+      item
+        (Contract
+           (Alpha_context.Contract.Implicit Tezlink_mock.faucet_public_key_hash))
+        (Debited balance)
+        Block_application
+    in
+    let bootstrap =
+      item (Contract contract) (Credited balance) Block_application
+    in
+    let balance_updates = [mint; bootstrap] in
+    let operation_result =
+      Transaction_result
+        (Transaction_to_contract_result
+           {
+             storage = None;
+             lazy_storage_diff = None;
+             balance_updates;
+             ticket_receipt = [];
+             originated_contracts = [];
+             consumed_gas = Alpha_context.Gas.Arith.zero;
+             storage_size = Z.zero;
+             paid_storage_size_diff = Z.zero;
+             allocated_destination_contract = false;
+           })
+    in
+    let internal_operation_results = [] in
+    let operation_result =
+      Imported_protocol.Apply_operation_result.Applied operation_result
+    in
+    let contents =
+      Single_result
+        (Manager_operation_result
+           {balance_updates = []; operation_result; internal_operation_results})
+    in
+    Receipt (Operation_metadata {contents})
+
+  let faucet_counter () : Alpha_context.Manager_counter.t tzresult =
+    Tezos_types.convert_using_serialization
+      ~name:"faucet_counter"
+      ~src:Data_encoding.z
+      ~dst:Tezlink_imports.Alpha_context.Manager_counter.encoding_for_RPCs
+      Z.zero
+
+  let create_transfer ~chain_id (account : Alpha_context.public_key_hash)
+      (balance : Alpha_context.Tez.t) : operation tzresult =
+    let open Result_syntax in
+    let open Imported_protocol.Alpha_context in
+    let operation =
+      Transaction
+        {
+          amount = balance;
+          parameters = Alpha_context.Script.unit_parameter;
+          entrypoint = Entrypoint.default;
+          destination = Implicit account;
+        }
+    in
+    let* counter = faucet_counter () in
+    let contents =
+      Single
+        (Manager_operation
+           {
+             source = Tezlink_mock.faucet_public_key_hash;
+             fee = Tez.zero;
+             counter;
+             operation;
+             gas_limit = Gas.Arith.zero;
+             storage_limit = Z.zero;
+           })
+    in
+    let signature = None in
+    let protocol_data = Operation_data {contents; signature} in
+    let shell : Tezos_base.Operation.shell_header =
+      {branch = Tezos_crypto.Hashed.Block_hash.zero}
+    in
+    let receipt = transfer_receipt account balance in
+    let hash = Operation_hash.zero in
+    return {chain_id; hash; receipt; shell; protocol_data}
+
+  let activate_bootstraps_with_transfers ~chain_id
+      (module Backend : Tezlink_backend_sig.S) =
+    let open Lwt_result_syntax in
+    let* bootstrap_accounts = Backend.bootstrap_accounts () in
+    let*? ops =
+      List.map_e
+        (fun (account, balance) -> create_transfer ~chain_id account balance)
+        bootstrap_accounts
+    in
+    return ops
 end
 
 module Zero_block_services = struct
@@ -296,7 +385,7 @@ module Genesis_block_services = struct
   let mock_block_header_data ~chain_id : Proto.block_header_data tzresult =
     let parameter =
       Imported_protocol_parameters.Default_parameters.parameters_of_constants
-        ~bootstrap_accounts:[Tezlink_mock.bootstrap_account]
+        ~bootstrap_accounts:[Tezlink_mock.baker_account]
         Tezlink_constants.all_constants.parametric
     in
     let parameter_format_json =
@@ -516,7 +605,7 @@ let hash :
       unit,
       Block_hash.t )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.hash
+  import_service Current_block_services.S.hash
 
 let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
@@ -528,9 +617,9 @@ let header :
       tezlink_rpc_context,
       unit,
       unit,
-      Block_services.block_header )
+      Current_block_services.block_header )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.header
+  import_service Current_block_services.S.header
 
 let shell_header :
     ( [`GET],
@@ -540,7 +629,7 @@ let shell_header :
       unit,
       Block_header.shell_header )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Header.shell_header
+  import_service Current_block_services.S.Header.shell_header
 
 let operation_hashes :
     ( [`GET],
@@ -550,7 +639,7 @@ let operation_hashes :
       unit,
       Operation_hash.t list list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Operation_hashes.operation_hashes
+  import_service Current_block_services.S.Operation_hashes.operation_hashes
 
 let operation :
     ( [`GET],
@@ -560,9 +649,10 @@ let operation :
       ; metadata : [`Always | `Never] option
       ; version : Tezos_shell_services.Block_services.version >,
       unit,
-      Tezos_shell_services.Block_services.version * Block_services.operation )
+      Tezos_shell_services.Block_services.version
+      * Current_block_services.operation )
     Tezos_rpc.Service.t =
-  Tezos_rpc.Service.subst2 Block_services.S.Operations.operation
+  Tezos_rpc.Service.subst2 Current_block_services.S.Operations.operation
 
 let bootstrapped :
     ( [`GET],
@@ -631,7 +721,7 @@ let preapply_operations :
         * Imported_protocol.operation_receipt)
         list )
     Tezos_rpc.Service.t =
-  import_service Block_services.S.Helpers.Preapply.operations
+  import_service Current_block_services.S.Helpers.Preapply.operations
 
 let raw_json_cycle :
     ( [`GET],

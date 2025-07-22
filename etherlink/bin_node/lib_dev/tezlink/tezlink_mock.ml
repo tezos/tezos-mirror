@@ -34,11 +34,17 @@ let fitness =
    being replaced by actual data. *)
 let context = Context_hash.of_bytes_exn (Bytes.make 32 '\255')
 
-(* We are introducing a mock bootstrap account, which will be useful for plugging
-   Tzkt on Tezlink. For now, we are using this bootstrap account as the proposer/baker,
-   but this should change. If we decide to introduce real Tezlink bootstrap account,
-   the baker/proposer should be the address zero or the address of the sequencer). *)
-let bootstrap_account =
+(* We are introducing a mock baker account at a fixed address to answer TzKT requests
+   about baking rights. This account has all baking rights for all cycles. For now, it
+   is at a fixed address; in the future, it could be replaced by the address of the
+   sequencer so that it can collect the DA-fee part of operation fees. *)
+let baker_initial_balance = 200000000000L
+
+let baker_initial_deposit = Alpha_context.Tez.of_mutez_exn baker_initial_balance
+
+let faucet_public_key_hash = Signature.Public_key_hash.zero
+
+let baker_account =
   let public_key_internal =
     let pk_opt =
       Tezos_crypto.Signature.Ed25519.Public_key.of_bytes_without_validation
@@ -57,7 +63,7 @@ let bootstrap_account =
       public_key,
       (* This amount was arbitrarly chosen according to bootstrap account
          in L1 sandbox *)
-      Alpha_context.Tez.of_mutez_exn 200000000000L,
+      baker_initial_deposit,
       None,
       None )
 
@@ -285,7 +291,7 @@ module Storage_repr = struct
     let stake ~consensus_pk =
       let lots =
         Option.value ~default:Imported_protocol.Tez_repr.one
-        @@ Imported_protocol.Tez_repr.of_mutez 200000000000L
+        @@ Imported_protocol.Tez_repr.of_mutez baker_initial_balance
       in
       let selected_stake =
         Imported_protocol.Stake_repr.make
@@ -386,23 +392,6 @@ module Voting_period = struct
       ~dst:Alpha_context.Voting_period.encoding
 end
 
-let balance_udpdate_bootstrap ~amount ~bootstrap =
-  let open Alpha_context.Receipt in
-  let migration =
-    item
-      Bootstrap
-      (Debited (Alpha_context.Tez.of_mutez_exn amount))
-      Protocol_migration
-  in
-  let baker = frozen_baker bootstrap in
-  let deposit =
-    item
-      (Deposits baker)
-      (Credited (Alpha_context.Tez.of_mutez_exn amount))
-      Protocol_migration
-  in
-  [migration; deposit]
-
 let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
   let open Alpha_context.Receipt in
   let debited_rewards =
@@ -413,3 +402,27 @@ let balance_udpdate_rewards ~(baker : Alpha_context.public_key_hash) ~amount =
     item (Deposits baker) (Credited amount) Block_application
   in
   [debited_rewards; credited_rewards]
+
+let storage_cycle () =
+  let public_key =
+    match baker_account.public_key with
+    | None -> (* Unreachable *) assert false
+    | Some public_key -> public_key
+  in
+  let consensus_pk =
+    Imported_protocol.Raw_context.
+      {
+        delegate = baker_account.public_key_hash;
+        consensus_pk = public_key;
+        consensus_pkh = baker_account.public_key_hash;
+        companion_pk = None;
+        companion_pkh = None;
+      }
+  in
+  let delegate_sampler_state =
+    Storage_repr.Cycle.create_sample_state
+      ~consensus_pks:[(consensus_pk, baker_initial_balance)]
+  in
+  let selected_stake_distribution = Storage_repr.Cycle.stake ~consensus_pk in
+  Lwt_result.return
+    Storage_repr.Cycle.{delegate_sampler_state; selected_stake_distribution}
