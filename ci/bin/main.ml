@@ -479,7 +479,7 @@ let () =
     ~jobs:
       [
         Tezos_ci.job_datadog_pipeline_trace;
-        Release_tag.job_update_release_page ~test:true ();
+        Release_tag.job_release_page ~test:true ();
       ]
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
