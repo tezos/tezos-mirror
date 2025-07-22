@@ -585,8 +585,10 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_execution::account_storage::TezlinkAccount;
     use tezos_tezlink::enc_wrappers::BlockHash;
+    use tezos_tezlink::operation::ManagerOperationContent;
     use tezos_tezlink::operation::Parameter;
 
     use crate::block_storage;
@@ -616,6 +618,7 @@ mod tests {
     use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_crypto_rs::hash::UnknownSignature;
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
@@ -647,28 +650,88 @@ mod tests {
     use tezos_tezlink::operation::RevealContent;
     use tezos_tezlink::operation::TransferContent;
 
+    #[derive(Clone)]
+    struct Bootstrap {
+        pkh: PublicKeyHash,
+        pk: PublicKey,
+        sk: SecretKeyEd25519,
+    }
+
+    fn bootstrap1() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh",
+            )
+            .unwrap(),
+        }
+    }
+
+    fn bootstrap2() -> Bootstrap {
+        Bootstrap {
+            pkh: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
+                .unwrap(),
+            pk: PublicKey::from_b58check(
+                "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
+            )
+            .unwrap(),
+            sk: SecretKeyEd25519::from_base58_check(
+                "edsk39qAm1fiMjgmPkw1EgQYkMzkJezLNewd7PLNHTkr6w9XA2zdfo",
+            )
+            .unwrap(),
+        }
+    }
+
+    fn sign_operation(
+        sk: &SecretKeyEd25519,
+        branch: &H256,
+        content: &ManagerOperationContent,
+    ) -> UnknownSignature {
+        // Watermark comes from `src/lib_crypto/signature_v2.ml`
+        // The watermark for a ManagerOperation is always `Generic_operation`
+        // encoded with `0x03`
+        let mut serialized_unsigned_operation = vec![3_u8];
+
+        let branch = branch.as_fixed_bytes();
+        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
+        content
+            .bin_write(&mut serialized_unsigned_operation)
+            .unwrap();
+        let signature = sk
+            .sign(serialized_unsigned_operation)
+            .expect("Signature should have succeeded");
+        signature.into()
+    }
+
     fn make_operation(
         fee: u64,
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
+        source: Bootstrap,
         content: OperationContent,
     ) -> Operation {
-        let branch = BlockHash::from(TezBlock::genesis_block_hash());
-        // No need a real signature for now
-        let signature = UnknownSignature::from_base58_check("sigSPESPpW4p44JK181SmFCFgZLVvau7wsJVN85bv5ciigMu7WSRnxs9H2NydN5ecxKHJBQTudFPrUccktoi29zHYsuzpzBX").unwrap();
+        let branch = TezBlock::genesis_block_hash();
+        let manager_op = ManagerOperation {
+            source: source.pkh,
+            fee: fee.into(),
+            counter: counter.into(),
+            operation: content,
+            gas_limit: gas_limit.into(),
+            storage_limit: storage_limit.into(),
+        }
+        .into();
+
+        let signature = sign_operation(&source.sk, &branch, &manager_op);
+
         Operation {
-            branch,
-            content: ManagerOperation {
-                source,
-                fee: fee.into(),
-                counter: counter.into(),
-                operation: content,
-                gas_limit: gas_limit.into(),
-                storage_limit: storage_limit.into(),
-            }
-            .into(),
+            branch: BlockHash::from(branch),
+            content: manager_op,
             signature,
         }
     }
@@ -678,16 +741,18 @@ mod tests {
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
-        pk: PublicKey,
+        source: Bootstrap,
     ) -> Operation {
         make_operation(
             fee,
             counter,
             gas_limit,
             storage_limit,
-            source,
-            OperationContent::Reveal(RevealContent { pk, proof: None }),
+            source.clone(),
+            OperationContent::Reveal(RevealContent {
+                pk: source.pk,
+                proof: None,
+            }),
         )
     }
 
@@ -697,7 +762,7 @@ mod tests {
         counter: u64,
         gas_limit: u64,
         storage_limit: u64,
-        source: PublicKeyHash,
+        source: Bootstrap,
         amount: Narith,
         destination: Contract,
         parameters: Option<Parameter>,
@@ -770,9 +835,6 @@ mod tests {
     const DUMMY_CHAIN_ID: U256 = U256::one();
     const DUMMY_BASE_FEE_PER_GAS: u64 = MINIMUM_BASE_FEE_PER_GAS;
     const DUMMY_DA_FEE: u64 = DA_FEE_PER_BYTE;
-
-    const TEZLINK_BOOTSTRAP_1: &str = "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx";
-    const TEZLINK_BOOTSTRAP_2: &str = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN";
 
     fn dummy_evm_config(evm_configuration: Config) -> EvmChainConfig {
         EvmChainConfig::create_config(
@@ -1034,11 +1096,13 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
+        let boostrap = bootstrap1();
+        let src = boostrap.pkh.clone();
+
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeeded");
 
-        let contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("Contract creation should have succeed");
+        let contract = Contract::Implicit(src.clone());
 
         let account = TezlinkImplicitAccount::from_contract(&context, &contract)
             .expect("Account interface should be correct");
@@ -1046,9 +1110,6 @@ mod tests {
         // Allocate bootstrap 1
         TezlinkImplicitAccount::allocate(&mut host, &context, &contract)
             .expect("Contract initialization should have succeeded");
-
-        let src = PublicKeyHash::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
 
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
@@ -1059,10 +1120,10 @@ mod tests {
             .manager(&host)
             .expect("Retrieve manager should have succeeded");
 
-        assert_eq!(Manager::NotRevealed(src.clone()), manager);
+        assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, src, pk.clone());
+        let reveal = make_reveal_operation(0, 1, 0, 0, boostrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,
@@ -1091,11 +1152,13 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
+        let boostrap1 = bootstrap1();
+        let src = boostrap1.pkh.clone();
+
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeed");
 
-        let bootstrap1_contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("Contract creation should have succeed");
+        let bootstrap1_contract = Contract::Implicit(src.clone());
 
         let mut bootstrap1 =
             TezlinkImplicitAccount::from_contract(&context, &bootstrap1_contract)
@@ -1119,21 +1182,20 @@ mod tests {
         // Verify that bootstrap 1 is not revealed
         assert!(matches!(manager, Manager::NotRevealed(_)));
 
-        let src = PublicKeyHash::from_b58check(TEZLINK_BOOTSTRAP_1)
-            .expect("PublicKeyHash b58 conversion should have succeed");
-
         let pk = PublicKey::from_b58check(
             "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
         )
         .expect("Public key creation should have succeed");
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, src.clone(), pk.clone());
+        let reveal = make_reveal_operation(0, 1, 0, 0, boostrap1.clone());
 
         // Bootstrap 1 will transfer 35 mutez to bootstrap 2
 
-        let bootstrap2_contract = Contract::from_b58check(TEZLINK_BOOTSTRAP_2)
-            .expect("Contract creation should have succeed");
+        let boostrap2 = bootstrap2();
+        let dst = boostrap2.pkh.clone();
+
+        let bootstrap2_contract = Contract::Implicit(dst.clone());
 
         let bootstrap2 =
             TezlinkImplicitAccount::from_contract(&context, &bootstrap2_contract)
@@ -1150,7 +1212,7 @@ mod tests {
             2,
             0,
             0,
-            src.clone(),
+            boostrap1,
             35_u64.into(),
             bootstrap2_contract,
             None,

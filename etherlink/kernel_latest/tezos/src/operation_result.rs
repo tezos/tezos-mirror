@@ -28,10 +28,13 @@ pub struct CounterError {
 pub enum ValidityError {
     CounterInThePast(CounterError),
     CounterInTheFuture(CounterError),
+    MissingManagerContract,
+    UnrevealedManagerKey(PublicKeyHash),
     CantPayFees(Narith),
     EmptyImplicitContract,
     GasLimitTooHigh,
     StorageLimitTooHigh,
+    InvalidSignature,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]

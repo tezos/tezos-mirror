@@ -60,7 +60,7 @@ pub struct ManagerOperation<C> {
     pub operation: C,
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter)]
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
     pub content: ManagerOperationContent,

@@ -99,7 +99,7 @@ impl From<OperationHash> for H256 {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct BlockHash(pub H256);
 impl NomReader<'_> for BlockHash {
     fn nom_read(bytes: &[u8]) -> NomResult<'_, Self> {
