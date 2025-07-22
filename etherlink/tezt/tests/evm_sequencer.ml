@@ -8578,6 +8578,7 @@ let test_trace_transaction_calltracer_on_simple_transfer =
     ~title:"debug_traceTransaction can trace a simple transfer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
