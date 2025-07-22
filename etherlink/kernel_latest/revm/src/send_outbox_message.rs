@@ -24,7 +24,7 @@ use tezos_smart_rollup_encoding::{
 use crate::{
     constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, WITHDRAWAL_SOL_ADDR},
     database::PrecompileDatabase,
-    helpers::u256_to_bigint,
+    helpers::storage::u256_to_bigint,
 };
 
 sol! {
