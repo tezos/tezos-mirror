@@ -9,20 +9,23 @@ use crate::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
+    precompile_provider::EtherlinkPrecompiles,
 };
-use tezos_ethereum::Log as RlpLog;
 
 use revm::{
     context::{ContextTr, CreateScheme, JournalTr, Transaction},
     interpreter::{
         gas::calculate_initial_tx_gas_for_tx, interpreter::ReturnDataImpl,
         interpreter_types::StackTr, CallInputs, CallOutcome, CallScheme, CreateInputs,
-        CreateOutcome, InitialAndFloorGas, InstructionResult, InterpreterTypes,
+        CreateOutcome, Gas, InitialAndFloorGas, InstructionResult, InterpreterResult,
+        InterpreterTypes,
     },
     primitives::{hardfork::SpecId, hash_map::HashMap, Address, Bytes, Log, B256, U256},
     Inspector,
 };
 use rlp::{Encodable, RlpStream};
+use std::ops::Range;
+use tezos_ethereum::Log as RlpLog;
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
 
@@ -170,6 +173,7 @@ impl CallTrace {
 
 pub struct CallTracer {
     config: CallTracerConfig,
+    precompiles: EtherlinkPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
     transaction_hash: Option<B256>,
     initial_gas: u64,
@@ -179,11 +183,13 @@ pub struct CallTracer {
 impl CallTracer {
     pub fn new(
         config: CallTracerConfig,
+        precompiles: EtherlinkPrecompiles,
         spec_id: SpecId,
         transaction_hash: Option<B256>,
     ) -> Self {
         Self {
             config,
+            precompiles,
             call_trace: HashMap::with_capacity(1),
             transaction_hash,
             initial_gas: 0,
@@ -266,11 +272,13 @@ where
             CallScheme::CallCode => ("CALLCODE", inputs.target_address),
         };
 
+        let call_data = inputs.input.bytes(context);
+
         let mut call_trace = CallTrace::new_minimal_trace(
             type_.into(),
             from,
             inputs.value.get(),
-            inputs.input.bytes(context).to_vec(),
+            call_data.to_vec(),
             depth,
         );
 
@@ -278,6 +286,47 @@ where
         call_trace.add_gas(Some(inputs.gas_limit + self.initial_gas));
 
         self.set_call_trace(depth, call_trace);
+
+        if let Some(precompile) = self
+            .precompiles
+            .builtins
+            .precompiles
+            .get(&inputs.bytecode_address)
+        {
+            // Hack-ish behavior. In case the invoked address is a precompile we need to
+            // pre-simulate its result because the `call_end` hook is never called when a
+            // precompile contract is called.
+
+            let memory_offset = Range { start: 0, end: 0 }; // Ignored.
+            let mut outcome = match precompile(&call_data, inputs.gas_limit) {
+                Ok(result) => CallOutcome {
+                    result: InterpreterResult {
+                        result: InstructionResult::Return,
+                        output: result.bytes,
+                        gas: Gas::new_spent(result.gas_used),
+                    },
+                    memory_offset,
+                },
+                Err(_) => CallOutcome {
+                    result: InterpreterResult {
+                        result: InstructionResult::PrecompileError,
+                        // No return data, indicates a precompile contract error.
+                        output: Bytes::new(),
+                        gas: Gas::new_spent(inputs.gas_limit),
+                    },
+                    memory_offset,
+                },
+            };
+
+            <CallTracer as Inspector<CTX, INTR>>::call_end(
+                self,
+                context,
+                inputs,
+                &mut outcome,
+            );
+
+            return None;
+        }
 
         // NB: Always return [None] or else the result of the call will be overriden.
         None

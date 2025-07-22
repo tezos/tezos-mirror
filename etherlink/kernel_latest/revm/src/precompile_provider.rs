@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -18,9 +19,9 @@ use crate::{
     table::table_precompile,
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EtherlinkPrecompiles {
-    builtins: EthPrecompiles,
+    pub builtins: EthPrecompiles,
 }
 
 impl EtherlinkPrecompiles {
