@@ -123,7 +123,7 @@ let init () =
   | Some logfile ->
       let sighup_flag = ref false in
       (* loop every second to check if sighup_flag was set *)
-      let _logfile_reopen () =
+      let logfile_reopen =
         let rec loop () =
           let* () =
             if !sighup_flag then (
@@ -142,7 +142,12 @@ let init () =
       let signal_hup_handler signal =
         if signal = Sys.sighup then sighup_flag := true
       in
-      Log.report "Installing signal handler for reopening logs" ;
+      let _ =
+        Lwt_main.Exit_hooks.add_first (fun () ->
+            let () = Lwt.cancel logfile_reopen in
+            Lwt.return_unit)
+      in
+      Log.report "Installing signal handler for reopening logfile" ;
       Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
   | `Local_orchestrator_local_agents | `Ssh_host _ -> Lwt.return_unit
