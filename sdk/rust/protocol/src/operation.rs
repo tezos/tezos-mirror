@@ -253,6 +253,54 @@ mod tests {
     /*
     octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "transaction",
+      "source": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "fee": "987",
+      "counter": "456",
+      "gas_limit": "0",
+      "storage_limit": "1405",
+      "amount": "10",
+      "destination": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "parameters": {
+        "entrypoint": "default",
+        "value": {
+          "prim": "Unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn transaction_transfer_with_parameters_encoding() {
+        let operation = OperationContent::Transaction(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+            fee: 987.into(),
+            counter: 456.into(),
+            operation: TransactionContent {
+                amount: 10.into(),
+                destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap(),
+                parameters: Some(Parameter {
+                    entrypoint: Entrypoint::try_from("default").unwrap(),
+                    // octez-client convert data "Unit" from Michelson to binary
+                    value: hex::decode("030b").unwrap(),
+                }),
+            },
+            gas_limit: 0.into(),
+            storage_limit: 1405.into(),
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6c00e7670f32038107a59a2b9cfefae36ea21f5aa63cdb07c80300fd0a0a000002298c03ed7d454a101eb7022bc95f7e5f41ac7800").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
       "source": "tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn",
       "fee": "7",
       "counter": "4223",
