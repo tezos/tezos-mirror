@@ -4004,7 +4004,7 @@ documentation:odoc:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   artifacts:
-    expire_in: 1 hour
+    expire_in: 4 hours
     paths:
     - docs/_build/api/odoc/
     - docs/odoc.log

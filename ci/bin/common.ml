@@ -1225,7 +1225,7 @@ module Documentation = struct
       ~artifacts:
         (artifacts
            ~when_:Always
-           ~expire_in:(Duration (Hours 1))
+           ~expire_in:(Duration (Hours 4))
            (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
            ["docs/_build/api/odoc/"; "docs/odoc.log"])
       [
