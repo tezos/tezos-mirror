@@ -121,12 +121,26 @@ let init () =
   (match Tezt_core.Cli.Logs.file with
   | None -> ()
   | Some logfile ->
+      let sighup_flag = ref false in
+      (* loop every second to check if sighup_flag was set *)
+      let _logfile_reopen () =
+        let rec loop () =
+          let* () =
+            if !sighup_flag then (
+              sighup_flag := false ;
+              Log.report "Reopening logfile : %s" logfile ;
+              Tezt_core.Log.set_file logfile ;
+              Lwt.return_unit)
+            else Lwt_unix.sleep 1.
+          in
+          loop ()
+        in
+        Log.report "Starting reopen logfile background handler" ;
+        loop ()
+      in
+      (* signal handler that now just defer Log.set_file *)
       let signal_hup_handler signal =
-        if signal = Sys.sighup then (
-          (* TODO: Not sure if set_file is async-signal-safe.
-             Maybe implement a better solution if it causes issues *)
-          Tezt_core.Log.set_file logfile ;
-          Log.report "Logfile was reopened")
+        if signal = Sys.sighup then sighup_flag := true
       in
       Log.report "Installing signal handler for reopening logs" ;
       Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
