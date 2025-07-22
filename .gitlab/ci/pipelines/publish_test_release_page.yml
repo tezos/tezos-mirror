@@ -42,7 +42,7 @@ datadog_pipeline_trace:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-publish:update-release-page:
+publish:release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
@@ -55,15 +55,10 @@ publish:update-release-page:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - sudo apk add aws-cli pandoc
   - eval $(opam env)
   script:
-  - sudo apk add aws-cli pandoc
-  - dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' --title
-    'Octez releases' --bucket ${S3_BUCKET} --path '${BUCKET_PATH:-}' changelog binaries
-    packages
-  - aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/"
-  - aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths
-    "/*"
+  - ./scripts/releases/publish_release_page.sh
   after_script:
   - cp /tmp/release_page*/index.md ./index.md
   variables:
@@ -74,5 +69,6 @@ publish:update-release-page:
   artifacts:
     expire_in: 1 day
     paths:
-    - index.md
+    - ./index.md
     - index.html
+  retry: 0
