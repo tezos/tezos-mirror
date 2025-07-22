@@ -121,7 +121,6 @@ let init () =
   (match Tezt_core.Cli.Logs.file with
   | None -> ()
   | Some logfile ->
-      Log.report "Installing signal handler for SIGHUP" ;
       let signal_hup_handler signal =
         if signal = Sys.sighup then (
           (* TODO: Not sure if set_file is async-signal-safe.
@@ -129,6 +128,7 @@ let init () =
           Tezt_core.Log.set_file logfile ;
           Log.report "Logfile was reopened")
       in
+      Log.report "Installing signal handler for reopening logs" ;
       Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
   | `Local_orchestrator_local_agents | `Ssh_host _ -> Lwt.return_unit
