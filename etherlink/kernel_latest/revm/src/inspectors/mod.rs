@@ -2,8 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::Error;
-use crate::{precompile_provider::EtherlinkPrecompiles, EVMInnerContext};
+use crate::{
+    database::EtherlinkVMDB, precompile_provider::EtherlinkPrecompiles, EVMInnerContext,
+    Error,
+};
+use call_tracer::{CallTracer, CallTracerConfig};
 use noop::NoInspector;
 use revm::{
     context::{
@@ -19,15 +22,18 @@ use revm::{
         interpreter::{EthInterpreter, ReturnDataImpl},
         interpreter_action::FrameInit,
         interpreter_types::StackTr,
-        CallInputs, CallOutcome, CreateInputs, CreateOutcome, Interpreter,
-        InterpreterTypes,
+        CallInputs, CallOutcome, CreateInputs, CreateOutcome, InterpreterTypes,
     },
+    primitives::B256,
     state::EvmState,
     ExecuteEvm, InspectEvm, Inspector,
 };
 use tezos_evm_runtime::runtime::Runtime;
 
+pub mod call_tracer;
 pub mod noop;
+
+mod storage;
 
 pub type EvmInspection<'a, Host> = Evm<
     EVMInnerContext<'a, Host>,
@@ -38,7 +44,7 @@ pub type EvmInspection<'a, Host> = Evm<
 >;
 
 pub struct EtherlinkEvmInspector<'a, Host: Runtime> {
-    pub inner: EvmInspection<'a, Host>,
+    inner: EvmInspection<'a, Host>,
 }
 
 impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
@@ -75,7 +81,7 @@ impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
 
 #[derive(Debug, Clone)]
 pub struct EtherlinkHandler<CTX, ERROR, FRAME> {
-    pub _phantom: core::marker::PhantomData<(CTX, ERROR, FRAME)>,
+    _phantom: core::marker::PhantomData<(CTX, ERROR, FRAME)>,
 }
 
 impl<EVM, ERROR, FRAME> Handler for EtherlinkHandler<EVM, ERROR, FRAME>
@@ -127,12 +133,20 @@ impl<Host: Runtime> InspectEvm for EtherlinkEvmInspector<'_, Host> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum TracerConfig {
+pub struct CallTracerInput {
+    pub config: CallTracerConfig,
+    pub transaction_hash: Option<B256>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TracerInput {
     NoOp,
+    CallTracer(CallTracerInput),
 }
 
 pub enum EtherlinkInspector {
     NoOp(NoInspector),
+    CallTracer(Box<CallTracer>),
 }
 
 impl Default for EtherlinkInspector {
@@ -141,26 +155,24 @@ impl Default for EtherlinkInspector {
     }
 }
 
-impl<CTX, INTR> Inspector<CTX, INTR> for EtherlinkInspector
+impl<'a, Host, CTX, INTR> Inspector<CTX, INTR> for EtherlinkInspector
 where
-    CTX: ContextTr,
+    Host: Runtime + 'a,
+    CTX: ContextTr<Db = EtherlinkVMDB<'a, Host>>,
     INTR: InterpreterTypes<Stack: StackTr, ReturnData = ReturnDataImpl>,
 {
-    fn initialize_interp(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
+    fn call(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CallInputs,
+    ) -> Option<CallOutcome> {
         match self {
-            Self::NoOp(no_inspector) => no_inspector.initialize_interp(interp, context),
-        }
-    }
-
-    fn step(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
-        match self {
-            Self::NoOp(no_inspector) => no_inspector.step(interp, context),
-        }
-    }
-
-    fn step_end(&mut self, interp: &mut Interpreter<INTR>, context: &mut CTX) {
-        match self {
-            Self::NoOp(no_inspector) => no_inspector.step_end(interp, context),
+            Self::NoOp(no_inspector) => {
+                <NoInspector as Inspector<CTX, INTR>>::call(no_inspector, context, inputs)
+            }
+            Self::CallTracer(call_tracer) => {
+                <CallTracer as Inspector<CTX, INTR>>::call(call_tracer, context, inputs)
+            }
         }
     }
 
@@ -177,6 +189,31 @@ where
                 inputs,
                 outcome,
             ),
+            Self::CallTracer(call_tracer) => {
+                <CallTracer as Inspector<CTX, INTR>>::call_end(
+                    call_tracer,
+                    context,
+                    inputs,
+                    outcome,
+                )
+            }
+        }
+    }
+
+    fn create(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut CreateInputs,
+    ) -> Option<CreateOutcome> {
+        match self {
+            Self::NoOp(no_inspector) => <NoInspector as Inspector<CTX, INTR>>::create(
+                no_inspector,
+                context,
+                inputs,
+            ),
+            Self::CallTracer(call_tracer) => {
+                <CallTracer as Inspector<CTX, INTR>>::create(call_tracer, context, inputs)
+            }
         }
     }
 
@@ -190,6 +227,14 @@ where
             Self::NoOp(no_inspector) => {
                 <NoInspector as Inspector<CTX, INTR>>::create_end(
                     no_inspector,
+                    context,
+                    inputs,
+                    outcome,
+                )
+            }
+            Self::CallTracer(call_tracer) => {
+                <CallTracer as Inspector<CTX, INTR>>::create_end(
+                    call_tracer,
                     context,
                     inputs,
                     outcome,

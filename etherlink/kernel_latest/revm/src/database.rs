@@ -27,7 +27,7 @@ use tezos_evm_runtime::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// Runtime host
-    host: &'a mut Host,
+    pub host: &'a mut Host,
     /// EVM world state handler
     world_state_handler: &'a mut WorldStateHandler,
     /// Constants for the current block
@@ -51,8 +51,6 @@ enum AccountState {
     SelfDestructed(B256),
 }
 
-// See: https://github.com/rust-lang/rust-clippy/issues/5787
-#[allow(clippy::needless_lifetimes)]
 impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     pub fn new(
         host: &'a mut Host,

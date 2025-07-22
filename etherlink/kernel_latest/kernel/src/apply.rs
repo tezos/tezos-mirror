@@ -24,7 +24,6 @@ use evm_execution::trace::{
     get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput, TracerInput,
 };
 use primitive_types::{H160, H256, U256};
-use revm::primitives::hardfork::SpecId;
 use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::BlockConstants;
@@ -310,9 +309,9 @@ fn config_to_revm_specid(config: &Config) -> revm::primitives::hardfork::SpecId 
     // configuration. The last case is the very first EVM version
     // that we supported (:= Shanghai).
     if config.selfdestruct_deprecated {
-        SpecId::CANCUN
+        revm::primitives::hardfork::SpecId::CANCUN
     } else {
-        SpecId::SHANGHAI
+        revm::primitives::hardfork::SpecId::SHANGHAI
     }
 }
 
@@ -328,7 +327,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     effective_gas_price: U256,
     access_list: AccessList,
     config: &Config,
-    _tracer_input: Option<TracerInput>,
+    tracer_input: Option<TracerInput>,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
     // Disclaimer:
     // The following code is over-complicated because we maintain
@@ -398,8 +397,24 @@ pub fn revm_run_transaction<Host: Runtime>(
                 )
                 .collect::<Vec<revm::context::transaction::AccessListItem>>(),
         ),
-        // TODO: Provide [tracer_input: Option<TracerInput>] when relevant.
-        None,
+        tracer_input.map(|tracer_input| match tracer_input {
+            TracerInput::CallTracer(CallTracerInput {
+                transaction_hash,
+                config,
+            }) => revm_etherlink::inspectors::TracerInput::CallTracer(
+                revm_etherlink::inspectors::CallTracerInput {
+                    config: revm_etherlink::inspectors::call_tracer::CallTracerConfig {
+                        only_top_call: config.only_top_call,
+                        with_logs: config.with_logs,
+                    },
+                    transaction_hash: transaction_hash
+                        .map(|hash| revm::primitives::B256::from(hash.0)),
+                },
+            ),
+            // TODO: StructLogger is a no-op on purpose for now. Check if this is something
+            // we want to maintain when switching to REVM.
+            TracerInput::StructLogger(_) => revm_etherlink::inspectors::TracerInput::NoOp,
+        }),
     ) {
         Ok(outcome) => {
             let gas_used = outcome.result.gas_used();
