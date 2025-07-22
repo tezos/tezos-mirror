@@ -10,5 +10,6 @@ XCTMain(
     testCase(TestBasicTraits.allTests),
     testCase(TestKeys.allTests),
     testCase(TestForging.allTests),
+    testCase(TestEntrypoints.allTests),
   ]
 )
