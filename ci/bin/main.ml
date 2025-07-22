@@ -476,7 +476,12 @@ let () =
         Tezos_ci.job_datadog_pipeline_trace;
         Release_tag.job_release_page ~test:false ();
       ]
-    ~description:"Pipeline that updates and publishes the release page."
+    ~description:"Pipeline that updates and publishes the release page." ;
+  register
+    "Docker"
+    If.(api_docker && on_tezos_namespace)
+    ~jobs:Master_branch.octez_distribution_docker_jobs
+    ~description:"Pipeline that build docker images."
 
 (** {2 Entry point of the generator binary} *)
 
