@@ -72,3 +72,9 @@ let init_explorus cloud node =
     cloud
     ~name:"Explorus"
     ~url:(sf "http://explorus.io?network=%s" (Node.rpc_endpoint node))
+
+(* Some DAL nodes (those in operator mode) refuse to start unless they are
+   connected to an Octez node keeping enough history to play refutation
+   games. *)
+let refutation_game_minimal_rolling_history_mode =
+  Node.(History_mode (Rolling (Some 79)))

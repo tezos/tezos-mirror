@@ -28,12 +28,6 @@ open Scenarios_helpers
 open Tezos
 open Yes_crypto
 
-(* Some DAL nodes (those in operator mode) refuse to start unless they are
-   connected to an Octez node keeping enough history to play refutation
-   games. *)
-let refutation_game_minimal_rolling_history_mode =
-  Node.(History_mode (Rolling (Some 79)))
-
 module Disconnect = struct
   module IMap = Map.Make (Int)
 
@@ -105,167 +99,6 @@ module Disconnect = struct
     Lwt.return {t with disconnected_bakers = bakers_to_keep_disconnected}
 end
 
-module Dal_reverse_proxy = struct
-  (** This module allows to configure NginX as a reverse proxy in
-      front of a collection of DAL nodes. This allows to balance the
-      load on the DAL nodes based on which DAL slot index is used
-      while complying with the interface of the rollup node, which
-      expects a single DAL node endpoint.
-
-      The NginX reverse-proxy configuration is added as an NginX site
-      (in directory /etc/nginx/sites-available/ which is symlinked in
-      /etc/nginx/sites-enabled/). This module makes no assumption
-      about the existence of other NginX sites and should be invisible
-      to them except that:
-
-      - it disables the "default" NginX site (the file
-        /etc/nginx/sites-enabled/default is removed if it exists),
-      - it overrides the "reverse_proxy" NgninX site if there is some.
-  *)
-
-  (* An NginX configuration file is made of directives inside
-     potentially nested context blocks. *)
-  type config = Directive of string | Context_block of string * config list
-
-  let rec pp_config out = function
-    | Directive s -> Format.fprintf out "%s;" s
-    | Context_block (head, l) ->
-        Format.fprintf
-          out
-          "@[<v 2>%s {@;%a@]@;}"
-          head
-          (Format.pp_print_list
-             ~pp_sep:(fun out () -> Format.fprintf out "@;")
-             pp_config)
-          l
-
-  let generate_nginx_config ~port out ~default_endpoint
-      (producers : (int * string) Seq.t) =
-    Format.fprintf
-      out
-      "@[<v 0>%a@]@."
-      pp_config
-      (Context_block
-         ( "server",
-           [
-             Directive (sf "listen 0.0.0.0:%d" port);
-             (* When fetching data about a slot the RPC are of the
-                form (GET /levels/<level>/slots/<slot_index>/...); we
-                direct the request to a DAL node subscribed to the
-                topics of the queried slot index. *)
-             Context_block
-               ( "location /levels/",
-                 producers
-                 |> Seq.map (fun (slot_index, endpoint) ->
-                        Context_block
-                          ( sf "location ~ ^/levels/[0-9]+?/slots/%d/" slot_index,
-                            [Directive (sf "proxy_pass %s" endpoint)] ))
-                 |> List.of_seq );
-             (* When posting a DAL slot, the format of the RPC is POST
-                /slots/?slot_index=<slot_index>. In this case too we
-                redirect the request to a DAL node subscribed to the
-                topics of the queried slot index. *)
-             Context_block
-               ( "location /slots",
-                 producers
-                 |> Seq.map (fun (slot_index, endpoint) ->
-                        Context_block
-                          ( sf
-                              "if ($query_string ~ \"slot_index=%d\")"
-                              slot_index,
-                            [Directive (sf "proxy_pass %s" endpoint)] ))
-                 |> List.of_seq );
-             (* Other queries can be answered by any DAL node. *)
-             Context_block
-               ("location /", [Directive (sf "proxy_pass %s" default_endpoint)]);
-           ] ))
-
-  let init_reverse_proxy cloud ~next_agent ~default_endpoint
-      (proxified_dal_nodes : (int * string) Seq.t) =
-    (* A NGINX reverse proxy which balances load between producer DAL
-       nodes based on the requested slot index. *)
-    let name = name_of Reverse_proxy in
-    let* agent = next_agent ~name in
-    let runner = Agent.runner agent in
-    let port = Agent.next_available_port agent in
-    let () = toplog "Launching reverse proxy" in
-    let () = toplog "Generating nginx reverse proxy config" in
-    let config_filename = "nginx_reverse_proxy_config" in
-    let out_chan = Stdlib.open_out config_filename in
-    let config_ppf = Format.formatter_of_out_channel out_chan in
-    Format.fprintf
-      config_ppf
-      "%a"
-      (generate_nginx_config ~default_endpoint ~port)
-      proxified_dal_nodes ;
-    close_out out_chan ;
-
-    (* Upload the configuration file. *)
-    let* (_ : string) =
-      Agent.copy
-        ~destination:"/etc/nginx/sites-available/reverse_proxy"
-        ~source:config_filename
-        agent
-    in
-
-    (* Disable the default configuration *)
-    let* () =
-      Process.spawn ?runner "rm" ["-f"; "/etc/nginx/sites-enabled/default"]
-      |> Process.check
-    in
-
-    (* Enable the reverse proxy configuration *)
-    let* () =
-      Process.spawn
-        ?runner
-        "ln"
-        [
-          "-s";
-          "/etc/nginx/sites-available/reverse_proxy";
-          "/etc/nginx/sites-enabled/reverse_proxy";
-        ]
-      |> Process.check
-    in
-
-    (* Check the NginX configuration *)
-    let* () = Process.spawn ?runner "nginx" ["-t"] |> Process.check in
-
-    (* Start the NginX service *)
-    let* () =
-      (* If the service can be stopped (i.e. the command doesn't fail), we
-         probably are in a SysV system. Nginx will run as a service natively.
-         Otherwise, we need to start it manually. *)
-      let* service_cmd =
-        Process.spawn ?runner "service" ["nginx"; "stop"] |> Process.wait
-      in
-      match Process.validate_status service_cmd with
-      | Ok () ->
-          Process.spawn ?runner "service" ["nginx"; "start"] |> Process.check
-      | Error _ ->
-          (* Runs the process as a daemon, and don't bind the process, otherwise
-             Tezt will wait for it to finish.
-          *)
-          let _process = Process.spawn ?runner "nginx" ["-g"; "daemon on;"] in
-          unit
-    in
-    (* In order to pass the reverse proxy to the various Tezt helpers we
-       need to pretend to be a DAL node. The simplest way to do so is to
-       call Dal_node.Agent.create_from_endpoint with the appropriate
-       rpc_port and never call Dal_node.run on the result.
-
-       Since the DAL node never runs, it does not call it's L1 endpoint. *)
-    let l1_node_endpoint = Endpoint.make ~host:"" ~scheme:"" ~port:0 () in
-    let* dal_node =
-      Dal_node.Agent.create_from_endpoint
-        ~name:"reverse-proxy-dal-node"
-        ~rpc_port:port
-        cloud
-        agent
-        ~l1_node_endpoint
-    in
-    return dal_node
-end
-
 type etherlink_configuration = {
   etherlink_sequencer : bool;
   etherlink_producers : int;
@@ -332,21 +165,6 @@ type baker = {
   stake : int;
 }
 
-type producer = {
-  node : Node.t;
-  dal_node : Dal_node.t;
-  client : Client.t;
-  account : Account.key;
-  is_ready : unit Lwt.t;
-  slot_index : int;
-}
-
-type observer = {
-  node : Node.t;
-  dal_node : Dal_node.t;
-  topic : [`Slot_index of int | `Pkh of string];
-}
-
 type echo_operator = {
   node : Node.t;
   client : Client.t;
@@ -376,28 +194,10 @@ type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
-(* "Status" of an attester at some level.
-   There are 5 cases:
-   - The attester is in the DAL committee and sent a dal_attestation -> With_DAL
-   - The attester is in the DAL committee and sent an attestation without DAL -> Without_DAL
-   - The attester is in the DAL committee and sent no attestation -> Expected_to_DAL_attest
-   - The attester is out of the DAL committee (but in the Tenderbake committee) and
-     sent an attestation -> Out_of_committee
-   - The attester is out of the DAL committee and did not send an attestation
-     (this case can happen either because they are out of the Tenderbake committee or
-     because their baker had an issue at this level) -> Those bakers will not be in the
-     `attestations` field of the `per_level_infos` crafted at the current level.
-*)
-type dal_status =
-  | With_DAL of Z.t
-  | Without_DAL
-  | Out_of_committee
-  | Expected_to_DAL_attest
-
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, dal_status) Hashtbl.t;
+  attestations : (public_key_hash, Dal_node_helpers.dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
 }
@@ -455,8 +255,9 @@ type t = {
      to [bootstrap.node_rpc_endpoint] which is a public endpoint when the
      '--bootstrap' argument is not provided *)
   bakers : baker list;
-  producers : producer list; (* NOTE: they have the observer profile*)
-  observers : observer list;
+  producers : Dal_node_helpers.producer list;
+      (* NOTE: they have the observer profile*)
+  observers : Dal_node_helpers.observer list;
   etherlink : etherlink option;
   echo_rollup : echo_operator option;
   time_between_blocks : int;
@@ -903,7 +704,7 @@ let update_ratio_attested_commitments_per_baker t per_level_info =
                ( public_key_hash,
                  match status with
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
-                 | With_DAL attestation_bitset ->
+                 | Dal_node_helpers.With_DAL attestation_bitset ->
                      {
                        attestable_slots;
                        attested_slots = Z.popcount attestation_bitset;
@@ -2017,6 +1818,7 @@ module Monitoring_app = struct
 end
 
 let get_infos_per_level t ~level ~metadata =
+  let open Dal_node_helpers in
   let client = t.bootstrap.client in
   let endpoint = t.some_node_rpc_endpoint in
   let etherlink_operators =
@@ -2159,97 +1961,6 @@ let init_teztale (configuration : configuration) cloud agent =
   if configuration.teztale then init_teztale cloud agent |> Lwt.map Option.some
   else Lwt.return_none
 
-let may_copy_dal_node_identity_file agent node = function
-  | None -> Lwt.return_unit
-  | Some source ->
-      toplog "Copying the DAL node identity file for %s" (Agent.name agent) ;
-      let* _ =
-        Agent.copy agent ~source ~destination:(Dal_node.identity_file node)
-      in
-      Lwt.return_unit
-
-let fund_producers_accounts (bootstrap : bootstrap) configuration
-    accounts_to_fund =
-  if List.length accounts_to_fund > 0 then
-    let () = toplog "Funding the producer accounts" in
-    let fundraiser_key =
-      match configuration.fundraiser with
-      | None ->
-          Test.fail
-            "No fundraiser key was specified. Please use either `--fundraiser` \
-             or the variable environment `TEZT_CLOUD_FUNDRAISER` to specified \
-             an unencrypted secret key of an account having funds to run the \
-             scenario"
-      | Some key -> key
-    in
-    let* () =
-      Client.import_secret_key
-        bootstrap.client
-        (Unencrypted fundraiser_key)
-        ~alias:"fundraiser"
-    in
-    let () = toplog "Revealing the fundraiser public key" in
-    let* () =
-      let*? process = Client.reveal ~src:"fundraiser" bootstrap.client in
-      let* _ = Process.wait process in
-      Lwt.return_unit
-    in
-    let* fundraiser =
-      Client.show_address ~alias:"fundraiser" bootstrap.client
-    in
-    let () = toplog "Fetching fundraiser's counter" in
-    let* counter =
-      Operation.get_next_counter ~source:fundraiser bootstrap.client
-    in
-    let () = toplog "Fetching fundraiser's balance" in
-    let* _balance =
-      Client.get_balance_for ~account:"fundraiser" bootstrap.client
-    in
-    let () = toplog "Injecting the batch" in
-    let* _op_hash =
-      accounts_to_fund
-      |> List.map (fun (dest, amount) ->
-             Operation.Manager.transfer ~amount ~dest ())
-      |> Operation.Manager.make_batch ~source:fundraiser ~counter
-      |> Fun.flip (Operation.Manager.inject ~dont_wait:true) bootstrap.client
-    in
-    (* Wait a bit. *)
-    let () = toplog "Waiting 10 seconds" in
-    let* () = Lwt_unix.sleep 10. in
-    let () = toplog "Waiting 10 seconds: done" in
-    Lwt.return_unit
-  else
-    let () =
-      toplog "Skipping batch injection because there is no account to fund"
-    in
-    Lwt.return_unit
-
-let init_producer_accounts (bootstrap : bootstrap) configuration =
-  let () = toplog "Initializing the producers" in
-  match configuration.producer_key with
-  | None ->
-      Client.stresstest_gen_keys
-        ~alias_prefix:"dal_producer"
-        (List.length configuration.dal_node_producers)
-        bootstrap.client
-  | Some producer_key -> (
-      match configuration.dal_node_producers with
-      | [_] ->
-          let* () =
-            Client.import_secret_key
-              bootstrap.client
-              (Unencrypted producer_key)
-              ~alias:"producer_key"
-          in
-          let* account =
-            Client.show_address ~alias:"producer_key" bootstrap.client
-          in
-          return [account]
-      | _ ->
-          Test.fail
-            "A producer key can only be used if there is exactly one slot on \
-             which data are produced.")
-
 let init_echo_rollup_account (bootstrap : bootstrap)
     (configuration : configuration) =
   if configuration.echo_rollup then
@@ -2351,7 +2062,7 @@ let init_public_network cloud (configuration : configuration)
                 dal_node
             in
             let* () =
-              may_copy_dal_node_identity_file
+              Dal_node_helpers.may_copy_dal_node_identity_file
                 agent
                 dal_node
                 configuration.bootstrap_dal_node_identity_file
@@ -2424,7 +2135,12 @@ let init_public_network cloud (configuration : configuration)
         |> return)
       stake
   in
-  let* producer_accounts = init_producer_accounts bootstrap configuration in
+  let* producer_accounts =
+    Dal_node_helpers.init_producer_accounts
+      ~client:bootstrap.client
+      ~producer_key:configuration.producer_key
+      ~dal_node_producers:configuration.dal_node_producers
+  in
   let* etherlink_rollup_operator_key, etherlink_batching_operator_keys =
     init_etherlink_operators bootstrap etherlink_configuration
   in
@@ -2446,7 +2162,12 @@ let init_public_network cloud (configuration : configuration)
         ~some:(fun operator -> [(operator, 11_000 * 1_000_000)])
         echo_rollup_key
   in
-  let* () = fund_producers_accounts bootstrap configuration accounts_to_fund in
+  let* () =
+    Dal_node_helpers.fund_producers_accounts
+      ~client:bootstrap.client
+      ~fundraiser:configuration.fundraiser
+      accounts_to_fund
+  in
   let etherlink_rollup_operator_key =
     match etherlink_rollup_operator_key with key :: _ -> Some key | [] -> None
   in
@@ -2758,7 +2479,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
         in
         let otel = Cloud.open_telemetry_endpoint cloud in
         let* () =
-          may_copy_dal_node_identity_file
+          Dal_node_helpers.may_copy_dal_node_identity_file
             agent
             dal_bootstrap_node
             configuration.bootstrap_dal_node_identity_file
@@ -2965,266 +2686,6 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
   in
   Lwt.return {node; dal_node; baker; accounts = baker_accounts; stake}
 
-let init_producer cloud configuration ~bootstrap teztale account i slot_index
-    agent =
-  let name = Format.asprintf "producer-node-%i" i in
-  let () = toplog "Initializing the DAL producer %s" name in
-  let data_dir =
-    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
-  in
-  let () = toplog "Init producer %s: init L1 node" name in
-  let env, with_yes_crypto =
-    may_set_yes_crypto_env configuration.simulate_network
-  in
-  let* node =
-    Node_helpers.init
-      ?env
-      ?data_dir
-      ~name
-      ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
-      ~rpc_external:configuration.external_rpc
-      configuration.network
-      ~with_yes_crypto
-      ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
-      cloud
-      agent
-  in
-  let endpoint = Client.Node node in
-  let () = toplog "Init %s producer: create client" name in
-  let* client = Client.Agent.create ~endpoint agent in
-  let () = toplog "Init %s producer: import key" name in
-  let* () =
-    Client.import_secret_key
-      client
-      ~endpoint
-      account.Account.secret_key
-      ~alias:account.Account.alias
-  in
-  let () = toplog "Init producer %s: reveal account" name in
-  let*? process = Client.reveal client ~endpoint ~src:account.Account.alias in
-  let* _ = Process.wait process in
-  let () = toplog "Init producer %s: create agent" name in
-  let* dal_node =
-    let ignore_pkhs =
-      if configuration.ignore_pkhs = [] then None
-      else Some configuration.ignore_pkhs
-    in
-    Dal_node.Agent.create
-      ~name:(Format.asprintf "producer-dal-node-%i" i)
-      ~node
-      ~disable_shard_validation:configuration.disable_shard_validation
-      ?ignore_pkhs
-      cloud
-      agent
-  in
-  let () = toplog "Init producer %s: init DAL node config" name in
-  let* () =
-    Dal_node.init_config
-      ~expected_pow:(Network.expected_pow configuration.network)
-      ~observer_profiles:[slot_index]
-      ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-      (* If `--no-dal` is given with `--producers 2`, then DAL nodes
-         are run for the producers. While this is weird in sandboxed
-         mode, it can make sense on ghostnet for example. *)
-      dal_node
-  in
-  let () = toplog "Init producer %s: add DAL node metrics" name in
-  let* () =
-    add_prometheus_source
-      ~node
-      ~dal_node
-      cloud
-      agent
-      (Format.asprintf "producer-%d" i)
-  in
-  let* () =
-    match teztale with
-    | None -> Lwt.return_unit
-    | Some teztale ->
-        Teztale.update_alias
-          teztale
-          ~address:account.Account.public_key_hash
-          ~alias:account.Account.alias
-  in
-  (* We do not wait on the promise because loading the SRS takes some time.
-     Instead we will publish commitments only once this promise is fulfilled. *)
-  let () = toplog "Init producer %s: wait for DAL node to be ready" name in
-  let otel = Cloud.open_telemetry_endpoint cloud in
-  let is_ready =
-    let ignore_pkhs =
-      if configuration.ignore_pkhs = [] then None
-      else Some configuration.ignore_pkhs
-    in
-    Dal_node.Agent.run
-      ~prometheus:Tezt_cloud_cli.prometheus
-      ?otel
-      ~memtrace:configuration.memtrace
-      ~event_level:`Notice
-      ~disable_shard_validation:configuration.disable_shard_validation
-      ?ignore_pkhs
-      ~ppx_profiling:configuration.ppx_profiling
-      ~ppx_profiling_backends:configuration.ppx_profiling_backends
-      dal_node
-  in
-  let () = toplog "Init producer %s: DAL node is ready" name in
-  let* () =
-    match teztale with
-    | None -> Lwt.return_unit
-    | Some teztale ->
-        Teztale.add_archiver
-          teztale
-          cloud
-          agent
-          ~node_name:(Node.name node)
-          ~node_port:(Node.rpc_port node)
-  in
-  Lwt.return {client; node; dal_node; account; is_ready; slot_index}
-
-let init_observer cloud configuration ~bootstrap teztale ~topic i agent =
-  let name = Format.asprintf "observer-node-%i" i in
-  let data_dir =
-    configuration.data_dir |> Option.map (fun data_dir -> data_dir // name)
-  in
-  let env, with_yes_crypto =
-    may_set_yes_crypto_env configuration.simulate_network
-  in
-  let* node =
-    Node_helpers.init
-      ?env
-      ?data_dir
-      ~name
-      ~arguments:[Peer bootstrap.node_p2p_endpoint]
-      ~rpc_external:configuration.external_rpc
-      configuration.network
-      ~with_yes_crypto
-      ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
-      cloud
-      agent
-  in
-  let* dal_node =
-    Dal_node.Agent.create
-      ~name:(Format.asprintf "observer-dal-node-%i" i)
-      ~node
-      ~disable_shard_validation:configuration.disable_shard_validation
-      cloud
-      agent
-  in
-  let* () =
-    match topic with
-    | `Slot_index slot_index ->
-        Dal_node.init_config
-          ~expected_pow:(Network.expected_pow configuration.network)
-          ~observer_profiles:[slot_index]
-          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-          dal_node
-    | `Pkh pkh ->
-        Dal_node.init_config
-          ~expected_pow:(Network.expected_pow configuration.network)
-          ~attester_profiles:[pkh]
-          ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-          dal_node
-  in
-  let* () =
-    add_prometheus_source
-      ~node
-      ~dal_node
-      cloud
-      agent
-      (Format.asprintf "observer-%d" i)
-  in
-  let otel = Cloud.open_telemetry_endpoint cloud in
-  let* () =
-    Dal_node.Agent.run
-      ~prometheus:Tezt_cloud_cli.prometheus
-      ?otel
-      ~memtrace:configuration.memtrace
-      ~event_level:`Notice
-      ~disable_shard_validation:configuration.disable_shard_validation
-      ~ppx_profiling:configuration.ppx_profiling
-      ~ppx_profiling_backends:configuration.ppx_profiling_backends
-      dal_node
-  in
-  let* () =
-    match teztale with
-    | None -> Lwt.return_unit
-    | Some teztale ->
-        Teztale.add_archiver
-          teztale
-          cloud
-          agent
-          ~node_name:(Node.name node)
-          ~node_port:(Node.rpc_port node)
-  in
-  Lwt.return {node; dal_node; topic}
-
-let init_dal_reverse_proxy_observers
-    {
-      external_rpc;
-      network;
-      snapshot;
-      ppx_profiling;
-      ppx_profiling_backends;
-      memtrace;
-      simulate_network;
-      _;
-    } ~name_of ~default_endpoint ~bootstrap ~dal_slots ~next_agent ~otel ~cloud
-    =
-  if dal_slots = [] then failwith "Expected at least a DAL slot." ;
-  let* dal_slots_and_nodes =
-    dal_slots
-    |> Lwt_list.map_p (fun slot_index ->
-           let name = name_of slot_index in
-           let* agent = next_agent ~name in
-           let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
-           let* node =
-             Node_helpers.init
-               ?env
-               ~name
-               ~arguments:
-                 [
-                   Peer bootstrap.node_p2p_endpoint;
-                   refutation_game_minimal_rolling_history_mode;
-                 ]
-               ~rpc_external:external_rpc
-               network
-               ~with_yes_crypto
-               ~snapshot
-               cloud
-               agent
-           in
-           let* dal_node = Dal_node.Agent.create ~name ~node cloud agent in
-           let* () =
-             Dal_node.init_config
-               ~expected_pow:(Network.expected_pow network)
-               ~operator_profiles:[slot_index]
-               ~peers:(Option.to_list bootstrap.dal_node_p2p_endpoint)
-               dal_node
-           in
-           let* () =
-             Dal_node.Agent.run
-               ?otel
-               ~memtrace
-               ~ppx_profiling
-               ~ppx_profiling_backends
-               dal_node
-           in
-           return (slot_index, Dal_node.rpc_endpoint dal_node))
-  in
-  let default_endpoint =
-    match default_endpoint with
-    | Some e -> e
-    | None ->
-        let _, first_observer_endpoint = List.hd dal_slots_and_nodes in
-        first_observer_endpoint
-  in
-  Dal_reverse_proxy.init_reverse_proxy
-    cloud
-    ~next_agent
-    ~default_endpoint
-    (List.to_seq dal_slots_and_nodes)
-
 let init_etherlink_dal_node
     ({
        external_rpc;
@@ -3325,12 +2786,19 @@ let init_etherlink_dal_node
       in
       let default_endpoint = Dal_node.rpc_endpoint default_dal_node in
       let* reverse_proxy_dal_node =
-        init_dal_reverse_proxy_observers
-          configuration
+        Dal_reverse_proxy.init_dal_reverse_proxy_observers
+          ~external_rpc:configuration.external_rpc
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          ~memtrace:configuration.memtrace
+          ~simulate_network:configuration.simulate_network
           ~name_of:(fun slot_index ->
             name_of (Etherlink_dal_observer {slot_index}))
           ~default_endpoint:(Some default_endpoint)
-          ~bootstrap
+          ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+          ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           ~dal_slots
           ~next_agent
           ~otel
@@ -3803,12 +3271,19 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
         some dal_node
     | _ ->
         let* dal_reverse_proxy_with_observers =
-          init_dal_reverse_proxy_observers
-            configuration
+          Dal_reverse_proxy.init_dal_reverse_proxy_observers
+            ~external_rpc:configuration.external_rpc
+            ~network:configuration.network
+            ~snapshot:configuration.snapshot
+            ~ppx_profiling:configuration.ppx_profiling
+            ~ppx_profiling_backends:configuration.ppx_profiling_backends
+            ~memtrace:configuration.memtrace
+            ~simulate_network:configuration.simulate_network
             ~name_of:(fun slot_index ->
               name_of (Echo_rollup_dal_observer {slot_index}))
             ~default_endpoint:None
-            ~bootstrap
+            ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+            ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
             ~dal_slots
             ~next_agent
             ~otel
@@ -3892,8 +3367,8 @@ let init_echo_rollup cloud configuration ~bootstrap operator dal_slots
   return operator
 
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
-    (bakers : baker list) (producers : producer list)
-    (observers : observer list) etherlink =
+    (bakers : baker list) (producers : Dal_node_helpers.producer list)
+    (observers : Dal_node_helpers.observer list) etherlink =
   match (agent, network) with
   | None, #Network.public -> (
       match (bakers, producers, observers, etherlink) with
@@ -4072,10 +3547,20 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* producers =
     Lwt_list.mapi_p
       (fun i ((agent, slot_index), account) ->
-        init_producer
+        Dal_node_helpers.init_producer
           cloud
-          configuration
-          ~bootstrap
+          ~data_dir:configuration.data_dir
+          ~simulate_network:configuration.simulate_network
+          ~external_rpc:configuration.external_rpc
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+          ~memtrace:configuration.memtrace
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          ~ignore_pkhs:configuration.ignore_pkhs
+          ~disable_shard_validation:configuration.disable_shard_validation
+          ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+          ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           teztale
           account
           i
@@ -4085,14 +3570,32 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   and* observers =
     Lwt_list.mapi_p
       (fun i (topic, agent) ->
-        init_observer cloud configuration ~bootstrap teztale ~topic i agent)
+        Dal_node_helpers.init_observer
+          cloud
+          ~data_dir:configuration.data_dir
+          ~simulate_network:configuration.simulate_network
+          ~external_rpc:configuration.external_rpc
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+          ~memtrace:configuration.memtrace
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          ~disable_shard_validation:configuration.disable_shard_validation
+          ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+          ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+          teztale
+          ~topic
+          i
+          agent)
       (observers_slot_index_agents @ observers_bakers_agents)
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* echo_rollup =
     match echo_rollup_key with
     | Some operator ->
-        let dal_slots = List.map (fun p -> p.slot_index) producers in
+        let dal_slots =
+          List.map (fun p -> p.Dal_node_helpers.slot_index) producers
+        in
         let* echo_rollup =
           init_echo_rollup
             cloud
@@ -4430,7 +3933,7 @@ let producers_not_ready t =
   (* If not all the producer nodes are ready, we do not publish the commitment
        for the current level. Another attempt will be done at the next level. *)
   let producer_ready producer =
-    match Lwt.state producer.is_ready with
+    match Lwt.state producer.Dal_node_helpers.is_ready with
     | Sleep -> true
     | Fail exn -> Lwt.reraise exn
     | Return () -> false

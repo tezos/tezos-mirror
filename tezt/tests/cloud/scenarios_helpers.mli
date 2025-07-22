@@ -28,3 +28,5 @@ val add_prometheus_source :
 
 (** [init_explorus cloud node] uses [node]'s rpc endpoint to register explorus as a service *)
 val init_explorus : Cloud.t -> Node.t -> unit Lwt.t
+
+val refutation_game_minimal_rolling_history_mode : Node.argument
