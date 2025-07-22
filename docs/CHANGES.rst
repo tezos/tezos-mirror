@@ -43,6 +43,9 @@ Node
   version 9 are not retro-compatible with previous Octez versions (MR
   :gl:`!18387`).
 
+- __Experimental__ Add support for UPnP manual port mapping.
+  (MR :gl:`!18135`)
+
 Client
 ------
 
