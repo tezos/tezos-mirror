@@ -420,9 +420,9 @@ pub fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::TezlinkImplicitAccount;
+    use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
     use primitive_types::H256;
-    use tezos_crypto_rs::hash::{SecretKeyEd25519, UnknownSignature};
+    use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -503,6 +503,17 @@ mod tests {
             .expect("Signature should have succeeded");
         signature.into()
     }
+
+    const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
+
+    static SCRIPT: &str = r#"
+        parameter string;
+        storage string;
+        code {
+            CAR ;
+            NIL operation ;
+            PAIR
+        }"#;
 
     fn make_operation(
         fee: u64,
@@ -609,6 +620,41 @@ mod tests {
             TezlinkImplicitAccount::from_public_key_hash(&context, &source.pkh)
                 .expect("Account creation should have succeed");
         account.set_manager_public_key(host, &source.pk).unwrap()
+    }
+
+    // This function sets up an account that will pass the validity checks
+    fn init_contract(
+        host: &mut impl Runtime,
+        src: &ContractKt1Hash,
+        script: &str,
+        initial_storage: &str,
+        balance: &Narith,
+    ) -> TezlinkOriginatedAccount {
+        // Setting the account in TezlinkImplicitAccount
+        let contract = Contract::Originated(src.clone());
+
+        let context = context::Context::init_context();
+
+        let mut account = TezlinkOriginatedAccount::from_contract(&context, &contract)
+            .expect("Account creation should have succeeded");
+
+        let parser = mir::parser::Parser::new();
+        let script_micheline = parser.parse_top_level(script).unwrap();
+        let storage_micheline = parser.parse(initial_storage).unwrap();
+
+        account
+            .set_code(host, &script_micheline.encode())
+            .expect("Set code should have succeeded");
+
+        account
+            .set_storage(host, &storage_micheline.encode())
+            .expect("Set storage should have succeeded");
+
+        account
+            .set_balance(host, balance)
+            .expect("Set balance should have succeeded");
+
+        account
     }
 
     // Test an operation on an account that has no entry in `/context/contracts/index`
@@ -1078,6 +1124,92 @@ mod tests {
 
         // Verify that balance was only debited for fees
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    #[test]
+    fn apply_transfer_with_execution() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeeded");
+
+        let initial_storage = "\"initial\"";
+
+        let source = init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+        let destination =
+            init_contract(&mut host, &dest, SCRIPT, initial_storage, &50_u64.into());
+
+        let storage_value = parser.parse("\"Hello world\"").unwrap().encode();
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(dest),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: storage_value.clone(),
+            }),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let storage = Some(storage_value);
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                storage,
+                lazy_storage_diff: None,
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh)),
+                        changes: -30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(CONTRACT_1).unwrap(),
+                        ),
+                        changes: 30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                ticket_receipt: vec![],
+                originated_contracts: vec![],
+                consumed_gas: 0_u64.into(),
+                storage_size: 0_u64.into(),
+                paid_storage_size_diff: 0_u64.into(),
+                allocated_destination_contract: false,
+            })),
+            internal_operation_results: vec![],
+        });
+
+        // Verify that source and destination balances changed
+        // 30 for transfer + 15 for fees, 5 should be left
+        assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
+        assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
         assert_eq!(receipt, expected_receipt);
     }
