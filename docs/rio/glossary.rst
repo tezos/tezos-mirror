@@ -308,7 +308,7 @@ _`Origination`
     is, to deploy -- a `smart contract`_ on the Tezos blockchain.
 
 _`Page`
-    A portion of the data in a slot_ that is small enough to fit in a layer 1 operation.
+    A portion of the data in a `DAL slot`_ that is small enough to fit in a layer 1 operation.
     The DAL splits the data in each slot into pages so refutation games can run properly.
 
 _`PVM`
@@ -380,10 +380,9 @@ _`Round`
 
 _`Shard`
     A piece of data that represents part of a piece of DAL data.
-    The DAL splits data into shards and distributes these shards to DAL nodes to attest.
-    A piece of data distributed by the DAL.
-    Data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards. 
-    The DAL distributes these shards to DAL nodes. Attesters are assigned shards to download (via DAL nodes) and attest.
+    Data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards.
+    The DAL distributes these shards to DAL nodes.
+    Attesters are assigned shards to download (via DAL nodes) and attest.
     Thanks to redundancy, not every shard needs to be attested for the full data to be considered available.
 
 _`Smart contract`
@@ -419,7 +418,7 @@ _`Transaction`
     `smart contract`_.
 
 _`Trap`
-   A DAL shard_ that is treated specially by the protocol for a particular attester, to ensure that attesters are honestly downloading and attesting to data:
+   A DAL shard_ that is treated specially by the protocol for a particular attester to ensure that attesters are honestly downloading and attesting to data.
    If a DAL attester attests to a trap, that attester will not receive DAL rewards.
 
 .. _def_user_account:
