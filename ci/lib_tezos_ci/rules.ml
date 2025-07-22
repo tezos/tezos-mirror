@@ -49,6 +49,8 @@ let api = pipeline_source_eq Api
 
 let api_release_page = api && var "TZ_API_KIND" == str "RELEASE_PAGE"
 
+let api_docker = api && var "TZ_API_KIND" == str "DOCKER"
+
 let scheduled = pipeline_source_eq Schedule
 
 let schedule_extended_tests =
