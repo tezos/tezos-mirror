@@ -143,13 +143,18 @@ fn tx_env<'a, Host: Runtime>(
     Ok(tx_env)
 }
 
-fn get_inspector_from(tracer_input: TracerInput, spec_id: SpecId) -> EtherlinkInspector {
+fn get_inspector_from(
+    tracer_input: TracerInput,
+    precompiles: EtherlinkPrecompiles,
+    spec_id: SpecId,
+) -> EtherlinkInspector {
     match tracer_input {
         TracerInput::CallTracer(CallTracerInput {
             config,
             transaction_hash,
         }) => EtherlinkInspector::CallTracer(Box::new(CallTracer::new(
             config,
+            precompiles,
             spec_id,
             transaction_hash,
         ))),
@@ -257,7 +262,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     );
 
     if let Some(tracer_input) = tracer_input {
-        let inspector = get_inspector_from(tracer_input, spec_id);
+        let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
 
         let mut evm = evm_inspect(
             db,

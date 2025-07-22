@@ -8610,6 +8610,7 @@ let test_trace_transaction_calltracer_precompiles =
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in

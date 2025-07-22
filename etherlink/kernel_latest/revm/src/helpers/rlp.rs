@@ -21,7 +21,7 @@ pub fn append_address<'a>(
 }
 
 pub fn append_option_canonical<'a, T, Enc>(
-    stream: &'a mut rlp::RlpStream,
+    stream: &'a mut RlpStream,
     v: &Option<T>,
     append: Enc,
 ) where
@@ -38,11 +38,11 @@ pub fn append_option_canonical<'a, T, Enc>(
     }
 }
 
-pub fn append_option_u64_le(stream: &mut rlp::RlpStream, v: &Option<u64>) {
+pub fn append_option_u64_le(stream: &mut RlpStream, v: &Option<u64>) {
     append_option_canonical(stream, v, append_u64_le)
 }
 
-pub fn append_option_address(stream: &mut rlp::RlpStream, address: &Option<Address>) {
+pub fn append_option_address(stream: &mut RlpStream, address: &Option<Address>) {
     append_option_canonical(stream, address, append_address)
 }
 
