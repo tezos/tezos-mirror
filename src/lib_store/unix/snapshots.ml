@@ -787,6 +787,7 @@ type block_data = {
   block_header : Block_header.t;
   operations : Operation.t list list;
   predecessor_header : Block_header.t;
+  predecessor_max_operations_ttl : int;
   predecessor_block_metadata_hash : Block_metadata_hash.t option;
   predecessor_ops_metadata_hash : Operation_metadata_list_list_hash.t option;
   resulting_context_hash : Context_hash.t;
@@ -799,6 +800,7 @@ let block_data_encoding =
            block_header;
            operations;
            predecessor_header;
+           predecessor_max_operations_ttl;
            predecessor_block_metadata_hash;
            predecessor_ops_metadata_hash;
            resulting_context_hash;
@@ -806,12 +808,14 @@ let block_data_encoding =
       ( operations,
         block_header,
         predecessor_header,
+        predecessor_max_operations_ttl,
         predecessor_block_metadata_hash,
         predecessor_ops_metadata_hash,
         resulting_context_hash ))
     (fun ( operations,
            block_header,
            predecessor_header,
+           predecessor_max_operations_ttl,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
            resulting_context_hash ) ->
@@ -819,14 +823,16 @@ let block_data_encoding =
         block_header;
         operations;
         predecessor_header;
+        predecessor_max_operations_ttl;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         resulting_context_hash;
       })
-    (obj6
+    (obj7
        (req "operations" (list (list (dynamic_size Operation.encoding))))
        (req "block_header" (dynamic_size Block_header.encoding))
        (req "predecessor_header" (dynamic_size Block_header.encoding))
+       (req "predecessor_max_operations_ttl" int31)
        (opt "predecessor_block_metadata_hash" Block_metadata_hash.encoding)
        (opt
           "predecessor_ops_metadata_hash"
@@ -1439,6 +1445,7 @@ module type EXPORTER = sig
   val write_block_data :
     t ->
     predecessor_header:Block_header.t ->
+    predecessor_max_operations_ttl:int ->
     predecessor_block_metadata_hash:Block_metadata_hash.t option ->
     predecessor_ops_metadata_hash:Operation_metadata_list_list_hash.t option ->
     export_block:Store.Block.t ->
@@ -1519,14 +1526,16 @@ module Raw_exporter : EXPORTER = struct
         snapshot_protocol_dir;
       }
 
-  let write_block_data t ~predecessor_header ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash ~export_block ~resulting_context_hash =
+  let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+      ~export_block ~resulting_context_hash =
     let open Lwt_syntax in
     let block_data =
       {
         block_header = Store.Block.header export_block;
         operations = Store.Block.operations export_block;
         predecessor_header;
+        predecessor_max_operations_ttl;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         resulting_context_hash;
@@ -1777,13 +1786,15 @@ module Tar_exporter : EXPORTER = struct
         tar;
       }
 
-  let write_block_data t ~predecessor_header ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash ~export_block ~resulting_context_hash =
+  let write_block_data t ~predecessor_header ~predecessor_max_operations_ttl
+      ~predecessor_block_metadata_hash ~predecessor_ops_metadata_hash
+      ~export_block ~resulting_context_hash =
     let block_data =
       {
         block_header = Store.Block.header export_block;
         operations = Store.Block.operations export_block;
         predecessor_header;
+        predecessor_max_operations_ttl;
         predecessor_block_metadata_hash;
         predecessor_ops_metadata_hash;
         resulting_context_hash;
@@ -2546,6 +2557,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       let* resulting_context_hash =
         Store.Block.resulting_context_hash chain_store export_block
       in
+      let* pred_block_metadata =
+        Store.Block.get_block_metadata chain_store pred_block
+      in
+      let pred_max_operations_ttl =
+        Store.Block.max_operations_ttl pred_block_metadata
+      in
       let* () =
         export_context snapshot_exporter ~data_dir pred_resulting_context_hash
       in
@@ -2554,6 +2571,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           export_block,
           resulting_context_hash,
           pred_block,
+          pred_max_operations_ttl,
           protocol_levels,
           (return_unit, floating_block_stream) )
     in
@@ -2561,6 +2579,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
            export_block,
            resulting_context_hash,
            pred_block,
+           pred_max_operations_ttl,
            protocol_levels,
            (return_unit, floating_block_stream) ) =
       Store.Unsafe.open_for_snapshot_export
@@ -2574,6 +2593,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         export_block,
         resulting_context_hash,
         pred_block,
+        pred_max_operations_ttl,
         protocol_levels,
         (return_unit, floating_block_stream) )
 
@@ -2646,6 +2666,12 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           let* resulting_context_hash =
             Store.Block.resulting_context_hash chain_store export_block
           in
+          let* pred_block_metadata =
+            Store.Block.get_block_metadata chain_store pred_block
+          in
+          let pred_max_operations_ttl =
+            Store.Block.max_operations_ttl pred_block_metadata
+          in
           let* () =
             export_context
               snapshot_exporter
@@ -2657,6 +2683,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
               export_block,
               resulting_context_hash,
               pred_block,
+              pred_max_operations_ttl,
               protocol_levels,
               cemented_table,
               (ro_fd, rw_fd),
@@ -2669,8 +2696,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     in
     let* ( export_mode,
            export_block,
-           pred_block,
            pred_resulting_context,
+           pred_block,
+           pred_max_operations_ttl,
            protocol_levels,
            cemented_table,
            (floating_ro_fd, floating_rw_fd),
@@ -2716,8 +2744,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
     return
       ( export_mode,
         export_block,
-        pred_block,
         pred_resulting_context,
+        pred_block,
+        pred_max_operations_ttl,
         protocol_levels,
         (reading_thread, floating_block_stream) )
 
@@ -2751,6 +2780,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
                  export_block,
                  resulting_context_hash,
                  pred_block,
+                 predecessor_max_operations_ttl,
                  protocol_levels,
                  (reading_thread, floating_block_stream) ) =
             if rolling then
@@ -2783,6 +2813,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
             Exporter.write_block_data
               snapshot_exporter
               ~predecessor_header:(Store.Block.header pred_block)
+              ~predecessor_max_operations_ttl
               ~predecessor_block_metadata_hash
               ~predecessor_ops_metadata_hash
               ~export_block
@@ -3767,8 +3798,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let apply_context context_index ~imported_context_hash chain_id ~block_header
       ~operations ~predecessor_header ~predecessor_block_metadata_hash
-      ~predecessor_ops_metadata_hash ~user_activated_upgrades
-      ~user_activated_protocol_overrides ~operation_metadata_size_limit =
+      ~predecessor_ops_metadata_hash ~predecessor_max_operations_ttl
+      ~user_activated_upgrades ~user_activated_protocol_overrides
+      ~operation_metadata_size_limit =
     let open Lwt_result_syntax in
     let* predecessor_context =
       let*! o = Context_ops.checkout context_index imported_context_hash in
@@ -3776,10 +3808,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Some ch -> return ch
       | None -> tzfail (Inconsistent_context imported_context_hash)
     in
+    let max_operations_ttl = predecessor_max_operations_ttl in
     let apply_environment =
       {
-        Block_validation.max_operations_ttl =
-          Int32.to_int predecessor_header.Block_header.shell.level;
+        Block_validation.max_operations_ttl;
         chain_id;
         predecessor_block_header = predecessor_header;
         predecessor_context;
@@ -3826,6 +3858,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             resulting_context_hash;
             operations;
             predecessor_header;
+            predecessor_max_operations_ttl;
             predecessor_block_metadata_hash;
             predecessor_ops_metadata_hash;
           } as block_data) =
@@ -3936,6 +3969,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           ~predecessor_header
           ~predecessor_block_metadata_hash
           ~predecessor_ops_metadata_hash
+          ~predecessor_max_operations_ttl
           ~user_activated_upgrades
           ~user_activated_protocol_overrides
           ~operation_metadata_size_limit
