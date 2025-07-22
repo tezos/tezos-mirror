@@ -20,6 +20,7 @@
   the parser would silently ignore any content that appeared after the first
   valid JSON object. Now, any extraneous data will cause the function to return
   an error. (!18745)
+- Fixes GCP KMS token refresh. (!18795)
 
 ### Storage changes
 
