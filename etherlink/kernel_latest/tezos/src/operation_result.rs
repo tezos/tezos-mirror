@@ -171,12 +171,38 @@ pub struct TransferSuccess {
     pub lazy_storage_diff: Option<()>,
 }
 
+// An operation error in a Tezos receipt has no specific format
+// It should just be encoded as a JSON, so we can't derive
+// NomReader and BinWriter if we want to be Tezos compatible
+#[derive(PartialEq, Debug)]
+pub struct OperationErrors {
+    pub errors: Vec<OperationError>,
+}
+
+impl From<Vec<OperationError>> for OperationErrors {
+    fn from(value: Vec<OperationError>) -> Self {
+        OperationErrors { errors: value }
+    }
+}
+
+impl BinWriter for OperationErrors {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        tezos_enc::dynamic(tezos_enc::unit)(&(), output)
+    }
+}
+
+impl NomReader<'_> for OperationErrors {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        tezos_nom::dynamic(|input| Ok((input, vec![].into())))(input)
+    }
+}
+
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
-    Failed(Vec<OperationError>),
+    Failed(OperationErrors),
 }
 
 /// A [Balance] updates can be triggered on different target
@@ -237,7 +263,7 @@ pub fn produce_operation_result<M: OperationKind>(
         },
         Err(operation_error) => OperationResult {
             balance_updates,
-            result: ContentResult::Failed(vec![operation_error]),
+            result: ContentResult::Failed(vec![operation_error].into()),
             internal_operation_results: vec![],
         },
     }
@@ -318,6 +344,7 @@ mod tests {
                     ).unwrap(),
                 })
     }
+
     #[test]
     fn test_operation_with_metadata_rlp_roundtrip() {
         let operation_and_receipt = dummy_test_result_operation();
@@ -341,7 +368,7 @@ mod tests {
     }
 
     // The operation with metadata below is produced by using the following command:
-    /* octez-codec encode 022-PsRiotum.operation_and_metadata from
+    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from
     '{"contents":
         [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
           "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
@@ -352,12 +379,76 @@ mod tests {
           "consumed_milligas":"2169000"}}}],
           "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
     #[test]
-    fn tezos_compatibility_for_operation_with_metadata() {
+    fn tezos_compatibility_for_successful_operation_with_metadata() {
         let mut output = vec![];
         dummy_test_result_operation()
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
         let operation_and_receipt_bytes = "00000000966c0002298c03ed7d454a101eb7022bc95f7e5f41ac78d40301f9100080bd83140000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000000000000004000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffd7f218000000000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000280de80000000000000000000a8b1840100000000000000000c5e6f3021d6effcc1b99d918a3db6dd4820893f076386fb9c85bf62f497870936898e970901e5f8b3e41a8eb0aa1a578811c110415c01719e6ed2dc6e96bb0a";
+
+        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+    }
+
+    /*
+        octez-codec encode alpha.operation.data_and_metadata from '{
+        "contents": [
+            {
+                "kind": "transaction",
+                "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                "fee": "255",
+                "counter": "1",
+                "gas_limit": "0",
+                "storage_limit": "0",
+                "amount": "27942405962072064",
+                "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+                "metadata": {
+                    "operation_result": {
+                        "status": "failed",
+                        "errors": []
+                    }
+                }
+            }
+        ],
+        "signature": "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
+    }'
+         */
+    #[test]
+    fn tezos_compatibility_for_failed_operation_with_metadata() {
+        let operation =
+            OperationDataAndMetadata::OperationWithMetadata (
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transfer(
+                            ManagerOperation {
+                                source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                fee: 255.into(),
+                                counter: 1.into(),
+                                gas_limit: 0.into(),
+                                storage_limit: 0.into(),
+                                operation: TransferContent {
+                                    amount: 27942405962072064.into(),
+                                    destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+                                    parameters: None,
+                                }
+                            }),
+                        receipt: OperationResultSum::Transfer(
+                                    OperationResult {
+                                        balance_updates: vec![],
+                                        result: ContentResult::Failed(vec![].into()),
+                                        internal_operation_results: vec![]
+                                    }
+                                )
+                    }],
+                    signature:  UnknownSignature::from_base58_check(
+                       "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
+                    ).unwrap(),
+                }
+            );
+        let mut output = vec![];
+        operation
+            .bin_write(output.as_mut())
+            .expect("Operation with metadata should be encodable");
+        let operation_and_receipt_bytes = "00000000476c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000010000000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
