@@ -385,7 +385,12 @@ let () =
   let component =
     Clap.mandatory_string
       ~long:"component"
-      ~description:"Component name"
+      ~description:
+        "Name of the component for which you are building the release page.\n\
+         Choose this carefully, as it will be used for paths and titles.\n\
+         In case the component is \"octez\", the release assets will be pulled \
+         from toplevel directory, instead of COMPONENT/COMPONENT-vX.Y as for \
+         any other component."
       ~placeholder:"COMPONENT"
       ~short:'c'
       ()
@@ -393,7 +398,9 @@ let () =
   let title =
     Clap.optional_string
       ~long:"title"
-      ~description:"Title fo the release page"
+      ~description:
+        "Title of the generated the release page. By default, it will be set \
+         to `COMPONENT releases`"
       ~short:'t'
       ~placeholder:"TITLE"
       ()
@@ -404,14 +411,25 @@ let () =
   let bucket =
     Clap.mandatory_string
       ~long:"bucket"
-      ~description:"Bucket name"
+      ~description:
+        "The name of the S3 bucket where the assets for the release page are \
+         stored. All assets listed on the release page are read from this \
+         bucket.\n\n\
+         Note that `BUCKET/PATH` must contain a `COMPONENT/versions.json` file \
+         that is readable, along with the assets associated with each version. \
+         For more details, see the Storage section."
       ~placeholder:"BUCKET"
       ()
   in
   let path =
     Clap.default_string
       ~long:"path"
-      ~description:"Path of the component in the bucket"
+      ~description:
+        "subpath of the releases assets the S3 bucket.\n\
+         Useful in case the bucket is not used only for the release page. For \
+         instance, the `site-prod.octez.tezos.com` S3 bucket is also used for \
+         the documentation. Thus, the release assets are stored in \
+         `octez.tezos.com/releases/`. In that case <PATH> is `/releases`."
       ~placeholder:"PATH"
       ""
   in
@@ -419,9 +437,11 @@ let () =
     Clap.default_string
       ~long:"url"
       ~description:
-        "URL of the bucket. `https://` should not be included.\n\
-         For example, to build the tezos/tezos release page the URL value \
-         should be `octez.tezos.com`"
+        "The URL of the bucket. By default it is the name of the bucket.\n\
+         This should be used in case the URL of the web page is not the same \
+         as the S3 bucket name.\n\
+         For instance, the `site-prod.octez.tezos.com` bucket should be used \
+         with `octez.tezos.com` URL."
       ~placeholder:"URL"
       bucket
   in
@@ -434,8 +454,12 @@ let () =
            ~parse:asset_type_of_string_opt
            ~show:string_of_asset_type)
         ~description:
-          "List of assets types to display in the page. Possible values are \
-           \"changelog\", \"binaries\", \"dashboards\" and \"packages\"."
+          "List of assets types to display in the page.\n\
+           Possible values are:\n\
+           - \"changelog\"\n\
+           - \"binaries\"\n\
+           - \"dashboards\"\n\
+           - \"packages\"."
         ~placeholder:"ASSET_TYPE"
         ())
   in
