@@ -26,7 +26,9 @@ use tezos_storage::{read_nom_value, read_optional_nom_value, store_bin};
 pub enum Manager {
     #[encoding(tag = 0)]
     NotRevealed(PublicKeyHash),
-    #[encoding(tag = 1)]
+    // Tag 1 is for public key before the Seoul
+    // protocol and therefore is deprecated
+    #[encoding(tag = 2)]
     Revealed(PublicKey),
 }
 
@@ -183,8 +185,8 @@ impl TezlinkImplicitAccount {
         public_key: &PublicKey,
     ) -> Result<(), tezos_storage::error::Error> {
         let path = concat(self.path(), &MANAGER_PATH)?;
-        // The tag for public key hash is 1 (see the Manager enum above)
-        let mut buffer = vec![1_u8];
+        // The tag for public key is 2 (see the Manager enum above)
+        let mut buffer = vec![2_u8];
         public_key
             .bin_write(&mut buffer)
             .map_err(|_| tezos_smart_rollup::host::RuntimeError::DecodingError)?;
@@ -316,7 +318,7 @@ mod test {
 
     /// obtained by `PublicKey::from_b58check("edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav")`
     const BOOTSTRAP1_PUBLIC_KEY_HEX: &str =
-        "01004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
+        "02004798d2cc98473d7e250c898885718afd2e4efbcb1a1595ab9730761ed830de0f";
 
     /// Set a key of bootstrap1 account according to the structure of a Tezos context
     /// We don't use function from [TezlinkImplicitAccount] on purpose to verify that
