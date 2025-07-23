@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez DAL Node RPC",
     "description": "The RPC API for the Octez DAL node.",
-    "version": "Octez 23.0~rc1 (4ac02172)"
+    "version": "Octez 23.0~rc2 (4e3e2258)"
   },
   "paths": {
     "/health": {
