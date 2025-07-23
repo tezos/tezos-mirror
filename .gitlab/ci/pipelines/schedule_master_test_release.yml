@@ -134,11 +134,6 @@ oc.build:static-x86_64-linux-binaries:
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
 
 oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -340,11 +335,6 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -387,11 +377,6 @@ oc.build-debian:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -474,11 +459,6 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -521,11 +501,6 @@ oc.build-ubuntu:
   artifacts:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -583,11 +558,6 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -761,11 +731,6 @@ oc.docker-build-fedora-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:

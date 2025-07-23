@@ -120,8 +120,6 @@ let jobs pipeline_type =
       ~variables:
         (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
@@ -151,8 +149,6 @@ let jobs pipeline_type =
       ~stage:Stages.images
       ~variables:(variables [("DISTRIBUTION", distribution)])
       ~parallel:(Matrix matrix)
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~tag:Dynamic
       [
         "./scripts/ci/build-packages-dependencies.sh \
@@ -185,8 +181,6 @@ let jobs pipeline_type =
       ~dependencies
       ?timeout
       ~tag:Dynamic
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~artifacts:(artifacts ["packages/$DISTRIBUTION/$RELEASE"])
       [
         (* This is an hack to enable Cargo networking for jobs in child pipelines.
@@ -296,8 +290,6 @@ let jobs pipeline_type =
       ~image
       ~dependencies
       ~variables
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       ?before_script
       script
@@ -310,8 +302,6 @@ let jobs pipeline_type =
       ~name
       ~dependencies
       ~variables
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in

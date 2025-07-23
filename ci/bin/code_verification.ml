@@ -618,8 +618,6 @@ let jobs pipeline_type =
       ~arch:Amd64
       ~cpu:Very_high
       ~storage:Ramfs
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:true
       ~rules:(make_rules ~changes:changeset_octez_or_doc ())
@@ -637,8 +635,6 @@ let jobs pipeline_type =
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:false
       ~rules:(make_rules ~changes:changeset_octez_or_doc ())
@@ -693,8 +689,6 @@ let jobs pipeline_type =
       ~arch:Amd64
       ~cpu:Very_high
       ~storage:Ramfs
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         (* Even though not many tests depend on static executables, some
            of those that do are limiting factors in the total duration
            of pipelines. So we start this job as early as possible,
@@ -728,8 +722,6 @@ let jobs pipeline_type =
            ~when_:On_success
            ["octez-evm-*"; "etherlink-*"])
       ~cpu:Very_high
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~before_script:
         [
           "./scripts/ci/take_ownership.sh";
@@ -919,8 +911,6 @@ let jobs pipeline_type =
         ~cpu:Very_high
         ~image:Images.CI.build
         ~stage:Stages.test
-        ~retry:
-          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
         ~before_script:
@@ -1245,8 +1235,6 @@ let jobs pipeline_type =
           ~name:"oc.unit:protocol_compiles"
           ~arch:Amd64
           ~cpu:Very_high
-          ~retry:
-            {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
           ~image:Images.CI.build
           ~stage:Stages.test
           ~dependencies:(build_dependencies Amd64)
@@ -1342,8 +1330,6 @@ let jobs pipeline_type =
         ~stage:Stages.test
         ~image:Images.CI.build
         ~cpu:Very_high
-        ~retry:
-          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         ~dependencies:order_after_build
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
@@ -1482,11 +1468,6 @@ let jobs pipeline_type =
               ~project:"tezos/tezos"
               ~branch:"latest-release"
               ~cpu:Very_high
-              ~retry:
-                {
-                  max = 2;
-                  when_ = [Stuck_or_timeout_failure; Runner_system_failure];
-                }
               ();
             job_compile_sources
               ~__POS__
@@ -1509,11 +1490,6 @@ let jobs pipeline_type =
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
               ~cpu:Very_high
-              ~retry:
-                {
-                  max = 2;
-                  when_ = [Stuck_or_timeout_failure; Runner_system_failure];
-                }
               ();
           ]
     in

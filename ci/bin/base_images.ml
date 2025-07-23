@@ -34,8 +34,6 @@ let jobs =
       ~stage:Stages.images
       ~variables
       ~parallel:(Matrix matrix)
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~tag:Gcp_very_high_cpu
       [script]
   in

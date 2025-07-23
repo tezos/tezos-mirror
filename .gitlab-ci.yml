@@ -163,6 +163,11 @@ workflow:
 
 default:
   interruptible: true
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 variables:
   ci_image_name: ${GCP_REGISTRY}/${CI_PROJECT_PATH}/ci

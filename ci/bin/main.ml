@@ -18,7 +18,11 @@ open Tezos_ci
 let () = Tezos_ci.Cli.init ()
 
 (* Sets up the [default:] top-level configuration element. *)
-let default = default ~interruptible:true ()
+let default =
+  default
+    ~interruptible:true
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+    ()
 
 (* Top-level [variables:] *)
 let variables : variables =

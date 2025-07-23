@@ -150,8 +150,6 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~arch:Amd64
       ~cpu:Very_high
       ~storage:Ramfs
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~release:true
       ()
   in
@@ -356,8 +354,6 @@ let octez_evm_node_jobs ?(test = false) () =
       ~arch:Amd64
       ~cpu:Very_high
       ~storage:Ramfs
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"

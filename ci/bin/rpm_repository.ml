@@ -123,8 +123,6 @@ let jobs pipeline_type =
       ~name
       ~stage:Stages.images
       ~variables:(variables [("DISTRIBUTION", distribution)])
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [
@@ -242,8 +240,6 @@ let jobs pipeline_type =
       ~image
       ~dependencies
       ~variables
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
@@ -256,8 +252,6 @@ let jobs pipeline_type =
       ~name
       ~image
       ~dependencies
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
@@ -269,8 +263,6 @@ let jobs pipeline_type =
       ~name
       ~dependencies
       ~variables
-      ~retry:
-        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
