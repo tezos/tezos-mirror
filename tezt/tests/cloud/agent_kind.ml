@@ -36,3 +36,28 @@ let name_of = function
   | Echo_rollup_operator -> "echo-rollup-operator"
   | Echo_rollup_dal_observer {slot_index} ->
       Format.sprintf "echo-rollup-dal-node-%d" slot_index
+
+type daemon =
+  | Baker_l1_node of int
+  | Baker_dal_node of int
+  | Producer_l1_node of int
+  | Producer_dal_node of int
+  | Observer_l1_node of int
+  | Observer_dal_node of int
+  | Echo_rollup_node of string
+  | Etherlink_sc_rollup_node of string
+  | Etherlink_evm_node of string
+  | Etherlink_producer_node of string
+
+let name_of_daemon = function
+  | Baker_l1_node i -> Format.asprintf "baker-node-%d" i
+  | Baker_dal_node i -> Format.asprintf "baker-dal-node-%d" i
+  | Producer_l1_node i -> Format.asprintf "producer-node-%i" i
+  | Producer_dal_node i -> Format.asprintf "producer-dal-node-%i" i
+  | Observer_l1_node i -> Format.asprintf "observer-node-%i" i
+  | Observer_dal_node i -> Format.asprintf "observer-dal-node-%i" i
+  | Echo_rollup_node name -> Format.asprintf "%s-rollup-node" name
+  | Etherlink_sc_rollup_node name ->
+      Format.asprintf "etherlink-%s-rollup-node" name
+  | Etherlink_evm_node name -> Format.asprintf "etherlink-%s-evm-node" name
+  | Etherlink_producer_node name -> Format.asprintf "etherlink-%s-node" name

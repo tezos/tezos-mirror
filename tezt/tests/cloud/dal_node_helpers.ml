@@ -6,6 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Agent_kind
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
@@ -119,7 +120,7 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~memtrace ~ppx_profiling ~ppx_profiling_backends ~ignore_pkhs
     ~disable_shard_validation ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale
     account i slot_index agent =
-  let name = Format.asprintf "producer-node-%i" i in
+  let name = name_of_daemon (Producer_l1_node i) in
   let () = toplog "Initializing the DAL producer %s" name in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
   let () = toplog "Init producer %s: init L1 node" name in
@@ -156,7 +157,7 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
   let* dal_node =
     let ignore_pkhs = if ignore_pkhs = [] then None else Some ignore_pkhs in
     Dal_node.Agent.create
-      ~name:(Format.asprintf "producer-dal-node-%i" i)
+      ~name:(name_of_daemon (Producer_dal_node i))
       ~node
       ~disable_shard_validation
       ?ignore_pkhs
@@ -229,7 +230,7 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
     ~snapshot ~memtrace ~ppx_profiling ~ppx_profiling_backends
     ~disable_shard_validation ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale
     ~topic i agent =
-  let name = Format.asprintf "observer-node-%i" i in
+  let name = name_of_daemon (Observer_l1_node i) in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
   let env, with_yes_crypto = may_set_yes_crypto_env simulate_network in
   let* node =
@@ -248,7 +249,7 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
   in
   let* dal_node =
     Dal_node.Agent.create
-      ~name:(Format.asprintf "observer-dal-node-%i" i)
+      ~name:(name_of_daemon (Observer_dal_node i))
       ~node
       ~disable_shard_validation
       cloud
