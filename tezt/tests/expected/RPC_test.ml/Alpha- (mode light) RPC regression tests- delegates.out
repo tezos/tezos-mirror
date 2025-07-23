@@ -27,7 +27,7 @@
     { "expected_assigned_shards_per_slot": 409,
       "delegate_attested_dal_slots": 0, "delegate_attestable_dal_slots": 0,
       "expected_dal_rewards": "212680", "sufficient_dal_participation": true,
-      "denounced": false }, "grace_period": 4,
+      "denounced": false }, "grace_period": 3,
   "active_staking_parameters":
     { "limit_of_staking_over_baking_millionth": 0,
       "edge_of_baking_over_staking_billionth": 1000000000 },
@@ -73,7 +73,7 @@ false
 [ "[PUBLIC_KEY_HASH]" ]
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
-4
+3
 
 ./octez-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
 "4000000000000"

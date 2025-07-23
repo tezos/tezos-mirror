@@ -21,7 +21,7 @@
             "4000000000000"
         ]
     ],
-    "consensus_rights_delay": 2,
+    "consensus_rights_delay": 1,
     "blocks_preservation_cycles": 1,
     "delegate_parameters_activation_delay": 3,
     "tolerated_inactivity_period": 1,
@@ -69,8 +69,8 @@
         "denominator": 3
     },
     "cache_script_size": 100000000,
-    "cache_stake_distribution_cycles": 5,
-    "cache_sampler_state_cycles": 5,
+    "cache_stake_distribution_cycles": 4,
+    "cache_sampler_state_cycles": 4,
     "dal_parametric": {
         "feature_enable": true,
         "incentives_enable": false,
