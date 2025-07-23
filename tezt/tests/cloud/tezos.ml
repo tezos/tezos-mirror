@@ -507,7 +507,7 @@ module Dal_node = struct
 
   module Agent = struct
     let create_from_endpoint ?(group = "DAL") ?net_port
-        ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
+        ?(path = Uses.path Constant.octez_dal_node) ~name ?rpc_port
         ?disable_shard_validation ?ignore_pkhs ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
@@ -535,7 +535,7 @@ module Dal_node = struct
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
       let node =
         create_from_endpoint
-          ?name
+          ~name
           ~path
           ?runner
           ~rpc_port
@@ -570,6 +570,19 @@ module Dal_node = struct
         ~executable
         ~on_alive_callback
         agent ;
+      let () =
+        match Agent.daily_logs_destination agent with
+        | None -> ()
+        | Some destination_root ->
+            Agent.register_shutdown_callback agent (fun () ->
+                let* () =
+                  Agent_kind.Logs.scp_logs
+                    ~destination_root
+                    ~daemon_name:name
+                    agent
+                in
+                Lwt.return_unit)
+      in
       let alert =
         Alerts.service_manager_process_down
           ~agent:(Agent.name agent)
@@ -587,12 +600,7 @@ module Dal_node = struct
         let target =
           Cloud.{agent; port = Dal_node.metrics_port node; app_name}
         in
-        let* () =
-          Cloud.add_prometheus_source
-            cloud
-            ~name:(Option.value name ~default:(Dal_node.name node))
-            [target]
-        in
+        let* () = Cloud.add_prometheus_source cloud ~name [target] in
         Alerts.add_process_exporter_alerts
           ~cloud
           ~agent_name:(Agent.name agent)
@@ -603,12 +611,12 @@ module Dal_node = struct
       in
       Lwt.return node
 
-    let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs
+    let create ?net_port ?path ~name ?disable_shard_validation ?ignore_pkhs
         ~node agent =
       create_from_endpoint
         ?net_port
         ?path
-        ?name
+        ~name
         ?disable_shard_validation
         ?ignore_pkhs
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)
