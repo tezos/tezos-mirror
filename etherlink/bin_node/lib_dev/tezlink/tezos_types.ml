@@ -63,13 +63,7 @@ module Contract = struct
 
   let of_hex contract =
     let bytes = Hex.to_bytes_exn (`Hex contract) in
-    match Data_encoding.Binary.of_bytes_opt implicit_encoding bytes with
-    | None ->
-        failwith
-          "subkey %s is not a contract root, expected a public key hash in \
-           hexadecimal representation"
-          contract
-    | Some contract -> Lwt_result_syntax.return contract
+    Data_encoding.Binary.of_bytes_opt implicit_encoding bytes
 end
 
 module Operation = struct

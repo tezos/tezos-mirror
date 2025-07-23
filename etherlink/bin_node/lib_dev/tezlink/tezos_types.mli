@@ -45,7 +45,7 @@ module Contract : sig
 
   val of_implicit : Signature.public_key_hash -> t
 
-  val of_hex : string -> Signature.public_key_hash tzresult Lwt.t
+  val of_hex : string -> Signature.public_key_hash option
 end
 
 module Operation : sig

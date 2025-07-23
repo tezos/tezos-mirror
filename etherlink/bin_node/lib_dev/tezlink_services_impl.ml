@@ -110,8 +110,8 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     let* contracts_keys =
       subkeys ~block Tezlink_durable_storage.Path.accounts_index
     in
-    let* contracts =
-      List.map_es Tezlink_durable_storage.contract_of_path contracts_keys
+    let contracts =
+      List.filter_map Tezlink_durable_storage.contract_of_path contracts_keys
     in
     List.map_es
       (fun c ->

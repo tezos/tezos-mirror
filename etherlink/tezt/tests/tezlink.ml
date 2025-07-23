@@ -924,6 +924,35 @@ let test_tezlink_reveal =
       ~error_msg:"Expected %R but got %L") ;
   unit
 
+let test_tezlink_bootstrap_block_info =
+  (* This test just makes sure the block info call on block 2 does not fail
+     catastrophically. We check block 2 in particular because at this level
+     we mock information to index bootstrap accounts. *)
+  let contract = Michelson_contracts.concat_hello () in
+  register_tezlink_test
+    ~title:"Test of tezlink block info on block 2"
+    ~tags:["bootstrap"; "block_info"]
+    ~bootstrap_contracts:[contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let*@ _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
+  let* info =
+    Client.RPC.call ~hooks ~endpoint client @@ RPC.get_chain_block ~block:"2" ()
+  in
+  Check.(
+    JSON.(info |-> "header" |-> "level" |> as_int = 2)
+      int
+      ~error_msg:
+        "Expect %R but got %L: we should have been able to get block info for \
+         level 2") ;
+  unit
+
 let test_tezlink_execution =
   let contract = Michelson_contracts.concat_hello () in
   register_tezlink_test
@@ -1072,4 +1101,5 @@ let () =
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
   test_tezlink_execution [Alpha] ;
+  test_tezlink_bootstrap_block_info [Alpha] ;
   test_tezlink_sandbox ()
