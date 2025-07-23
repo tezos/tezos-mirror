@@ -438,6 +438,30 @@ let eip2930_storage_access =
     ~label:"storageaccess"
     ~contract:"StorageAccess"
 
+let nested_delegatecalls_A =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_A"
+    ~contract:"A"
+
+let nested_delegatecalls_B =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_B"
+    ~contract:"B"
+
+let nested_delegatecalls_C =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_C"
+    ~contract:"C"
+
+let nested_delegatecalls_D =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/nested_delegatecalls.sol")
+    ~label:"nested_delegatecalls_D"
+    ~contract:"D"
+
 module Precompile = struct
   let withdrawal = "0xff00000000000000000000000000000000000001"
 
