@@ -73,7 +73,7 @@ _`Metadata`
 _`Node`
     A peer in a Tezos P2P network.
     The term "node" can refer to a few different kinds of nodes, including Tezos layer 1 nodes, `Data Availability Layer node`_\ s, and `Smart Rollup`_ nodes.
-    The context should help to disambiguate between these, but by default a node means a layer 1 node.
+    The context should help to disambiguate between these, but in most cases, the term "node" refers to a layer 1 node.
     Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
 
 _`Operation`
@@ -310,7 +310,7 @@ _`Origination`
 
 _`Page`
     A portion of the raw (unexpanded) data in a `DAL slot`_ of a fixed size that is small enough to fit in a layer 1 operation.
-    The DAL splits the raw data in each slot into pages, that can be requested individually, so that for example refutation games can run properly.
+    The DAL splits the raw data in each slot into pages that can be requested individually so that for example refutation games can run properly.
 
 _`PVM`
    A PVM (Proof-generating Virtual Machine) is a reference
@@ -380,8 +380,7 @@ _`Round`
     round results in an invalid block_.
 
 _`Shard`
-    A piece of data that represents part of a piece of DAL data.
-    raw data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards.
+    Raw data aimed to published over the DAL is first expanded based on a redundancy factor and then split into shards.
     The DAL distributes these shards to DAL nodes.
     Attesters are assigned shards to download (via DAL nodes) and attest.
     Thanks to redundancy, not every shard needs to be attested for the full data to be considered available.
