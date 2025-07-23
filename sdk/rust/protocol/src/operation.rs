@@ -43,19 +43,19 @@ pub struct RevealContent {
 pub struct TransactionContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameters: WithDefaultValue<Parameter>,
+    pub parameters: WithDefaultValue<Parameters>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Parameter {
+pub struct Parameters {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
 }
 
-impl Default for Parameter {
+impl Default for Parameters {
     fn default() -> Self {
-        Parameter {
+        Parameters {
             entrypoint: Entrypoint::default(),
             // This is the binary representation of the Michelson "Unit" value as produced by
             // octez-client convert data "Unit" from Michelson to binary
@@ -203,7 +203,7 @@ mod tests {
                 amount: 1_000_000_u64.into(),
                 destination: Contract::from_b58check("KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv")
                     .unwrap(),
-                parameters: Parameter {
+                parameters: Parameters {
                     entrypoint: Entrypoint::try_from("B").unwrap(),
                     // octez-client convert data '"Hello"' from Michelson to binary
                     value: hex::decode("010000000548656c6c6f").unwrap(),
@@ -246,7 +246,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameter::default().into(),
+                parameters: Parameters::default().into(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -290,7 +290,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Parameter::default().into(),
+                parameters: Parameters::default().into(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -334,7 +334,7 @@ mod tests {
                 amount: 0.into(),
                 destination: Contract::from_b58check("tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ")
                     .unwrap(),
-                parameters: Parameter {
+                parameters: Parameters {
                     entrypoint: Entrypoint::try_from("remove_delegate").unwrap(),
                     // octez-client convert data "Unit" from Michelson to binary
                     value: hex::decode("030b").unwrap(),
