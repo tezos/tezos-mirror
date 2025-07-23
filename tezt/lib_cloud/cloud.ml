@@ -53,6 +53,7 @@ let shutdown ?exn t =
       Lwt.return_unit)
     else Lwt.return_unit
   in
+  let* () = Lwt_list.iter_s (fun a -> Agent.run_shutdown_callback a) t.agents in
   Log.info "Shutting down processes..." ;
   let* () =
     Lwt.catch

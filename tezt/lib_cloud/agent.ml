@@ -69,6 +69,7 @@ type t = {
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
   service_manager : Service_manager.t option;
+  mutable on_shutdown : (unit -> unit Lwt.t) list;
 }
 
 let ssh_id () = Env.ssh_private_key_filename ()
@@ -87,6 +88,7 @@ let encoding =
            configuration;
            process_monitor;
            service_manager = _;
+           on_shutdown = _;
          } ->
       ( vm_name,
         zone,
@@ -139,7 +141,8 @@ let encoding =
         configuration;
         process_monitor;
         service_manager = None;
-        (* As of now, this encoding is only used when reattaching *)
+        on_shutdown =
+          [] (* As of now, this encoding is only used when reattaching *);
       })
     (obj6
        (req "vm_name" (option string))
@@ -190,6 +193,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     zone;
     process_monitor;
     service_manager = Service_manager.init () |> Option.some;
+    on_shutdown = [];
   }
 
 let cmd_wrapper {zone; vm_name; _} =
@@ -217,6 +221,11 @@ let temp_execution_path () =
   (* This assumes that Tezt.Temp.file always returns the same result for the
      same process. *)
   Temp.dir ""
+
+let register_shutdown_callback t callback =
+  t.on_shutdown <- callback :: t.on_shutdown
+
+let run_shutdown_callback t = Lwt_list.iter_s (fun f -> f ()) t.on_shutdown
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with

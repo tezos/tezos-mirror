@@ -103,6 +103,13 @@ val service_manager : t -> Service_manager.t option
 (** Returns the path in which the agent aims it's data. *)
 val temp_execution_path : unit -> string
 
+(** Register a callback that will be executed as soon as the agent is shutting
+    down. *)
+val register_shutdown_callback : t -> (unit -> unit Lwt.t) -> unit
+
+(** Runs the registered callbacks. *)
+val run_shutdown_callback : t -> unit Lwt.t
+
 (** Run a command on the docker image run by the agent.
 
     This command should not be used outside of the [tezt-cloud]
