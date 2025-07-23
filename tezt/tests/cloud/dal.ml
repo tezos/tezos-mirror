@@ -2495,7 +2495,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
       ?env
       ?data_dir
       ~arguments:Node.[Peer bootstrap.node_p2p_endpoint]
-      ~name:(Format.asprintf "baker-node-%d" i)
+      ~name:(name_of_daemon (Baker_l1_node i))
       ~rpc_external:configuration.external_rpc
       configuration.network
       ~with_yes_crypto
@@ -2509,7 +2509,7 @@ let init_baker ?stake cloud (configuration : configuration) ~bootstrap teztale
     else
       let* dal_node =
         Dal_node.Agent.create
-          ~name:(Format.asprintf "baker-dal-node-%d" i)
+          ~name:(name_of_daemon (Baker_dal_node i))
           ~node
           ~disable_shard_validation:configuration.disable_shard_validation
           cloud

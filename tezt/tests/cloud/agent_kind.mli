@@ -36,3 +36,21 @@ type t =
 (** [name_of agent] returns the standard name associated with a given [agent].
     Used for consistent naming of VMs, logs and artifacts. *)
 val name_of : t -> string
+
+(** [daemon] stands for a binary that is running onto an agent. A [daemon] is
+    identified by a standard name that is used for consistent namings. *)
+type daemon =
+  | Baker_l1_node of int
+  | Baker_dal_node of int
+  | Producer_l1_node of int
+  | Producer_dal_node of int
+  | Observer_l1_node of int
+  | Observer_dal_node of int
+  | Echo_rollup_node of string
+  | Etherlink_sc_rollup_node of string
+  | Etherlink_evm_node of string
+  | Etherlink_producer_node of string
+
+(** [name_of_daemon] returns the standard name associated with a given [daemon].
+    Used for consistent naming of VMs, logs and artifacts. *)
+val name_of_daemon : daemon -> string

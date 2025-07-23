@@ -284,7 +284,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
-      ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
+      ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
       ~default_operator:account.alias
       ~operators
@@ -400,7 +400,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
                     ]
                 else None)
              ())
-      ~name:(Format.asprintf "etherlink-%s-evm-node" name)
+      ~name:(name_of_daemon (Etherlink_evm_node name))
       ~mode
       endpoint
       cloud
@@ -436,7 +436,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
   let* node =
     Node.Agent.init
       ~rpc_external
-      ~name:(Format.asprintf "etherlink-%s-node" name)
+      ~name:(name_of_daemon (Etherlink_producer_node name))
       ~arguments:[Peer node_p2p_endpoint; Synchronisation_threshold 0]
       cloud
       agent
@@ -464,7 +464,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
   in
   let* sc_rollup_node =
     Sc_rollup_node.Agent.create
-      ~name:(Format.asprintf "etherlink-%s-rollup-node" name)
+      ~name:(name_of_daemon (Etherlink_sc_rollup_node name))
       ~base_dir:(Client.base_dir client)
       cloud
       agent
@@ -502,7 +502,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
   (* TODO: try using this local EVM node for Floodgate confirmations. *)
   let* evm_node =
     Evm_node.Agent.init
-      ~name:(Format.asprintf "etherlink-%s-evm-node" name)
+      ~name:(name_of_daemon (Etherlink_evm_node name))
       ~mode
       endpoint
       cloud
