@@ -115,7 +115,8 @@ val service_manager : t -> Service_manager.t option
     automatically created in /tmp/tezt-$n with the name of the command as
     prefix (warning: it can causes duplicates).
  *)
-val docker_run_command : t -> ?detach:bool -> string -> string list -> Process.t
+val docker_run_command :
+  ?name:string -> t -> ?detach:bool -> string -> string list -> Process.t
 
 (** [copy ?refresh ?is_directory ?destination agent ~source] copies the file
     into the [agent] directory and returns the directory where the file
