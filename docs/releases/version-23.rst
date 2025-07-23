@@ -1,4 +1,4 @@
-Version 23.0~rc1
+Version 23.0~rc2
 ================
 
 Changes
@@ -93,14 +93,14 @@ From sources
 ~~~~~~~~~~~~
 
   git fetch
-  git checkout octez-v23.0
+  git checkout octez-v23.0-rc2
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v23.0`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v23.0-rc2`` Docker images of Octez.
 
 Changelog
 ---------
