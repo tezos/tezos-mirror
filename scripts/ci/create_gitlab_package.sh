@@ -79,12 +79,23 @@ cp "$GPG_PUBLIC_KEY" "public/octez.asc"
 # be set accordingly by the CI.
 BUCKET="$GCP_LINUX_PACKAGES_BUCKET"
 
+if [ "$CI_COMMIT_REF_PROTECTED" = "true" ]; then
+  echo "### Logging into protected repo ..."
+  echo "${GCP_PROTECTED_SERVICE_ACCOUNT}" | base64 -d > protected_sa.json
+  gcloud auth activate-service-account --key-file=protected_sa.json
+else
+  echo "### Logging into standard repo ..."
+  # Nothing to do
+fi
+
 GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
 export GOOGLE_OAUTH_ACCESS_TOKEN
 
 echo "Push to $BUCKET"
-
-gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+# Upload only if not running in dry-run
+if [ -z "${dry_run:-}" ]; then
+  gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+fi
 
 # Loop over architectures
 for architecture in ${architectures}; do
