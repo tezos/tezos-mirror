@@ -1388,15 +1388,21 @@ let test_unstaked_requests_many_delegates () =
         let expected_list =
           (* unstaked_frozen_balance =?= 0 *)
           match target_cycle with
+          (* D0 unstakes in C0: D0 unstaked_frozen <> 0 *)
           | 1 -> List.init 6 (fun i -> if i = 0 then false else true)
+          (* D1 unstakes in C1: D0, D1 unstaked_frozen <> 0 *)
           | 2 -> List.init 6 (fun i -> if i <= 1 then false else true)
+          (* D2 unstakes in C2: D0, D1, D2 unstaked_frozen <> 0 *)
           | 3 -> List.init 6 (fun i -> if i <= 2 then false else true)
+          (* D3 unstakes in C3: D1, D2, D3 unstaked_frozen <> 0; D0 unstaked_frozen = 0 *)
           | 4 -> List.init 6 (fun i -> if 1 <= i && i <= 3 then false else true)
-          | 5 -> List.init 6 (fun i -> if 2 <= i && i <= 4 then false else true)
-          | 6 -> List.init 6 (fun i -> if 3 <= i then false else true)
-          | 7 -> List.init 6 (fun i -> if 4 <= i then false else true)
-          | 8 -> List.init 6 (fun i -> if i = 5 then false else true)
-          | 9 -> List.init 6 (fun _i -> true)
+          (* D4 unstakes in C4: D3, D4 unstaked_frozen <> 0; D0, D1, D2 unstaked_frozen = 0 *)
+          | 5 -> List.init 6 (fun i -> if 3 <= i && i <= 4 then false else true)
+          (* D5 unstakes in C5: D4, D5 unstaked_frozen <> 0; D0, D1, D2, D3 unstaked_frozen = 0 *)
+          | 6 -> List.init 6 (fun i -> if 4 <= i then false else true)
+          (* D5 unstaked_frozen <> 0; D0, D1, D2, D3, D4 unstaked_frozen = 0 *)
+          | 7 -> List.init 6 (fun i -> if 5 <= i then false else true)
+          | 8 -> List.init 6 (fun _i -> true)
           | _ -> failwith "unexpected input"
         in
         let* () =
@@ -1418,8 +1424,8 @@ let test_unstaked_requests_many_delegates () =
           else unit
         in
         unit)
-      (* From cycle 1 to 9 *)
-      (List.init 9 (fun i -> i + 1))
+      (* From cycle 1 to 8 *)
+      (List.init 8 (fun i -> i + 1))
   in
   unit
 
@@ -1584,20 +1590,6 @@ let test_unstaked_requests_and_min_delegated () =
     bake_until_cycle_with_and_check
       ~bakers:[default_baker]
       ~target_cycle:5
-      ~delegate:default_baker
-      ~check_last_block:(fun _ -> unit)
-      ~check_next_block:(fun _ ->
-        let* _ = Local_helpers.unstake_requests ~staker:delegate_0 client in
-        Local_helpers.check_is_finalizable_all_requests
-          ~staker:delegate_0
-          ~expected:false
-          client)
-      client
-  in
-  let* () =
-    bake_until_cycle_with_and_check
-      ~bakers:[default_baker]
-      ~target_cycle:6
       ~delegate:default_baker
       ~check_last_block:(fun _ -> unit)
       ~check_next_block:(fun _ ->
