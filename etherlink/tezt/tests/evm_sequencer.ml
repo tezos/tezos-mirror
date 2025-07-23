@@ -8788,6 +8788,96 @@ let test_trace_transaction_calltracer_deposit =
   in
   unit
 
+let test_trace_transaction_calltracer_on_nested_delegatecalls =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "rpc"; "trace"; "call_trace"; "nested_delegatecalls"]
+    ~title:
+      "debug_traceTransaction with calltracer can trace nested delegatecalls \
+       with appropriate sender addresses for each call"
+    ~da_fee:Wei.zero
+    ~maximum_allowed_ticks:100_000_000_000_000L
+    ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let endpoint = Evm_node.endpoint sequencer in
+  let source_private_key, address_eoa =
+    Eth_account.
+      ( bootstrap_accounts.(0).private_key,
+        String.lowercase_ascii bootstrap_accounts.(0).address )
+  in
+  let init_contract ~contract =
+    let open Solidity_contracts in
+    let* contract = contract evm_version in
+    let* () = Eth_cli.add_abi ~label:contract.label ~abi:contract.abi () in
+    let* address, _ =
+      send_transaction_to_sequencer
+        (Eth_cli.deploy
+           ~source_private_key
+           ~endpoint
+           ~abi:contract.label
+           ~bin:contract.bin)
+        sequencer
+    in
+    return (String.lowercase_ascii address, contract.label)
+  in
+  let* address_A, label_A =
+    init_contract ~contract:Solidity_contracts.nested_delegatecalls_A
+  in
+  let* address_B, _ =
+    init_contract ~contract:Solidity_contracts.nested_delegatecalls_B
+  in
+  let* address_C, _ =
+    init_contract ~contract:Solidity_contracts.nested_delegatecalls_C
+  in
+  let* address_D, _ =
+    init_contract ~contract:Solidity_contracts.nested_delegatecalls_D
+  in
+  let* _ = produce_block sequencer in
+  let* transaction_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key
+         ~endpoint
+         ~abi_label:label_A
+         ~address:address_A
+         ~method_call:
+           (Format.sprintf
+              "callB(\"%s\",\"%s\",\"%s\")"
+              address_B
+              address_C
+              address_D))
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@ trace_result =
+    Rpc.trace_transaction
+      ~tracer:"callTracer"
+      ~transaction_hash
+      ~tracer_config:[("withLog", `Bool true); ("onlyTopCall", `Bool false)]
+      sequencer
+  in
+  assert (JSON.(trace_result |-> "type" |> as_string) = "CALL") ;
+  assert (JSON.(trace_result |-> "from" |> as_string) = address_eoa) ;
+  assert (JSON.(trace_result |-> "to" |> as_string) = address_A) ;
+  let call_list = JSON.(trace_result |-> "calls" |> as_list) in
+  let delegatecall_1 = List.hd call_list in
+  assert (JSON.(delegatecall_1 |-> "type" |> as_string) = "DELEGATECALL") ;
+  assert (JSON.(delegatecall_1 |-> "from" |> as_string) = address_A) ;
+  assert (JSON.(delegatecall_1 |-> "to" |> as_string) = address_B) ;
+  let delegatecall_1_call_list = JSON.(delegatecall_1 |-> "calls" |> as_list) in
+  let delegatecall_2 = List.hd delegatecall_1_call_list in
+  assert (JSON.(delegatecall_2 |-> "type" |> as_string) = "CALL") ;
+  assert (JSON.(delegatecall_2 |-> "from" |> as_string) = address_A) ;
+  assert (JSON.(delegatecall_2 |-> "to" |> as_string) = address_C) ;
+  let delegatecall_2_call_list = JSON.(delegatecall_2 |-> "calls" |> as_list) in
+  let delegatecall_3 = List.hd delegatecall_2_call_list in
+  assert (JSON.(delegatecall_3 |-> "type" |> as_string) = "CALL") ;
+  assert (JSON.(delegatecall_3 |-> "from" |> as_string) = address_C) ;
+  assert (JSON.(delegatecall_3 |-> "to" |> as_string) = address_D) ;
+  unit
+
 let test_miner =
   let sequencer_pool_address =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
@@ -13527,6 +13617,7 @@ let () =
   test_trace_transaction_calltracer_on_simple_transfer protocols ;
   test_trace_transaction_calltracer_precompiles protocols ;
   test_trace_transaction_calltracer_deposit protocols ;
+  test_trace_transaction_calltracer_on_nested_delegatecalls [Alpha] ;
   test_debug_print_store_schemas () ;
   test_man () ;
   test_describe_config () ;
