@@ -83,8 +83,10 @@ GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
 export GOOGLE_OAUTH_ACCESS_TOKEN
 
 echo "Push to $BUCKET"
-
-gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+# Upload only if not running in dry-run
+if [ -z "${dry_run:-}" ]; then
+  gsutil -m cp -r public/octez.asc gs://"${BUCKET}"
+fi
 
 # Loop over architectures
 for architecture in ${architectures}; do
