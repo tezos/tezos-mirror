@@ -4599,7 +4599,7 @@ mod interpreter_tests {
     fn set_delegate() {
         use Instruction as I;
         let sd = super::SetDelegate(Some(
-            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+            PublicKeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
         let stk = &mut stk![V::new_option(Some(V::KeyHash(sd.0.clone().unwrap())))];
         let ctx = &mut Ctx::default();
@@ -4623,7 +4623,7 @@ mod interpreter_tests {
         // as expected.
         use Instruction as I;
         let sd = super::SetDelegate(Some(
-            KeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
+            PublicKeyHash::try_from("tz3h4mjmMieZKSaSBWBC7XmeL6JQ3hucFDcP").unwrap(),
         ));
         let stk = &mut stk![
             V::new_option(Some(V::KeyHash(sd.0.clone().unwrap()))),
@@ -5548,7 +5548,7 @@ mod interpreter_tests {
     #[test]
     fn implicit_account() {
         let mut ctx = Ctx::default();
-        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         let mut stack = stk![V::KeyHash(key_hash)];
         let start_milligas = ctx.gas.milligas();
         assert_eq!(interpret(&[ImplicitAccount], &mut ctx, &mut stack), Ok(()));
@@ -5566,9 +5566,9 @@ mod interpreter_tests {
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
 
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([
@@ -5599,8 +5599,8 @@ mod interpreter_tests {
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         let mut ctx = Ctx::default();
         ctx.set_voting_powers([(key_hash_1, 30u32.into()), (key_hash_2, 50u32.into())]);
         let mut stack = stk![];

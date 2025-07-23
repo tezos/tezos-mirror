@@ -283,7 +283,7 @@ pub mod interpret_cost {
     use num_traits::Zero;
 
     use super::{AsGasCost, BigIntByteSize, Log2i, OutOfGas};
-    use crate::ast::{Key, KeyHash, Micheline, Or, Ticket, TypedValue};
+    use crate::ast::{Key, Micheline, Or, Ticket, TypedValue};
 
     pub const DIP: u32 = 10;
     pub const DROP: u32 = 10;
@@ -644,9 +644,7 @@ pub mod interpret_cost {
             (V::Signature(_), V::Signature(_)) => CMP_SIGNATURE,
             (V::Signature(_), _) => incomparable(),
 
-            (V::KeyHash(_), V::KeyHash(_)) => {
-                cmp_bytes(KeyHash::BYTE_SIZE as u64, KeyHash::BYTE_SIZE as u64)?
-            }
+            (V::KeyHash(_), V::KeyHash(_)) => cmp_bytes(20u64, 20u64)?,
             (V::KeyHash(_), _) => incomparable(),
 
             (V::Or(l), V::Or(r)) => match (l.as_ref(), r.as_ref()) {

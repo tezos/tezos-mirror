@@ -11,11 +11,10 @@
 use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
 use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
-use crate::ast::michelson_key_hash::KeyHash;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
-use tezos_crypto_rs::hash::OperationHash;
+use tezos_crypto_rs::{hash::OperationHash, public_key_hash::PublicKeyHash};
 
 /// [Ctx] includes "outer context" required for typechecking and interpreting
 /// Michelson.
@@ -59,7 +58,7 @@ pub struct Ctx<'a> {
     /// you provide a custom function here, you also must define
     /// [Self::total_voting_power] to be consistent with your function! See also
     /// [Self::set_voting_powers]. Defaults to returning `0` for any address.
-    pub voting_powers: Box<dyn Fn(&KeyHash) -> BigUint>,
+    pub voting_powers: Box<dyn Fn(&PublicKeyHash) -> BigUint>,
     /// The minimal injection time for the current block, as a unix timestamp
     /// (in seconds). Defaults to `0`.
     pub now: BigInt,
@@ -111,12 +110,12 @@ impl<'a> Ctx<'a> {
 
     /// Set a reasonable implementation for [Self::voting_powers] and a
     /// consistent value for [Self::total_voting_power] by providing something
-    /// that converts into  [`HashMap<KeyHash, BigUint>`], mapping key hashes to
+    /// that converts into  [`HashMap<PublicKeyHash, BigUint>`], mapping key hashes to
     /// voting powers. If a given key hash is unspecified, its voting power is
     /// assumed to be `0`. [Self::total_voting_power] is set to the sum of all
     /// values.
-    pub fn set_voting_powers(&mut self, v: impl Into<HashMap<KeyHash, BigUint>>) {
-        let map: HashMap<KeyHash, BigUint> = v.into();
+    pub fn set_voting_powers(&mut self, v: impl Into<HashMap<PublicKeyHash, BigUint>>) {
+        let map: HashMap<PublicKeyHash, BigUint> = v.into();
         self.total_voting_power = map.values().sum();
         self.voting_powers = Box::new(move |x| map.get(x).unwrap_or(&0u32.into()).clone());
     }
