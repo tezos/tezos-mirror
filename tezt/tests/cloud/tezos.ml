@@ -290,7 +290,7 @@ module Node = struct
   module Agent = struct
     let create ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
         ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
-        ?name ?net_addr cloud agent =
+        ~name ?net_addr cloud agent =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
       let* () =
@@ -326,7 +326,7 @@ module Node = struct
       let node =
         create
           ?data_dir
-          ?name
+          ~name
           ~path
           ?runner
           ?rpc_external
@@ -377,12 +377,7 @@ module Node = struct
           Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
         in
         let target = Cloud.{agent; port = Node.metrics_port node; app_name} in
-        let* () =
-          Cloud.add_prometheus_source
-            cloud
-            ~name:(Option.value name ~default:(Node.name node))
-            [target]
-        in
+        let* () = Cloud.add_prometheus_source cloud ~name [target] in
         (* Prometheus process-exporter *)
         Alerts.add_process_exporter_alerts
           ~cloud
@@ -399,6 +394,19 @@ module Node = struct
         ~executable
         ~on_alive_callback
         agent ;
+      let () =
+        match Agent.daily_logs_destination agent with
+        | None -> ()
+        | Some destination_root ->
+            Agent.register_shutdown_callback agent (fun () ->
+                let* () =
+                  Agent_kind.Logs.scp_logs
+                    ~destination_root
+                    ~daemon_name:name
+                    agent
+                in
+                Lwt.return_unit)
+      in
       Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
