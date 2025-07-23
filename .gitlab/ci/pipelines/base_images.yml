@@ -43,11 +43,6 @@ oc.base-images.debian:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: debian
     IMAGE_PATH: debian
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -72,11 +67,6 @@ oc.base-images.ubuntu:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: ubuntu
     IMAGE_PATH: ubuntu
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -101,11 +91,6 @@ oc.base-images.fedora:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: fedora
     IMAGE_PATH: fedora
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
@@ -130,11 +115,6 @@ oc.base-images.rockylinux:
     DOCKER_VERSION: 24.0.7
     DISTRIBUTION: rockylinux
     IMAGE_PATH: rockylinux/rockylinux
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
   parallel:
     matrix:
     - RELEASE:
