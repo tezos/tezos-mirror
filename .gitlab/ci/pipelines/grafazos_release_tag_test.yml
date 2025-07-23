@@ -58,6 +58,7 @@ grafazos.gitlab:release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+  retry: 0
 
 grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
@@ -107,3 +108,4 @@ grafazos.publish:release-page:
     paths:
     - ./index.md
     - index.html
+  retry: 0

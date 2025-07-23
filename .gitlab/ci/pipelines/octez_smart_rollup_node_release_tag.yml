@@ -222,6 +222,7 @@ rollup-node.docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  retry: 0
 
 rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -240,3 +241,4 @@ rollup-node.gitlab:octez-smart-rollup-node-release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/rollup_node/releases/create_gitlab_release.sh
+  retry: 0

@@ -227,6 +227,7 @@ docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  retry: 0
 
 gitlab:octez-evm-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -245,6 +246,7 @@ gitlab:octez-evm-node-release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/create_gitlab_octez_evm_node_release.sh
+  retry: 0
 
 docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -265,3 +267,4 @@ docker:promote_to_latest:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  retry: 0

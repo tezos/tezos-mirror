@@ -17,6 +17,7 @@ let job_gitlab_release =
     ~dependencies:(Dependent [Artifacts (Common.job_build ())])
     ~name:"gitlab:release"
     ["./grafazos/scripts/releases/create_gitlab_release.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 let job_release_page ~test () =
   job
@@ -53,6 +54,7 @@ let job_release_page ~test () =
            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
          ])
     ["./grafazos/scripts/releases/publish_release_page.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 let jobs ~test ?(dry_run = false) () =
   (* If the release is a dry run, we do not publish a gitlab release page. *)

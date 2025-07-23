@@ -85,6 +85,7 @@ teztale.gitlab:release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./teztale/scripts/releases/create_gitlab_release.sh
+  retry: 0
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -197,3 +198,4 @@ teztale.publish:release-page:
     paths:
     - ./index.md
     - index.html
+  retry: 0

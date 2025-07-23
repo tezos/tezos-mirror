@@ -81,6 +81,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~dependencies:(Dependent [Job job_docker_amd64; Job job_docker_arm64])
     ~ci_docker_hub
     ["./scripts/ci/docker_merge_manifests.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 let jobs ?(test = false) () =
   let job_docker_amd64 = job_docker_build ~__POS__ ~arch:Amd64 ~test () in
@@ -116,6 +117,7 @@ let jobs ?(test = false) () =
       ~dependencies
       ~name:"gitlab:octez-smart-rollup-node-release"
       ["./scripts/rollup_node/releases/create_gitlab_release.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   [
     Tezos_ci.job_datadog_pipeline_trace;
