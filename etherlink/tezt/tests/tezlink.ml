@@ -1009,6 +1009,7 @@ let test_tezlink_sandbox () =
       ~preimages_dir
       (Uses.path Constant.WASM.evm_kernel)
   in
+  let spawn_rpc = Port.fresh () in
   let sequencer_mode =
     Evm_node.Tezlink_sandbox
       {
@@ -1030,7 +1031,9 @@ let test_tezlink_sandbox () =
   let* sequencer =
     Evm_node.init
       ~mode:sequencer_mode
-      ~spawn_rpc:(Port.fresh ())
+      ~spawn_rpc
+      ~patch_config:
+        (Evm_node.patch_config_with_experimental_feature ~spawn_rpc ())
       Uri.(empty |> to_string)
   in
 
