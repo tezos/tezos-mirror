@@ -37,3 +37,4 @@ docker:promote_to_latest:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "false"
+  retry: 0

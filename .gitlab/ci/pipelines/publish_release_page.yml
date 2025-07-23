@@ -44,3 +44,4 @@ publish:release-page:
     paths:
     - ./index.md
     - index.html
+  retry: 0

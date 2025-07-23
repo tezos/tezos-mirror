@@ -72,7 +72,7 @@ let archs_variables pipeline =
 
 (* Push .deb artifacts to storagecloud apt repository. *)
 let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
-    ?dependencies ~prefix ~variables ~image script : tezos_job =
+    ?dependencies ~prefix ~variables ?retry ~image script : tezos_job =
   let variables =
     variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]
   in
@@ -84,6 +84,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~name
     ~id_tokens:Tezos_ci.id_tokens
     ~image
+    ?retry
     ~before_script:
       (before_script
          ~source_version:true
@@ -92,7 +93,6 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
            "apt install -y apt-utils debsigs jq";
          ])
     ~variables
-    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     script
 
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
@@ -266,6 +266,7 @@ let jobs pipeline_type =
              Artifacts job_build_data_packages;
            ])
       ~variables:(archs_variables pipeline_type)
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~image:Images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
@@ -281,6 +282,7 @@ let jobs pipeline_type =
              Artifacts job_build_data_packages;
            ])
       ~variables:(archs_variables pipeline_type)
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ~image:Images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in

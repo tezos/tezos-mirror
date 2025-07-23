@@ -92,6 +92,7 @@ let job_release_page ~test ?dependencies () =
            ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
          ])
     ["./scripts/releases/publish_release_page.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -192,6 +193,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         "./scripts/ci/restrict_export_to_octez_source.sh";
         "./scripts/ci/gitlab-release.sh";
       ]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
     let before_script =
@@ -216,6 +218,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         | Schedule_test -> " --dry-run"
         | _ -> "");
       ]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   let jobs_dnf_repository = Rpm_repository.jobs Release in
   let jobs_debian_repository = Debian_repository.jobs Release in
@@ -258,6 +261,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ?variables
       ~name:"opam:release"
       [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   let job_promote_to_latest_test =
     Common.job_docker_promote_to_latest
@@ -386,6 +390,7 @@ let octez_evm_node_jobs ?(test = false) () =
       ~name:"gitlab:octez-evm-node-release"
       ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   let job_docker_promote_to_latest ~ci_docker_hub () : tezos_job =
     job_docker_authenticated
@@ -398,6 +403,7 @@ let octez_evm_node_jobs ?(test = false) () =
         "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
          ./scripts/ci/octez-evm-node-release.sh";
       ]
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
   in
   [
     (* Stage: start *)

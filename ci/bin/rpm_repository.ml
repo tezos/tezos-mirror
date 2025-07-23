@@ -52,7 +52,7 @@ let fedora_package_release_matrix ?(ramfs = false) = function
 (* Push .rpm artifacts to storagecloud rpm repository. *)
 let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
-    script : tezos_job =
+    ?retry script : tezos_job =
   let variables =
     variables
     @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")]
@@ -67,8 +67,8 @@ let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?id_tokens
     ~image
     ~before_script
-    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     ~variables
+    ?retry
     script
 
 (* The entire RPM packages pipeline. When [pipeline_type] is [Before_merging]
@@ -208,6 +208,7 @@ let jobs pipeline_type =
         (before_script
            ~source_version:true
            ["./scripts/ci/prepare-rpm-repo.sh"])
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ["./scripts/ci/create_rpm_repo.sh rockylinux 9.3"]
   in
   let job_rpm_repo_fedora =
@@ -228,6 +229,7 @@ let jobs pipeline_type =
         (before_script
            ~source_version:true
            ["./scripts/ci/prepare-rpm-repo.sh"])
+      ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       ["./scripts/ci/create_rpm_repo.sh fedora 39 42"]
   in
   (* These test the installability *)

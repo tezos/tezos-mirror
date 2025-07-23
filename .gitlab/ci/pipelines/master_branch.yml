@@ -406,6 +406,7 @@ docker:merge_manifests:
   variables:
     DOCKER_VERSION: 24.0.7
     CI_DOCKER_HUB: "true"
+  retry: 0
 
 publish_kernel_sdk:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
