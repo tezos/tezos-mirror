@@ -61,3 +61,61 @@ let name_of_daemon = function
       Format.asprintf "etherlink-%s-rollup-node" name
   | Etherlink_evm_node name -> Format.asprintf "etherlink-%s-evm-node" name
   | Etherlink_producer_node name -> Format.asprintf "etherlink-%s-node" name
+
+module Logs = struct
+  let scp_logs ~destination_root ~daemon_name agent =
+    let agent_name = Agent.name agent in
+    (* This is not compatible with the --proxy mode as the Agent's location of
+       the proxy might differ from the localhost one. *)
+    let tezt_root_path = Agent.temp_execution_path () in
+    Log.info "Retrieving logs from %s" agent_name ;
+    match Agent.runner agent with
+    | None ->
+        Log.warn "Cannot retrieve logs for %s: no runner for agent" agent_name ;
+        Lwt.return_unit
+    | Some runner ->
+        let identity =
+          Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
+        in
+        let port =
+          Option.fold
+            ~none:[]
+            ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
+            runner.Runner.ssh_port
+        in
+        let source =
+          Format.sprintf
+            "%s%s:%s"
+            (Option.fold
+               ~none:""
+               ~some:(fun u -> Format.sprintf "%s@" u)
+               runner.Runner.ssh_user)
+            runner.address
+            tezt_root_path
+        in
+        let local_path =
+          let local_path_root = destination_root // agent_name in
+          if not (Sys.file_exists destination_root) then
+            Sys.mkdir destination_root 0o755 ;
+          if not (Sys.file_exists local_path_root) then
+            Sys.mkdir local_path_root 0o755 ;
+          let local_path = local_path_root // daemon_name in
+          let () = Sys.mkdir local_path 0o755 in
+          local_path
+        in
+        Lwt.catch
+          (fun () ->
+            Process.run
+              "scp"
+              (["-r"] @ ["-O"]
+              @ ["-o"; "StrictHostKeyChecking=no"]
+              @ identity @ port
+              @ [source // daemon_name // "daily_logs"]
+              @ [local_path // "daily_logs"]))
+          (fun exn ->
+            Log.warn
+              "Cannot retrieve log from %s: %s"
+              agent_name
+              (Printexc.to_string exn) ;
+            Lwt.return_unit)
+end
