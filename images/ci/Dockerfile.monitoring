@@ -14,7 +14,6 @@ USER root
 # hadolint ignore=DL3018,DL3019
 RUN apk update && apk add --no-cache npm curl jq
 
-
 # Set NPM registry
 # NPM_REGISTRY_DOMAIN and NPM_REGISTRY are set in the GitLab CI/CD
 ARG NPM_REGISTRY_DOMAIN
