@@ -7,7 +7,7 @@
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use tezos_crypto_rs::{hash::BlsSignature, public_key::PublicKey, public_key_hash::PublicKeyHash};
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 #[encoding(tags = "u8")]
@@ -43,7 +43,7 @@ pub struct RevealContent {
 pub struct TransactionContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameters: Option<Parameter>,
+    pub parameters: WithDefaultValue<Parameter>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -51,6 +51,17 @@ pub struct Parameter {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+impl Default for Parameter {
+    fn default() -> Self {
+        Parameter {
+            entrypoint: Entrypoint::default(),
+            // This is the binary representation of the Michelson "Unit" value as produced by
+            // octez-client convert data "Unit" from Michelson to binary
+            value: vec![0x03, 0x0b],
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -192,11 +203,12 @@ mod tests {
                 amount: 1_000_000_u64.into(),
                 destination: Contract::from_b58check("KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv")
                     .unwrap(),
-                parameters: Some(Parameter {
+                parameters: Parameter {
                     entrypoint: Entrypoint::try_from("B").unwrap(),
                     // octez-client convert data '"Hello"' from Michelson to binary
                     value: hex::decode("010000000548656c6c6f").unwrap(),
-                }),
+                }
+                .into(),
             },
             gas_limit: 1380_u64.into(),
             storage_limit: 0_u64.into(),
@@ -234,7 +246,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: None,
+                parameters: Parameter::default().into(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -278,11 +290,7 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: Some(Parameter {
-                    entrypoint: Entrypoint::try_from("default").unwrap(),
-                    // octez-client convert data "Unit" from Michelson to binary
-                    value: hex::decode("030b").unwrap(),
-                }),
+                parameters: Parameter::default().into(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
@@ -326,11 +334,12 @@ mod tests {
                 amount: 0.into(),
                 destination: Contract::from_b58check("tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ")
                     .unwrap(),
-                parameters: Some(Parameter {
+                parameters: Parameter {
                     entrypoint: Entrypoint::try_from("remove_delegate").unwrap(),
                     // octez-client convert data "Unit" from Michelson to binary
                     value: hex::decode("030b").unwrap(),
-                }),
+                }
+                .into(),
             },
             gas_limit: 0.into(),
             storage_limit: 0.into(),
