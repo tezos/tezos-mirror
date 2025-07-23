@@ -132,7 +132,7 @@ _`Attestation lag`
     Attesters (via their DAL nodes) include their DAL attestations in their attestation operations immediately after the attestation lag has passed.
 
 _`Attestation threshold`
-    The minimum percentage of DAL shard_\ s that must be attested by attesters before the data is considered to be attested and therefore available to Smart Rollups.
+    In the DAL, the minimum percentage of DAL shard_\ s that must be attested by attesters before the data is considered to be attested and therefore available to Smart Rollups.
 
 _`Attesting`
     When a block_ is created and propagated on the network, delegates that have
@@ -398,7 +398,7 @@ _`Smart Rollup`
     See :doc:`smart_rollups`.
 
 _`DAL slot`
-    Each block has a certain number of slots to which Data Availability Layer users can post raw data to distribute via the DAL.
+    Each block has a certain number of slots to which Data Availability Layer users can post raw data as binary large objects (blobs) to distribute via the DAL.
 
 _`Staker`
     A `user account`_ that made a security deposit.
