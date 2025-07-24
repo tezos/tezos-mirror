@@ -72,7 +72,7 @@ _`Metadata`
 
 _`Node`
     A peer in a Tezos P2P network.
-    The term "node" can refer to a few different kinds of nodes, including Tezos layer 1 nodes, `Data Availability Layer node`_\ s, and `Smart Rollup`_ nodes.
+    The term "node" can refer to a few different kinds of nodes, including Tezos layer 1 nodes, `DAL node`_\ s, and `Smart Rollup`_ nodes.
     The context should help to disambiguate between these, but in most cases, the term "node" refers to a layer 1 node.
     Layer 1 nodes maintain a local state and propagates block_\ s and operation_\ s.
 
@@ -208,7 +208,7 @@ _`Data Availability Layer`
     The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
     See :doc:`../shell/dal`.
 
-_`Data Availability Layer node`
+_`DAL node`
     DAL nodes (instances of the ``octez-dal-node`` binary) are responsible for distributing the data that users submit to the DAL.
 
 .. _def_delegate:
