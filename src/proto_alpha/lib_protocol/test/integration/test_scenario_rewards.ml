@@ -456,12 +456,12 @@ let test_overstake =
   begin_test_with_rewards_checks ~init_limit:3.
   --> next_block_with_check_rewards
         ~loc:__LOC__
-        ~staker_diff:(Q.of_int32 30_516l)
-        ~delegate_diff:(Q.of_int32 141_452l)
+        ~staker_diff:(Q.of_int32 30_503l)
+        ~delegate_diff:(Q.of_int32 141_060l)
   --> next_block_with_check_rewards
         ~loc:__LOC__
-        ~staker_diff:(Q.of_int32 30_516l)
-        ~delegate_diff:(Q.of_int32 141_452l)
+        ~staker_diff:(Q.of_int32 30_503l)
+        ~delegate_diff:(Q.of_int32 141_060l)
   --> add_account_with_funds
         "staker2"
         ~funder:"faucet"
@@ -471,30 +471,34 @@ let test_overstake =
   --> next_block_with_check_rewards
         ~loc:__LOC__
         ~staker_diff:
-          (Q.make (Z.of_int64 123_818_187_500_000L) (Z.of_int64 6_937_492_371L))
-          (* = 12466.3429088 *)
-        ~delegate_diff:(Q.of_int32 118_425l)
+          (Q.make
+             (Z.of_int64 494_662_250_000_000L)
+             (Z.of_int64 27_749_969_497L))
+          (* = 17825.68626079 *)
+        ~delegate_diff:(Q.of_int32 118_086l)
   --> check_overstaked_status ~loc:__LOC__ ~expected:false "delegate"
   --> stake "staker2" (Amount (Tez.of_mutez 300_000_000_000L))
   --> check_overstaked_status ~loc:__LOC__ ~expected:true "delegate"
   --> next_block_with_check_rewards
         ~loc:__LOC__
         ~staker_diff:
-          (Q.make (Z.of_int64 89_477_100_000_000L) (Z.of_int64 7_912_488_031L))
-          (* = 7898.71925 *)
-        ~delegate_diff:(Q.of_int32 107_480l)
+          (Q.make
+             (Z.of_int64 3_570_648_000_000_000L)
+             (Z.of_int64 316_499_521_483L))
+          (* = 11281.68530325 *)
+        ~delegate_diff:(Q.of_int32 107_227l)
   --> set_edge 0.8 --> wait_delegate_parameters_activation
   --> set_delegate "staker2" (Some "faucet")
   --> check_overstaked_status ~loc:__LOC__ ~expected:false "delegate"
   --> next_block_with_check_rewards
         ~loc:__LOC__
-        ~staker_diff:(Q.of_int32 34_603l)
-        ~delegate_diff:(Q.of_int32 452_898l)
+        ~staker_diff:(Q.of_int32 34_634l)
+        ~delegate_diff:(Q.of_int32 452_382l)
   --> wait_n_cycles_f Test_scenario_stake.unstake_wait
   --> next_block_with_check_rewards
         ~loc:__LOC__
-        ~staker_diff:(Q.of_int32 17_858l)
-        ~delegate_diff:(Q.of_int32 233_748l)
+        ~staker_diff:(Q.of_int32 17_889l)
+        ~delegate_diff:(Q.of_int32 233_679l)
 
 let tests =
   tests_of_scenarios
