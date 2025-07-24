@@ -739,8 +739,22 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
               Option.value_f alias ~default:(fun () ->
                   Format.asprintf "baker_%d" i)
             in
-            (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
-            :: acc)
+            let delegate_alias =
+              ( alias,
+                pkh,
+                pk,
+                ck,
+                stake,
+                frozen_deposits,
+                unstake_frozen_deposits )
+            in
+            let consensus_key_alias =
+              match ck with
+              | None -> []
+              | Some (cpkh, cpk) ->
+                  [(alias ^ "_consensus_key", cpkh, cpk, None, 0L, 0L, 0L)]
+            in
+            consensus_key_alias @ (delegate_alias :: acc))
           []
           delegates
         |> List.rev
