@@ -63,6 +63,7 @@ val make :
   next_available_port:(unit -> int) ->
   vm_name:string option ->
   process_monitor:Process_monitor.t option ->
+  daily_logs_destination:string option ->
   unit ->
   t
 
@@ -87,6 +88,9 @@ val runner : t -> Runner.t option
 
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
+
+(** [daily_logs_destination agent] associated to the agent. *)
+val daily_logs_destination : t -> string option
 
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option

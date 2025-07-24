@@ -69,6 +69,7 @@ type t = {
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
   service_manager : Service_manager.t option;
+  daily_logs_destination : string option;
   mutable on_shutdown : (unit -> unit Lwt.t) list;
 }
 
@@ -88,6 +89,7 @@ let encoding =
            configuration;
            process_monitor;
            service_manager = _;
+           daily_logs_destination;
            on_shutdown = _;
          } ->
       ( vm_name,
@@ -95,13 +97,15 @@ let encoding =
         point,
         next_available_port (),
         configuration,
-        process_monitor ))
+        process_monitor,
+        daily_logs_destination ))
     (fun ( vm_name,
            zone,
            point,
            next_available_port,
            configuration,
-           process_monitor ) ->
+           process_monitor,
+           daily_logs_destination ) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -141,16 +145,18 @@ let encoding =
         configuration;
         process_monitor;
         service_manager = None;
+        daily_logs_destination;
         on_shutdown =
           [] (* As of now, this encoding is only used when reattaching *);
       })
-    (obj6
+    (obj7
        (req "vm_name" (option string))
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
        (req "configuration" Configuration.encoding)
-       (opt "process_monitor" Process_monitor.encoding))
+       (opt "process_monitor" Process_monitor.encoding)
+       (opt "daily_logs_destination" string))
 
 (* Getters *)
 
@@ -166,8 +172,10 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
+let daily_logs_destination {daily_logs_destination; _} = daily_logs_destination
+
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
-    ~process_monitor () =
+    ~process_monitor ~daily_logs_destination () =
   let ssh_user = "root" in
   let runner =
     match (point, ssh_id) with
@@ -193,6 +201,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     zone;
     process_monitor;
     service_manager = Service_manager.init () |> Option.some;
+    daily_logs_destination;
     on_shutdown = [];
   }
 
