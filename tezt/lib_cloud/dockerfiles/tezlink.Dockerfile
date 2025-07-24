@@ -2,8 +2,11 @@
 # encounter any dependency issue
 FROM debian:sid AS base
 
-# ignore "Pin versions in apt get install" hadolint warning
-# hadolint ignore=DL3008
+# ignore "Pin versions in apt get install" and "Delete the apt-get
+# lists after installing something" hadolint warnings. The apt-get
+# list will be deleted later.
+# hadolint ignore=DL3008,DL3009
+
 RUN apt-get update && apt-get install -y \
     # netbase is needed to handle transport services
     netbase \
@@ -21,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     prometheus-process-exporter \
     # emacs can be useful for debugging
     emacs \
-    # wget can be used to import snapshots
+    # wget is needed to get the microsoft keys and repo (in this dockerfile) and also to import snapshots (in some scenario)
     wget \
     # Necessary certificates for mirages dependencies
     ca-certificates \
@@ -31,8 +34,26 @@ RUN apt-get update && apt-get install -y \
     nginx \
     # libfaketime allows us to set the current date inside docker
     libfaketime \
+    # tzkt depends on PGSQL
+    postgresql \
+    # to run commands as postgres user
+    sudo \
+    # to clone Tzkt sources
+    git \
     # DL3015: Use --no-install-recommends
-    --no-install-recommends && \
+    --no-install-recommends
+
+# Add Microsoft keys and repo, to be able to install dotnet to run TZKT
+
+# ignore "Pin versions in apt get install" hadolint warning.
+# hadolint ignore=DL3008
+RUN wget -q https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -O packages-microsoft-prod.deb && \
+    dpkg -i packages-microsoft-prod.deb && \
+    rm packages-microsoft-prod.deb && \
+    # dotnet is used to compile and run TZKT
+    apt-get update && apt-get install -y dotnet-sdk-9.0 \
+    # DL3015: Use --no-install-recommends
+    --no-install-recommends  && \
     # DL3009: Delete the apt-get lists after Installing
     rm -rf /var/lib/apt/lists/* && \
     # This directory is necessary for running sshd
