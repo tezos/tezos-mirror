@@ -713,8 +713,10 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
           other_accounts_pkh
       in
       let with_alias =
-        List.mapi
-          (fun i (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
+        List.fold_left_i
+          (fun i
+               acc
+               (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
             let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
             let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
             let ck =
@@ -737,8 +739,11 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
               Option.value_f alias ~default:(fun () ->
                   Format.asprintf "baker_%d" i)
             in
-            (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits))
+            (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+            :: acc)
+          []
           delegates
+        |> List.rev
       in
       let* rich_accounts =
         match rich_accounts_over with
