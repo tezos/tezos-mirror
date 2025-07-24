@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Agent_kind
+module Helpers = Dal_common.Helpers
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
@@ -223,6 +224,121 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
           ~node_port:(Node.rpc_port node)
   in
   Lwt.return {client; node; dal_node; account; is_ready; slot_index}
+
+let ensure_enough_funds ~client ~fee ~producers ~network ~producer_key
+    ~some_node_rpc_endpoint i =
+  let producer = List.nth producers i in
+  match (network, producer_key) with
+  | `Sandbox, _ -> (* Producer has enough money *) Lwt.return_unit
+  | _, Some _ ->
+      (* Producer key is assumed to have enough money. We simply check that it is the case,
+         but do not refund it. *)
+      let* balance =
+        RPC_core.call some_node_rpc_endpoint
+        @@ RPC.get_chain_block_context_contract_balance
+             ~id:producer.account.public_key_hash
+             ()
+      in
+      if balance < Tez.of_mutez_int fee then
+        Lwt.fail_with
+          "Producer key has not enough money anymore to publish slots"
+      else Lwt.return_unit
+  | _ ->
+      let* balance =
+        RPC_core.call some_node_rpc_endpoint
+        @@ RPC.get_chain_block_context_contract_balance
+             ~id:producer.account.public_key_hash
+             ()
+      in
+      (* This is to prevent having to refund two producers at the same time and ensure it can produce at least one slot. *)
+      let random = Random.int 5_000_000 + 10_000 in
+      if balance < Tez.of_mutez_int random then
+        let* fundraiser = Client.show_address ~alias:"fundraiser" client in
+        let* _op_hash =
+          Operation.Manager.transfer
+            ~amount:10_000_000
+            ~dest:producer.account
+            ()
+          |> Operation.Manager.make ~fee ~source:fundraiser
+          |> Seq.return |> List.of_seq
+          |> Fun.flip (Operation.Manager.inject ~dont_wait:true) client
+        in
+        Lwt.return_unit
+      else Lwt.return_unit
+
+let produce_slot ~client ~producers ~network ~producer_key
+    ~some_node_rpc_endpoint ~producers_delay ~slot_size level i =
+  if level mod producers_delay = 0 then (
+    let all_start = Unix.gettimeofday () in
+    let producer = List.nth producers i in
+    toplog
+      "Producing a slot for index %d for level %d"
+      producer.slot_index
+      level ;
+    let fee = 800 in
+    let* () =
+      ensure_enough_funds
+        ~client
+        ~fee
+        ~producers
+        ~network
+        ~producer_key
+        ~some_node_rpc_endpoint
+        i
+    in
+    toplog "Ensured enough funds are available" ;
+    let index = producer.slot_index in
+    let content =
+      Format.asprintf "%d:%d" level index
+      |> Helpers.make_slot ~padding:false ~slot_size
+    in
+    let* _ = Node.wait_for_level producer.node level in
+    let make_commitment_start = Unix.gettimeofday () in
+    let* _commitment =
+      (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+         - tz1: fees of 513µtz and 1333 gas consumed
+         - tz2: fees of 514µtz and 1318 gas consumed
+         - tz3: fees of 543µtz and 1607 gas consumed
+         - tz4: fees of 700µtz and 2837 gas consumed
+         We added a (quite small) margin to it. *)
+      Helpers.publish_and_store_slot
+        ~fee
+        ~gas_limit:3000
+        ~dont_wait:true
+        producer.client
+        producer.dal_node
+        producer.account
+        ~force:true
+        ~index
+        content
+    in
+    let make_commitment_end = Unix.gettimeofday () in
+    Log.info
+      "publish_commitment operation for index %d injected at level %d"
+      producer.slot_index
+      level ;
+    let all_end = Unix.gettimeofday () in
+    let all_duration = all_end -. all_start in
+    let commitment_duration = make_commitment_end -. make_commitment_start in
+    Log.info
+      "Produce slot (for index %d) duration:@.- publish_and_store_slot: %f \
+       s@.- overall (including wait for level): %f s@."
+      producer.slot_index
+      commitment_duration
+      all_duration ;
+    Lwt.return_unit)
+  else Lwt.return_unit
+
+let producers_not_ready ~producers =
+  (* If not all the producer nodes are ready, we do not publish the commitment
+       for the current level. Another attempt will be done at the next level. *)
+  let producer_ready producer =
+    match Lwt.state producer.is_ready with
+    | Sleep -> true
+    | Fail exn -> Lwt.reraise exn
+    | Return () -> false
+  in
+  List.for_all producer_ready producers
 
 (* Observer functions *)
 

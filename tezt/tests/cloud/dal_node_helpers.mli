@@ -91,6 +91,26 @@ val init_producer :
   Agent.t ->
   producer Lwt.t
 
+(** [produce_slot ~client ~producers ~network ~producer_key
+    ~some_node_rpc_endpoint ~producers_delay ~slot_size level index]
+    attempts to produce and publish a DAL slot commitment for the given [level]
+    and producer [index]. *)
+val produce_slot :
+  client:Client.t ->
+  producers:producer list ->
+  network:Network.t ->
+  producer_key:string option ->
+  some_node_rpc_endpoint:Endpoint.t ->
+  producers_delay:int ->
+  slot_size:int ->
+  int ->
+  int ->
+  unit Lwt.t
+
+(** [producers_not_ready ~producers] returns [true] if at least one of the
+    given [producers] has not yet completed its [is_ready] promise. *)
+val producers_not_ready : producers:producer list -> bool
+
 (** Initialize a DAL observer node and DAL node. *)
 val init_observer :
   Cloud.t ->
