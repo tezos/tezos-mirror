@@ -893,7 +893,6 @@ grafazos.build:
   stage: build
   tags:
   - gcp
-  rules: []
   needs:
   - oc.docker:jsonnet:amd64
   dependencies:

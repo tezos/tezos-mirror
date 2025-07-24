@@ -890,7 +890,6 @@ grafazos.build:
   stage: build
   tags:
   - gcp
-  rules: []
   needs:
   - oc.docker:jsonnet:amd64
   dependencies:
@@ -915,7 +914,6 @@ grafazos.gitlab_release:
   stage: publish
   tags:
   - gcp
-  rules: []
   needs:
   - grafazos.build
   dependencies:

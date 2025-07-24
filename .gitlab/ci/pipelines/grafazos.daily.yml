@@ -47,7 +47,6 @@ grafazos.build:
   stage: test
   tags:
   - gcp
-  rules: []
   needs:
   - oc.docker:jsonnet:amd64
   dependencies:
