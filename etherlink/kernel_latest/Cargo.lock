@@ -2562,6 +2562,7 @@ dependencies = [
  "alloy-sol-types 1.2.1",
  "format_no_std",
  "hex",
+ "nom",
  "num-bigint",
  "primitive-types",
  "revm",

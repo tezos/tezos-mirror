@@ -75,7 +75,8 @@ impl EtherlinkPrecompiles {
                     inputs,
                     address,
                     gas_limit,
-                )?;
+                )
+                .map_err(|e| e.to_string())?;
                 Ok(Some(result))
             }
             TABLE_PRECOMPILE_ADDRESS => {
