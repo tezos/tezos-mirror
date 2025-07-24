@@ -610,6 +610,19 @@ let pp_lazy_storage_diff ppf = function
             Michelson_v1_printer.print_big_map_diff
             lazy_storage_diff)
 
+let pp_address_registry_diff ppf Address_registry.{address; index} =
+  Format.fprintf ppf "%a: %a" Destination.pp address Z.pp_print index
+
+let pp_address_registry_diff ppf = function
+  | [] -> ()
+  | _ :: _ as l ->
+      Format.fprintf
+        ppf
+        "@,@[<v 2>Updated address registry:@ @[<v 2>%a@]@]"
+        ((Format.pp_print_list ~pp_sep:Format.pp_print_cut)
+           pp_address_registry_diff)
+        l
+
 let pp_origination_result ppf
     {
       lazy_storage_diff;
@@ -645,6 +658,7 @@ let pp_transaction_result ppf = function
         paid_storage_size_diff;
         lazy_storage_diff;
         allocated_destination_contract = _;
+        address_registry_diff;
       } ->
       (match originated_contracts with
       | [] -> ()
@@ -667,7 +681,8 @@ let pp_transaction_result ppf = function
       pp_paid_storage_size_diff ppf paid_storage_size_diff ;
       pp_consumed_gas ppf consumed_gas ;
       pp_balance_updates ppf balance_updates ;
-      pp_ticket_receipt ppf ticket_receipt
+      pp_ticket_receipt ppf ticket_receipt ;
+      pp_address_registry_diff ppf address_registry_diff
   | Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt} ->
       pp_consumed_gas ppf consumed_gas ;
       pp_ticket_receipt ppf ticket_receipt
