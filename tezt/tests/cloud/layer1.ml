@@ -319,6 +319,8 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
       upgrade will be performed via a UAU.
 
     - [stresstest]: See the description of [stresstest_conf]
+
+    - [daily_logs_destination]: daemons daily logs retrieval folder, if set.
   *)
 type configuration = {
   stake : int list;
@@ -327,6 +329,7 @@ type configuration = {
   stresstest : stresstest_conf option;
   maintenance_delay : int;
   migration_offset : int option;
+  daily_logs_destination : string option;
 }
 
 (** A version of the [configuration] partially defined. *)
@@ -1094,7 +1097,16 @@ let register (module Cli : Scenarios_cli.Layer1) =
     if stake = [] then Test.fail "stake parameter can not be empty" ;
     if snapshot = Snapshot_helpers.No_snapshot then
       Test.fail "snapshot parameter can not be empty" ;
-    {stake; network; snapshot; stresstest; maintenance_delay; migration_offset}
+    let daily_logs_destination = Tezt_cloud_cli.retrieve_daily_logs in
+    {
+      stake;
+      network;
+      snapshot;
+      stresstest;
+      maintenance_delay;
+      migration_offset;
+      daily_logs_destination;
+    }
   in
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in

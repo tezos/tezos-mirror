@@ -61,6 +61,7 @@ type configuration = {
   ppx_profiling : bool;
   ppx_profiling_backends : string list;
   network_health_monitoring : bool;
+  daily_logs_destination : string option;
 }
 
 type bootstrap = {
@@ -1335,6 +1336,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
+    let daily_logs_destination = Tezt_cloud_cli.retrieve_daily_logs in
     let t =
       {
         with_dal;
@@ -1367,6 +1369,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         ppx_profiling;
         ppx_profiling_backends;
         network_health_monitoring;
+        daily_logs_destination;
       }
     in
     (t, etherlink)

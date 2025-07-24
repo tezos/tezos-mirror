@@ -257,6 +257,9 @@ module Tezt_cloud_cli : sig
   val prometheus : bool
 
   val scenario_specific_json : (string * Data_encoding.Json.t) option
+
+  (** Equivalent to [Cli.retrieve_daily_logs] *)
+  val retrieve_daily_logs : string option
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
