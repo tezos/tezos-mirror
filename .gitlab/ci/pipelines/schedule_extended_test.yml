@@ -50,27 +50,6 @@ oc.docker:client-libs-dependencies:
     reports:
       dotenv: client_libs_dependencies_image_tag.env
 
-oc.docker:jsonnet:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - ./scripts/ci/docker_initialize.sh
-  script:
-  - ./scripts/ci/docker_jsonnet_build.sh
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: jsonnet_image_tag.env
-
 oc.docker:rust-toolchain:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
@@ -837,30 +816,6 @@ build_octez_source:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-
-grafazos.build_dashboards:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:jsonnet:amd64
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - cd grafazos/
-  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
-  script:
-  - make
-  artifacts:
-    name: grafazos-dashboards
-    expire_in: 1 day
-    paths:
-    - grafazos/output/**/*.json
-    when: on_success
 
 teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}

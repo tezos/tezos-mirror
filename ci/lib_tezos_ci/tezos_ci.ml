@@ -894,7 +894,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
            '%s'."
           name
   in
-  if rules == Some [] then
+  if rules = Some [] then
     failwith "The job '%s' cannot have empty [rules]." name ;
   let arch = if Option.is_some arch then arch else arch_of_tag tag in
   (match (image, arch) with

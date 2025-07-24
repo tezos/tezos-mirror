@@ -5,7 +5,5 @@
  (name grafazos)
  (libraries
   gitlab_ci
-  tezos_ci)
- (flags
-  (:standard)
-  -open Gitlab_ci.Base))
+  tezos_ci
+  cacio))

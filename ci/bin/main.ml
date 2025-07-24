@@ -101,6 +101,11 @@ let variables : variables =
    - how;
    - and by whom it is triggered (a developer? a release manager? some automated system?). *)
 
+(** {3 Components} *)
+
+(* This must be done before registering shared pipelines. *)
+let () = Grafazos.register ()
+
 (** {3 General pipelines} *)
 
 let () =
@@ -157,8 +162,6 @@ let () =
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
-  (* Matches Grafazos release tags, e.g. [grafazos-v1.2]. *)
-  let grafazos_release_tag_re = "/^grafazos-v\\d+\\.\\d+$/" in
   (* Matches Teztale release tags, e.g. [teztale-v1.2]. *)
   let teztale_release_tag_re = "/^teztale-v\\d+\\.\\d+$/" in
   (* Matches smart rollup node release tags,
@@ -191,7 +194,6 @@ let () =
       octez_release_tags
       @ [
           octez_evm_node_release_tag_re;
-          grafazos_release_tag_re;
           teztale_release_tag_re;
           octez_smart_rollup_node_release_tag_re;
         ]
@@ -274,19 +276,6 @@ let () =
     ~description:
       "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
        This pipeline checks that 'octez_minor_release_tag' pipelines work as \
-       intended, without publishing any release. Developers or release \
-       managers can create this pipeline by pushing a tag to a fork of \
-       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  (* TODO: We should be able to register this pipeline in [grafazos/ci]. *)
-  register
-    "grafazos_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_match grafazos_release_tag_re)
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace
-      :: Grafazos.Release.jobs ~test:true ())
-    ~description:
-      "Test release pipeline for Grafazos.\n\n\
-       This pipeline checks that 'grafazos_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;

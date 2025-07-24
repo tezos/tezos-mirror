@@ -51,7 +51,6 @@ let monitoring_child_pipeline =
     ~jobs:
       [
         job_datadog_pipeline_trace;
-        Grafazos.Common.job_build ();
         job_build_layer1_profiling ~expire_in:Never ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
         Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ~cpu:Very_high ();
@@ -294,15 +293,12 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
        match (test, release_tag_pipeline_type) with
        | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
            !Tezos_ci.Hooks.global_release
-           @ Grafazos.Release.jobs ~test:false ~dry_run:false ()
            @ Teztale.Release.jobs ~test:false ~dry_run:false ()
        | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
            !Tezos_ci.Hooks.global_test_release
-           @ Grafazos.Release.jobs ~test:true ~dry_run:false ()
            @ Teztale.Release.jobs ~test:true ~dry_run:false ()
        | true, Schedule_test ->
            !Tezos_ci.Hooks.global_scheduled_test_release
-           @ Grafazos.Release.jobs ~test:true ~dry_run:true ()
            @ Teztale.Release.jobs ~test:true ~dry_run:true ()
        | false, Schedule_test ->
            failwith

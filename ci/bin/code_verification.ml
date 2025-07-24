@@ -506,6 +506,7 @@ let jobs pipeline_type =
         | Schedule_extended_test -> [])
     in
     let job_check_jsonnet =
+      (* Note: this job's script includes a copy-paste of the script of [grafazos.build]. *)
       job
         ~__POS__
         ~name:"check_jsonnet"
@@ -821,22 +822,6 @@ let jobs pipeline_type =
       |> enable_cargo_cache
       |> enable_sccache ~cache_size:"2G"
     in
-    let job_build_grafazos =
-      match pipeline_type with
-      | Merge_train | Before_merging ->
-          Grafazos.Common.job_build
-            ~rules:
-              [
-                job_rule
-                  ~when_:Always
-                  ~changes:(Changeset.encode Grafazos.Common.changeset_grafazos)
-                  ();
-                job_rule ~when_:Manual ();
-              ]
-            ()
-      | Schedule_extended_test ->
-          Grafazos.Common.job_build ~rules:[job_rule ~when_:Always ()] ()
-    in
     let job_build_teztale ?cpu ~arch ?storage ?(sccache_size = "5G") () =
       Teztale.Common.job_build
         ~arch
@@ -858,7 +843,6 @@ let jobs pipeline_type =
       job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
-      job_build_grafazos;
       job_build_teztale
         ~arch:Amd64
         ~cpu:Very_high

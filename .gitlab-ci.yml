@@ -9,6 +9,20 @@ workflow:
     variables:
       PIPELINE_TYPE: ci_docker_release
     when: always
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "grafazos.daily"
+    variables:
+      PIPELINE_TYPE: grafazos.daily
+    when: always
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    variables:
+      PIPELINE_TYPE: grafazos.release
+    when: always
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    variables:
+      PIPELINE_TYPE: grafazos.test_release
+    when: always
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
       && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
     variables:
@@ -57,11 +71,6 @@ workflow:
       PIPELINE_TYPE: octez_minor_release_tag_test
     when: always
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^grafazos-v\d+\.\d+$/
-    variables:
-      PIPELINE_TYPE: grafazos_release_tag_test
-    when: always
-  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^teztale-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: teztale_release_tag_test
@@ -83,8 +92,8 @@ workflow:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag
     when: always
@@ -92,8 +101,8 @@ workflow:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     variables:
       PIPELINE_TYPE: non_release_tag_test
     when: always
@@ -204,6 +213,20 @@ include:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
       == "ci-docker-latest-release"
     when: always
+- local: .gitlab/ci/pipelines/grafazos.daily.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "grafazos.daily"
+    when: always
+- local: .gitlab/ci/pipelines/grafazos.release.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    when: always
+- local: .gitlab/ci/pipelines/grafazos.test_release.yml
+  rules:
+  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
+      =~ /^grafazos-v\d+\.\d+$/
+    when: always
 - local: .gitlab/ci/pipelines/before_merging.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE == "tezos" && $CI_PIPELINE_SOURCE == "merge_request_event"
@@ -249,11 +272,6 @@ include:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
       =~ /^octez-v\d+\.[1-9][0-9]*$/
     when: always
-- local: .gitlab/ci/pipelines/grafazos_release_tag_test.yml
-  rules:
-  - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
-      =~ /^grafazos-v\d+\.\d+$/
-    when: always
 - local: .gitlab/ci/pipelines/teztale_release_tag_test.yml
   rules:
   - if: $CI_PROJECT_NAMESPACE != "tezos" && $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_TAG
@@ -278,8 +296,8 @@ include:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/non_release_tag_test.yml
   rules:
@@ -287,8 +305,8 @@ include:
       != null && $CI_COMMIT_TAG !~ /^octez-v\d+\.0(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
       !~ /^octez-v\d+\.[1-9][0-9]*$/ && $CI_COMMIT_TAG !~ /^octez-v\d+\.\d+\-beta\d*$/
       && $CI_COMMIT_TAG !~ /^octez-evm-node-v\d+\.\d+(?:\-rc\d+)?$/ && $CI_COMMIT_TAG
-      !~ /^grafazos-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG
-      !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      !~ /^teztale-v\d+\.\d+$/ && $CI_COMMIT_TAG !~ /^octez-smart-rollup-node-v\d+(\.\d+)?(?:\-(rc|beta)\d+)?$/
+      && $CI_COMMIT_TAG !~ /^grafazos-v\d+\.\d+$/
     when: always
 - local: .gitlab/ci/pipelines/schedule_extended_test.yml
   rules:

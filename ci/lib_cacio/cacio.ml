@@ -327,22 +327,28 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                  and the [trigger]. *)
               let rules =
                 if with_changes then
-                  [
-                    Gitlab_ci.Util.job_rule
-                      ~changes:(Tezos_ci.Changeset.encode only_if_changed)
-                      ~when_:
-                        (match trigger with
-                        | Auto -> On_success
-                        | Manual -> Manual)
-                      ();
-                  ]
+                  Some
+                    [
+                      Gitlab_ci.Util.job_rule
+                        ~changes:(Tezos_ci.Changeset.encode only_if_changed)
+                        ~when_:
+                          (match trigger with
+                          | Auto -> On_success
+                          | Manual -> Manual)
+                        ();
+                    ]
                 else
                   match trigger with
-                  | Auto -> []
-                  | Manual -> [Gitlab_ci.Util.job_rule ~when_:Manual ()]
+                  | Auto -> None
+                  | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
               in
               let interruptible =
                 match stage with Build | Test -> true | Publish -> false
+              in
+              let retry : Gitlab_ci.Types.retry option =
+                match stage with
+                | Build | Test -> None
+                | Publish -> Some {max = 0; when_ = []}
               in
               Tezos_ci.job
                 ~__POS__:source_location
@@ -351,8 +357,9 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ~description
                 ~image
                 ~dependencies:(Dependent dependencies)
-                ~rules
+                ?rules
                 ~interruptible
+                ?retry
                 ?variables
                 ?artifacts
                 script

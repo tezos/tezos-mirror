@@ -1,0 +1,114 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- images
+- build
+- publish
+
+oc.docker:jsonnet:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_jsonnet_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: jsonnet_image_tag.env
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+
+grafazos.build:
+  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:jsonnet:amd64
+  dependencies:
+  - oc.docker:jsonnet:amd64
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - cd grafazos/
+  - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
+  - make
+  artifacts:
+    name: grafazos-dashboards
+    expire_in: 1 day
+    paths:
+    - grafazos/output/**/*.json
+    when: on_success
+
+grafazos.gitlab_release:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - grafazos.build
+  dependencies:
+  - grafazos.build
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./grafazos/scripts/releases/create_gitlab_release.sh
+  retry: 0
+
+grafazos.release_page:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp
+  rules:
+  - when: manual
+    allow_failure: true
+  needs:
+  - grafazos.build
+  dependencies:
+  - grafazos.build
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./grafazos/scripts/releases/publish_release_page.sh
+  variables:
+    S3_BUCKET: site-prod.octez.tezos.com/releases
+    URL: octez.tezos.com
+    DISTRIBUTION_ID: ${CLOUDFRONT_DISTRIBUTION_ID}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
+  retry: 0
