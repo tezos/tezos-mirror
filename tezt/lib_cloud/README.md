@@ -215,6 +215,10 @@ However, all your VMs may come with a time to live parameter. For the
 `--cloud` mode, it is set to 2 hours. For the proxy mode (see below),
 it is not set by default.
 
+Also, note that the role of the `TEZT_CLOUD` variable (or the `--tezt-cloud`
+option) is crucial here, as the VMs being destroyed are the ones whose name have
+a prefix that is the value of `TEZT_CLOUD`.
+
 ## Monitoring
 
 Tezt-cloud offers you a way to monitor your VMs via
