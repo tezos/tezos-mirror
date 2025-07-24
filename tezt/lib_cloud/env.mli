@@ -143,6 +143,9 @@ val binaries_path : string
 (** Equivalent to [Cli.log_rotation] *)
 val log_rotation : int
 
+(** Equivalent to [Cli.retrieve_daily_logs] *)
+val retrieve_daily_logs : string option
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 
