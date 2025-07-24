@@ -730,6 +730,8 @@ type tag =
   | Gcp_arm64
   | Gcp_dev
   | Gcp_dev_arm64
+  | Gcp_not_interruptible
+  | Gcp_not_interruptible_dev
   | Gcp_tezt
   | Gcp_tezt_dev
   | Gcp_high_cpu
@@ -746,6 +748,8 @@ let string_of_tag = function
   | Gcp_arm64 -> "gcp_arm64"
   | Gcp_dev -> "gcp_dev"
   | Gcp_dev_arm64 -> "gcp_dev_arm64"
+  | Gcp_not_interruptible -> "gcp_not_interruptible"
+  | Gcp_not_interruptible_dev -> "gcp_not_interruptible_dev"
   | Gcp_tezt -> "gcp_tezt"
   | Gcp_tezt_dev -> "gcp_tezt_dev"
   | Gcp_high_cpu -> "gcp_high_cpu"
@@ -760,8 +764,9 @@ let string_of_tag = function
 (** The architecture of the runner associated to a tag . *)
 let arch_of_tag = function
   | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
-  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
-  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
+  | Gcp | Gcp_dev | Gcp_not_interruptible | Gcp_not_interruptible_dev | Gcp_tezt
+  | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev | Gcp_very_high_cpu
+  | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
   | Gcp_very_high_cpu_ramfs_dev | Aws_specific ->
       Some Amd64
   | Dynamic -> None
@@ -984,7 +989,10 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
   (match
      (Sys.getenv_opt Gitlab_ci.Predefined_vars.(show gitlab_user_login), tag)
    with
-  | Some "nomadic-margebot", (Gcp_dev | Gcp_dev_arm64) ->
+  | ( Some "nomadic-margebot",
+      ( Gcp_dev | Gcp_dev_arm64 | Gcp_not_interruptible_dev | Gcp_tezt_dev
+      | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs_dev
+        ) ) ->
       failwith
         "[job] Attempting to merge a CI configuration using development \
          runners (job: %s)"
