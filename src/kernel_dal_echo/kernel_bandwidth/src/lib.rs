@@ -37,7 +37,6 @@ fn process_slot(
                     slot_index,
                     published_level
                 );
-                return;
             }
             Ok(num) => {
                 debug_msg!(
@@ -57,8 +56,6 @@ fn process_slot(
                     slot_index,
                     &err.to_string()
                 );
-                // Stop fetching pages on error
-                return;
             }
         }
     }
