@@ -59,6 +59,7 @@ type execution_result = {
   operations : packed_internal_operation list;
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
+  address_registry_diff : Address_registry.diff list;
 }
 
 type step_constants = Script_typed_ir.step_constants = {
@@ -146,7 +147,7 @@ module Internals : sig
       [ks] to execute the interpreter on the current A-stack. *)
   val next :
     logger option ->
-    Local_gas_counter.outdated_context * step_constants ->
+    Local_gas_counter.outdated_context * step_constants * address_registry_diffs ->
     Local_gas_counter.local_gas_counter ->
     ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) continuation ->
@@ -155,12 +156,13 @@ module Internals : sig
     ('r
     * 'f
     * Local_gas_counter.outdated_context
-    * Local_gas_counter.local_gas_counter)
+    * Local_gas_counter.local_gas_counter
+    * address_registry_diffs)
     tzresult
     Lwt.t
 
   val step :
-    Local_gas_counter.outdated_context * step_constants ->
+    Local_gas_counter.outdated_context * step_constants * address_registry_diffs ->
     Local_gas_counter.local_gas_counter ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     'a ->
@@ -168,7 +170,8 @@ module Internals : sig
     ('r
     * 'f
     * Local_gas_counter.outdated_context
-    * Local_gas_counter.local_gas_counter)
+    * Local_gas_counter.local_gas_counter
+    * address_registry_diffs)
     tzresult
     Lwt.t
 
@@ -176,10 +179,11 @@ module Internals : sig
     logger option ->
     context ->
     Script_typed_ir.step_constants ->
+    address_registry_diffs ->
     ('a, 's, 'r, 'f) Script_typed_ir.kdescr ->
     'a ->
     's ->
-    ('r * 'f * context) tzresult Lwt.t
+    ('r * 'f * context * address_registry_diffs) tzresult Lwt.t
 
   (** [kstep logger ctxt step_constants kinstr accu stack] interprets the
       script represented by [kinstr] under the context [ctxt]. This will
@@ -192,11 +196,12 @@ module Internals : sig
     logger option ->
     context ->
     step_constants ->
+    address_registry_diffs ->
     ('a, 's) stack_ty ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     'a ->
     's ->
-    ('r * 'f * context) tzresult Lwt.t
+    ('r * 'f * context * address_registry_diffs) tzresult Lwt.t
 
   module Raw : sig
     open Local_gas_counter
@@ -217,12 +222,14 @@ module Internals : sig
     val kiter : ('a, 'b, 's, 'r, 'f, 'c) kiter_type
 
     val next :
-      outdated_context * step_constants ->
+      outdated_context * step_constants * address_registry_diffs ->
       local_gas_counter ->
       ('a, 's, 'r, 'f) continuation ->
       'a ->
       's ->
-      ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+      ('r * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+      tzresult
+      Lwt.t
 
     val ilist_map : ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type
 

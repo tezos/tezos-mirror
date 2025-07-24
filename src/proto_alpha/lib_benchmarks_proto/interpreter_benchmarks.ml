@@ -257,7 +257,7 @@ let time_benchmark_from_kinstr_and_stack :
           (* Lwt_main.run *)
           ignore
             (Script_interpreter.Internals.step
-               (outdated_ctxt, step_constants)
+               (outdated_ctxt, step_constants, [])
                (Local_gas_counter 9_999_999_999)
                kinstr
                bef_top
@@ -271,7 +271,7 @@ let time_benchmark_from_kinstr_and_stack :
             ignore
               (* Lwt_main.run *)
               (Script_interpreter.Internals.step
-                 (outdated_ctxt, step_constants)
+                 (outdated_ctxt, step_constants, [])
                  (Local_gas_counter 9_999_999_999)
                  kinstr
                  bef_top
@@ -303,7 +303,7 @@ let alloc_benchmark_from_kinstr_and_stack :
     let result =
       Lwt_main.run
       @@ Script_interpreter.Internals.step
-           (outdated_ctxt, step_constants)
+           (outdated_ctxt, step_constants, [])
            (Local_gas_counter 9_999_999_999)
            kinstr
            bef_top
@@ -311,7 +311,7 @@ let alloc_benchmark_from_kinstr_and_stack :
     in
     Result.fold
       ~error:(fun _ -> 0.0)
-      ~ok:(fun (stack_top, stack, _, _) ->
+      ~ok:(fun (stack_top, stack, _, _, _) ->
         let size_after =
           Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef))
         in
@@ -710,7 +710,7 @@ let time_benchmark_from_continuation :
                 (* Lwt_main.run *)
                 (Script_interpreter.Internals.next
                    None
-                   (outdated_ctxt, step_constants)
+                   (outdated_ctxt, step_constants, [])
                    (Local_gas_counter 9_999_999_999)
                    stack_type
                    cont
@@ -740,7 +740,7 @@ let time_benchmark_from_continuation :
                   (* Lwt_main.run *)
                   (Script_interpreter.Internals.next
                      None
-                     (outdated_ctxt, step_constants)
+                     (outdated_ctxt, step_constants, [])
                      (Local_gas_counter 9_999_999_999)
                      stack_type
                      cont
@@ -778,7 +778,7 @@ let alloc_benchmark_from_continuation :
       Lwt_main.run
       @@ Script_interpreter.Internals.next
            None
-           (outdated_ctxt, step_constants)
+           (outdated_ctxt, step_constants, [])
            (Local_gas_counter 9_999_999_999)
            stack_type
            cont
@@ -787,7 +787,7 @@ let alloc_benchmark_from_continuation :
     in
     Result.fold
       ~error:(fun _ -> 0.0)
-      ~ok:(fun (stack_top, stack, _, _) ->
+      ~ok:(fun (stack_top, stack, _, _, _) ->
         let size_after =
           Obj.reachable_words (Obj.repr (stack_top, stack, bef_top, bef, cont))
         in

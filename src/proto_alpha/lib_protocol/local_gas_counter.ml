@@ -84,6 +84,13 @@ let use_gas_counter_in_context ctxt gas_counter f =
   (y, outdated_context ctxt, local_gas_counter ctxt)
 [@@ocaml.inline always]
 
+let use_gas_counter_in_context_with_diff ctxt gas_counter f =
+  let open Lwt_result_syntax in
+  let ctxt = update_context gas_counter ctxt in
+  let+ y, ctxt, diff = f ctxt in
+  (y, outdated_context ctxt, local_gas_counter ctxt, diff)
+[@@ocaml.inline always]
+
 let consume_opt (Local_gas_counter gas_counter) (cost : Gas.cost) =
   let gas_counter = gas_counter - (cost :> int) in
   if Compare.Int.(gas_counter < 0) then None

@@ -450,6 +450,10 @@ end
 
 module Global_constants_storage = Global_constants_storage
 
+module Address_registry = struct
+  type diff = {address : Destination.t; counter : Z.t}
+end
+
 module Address_registry_storage = struct
   type add_result = {ctxt : context; index : Z.t; existed : bool}
 

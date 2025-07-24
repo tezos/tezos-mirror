@@ -85,7 +85,7 @@ let test_register_address_empty_context () =
   let*?@ addr =
     Alpha_context.Destination.of_b58check "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"
   in
-  let*@ _ctxt, addr_counter = Script_address_registry.index ctxt addr in
+  let*@ _ctxt, addr_counter, _ = Script_address_registry.index ctxt addr in
   if Z.(addr_counter <> succ zero) then
     failwith "First registered address should have counter one"
   else return_unit
@@ -102,7 +102,7 @@ let init_registry ctx number =
     if curr_number >= number then return ctx
     else
       let addr = generate_address curr_number in
-      let*@ ctx, _ = Script_address_registry.index ctx addr in
+      let*@ ctx, _, _ = Script_address_registry.index ctx addr in
       loop ctx (succ curr_number)
   in
   loop ctx 0
@@ -112,7 +112,7 @@ let test_register_address_non_empty_registry ?(number_of_addresses = 10) () =
   let* ctxt = init_context () in
   let* ctxt = init_registry ctxt number_of_addresses in
   let addr = generate_address (number_of_addresses + 1) in
-  let*@ _ctxt, addr_counter = Script_address_registry.index ctxt addr in
+  let*@ _ctxt, addr_counter, _ = Script_address_registry.index ctxt addr in
   if Z.(addr_counter <> succ (of_int number_of_addresses)) then
     failwith
       "Address should have counter %d, got %a"
@@ -128,7 +128,7 @@ let test_addresses_are_registered_consecutively ?(number_of_addresses = 10) () =
     if curr_number > number_of_addresses then return ctx
     else
       let addr = generate_address curr_number in
-      let*@ ctx, addr_counter = Script_address_registry.index ctx addr in
+      let*@ ctx, addr_counter, _ = Script_address_registry.index ctx addr in
       if Z.(addr_counter <> of_int curr_number) then
         failwith
           "Address should have counter %d, got %a"
@@ -148,8 +148,10 @@ let test_register_address_twice () =
   let addr =
     Alpha_context.Destination.Contract (Implicit Signature.Public_key_hash.zero)
   in
-  let*@ ctxt, addr_counter = Script_address_registry.index ctxt addr in
-  let*@ _ctxt, second_addr_counter = Script_address_registry.index ctxt addr in
+  let*@ ctxt, addr_counter, _ = Script_address_registry.index ctxt addr in
+  let*@ _ctxt, second_addr_counter, _ =
+    Script_address_registry.index ctxt addr
+  in
   if Z.(addr_counter <> second_addr_counter) then
     failwith "An address cannot have different counter"
   else return_unit

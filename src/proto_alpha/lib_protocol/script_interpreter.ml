@@ -331,20 +331,23 @@ module Raw = struct
 
   and next :
       type a s r f.
-      outdated_context * step_constants ->
+      outdated_context * step_constants * address_registry_diffs ->
       local_gas_counter ->
       (a, s, r, f) continuation ->
       a ->
       s ->
-      (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
-   fun ((ctxt, _) as g) gas ks0 accu stack ->
+      (r * f * outdated_context * local_gas_counter * address_registry_diffs)
+      tzresult
+      Lwt.t =
+   fun ((ctxt, _, address_registry_diffs) as g) gas ks0 accu stack ->
     match consume_control gas ks0 with
     | None -> tzfail Gas.Operation_quota_exceeded
     | Some gas -> (
         match ks0 with
         | KLog (ks, sty, logger) ->
             (logger.klog [@ocaml.tailcall]) logger g gas sty ks0 ks accu stack
-        | KNil -> Lwt.return (Ok (accu, stack, ctxt, gas))
+        | KNil ->
+            Lwt.return (Ok (accu, stack, ctxt, gas, address_registry_diffs))
         | KCons (k, ks) -> (step [@ocaml.tailcall]) g gas k ks accu stack
         | KLoop_in (ki, ks') ->
             (kloop_in [@ocaml.tailcall]) g gas ks0 ki ks' accu stack
@@ -398,7 +401,7 @@ module Raw = struct
               accu
               stack
         | KView_exit (orig_step_constants, ks) ->
-            let g = (fst g, orig_step_constants) in
+            let g = (ctxt, orig_step_constants, address_registry_diffs) in
             (next [@ocaml.tailcall]) g gas ks accu stack)
 
   (*
@@ -526,7 +529,7 @@ module Raw = struct
     let open Lwt_result_syntax in
     {
       ifailwith =
-        (fun logger (ctxt, _) gas kloc tv accu ->
+        (fun logger (ctxt, _, _diff) gas kloc tv accu ->
           let v = accu in
           let ctxt = update_context gas ctxt in
           let* v, _ctxt =
@@ -559,7 +562,7 @@ module Raw = struct
   and iview : type a b c d e f i o. (a, b, c, d, e, f, i, o) iview_type =
     let open Lwt_result_syntax in
     fun instrument
-        (ctxt, sc)
+        (ctxt, sc, address_registry_diffs)
         gas
         (View_signature {name; input_ty; output_ty})
         stack_ty
@@ -572,7 +575,13 @@ module Raw = struct
       let ctxt = update_context gas ctxt in
       let return_none ctxt =
         let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-        (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
+        (step [@ocaml.tailcall])
+          (ctxt, sc, address_registry_diffs)
+          gas
+          k
+          ks
+          None
+          stack
       in
       let legacy = Script_ir_translator_config.make ~legacy:true () in
       match addr.destination with
@@ -658,7 +667,8 @@ module Raw = struct
                             chain_id = sc.chain_id;
                             now = sc.now;
                             level = sc.level;
-                          } )
+                          },
+                          address_registry_diffs )
                         gas
                         kinstr
                         (instrument
@@ -668,7 +678,7 @@ module Raw = struct
 
   and step : type a s b t r f. (a, s, b, t, r, f) step_type =
     let open Lwt_result_syntax in
-    fun ((ctxt, sc) as g) gas i ks accu stack ->
+    fun ((ctxt, sc, address_registry_diffs) as g) gas i ks accu stack ->
       match consume_instr gas i accu stack with
       | None -> tzfail Gas.Operation_quota_exceeded
       | Some gas -> (
@@ -857,7 +867,13 @@ module Raw = struct
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 Script_big_map.mem ctxt key map
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | IBig_map_get (_, k) ->
               let map, stack = stack in
               let key = accu in
@@ -865,7 +881,13 @@ module Raw = struct
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 Script_big_map.get ctxt key map
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | IBig_map_update (_, k) ->
               let key = accu in
               let maybe_value, (map, stack) = stack in
@@ -873,7 +895,13 @@ module Raw = struct
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 Script_big_map.update ctxt key maybe_value map
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks big_map stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                big_map
+                stack
           | IBig_map_get_and_update (_, k) ->
               let key = accu in
               let v, (map, stack) = stack in
@@ -881,7 +909,13 @@ module Raw = struct
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 Script_big_map.get_and_update ctxt key v map
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks v' (map', stack)
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                v'
+                (map', stack)
           (* timestamp operations *)
           | IAdd_seconds_to_timestamp (_, k) ->
               let n = accu in
@@ -1182,7 +1216,13 @@ module Raw = struct
               let capture = accu in
               let lam, stack = stack in
               let* lam', ctxt, gas = apply ctxt gas capture_ty capture lam in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks lam' stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                lam'
+                stack
           | ILambda (_, lam, k) ->
               (step [@ocaml.tailcall]) g gas k ks lam (accu, stack)
           | IFailwith (kloc, tv) ->
@@ -1234,14 +1274,26 @@ module Raw = struct
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 Script_ir_translator.pack_data ctxt ty value
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks bytes stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                bytes
+                stack
           | IUnpack (_, ty, k) ->
               let bytes = accu in
               let* opt, ctxt, gas =
                 use_gas_counter_in_context ctxt gas @@ fun ctxt ->
                 unpack ctxt ~ty ~bytes
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks opt stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                opt
+                stack
           | IAddress (_, k) ->
               let typed_contract = accu in
               let destination = Typed_contract.destination typed_contract in
@@ -1269,15 +1321,34 @@ module Raw = struct
                   in
                   let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
                   let accu = maybe_contract in
-                  (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
-              | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    accu
+                    stack
+              | None ->
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    None
+                    stack)
           | ITransfer_tokens (loc, k) ->
               let p = accu in
               let amount, (typed_contract, stack) = stack in
               let* accu, ctxt, gas =
                 transfer (ctxt, sc) gas amount loc typed_contract p
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                accu
+                stack
           | IImplicit_account (_, k) ->
               let key = accu in
               let res = Typed_implicit key in
@@ -1292,12 +1363,12 @@ module Raw = struct
               (step [@ocaml.tailcall]) g gas k ks res stack
           | IIndex_address (_, k) ->
               let (address : address) = accu in
-              let* res, ctxt, gas =
-                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
-                let* ctxt, res =
+              let* res, ctxt, gas, diff =
+                use_gas_counter_in_context_with_diff ctxt gas @@ fun ctxt ->
+                let* ctxt, res, diff =
                   Script_address_registry.index ctxt address.destination
                 in
-                return (res, ctxt)
+                return (res, ctxt, diff)
               in
               let*? res =
                 match Script_int.is_nat (Script_int.of_zint res) with
@@ -1307,7 +1378,16 @@ module Raw = struct
                 | None -> Result_syntax.tzfail Address_registry_invalid_counter
                 | Some n -> ok n
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+              let address_registry_diffs =
+                List.rev_append diff address_registry_diffs
+              in
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id
@@ -1324,13 +1404,26 @@ module Raw = struct
               let delegate = accu in
               let credit, (init, stack) = stack in
               let* res, contract, ctxt, gas =
-                create_contract g gas storage_type code delegate credit init
+                create_contract
+                  (ctxt, sc)
+                  gas
+                  storage_type
+                  code
+                  delegate
+                  credit
+                  init
               in
               let destination = Destination.Contract (Originated contract) in
               let stack =
                 ({destination; entrypoint = Entrypoint.default}, stack)
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | ISet_delegate (_, k) ->
               let delegate = accu in
               let operation = Delegation delegate in
@@ -1346,11 +1439,17 @@ module Raw = struct
               in
               let res = {piop; lazy_storage_diff = None} in
               let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | IBalance (_, k) ->
               let ctxt = update_context gas ctxt in
               let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-              let g = (ctxt, sc) in
+              let g = (ctxt, sc, address_registry_diffs) in
               (step [@ocaml.tailcall]) g gas k ks sc.balance (accu, stack)
           | ILevel (_, k) ->
               (step [@ocaml.tailcall]) g gas k ks sc.level (accu, stack)
@@ -1472,8 +1571,21 @@ module Raw = struct
                       ( Bytes.of_string transaction.bound_data,
                         (Script_int.of_int64 balance, state) )
                   in
-                  (step [@ocaml.tailcall]) (ctxt, sc) gas k ks state stack
-              | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    state
+                    stack
+              | None ->
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    None
+                    stack)
           | ISapling_verify_update_deprecated (_, k) -> (
               let transaction = accu in
               let state, stack = stack in
@@ -1489,8 +1601,21 @@ module Raw = struct
               match balance_state_opt with
               | Some (balance, state) ->
                   let state = Some (Script_int.of_int64 balance, state) in
-                  (step [@ocaml.tailcall]) (ctxt, sc) gas k ks state stack
-              | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    state
+                    stack
+              | None ->
+                  (step [@ocaml.tailcall])
+                    (ctxt, sc, address_registry_diffs)
+                    gas
+                    k
+                    ks
+                    None
+                    stack)
           | IChainId (_, k) ->
               let accu = Script_chain_id.make sc.chain_id
               and stack = (accu, stack) in
@@ -1502,13 +1627,19 @@ module Raw = struct
               let* ctxt, power = Vote.get_voting_power ctxt key_hash in
               let power = Script_int.(abs (of_int64 power)) in
               let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks power stack
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                power
+                stack
           | ITotal_voting_power (_, k) ->
               let ctxt = update_context gas ctxt in
               let* ctxt, power = Vote.get_total_voting_power ctxt in
               let power = Script_int.(abs (of_int64 power)) in
               let gas, ctxt = local_gas_counter_and_outdated_context ctxt in
-              let g = (ctxt, sc) in
+              let g = (ctxt, sc, address_registry_diffs) in
               (step [@ocaml.tailcall]) g gas k ks power (accu, stack)
           | IKeccak (_, k) ->
               let bytes = accu in
@@ -1738,7 +1869,13 @@ module Raw = struct
                   ~tag
                   ~event_data
               in
-              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack)
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                accu
+                stack)
 end
 
 open Raw
@@ -1750,12 +1887,20 @@ open Raw
 
 *)
 
-let step_descr ~log_now logger (ctxt, sc) descr accu stack =
+let step_descr ~log_now logger (ctxt, sc, address_registry_diffs) descr accu
+    stack =
   let open Lwt_result_syntax in
   let gas, outdated_ctxt = local_gas_counter_and_outdated_context ctxt in
-  let* accu, stack, ctxt, gas =
+  let* accu, stack, ctxt, gas, address_registry_diffs =
     match logger with
-    | None -> step (outdated_ctxt, sc) gas descr.kinstr KNil accu stack
+    | None ->
+        step
+          (outdated_ctxt, sc, address_registry_diffs)
+          gas
+          descr.kinstr
+          KNil
+          accu
+          stack
     | Some logger ->
         (if log_now then
            let loc = kinstr_location descr.kinstr in
@@ -1769,23 +1914,23 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
               descr.kinstr )
         in
         let knil = KLog (KNil, descr.kaft, logger) in
-        step (outdated_ctxt, sc) gas log knil accu stack
+        step (outdated_ctxt, sc, address_registry_diffs) gas log knil accu stack
   in
-  return (accu, stack, update_context gas ctxt)
+  return (accu, stack, update_context gas ctxt, address_registry_diffs)
 
 let interp logger g lam arg =
   let open Lwt_result_syntax in
   match lam with
   | LamRec (code, _) ->
-      let+ ret, (EmptyCell, EmptyCell), ctxt =
+      let+ ret, (EmptyCell, EmptyCell), ctxt, address_registry_diffs =
         step_descr ~log_now:true logger g code arg (lam, (EmptyCell, EmptyCell))
       in
-      (ret, ctxt)
+      (ret, ctxt, address_registry_diffs)
   | Lam (code, _) ->
-      let+ ret, (EmptyCell, EmptyCell), ctxt =
+      let+ ret, (EmptyCell, EmptyCell), ctxt, address_registry_diffs =
         step_descr ~log_now:true logger g code arg (EmptyCell, EmptyCell)
       in
-      (ret, ctxt)
+      (ret, ctxt, address_registry_diffs)
 
 (*
 
@@ -1836,6 +1981,7 @@ type execution_result = {
   operations : packed_internal_operation list;
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
+  address_registry_diff : Address_registry.diff list;
 }
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -1893,10 +2039,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
   let*? to_update, ctxt =
     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
   in
-  let* (ops, new_storage), ctxt =
+  let* (ops, new_storage), ctxt, address_registry_diffs =
     trace
       (Runtime_contract_error step_constants.self)
-      (interp logger (ctxt, step_constants) code (arg, old_storage))
+      (interp logger (ctxt, step_constants, []) code (arg, old_storage))
   in
   let* storage, lazy_storage_diff, ctxt =
     Script_ir_translator.extract_lazy_storage_diff
@@ -1961,6 +2107,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         operations;
         ticket_diffs;
         ticket_receipt;
+        address_registry_diff = address_registry_diffs;
       },
       ctxt )
 
@@ -2011,7 +2158,8 @@ module Internals = struct
     in
     next g gas ks accu stack
 
-  let kstep logger ctxt step_constants sty kinstr accu stack =
+  let kstep logger ctxt step_constants address_registry_diffs sty kinstr accu
+      stack =
     let open Lwt_result_syntax in
     let kinstr =
       match logger with
@@ -2020,16 +2168,27 @@ module Internals = struct
           ILog (kinstr_location kinstr, sty, LogEntry, logger, kinstr)
     in
     let gas, outdated_ctxt = local_gas_counter_and_outdated_context ctxt in
-    let* accu, stack, ctxt, gas =
-      step (outdated_ctxt, step_constants) gas kinstr KNil accu stack
+    let* accu, stack, ctxt, gas, address_registry_diffs =
+      step
+        (outdated_ctxt, step_constants, address_registry_diffs)
+        gas
+        kinstr
+        KNil
+        accu
+        stack
     in
-    return (accu, stack, update_context gas ctxt)
+    return (accu, stack, update_context gas ctxt, address_registry_diffs)
 
-  let step (ctxt, step_constants) gas ks accu stack =
-    step (ctxt, step_constants) gas ks KNil accu stack
+  let step (ctxt, step_constants, address_registry_diffs) gas ks accu stack =
+    step (ctxt, step_constants, address_registry_diffs) gas ks KNil accu stack
 
-  let step_descr logger ctxt step_constants descr stack =
-    step_descr ~log_now:false logger (ctxt, step_constants) descr stack
+  let step_descr logger ctxt step_constants address_registry_diffs descr stack =
+    step_descr
+      ~log_now:false
+      logger
+      (ctxt, step_constants, address_registry_diffs)
+      descr
+      stack
 
   module Raw = Raw
 end

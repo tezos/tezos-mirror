@@ -1257,7 +1257,7 @@ and logger = {
 
 and ('a, 'S, 'r, 'F) klog =
   logger ->
-  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.outdated_context * step_constants * address_registry_diffs ->
   Local_gas_counter.local_gas_counter ->
   ('a, 'S) stack_ty ->
   ('a, 'S, 'r, 'F) continuation ->
@@ -1267,7 +1267,8 @@ and ('a, 'S, 'r, 'F) klog =
   ('r
   * 'F
   * Local_gas_counter.outdated_context
-  * Local_gas_counter.local_gas_counter)
+  * Local_gas_counter.local_gas_counter
+  * address_registry_diffs)
   tzresult
   Lwt.t
 
@@ -1277,8 +1278,10 @@ and ('a, 'S, 'b, 'T, 'r, 'F) ilog =
   ('a, 'S) stack_ty ->
   ('a, 'S, 'b, 'T, 'r, 'F) step_type
 
+and address_registry_diffs = Alpha_context.Address_registry.diff list
+
 and ('a, 'S, 'b, 'T, 'r, 'F) step_type =
-  Local_gas_counter.outdated_context * step_constants ->
+  Local_gas_counter.outdated_context * step_constants * address_registry_diffs ->
   Local_gas_counter.local_gas_counter ->
   ('a, 'S, 'b, 'T) kinstr ->
   ('b, 'T, 'r, 'F) continuation ->
@@ -1287,7 +1290,8 @@ and ('a, 'S, 'b, 'T, 'r, 'F) step_type =
   ('r
   * 'F
   * Local_gas_counter.outdated_context
-  * Local_gas_counter.local_gas_counter)
+  * Local_gas_counter.local_gas_counter
+  * address_registry_diffs)
   tzresult
   Lwt.t
 

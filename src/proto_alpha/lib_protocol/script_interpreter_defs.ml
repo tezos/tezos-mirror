@@ -834,7 +834,7 @@ let id x = x
 
 type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   ('a, 'b, 'e, 'f) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('m * 'n, 'a * 'b, 'o, 'a * 'b) kinstr ->
   ('m * 'n) list ->
@@ -844,11 +844,13 @@ type ('a, 'b, 'c, 'e, 'f, 'm, 'n, 'o) kmap_exit_type =
   (('m, 'o) map, 'a * 'b, 'e, 'f) continuation ->
   'o ->
   'a * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
   ('a, 'b * 'c, 'd, 'e) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('j * 'k, 'b * 'c, 'a, 'b * 'c) kinstr ->
   ('j * 'k) list ->
@@ -857,11 +859,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j, 'k) kmap_enter_type =
   (('j, 'a) map, 'b * 'c, 'd, 'e) continuation ->
   'b ->
   'c ->
-  ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('d * 'e * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('i, 'a * 'b, 'j, 'a * 'b) kinstr ->
   'i list ->
@@ -871,11 +875,13 @@ type ('a, 'b, 'c, 'd, 'e, 'i, 'j) klist_exit_type =
   ('j Script_list.t, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   ('b, 'a * 'c, 'd, 'e) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('j, 'a * 'c, 'b, 'a * 'c) kinstr ->
   'j list ->
@@ -885,31 +891,37 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'j) klist_enter_type =
   ('b Script_list.t, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
-  ('d * 'e * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('d * 'e * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) kloop_in_left_type =
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('c, 'd, 'e, 'f) continuation ->
   ('a, 'g, 'c, 'd) kinstr ->
   ('b, 'g, 'e, 'f) continuation ->
   ('a, 'b) or_ ->
   'g ->
-  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'r, 'f, 's) kloop_in_type =
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('b, 'c, 'r, 'f) continuation ->
   ('a, 's, 'b, 'c) kinstr ->
   ('a, 's, 'r, 'f) continuation ->
   bool ->
   'a * 's ->
-  ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('r * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
   ('a, 's, 'r, 'f) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('b, 'a * 's, 'a, 's) kinstr ->
   ('b, 'c) ty option ->
@@ -917,11 +929,13 @@ type ('a, 'b, 's, 'r, 'f, 'c) kiter_type =
   ('a, 's, 'r, 'f) continuation ->
   'a ->
   's ->
-  ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('r * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('e, 'a * 'b, 'f, 'a * 'b) kinstr ->
   ('f Script_list.t, 'a * 'b, 'g, 'h) kinstr ->
@@ -929,11 +943,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i) ilist_map_type =
   ('f Script_list.t, 'i) ty option ->
   'e Script_list.t ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
   ('e, 'cmp) ty option ->
@@ -941,11 +957,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'cmp) ilist_iter_type =
   ('f, 'g, 'c, 'd) continuation ->
   'e Script_list.t ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('e, 'a * 'b, 'a, 'b) kinstr ->
   'e comparable_ty option ->
@@ -953,11 +971,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iset_iter_type =
   ('f, 'g, 'c, 'd) continuation ->
   'e set ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'g, 'a * 'b) kinstr ->
   (('e, 'g) map, 'a * 'b, 'h, 'i) kinstr ->
@@ -965,11 +985,13 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'i, 'j) imap_map_type =
   (('e, 'g) map, 'j) ty option ->
   ('e, 'f) map ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
   ('a, 'b, 'c, 'd) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('e * 'f, 'a * 'b, 'a, 'b) kinstr ->
   ('e * 'f, 'cmp) ty option ->
@@ -977,68 +999,85 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h, 'cmp) imap_iter_type =
   ('g, 'h, 'c, 'd) continuation ->
   ('e, 'f) map ->
   'a * 'b ->
-  ('c * 'd * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('c * 'd * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f) imul_teznat_type =
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Tez.t ->
   Script_int.n Script_int.num * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+  ( 'e * 'f * outdated_context * local_gas_counter * address_registry_diffs,
+    error trace )
+  result
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f) imul_nattez_type =
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   Script.location ->
   (Tez.t, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Tez.t * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+  ( 'e * 'f * outdated_context * local_gas_counter * address_registry_diffs,
+    error trace )
+  result
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_nat_type =
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+  ( 'e * 'f * outdated_context * local_gas_counter * address_registry_diffs,
+    error trace )
+  result
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f) ilsr_nat_type =
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   Script.location ->
   (Script_int.n Script_int.num, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   Script_int.n Script_int.num ->
   Script_int.n Script_int.num * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+  ( 'e * 'f * outdated_context * local_gas_counter * address_registry_diffs,
+    error trace )
+  result
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f) ilsl_bytes_type =
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   Script.location ->
   (bytes, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   bytes ->
   Script_int.n Script_int.num * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter, error trace) result Lwt.t
+  ( 'e * 'f * outdated_context * local_gas_counter * address_registry_diffs,
+    error trace )
+  result
+  Lwt.t
 
 type ifailwith_type = {
   ifailwith :
     'a 'ac 'b.
     logger option ->
-    outdated_context * step_constants ->
+    outdated_context * step_constants * address_registry_diffs ->
     local_gas_counter ->
     Script.location ->
     ('a, 'ac) ty ->
@@ -1050,18 +1089,20 @@ type ifailwith_type = {
 type ('a, 'b, 'c, 'd, 'e, 'f, 'g) iexec_type =
   ('a, end_of_stack, 'e, 'f) cont_instrumentation ->
   logger option ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('a, 'b) stack_ty option ->
   ('a, 'b, 'c, 'd) kinstr ->
   ('c, 'd, 'e, 'f) continuation ->
   'g ->
   ('g, 'a) lambda * 'b ->
-  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t
 
 type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
   ('o, end_of_stack, 'e, 'f) cont_instrumentation ->
-  outdated_context * step_constants ->
+  outdated_context * step_constants * address_registry_diffs ->
   local_gas_counter ->
   ('i, 'o) view_signature ->
   ('a, 'b) stack_ty option ->
@@ -1069,4 +1110,6 @@ type ('a, 'b, 'c, 'd, 'e, 'f, 'i, 'o) iview_type =
   ('c, 'd, 'e, 'f) continuation ->
   'i ->
   address * ('a * 'b) ->
-  ('e * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+  ('e * 'f * outdated_context * local_gas_counter * address_registry_diffs)
+  tzresult
+  Lwt.t

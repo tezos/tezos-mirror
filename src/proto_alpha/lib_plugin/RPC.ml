@@ -1300,6 +1300,7 @@ module Scripts = struct
                  lazy_storage_diff;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ ) =
           Script_interpreter.execute
@@ -1371,6 +1372,7 @@ module Scripts = struct
                    lazy_storage_diff;
                    ticket_diffs = _;
                    ticket_receipt = _;
+                   address_registry_diff = _;
                  },
                  _ctxt ),
                trace ) =
@@ -1459,6 +1461,7 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
@@ -1557,6 +1560,7 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
@@ -1827,6 +1831,7 @@ module Scripts = struct
                 None
                 ctxt
                 step_constants
+                []
                 descr
                 x
                 st
@@ -1834,11 +1839,12 @@ module Scripts = struct
             match absurd with _ -> .)
         | Typed descr ->
             let descr = Script_ir_translator.close_descr descr in
-            let* y, output_st, _ctxt =
+            let* y, output_st, _ctxt, _ =
               Script_interpreter.Internals.step_descr
                 None
                 ctxt
                 step_constants
+                []
                 descr
                 x
                 st

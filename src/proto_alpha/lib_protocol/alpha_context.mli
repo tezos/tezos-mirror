@@ -4419,6 +4419,10 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+module Address_registry : sig
+  type diff = {address : Destination.t; counter : Z.t}
+end
+
 module Address_registry_storage : sig
   type add_result = {ctxt : context; index : Z.t; existed : bool}
 
