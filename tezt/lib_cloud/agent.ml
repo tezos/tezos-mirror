@@ -111,7 +111,23 @@ let encoding =
         | None -> None
         | Some (address, ssh_port) ->
             let ssh_id = ssh_id () in
-            Runner.create ~ssh_user:"root" ~ssh_id ~ssh_port ~address ()
+            (* The host check is very not convenient at all for this setting. This makes
+               tezt cloud sensible to man in the middle attacks. There are other options
+               like doing the check the first time only etc... But they all fail at some
+               point. I think the issue is that:
+
+                - GCP may reuse IP addresses
+                - The docker image generates new key anytime it is generated
+
+                I don't have a good proposition that keeps a nice UX and is secure at the moment.
+            *)
+            Runner.create
+              ~options:["-o"; "StrictHostKeyChecking=no"]
+              ~ssh_user:"root"
+              ~ssh_id
+              ~ssh_port
+              ~address
+              ()
             |> Option.some
       in
       {
@@ -156,7 +172,14 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     | Some _, None | None, Some _ ->
         Test.fail "Agent.make was not initialized correctly"
     | Some (address, ssh_port), Some ssh_id ->
-        Runner.create ~ssh_user ~ssh_id ~ssh_port ~address () |> Option.some
+        Runner.create
+          ~options:["-o"; "StrictHostKeyChecking=no"]
+          ~ssh_user
+          ~ssh_id
+          ~ssh_port
+          ~address
+          ()
+        |> Option.some
   in
   {
     point;
@@ -223,20 +246,7 @@ let docker_run_command agent ?(detach = false) cmd args =
       let cmd, args =
         if detach then run_detached ~runner cmd args else (cmd, args)
       in
-      let cmd, args =
-        Runner.wrap_with_ssh runner (Runner.Shell.cmd [] cmd args)
-      in
-      (* The host check is very not convenient at all for this setting. This makes
-         tezt cloud sensible to man in the middle attacks. There are other options
-         like doing the check the first time only etc... But they all fail at some
-         point. I think the issue is that:
-
-          - GCP may reuse IP addresses
-          - The docker image generates new key anytime it is generated
-
-          I don't have a good proposition that keeps a nice UX and is secure at the moment.
-      *)
-      Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+      Process.spawn ~runner cmd args
 
 let copy agent ~consistency_check ~is_directory ~source ~destination =
   let* exists =
