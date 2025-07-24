@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{database::PrecompileDatabase, send_outbox_message::Withdrawal};
+use crate::{database::PrecompileDatabase, precompiles::send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
@@ -12,7 +12,7 @@ use inspectors::{
     plain::{is_plain_transaction, minimal_plain_trace},
     CallTracerInput, EtherlinkInspector, EvmInspection, TracerInput,
 };
-use precompile_provider::EtherlinkPrecompiles;
+use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
         result::{EVMError, ExecResultAndState, ExecutionResult},
@@ -33,17 +33,13 @@ use thiserror::Error;
 use world_state_handler::{account_path, WorldStateHandler};
 
 pub mod inspectors;
-pub mod precompile_init;
-pub mod precompile_provider;
-pub mod send_outbox_message;
+pub mod precompiles;
 pub mod world_state_handler;
 
 mod block_storage;
 mod code_storage;
-mod constants;
 mod database;
 mod helpers;
-mod table;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -351,12 +347,12 @@ mod test {
     };
 
     use crate::{
-        constants::WITHDRAWAL_SOL_ADDR,
-        precompile_init::init_precompile_bytecodes,
+        precompiles::constants::WITHDRAWAL_SOL_ADDR,
+        precompiles::initializer::init_precompile_bytecodes,
         world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH},
     };
     use crate::{
-        precompile_provider::EtherlinkPrecompiles, run_transaction,
+        precompiles::provider::EtherlinkPrecompiles, run_transaction,
         world_state_handler::account_path, ExecutionOutcome,
     };
 

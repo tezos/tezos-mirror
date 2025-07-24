@@ -11,10 +11,10 @@ use revm::{
 };
 
 use crate::{
-    constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST},
     database::PrecompileDatabase,
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    send_outbox_message::revert,
+    precompiles::constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST},
+    precompiles::send_outbox_message::revert,
 };
 
 sol! {

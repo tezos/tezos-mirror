@@ -360,7 +360,7 @@ pub fn revm_run_transaction<Host: Runtime>(
         config_to_revm_specid(config),
         block_constants,
         &mut world_state_handler,
-        revm_etherlink::precompile_provider::EtherlinkPrecompiles::new(),
+        revm_etherlink::precompiles::provider::EtherlinkPrecompiles::new(),
         revm::primitives::Address::from_slice(&caller.0),
         to.map(|to| revm::primitives::Address::from_slice(&to.0)),
         revm::primitives::Bytes::from(call_data),
@@ -506,12 +506,12 @@ pub fn revm_run_transaction<Host: Runtime>(
                     .withdrawals
                     .into_iter()
                     .map(|withdrawal| match withdrawal {
-                        revm_etherlink::send_outbox_message::Withdrawal::Standard(
+                        revm_etherlink::precompiles::send_outbox_message::Withdrawal::Standard(
                             outbox_message_full,
                         ) => evm_execution::handler::Withdrawal::Standard(
                             outbox_message_full,
                         ),
-                        revm_etherlink::send_outbox_message::Withdrawal::Fast(
+                        revm_etherlink::precompiles::send_outbox_message::Withdrawal::Fast(
                             outbox_message_full,
                         ) => {
                             evm_execution::handler::Withdrawal::Fast(outbox_message_full)

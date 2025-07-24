@@ -11,12 +11,12 @@ use revm::{
 };
 
 use crate::{
-    constants::{
+    database::PrecompileDatabase,
+    precompiles::constants::{
         CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
     },
-    database::PrecompileDatabase,
-    send_outbox_message::send_outbox_message_precompile,
-    table::table_precompile,
+    precompiles::send_outbox_message::send_outbox_message_precompile,
+    precompiles::table::table_precompile,
 };
 
 #[derive(Debug, Default, Clone)]

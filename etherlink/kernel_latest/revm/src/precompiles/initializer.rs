@@ -10,11 +10,11 @@ use revm::{
 use tezos_evm_runtime::runtime::Runtime;
 
 use crate::{
-    constants::{
+    custom,
+    precompiles::constants::{
         FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT,
         INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
-    custom,
     world_state_handler::{account_path, WorldStateHandler},
     Error,
 };
