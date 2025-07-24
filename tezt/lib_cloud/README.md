@@ -82,6 +82,12 @@ This variable is also used to determine the dockerfile to be used for
 your experiment. In case you want to use a different dockerfile, you
 can use the CLI option `--dockerfile-alias`.
 
+You can use several namespaces by switching between several values of the `TEZT_CLOUD`
+variable but avoid values which are prefixes of each other. For instance use
+`<username>`, `test-<username>`, and `prod-<username>` instead of `<username>`,
+`<username>-test`, and `<username>-prod`; otherwise destroying the machines
+(with the `CLOUD terraform destroy` command) of the `<username>` namespace
+would also destroy the machines of the `<username>-test` and `<username>-prod` namespaces.
 # Docker
 
 The library relies mainly on docker. Each VM that will be deployed
