@@ -424,9 +424,20 @@ let () =
             ~aliases
             ~other_accounts_pkh
         in
+        let consensus_keys_count =
+          List.length
+            (List.filter
+               (fun (_, _, _, ck) -> Option.is_some ck)
+               yes_alias_list)
+        in
+        let all_keys_count = List.length yes_alias_list in
+        let delegate_keys_count = all_keys_count - consensus_keys_count in
         Format.printf
-          "@[<h>Number of keys to export:@;<3 0>%d@]@."
-          (List.length yes_alias_list) ;
+          "@[<h>Number of keys to export:@;\
+           <3 0>%d (%d delegate keys | %d consensus keys)@]@."
+          all_keys_count
+          delegate_keys_count
+          consensus_keys_count ;
         if populate_wallet ~replace:!force yes_wallet_dir yes_alias_list then
           Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
