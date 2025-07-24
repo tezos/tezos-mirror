@@ -9,7 +9,7 @@ use crate::{
         append_address, append_option_address, append_option_canonical,
         append_option_u64_le, append_u16_le, append_u256_le, append_u64_le,
     },
-    precompile_provider::EtherlinkPrecompiles,
+    precompiles::provider::EtherlinkPrecompiles,
 };
 
 use revm::{

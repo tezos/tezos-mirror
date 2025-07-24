@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 
 use crate::{
-    database::EtherlinkVMDB, precompile_provider::EtherlinkPrecompiles, EVMInnerContext,
-    Error,
+    database::EtherlinkVMDB, precompiles::provider::EtherlinkPrecompiles,
+    EVMInnerContext, Error,
 };
 use call_tracer::{CallTracer, CallTracerConfig};
 use noop::NoInspector;
