@@ -302,6 +302,19 @@ let getpass () =
   passwd
 
 module Json = struct
+  type error += Json_decoding_error of {input : string; error : string}
+
+  let () =
+    register_error_kind
+      `Temporary
+      ~id:"json_decoding_error"
+      ~title:"Json decoding error"
+      ~description:"The input string is not a valid JSON value"
+      Data_encoding.(obj2 (req "input" string) (req "error" string))
+      (function
+        | Json_decoding_error {input; error} -> Some (input, error) | _ -> None)
+      (fun (input, error) -> Json_decoding_error {input; error})
+
   let to_root = function
     | `O ctns -> `O ctns
     | `A ctns -> `A ctns
@@ -322,7 +335,9 @@ module Json = struct
         Lwt_io.with_file ~mode:Input file (fun chan ->
             let open Lwt_result_syntax in
             let*! str = Lwt_io.read chan in
-            return (Ezjsonm.from_string str :> Data_encoding.json)))
+            match Data_encoding.Json.from_string str with
+            | Ok json -> return json
+            | Error error -> tzfail (Json_decoding_error {input = str; error})))
 end
 
 (* This module is used by [safe_cancel_on_exit] to register and unregister
