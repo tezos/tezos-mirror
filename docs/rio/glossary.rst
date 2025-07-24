@@ -138,6 +138,7 @@ _`Attesting`
     When a block_ is created and propagated on the network, delegates that have
     `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
     Attestation operations are included in the next block_.
+    Attestation operations are used both for L1 consensus protocol for pre-attesting and attesting block_\ s, and in the DAL_ for attesting available shard_\ s.
 
 _`Attesting rights`
     See `baking rights`_.
@@ -199,6 +200,9 @@ _`Cycle`
     The length of a cycle is a (parametric) protocol
     constant_, and thus might change across different
     Tezos protocols.
+
+_`DAL`
+    See `Data Availability Layer`_
 
 _`Data Availability Layer`
     The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
@@ -321,7 +325,7 @@ _`PVM`
    This ability is used during the final step of a `refutation game`_.
 
 _`Redundancy factor`
-    The amount of redundancy that the protocol uses when splitting DAL data into shard_\ s.
+    The amount of redundancy that the protocol uses when splitting expanded DAL data into shard_\ s.
     The higher the redundancy factor, the fewer shards are needed to reconstruct the initial data.
 
 _`Refutation game`
@@ -398,7 +402,7 @@ _`Smart Rollup`
     See :doc:`smart_rollups`.
 
 _`DAL slot`
-    Each block has a certain number of slots to which Data Availability Layer users can post raw data as binary large objects (blobs) to distribute via the DAL.
+    Each block has a certain number of slots to which Data Availability Layer users can post raw data (also called blobs, for binary large objects) to distribute via the DAL.
 
 _`Staker`
     A `user account`_ that made a security deposit.
