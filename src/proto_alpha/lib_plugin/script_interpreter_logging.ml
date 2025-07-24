@@ -2078,7 +2078,7 @@ module Logger (Base : Logger_base) = struct
       logger -> logging_event -> (a, s) stack_ty -> (a, s, b, t, r, f) step_type
       =
     let open Lwt_result_syntax in
-    fun logger event sty ((ctxt, _) as g) old_gas k ks accu stack ->
+    fun logger event sty ((ctxt, _, _) as g) old_gas k ks accu stack ->
       (match (k, event) with
       | ILog _, LogEntry -> ()
       | _, LogEntry -> log_entry ctxt old_gas k sty accu stack
@@ -2346,14 +2346,16 @@ module Logger (Base : Logger_base) = struct
   let klog :
       type a s r f.
       logger ->
-      outdated_context * step_constants ->
+      outdated_context * step_constants * address_registry_diffs ->
       local_gas_counter ->
       (a, s) stack_ty ->
       (a, s, r, f) continuation ->
       (a, s, r, f) continuation ->
       a ->
       s ->
-      (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
+      (r * f * outdated_context * local_gas_counter * address_registry_diffs)
+      tzresult
+      Lwt.t =
     let open Lwt_result_syntax in
     fun logger g old_gas stack_ty k0 ks accu stack ->
       let ty_for_logging_unsafe = function
@@ -2463,7 +2465,8 @@ module Logger (Base : Logger_base) = struct
                 stack
           | KMap_head (f, k) -> (next [@ocaml.tailcall]) g gas k (f accu) stack
           | KView_exit (scs, k) ->
-              (next [@ocaml.tailcall]) (fst g, scs) gas k accu stack
+              let ctxt, _, diffs = g in
+              (next [@ocaml.tailcall]) (ctxt, scs, diffs) gas k accu stack
           | KLog _ as k ->
               (* This case should never happen. *)
               (next [@ocaml.tailcall]) g old_gas k accu stack

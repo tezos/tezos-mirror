@@ -458,6 +458,8 @@ module Address_registry = struct
   let init = Storage.Contract.Address_registry.Next.init
 
   let next_counter_and_incr = Storage.Contract.Address_registry.Next.incr
+
+  type diff = {address : Destination.t; counter : Z.t}
 end
 
 module Big_map = struct

@@ -13,7 +13,13 @@ let set_counter ctxt contract =
   let* ctxt, _size_diff, _has_changed =
     Alpha_context.Address_registry.add ctxt contract next_counter
   in
-  return (ctxt, next_counter)
+  return
+    ( ctxt,
+      next_counter,
+      [
+        Alpha_context.Address_registry.
+          {address = contract; counter = next_counter};
+      ] )
 
 let index ctxt contract =
   let open Lwt_result_syntax in
@@ -21,5 +27,5 @@ let index ctxt contract =
     Alpha_context.Address_registry.find ctxt contract
   in
   match existing_counter with
-  | Some c -> return (ctxt, c)
+  | Some c -> return (ctxt, c, [])
   | None -> set_counter ctxt contract

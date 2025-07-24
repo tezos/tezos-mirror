@@ -55,6 +55,24 @@ val use_gas_counter_in_context :
   (Alpha_context.context -> ('a * Alpha_context.context) tzresult Lwt.t) ->
   ('a * outdated_context * local_gas_counter) tzresult Lwt.t
 
+(** [use_gas_counter_in_context_with_diff outdated_ctxt gas_counter f] first applies the
+    [gas_counter] on the outdated context [outdated_ctxt], then invokes [f] on
+    the resulting context, and returns a new [outdated_context] and a
+    [local_gas_counter] value. *)
+val use_gas_counter_in_context_with_diff :
+  outdated_context ->
+  local_gas_counter ->
+  (Alpha_context.context ->
+  ('a * Alpha_context.context * Alpha_context.Address_registry.diff list)
+  tzresult
+  Lwt.t) ->
+  ('a
+  * outdated_context
+  * local_gas_counter
+  * Alpha_context.Address_registry.diff list)
+  tzresult
+  Lwt.t
+
 (** [consume_opt amt cost] attempts to consume an [amt] of gas and returns the
     new remaining value wrapped in [Some]. If the resulting gas is negative
     [None] is returned. *)

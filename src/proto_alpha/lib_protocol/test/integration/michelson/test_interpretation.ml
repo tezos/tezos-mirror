@@ -59,14 +59,15 @@ let run_step ctxt code accu stack =
   let open Lwt_result_syntax in
   let open Script_interpreter in
   let open Contract_helpers in
-  let* ((_, _, ctxt') as r) =
-    Internals.step_descr None ctxt default_step_constants code accu stack
+  let* ((_, _, ctxt', _) as r) =
+    Internals.step_descr None ctxt default_step_constants [] code accu stack
   in
-  let* _, _, ctxt'' =
+  let* _, _, ctxt'', _ =
     Internals.step_descr
       (Some logger)
       ctxt
       default_step_constants
+      []
       code
       accu
       stack

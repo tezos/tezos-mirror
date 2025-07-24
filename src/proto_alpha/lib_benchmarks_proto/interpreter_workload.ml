@@ -1643,6 +1643,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
            (Some logger)
            ctxt
            step_constants
+           []
            sty
            kinstr
            (fst stack)
@@ -1652,7 +1653,7 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
     | Error errs ->
         Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
-    | Ok (_aft_top, _aft, _ctxt) ->
+    | Ok (_aft_top, _aft, _ctxt, _diffs) ->
         (* ((aft_top, aft), List.rev !trace, ctxt) *)
         List.rev !trace
   with Stop_bench -> List.rev !trace
@@ -1689,7 +1690,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
       Lwt_main.run
         (Script_interpreter.Internals.next
            (Some logger)
-           (outdated_ctxt, step_constants)
+           (outdated_ctxt, step_constants, [])
            (Local_gas_counter 0xFF_FF_FF_FF)
            stack_type
            cont
@@ -1700,7 +1701,7 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
     | Error errs ->
         Format.eprintf "%a@." Error_monad.pp_print_trace errs ;
         raise (Failure "Interpreter_workload.extract_deps: error in step")
-    | Ok (_aft_top, _aft, _outdated_ctxt, _gas) ->
+    | Ok (_aft_top, _aft, _outdated_ctxt, _gas, _) ->
         (* ((aft_top, aft), List.rev !trace, outdated_ctxt, gas) *)
         List.rev !trace
   with Stop_bench -> List.rev !trace

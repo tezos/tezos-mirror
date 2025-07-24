@@ -628,6 +628,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
            operations;
            ticket_diffs;
            ticket_receipt;
+           address_registry_diff = _;
          },
          ctxt ) =
     execute
@@ -2875,6 +2876,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                      operations;
                      ticket_diffs;
                      ticket_receipt;
+                     address_registry_diff = _;
                    },
                    ctxt ) =
               Script_interpreter.execute_with_typed_parameter

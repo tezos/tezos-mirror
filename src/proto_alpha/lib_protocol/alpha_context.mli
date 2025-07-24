@@ -4428,6 +4428,8 @@ module Address_registry : sig
   val init : context -> context tzresult Lwt.t
 
   val next_counter_and_incr : context -> (context * Z.t) tzresult Lwt.t
+
+  type diff = {address : Destination.t; counter : Z.t}
 end
 
 (** See {!Block_payload_repr}. *)
