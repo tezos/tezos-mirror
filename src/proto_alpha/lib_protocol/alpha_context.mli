@@ -4421,6 +4421,8 @@ end
 
 module Address_registry : sig
   type diff = {address : Destination.t; counter : Z.t}
+
+  val encoding : diff Data_encoding.t
 end
 
 module Address_registry_storage : sig

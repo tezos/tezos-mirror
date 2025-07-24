@@ -452,6 +452,13 @@ module Global_constants_storage = Global_constants_storage
 
 module Address_registry = struct
   type diff = {address : Destination.t; counter : Z.t}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; counter} -> (address, counter))
+      (fun (address, counter) -> {address; counter})
+      (obj2 (req "address" Destination.encoding) (req "counter" z))
 end
 
 module Address_registry_storage = struct
