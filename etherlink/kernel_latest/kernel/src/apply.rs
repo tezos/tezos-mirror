@@ -344,7 +344,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     // TODO: Simplify all the base structures to avoid these translations
     // once we fully make the switch to REVM.
     let mut world_state_handler =
-        match revm_etherlink::world_state_handler::new_world_state_handler() {
+        match revm_etherlink::storage::world_state_handler::new_world_state_handler() {
             Ok(world_state_handler) => world_state_handler,
             Err(err) => {
                 return Err(Error::InvalidRunTransaction(

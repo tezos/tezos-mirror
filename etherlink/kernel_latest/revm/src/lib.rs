@@ -26,18 +26,16 @@ use revm::{
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
     Context, ExecuteCommitEvm, InspectEvm, Journal, MainBuilder,
 };
+use storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
-use world_state_handler::{account_path, WorldStateHandler};
 
 pub mod inspectors;
 pub mod precompiles;
-pub mod world_state_handler;
+pub mod storage;
 
-mod block_storage;
-mod code_storage;
 mod database;
 mod helpers;
 
@@ -349,11 +347,13 @@ mod test {
     use crate::{
         precompiles::constants::WITHDRAWAL_SOL_ADDR,
         precompiles::initializer::init_precompile_bytecodes,
-        world_state_handler::{new_world_state_handler, WITHDRAWALS_TICKETER_PATH},
+        storage::world_state_handler::{
+            new_world_state_handler, WITHDRAWALS_TICKETER_PATH,
+        },
     };
     use crate::{
         precompiles::provider::EtherlinkPrecompiles, run_transaction,
-        world_state_handler::account_path, ExecutionOutcome,
+        storage::world_state_handler::account_path, ExecutionOutcome,
     };
 
     mod utilities {

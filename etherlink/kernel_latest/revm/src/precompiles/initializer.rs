@@ -15,7 +15,7 @@ use crate::{
         FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CONTRACT,
         INTERNAL_FORWARDER_SOL_CONTRACT, WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CONTRACT,
     },
-    world_state_handler::{account_path, WorldStateHandler},
+    storage::world_state_handler::{account_path, WorldStateHandler},
     Error,
 };
 
