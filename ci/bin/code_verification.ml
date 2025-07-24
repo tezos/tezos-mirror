@@ -1777,7 +1777,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_audit_riscv_deps])
+          ~dependencies:(Dependent [])
           [
             Format.asprintf
               "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='%s' check"

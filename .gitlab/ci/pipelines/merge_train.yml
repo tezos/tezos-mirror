@@ -2347,7 +2347,6 @@ check_riscv_kernels:
     when: on_success
   needs:
   - oc.docker:rust-toolchain:amd64
-  - audit_riscv_deps
   dependencies:
   - oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
