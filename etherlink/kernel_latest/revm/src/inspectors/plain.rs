@@ -9,7 +9,7 @@
 // The implemention is ad-hoc for each tracer on purpose to match the default cases expected
 // for tooling compatibility.
 
-use crate::world_state_handler::StorageAccount;
+use crate::storage::world_state_handler::StorageAccount;
 
 use super::{call_tracer::CallTrace, EtherlinkInspector};
 use revm::{

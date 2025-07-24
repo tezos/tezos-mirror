@@ -479,7 +479,7 @@ impl Evaluation {
         if let Ok(true) = is_revm_enabled(host) {
             if from.is_zero() {
                 let mut simulation_caller =
-                    revm_etherlink::world_state_handler::StorageAccount::from_address(
+                    revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
                         &revm::primitives::Address::from_slice(&from.0),
                     )
                     .map_err(|err| {

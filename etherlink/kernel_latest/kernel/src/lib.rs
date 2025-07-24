@@ -284,7 +284,7 @@ pub fn run<Host: Runtime>(host: &mut Host) -> Result<(), anyhow::Error> {
 
     if is_revm_enabled(host)? {
         let mut world_state_handler =
-            revm_etherlink::world_state_handler::new_world_state_handler()
+            revm_etherlink::storage::world_state_handler::new_world_state_handler()
                 .map_err(|_| Error::RevmPrecompileInitError)?;
         revm_etherlink::precompiles::initializer::init_precompile_bytecodes(
             host,

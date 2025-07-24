@@ -6,12 +6,14 @@
 use std::mem;
 
 use crate::{
-    block_storage::{get_block_hash, BLOCKS_STORED},
-    code_storage::CodeStorage,
     helpers::legacy::FaDepositWithProxy,
     precompiles::send_outbox_message::Withdrawal,
-    world_state_handler::{
-        account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
+    storage::{
+        block::{get_block_hash, BLOCKS_STORED},
+        code::CodeStorage,
+        world_state_handler::{
+            account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
+        },
     },
     Error,
 };
