@@ -12824,11 +12824,13 @@ let test_deposit_event =
 
   unit
 
-let test_withdrawal_events =
+let test_withdrawal_events ~enable_revm =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "withdrawal"; "event"]
-    ~title:"Regression test for the withdrawal events"
+    ~title:
+      ("Regression test for the withdrawal events"
+      ^ if enable_revm then " (with revm)" else "")
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12849,7 +12851,7 @@ let test_withdrawal_events =
       ~enable_multichain:false
         (* TODO: temporary, needs migration to set custom precompile's
            bytecode. *)
-      ~enable_revm:false
+      ~enable_revm
       ~enable_fast_withdrawal:true
       protocol
   in
@@ -12913,11 +12915,13 @@ let test_withdrawal_events =
 
   unit
 
-let test_fa_deposit_and_withdrawals_events =
+let test_fa_deposit_and_withdrawals_events ~enable_revm =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "fa_bridge"; "event"]
-    ~title:"Regression test for the FA deposit and withdrawal events"
+    ~title:
+      ("Regression test for the FA deposit and withdrawal events"
+      ^ if enable_revm then " (with revm)" else "")
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12939,7 +12943,7 @@ let test_fa_deposit_and_withdrawals_events =
       ~enable_multichain:false
         (* TODO: temporary, needs migration to set custom precompile's
            bytecode. *)
-      ~enable_revm:false
+      ~enable_revm
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol
@@ -13663,8 +13667,10 @@ let () =
   test_tx_queue_limit [Alpha] ;
   test_observer_periodic_snapshot [Alpha] ;
   test_deposit_event [Alpha] ;
-  test_withdrawal_events [Alpha] ;
-  test_fa_deposit_and_withdrawals_events [Alpha] ;
+  test_withdrawal_events [Alpha] ~enable_revm:false ;
+  test_withdrawal_events [Alpha] ~enable_revm:true ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:false ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:true ;
   test_block_producer_validation [Alpha] ;
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
