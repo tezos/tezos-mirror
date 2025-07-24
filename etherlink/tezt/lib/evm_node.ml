@@ -1273,6 +1273,17 @@ let optional_json_put ~name v f json =
         (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
         json
 
+(** [update_or_create_json ~origin key f json] is equivalent to
+    [JSON.update key f json] but [json] can be [Null] in which case an
+    object is created *)
+let update_or_create_json ~origin key f json =
+  JSON.update
+    key
+    (fun json ->
+      let json = if JSON.is_null json then JSON.parse ~origin "{}" else json in
+      f json)
+    json
+
 type tx_queue_config =
   | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
   | Enable of bool
@@ -1383,6 +1394,17 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
     match patch_config with
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
+  in
+
+  let* () =
+    if Option.is_some spawn_rpc then
+      Config_file.update evm_node
+      @@ update_or_create_json
+           ~origin:"init"
+           "experimental_features"
+           (optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
+                `O [("protected_port", `Float (float_of_int port))]))
+    else return ()
   in
   let* () = run ?extra_arguments evm_node in
   return evm_node
