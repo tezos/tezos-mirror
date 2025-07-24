@@ -87,6 +87,7 @@ type successful_transaction_result =
       storage_size : Z.t;
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
+      address_registry_diff : Address_registry.diff list;
     }
   | Transaction_to_sc_rollup_result of {
       consumed_gas : Gas.Arith.fp;

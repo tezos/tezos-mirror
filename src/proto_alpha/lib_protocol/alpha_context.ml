@@ -460,6 +460,13 @@ module Address_registry = struct
   let next_counter_and_incr = Storage.Contract.Address_registry.Next.incr
 
   type diff = {address : Destination.t; counter : Z.t}
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; counter} -> (address, counter))
+      (fun (address, counter) -> {address; counter})
+      (obj2 (req "address" Destination.encoding) (req "counter" z))
 end
 
 module Big_map = struct
