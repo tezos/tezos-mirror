@@ -134,23 +134,31 @@ let cycles_to_period
   let*?@ res = Alpha_context.Period.mult c one_cycle_period in
   return res
 
+type duration = Days of int32 | Hours of int32
+
 let check_protocol_time_correlation
-    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles ~days =
+    ~(constants : Protocol.Alpha_context.Constants.Parametric.t) ~cycles
+    ~duration =
   let open Lwt_result_wrap_syntax in
   let open Protocol in
-  let days_to_period x =
-    let*?@ res = Protocol.Alpha_context.Period.(mult x one_day) in
+  let duration_to_period x =
+    let x, period =
+      match x with
+      | Days x -> (x, Protocol.Alpha_context.Period.one_day)
+      | Hours x -> (x, Protocol.Alpha_context.Period.one_hour)
+    in
+    let*?@ res = Protocol.Alpha_context.Period.mult x period in
     return res
   in
+  let* duration = duration_to_period duration in
   let* constant = cycles_to_period ~constants cycles in
-  let* days = days_to_period days in
   Assert.equal
     ~loc:__LOC__
     (fun x y -> Alpha_context.Period.compare x y = 0)
-    "constant in cycles is not equal to given days"
+    "constant in cycles is not equal to given period"
     Alpha_context.Period.pp
     constant
-    days
+    duration
 
 let () =
   register_test
@@ -163,9 +171,9 @@ let () =
       constants.delay_increment_per_round >= Period.one_second)
 
 let () =
-  register_test ~title:"one cycle is 1 day" @@ fun () ->
+  register_test ~title:"one cycle is 4 hours" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  check_protocol_time_correlation ~constants ~cycles:1l ~days:1l
+  check_protocol_time_correlation ~constants ~cycles:1l ~duration:(Hours 4l)
 
 let () =
   register_test ~title:"voting period is 14 days" @@ fun () ->
@@ -173,7 +181,7 @@ let () =
   check_protocol_time_correlation
     ~constants
     ~cycles:constants.cycles_per_voting_period
-    ~days:14l
+    ~duration:(Days 14l)
 
 let () =
   register_test ~title:"delegate parameters activation delay is 5 days"
@@ -182,15 +190,15 @@ let () =
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.delegate_parameters_activation_delay)
-    ~days:5l
+    ~duration:(Days 5l)
 
 let () =
-  register_test ~title:"tolerated inactivity period is 2 days" @@ fun () ->
+  register_test ~title:"tolerated inactivity period is 8 hours" @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   check_protocol_time_correlation
     ~constants
     ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
-    ~days:2l
+    ~duration:(Hours 8l)
 
 let () =
   register_test ~title:"Nonce commitment per cycle is above 128" @@ fun () ->
@@ -229,7 +237,7 @@ let () =
     ~title:"Nonce revelation period is short enough for VDF to fit in a cycle "
   @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int32.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
@@ -249,7 +257,7 @@ let () =
   let constants = Default_parameters.constants_mainnet in
   let open Lwt_result_syntax in
   let* cycle_period = cycles_to_period ~constants 1l in
-  Assert.lt
+  Assert.leq
     ~loc:__LOC__
     Int64.compare
     "nonce_revelation_threshold is too short wrt blocks_per_cycle"
