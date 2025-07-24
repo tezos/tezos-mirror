@@ -40,3 +40,6 @@ let ticket_router_tester_path () =
   Base.(
     project_root
     // "etherlink/tezos_contracts/fa_bridge/ticket_router_tester.tz")
+
+let fa_deposit_path () =
+  Base.(project_root // "etherlink/tezos_contracts/fa_deposit.tz")

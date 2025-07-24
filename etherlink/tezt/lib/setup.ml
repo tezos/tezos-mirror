@@ -17,6 +17,7 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+  fa_deposit : string;
 }
 
 type multichain_sequencer_setup = {
@@ -140,8 +141,17 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       client
   in
   let* () = Client.bake_for_and_wait ~keys:[] client in
+  (* Originates the FA deposit contract. *)
+  let* fa_deposit =
+    Client.originate_contract
+      ~alias:"fa-deposit"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap3.public_key_hash
+      ~prg:(fa_deposit_path ())
+      ~burn_cap:Tez.one
+      client
   (* Originates the ticket router tester (FA bridge) contract. *)
-  let* ticket_router_tester =
+  and* ticket_router_tester =
     Client.originate_contract
       ~alias:"ticket-router-tester"
       ~amount:Tez.zero
@@ -162,6 +172,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       admin;
       sequencer_governance;
       ticket_router_tester;
+      fa_deposit;
     }
 
 let run_new_rpc_endpoint evm_node =

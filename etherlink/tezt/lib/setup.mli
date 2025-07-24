@@ -14,6 +14,7 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+  fa_deposit : string;
 }
 
 type multichain_sequencer_setup = {
