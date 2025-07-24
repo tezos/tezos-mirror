@@ -926,6 +926,7 @@ grafazos.gitlab_release:
   - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+  retry: 0
 
 grafazos.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
@@ -955,6 +956,7 @@ grafazos.release_page:
     paths:
     - ./index.md
     - index.html
+  retry: 0
 
 teztale.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0

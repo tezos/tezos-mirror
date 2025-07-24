@@ -344,6 +344,11 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
               let interruptible =
                 match stage with Build | Test -> true | Publish -> false
               in
+              let retry : Gitlab_ci.Types.retry option =
+                match stage with
+                | Build | Test -> None
+                | Publish -> Some {max = 0; when_ = []}
+              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -353,6 +358,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ~dependencies:(Dependent dependencies)
                 ~rules
                 ~interruptible
+                ?retry
                 ?variables
                 ?artifacts
                 script
