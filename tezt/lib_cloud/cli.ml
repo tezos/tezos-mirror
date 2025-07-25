@@ -51,7 +51,7 @@ type config = {
   log_rotation : int option;
   slack_channel_id : string option;
   slack_bot_token : string option;
-  scenario_specific : Data_encoding.Json.t option;
+  scenario_specific : (string * Data_encoding.Json.t) option;
 }
 
 let encoding =
@@ -277,7 +277,7 @@ let encoding =
                 (opt "slack_channel_id" string)))
           (obj2
              (opt "slack_bot_token" string)
-             (opt "scenario_specific" Data_encoding.Json.encoding))))
+             (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding)))))
 
 let section =
   Clap.section
@@ -306,7 +306,7 @@ let config =
           raise exn
       | e -> raise e)
 
-let scenario_specific = Option.value ~default:(`O []) config.scenario_specific
+let scenario_specific = config.scenario_specific
 
 let some = Option.some
 

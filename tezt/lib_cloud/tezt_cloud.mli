@@ -252,11 +252,11 @@ module Prometheus : sig
   val get_query_endpoint : query:string -> Uri.t option
 end
 
+(** Expose the elements of [Cli] which are useful for the scenario. *)
 module Tezt_cloud_cli : sig
-  (** Equivalent to [Cli.prometheus] *)
   val prometheus : bool
 
-  val scenario_specific_json : Data_encoding.Json.t
+  val scenario_specific_json : (string * Data_encoding.Json.t) option
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

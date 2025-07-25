@@ -89,6 +89,8 @@ let snapshot_typ : Snapshot_helpers.t Clap.typ =
       try Some (parse_snapshot (Some snapshot)) with _exn -> None)
     ~show:to_string
 
+exception Scenario_mismatch
+
 module type Dal = sig
   val blocks_history : int
 
@@ -175,6 +177,8 @@ module type Dal = sig
 end
 
 module Dal () : Dal = struct
+  let scenario_name = "DAL"
+
   let section =
     Clap.section
       ~description:
@@ -182,18 +186,29 @@ module Dal () : Dal = struct
       "DAL"
 
   let config =
-    try
-      Data_encoding.Json.destruct
-        Scenarios_configuration.DAL.encoding
-        Tezt_cloud_cli.scenario_specific_json
-    with
-    | Json_encoding.Cannot_destruct (_, e) as exn ->
+    match Tezt_cloud_cli.scenario_specific_json with
+    | None ->
+        Data_encoding.Json.destruct Scenarios_configuration.DAL.encoding (`O [])
+    | Some (name, options) when name = scenario_name -> (
+        try
+          Data_encoding.Json.destruct
+            Scenarios_configuration.DAL.encoding
+            options
+        with
+        | Json_encoding.Cannot_destruct (_, e) as exn ->
+            Log.error
+              "Cannot load config file: %s - %s"
+              (Printexc.to_string exn)
+              (Printexc.to_string e) ;
+            raise exn
+        | e -> raise e)
+    | Some (name, _options) ->
         Log.error
-          "Cannot load config file: %s - %s"
-          (Printexc.to_string exn)
-          (Printexc.to_string e) ;
-        raise exn
-    | e -> raise e
+          "Configuration file mismatch. This config file is for scenario %s \
+           whereas the command was launched for scenario %s"
+          name
+          scenario_name ;
+        raise Scenario_mismatch
 
   let blocks_history =
     Clap.default_int
