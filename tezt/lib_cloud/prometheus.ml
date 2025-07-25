@@ -231,14 +231,30 @@ let reload t =
 
 let add_job (t : t) ?(metrics_path = "/metrics") ~name targets =
   let new_job = {name; metrics_path; targets} in
-  if List.exists (fun (job : job) -> job.name = source.name) t.jobs then (
-    Log.warn "Prometheus: trying to add duplicate job : %s. Ignoring." name ;
-    Lwt.return_unit)
-  else (
-    Log.report "Prometheus: adding job %s with %a" new_job.name pp_job new_job ;
-    t.jobs <- new_job :: t.jobs ;
-    write_configuration_file t ;
-    reload t)
+  let jobs =
+    match List.find_opt (fun (job : job) -> name = job.name) t.jobs with
+    | None ->
+        Log.report
+          "Prometheus: adding job %s with %a"
+          new_job.name
+          pp_job
+          new_job ;
+        List.rev (new_job :: t.jobs)
+    | Some job ->
+        let targets = List.sort_uniq compare (targets @ job.targets) in
+        let new_job = {new_job with targets} in
+        Log.report
+          "Prometheus: replacing job %s with %a"
+          new_job.name
+          pp_job
+          new_job ;
+        List.map
+          (fun (job : job) -> if job.name = name then new_job else job)
+          t.jobs
+  in
+  t.jobs <- jobs ;
+  write_configuration_file t ;
+  reload t
 
 let default_group_name = "tezt"
 
