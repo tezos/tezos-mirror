@@ -182,9 +182,18 @@ module Dal () : Dal = struct
       "DAL"
 
   let config =
-    Data_encoding.Json.destruct
-      Scenarios_configuration.DAL.encoding
-      Tezt_cloud_cli.scenario_specific_json
+    try
+      Data_encoding.Json.destruct
+        Scenarios_configuration.DAL.encoding
+        Tezt_cloud_cli.scenario_specific_json
+    with
+    | Json_encoding.Cannot_destruct (_, e) as exn ->
+        Log.error
+          "Cannot load config file: %s - %s"
+          (Printexc.to_string exn)
+          (Printexc.to_string e) ;
+        raise exn
+    | e -> raise e
 
   let blocks_history =
     Clap.default_int

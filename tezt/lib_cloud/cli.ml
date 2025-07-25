@@ -294,10 +294,17 @@ let config_file =
 let config =
   match config_file with
   | None -> Data_encoding.Json.destruct encoding (`O [])
-  | Some file ->
+  | Some file -> (
       let json = Ezjsonm.from_channel (In_channel.open_text file) in
       Format.printf "%s@." (Ezjsonm.value_to_string json) ;
-      Data_encoding.Json.destruct encoding json
+      try Data_encoding.Json.destruct encoding json with
+      | Json_encoding.Cannot_destruct (_, e) as exn ->
+          Log.error
+            "Cannot load config file: %s - %s"
+            (Printexc.to_string exn)
+            (Printexc.to_string e) ;
+          raise exn
+      | e -> raise e)
 
 let scenario_specific = Option.value ~default:(`O []) config.scenario_specific
 
