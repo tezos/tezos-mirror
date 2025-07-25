@@ -2447,7 +2447,6 @@ dependencies = [
  "primitive-types",
  "revm",
  "rlp",
- "serde_json",
  "tezos-evm-logging-latest",
  "tezos-evm-runtime-latest",
  "tezos-indexable-storage-latest",

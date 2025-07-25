@@ -35,6 +35,3 @@ tezos-indexable-storage.workspace = true
 format_no_std.workspace = true
 thiserror.workspace = true
 tezos-evm-logging.workspace = true
-
-[dev-dependencies]
-serde_json = "1"
