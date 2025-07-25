@@ -255,6 +255,8 @@ end
 module Tezt_cloud_cli : sig
   (** Equivalent to [Cli.prometheus] *)
   val prometheus : bool
+
+  val scenario_specific_json : Data_encoding.Json.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

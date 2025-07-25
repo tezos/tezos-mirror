@@ -181,21 +181,10 @@ module Dal () : Dal = struct
         "All the options related to running DAL scenarios onto the cloud"
       "DAL"
 
-  let config_file =
-    Clap.optional_string
-      ~section
-      ~long:"config-file"
-      ~description:"Configuration file for the tezt_cloud scenario"
-      ()
-
   let config =
-    match config_file with
-    | None ->
-        Data_encoding.Json.destruct Scenarios_configuration.DAL.encoding (`O [])
-    | Some file ->
-        let json = Ezjsonm.from_channel (In_channel.open_text file) in
-        Format.printf "%s@." (Ezjsonm.value_to_string json) ;
-        Data_encoding.Json.destruct Scenarios_configuration.DAL.encoding json
+    Data_encoding.Json.destruct
+      Scenarios_configuration.DAL.encoding
+      Tezt_cloud_cli.scenario_specific_json
 
   let blocks_history =
     Clap.default_int

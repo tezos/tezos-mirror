@@ -9,10 +9,299 @@ open Tezt
 include Cli
 include Types
 
+type config = {
+  localhost : bool option;
+  ssh_host : string option;
+  monitoring : bool option;
+  destroy : bool option;
+  keep_alive : bool option;
+  project_id : string option;
+  vms : int option;
+  vm_base_port : int option;
+  ports_per_vm : int option;
+  proxy : bool option;
+  os : Os.t option;
+  grafana : bool option;
+  grafana_legacy_source : bool option;
+  alert_handlers : string list;
+  prometheus : bool option;
+  prometheus_export : bool option;
+  prometheus_port : int option;
+  prometheus_export_path : string option;
+  prometheus_snapshots : (string * int option) list;
+  prometheus_scrape_interval : int option;
+  process_monitoring : bool option;
+  website : bool option;
+  machine_type : string option;
+  dockerfile_alias : string option;
+  website_port : int option;
+  max_run_duration : int option;
+  no_max_run_duration : bool option;
+  tezt_cloud : string option;
+  dns_domains : string list;
+  no_dns : bool option;
+  open_telemetry : bool option;
+  macosx : bool option;
+  check_file_consistency : bool option;
+  docker_host_network : bool option;
+  push_docker : bool option;
+  auto_approve : bool option;
+  faketime : string option;
+  binaries_path : string option;
+  log_rotation : int option;
+  slack_channel_id : string option;
+  slack_bot_token : string option;
+  scenario_specific : Data_encoding.Json.t option;
+}
+
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           localhost;
+           ssh_host;
+           monitoring;
+           destroy;
+           keep_alive;
+           project_id;
+           vms;
+           vm_base_port;
+           ports_per_vm;
+           proxy;
+           os;
+           grafana;
+           grafana_legacy_source;
+           alert_handlers;
+           prometheus;
+           prometheus_export;
+           prometheus_port;
+           prometheus_export_path;
+           prometheus_snapshots;
+           prometheus_scrape_interval;
+           process_monitoring;
+           website;
+           machine_type;
+           dockerfile_alias;
+           website_port;
+           max_run_duration;
+           no_max_run_duration;
+           tezt_cloud;
+           dns_domains;
+           no_dns;
+           open_telemetry;
+           macosx;
+           check_file_consistency;
+           docker_host_network;
+           push_docker;
+           auto_approve;
+           faketime;
+           binaries_path;
+           log_rotation;
+           slack_channel_id;
+           slack_bot_token;
+           scenario_specific;
+         } ->
+      ( ( ( localhost,
+            ssh_host,
+            monitoring,
+            destroy,
+            keep_alive,
+            project_id,
+            vms,
+            vm_base_port,
+            ports_per_vm,
+            proxy ),
+          ( os,
+            grafana,
+            grafana_legacy_source,
+            alert_handlers,
+            prometheus,
+            prometheus_export,
+            prometheus_port,
+            prometheus_export_path,
+            prometheus_snapshots,
+            prometheus_scrape_interval ) ),
+        ( ( ( process_monitoring,
+              website,
+              machine_type,
+              dockerfile_alias,
+              website_port,
+              max_run_duration,
+              no_max_run_duration,
+              tezt_cloud,
+              dns_domains,
+              no_dns ),
+            ( open_telemetry,
+              macosx,
+              check_file_consistency,
+              docker_host_network,
+              push_docker,
+              auto_approve,
+              faketime,
+              binaries_path,
+              log_rotation,
+              slack_channel_id ) ),
+          (slack_bot_token, scenario_specific) ) ))
+    (fun ( ( ( localhost,
+               ssh_host,
+               monitoring,
+               destroy,
+               keep_alive,
+               project_id,
+               vms,
+               vm_base_port,
+               ports_per_vm,
+               proxy ),
+             ( os,
+               grafana,
+               grafana_legacy_source,
+               alert_handlers,
+               prometheus,
+               prometheus_export,
+               prometheus_port,
+               prometheus_export_path,
+               prometheus_snapshots,
+               prometheus_scrape_interval ) ),
+           ( ( ( process_monitoring,
+                 website,
+                 machine_type,
+                 dockerfile_alias,
+                 website_port,
+                 max_run_duration,
+                 no_max_run_duration,
+                 tezt_cloud,
+                 dns_domains,
+                 no_dns ),
+               ( open_telemetry,
+                 macosx,
+                 check_file_consistency,
+                 docker_host_network,
+                 push_docker,
+                 auto_approve,
+                 faketime,
+                 binaries_path,
+                 log_rotation,
+                 slack_channel_id ) ),
+             (slack_bot_token, scenario_specific) ) ) ->
+      {
+        localhost;
+        ssh_host;
+        monitoring;
+        destroy;
+        keep_alive;
+        project_id;
+        vms;
+        vm_base_port;
+        ports_per_vm;
+        proxy;
+        os;
+        grafana;
+        grafana_legacy_source;
+        alert_handlers;
+        prometheus;
+        prometheus_export;
+        prometheus_port;
+        prometheus_export_path;
+        prometheus_snapshots;
+        prometheus_scrape_interval;
+        process_monitoring;
+        website;
+        machine_type;
+        dockerfile_alias;
+        website_port;
+        max_run_duration;
+        no_max_run_duration;
+        tezt_cloud;
+        dns_domains;
+        no_dns;
+        open_telemetry;
+        macosx;
+        check_file_consistency;
+        docker_host_network;
+        push_docker;
+        auto_approve;
+        faketime;
+        binaries_path;
+        log_rotation;
+        slack_channel_id;
+        slack_bot_token;
+        scenario_specific;
+      })
+    (merge_objs
+       (merge_objs
+          (obj10
+             (opt "localhost" bool)
+             (opt "ssh_host" string)
+             (opt "monitoring" bool)
+             (opt "destroy" bool)
+             (opt "keep_alive" bool)
+             (opt "project_id" string)
+             (opt "vms" int31)
+             (opt "vm_base_port" int31)
+             (opt "ports_per_vm" int31)
+             (opt "proxy" bool))
+          (obj10
+             (opt "os" Os.encoding)
+             (opt "grafana" bool)
+             (opt "grafana_legacy_source" bool)
+             (dft "alert_handlers" (list string) [])
+             (opt "prometheus" bool)
+             (opt "prometheus_export" bool)
+             (opt "prometheus_port" int31)
+             (opt "prometheus_export_path" string)
+             (dft "prometheus_snapshots" (list (tup2 string (option int31))) [])
+             (opt "prometheus_scrape_interval" int31)))
+       (merge_objs
+          (merge_objs
+             (obj10
+                (opt "process_monitoring" bool)
+                (opt "website" bool)
+                (opt "machine_type" string)
+                (opt "dockerfile_alias" string)
+                (opt "website_port" int31)
+                (opt "max_run_duration" int31)
+                (opt "no_max_run_duration" bool)
+                (opt "tezt_cloud" string)
+                (dft "dns_domains" (list string) [])
+                (opt "no_dns" bool))
+             (obj10
+                (opt "open_telemetry" bool)
+                (opt "macosx" bool)
+                (opt "check_file_consistency" bool)
+                (opt "docker_host_network" bool)
+                (opt "push_docker" bool)
+                (opt "auto_approve" bool)
+                (opt "faketime" string)
+                (opt "binaries_path" string)
+                (opt "log_rotation" int31)
+                (opt "slack_channel_id" string)))
+          (obj2
+             (opt "slack_bot_token" string)
+             (opt "scenario_specific" Data_encoding.Json.encoding))))
+
 let section =
   Clap.section
     ~description:"All the options related to Tezt cloud library"
     "Cloud"
+
+let config_file =
+  Clap.optional_string
+    ~section
+    ~long:"config-file"
+    ~description:"Configuration file for the tezt_cloud scenario"
+    ()
+
+let config =
+  match config_file with
+  | None -> Data_encoding.Json.destruct encoding (`O [])
+  | Some file ->
+      let json = Ezjsonm.from_channel (In_channel.open_text file) in
+      Format.printf "%s@." (Ezjsonm.value_to_string json) ;
+      Data_encoding.Json.destruct encoding json
+
+let scenario_specific = Option.value ~default:(`O []) config.scenario_specific
+
+let some = Option.some
 
 let localhost =
   Clap.flag
@@ -20,14 +309,17 @@ let localhost =
     ~set_long:"localhost"
     ~unset_long:"cloud"
     ~description:"If set, the test is run locally"
-    false
+    (Option.value ~default:false config.localhost)
 
 let ssh_host =
-  Clap.optional_string
-    ~section
-    ~long:"ssh-host"
-    ~description:"Whether to provision a non-gcp vm host via ssh"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"ssh-host"
+      ~description:"Whether to provision a non-gcp vm host via ssh"
+      ()
+  in
+  Option.fold ~none:config.ssh_host ~some from_cli
 
 let ssh_private_key =
   Clap.optional_string
@@ -44,7 +336,7 @@ let monitoring =
     ~description:
       "If set, all the VMs are monitored with netdata. The monitoring \
        dashboard is accessible on port 13999 of the monitored VM."
-    false
+    (Option.value ~default:false config.monitoring)
 
 let destroy =
   Clap.flag
@@ -52,7 +344,7 @@ let destroy =
     ~set_long:"destroy"
     ~unset_long:"no-destroy"
     ~description:"If set, the machines are destroyed at the end of the test"
-    false
+    (Option.value ~default:false config.destroy)
 
 let keep_alive =
   Clap.flag
@@ -61,37 +353,43 @@ let keep_alive =
     ~description:
       "If set, the test will prompt the user to press <enter> to end the test. \
        This option can be used to inspect VMs state at the end of a scenrio."
-    false
+    (Option.value ~default:false config.keep_alive)
 
 let project_id =
-  Clap.optional_string
-    ~section
-    ~long:"project-id"
-    ~description:
-      "Allows to specify a given project id. Otherwise, a default one will be \
-       fetched with `gcloud config get-value project`"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"project-id"
+      ~description:
+        "Allows to specify a given project id. Otherwise, a default one will \
+         be fetched with `gcloud config get-value project`"
+      ()
+  in
+  Option.fold ~none:config.project_id ~some from_cli
 
 let vms =
-  Clap.optional_int
-    ~section
-    ~long:"vms-limit"
-    ~description:"Maximum number of VMs running during the test."
-    ()
+  let from_cli =
+    Clap.optional_int
+      ~section
+      ~long:"vms-limit"
+      ~description:"Maximum number of VMs running during the test."
+      ()
+  in
+  Option.fold ~none:config.vms ~some from_cli
 
 let vm_base_port =
   Clap.default_int
     ~section
     ~long:"vm-base-port"
     ~description:"The first available port on the VM"
-    30_000
+    (Option.value ~default:30_000 config.vm_base_port)
 
 let ports_per_vm =
   Clap.default_int
     ~section
     ~long:"ports-per-vm"
     ~description:"Number of opened ports per VM (default is 50)"
-    50
+    (Option.value ~default:50 config.ports_per_vm)
 
 let proxy =
   Clap.flag
@@ -99,7 +397,7 @@ let proxy =
     ~set_long:"proxy"
     ~description:
       "Enables to run the orchestrator on a VM instead of the host machine"
-    false
+    (Option.value ~default:false config.proxy)
 
 let os =
   Clap.default
@@ -109,7 +407,7 @@ let os =
     ~description:
       "The OS to be used for the VM (default is cos). Other possible value is \
        'debian'."
-    Os.Cos
+    (Option.value ~default:Os.Cos config.os)
 
 let grafana =
   Clap.flag
@@ -117,7 +415,9 @@ let grafana =
     ~set_long:"grafana"
     ~unset_long:"no-grafana"
     ~description:"Flag to set whether to run grafana"
-    (((not localhost) || proxy) && os = Os.Cos)
+    (Option.value
+       ~default:(((not localhost) || proxy) && os = Os.Cos)
+       config.grafana)
 
 let grafana_legacy_source =
   Clap.flag
@@ -127,14 +427,15 @@ let grafana_legacy_source =
       "Flag to indicate to use grafana legacy 'Prometheus' source name when \
        importing a prometheus snapshot. Newer dashboards should use \
        ${datasource} as source instead of the hardcoded 'Prometheus' name."
-    false
+    (Option.value ~default:false config.grafana_legacy_source)
 
 let alert_handlers =
-  Clap.list_string
-    ~section
-    ~long:"alert-handler"
-    ~description:"Specify an alert handler to be registered by alert manager."
-    ()
+  config.alert_handlers
+  @ Clap.list_string
+      ~section
+      ~long:"alert-handler"
+      ~description:"Specify an alert handler to be registered by alert manager."
+      ()
 
 let prometheus =
   Clap.flag
@@ -142,7 +443,7 @@ let prometheus =
     ~set_long:"prometheus"
     ~unset_long:"no-prometheus"
     ~description:"Flag to set whether metrics are exported into prometheus"
-    (grafana || alert_handlers <> [])
+    (Option.value ~default:(grafana || alert_handlers <> []) config.prometheus)
 
 let prometheus_export =
   Clap.flag
@@ -150,7 +451,7 @@ let prometheus_export =
     ~set_long:"prometheus-export"
     ~unset_long:"no-prometheus-export"
     ~description:"Export a Prometheus snapshot at the end of the scenario"
-    true
+    (Option.value ~default:true config.prometheus_export)
 
 let default_prometheus_port = 9090
 
@@ -162,14 +463,17 @@ let prometheus_port =
       (sf
          "Set the port on which the prometheus instance will run (default: %d)."
          default_prometheus_port)
-    default_prometheus_port
+    (Option.value ~default:default_prometheus_port config.prometheus_port)
 
 let prometheus_export_path =
-  Clap.optional_string
-    ~section
-    ~long:"prometheus-export-path"
-    ~description:"Path of the prometheus snapshot"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"prometheus-export-path"
+      ~description:"Path of the prometheus snapshot"
+      ()
+  in
+  Option.fold ~none:config.prometheus_export_path ~some from_cli
 
 let prometheus_snapshots =
   let parse str =
@@ -185,18 +489,19 @@ let prometheus_snapshots =
   let typ =
     Clap.typ ~name:"prometheus-snapshot-imported" ~dummy:("", None) ~parse ~show
   in
-  Clap.list
-    typ
-    ~section
-    ~long:"prometheus-snapshots"
-    ~placeholder:"/path/to/snapshot[:port]"
-    ~description:
-      (sf
-         "Path to the snapshot to load in a prometheus docker container. If no \
-          port is specified, a port will be automatically assigned starting \
-          with the value of --prometheus-port (default: %d)"
-         default_prometheus_port)
-    ()
+  config.prometheus_snapshots
+  @ Clap.list
+      typ
+      ~section
+      ~long:"prometheus-snapshots"
+      ~placeholder:"/path/to/snapshot[:port]"
+      ~description:
+        (sf
+           "Path to the snapshot to load in a prometheus docker container. If \
+            no port is specified, a port will be automatically assigned \
+            starting with the value of --prometheus-port (default: %d)"
+           default_prometheus_port)
+      ()
 
 let prometheus_scrape_interval =
   Clap.default_int
@@ -204,7 +509,7 @@ let prometheus_scrape_interval =
     ~long:"prometheus-scrape-interval"
     ~description:
       "Set the scraping interval of the prometheus instance (default: 5)"
-    5
+    (Option.value ~default:5 config.prometheus_scrape_interval)
 
 let process_monitoring =
   Clap.flag
@@ -214,7 +519,8 @@ let process_monitoring =
     ~description:
       "Flag to set process monitoring through prometheus process exporter. \
        Default is set when prometheus is set"
-    prometheus (* Automatically enable when enabling prometheus *)
+    (Option.value ~default:prometheus config.process_monitoring)
+(* Automatically enable when enabling prometheus *)
 
 let website =
   Clap.flag
@@ -224,7 +530,7 @@ let website =
     ~description:
       "A webpage is up on localhost to summarize various information related \
        to the experiment"
-    prometheus
+    (Option.value ~default:prometheus config.website)
 
 let machine_type =
   Clap.default_string
@@ -236,16 +542,21 @@ let machine_type =
           https://cloud.google.com/compute/docs/general-purpose-machines#n2_series). \
           Default is %s."
          Types.Agent_configuration.default_gcp_machine_type)
-    Types.Agent_configuration.default_gcp_machine_type
+    (Option.value
+       ~default:Types.Agent_configuration.default_gcp_machine_type
+       config.machine_type)
 
 let dockerfile_alias =
-  Clap.optional_string
-    ~section
-    ~long:"dockerfile-alias"
-    ~description:
-      "Specify the name of the dockerfile alias to use (default is given by \
-       the environment variable `TEZT_CLOUD`)"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"dockerfile-alias"
+      ~description:
+        "Specify the name of the dockerfile alias to use (default is given by \
+         the environment variable `TEZT_CLOUD`)"
+      ()
+  in
+  Option.fold ~none:config.dockerfile_alias ~some from_cli
 
 let website_port =
   Clap.default_int
@@ -255,7 +566,9 @@ let website_port =
     (* When the website is run by the orchestrator, it is easier to
        use port 80. We could decide in the future to use 80 by
        default. *)
-    (if proxy && localhost then 80 else 8080)
+    (Option.value
+       ~default:(if proxy && localhost then 80 else 8080)
+       config.website_port)
 
 let max_run_duration =
   Clap.default_int
@@ -264,7 +577,7 @@ let max_run_duration =
     ~description:
       "Specify the maximum time (in seconds) of a VM (from the first time it \
        was created)."
-    7200
+    (Option.value ~default:7200 config.max_run_duration)
 
 let no_max_run_duration =
   Clap.flag
@@ -273,28 +586,32 @@ let no_max_run_duration =
     ~description:"Ensure the VM can only be destroyed manually."
     (* If the proxy mode is active, we don't want to use [max_run_duration]
        since it aims to run long running tests. *)
-    (proxy || os <> Os.Cos)
+    (Option.value ~default:(proxy || os <> Os.Cos) config.no_max_run_duration)
 
 let tezt_cloud =
-  Clap.optional_string
-    ~section
-    ~long:"tezt-cloud"
-    ~description:"Overwrite the TEZT_CLOUD variable"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"tezt-cloud"
+      ~description:"Overwrite the TEZT_CLOUD variable"
+      ()
+  in
+  Option.fold ~none:config.tezt_cloud ~some from_cli
 
 let dns_domains =
-  Clap.list_string
-    ~section
-    ~long:"dns-domain"
-    ~long_synonyms:["dns"]
-    ~description:
-      "Register a list of DNS domains. By default a domain is registered when \
-       using the proxy mode. In that case the domain will be prepended by the \
-       value of the `tezt-cloud` parameter and suffixed by the domain \
-       registered under the zone name `tezt-cloud` (check the README to get \
-       more details). The format expects domains that have suffixes matching \
-       domains registered with the GCP project."
-    ()
+  config.dns_domains
+  @ Clap.list_string
+      ~section
+      ~long:"dns-domain"
+      ~long_synonyms:["dns"]
+      ~description:
+        "Register a list of DNS domains. By default a domain is registered \
+         when using the proxy mode. In that case the domain will be prepended \
+         by the value of the `tezt-cloud` parameter and suffixed by the domain \
+         registered under the zone name `tezt-cloud` (check the README to get \
+         more details). The format expects domains that have suffixes matching \
+         domains registered with the GCP project."
+      ()
 
 let no_dns =
   Clap.flag
@@ -304,7 +621,7 @@ let no_dns =
     ~description:
       "Prevent from adding any DNS domain associated with the experiment. This \
        cancel any effect of [--dns-domain]."
-    false
+    (Option.value ~default:false config.no_dns)
 
 let open_telemetry =
   Clap.flag
@@ -313,14 +630,14 @@ let open_telemetry =
     ~unset_long:"no-open-telemetry"
     ~set_long_synonyms:["otel"]
     ~description:"Run the Open Telemetry stack"
-    false
+    (Option.value ~default:false config.open_telemetry)
 
 let macosx =
   Clap.flag
     ~section
     ~set_long:"macosx"
     ~description:"Use this flag if you run tezt-cloud from Mac OS/X"
-    false
+    (Option.value ~default:false config.macosx)
 
 let check_file_consistency =
   Clap.flag
@@ -332,7 +649,7 @@ let check_file_consistency =
        machine to a VM are consistent (i.e., they have the same hash). \
        Although a scenario can opt in or opt out, this flag sets the default \
        behavior. Its default value is [true] unless [--macosx] is used."
-    (not macosx)
+    (Option.value ~default:(not macosx) config.check_file_consistency)
 
 let docker_host_network =
   Clap.flag
@@ -344,7 +661,7 @@ let docker_host_network =
        network or not. This is not available on Mac OS/X. By default [true] \
        unless Mac OS/X is set. If not set, a dedicated docker network is \
        created."
-    (not macosx)
+    (Option.value ~default:(not macosx) config.docker_host_network)
 
 let push_docker =
   Clap.flag
@@ -356,7 +673,7 @@ let push_docker =
        bandwidth or some time during a redeployment that won't add or remove \
        VMs that are already running, it is useful to prevent those containers \
        to be pushed."
-    true
+    (Option.value ~default:true config.push_docker)
 
 let auto_approve =
   Clap.flag
@@ -366,19 +683,22 @@ let auto_approve =
     ~description:
       "If set to true (default), don't ask confirmation before updating a \
        deployment via terraform."
-    true
+    (Option.value ~default:true config.auto_approve)
 
 let faketime =
-  Clap.optional_string
-    ~section
-    ~long:"faketime"
-    ~description:
-      "This argument specifies the value used to set [FAKETIME] environment \
-       variable for the Docker images. Use it with a docker image that uses \
-       [libfaketime]. For instance, use [--faketime \"-10d\"] if you want to \
-       set your experminent 10 days in the past. See [libfaketime] for a \
-       complete overview about the [FAKETIME] available formats."
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"faketime"
+      ~description:
+        "This argument specifies the value used to set [FAKETIME] environment \
+         variable for the Docker images. Use it with a docker image that uses \
+         [libfaketime]. For instance, use [--faketime \"-10d\"] if you want to \
+         set your experminent 10 days in the past. See [libfaketime] for a \
+         complete overview about the [FAKETIME] available formats."
+      ()
+  in
+  Option.fold ~none:config.faketime ~some from_cli
 
 let binaries_path =
   Clap.default_string
@@ -387,7 +707,9 @@ let binaries_path =
     ~description:
       "Where to find binaries in the docker image by default (default is: \
        '/tmp/tezt-runners')"
-    Types.Agent_configuration.default_gcp_binaries_path
+    (Option.value
+       ~default:Types.Agent_configuration.default_gcp_binaries_path
+       config.binaries_path)
 
 let log_rotation =
   Clap.default_int
@@ -397,7 +719,7 @@ let log_rotation =
       "Maximum number of log rotations before removing older log files. \
        Default is 300 if a log-file is specified.\n\
       \       Set to 0 to completely disable log-rotation"
-    300
+    (Option.value ~default:300 config.log_rotation)
 
 let section =
   Clap.section
@@ -405,15 +727,21 @@ let section =
     "Cloud reporting and alerting options"
 
 let slack_channel_id =
-  Clap.optional_string
-    ~section
-    ~long:"slack-channel-id"
-    ~description:"The Slack channel id to send reports and alerts on"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"slack-channel-id"
+      ~description:"The Slack channel id to send reports and alerts on"
+      ()
+  in
+  Option.fold ~none:config.slack_channel_id ~some from_cli
 
 let slack_bot_token =
-  Clap.optional_string
-    ~section
-    ~long:"slack-bot-token"
-    ~description:"The Slack bot token used to send reports and alerts"
-    ()
+  let from_cli =
+    Clap.optional_string
+      ~section
+      ~long:"slack-bot-token"
+      ~description:"The Slack bot token used to send reports and alerts"
+      ()
+  in
+  Option.fold ~none:config.slack_bot_token ~some from_cli
