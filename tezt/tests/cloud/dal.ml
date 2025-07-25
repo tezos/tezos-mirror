@@ -32,7 +32,7 @@ type configuration = {
   with_dal : bool;
   stake : int list Lwt.t;
   bakers : string list; (* unencrypted secret keys *)
-  stake_machine_type : string list option;
+  stake_machine_type : string list;
   dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
   observer_pkhs : string list;
@@ -43,7 +43,7 @@ type configuration = {
   echo_rollup : bool;
   disconnect : (int * int) option;
   network : Network.t;
-  simulate_network : Cli.network_simulation_config;
+  simulate_network : Scenarios_configuration.network_simulation_config;
   snapshot : Snapshot_helpers.t;
   bootstrap : bool;
   teztale : bool;
@@ -447,8 +447,8 @@ let round_robin_split m lst =
     (fun idx x ->
       let bucket = idx mod m in
       buckets.(bucket) <- x :: buckets.(bucket))
-    (List.rev lst) ;
-  Array.to_list buckets |> List.rev
+    lst ;
+  Array.to_list buckets |> List.map List.rev
 
 let init_sandbox_and_activate_protocol cloud (configuration : configuration)
     ?(etherlink_configuration :
@@ -1188,7 +1188,7 @@ let yes_wallet_exe = Uses.path Constant.yes_wallet
 let parse_stake_arg ~stake_arg ~simulation_arg =
   let open Network in
   match simulation_arg with
-  | Cli.Disabled -> (
+  | Scenarios_configuration.Disabled -> (
       match stake_arg with
       | Custom distrib -> return distrib
       | Mimic {network; max_nb_bakers} ->
@@ -1385,7 +1385,7 @@ let register (module Cli : Scenarios_cli.Dal) =
   toplog "Parsing CLI done" ;
   let baker_daemon_count =
     match simulate_network with
-    | Scenarios_cli.Disabled -> 0
+    | Scenarios_configuration.Disabled -> 0
     | Scatter (_selected_baker_count, baker_daemon_count) -> baker_daemon_count
     | Map
         ( _selected_baker_count,
@@ -1444,17 +1444,12 @@ let register (module Cli : Scenarios_cli.Dal) =
            match agent_kind with
            | Bootstrap -> default_vm_configuration ~name
            | Baker i -> (
-               match configuration.stake_machine_type with
-               | None -> default_vm_configuration ~name
-               | Some list -> (
-                   try
-                     let machine_type = List.nth list i in
-                     Agent.Configuration.make
-                       ?docker_image
-                       ~machine_type
-                       ~name
-                       ()
-                   with _ -> default_vm_configuration ~name))
+               try
+                 let machine_type =
+                   List.nth configuration.stake_machine_type i
+                 in
+                 Agent.Configuration.make ?docker_image ~machine_type ~name ()
+               with _ -> default_vm_configuration ~name)
            | Producer _ ->
                let machine_type = configuration.producer_machine_type in
                Agent.Configuration.make ?docker_image ?machine_type ~name ()

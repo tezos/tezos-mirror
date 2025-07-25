@@ -6,7 +6,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Scenarios_cli
+open Scenarios_configuration
 
 let yes_crypto_env =
   String_map.singleton Tezos_crypto.Helpers.yes_crypto_environment_variable "y"

@@ -31,7 +31,7 @@ val init_dal_reverse_proxy_observers :
   ppx_profiling:bool ->
   ppx_profiling_backends:string list ->
   memtrace:bool ->
-  simulate_network:Scenarios_cli.network_simulation_config ->
+  simulate_network:Scenarios_configuration.network_simulation_config ->
   name_of:(int -> string) ->
   default_endpoint:string option ->
   node_p2p_endpoint:string ->

@@ -7,6 +7,9 @@
 
 include module type of Tezt.Cli
 
+(** The name and encoding of the scenario specific options if mentionned in the config file. *)
+val scenario_specific : (string * Data_encoding.Json.t) option
+
 (** When [localhost] is [true], the cloud scenario should be run locally. This
     can be used to test a scenario before deploying it. *)
 val localhost : bool

@@ -47,7 +47,7 @@ val init_etherlink_operators :
     DAL if enabled and a configurable number of producers. *)
 val init_etherlink :
   data_dir:string option ->
-  simulate_network:Scenarios_cli.network_simulation_config ->
+  simulate_network:Scenarios_configuration.network_simulation_config ->
   external_rpc:bool ->
   network:Network.t ->
   snapshot:Snapshot_helpers.t ->

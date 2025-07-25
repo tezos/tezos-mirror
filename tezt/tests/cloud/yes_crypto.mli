@@ -10,7 +10,7 @@
     which bypasses certain cryptographic confirmations in Octez nodes.
 *)
 
-open Scenarios_cli
+open Scenarios_configuration
 
 (** [should_enable_yes_crypto config] returns a flag
     indicating whether "yes-crypto" mode should be enabled (for [Scatter] and [Map])

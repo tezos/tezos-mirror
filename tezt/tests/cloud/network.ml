@@ -14,11 +14,121 @@ type public =
   | `Rionet
   | `Seoulnet ]
 
-type t = [public | `Sandbox]
+type t = [`Sandbox | public]
+
+let public_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 2)
+        ~title:"mainnet"
+        empty
+        (function `Mainnet -> Some () | _ -> None)
+        (fun () -> `Mainnet);
+      case
+        (Tag 3)
+        ~title:"ghostnet"
+        empty
+        (function `Ghostnet -> Some () | _ -> None)
+        (fun () -> `Ghostnet);
+      case
+        (Tag 4)
+        ~title:"nextnet"
+        string
+        (function `Nextnet date -> Some date | _ -> None)
+        (fun date -> `Nextnet date);
+      case
+        (Tag 5)
+        ~title:"weeklynet"
+        string
+        (function `Weeklynet date -> Some date | _ -> None)
+        (fun date -> `Weeklynet date);
+      case
+        (Tag 6)
+        ~title:"rionet"
+        empty
+        (function `Rionet -> Some () | _ -> None)
+        (fun () -> `Rionet);
+      case
+        (Tag 7)
+        ~title:"seoulnet"
+        empty
+        (function `Seoulnet -> Some () | _ -> None)
+        (fun () -> `Seoulnet);
+    ]
+
+let encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 1)
+        ~title:"sandbox"
+        empty
+        (function `Sandbox -> Some () | _ -> None)
+        (fun () -> `Sandbox);
+      case
+        (Tag 2)
+        ~title:"mainnet"
+        empty
+        (function `Mainnet -> Some () | _ -> None)
+        (fun () -> `Mainnet);
+      case
+        (Tag 3)
+        ~title:"ghostnet"
+        empty
+        (function `Ghostnet -> Some () | _ -> None)
+        (fun () -> `Ghostnet);
+      case
+        (Tag 4)
+        ~title:"nextnet"
+        string
+        (function `Nextnet date -> Some date | _ -> None)
+        (fun date -> `Nextnet date);
+      case
+        (Tag 5)
+        ~title:"weeklynet"
+        string
+        (function `Weeklynet date -> Some date | _ -> None)
+        (fun date -> `Weeklynet date);
+      case
+        (Tag 6)
+        ~title:"rionet"
+        empty
+        (function `Rionet -> Some () | _ -> None)
+        (fun () -> `Rionet);
+      case
+        (Tag 7)
+        ~title:"seoulnet"
+        empty
+        (function `Seoulnet -> Some () | _ -> None)
+        (fun () -> `Seoulnet);
+    ]
 
 type stake_repartition =
   | Custom of int list
   | Mimic of {network : public; max_nb_bakers : int option}
+
+let stake_repartition_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 1)
+        ~title:"custom"
+        (list int31)
+        (function Custom l -> Some l | _ -> None)
+        (fun l -> Custom l);
+      case
+        (Tag 2)
+        ~title:"mimic"
+        (obj2 (req "network" public_encoding) (opt "max_nb_bakers" int31))
+        (function
+          | Mimic {network; max_nb_bakers} -> Some (network, max_nb_bakers)
+          | _ -> None)
+        (fun (network, max_nb_bakers) -> Mimic {network; max_nb_bakers});
+    ]
 
 let to_public = function
   | `Sandbox -> failwith "Sandbox is not public"
