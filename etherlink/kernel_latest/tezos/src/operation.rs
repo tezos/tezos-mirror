@@ -19,6 +19,7 @@ use tezos_data_encoding::{
     nom::{error::DecodeError, NomError, NomReader},
 };
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use thiserror::Error;
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Parameter {
@@ -224,6 +225,14 @@ pub fn serialize_unsigned_operation(
     content.bin_write(&mut serialized_unsigned_operation)?;
 
     Ok(serialized_unsigned_operation)
+}
+
+#[derive(Error, Debug)]
+pub enum SignatureErrors {
+    #[error("Signing failed with encoding error {0}")]
+    BinError(#[from] BinError),
+    #[error("Signing failed with cryptographic error {0}")]
+    CryptoError(#[from] tezos_crypto_rs::CryptoError),
 }
 
 pub fn verify_signature(
