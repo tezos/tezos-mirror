@@ -32,7 +32,7 @@ tezos_data_encoding.workspace = true
 tezos-indexable-storage.workspace = true
 
 # Miscs
-format_no_std = { version = "1.2.0" }
+format_no_std.workspace = true
 thiserror.workspace = true
 tezos-evm-logging.workspace = true
 

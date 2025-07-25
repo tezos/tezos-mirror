@@ -105,6 +105,9 @@ alloy-primitives = { version = "1.2.0", default-features = false }
 # mir without bls
 mir = { path = "../../contrib/mir", default-features = false }
 
+# miscs
+format_no_std = "1.2.0"
+
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates
 # within the dependency graph.
