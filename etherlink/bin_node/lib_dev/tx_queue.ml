@@ -85,9 +85,10 @@ module Address_nonce = struct
       | None -> return @@ Nonce_bitset.create ~next_nonce
     in
     let* nonce_bitset =
-      (* Only adds [nonce] if [bitset_nonce.next_nonce] is inferior or
-         equal. If [nonce_bitset.next_nonce > nonce] then there is no
-         need to add because [nonce] is already in the past.
+      (* [Nonce_bitset.add] takes care of only adding [nonce] if
+         [bitset_nonce.next_nonce] is inferior or equal. If
+         [nonce_bitset.next_nonce > nonce] then there is no need to
+         add because [nonce] is already in the past.
 
          This is follow-up to the previous comment where we are in a
          rare ce condition of the transaction is being validated while
@@ -95,9 +96,7 @@ module Address_nonce = struct
          such case we simply don't register the nonce, and the
          transaction will be dropped by the upstream node when
          receiving it. *)
-      if Z.gt nonce_bitset.Nonce_bitset.next_nonce nonce then
-        return nonce_bitset
-      else Nonce_bitset.add nonce_bitset ~nonce
+      Nonce_bitset.add nonce_bitset ~nonce
     in
     let () = S.replace nonces addr nonce_bitset in
     return_unit

@@ -31,9 +31,11 @@ let offset ~nonce1 ~nonce2 =
 
 let add {next_nonce; bitset} ~nonce =
   let open Result_syntax in
-  let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
-  let* bitset = Bitset.add bitset offset_position in
-  return {next_nonce; bitset}
+  if Z.lt nonce next_nonce then return {next_nonce; bitset}
+  else
+    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
+    let* bitset = Bitset.add bitset offset_position in
+    return {next_nonce; bitset}
 
 let remove {next_nonce; bitset} ~nonce =
   let open Result_syntax in
