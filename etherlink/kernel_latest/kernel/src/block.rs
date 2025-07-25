@@ -579,6 +579,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 mod tests {
     use super::*;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
+    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_execution::account_storage::TezlinkAccount;
     use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameter;
@@ -861,6 +862,7 @@ mod tests {
             value,
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         )
     }
@@ -928,6 +930,7 @@ mod tests {
             value,
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         );
 
@@ -1901,6 +1904,7 @@ mod tests {
             U256::zero(),
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         );
         unsigned_tx

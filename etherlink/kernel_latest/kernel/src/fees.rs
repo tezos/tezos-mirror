@@ -311,6 +311,7 @@ mod tests {
     use evm::ExitSucceed;
     use evm_execution::account_storage::{account_path, EthereumAccountStorage};
     use primitive_types::{H160, U256};
+    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_evm_runtime::runtime::MockKernelHost;
 
     use proptest::prelude::*;
@@ -559,6 +560,7 @@ mod tests {
             U256::zero(),
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         )
     }

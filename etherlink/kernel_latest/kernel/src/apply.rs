@@ -25,7 +25,9 @@ use std::borrow::Cow;
 use tezos_ethereum::access_list::{AccessList, AccessListItem};
 use tezos_ethereum::block::BlockConstants;
 use tezos_ethereum::transaction::{TransactionHash, TransactionType};
-use tezos_ethereum::tx_common::EthereumTransactionCommon;
+use tezos_ethereum::tx_common::{
+    signed_authorization, AuthorizationList, EthereumTransactionCommon,
+};
 use tezos_ethereum::tx_signature::TxSignature;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
@@ -322,6 +324,7 @@ pub fn revm_run_transaction<Host: Runtime>(
     call_data: Vec<u8>,
     effective_gas_price: U256,
     access_list: AccessList,
+    authorization_list: AuthorizationList,
     config: &Config,
     tracer_input: Option<TracerInput>,
 ) -> Result<Option<ExecutionOutcome>, anyhow::Error> {
@@ -393,6 +396,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 )
                 .collect::<Vec<revm::context::transaction::AccessListItem>>(),
         ),
+        signed_authorization(authorization_list),
         tracer_input.map(|tracer_input| match tracer_input {
             TracerInput::CallTracer(CallTracerInput {
                 transaction_hash,
@@ -568,6 +572,7 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
         call_data,
         effective_gas_price,
         transaction.access_list.clone(),
+        transaction.authorization_list.clone(),
         evm_configuration,
         tracer_input,
     ) {
@@ -901,7 +906,7 @@ mod tests {
     use tezos_ethereum::{
         block::{BlockConstants, BlockFees},
         transaction::TransactionType,
-        tx_common::EthereumTransactionCommon,
+        tx_common::{AuthorizationList, EthereumTransactionCommon},
     };
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
@@ -972,6 +977,7 @@ mod tests {
             U256::zero(),
             vec![],
             vec![],
+            AuthorizationList::default(),
             None,
         );
         // sign tx
