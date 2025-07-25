@@ -673,6 +673,7 @@ oc.build_x86_64-released:
   - gcp_very_high_cpu_ramfs
   rules:
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -763,6 +764,7 @@ oc.build_x86_64-exp-dev-extra:
   - gcp_very_high_cpu
   rules:
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -906,6 +908,7 @@ oc.build_kernels:
   - gcp
   rules:
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -986,6 +989,7 @@ oc.build_dsn_node:
   - gcp
   rules:
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -3872,6 +3876,7 @@ documentation:odoc:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -3938,6 +3943,7 @@ documentation:manuals:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -3992,6 +3998,7 @@ documentation:docgen:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -4055,6 +4062,7 @@ documentation:build_all:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
@@ -4106,6 +4114,7 @@ documentation:linkcheck:
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
     when: on_success
   - changes:
+    - '**/*.rst'
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml

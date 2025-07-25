@@ -320,6 +320,8 @@ let changeset_octez_docs =
           "dune";
           "dune-project";
           "dune-workspace";
+          "**/*.rst";
+          (* Nota: stays as it is, many non-rst files in this folder *)
           "docs/**/*";
         ])
 
