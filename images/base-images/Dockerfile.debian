@@ -9,7 +9,7 @@ ENV TZ=Etc/UTC
 # Setup proxy
 ARG APT_PROXY
 ENV APT_PROXY=${APT_PROXY:-false}
-RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
+RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
 
 # install datadog static binary
 COPY images/scripts/install_datadog_static.sh /tmp
