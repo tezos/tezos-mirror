@@ -299,6 +299,10 @@ type tag =
   | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
   | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
   | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
+  | Gcp_not_interruptible
+      (** GCP prod AMD64 runner, suitable for jobs that should not be interrupted. *)
+  | Gcp_not_interruptible_dev
+      (** GCP dev AMD64 runner, suitable for jobs that should not be interrupted. *)
   | Gcp_tezt
       (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
   | Gcp_tezt_dev
