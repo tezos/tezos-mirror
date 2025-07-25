@@ -173,6 +173,10 @@ let block_time : t -> int = function
   | `Ghostnet -> 5
   | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
 
+let next_protocol : t -> Protocol.t = function
+  | `Mainnet | `Ghostnet | `Rionet -> S023
+  | _ -> Alpha
+
 let public_rpc_endpoint testnet =
   Endpoint.make
     ~scheme:"https"

@@ -82,36 +82,6 @@ module Node = struct
          [Allow_yes_crypto; Force_history_mode_switch]
          peers
 
-  (** [add_migration_offset_to_config node snapshot ~migration_offset ~network] adds an
-      entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
-      to upgrade to the next protocol of [~network]. This entry is is parametrised by the
-      information obtained from [snapshot]. *)
-  let add_migration_offset_to_config node snapshot ~migration_offset ~network =
-    let* level = get_snapshot_info_level node snapshot in
-    match migration_offset with
-    | None -> Lwt.return_unit
-    | Some migration_offset ->
-        let* network_config =
-          match network with
-          | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config
-          | `Ghostnet -> Lwt.return Node.Config_file.ghostnet_network_config
-          | _ ->
-              Lwt.fail_with
-                "Migration scenarios are only supported for Mainnet and \
-                 Ghostnet."
-        in
-        let migration_level = level + migration_offset in
-        toplog "Add UAU entry for level : %d" migration_level ;
-        Node.Config_file.update node (fun json ->
-            JSON.put
-              ( "network",
-                JSON.annotate
-                  ~origin:"add_migration_offset_to_config"
-                  network_config )
-              json
-            |> Node.Config_file.update_network_with_user_activated_upgrades
-                 [(migration_level, Protocol.Alpha)])
-
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
      because of data not included in the snapshot.
@@ -161,7 +131,11 @@ module Node = struct
     let config = isolated_config ~peers ~network ~delay:0 in
     let* () = Node.config_reset node config in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
     in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
@@ -180,7 +154,11 @@ module Node = struct
     let config = isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
     in
     let* () = import_snapshot ~no_check:true ~name node snapshot in
     let arguments = isolated_args peers in

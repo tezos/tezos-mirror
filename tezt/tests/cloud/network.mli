@@ -45,6 +45,8 @@ val default_protocol : t -> Protocol.t
 (** Block time value for the network *)
 val block_time : t -> int
 
+val next_protocol : t -> Protocol.t
+
 (** Endpoint publicly available with RPC opened *)
 val public_rpc_endpoint : public -> Endpoint.t
 

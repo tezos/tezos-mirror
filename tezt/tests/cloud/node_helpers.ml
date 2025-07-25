@@ -23,6 +23,32 @@ let yes_wallet agent =
   let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
   Yes_wallet.Agent.create ~name agent
 
+let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
+    =
+  let* level = get_snapshot_info_level node snapshot in
+  match migration_offset with
+  | None -> Lwt.return_unit
+  | Some migration_offset ->
+      let* network_config =
+        match network with
+        | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config
+        | `Ghostnet -> Lwt.return Node.Config_file.ghostnet_network_config
+        | _ ->
+            Lwt.fail_with
+              "Migration scenarios are only supported for Mainnet and Ghostnet."
+      in
+      let migration_level = level + migration_offset in
+      toplog "Add UAU entry for level : %d" migration_level ;
+      Node.Config_file.update node (fun json ->
+          JSON.put
+            ( "network",
+              JSON.annotate
+                ~origin:"add_migration_offset_to_config"
+                network_config )
+            json
+          |> Node.Config_file.update_network_with_user_activated_upgrades
+               [(migration_level, Network.next_protocol network)])
+
 let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
     ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling cloud
     agent =
