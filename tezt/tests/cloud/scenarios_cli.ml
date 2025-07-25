@@ -866,6 +866,8 @@ module type Tezlink = sig
   val proxy_localhost : bool
 
   val public_rpc_port : int option
+
+  val tzkt_api_port : int option
 end
 
 module Tezlink () : Tezlink = struct
@@ -892,5 +894,12 @@ module Tezlink () : Tezlink = struct
       ~section
       ~long:"public-rpc-port"
       ~description:"Set the port number of the RPC server"
+      ()
+
+  let tzkt_api_port =
+    Clap.optional_int
+      ~section
+      ~long:"tzkt-api-port"
+      ~description:"Set the port number of the TZKT API"
       ()
 end
