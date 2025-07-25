@@ -2,8 +2,6 @@
 
 set -e
 
-script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-
 REGION="${REGION:-eu-west-1}"
 
 if [ -z "${S3_BUCKET:-}" ]; then
@@ -88,10 +86,16 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-"${script_dir}"/create_release_page.sh "$versions_list_filename"
+echo "Syncing $versions_list_filename to remote s3 bucket"
+aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"
 
-echo "Syncing files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
+echo "Building release page"
+dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+  --title 'Octez releases' --bucket "${S3_BUCKET}" --path \
+  "${BUCKET_PATH:-}" changelog binaries packages
+
+echo "Syncing html files to remote s3 bucket"
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}${BUCKET_PATH}/" --cache-control "max-age=30, must-revalidate" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
