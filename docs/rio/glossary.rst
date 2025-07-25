@@ -331,7 +331,7 @@ _`PVM`
    This ability is used during the final step of a `refutation game`_.
 
 _`Redundancy factor`
-    The amount of redundancy that the protocol uses when splitting expanded DAL data into shard_\ s.
+    The amount of redundancy that the protocol uses when expanding and splitting DAL data into shard_\ s.
     The higher the redundancy factor, the fewer shards are needed to reconstruct the initial data.
 
 _`Refutation game`
