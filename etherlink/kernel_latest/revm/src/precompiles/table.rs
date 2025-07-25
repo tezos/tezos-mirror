@@ -5,16 +5,20 @@
 use alloy_sol_types::{sol, SolEvent, SolValue};
 use primitive_types::U256;
 use revm::{
-    context::{ContextTr, Transaction},
+    context::ContextTr,
     interpreter::{Gas, InputsImpl, InstructionResult, InterpreterResult},
-    primitives::{Address, Bytes},
+    primitives::Bytes,
 };
 
 use crate::{
     database::PrecompileDatabase,
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
-    precompiles::constants::{FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST},
-    precompiles::send_outbox_message::revert,
+    precompiles::{
+        constants::{
+            FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, TABLE_PRECOMPILE_ADDRESS,
+        },
+        send_outbox_message::revert,
+    },
 };
 
 sol! {
@@ -47,19 +51,22 @@ pub(crate) fn table_precompile<CTX>(
     context: &mut CTX,
     is_static: bool,
     transfer: &InputsImpl,
-    current: &Address,
     gas_limit: u64,
 ) -> Result<InterpreterResult, String>
 where
     CTX: ContextTr,
     CTX::Db: PrecompileDatabase,
 {
-    if transfer.target_address != *current
-        || is_static
-        || context.tx().caller() == *current
-        || transfer.caller_address != FA_WITHDRAWAL_SOL_ADDR
-    {
-        return Ok(revert());
+    if transfer.target_address != TABLE_PRECOMPILE_ADDRESS {
+        return Ok(revert("invalid transfer target address"));
+    }
+
+    if is_static {
+        return Ok(revert("static calls are not allowed"));
+    }
+
+    if transfer.caller_address != FA_WITHDRAWAL_SOL_ADDR {
+        return Ok(revert("unauthorized caller"));
     }
 
     match input {
@@ -75,7 +82,7 @@ where
                 .map_err(|e| e.to_string())?;
 
             if !added {
-                return Ok(revert());
+                return Ok(revert("ticket balance overflow"));
             }
 
             let result = InterpreterResult {
@@ -97,7 +104,7 @@ where
                 .map_err(|e| e.to_string())?;
 
             if !removed {
-                return Ok(revert());
+                return Ok(revert("insufficient ticket balance"));
             }
 
             let result = InterpreterResult {
@@ -157,6 +164,6 @@ where
             };
             Ok(result)
         }
-        _ => Ok(revert()),
+        _ => Ok(revert("unknown selector")),
     }
 }

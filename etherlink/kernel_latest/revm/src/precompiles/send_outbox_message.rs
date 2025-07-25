@@ -30,7 +30,8 @@ use crate::{
     database::PrecompileDatabase,
     helpers::storage::u256_to_bigint,
     precompiles::constants::{
-        FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, WITHDRAWAL_SOL_ADDR,
+        FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST,
+        SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
     },
 };
 
@@ -113,11 +114,11 @@ pub enum Withdrawal {
     Fast(OutboxMessage<FastWithdrawalInterface>),
 }
 
-pub(crate) fn revert() -> InterpreterResult {
+pub(crate) fn revert(reason: &str) -> InterpreterResult {
     InterpreterResult {
         result: InstructionResult::Revert,
         gas: Gas::new(0),
-        output: Bytes::new(),
+        output: Bytes::copy_from_slice(reason.as_bytes()),
     }
 }
 
@@ -268,22 +269,25 @@ pub(crate) fn send_outbox_message_precompile<CTX>(
     context: &mut CTX,
     is_static: bool,
     transfer: &InputsImpl,
-    current: &Address,
     gas_limit: u64,
 ) -> Result<InterpreterResult, SendOutboxError>
 where
     CTX: ContextTr,
     CTX::Db: PrecompileDatabase,
 {
-    if transfer.target_address != *current
-        || context.tx().caller() == *current
-        || is_static
-        || !matches!(
-            transfer.caller_address,
-            WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
-        )
-    {
-        return Ok(revert());
+    if transfer.target_address != SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS {
+        return Ok(revert("invalid transfer target address"));
+    }
+
+    if is_static {
+        return Ok(revert("static calls are not allowed"));
+    }
+
+    if !matches!(
+        transfer.caller_address,
+        WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
+    ) {
+        return Ok(revert("unauthorized caller"));
     }
 
     match input {
@@ -463,6 +467,6 @@ where
             };
             Ok(result)
         }
-        _ => Ok(revert()),
+        _ => Ok(revert("unknown selector")),
     }
 }
