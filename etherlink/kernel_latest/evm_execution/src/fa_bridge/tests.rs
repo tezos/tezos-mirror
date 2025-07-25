@@ -77,11 +77,10 @@ fn fa_deposit_reached_wrapper_contract() {
         deposit.amount
     );
 
-    let mint_event =
-        token_wrapper::Mint::decode_log_data(&convert_log(&res.logs[0]), true)
-            .expect("Failed to parse Mint event");
+    let mint_event = token_wrapper::Mint::decode_log_data(&convert_log(&res.logs[0]))
+        .expect("Failed to parse Mint event");
     let deposit_event =
-        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[1]), true)
+        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[1]))
             .expect("Failed to parse Deposit event");
 
     assert_eq!(mint_event.amount, convert_u256(&deposit.amount));
@@ -146,7 +145,7 @@ fn fa_deposit_refused_due_non_existing_contract() {
     );
 
     let deposit_event =
-        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[0]), true)
+        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[0]))
             .expect("Failed to parse Deposit event");
 
     assert_eq!(
@@ -212,7 +211,7 @@ fn fa_deposit_refused_non_compatible_interface() {
     );
 
     let deposit_event =
-        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[0]), true)
+        kernel_wrapper::Deposit::decode_log_data(&convert_log(&res.logs[0]))
             .expect("Failed to parse Deposit event");
 
     assert_eq!(
@@ -353,12 +352,11 @@ fn fa_withdrawal_executed_via_l2_proxy_contract() {
 
     // Ensure events are emitted correctly
     let withdrawal_event =
-        kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&res.logs[0]), true)
+        kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&res.logs[0]))
             .expect("Failed to parse Withdrawal event");
 
-    let burn_event =
-        token_wrapper::Burn::decode_log_data(&convert_log(&res.logs[1]), true)
-            .expect("Failed to parse Burn event");
+    let burn_event = token_wrapper::Burn::decode_log_data(&convert_log(&res.logs[1]))
+        .expect("Failed to parse Burn event");
 
     assert_eq!(
         withdrawal_event.ticketHash,

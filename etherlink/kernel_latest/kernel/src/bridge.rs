@@ -367,7 +367,7 @@ mod tests {
             outcome.logs[0].topics.iter().map(|x| x.0.into()).collect(),
             outcome.logs[0].data.clone().into(),
         );
-        let event = events::Deposit::decode_log_data(&log_data, true).unwrap();
+        let event = events::Deposit::decode_log_data(&log_data).unwrap();
         assert_eq!(event.amount, alloy_primitives::U256::from(1));
         assert_eq!(
             event.receiver,

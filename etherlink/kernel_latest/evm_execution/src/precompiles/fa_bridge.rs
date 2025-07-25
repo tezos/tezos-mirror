@@ -212,7 +212,7 @@ pub fn fa_bridge_precompile<Host: Runtime>(
         }
         // "claim"'s selector | 4 first bytes of keccak256("claim(uint256)")
         [0x37, 0x96, 0x07, 0xf5, input_data @ ..] => {
-            match SolClaimInput::abi_decode_data(input_data, true) {
+            match SolClaimInput::abi_decode_data(input_data) {
                 Err(err) => Ok(precompile_outcome_error!(
                     "Claim FA deposit: parsing failed w/ `{err}`"
                 )),

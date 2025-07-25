@@ -340,7 +340,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
         [0xcd, 0xa4, 0xfe, 0xe2, input_data @ ..] => {
             // Execute base withdrawal preliminary
             let Ok((address_str,)) =
-                SolStandardWithdrawalInput::abi_decode_data(input_data, true)
+                SolStandardWithdrawalInput::abi_decode_data(input_data)
             else {
                 log!(
                     handler.borrow_host(),
@@ -414,7 +414,7 @@ pub fn withdrawal_precompile<Host: Runtime>(
             };
 
             let Ok((target, fast_withdrawal_contract, payload)) =
-                SolFastWithdrawalInput::abi_decode_data(input_data, true)
+                SolFastWithdrawalInput::abi_decode_data(input_data)
             else {
                 log!(
                     handler.borrow_host(),
@@ -705,7 +705,7 @@ mod tests {
             log.topics.iter().map(|x| x.0.into()).collect(),
             log.data.clone().into(),
         );
-        let event = events::Withdrawal::decode_log_data(&log_data, true).unwrap();
+        let event = events::Withdrawal::decode_log_data(&log_data).unwrap();
         assert_eq!(event.amount, alloy_primitives::U256::from_be_bytes(amount));
         assert_eq!(
             event.sender,

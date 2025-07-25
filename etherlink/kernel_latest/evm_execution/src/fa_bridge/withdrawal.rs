@@ -186,9 +186,9 @@ impl FaWithdrawal {
     /// )
     pub fn try_parse(input_data: &[u8], sender: H160) -> Result<Self, FaBridgeError> {
         let (ticket_owner, routing_info, amount, ticketer, content) =
-            SolStandardWithdrawalInput::abi_decode_data(input_data, true).map_err(
-                |_| FaBridgeError::AbiDecodeError("Failed to parse precompile call data"),
-            )?;
+            SolStandardWithdrawalInput::abi_decode_data(input_data).map_err(|_| {
+                FaBridgeError::AbiDecodeError("Failed to parse precompile call data")
+            })?;
 
         let ticket_owner = alloy_to_h160(&ticket_owner).unwrap_or_default();
         let amount = alloy_to_u256(&amount);
@@ -359,7 +359,7 @@ impl FaFastWithdrawal {
             content,
             fast_withdrawal_contract_address,
             payload,
-        ) = SolFastWithdrawalInput::abi_decode_data(input_data, true).map_err(|_| {
+        ) = SolFastWithdrawalInput::abi_decode_data(input_data).map_err(|_| {
             FaBridgeError::AbiDecodeError("Failed to parse precompile call data")
         })?;
 
@@ -695,7 +695,7 @@ mod tests {
         let log = withdrawal.event_log(U256::one());
 
         let withdrawal_event =
-            kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&log), true)
+            kernel_wrapper::Withdrawal::decode_log_data(&convert_log(&log))
                 .expect("Failed to parse Withdrawal event");
 
         let ticket_hash_topic =
