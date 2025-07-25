@@ -825,4 +825,101 @@ mod test {
             other: None,
         })
     }
+
+    #[derive(Debug, PartialEq)]
+    struct TestStruct {
+        flag: bool,
+        value: u32,
+    }
+
+    impl NomReader<'_> for TestStruct {
+        fn nom_read(input: &[u8]) -> NomResult<Self> {
+            let (input, flag) = boolean(input)?;
+            let (input, value) = u32(input)?;
+            Ok((input, TestStruct { flag, value }))
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum TestEnum {
+        Data(TestStruct),
+        Empty,
+    }
+
+    impl NomReader<'_> for TestEnum {
+        fn nom_read(input: &[u8]) -> NomResult<Self> {
+            let (input, tag) = u8(input)?;
+            match tag {
+                0 => {
+                    let (input, data) = TestStruct::nom_read(input)?;
+                    Ok((input, TestEnum::Data(data)))
+                }
+                1 => Ok((input, TestEnum::Empty)),
+                _ => Err(nom::Err::Error(DecodeError {
+                    input,
+                    kind: DecodeErrorKind::Nom(ErrorKind::Tag),
+                    other: None,
+                })),
+            }
+        }
+    }
+
+    impl NomReader<'_> for bool {
+        fn nom_read(input: &[u8]) -> NomResult<Self> {
+            boolean(input)
+        }
+    }
+
+    #[test]
+    fn test_nom_read_exact_struct() {
+        let input = &[0xff, 0x00, 0x00, 0x00, 0x42];
+        let result = TestStruct::nom_read_exact(input);
+        assert_eq!(
+            result,
+            Ok(TestStruct {
+                flag: true,
+                value: 66
+            })
+        );
+    }
+
+    #[test]
+    fn failed_to_short_nom_read_exact_struct() {
+        let input = &[0xff, 0x00, 0x00];
+        let result = TestStruct::nom_read_exact(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn failed_to_long_nom_read_exact_struct() {
+        let input = &[0xff, 0x00, 0x00, 0x00, 0x42, 0x00];
+        let result = TestStruct::nom_read_exact(input);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_nom_read_exact_enum() {
+        let input = &[0x00, 0xff, 0x00, 0x00, 0x00, 0x42];
+        let result = TestEnum::nom_read_exact(input);
+        assert_eq!(
+            result,
+            Ok(TestEnum::Data(TestStruct {
+                flag: true,
+                value: 66
+            }))
+        );
+
+        let input = &[0x01];
+        let result = TestEnum::nom_read_exact(input);
+        assert_eq!(result, Ok(TestEnum::Empty));
+    }
+
+    #[test]
+    fn test_nom_read_exact_boolean() {
+        let result = bool::nom_read_exact(&[0xff]);
+        assert_eq!(result, Ok(true));
+
+        let result = bool::nom_read_exact(&[0x00]);
+        assert_eq!(result, Ok(false));
+    }
 }
