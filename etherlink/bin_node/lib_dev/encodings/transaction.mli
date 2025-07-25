@@ -2,11 +2,11 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type transaction_type = Legacy | Eip2930 | Eip1559
+type transaction_type = Legacy | Eip2930 | Eip1559 | Eip7702
 
 (** Payload of an Ethereum transaction.
 
@@ -19,6 +19,15 @@ type transaction_type = Legacy | Eip2930 | Eip1559
 
 type access_list_item = bytes * bytes list
 
+type authorization_list_item = {
+  chain_id : Z.t;
+  address : bytes;
+  nonce : Z.t;
+  y_parity : Z.t;
+  r : Z.t;
+  s : Z.t;
+}
+
 type transaction = {
   transaction_type : transaction_type;
   chain_id : Z.t option;
@@ -30,8 +39,7 @@ type transaction = {
   value : Z.t;
   data : bytes;
   access_list : access_list_item list;
-      (** Access list are not yet supported. Even if the kernel does not
-          support them, we need to decode them to verify the signature. *)
+  authorization_list : authorization_list_item list;
   v : Z.t;
   r : Z.t;
   s : Z.t;
@@ -45,6 +53,9 @@ val decode_eip1559 : bytes -> (transaction, string) result
 
 (** [decode_eip2930 bytes] tries to decode [bytes] into a {!transaction}. *)
 val decode_eip2930 : bytes -> (transaction, string) result
+
+(** [decode_eip7702 bytes] tries to decode [bytes] into a {!transaction}. *)
+val decode_eip7702 : bytes -> (transaction, string) result
 
 (** [decode bytes] tries to decode [bytes] into a {!transaction},
     using {!decode_eip1559}, {!decode_eip2930} or {!decode_legacy}
