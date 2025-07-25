@@ -16,7 +16,7 @@ use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
     context::{
         result::{EVMError, ExecResultAndState, ExecutionResult},
-        transaction::AccessList,
+        transaction::{AccessList, SignedAuthorization},
         tx::TxEnvBuilder,
         BlockEnv, CfgEnv, ContextTr, DBErrorMarker, Evm, TxEnv,
     },
@@ -103,6 +103,7 @@ fn tx_env<'a, Host: Runtime>(
     value: U256,
     data: Bytes,
     access_list: AccessList,
+    authorization_list: Vec<SignedAuthorization>,
     chain_id: u64,
 ) -> Result<TxEnv, Error> {
     let kind = match destination {
@@ -128,6 +129,7 @@ fn tx_env<'a, Host: Runtime>(
         .nonce(nonce)
         .chain_id(Some(chain_id))
         .access_list(access_list)
+        .authorization_list_signed(authorization_list)
         .build()
         .map_err(|err| {
             Error::Custom(format!(
@@ -232,6 +234,7 @@ pub fn run_transaction<'a, Host: Runtime>(
     effective_gas_price: u128,
     value: U256,
     access_list: AccessList,
+    authorization_list: Vec<SignedAuthorization>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
     let mut commit_status = true;
@@ -246,6 +249,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         value,
         call_data,
         access_list,
+        authorization_list,
         block_constants.chain_id.as_u64(),
     )?;
 
@@ -437,6 +441,7 @@ mod test {
             0,
             value_sent,
             AccessList(vec![]),
+            vec![],
             None,
         )
         .unwrap();
@@ -518,6 +523,7 @@ mod test {
             1,
             value_sent,
             AccessList(vec![]),
+            vec![],
             None,
         )
         .unwrap();
@@ -585,6 +591,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            vec![],
             None,
         );
 
@@ -664,6 +671,7 @@ mod test {
             0,
             withdrawn_amount,
             AccessList(vec![]),
+            vec![],
             None,
         )
         .unwrap();
@@ -725,6 +733,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            vec![],
             None,
         );
 
@@ -754,6 +763,7 @@ mod test {
             1,
             U256::ZERO,
             AccessList(vec![]),
+            vec![],
             None,
         );
 
