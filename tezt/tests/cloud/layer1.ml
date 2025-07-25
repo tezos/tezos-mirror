@@ -196,10 +196,6 @@ module Node = struct
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
     Client.Agent.create ~name ~endpoint:(Client.Node node) agent
 
-  let yes_wallet agent =
-    let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
-    Yes_wallet.Agent.create ~name agent
-
   (** Initialize the node,
       create the associated client,
       create the yes-wallet.
@@ -216,7 +212,7 @@ module Node = struct
         migration_offset
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
         ~node
@@ -247,7 +243,7 @@ module Node = struct
         (agent, node, name)
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
         (fun {pkh = alias; pk = public_key} ->
@@ -270,7 +266,7 @@ module Node = struct
         (agent, node, name)
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
     let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
