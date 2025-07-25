@@ -37,6 +37,14 @@ let add {next_nonce; bitset} ~nonce =
     let* bitset = Bitset.add bitset offset_position in
     return {next_nonce; bitset}
 
+let add_many {next_nonce; bitset} ~nonce ~length =
+  let open Result_syntax in
+  if Z.lt nonce next_nonce then return {next_nonce; bitset}
+  else
+    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
+    let* bitset = Bitset.add_many bitset offset_position length in
+    return {next_nonce; bitset}
+
 let remove {next_nonce; bitset} ~nonce =
   let open Result_syntax in
   if Z.lt nonce next_nonce then
@@ -45,6 +53,16 @@ let remove {next_nonce; bitset} ~nonce =
   else
     let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
     let* bitset = Bitset.remove bitset offset_position in
+    return {next_nonce; bitset}
+
+let remove_many {next_nonce; bitset} ~nonce ~length =
+  let open Result_syntax in
+  if Z.lt nonce next_nonce then
+    (* we don't remove the nonces if they can't all exist in the bitset *)
+    return {next_nonce; bitset}
+  else
+    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
+    let* bitset = Bitset.remove_many bitset offset_position length in
     return {next_nonce; bitset}
 
 let shift {next_nonce; bitset} ~nonce =

@@ -12,6 +12,8 @@ module type L2_transaction = sig
 
   type address
 
+  type nonce
+
   val address_encoding : address Data_encoding.t
 
   val hash_of_tx_object : legacy -> Ethereum_types.hash
@@ -20,7 +22,15 @@ module type L2_transaction = sig
 
   val from_address_of_tx_object : legacy -> address
 
-  val nonce_of_tx_object : legacy -> Ethereum_types.quantity
+  val bitset_add_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+
+  val bitset_remove_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+
+  val next_nonce : nonce -> Z.t
+
+  val nonce_to_z_opt : nonce -> Z.t option
+
+  val nonce_of_tx_object : legacy -> nonce
 
   val transaction_object_from_legacy : legacy -> t
 
@@ -37,7 +47,8 @@ module Eth_transaction_object :
     with type t = Transaction_object.t
      and type legacy = Ethereum_types.legacy_transaction_object
      and type address = Ethereum_types.address
-     and module AddressMap = Ethereum_types.AddressMap = struct
+     and module AddressMap = Ethereum_types.AddressMap
+     and type nonce = Ethereum_types.quantity = struct
   open Ethereum_types
 
   type t = Transaction_object.t
@@ -45,6 +56,8 @@ module Eth_transaction_object :
   type legacy = legacy_transaction_object
 
   type nonrec address = address
+
+  type nonce = quantity
 
   let address_encoding = address_encoding
 
@@ -54,6 +67,14 @@ module Eth_transaction_object :
 
   let from_address_of_tx_object (tx_object : legacy_transaction_object) =
     tx_object.from
+
+  let bitset_add_nonce bitset (Qty nonce) = Nonce_bitset.add bitset ~nonce
+
+  let bitset_remove_nonce bitset (Qty nonce) = Nonce_bitset.remove bitset ~nonce
+
+  let next_nonce (Qty nonce) = Z.succ nonce
+
+  let nonce_to_z_opt (Qty nonce) = Some nonce
 
   let nonce_of_tx_object (tx_object : legacy_transaction_object) =
     tx_object.nonce
@@ -66,10 +87,13 @@ module Eth_transaction_object :
   let make_txpool ~pending ~queued = {pending; queued}
 end
 
+type tezlink_batch_nonces = {first : Z.t; length : int}
+
 module Tezlink_operation :
   L2_transaction
     with type t = Tezos_types.Operation.t
-     and type legacy = Tezos_types.Operation.t = struct
+     and type legacy = Tezos_types.Operation.t
+     and type nonce = tezlink_batch_nonces = struct
   open Ethereum_types
 
   type t = Tezos_types.Operation.t
@@ -77,6 +101,8 @@ module Tezlink_operation :
   type legacy = Tezos_types.Operation.t
 
   type address = Signature.public_key_hash
+
+  type nonce = tezlink_batch_nonces
 
   let address_encoding = Signature.Public_key_hash.encoding
 
@@ -86,8 +112,20 @@ module Tezlink_operation :
 
   let from_address_of_tx_object (op : Tezos_types.Operation.t) = op.source
 
+  let bitset_add_nonce bitset {first; length} =
+    Nonce_bitset.add_many bitset ~nonce:first ~length
+
+  let bitset_remove_nonce bitset {first; length} =
+    Nonce_bitset.remove_many bitset ~nonce:first ~length
+
+  let next_nonce {first; length} = Z.(add first (of_int length))
+
+  (* This function is only called in the handler of the [Content]
+     request which is never called in the case of Tezlink. *)
+  let nonce_to_z_opt _nonce = None
+
   let nonce_of_tx_object (op : Tezos_types.Operation.t) =
-    Ethereum_types.Qty op.counter
+    {first = op.counter; length = 1}
 
   let transaction_object_from_legacy op = op
 

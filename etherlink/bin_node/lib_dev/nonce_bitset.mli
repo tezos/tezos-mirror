@@ -49,12 +49,23 @@ val offset : nonce1:Z.t -> nonce2:Z.t -> int tzresult
     [bitset_nonce]. *)
 val add : t -> nonce:Z.t -> t tzresult
 
+(** [add_many bitset_nonce ~nonce ~length] adds the nonces [nonce],
+    [nonce+1], ..., [nonce+length-1] to [bitset_nonce]. *)
+val add_many : t -> nonce:Z.t -> length:int -> t tzresult
+
 (** [remove bitset_nonce ~nonce] removes the nonce [nonce] from
     [bitset_nonce].
 
     If [nonce] is strictly inferior to [bitset_nonce.next_nonce] then
     it's a no-op because nonce can't exist in the bitset. *)
 val remove : t -> nonce:Z.t -> t tzresult
+
+(** [remove_many bitset_nonce ~nonce ~length] removes the nonces
+    [nonce], [nonce+1], ..., [nonce+length-1] from [bitset_nonce].
+
+    If [nonce] is strictly inferior to [bitset_nonce.next_nonce] then
+    it's a no-op because some nonces can't exist in the bitset. *)
+val remove_many : t -> nonce:Z.t -> length:int -> t tzresult
 
 (** [shift bitset_nonce ~nonce] shifts the bitset of [bitset_nonce]
       so the next_nonce is now [nonce]. Shifting the bitset means

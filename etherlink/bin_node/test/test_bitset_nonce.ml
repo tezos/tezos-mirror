@@ -12,7 +12,9 @@
     Invocation:   dune exec etherlink/bin_node/test/test_bitset_nonce.exe
     Subject:      Tests for Nonce_bitset
 *)
-open Evm_node_lib_dev.Tx_queue.Internal_for_tests
+open Evm_node_lib_dev
+
+open Tx_queue.Internal_for_tests
 
 let comparable_bitset =
   Check.(
@@ -195,6 +197,7 @@ module Address_nonce_helpers = struct
          ~addr
          ~next_nonce:(Z.of_int next_nonce)
          ~nonce:(Z.of_int nonce)
+         ~add:(fun bitset nonce -> Nonce_bitset.add bitset ~nonce)
 
   let next_gap_nonce nonces ~addr ~__LOC__ ~next_nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -202,11 +205,19 @@ module Address_nonce_helpers = struct
 
   let confirm_nonce nonces ~addr ~__LOC__ ~nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Address_nonce.confirm_nonce nonces ~addr ~nonce:(Z.of_int nonce)
+    @@ Address_nonce.confirm_nonce
+         nonces
+         ~addr
+         ~nonce:(Z.of_int nonce)
+         ~next:Z.succ
 
   let remove_nonce nonces ~addr ~__LOC__ ~nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Address_nonce.remove nonces ~addr ~nonce:(Z.of_int nonce)
+    @@ Address_nonce.remove
+         nonces
+         ~addr
+         ~nonce:(Z.of_int nonce)
+         ~rm:(fun bitset nonce -> Nonce_bitset.remove bitset ~nonce)
 
   let add nonces ~addr ~__LOC__ ~next_nonce ~nonce ~expected =
     add_nonce nonces ~addr ~__LOC__ ~next_nonce ~nonce ;

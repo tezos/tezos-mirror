@@ -59,7 +59,7 @@ module Address_nonce = struct
     if Nonce_bitset.is_empty nonce_bitset then S.remove nonces addr
     else S.replace nonces addr nonce_bitset
 
-  let add nonces ~addr ~next_nonce ~nonce =
+  let add nonces ~addr ~next_nonce ~nonce ~add =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     let* nonce_bitset =
@@ -85,7 +85,7 @@ module Address_nonce = struct
       | None -> return @@ Nonce_bitset.create ~next_nonce
     in
     let* nonce_bitset =
-      (* [Nonce_bitset.add] takes care of only adding [nonce] if
+      (* [add] should take care of only adding [nonce] if
          [bitset_nonce.next_nonce] is inferior or equal. If
          [nonce_bitset.next_nonce > nonce] then there is no need to
          add because [nonce] is already in the past.
@@ -96,17 +96,17 @@ module Address_nonce = struct
          such case we simply don't register the nonce, and the
          transaction will be dropped by the upstream node when
          receiving it. *)
-      Nonce_bitset.add nonce_bitset ~nonce
+      add nonce_bitset nonce
     in
     let () = S.replace nonces addr nonce_bitset in
     return_unit
 
-  let confirm_nonce nonces ~addr ~nonce =
+  let confirm_nonce nonces ~addr ~nonce ~next =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let next_nonce = Z.succ nonce in
+        let next_nonce = next nonce in
         if Z.gt nonce_bitset.Nonce_bitset.next_nonce next_nonce then
           (* A tx with a superior nonce was already confirmed, nothing
              to confirm.
@@ -122,12 +122,12 @@ module Address_nonce = struct
           return_unit
     | None -> return_unit
 
-  let remove nonces ~addr ~nonce =
+  let remove nonces ~addr ~nonce ~rm =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let* nonce_bitset = Nonce_bitset.remove nonce_bitset ~nonce in
+        let* nonce_bitset = rm nonce_bitset nonce in
         update nonces addr nonce_bitset ;
         return_unit
     | None -> return_unit
@@ -629,7 +629,7 @@ struct
           let addr =
             Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
           in
-          let (Qty tx_nonce) = Tx.nonce_of_tx_object tx_object in
+          let tx_nonce = Tx.nonce_of_tx_object tx_object in
           let pending_callback (reason : pending_variant) =
             let open Lwt_syntax in
             let* res =
@@ -644,6 +644,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~rm:Tx.bitset_remove_nonce
               | `Confirmed ->
                   let* () =
                     Tx_queue_events.transaction_confirmed
@@ -654,6 +655,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~next:Tx.next_nonce
             in
             let* () =
               match res with
@@ -695,6 +697,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~rm:Tx.bitset_remove_nonce
             in
             let* () =
               match res with
@@ -738,13 +741,14 @@ struct
                   state.tx_per_address
                   (Tx.from_address_of_tx_object tx_object) ;
                 Transaction_objects.add state.tx_object tx_object ;
-                let Ethereum_types.(Qty next_nonce) = next_nonce in
+                let (Qty next_nonce) = next_nonce in
                 let*? () =
                   Address_nonce.add
                     state.address_nonce
                     ~addr
                     ~next_nonce
                     ~nonce:tx_nonce
+                    ~add:Tx.bitset_add_nonce
                 in
                 Queue.add
                   {
@@ -812,7 +816,7 @@ struct
           return_unit
       | Nonce {next_nonce; address} ->
           protect @@ fun () ->
-          let Ethereum_types.(Qty next_nonce) = next_nonce in
+          let (Qty next_nonce) = next_nonce in
           let*? next_gap =
             Address_nonce.next_gap
               state.address_nonce
@@ -827,7 +831,6 @@ struct
       | Is_locked -> protect @@ fun () -> return (is_locked state)
       | Content ->
           protect @@ fun () ->
-          let open Ethereum_types in
           let process_transactions tx_map lookup_fn acc =
             String.Hashtbl.fold
               (fun hash value acc ->
@@ -839,11 +842,17 @@ struct
                         acc
                       |> Option.value ~default:Ethereum_types.NonceMap.empty
                     in
+                    let tx_nonce_opt =
+                      Tx.nonce_of_tx_object obj |> Tx.nonce_to_z_opt
+                    in
                     let updated_nonce_map =
-                      Ethereum_types.NonceMap.add
-                        (Qty.to_z (Tx.nonce_of_tx_object obj))
-                        obj
-                        existing_nonce_map
+                      match tx_nonce_opt with
+                      | Some tx_nonce ->
+                          Ethereum_types.NonceMap.add
+                            tx_nonce
+                            obj
+                            existing_nonce_map
+                      | None -> existing_nonce_map
                     in
                     Tx.AddressMap.add
                       (Tx.from_address_of_tx_object obj)
