@@ -37,24 +37,12 @@ open Alpha_context
 (** [baker] bakes and [attester] attests *)
 let bake_and_attest_once (_b_pred, b_cur) baker attester =
   let open Lwt_result_wrap_syntax in
-  let open Context in
-  let* attesters_list = Context.get_attesters (B b_cur) in
-  List.find_map
-    (function
-      | {Plugin.RPC.Validators.delegate; slots; _} ->
-          if Signature.Public_key_hash.equal delegate attester then
-            Some (delegate, slots)
-          else None)
-    attesters_list
-  |> function
-  | None -> assert false
-  | Some (delegate, _slots) ->
-      let*?@ round = Block.get_round b_cur in
-      let* attestation = Op.attestation ~round ~delegate b_cur in
-      Block.bake_with_metadata
-        ~policy:(By_account baker)
-        ~operation:attestation
-        b_cur
+  let*?@ round = Block.get_round b_cur in
+  let* attestation = Op.attestation ~manager_pkh:attester ~round b_cur in
+  Block.bake_with_metadata
+    ~policy:(By_account baker)
+    ~operation:attestation
+    b_cur
 
 (** We test that:
   - a delegate that participates enough, gets its attesting rewards at the end of the cycle,

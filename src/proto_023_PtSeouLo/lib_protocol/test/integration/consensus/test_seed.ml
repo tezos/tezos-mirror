@@ -329,8 +329,9 @@ let test_unrevealed () =
     let* slots = Context.get_attesters (B b) in
     let* attestations =
       List.map_es
-        (fun {Plugin.RPC.Validators.consensus_key; _} ->
-          Op.attestation ~delegate:consensus_key b)
+        (fun attester ->
+          let attesting_slot = Op.attesting_slot_of_attester attester in
+          Op.attestation ~attesting_slot b)
         slots
     in
     Block.bake ?policy ~operations:attestations b

@@ -117,9 +117,9 @@ let test_valid_double_attestation_evidence () =
        are identical. *)
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -233,16 +233,16 @@ let test_different_branch () =
   let open Lwt_result_syntax in
   let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
-  let* attester, _slots = Context.get_attester (B blk) in
-  let* attestation_a = Op.raw_attestation ~delegate:attester blk in
+  let* {Context.delegate = manager_pkh; _} = Context.get_attester (B blk) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh blk in
   let* attestation_b =
-    Op.raw_attestation ~branch:Block_hash.zero ~delegate:attester blk
+    Op.raw_attestation ~branch:Block_hash.zero ~manager_pkh blk
   in
   let operation = double_attestation (B blk) attestation_a attestation_b in
   let* _blk = Block.bake ~operation blk in
-  let* preattestation_a = Op.raw_preattestation ~delegate:attester blk in
+  let* preattestation_a = Op.raw_preattestation ~manager_pkh blk in
   let* preattestation_b =
-    Op.raw_preattestation ~branch:Block_hash.zero ~delegate:attester blk
+    Op.raw_preattestation ~branch:Block_hash.zero ~manager_pkh blk
   in
   let operation =
     double_preattestation (B blk) preattestation_a preattestation_b
@@ -258,24 +258,30 @@ let test_different_slots () =
   let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attesters = Context.get_attesters (B blk) in
-  let delegate, slot1, slot2 =
+  let consensus_pkh, slot1, slot2 =
     (* Find an attester with more than 1 slot. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
          (fun (attester : RPC.Validators.t) ->
            match attester.slots with
-           | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+           | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
            | _ -> None)
          attesters)
   in
-  let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 blk in
-  let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 blk in
+  let attesting_slot1 = {Op.slot = slot1; consensus_pkh} in
+  let attesting_slot2 = {Op.slot = slot2; consensus_pkh} in
+  let* attestation1 = Op.raw_attestation ~attesting_slot:attesting_slot1 blk in
+  let* attestation2 = Op.raw_attestation ~attesting_slot:attesting_slot2 blk in
   let double_attestation =
     double_attestation (B blk) attestation1 attestation2
   in
-  let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 blk in
-  let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 blk in
+  let* preattestation1 =
+    Op.raw_preattestation ~attesting_slot:attesting_slot1 blk
+  in
+  let* preattestation2 =
+    Op.raw_preattestation ~attesting_slot:attesting_slot2 blk
+  in
   let double_preattestation =
     double_preattestation (B blk) preattestation1 preattestation2
   in
@@ -309,9 +315,9 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -324,8 +330,8 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   let* blk_30, blk_40 = block_fork ~excluding:[delegate] blk_with_evidence1 in
   let* blk_3 = Block.bake ~policy:(Excluding [delegate]) blk_30 in
   let* blk_4 = Block.bake ~policy:(Excluding [delegate]) blk_40 in
-  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
-  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
+  let* attestation_3 = Op.raw_attestation ~manager_pkh:delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~manager_pkh:delegate blk_4 in
   let operation =
     double_attestation (B blk_with_evidence1) attestation_3 attestation_4
   in
@@ -418,9 +424,9 @@ let test_two_double_attestation_evidences_staggered () =
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -434,8 +440,8 @@ let test_two_double_attestation_evidences_staggered () =
   let* blk_30, blk_40 = block_fork ~excluding:[delegate] blk_with_evidence1 in
   let* blk_3 = Block.bake ~policy:(Excluding [delegate]) blk_30 in
   let* blk_4 = Block.bake ~policy:(Excluding [delegate]) blk_40 in
-  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
-  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
+  let* attestation_3 = Op.raw_attestation ~manager_pkh:delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~manager_pkh:delegate blk_4 in
   let operation_evidence2 =
     double_attestation (B blk_with_evidence1) attestation_3 attestation_4
   in
@@ -493,9 +499,9 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* bakers = Context.get_bakers (B blk_a) in
   let baker = Context.get_first_different_baker delegate bakers in
@@ -520,8 +526,8 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
   let* blk_30, blk_40 = block_fork ~excluding:[delegate] blk_new_cycle in
   let* blk_3 = Block.bake ~policy:(Excluding [delegate]) blk_30 in
   let* blk_4 = Block.bake ~policy:(Excluding [delegate]) blk_40 in
-  let* attestation_3 = Op.raw_attestation ~delegate blk_3 in
-  let* attestation_4 = Op.raw_attestation ~delegate blk_4 in
+  let* attestation_3 = Op.raw_attestation ~manager_pkh:delegate blk_3 in
+  let* attestation_4 = Op.raw_attestation ~manager_pkh:delegate blk_4 in
   let operation =
     double_attestation (B blk_new_cycle) attestation_3 attestation_4
   in
@@ -614,23 +620,16 @@ let test_invalid_double_attestation_duplicate_in_committee () =
   let* blk_1, blk_2 = block_fork b in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* attesters = Context.get_attesters (B blk_a) in
-  let attester, slot =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Test_aggregate.find_attester_with_bls_key attesters)
+  let* attesting_slot =
+    Op.get_attesting_slot_with_bls_key ~attested_block:blk_a
   in
-  let* op1 =
-    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_a
+  let* op1 = Op.raw_attestation ~attesting_slot blk_a in
+  let* op2 =
+    Op.raw_attestations_aggregate
+      ~committee:[(attesting_slot, None); (attesting_slot, None)]
+      blk_b
   in
-  let* op2_standalone =
-    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_b
-  in
-  let op2 =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Op.raw_aggregate [op2_standalone; op2_standalone])
-  in
+  let slot = attesting_slot.slot in
   let op =
     let contents =
       if Operation_hash.(Operation.hash op1 < Operation.hash op2) then
@@ -653,7 +652,7 @@ let test_invalid_double_attestation_duplicate_in_committee () =
       op
   in
   (* Also check with duplicate slots with different dal contents *)
-  let* op2_standalone' =
+  let* op2 =
     let number_of_slots =
       Default_parameters.constants_test.dal.number_of_slots
     in
@@ -661,16 +660,9 @@ let test_invalid_double_attestation_duplicate_in_committee () =
     let dal_content =
       {attestation = Dal.Attestation.(commit empty slot_index)}
     in
-    Op.raw_attestation
-      ~delegate:attester.RPC.Validators.delegate
-      ~slot
-      ~dal_content
+    Op.raw_attestations_aggregate
+      ~committee:[(attesting_slot, None); (attesting_slot, Some dal_content)]
       blk_b
-  in
-  let op2 =
-    WithExceptions.Option.get
-      ~loc:__LOC__
-      (Op.raw_aggregate [op2_standalone; op2_standalone'])
   in
   let op =
     let contents =
@@ -744,8 +736,16 @@ let test_different_delegates () =
   let* attester_a, attester_b =
     Context.get_first_different_attesters (B blk_b)
   in
-  let* e_a = Op.raw_attestation ~delegate:attester_a.delegate blk_a in
-  let* e_b = Op.raw_attestation ~delegate:attester_b.delegate blk_b in
+  let* e_a =
+    Op.raw_attestation
+      ~attesting_slot:(Op.attesting_slot_of_attester attester_a)
+      blk_a
+  in
+  let* e_b =
+    Op.raw_attestation
+      ~attesting_slot:(Op.attesting_slot_of_attester attester_b)
+      blk_b
+  in
   let* (_ : Block.t) = Block.bake ~operation:(Operation.pack e_b) blk_b in
   double_attestation (B blk_b) e_a e_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
@@ -755,46 +755,8 @@ let test_different_delegates () =
           true
       | _ -> false)
 
-(** Check that a double attestation evidence that exposes a ill-formed
-    attestation fails. *)
-let test_wrong_delegate () =
-  let open Lwt_result_syntax in
-  let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
-  let* blk_1, blk_2 = block_fork genesis in
-  let* blk_a = Block.bake blk_1 in
-  let* blk_b = Block.bake blk_2 in
-  let* attester_a, _a_slots = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate:attester_a blk_a in
-  let* attester0, _slots0 = Context.get_attester_n (B blk_b) 0 in
-  let* attester1, _slots1 = Context.get_attester_n (B blk_b) 1 in
-  let attester_b =
-    if Signature.Public_key_hash.equal attester_a attester0 then attester1
-    else attester0
-  in
-  let* attestation_b = Op.raw_attestation ~delegate:attester_b blk_b in
-  double_attestation (B blk_b) attestation_a attestation_b |> fun operation ->
-  let*! res = Block.bake ~operation blk_b in
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation
-          Misbehaviour.Double_attesting ->
-          true
-      | _ -> false)
-
 let test_freeze_more_with_low_balance =
   let open Lwt_result_syntax in
-  let get_attesting_slots_for_account ctxt account =
-    (* Get the slots of the given account in the given context. *)
-    let* attesters_list = Context.get_attesters ctxt in
-    match attesters_list with
-    | [d1; d2] ->
-        return
-          (if Signature.Public_key_hash.equal account d1.delegate then d1
-           else if Signature.Public_key_hash.equal account d2.delegate then d2
-           else assert false)
-            .slots
-    | _ -> assert false
-    (* there are exactly two attesters for this test. *)
-  in
   let double_attest_and_punish b2 account1 =
     let open Lwt_result_syntax in
     (* Bake a block on top of [b2] that includes a double-attestation
@@ -802,16 +764,8 @@ let test_freeze_more_with_low_balance =
     let* blk_d1, blk_d2 = block_fork b2 in
     let* blk_a = Block.bake ~policy:(Block.By_account account1) blk_d1 in
     let* blk_b = Block.bake ~policy:(Block.By_account account1) blk_d2 in
-    let* slots_a = get_attesting_slots_for_account (B blk_a) account1 in
-    let slot =
-      match List.hd slots_a with None -> assert false | Some s -> s
-    in
-    let* attestation_a = Op.raw_attestation ~delegate:account1 ~slot blk_a in
-    let* slots_b = get_attesting_slots_for_account (B blk_b) account1 in
-    let slot =
-      match List.hd slots_b with None -> assert false | Some s -> s
-    in
-    let* attestation_b = Op.raw_attestation ~delegate:account1 ~slot blk_b in
+    let* attestation_a = Op.raw_attestation ~manager_pkh:account1 blk_a in
+    let* attestation_b = Op.raw_attestation ~manager_pkh:account1 blk_b in
     let denunciation = double_attestation (B b2) attestation_a attestation_b in
     let* b =
       Block.bake ~policy:(Excluding [account1]) b2 ~operations:[denunciation]
@@ -983,9 +937,9 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
   let* blk_1, blk_2 = block_fork genesis in
   let* blk_a = Block.bake blk_1 in
   let* blk_b = Block.bake blk_2 in
-  let* delegate, _ = Context.get_attester (B blk_a) in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* {Context.delegate; _} = Context.get_attester (B blk_a) in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let operation2 = double_attestation (B genesis) attestation_b attestation_a in
   let* bakers = Context.get_bakers (B blk_a) in
@@ -1028,19 +982,25 @@ let different_slots_under_feature_flag () =
   in
   let* block = Block.bake genesis in
   let* attesters = Context.get_attesters (B block) in
-  let delegate, slot1, slot2 =
+  let consensus_pkh, slot1, slot2 =
     (* Find an attester with more than 1 slot. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
          (fun (attester : RPC.Validators.t) ->
            match attester.slots with
-           | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+           | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
            | _ -> None)
          attesters)
   in
-  let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 block in
-  let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 block in
+  let attesting_slot1 = {Op.slot = slot1; consensus_pkh} in
+  let attesting_slot2 = {Op.slot = slot2; consensus_pkh} in
+  let* attestation1 =
+    Op.raw_attestation ~attesting_slot:attesting_slot1 block
+  in
+  let* attestation2 =
+    Op.raw_attestation ~attesting_slot:attesting_slot2 block
+  in
   let double_attestation_evidence =
     double_attestation (B block) attestation1 attestation2
   in
@@ -1107,7 +1067,6 @@ let tests =
       `Quick
       test_too_late_double_attestation_evidence;
     Tztest.tztest "different delegates" `Quick test_different_delegates;
-    Tztest.tztest "wrong delegate" `Quick test_wrong_delegate;
     Tztest.tztest
       "different slots under feature flag"
       `Quick

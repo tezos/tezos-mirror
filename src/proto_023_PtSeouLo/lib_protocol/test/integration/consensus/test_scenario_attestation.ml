@@ -54,18 +54,35 @@ let check_aggregated_committee ~check_not_found ~kind delegates =
         List.map_es
           (fun delegate_name ->
             let delegate = State.find_account delegate_name state in
-            let* consensus_key_info =
-              Context.Delegate.consensus_key (B state.grandparent) delegate.pkh
+            let block_at_attested_level =
+              match kind with
+              | Preattestation ->
+                  block
+                  (* The preattested block is a block at the same
+                     level as [block] but an earlier round. For
+                     retrieving the appropriate consensus_key we only
+                     care about the level so we can use [block]. *)
+              | Attestation -> state.grandparent (* [block]'s predecessor *)
             in
-            let consensus_key = consensus_key_info.active in
-            let* consensus_key = Account.find consensus_key.consensus_key_pkh in
-            return (delegate.pkh, consensus_key.pkh))
+            let* consensus_key_info =
+              Context.Delegate.consensus_key
+                (B block_at_attested_level)
+                delegate.pkh
+            in
+            return
+              {
+                Protocol.Alpha_context.Consensus_key.delegate = delegate.pkh;
+                consensus_pkh = consensus_key_info.active.consensus_key_pkh;
+              })
           delegates
       in
       let metadata = Stdlib.Option.get state.previous_metadata in
       check_attestation_aggregate_metadata
         ~check_not_found
         ~kind
+        ~expect_same_order:false
+          (* Delegates are provided manually and may not be sorted the
+             same way as when construction the aggregation. *)
         delegates
         metadata
         (block, state))

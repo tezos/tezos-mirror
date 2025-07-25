@@ -135,28 +135,33 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
+type attester = Plugin.RPC.Validators.t = {
+  level : Raw_level.t;
+  delegate : Signature.public_key_hash;
+  consensus_key : Signature.public_key_hash;
+  companion_key : Signature.Bls.Public_key_hash.t option;
+  slots : Slot.t list;
+}
+
 let get_attesters ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
+
+let get_attester ?manager_pkh ctxt =
+  let open Lwt_result_syntax in
+  let* attesters = get_attesters ctxt in
+  match manager_pkh with
+  | None -> return (WithExceptions.Option.get ~loc:__LOC__ (List.hd attesters))
+  | Some manager_pkh ->
+      List.find_opt
+        (fun {delegate; _} ->
+          Signature.Public_key_hash.equal delegate manager_pkh)
+        attesters
+      |> WithExceptions.Option.get ~loc:__LOC__
+      |> return
 
 let get_first_different_attesters ctxt =
   let open Lwt_result_syntax in
   let+ attesters = get_attesters ctxt in
   match attesters with x :: y :: _ -> (x, y) | _ -> assert false
-
-let get_attester ctxt =
-  let open Lwt_result_syntax in
-  let+ attesters = get_attesters ctxt in
-  let attester = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd attesters in
-  (attester.consensus_key, attester.slots)
-
-let get_attester_slot ctxt pkh =
-  let open Lwt_result_syntax in
-  let+ attesters = get_attesters ctxt in
-  List.find_map
-    (function
-      | {Plugin.RPC.Validators.consensus_key; slots; _} ->
-          if Signature.Public_key_hash.(consensus_key = pkh) then Some slots
-          else None)
-    attesters
 
 let get_attester_n ctxt n =
   let open Lwt_result_syntax in
@@ -165,6 +170,21 @@ let get_attester_n ctxt n =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
   (attester.consensus_key, attester.slots)
+
+let attester_has_bls_key {consensus_key; _} =
+  Signature.Public_key_hash.is_bls consensus_key
+
+let get_attesters_with_bls_key ctxt =
+  let open Lwt_result_syntax in
+  let* attesters = get_attesters ctxt in
+  return (List.filter attester_has_bls_key attesters)
+
+let get_attester_with_bls_key ctxt =
+  let open Lwt_result_syntax in
+  let* attesters = get_attesters ctxt in
+  List.find_opt attester_has_bls_key attesters
+  |> WithExceptions.Option.get ~loc:__LOC__
+  |> return
 
 let get_attesting_power_for_delegate ctxt ?level pkh =
   let open Lwt_result_syntax in

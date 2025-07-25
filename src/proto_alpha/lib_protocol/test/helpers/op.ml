@@ -80,30 +80,93 @@ let mk_block_payload_hash (b : Block.t) =
     ~payload_round
     hashes
 
-let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
-    ?block_payload_hash ?branch attested_block =
+type attesting_slot = {slot : Slot.t; consensus_pkh : public_key_hash}
+
+let attesting_slot_of_attester {Plugin.RPC.Validators.consensus_key; slots; _} =
+  let slot = List.hd slots |> WithExceptions.Option.get ~loc:__LOC__ in
+  {slot; consensus_pkh = consensus_key}
+
+let get_attesting_slot ~attested_block =
+  let open Lwt_result_syntax in
+  let* attester = Context.get_attester (B attested_block) in
+  return (attesting_slot_of_attester attester)
+
+let get_attesting_slot_of_delegate ~manager_pkh ~attested_block =
+  let open Lwt_result_syntax in
+  let* attester = Context.get_attester ~manager_pkh (B attested_block) in
+  return (attesting_slot_of_attester attester)
+
+let get_different_attesting_slot ~consensus_pkh_to_avoid ~attested_block =
+  let open Lwt_result_syntax in
+  let* attesters = Context.get_attesters (B attested_block) in
+  let attester =
+    List.find_opt
+      (fun {Plugin.RPC.Validators.consensus_key; _} ->
+        not
+          (Signature.Public_key_hash.equal consensus_key consensus_pkh_to_avoid))
+      attesters
+    |> WithExceptions.Option.get ~loc:__LOC__
+  in
+  return (attesting_slot_of_attester attester)
+
+let non_canonical_attesting_slot_of_attester {Context.consensus_key; slots; _} =
+  let slot =
+    match slots with
+    | _ :: non_canonical_slot :: _ -> non_canonical_slot
+    | _ -> Test.fail ~__LOC__ "Expected attester to have at least two slots"
+  in
+  {slot; consensus_pkh = consensus_key}
+
+let get_non_canonical_attesting_slot ~attested_block =
+  let open Lwt_result_syntax in
+  let* attester = Context.get_attester (B attested_block) in
+  return (non_canonical_attesting_slot_of_attester attester)
+
+let default_committee ~attested_block =
+  let open Lwt_result_syntax in
+  let* attesters_with_bls_key =
+    Context.get_attesters_with_bls_key (B attested_block)
+  in
+  return (List.map attesting_slot_of_attester attesters_with_bls_key)
+
+let get_attesting_slot_with_bls_key ~attested_block =
+  let open Lwt_result_syntax in
+  let* attester = Context.get_attester_with_bls_key (B attested_block) in
+  return (attesting_slot_of_attester attester)
+
+let get_attesting_slot_with_non_bls_key ~attested_block =
+  let open Lwt_result_syntax in
+  let* attesters = Context.get_attesters (B attested_block) in
+  let attester =
+    List.find_opt
+      (fun attester -> not (Context.attester_has_bls_key attester))
+      attesters
+    |> WithExceptions.Option.get ~loc:__LOC__
+  in
+  return (attesting_slot_of_attester attester)
+
+let attesting_slot_of_delegate_rights
+    {RPC.Attestation_rights.consensus_key; first_slot; _} =
+  {slot = first_slot; consensus_pkh = consensus_key}
+
+let mk_consensus_content_signer_and_branch ?attesting_slot ?manager_pkh ?level
+    ?round ?block_payload_hash ?branch attested_block =
   let open Lwt_result_wrap_syntax in
   let branch =
     match branch with
     | None -> attested_block.Block.header.shell.predecessor
     | Some branch -> branch
   in
-  let* delegate_pkh, slots =
-    match delegate with
-    | None -> Context.get_attester (B attested_block)
-    | Some del -> (
-        let* slots = Context.get_attester_slot (B attested_block) del in
-        match slots with
-        | None -> return (del, [])
-        | Some slots -> return (del, slots))
-  in
-  let* slot =
-    match slot with
-    | None -> (
-        match List.hd slots with
-        | Some s -> return s
-        | None -> tzfail (Block.No_slots_found_for delegate_pkh))
-    | Some slot -> return slot
+  let* {slot; consensus_pkh} =
+    match (attesting_slot, manager_pkh) with
+    | Some attesting_slot, None -> return attesting_slot
+    | None, None -> get_attesting_slot ~attested_block
+    | None, Some manager_pkh ->
+        get_attesting_slot_of_delegate ~manager_pkh ~attested_block
+    | Some _, Some _ ->
+        Test.fail
+          ~__LOC__
+          "Cannot provide both ~attesting_slot and ~manager_pkh"
   in
   let* level =
     match level with
@@ -125,16 +188,16 @@ let mk_consensus_content_signer_and_branch ?delegate ?slot ?level ?round
     | Some block_payload_hash -> block_payload_hash
   in
   let consensus_content = {slot; level; round; block_payload_hash} in
-  let* signer = Account.find delegate_pkh in
+  let* signer = Account.find consensus_pkh in
   return (consensus_content, signer.sk, branch)
 
-let raw_attestation ?delegate ?slot ?level ?round ?block_payload_hash
-    ?dal_content ?branch attested_block =
+let raw_attestation ?attesting_slot ?manager_pkh ?level ?round
+    ?block_payload_hash ?dal_content ?branch attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
-      ?delegate
-      ?slot
+      ?attesting_slot
+      ?manager_pkh
       ?level
       ?round
       ?block_payload_hash
@@ -156,7 +219,7 @@ let raw_aggregate attestations =
         match (contents, signature) with
         | ( Single (Attestation {consensus_content; dal_content}),
             Some (Bls bls_sig) ) -> (
-            let {slot; _} = consensus_content in
+            let ({slot; _} : consensus_content) = consensus_content in
             match acc with
             | Some (shell, proposal, slots, signatures) ->
                 Some
@@ -186,16 +249,13 @@ let raw_aggregate attestations =
   let protocol_data = {contents; signature = Some (Bls signature)} in
   ({shell; protocol_data} : Kind.attestations_aggregate operation)
 
-let aggregate attestations =
-  Option.map Operation.pack (raw_aggregate attestations)
-
 let raw_aggregate_preattestations preattestations =
   let aggregate_content =
     List.fold_left
       (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
         match (contents, signature) with
         | Single (Preattestation consensus_content), Some (Bls bls_sig) -> (
-            let {slot; _} = consensus_content in
+            let ({slot; _} : consensus_content) = consensus_content in
             match acc with
             | Some (shell, proposal, slots, signatures) ->
                 Some (shell, proposal, slot :: slots, bls_sig :: signatures)
@@ -221,16 +281,13 @@ let raw_aggregate_preattestations preattestations =
   let protocol_data = {contents; signature = Some (Bls signature)} in
   ({shell; protocol_data} : Kind.preattestations_aggregate operation)
 
-let aggregate_preattestations preattestations =
-  Option.map Operation.pack (raw_aggregate_preattestations preattestations)
-
-let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
-    ?branch attested_block =
+let attestation ?attesting_slot ?manager_pkh ?level ?round ?block_payload_hash
+    ?dal_content ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_attestation
-      ?delegate
-      ?slot
+      ?attesting_slot
+      ?manager_pkh
       ?level
       ?round
       ?block_payload_hash
@@ -240,27 +297,25 @@ let attestation ?delegate ?slot ?level ?round ?block_payload_hash ?dal_content
   in
   return (Operation.pack op)
 
-let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
+    ?branch attested_block =
   let open Lwt_result_syntax in
   let* committee =
     match committee with
     | Some committee -> return committee
     | None ->
-        let* attesters = Context.get_attesters (B attested_block) in
+        let* attesting_slots = default_committee ~attested_block in
         return
-        @@ List.filter_map
-             (fun attester ->
-               match attester.Plugin.RPC.Validators.consensus_key with
-               | Bls _ -> Some attester.delegate
-               | _ -> None)
-             attesters
+          (List.map
+             (fun attesting_slot -> (attesting_slot, None))
+             attesting_slots)
   in
   let* attestations =
     List.map_es
-      (fun delegate ->
+      (fun (attesting_slot, dal_content) ->
         raw_attestation
-          ~delegate
+          ~attesting_slot
+          ?dal_content
           ?level
           ?round
           ?block_payload_hash
@@ -268,17 +323,31 @@ let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
           attested_block)
       committee
   in
-  match aggregate attestations with
+  match raw_aggregate attestations with
   | Some aggregate_attestation -> return aggregate_attestation
   | None -> failwith "no Bls delegate found"
 
-let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
+let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
     attested_block =
+  let open Lwt_result_syntax in
+  let* op =
+    raw_attestations_aggregate
+      ?committee
+      ?level
+      ?round
+      ?block_payload_hash
+      ?branch
+      attested_block
+  in
+  return (Operation.pack op)
+
+let raw_preattestation ?attesting_slot ?manager_pkh ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* consensus_content, signer, branch =
     mk_consensus_content_signer_and_branch
-      ?delegate
-      ?slot
+      ?attesting_slot
+      ?manager_pkh
       ?level
       ?round
       ?block_payload_hash
@@ -293,13 +362,13 @@ let raw_preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
     branch
     contents
 
-let preattestation ?delegate ?slot ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let preattestation ?attesting_slot ?manager_pkh ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_preattestation
-      ?delegate
-      ?slot
+      ?attesting_slot
+      ?manager_pkh
       ?level
       ?round
       ?block_payload_hash
@@ -314,21 +383,13 @@ let raw_preattestations_aggregate ?committee ?level ?round ?block_payload_hash
   let* committee =
     match committee with
     | Some committee -> return committee
-    | None ->
-        let* attesters = Context.get_attesters (B attested_block) in
-        return
-        @@ List.filter_map
-             (fun attester ->
-               match attester.Plugin.RPC.Validators.consensus_key with
-               | Bls _ -> Some attester.delegate
-               | _ -> None)
-             attesters
+    | None -> default_committee ~attested_block
   in
   let* preattestations =
     List.map_es
-      (fun delegate ->
+      (fun attesting_slot ->
         raw_preattestation
-          ~delegate
+          ~attesting_slot
           ?level
           ?round
           ?block_payload_hash
@@ -1338,58 +1399,79 @@ let show_mode = function
   | Construction -> "Construction"
   | Mempool -> "Mempool"
 
-let check_validation_and_application ~loc ?error ~predecessor mode operation =
+let check_validation_and_application ~loc ?check_after ?error ~predecessor mode
+    operation =
   let open Lwt_result_syntax in
-  let check_error res =
-    match error with
-    | Some error -> Assert.proto_error ~loc res error
-    | None ->
+  let check_res res =
+    match (check_after, error) with
+    | None, None ->
         (* assert success *)
-        let*? (_ : Block.t) = res in
+        let*? (_ : Block.block_with_metadata) = res in
         return_unit
+    | Some check_after, None ->
+        let*? block_with_metadata = res in
+        check_after block_with_metadata
+    | None, Some error -> Assert.proto_error ~loc res error
+    | Some _, Some _ ->
+        Test.fail
+          "Op.check_validation_and_application: cannot provide both \
+           [check_after] and [error] (called from: %s)"
+          loc
   in
   match mode with
   | Application ->
       let*! result =
-        Block.bake ~baking_mode:Application ~operation predecessor
+        Block.bake_with_metadata ~baking_mode:Application ~operation predecessor
       in
-      check_error result
+      check_res result
   | Construction ->
-      let*! result = Block.bake ~baking_mode:Baking ~operation predecessor in
-      check_error result
+      let*! result =
+        Block.bake_with_metadata ~baking_mode:Baking ~operation predecessor
+      in
+      check_res result
   | Mempool ->
       let*! res =
         let* inc =
           Incremental.begin_construction ~mempool_mode:true predecessor
         in
-        let* inc = Incremental.add_operation inc operation in
+        let* inc, op_receipt =
+          Incremental.add_operation_with_metadata inc operation
+        in
         (* Finalization doesn't do much in mempool mode, but some RPCs
            still call it, so we check that it doesn't fail unexpectedly. *)
-        Incremental.finalize_block inc
+        let* block, header_metadata =
+          Incremental.finalize_block_with_metadata inc
+        in
+        return (block, (header_metadata, [op_receipt]))
       in
-      check_error res
+      check_res res
 
 let check_validation_and_application_all_modes_different_outcomes ~loc
+    ?check_after_application ?check_after_construction ?check_after_mempool
     ?application_error ?construction_error ?mempool_error ~predecessor operation
     =
   List.iter_es
-    (fun (mode, error) ->
+    (fun (mode, check_after, error) ->
       check_validation_and_application
         ~loc:(Format.sprintf "%s (%s mode)" loc (show_mode mode))
+        ?check_after
         ?error
         ~predecessor
         mode
         operation)
     [
-      (Application, application_error);
-      (Construction, construction_error);
-      (Mempool, mempool_error);
+      (Application, check_after_application, application_error);
+      (Construction, check_after_construction, construction_error);
+      (Mempool, check_after_mempool, mempool_error);
     ]
 
-let check_validation_and_application_all_modes ~loc ?error ~predecessor
-    operation =
+let check_validation_and_application_all_modes ~loc ?check_after ?error
+    ~predecessor operation =
   check_validation_and_application_all_modes_different_outcomes
     ~loc
+    ?check_after_application:check_after
+    ?check_after_construction:check_after
+    ?check_after_mempool:check_after
     ?application_error:error
     ?construction_error:error
     ?mempool_error:error

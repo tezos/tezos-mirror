@@ -193,8 +193,8 @@ let test_valid_double_baking_followed_by_double_attesting () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_final =
     Block.bake ~policy:(By_account baker2) ~operation blk_with_db_evidence
@@ -271,8 +271,8 @@ let test_valid_double_attesting_followed_by_double_baking () =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then e1.delegate
     else e2.delegate
   in
-  let* attestation_a = Op.raw_attestation ~delegate blk_a in
-  let* attestation_b = Op.raw_attestation ~delegate blk_b in
+  let* attestation_a = Op.raw_attestation ~manager_pkh:delegate blk_a in
+  let* attestation_b = Op.raw_attestation ~manager_pkh:delegate blk_b in
   let operation = double_attestation (B genesis) attestation_a attestation_b in
   let* blk_with_de_evidence =
     Block.bake ~policy:(By_account baker2) ~operation blk_a
@@ -365,7 +365,7 @@ let test_payload_producer_gets_evidence_rewards () =
   let* preattestations =
     List.map_ep
       (fun (attester, _slots) ->
-        Op.preattestation ~delegate:attester b_with_evidence)
+        Op.preattestation ~manager_pkh:attester b_with_evidence)
       preattesters
   in
   let* b' =

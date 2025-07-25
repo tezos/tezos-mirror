@@ -53,8 +53,8 @@ end = struct
       ?(preattestation_round = Round.zero)
       ?(preattested_block = fun _predpred _pred curr -> curr)
       ?(mk_ops = fun op -> [op])
-      ?(get_delegate_and_slot =
-        fun _predpred _pred _curr -> Lwt_result_syntax.return (None, None))
+      ?(get_attesting_slot =
+        fun ~attested_block:_ -> Lwt_result_syntax.return_none)
       ?(post_process = Ok (fun _ -> Lwt_result_syntax.return_unit)) ~loc () =
     let open Lwt_result_syntax in
     let* genesis, _contracts =
@@ -64,11 +64,10 @@ end = struct
     let* attestation = Op.attestation b1 in
     let* b2 = bake b1 ~operations:[attestation] in
     let attested_block = preattested_block genesis b1 b2 in
-    let* delegate, slot = get_delegate_and_slot genesis b1 b2 in
+    let* attesting_slot = get_attesting_slot ~attested_block in
     let* p =
       Op.preattestation
-        ?delegate
-        ?slot
+        ?attesting_slot
         ~round:preattestation_round
         attested_block
     in
@@ -162,30 +161,17 @@ end = struct
 
   (** OK: explicit the correct attester and preattesting slot in the test *)
   let preattestation_in_block_with_good_slot () =
-    let open Lwt_result_syntax in
-    aux_simple_preattestation_inclusion
-      ~get_delegate_and_slot:(fun _predpred _pred curr ->
-        let module V = Plugin.RPC.Validators in
-        let* validators = Context.get_attesters (B curr) in
-        match validators with
-        | {V.delegate; slots = s :: _; _} :: _ -> return (Some delegate, Some s)
-        | _ -> assert false
-        (* there is at least one attester with a slot *))
-      ~loc:__LOC__
-      ()
+    aux_simple_preattestation_inclusion ~loc:__LOC__ ()
 
   (** KO: the used slot for injecting the attestation is not the canonical one *)
   let preattestation_in_block_with_wrong_slot () =
     let open Lwt_result_syntax in
     aux_simple_preattestation_inclusion
-      ~get_delegate_and_slot:(fun _predpred _pred curr ->
-        let module V = Plugin.RPC.Validators in
-        let* validators = Context.get_attesters (B curr) in
-        match validators with
-        | {V.delegate; V.slots = _ :: non_canonical_slot :: _; _} :: _ ->
-            return (Some delegate, Some non_canonical_slot)
-        | _ -> assert false
-        (* there is at least one attester with a slot *))
+      ~get_attesting_slot:(fun ~attested_block ->
+        let* attesting_slot =
+          Op.get_non_canonical_attesting_slot ~attested_block
+        in
+        return_some attesting_slot)
       ~loc:__LOC__
       ~post_process:
         (Error
@@ -201,15 +187,18 @@ end = struct
   let preattestation_in_block_with_wrong_signature () =
     let open Lwt_result_syntax in
     aux_simple_preattestation_inclusion
-      ~get_delegate_and_slot:(fun _predpred _pred curr ->
-        let module V = Plugin.RPC.Validators in
-        let* validators = Context.get_attesters (B curr) in
-        match validators with
-        | {V.delegate; _} :: {V.slots = s :: _; _} :: _ ->
-            (* the canonical slot s is not owned by the delegate "delegate" !*)
-            return (Some delegate, Some s)
-        | _ -> assert false
-        (* there is at least one attester with a slot *))
+      ~get_attesting_slot:(fun ~attested_block ->
+        let* attester = Context.get_attester (B attested_block) in
+        let* another_delegates_attesting_slot =
+          Op.get_different_attesting_slot
+            ~consensus_pkh_to_avoid:attester.consensus_key
+            ~attested_block
+        in
+        return_some
+          {
+            Op.slot = another_delegates_attesting_slot.slot;
+            consensus_pkh = attester.consensus_key;
+          })
       ~loc:__LOC__
       ~post_process:
         (Error
