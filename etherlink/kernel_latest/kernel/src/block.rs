@@ -618,7 +618,6 @@ mod tests {
     use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_crypto_rs::hash::UnknownSignature;
-    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
@@ -692,19 +691,17 @@ mod tests {
         branch: &H256,
         content: &ManagerOperationContent,
     ) -> UnknownSignature {
-        // Watermark comes from `src/lib_crypto/signature_v2.ml`
-        // The watermark for a ManagerOperation is always `Generic_operation`
-        // encoded with `0x03`
-        let mut serialized_unsigned_operation = vec![3_u8];
-
-        let branch = branch.as_fixed_bytes();
-        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
-        content
-            .bin_write(&mut serialized_unsigned_operation)
+        let serialized_unsigned_operation =
+            tezos_tezlink::operation::serialize_unsigned_operation(
+                &(*branch).into(),
+                content,
+            )
             .unwrap();
+
         let signature = sk
             .sign(serialized_unsigned_operation)
             .expect("Signature should have succeeded");
+
         signature.into()
     }
 
@@ -1096,8 +1093,8 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
-        let boostrap = bootstrap1();
-        let src = boostrap.pkh.clone();
+        let bootstrap = bootstrap1();
+        let src = bootstrap.pkh.clone();
 
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeeded");
@@ -1123,7 +1120,7 @@ mod tests {
         assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, boostrap);
+        let reveal = make_reveal_operation(0, 1, 0, 0, bootstrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,

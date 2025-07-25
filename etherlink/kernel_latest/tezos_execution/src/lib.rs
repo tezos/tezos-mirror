@@ -455,7 +455,6 @@ mod tests {
     use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
     use primitive_types::H256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519, UnknownSignature};
-    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -520,16 +519,13 @@ mod tests {
         branch: &H256,
         content: &ManagerOperationContent,
     ) -> UnknownSignature {
-        // Watermark comes from `src/lib_crypto/signature_v2.ml`
-        // The watermark for a ManagerOperation is always `Generic_operation`
-        // encoded with `0x03`
-        let mut serialized_unsigned_operation = vec![3_u8];
-
-        let branch = branch.as_fixed_bytes();
-        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
-        content
-            .bin_write(&mut serialized_unsigned_operation)
+        let serialized_unsigned_operation =
+            tezos_tezlink::operation::serialize_unsigned_operation(
+                &(*branch).into(),
+                content,
+            )
             .unwrap();
+
         let signature = sk
             .sign(serialized_unsigned_operation)
             .expect("Signature should have succeeded");
