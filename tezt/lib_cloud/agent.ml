@@ -219,7 +219,7 @@ let host_run_command agent cmd args =
   | Some cmd_wrapper ->
       Process.spawn cmd_wrapper.Gcloud.cmd (cmd_wrapper.args @ [cmd] @ args)
 
-let docker_run_command agent ?(detach = false) cmd args =
+let docker_run_command ?name agent ?(detach = false) cmd args =
   (* This function allows to run a command and detach it from the terminal
       session and parent process. This allows to run a command in background
       without the session (and processes group) being killed by ssh on
@@ -241,12 +241,12 @@ let docker_run_command agent ?(detach = false) cmd args =
   match agent.runner with
   | None ->
       let cmd, args = if detach then run_detached cmd args else (cmd, args) in
-      Process.spawn cmd args
+      Process.spawn ?name cmd args
   | Some runner ->
       let cmd, args =
         if detach then run_detached ~runner cmd args else (cmd, args)
       in
-      Process.spawn ~runner cmd args
+      Process.spawn ?name ~runner cmd args
 
 let copy agent ~consistency_check ~is_directory ~source ~destination =
   let* exists =
