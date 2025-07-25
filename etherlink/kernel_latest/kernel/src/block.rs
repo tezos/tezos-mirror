@@ -587,8 +587,7 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_tezlink::enc_wrappers::BlockHash;
-    use tezos_tezlink::operation::ManagerOperationContent;
+    use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameter;
 
     use crate::block_storage;
@@ -617,7 +616,6 @@ mod tests {
     use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
-    use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
@@ -684,22 +682,6 @@ mod tests {
             )
             .unwrap(),
         }
-    }
-
-    fn sign_operation(
-        sk: &SecretKeyEd25519,
-        branch: &BlockHash,
-        content: &ManagerOperationContent,
-    ) -> Result<UnknownSignature, tezos_tezlink::operation::SignatureErrors> {
-        let serialized_unsigned_operation =
-            tezos_tezlink::operation::serialize_unsigned_operation(branch, content)
-                .unwrap();
-
-        let signature = sk
-            .sign(serialized_unsigned_operation)
-            .expect("Signature should have succeeded");
-
-        Ok(signature.into())
     }
 
     fn make_operation(

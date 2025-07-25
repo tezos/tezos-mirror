@@ -453,16 +453,15 @@ pub fn apply_operation<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
-    use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519, UnknownSignature};
+    use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
-        enc_wrappers::BlockHash,
         operation::{
-            ManagerOperation, ManagerOperationContent, Operation, OperationContent,
-            Parameter, RevealContent, TransferContent,
+            sign_operation, ManagerOperation, Operation, OperationContent, Parameter,
+            RevealContent, TransferContent,
         },
         operation_result::{
             Balance, BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
@@ -511,21 +510,6 @@ mod tests {
             )
             .unwrap(),
         }
-    }
-
-    fn sign_operation(
-        sk: &SecretKeyEd25519,
-        branch: &BlockHash,
-        content: &ManagerOperationContent,
-    ) -> Result<UnknownSignature, tezos_tezlink::operation::SignatureErrors> {
-        let serialized_unsigned_operation =
-            tezos_tezlink::operation::serialize_unsigned_operation(branch, content)
-                .unwrap();
-
-        let signature = sk
-            .sign(serialized_unsigned_operation)
-            .expect("Signature should have succeeded");
-        Ok(signature.into())
     }
 
     const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";

@@ -11,7 +11,7 @@ use nom::Finish;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{BlsSignature, UnknownSignature};
+use tezos_crypto_rs::hash::{BlsSignature, SecretKeyEd25519, UnknownSignature};
 use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
@@ -233,6 +233,18 @@ pub enum SignatureErrors {
     BinError(#[from] BinError),
     #[error("Signing failed with cryptographic error {0}")]
     CryptoError(#[from] tezos_crypto_rs::CryptoError),
+}
+
+pub fn sign_operation(
+    sk: &SecretKeyEd25519,
+    branch: &BlockHash,
+    content: &ManagerOperationContent,
+) -> Result<UnknownSignature, SignatureErrors> {
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
+
+    let signature = sk.sign(serialized_unsigned_operation)?;
+
+    Ok(signature.into())
 }
 
 pub fn verify_signature(
