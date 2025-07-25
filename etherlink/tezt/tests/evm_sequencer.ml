@@ -12824,11 +12824,13 @@ let test_deposit_event =
 
   unit
 
-let test_withdrawal_events =
+let test_withdrawal_events ~enable_revm =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "withdrawal"; "event"]
-    ~title:"Regression test for the withdrawal events"
+    ~title:
+      ("Regression test for the withdrawal events"
+      ^ if enable_revm then " (with revm)" else "")
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12849,7 +12851,7 @@ let test_withdrawal_events =
       ~enable_multichain:false
         (* TODO: temporary, needs migration to set custom precompile's
            bytecode. *)
-      ~enable_revm:false
+      ~enable_revm
       ~enable_fast_withdrawal:true
       protocol
   in
@@ -12913,11 +12915,13 @@ let test_withdrawal_events =
 
   unit
 
-let test_fa_deposit_and_withdrawals_events =
+let test_fa_deposit_and_withdrawals_events ~enable_revm =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "fa_bridge"; "event"]
-    ~title:"Regression test for the FA deposit and withdrawal events"
+    ~title:
+      ("Regression test for the FA deposit and withdrawal events"
+      ^ if enable_revm then " (with revm)" else "")
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12939,7 +12943,7 @@ let test_fa_deposit_and_withdrawals_events =
       ~enable_multichain:false
         (* TODO: temporary, needs migration to set custom precompile's
            bytecode. *)
-      ~enable_revm:false
+      ~enable_revm
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol
@@ -13268,43 +13272,8 @@ let expect_failure msg k =
       Test.fail msg)
     (fun _ -> unit)
 
-let test_fa_deposit_can_be_claimed =
-  register_all
-    ~__FILE__
-    ~kernels:[Latest]
-    ~tags:["evm"; "fa_deposit"; "claim"]
-    ~time_between_blocks:Nothing
-    ~use_dal:Register_without_feature
-    ~enable_fa_bridge:true
-    ~use_multichain:Register_without_feature
-    ~maximum_allowed_ticks:2_000_000_000L
-    ~use_revm:activate_revm_registration
-    ~title:"Claims are operational"
-  @@ fun {
-           client;
-           sequencer;
-           sc_rollup_address;
-           proxy;
-           sc_rollup_node;
-           evm_version;
-           _;
-         }
-             _protocol ->
-  let* l1_contract =
-    Client.originate_contract
-      ~alias:"l1_contract"
-      ~amount:Tez.zero
-      ~src:Constant.bootstrap4.public_key_hash
-      ~prg:"etherlink/tezos_contracts/fa_deposit.tz"
-      ~burn_cap:Tez.one
-      client
-  in
-  let* () = Client.bake_for_and_wait client in
-
-  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
-
-  Log.info "%s originated" l1_contract ;
-
+let produce_proxy_owned_fa_deposit_and_claim ~client ~sequencer
+    ~sc_rollup_address ~evm_version ~fa_deposit =
   let* incrementor = Solidity_contracts.incrementor evm_version in
 
   let* incrementor, _tx_hash =
@@ -13339,7 +13308,7 @@ let test_fa_deposit_can_be_claimed =
   let* () =
     Client.transfer
       ~giver:Constant.bootstrap4.public_key_hash
-      ~receiver:l1_contract
+      ~receiver:fa_deposit
       ~arg:
         (sf
            {|Pair 50 (Pair 0x%s%s "%s")|}
@@ -13373,6 +13342,30 @@ let test_fa_deposit_can_be_claimed =
   in
   let produce_block () = Rpc.produce_block sequencer in
   let* _res = wait_for_application ~produce_block claim in
+  return nonce
+
+let test_fa_deposit_can_be_claimed =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "fa_deposit"; "claim"]
+    ~time_between_blocks:Nothing
+    ~use_dal:Register_without_feature
+    ~enable_fa_bridge:true
+    ~use_multichain:Register_without_feature
+    ~maximum_allowed_ticks:2_000_000_000L
+    ~use_revm:activate_revm_registration
+    ~title:"Claims are operational"
+  @@ fun {client; sequencer; sc_rollup_address; evm_version; l1_contracts; _}
+             _protocol ->
+  let* nonce =
+    produce_proxy_owned_fa_deposit_and_claim
+      ~client
+      ~sequencer
+      ~sc_rollup_address
+      ~evm_version
+      ~fa_deposit:l1_contracts.fa_deposit
+  in
 
   let*@ block =
     Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" sequencer
@@ -13409,6 +13402,48 @@ let test_fa_deposit_can_be_claimed =
       ()
   in
 
+  unit
+
+let test_claim_deposit_event ~enable_revm =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "fa_bridge"; "claim"; "deposit"; "event"]
+    ~title:
+      ("Regression test for the claimed FA deposit event"
+      ^ if enable_revm then " (with revm)" else "")
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let* {sequencer; sc_rollup_address; client; evm_version; l1_contracts; _} =
+    let genesis_timestamp = next_timestamp () in
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+      ~enable_revm
+      ~enable_fa_bridge:true
+      ~enable_fast_fa_withdrawal:true
+      protocol
+  in
+  let* _nonce =
+    produce_proxy_owned_fa_deposit_and_claim
+      ~client
+      ~sequencer
+      ~sc_rollup_address
+      ~evm_version
+      ~fa_deposit:l1_contracts.fa_deposit
+  in
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+  capture_logs ~header:"Claimed deposit" receipt.logs ;
   unit
 
 let test_eip2930_storage_access =
@@ -13663,9 +13698,13 @@ let () =
   test_tx_queue_limit [Alpha] ;
   test_observer_periodic_snapshot [Alpha] ;
   test_deposit_event [Alpha] ;
-  test_withdrawal_events [Alpha] ;
-  test_fa_deposit_and_withdrawals_events [Alpha] ;
+  test_withdrawal_events [Alpha] ~enable_revm:false ;
+  test_withdrawal_events [Alpha] ~enable_revm:true ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:false ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:true ;
   test_block_producer_validation [Alpha] ;
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
+  test_claim_deposit_event [Alpha] ~enable_revm:false ;
+  test_claim_deposit_event [Alpha] ~enable_revm:true ;
   test_eip2930_storage_access [Alpha]
