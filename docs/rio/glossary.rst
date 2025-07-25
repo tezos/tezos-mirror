@@ -131,6 +131,9 @@ _`Attestation lag`
     A delay of a certain number of blocks that gives DAL nodes time to verify that DAL data is available.
     Attesters (via their DAL nodes) include their DAL attestations in their attestation operations immediately after the attestation lag has passed.
 
+_`Attestation quorum`
+    As described in :doc:`The consensus algorithm<consensus>`, the minimal number of attestations that are needed to consider a block as pre-attested or attested.
+
 _`Attestation threshold`
     In the DAL, the minimum percentage of DAL shard_\ s that must be attested by attesters before the data is considered to be attested and therefore available to Smart Rollups.
 
@@ -204,12 +207,15 @@ _`Cycle`
 _`DAL`
     See `Data Availability Layer`_
 
+_`DAL node`
+    DAL nodes (instances of the ``octez-dal-node`` binary) are responsible for distributing the data that users submit to the DAL.
+
+_`DAL slot`
+    Each block has a certain number of slots to which Data Availability Layer users can post raw data (also called blobs, for binary large objects) to distribute via the DAL.
+
 _`Data Availability Layer`
     The Data Availability Layer (DAL) is a companion peer-to-peer network for Tezos that distributes data to Smart Rollups.
     See :doc:`../shell/dal`.
-
-_`DAL node`
-    DAL nodes (instances of the ``octez-dal-node`` binary) are responsible for distributing the data that users submit to the DAL.
 
 .. _def_delegate:
 .. _def_delegate_rio:
@@ -400,9 +406,6 @@ _`Smart Rollup`
     Smart rollups constitute a `Layer 2`_ solution that can be used to deploy either a general-purpose polyvalent Layer 2 blockchain
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
-
-_`DAL slot`
-    Each block has a certain number of slots to which Data Availability Layer users can post raw data (also called blobs, for binary large objects) to distribute via the DAL.
 
 _`Staker`
     A `user account`_ that made a security deposit.
