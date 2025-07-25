@@ -2558,7 +2558,6 @@ dependencies = [
 name = "revm-etherlink"
 version = "0.1.0"
 dependencies = [
- "alloy-primitives 1.2.1",
  "alloy-sol-types 1.2.1",
  "format_no_std",
  "hex",
