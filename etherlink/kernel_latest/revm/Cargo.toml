@@ -17,9 +17,7 @@ revm.workspace = true
 hex.workspace = true
 primitive-types.workspace = true
 tezos_ethereum.workspace = true
-alloy-sol-types = { version = "1.2.0", default-features = false, features = [
-    "json",
-] }
+alloy-sol-types.workspace = true
 num-bigint.workspace = true
 rlp.workspace = true
 nom.workspace = true
