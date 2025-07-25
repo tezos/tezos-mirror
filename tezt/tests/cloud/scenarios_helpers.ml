@@ -51,6 +51,7 @@ let add_prometheus_source ?dal_node ?sc_rollup_node ?evm_node ?node cloud agent
     Option.map
       (fun evm_node ->
         target
+          (* Note: Evm node uses the same port for rpc and for metrics *)
           (Tezos.Evm_node.rpc_port evm_node)
           (Tezt_etherlink.Evm_node.name evm_node))
       evm_node
