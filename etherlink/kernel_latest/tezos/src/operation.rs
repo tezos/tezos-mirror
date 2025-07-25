@@ -208,12 +208,10 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
     }
 }
 
-pub fn verify_signature(
-    pk: &PublicKey,
+pub fn serialize_unsigned_operation(
     branch: &BlockHash,
-    operation: &ManagerOperationContent,
-    signature: UnknownSignature,
-) -> Result<bool, BinError> {
+    content: &ManagerOperationContent,
+) -> Result<Vec<u8>, BinError> {
     // Watermark comes from `src/lib_crypto/signature_v2.ml`
     // The watermark for a ManagerOperation is always `Generic_operation`
     // encoded with `0x03`
@@ -223,7 +221,18 @@ pub fn verify_signature(
 
     let branch: [u8; 32] = branch.0.to_fixed_bytes();
     tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
-    operation.bin_write(&mut serialized_unsigned_operation)?;
+    content.bin_write(&mut serialized_unsigned_operation)?;
+
+    Ok(serialized_unsigned_operation)
+}
+
+pub fn verify_signature(
+    pk: &PublicKey,
+    branch: &BlockHash,
+    operation: &ManagerOperationContent,
+    signature: UnknownSignature,
+) -> Result<bool, BinError> {
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, operation)?;
 
     let signature = &signature.into();
 
