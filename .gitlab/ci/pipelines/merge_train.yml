@@ -680,15 +680,19 @@ oc.build_x86_64-released:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
     - cohttp/**/*
     - data-encoding/**/*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
+    - etherlink/**/*.ml*
     - irmin/**/*
+    - irmin/**/*.ml*
     - michelson_test_scripts/**/*
     - opam/**/*
     - opentelemetry/**/*
@@ -701,9 +705,11 @@ oc.build_x86_64-released:
     - scripts/**/*/
     - sdk/**/*
     - src/**/*
+    - src/**/*.ml*
     - tezt/**/*
+    - tezt/**/*.ml*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -771,15 +777,19 @@ oc.build_x86_64-exp-dev-extra:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
     - cohttp/**/*
     - data-encoding/**/*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink/**/*
+    - etherlink/**/*.ml*
     - irmin/**/*
+    - irmin/**/*.ml*
     - michelson_test_scripts/**/*
     - opam/**/*
     - opentelemetry/**/*
@@ -792,9 +802,11 @@ oc.build_x86_64-exp-dev-extra:
     - scripts/**/*/
     - sdk/**/*
     - src/**/*
+    - src/**/*.ml*
     - tezt/**/*
+    - tezt/**/*.ml*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -915,17 +927,21 @@ oc.build_kernels:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
     - cohttp/**/*
     - data-encoding/**/*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink.mk
     - etherlink/**/*
+    - etherlink/**/*.ml*
     - images/**/*
     - irmin/**/*
+    - irmin/**/*.ml*
     - kernels.mk
     - michelson_test_scripts/**/*
     - opam/**/*
@@ -940,9 +956,11 @@ oc.build_kernels:
     - scripts/ci/**/*
     - sdk/**/*
     - src/**/*
+    - src/**/*.ml*
     - tezt/**/*
+    - tezt/**/*.ml*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*
+    - vendors/**/*.ml*
     when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -996,17 +1014,21 @@ oc.build_dsn_node:
     - Makefile
     - brassaia-eio/**/*
     - brassaia/**/*
-    - client-libs/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
     - cohttp/**/*
     - data-encoding/**/*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
     - etherlink.mk
     - etherlink/**/*
+    - etherlink/**/*.ml*
     - images/**/*
     - irmin/**/*
+    - irmin/**/*.ml*
     - kernels.mk
     - michelson_test_scripts/**/*
     - opam/**/*
@@ -1021,9 +1043,11 @@ oc.build_dsn_node:
     - scripts/ci/**/*
     - sdk/**/*
     - src/**/*
+    - src/**/*.ml*
     - tezt/**/*
+    - tezt/**/*.ml*
     - tzt_reference_test_suite/**/*
-    - vendors/**/*
+    - vendors/**/*.ml*
     when: on_success
   dependencies:
   - oc.docker:rust-toolchain:amd64
@@ -3880,20 +3904,20 @@ documentation:odoc:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
+    - etherlink/**/*.ml*
+    - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -3947,20 +3971,20 @@ documentation:manuals:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
+    - etherlink/**/*.ml*
+    - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -4002,20 +4026,20 @@ documentation:docgen:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
+    - etherlink/**/*.ml*
+    - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -4066,20 +4090,20 @@ documentation:build_all:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
+    - etherlink/**/*.ml*
+    - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
     when: on_success
   needs:
   - oc.docker:ci:amd64
@@ -4118,20 +4142,20 @@ documentation:linkcheck:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
     - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*
-    - client-libs/**/*
-    - data-encoding/**/*
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
     - docs/**/*
     - dune
     - dune-project
     - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
+    - etherlink/**/*.ml*
+    - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
-    - src/**/*
-    - tezt/**/*
-    - vendors/**/*
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
     when: manual
     allow_failure: true
   needs:
