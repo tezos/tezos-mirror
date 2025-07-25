@@ -20,34 +20,6 @@ module Clap = struct
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
 end
 
-(* [network_simulation_configuration] allows to configure the simulation of a
-   network, relying on the actual distribution of rights that will be found in
-   the imported data (data-dir or snapshot). It requires yes crypto to be
-   enabled.
-   The simulate option has three modes:
-     - scatter(x,y): selects the [x] biggest bakers found, and scatters their
-       baking rights, in a round robin fashion, on [y] baker daemons. This is
-       particularly useful to scatter the baking power across several baker
-       daemons,
-     - map(x,y,z): maps [y] keys from the biggest bakers found onto [y] baker
-       daemons (theses daemons are handling a single key) and scatters the
-       remaining [x-y] keys to [z] baker daemons. This is particularly useful to
-       simulate the behaviour of an actual network,
-     - disabled: no simulation, we rely on the configuration.stake parameter.
-   For example:
-     - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]
-     - map(10,3,0):[[0];[1];[2;3;4;5;6;7;8;9]]
-     - map(10,3,2):[[0];[1];[2;5;6;8];[3;5;8;9]]*)
-type network_simulation_config =
-  | Scatter of int * int
-  | Map of int * int * int
-  | Disabled
-
-let simulate_network_to_string = function
-  | Scatter (x, y) -> Format.sprintf "scatter(%d,%d)" x y
-  | Map (x, y, z) -> Format.sprintf "map(%d,%d,%d)" x y z
-  | Disabled -> Format.sprintf "disabled"
-
 let parse_network_simulation_config_from_args simulate_network_arg =
   let is_positive_param p =
     if p > 0 then p
@@ -80,7 +52,7 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       |> int_of_string |> is_positive_param
     in
     let () = is_arg1_sup_eq_arg2 arg1 arg2 in
-    Some (Scatter (arg1, arg2))
+    Some (Scenarios_configuration.Scatter (arg1, arg2))
   else if Str.string_match re_map simulate_network_arg 0 then
     let arg1 =
       Str.matched_group 2 simulate_network_arg
@@ -95,7 +67,7 @@ let parse_network_simulation_config_from_args simulate_network_arg =
       |> int_of_string |> is_positive_param
     in
     let () = is_arg1_sup_eq_arg2 arg1 (arg2 + arg3) in
-    Some (Map (arg1, arg2, arg3))
+    Some (Scenarios_configuration.Map (arg1, arg2, arg3))
   else
     Test.fail
       "Unexpected network simulation config (--simulation) [%s]"
@@ -126,9 +98,10 @@ module type Dal = sig
 
   val network : Network.t
 
-  val simulate_network_typ : network_simulation_config Clap.typ
+  val simulate_network_typ :
+    Scenarios_configuration.network_simulation_config Clap.typ
 
-  val simulate_network : network_simulation_config
+  val simulate_network : Scenarios_configuration.network_simulation_config
 
   val snapshot : Snapshot_helpers.t
 
@@ -138,7 +111,7 @@ module type Dal = sig
 
   val bakers : string list
 
-  val stake_machine_type : string list option
+  val stake_machine_type : string list
 
   val dal_producers_slot_indices : int list
 
@@ -208,26 +181,49 @@ module Dal () : Dal = struct
         "All the options related to running DAL scenarios onto the cloud"
       "DAL"
 
+  let config_file =
+    Clap.optional_string
+      ~section
+      ~long:"config-file"
+      ~description:"Configuration file for the tezt_cloud scenario"
+      ()
+
+  let config =
+    match config_file with
+    | None ->
+        Data_encoding.Json.destruct Scenarios_configuration.DAL.encoding (`O [])
+    | Some file ->
+        let json = Ezjsonm.from_channel (In_channel.open_text file) in
+        Format.printf "%s@." (Ezjsonm.value_to_string json) ;
+        Data_encoding.Json.destruct Scenarios_configuration.DAL.encoding json
+
   let blocks_history =
     Clap.default_int
       ~section
       ~long:"blocks-history"
       ~description:"Number of blocks history kept in memory. Default value: 100"
-      100
+      (Option.value ~default:100 config.blocks_history)
 
   let fundraiser =
-    Clap.optional_string
-      ~section
-      ~long:"fundraiser"
-      ~description:"Fundraiser secret key that has enough money on test network"
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"fundraiser"
+        ~description:
+          "Fundraiser secret key that has enough money on test network"
+        ()
+    in
+    Option.fold ~none:config.fundraiser ~some:Option.some from_cli
 
   let producer_key =
-    Clap.optional_string
-      ~section
-      ~long:"producer-key"
-      ~description:"Producer secret key that has enough money"
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"producer-key"
+        ~description:"Producer secret key that has enough money"
+        ()
+    in
+    Option.fold ~none:config.producer_key ~some:Option.some from_cli
 
   let producers_delay =
     Clap.default_int
@@ -236,7 +232,14 @@ module Dal () : Dal = struct
       ~description:
         "Delay in levels between two slot productions. Default is 1 meaning \
          \"produce every level\"."
-      1
+      (Option.value ~default:1 config.producers_delay)
+
+  let network_typ : Network.t Clap.typ =
+    Clap.typ
+      ~name:"network"
+      ~dummy:`Ghostnet
+      ~parse:Network.parse
+      ~show:Network.to_string
 
   let network =
     Clap.default
@@ -247,14 +250,15 @@ module Dal () : Dal = struct
          (sandbox,ghostnet,nextnet-YYYY-MM-DD,weeklynet-YYYY-MM-DD,...)"
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
-      `Sandbox
+      (Option.value ~default:`Sandbox config.network)
 
-  let simulate_network_typ : network_simulation_config Clap.typ =
+  let simulate_network_typ :
+      Scenarios_configuration.network_simulation_config Clap.typ =
     Clap.typ
       ~name:"simulate_network"
-      ~dummy:Disabled
+      ~dummy:Scenarios_configuration.Disabled
       ~parse:parse_network_simulation_config_from_args
-      ~show:simulate_network_to_string
+      ~show:Scenarios_configuration.simulate_network_to_string
 
   let simulate_network =
     Clap.default
@@ -281,7 +285,7 @@ module Dal () : Dal = struct
          - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]\n\
          - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]]"
       simulate_network_typ
-      Disabled
+      (Option.value ~default:Disabled config.simulate_network)
 
   let snapshot =
     Clap.default
@@ -291,13 +295,14 @@ module Dal () : Dal = struct
         "Snapshot file, which is stored locally, to initiate the scenario with \
          some data"
       snapshot_typ
-      No_snapshot
+      (Option.value ~default:No_snapshot config.snapshot)
 
   let bootstrap =
     Clap.flag
       ~section
       ~set_long:"bootstrap"
-      (match network with `Sandbox -> true | _ -> false)
+      (let default = match network with `Sandbox -> true | _ -> false in
+       Option.value ~default config.bootstrap)
 
   let stake_repartition_typ : Network.stake_repartition Clap.typ =
     let open Network in
@@ -331,9 +336,9 @@ module Dal () : Dal = struct
       ~show:(function
         | Custom l ->
             l |> List.map string_of_int |> String.concat (String.make 1 ',')
-        | Mimic {network; max_nb_bakers = None} -> Network.to_string network
+        | Mimic {network; max_nb_bakers = None} -> to_string network
         | Mimic {network; max_nb_bakers = Some n} ->
-            Format.sprintf "%s_%d" (Network.to_string network) n)
+            Format.sprintf "%s_%d" (to_string network) n)
 
   let stake =
     Clap.default
@@ -347,45 +352,55 @@ module Dal () : Dal = struct
          provided share repartitions is the same as on this network (truncated \
          to the N biggest delegates if <network>_<N> is given)."
       stake_repartition_typ
-      (if network = `Sandbox && simulate_network = Disabled then Custom [100]
-       else Custom [])
+      (let default =
+         if network = `Sandbox && simulate_network = Disabled then
+           Network.Custom [100]
+         else Custom []
+       in
+       Option.value ~default config.stake)
 
   let bakers =
-    Clap.list_string
-      ~section
-      ~long:"bakers"
-      ~placeholder:"<unencrypted pkh> <unencrypted pkh>"
-      ~description:
-        "Specify a baker secret key to bake with. While [--stake] is mostly \
-         used for private networks, this one can be used on public networks."
-      ()
+    config.bakers
+    @ Clap.list_string
+        ~section
+        ~long:"bakers"
+        ~placeholder:"<unencrypted pkh> <unencrypted pkh>"
+        ~description:
+          "Specify a baker secret key to bake with. While [--stake] is mostly \
+           used for private networks, this one can be used on public networks."
+        ()
 
   let stake_machine_type =
     let stake_machine_type_typ =
       Clap.list ~name:"stake_machine_type" ~dummy:["foo"] Fun.id Fun.id
     in
-    Clap.optional
-      ~section
-      ~long:"stake-machine-type"
-      ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
-      ~description:
-        "Specify the machine type used by the stake. The nth machine type will \
-         be assigned to the nth stake specified with [--stake]. If less \
-         machine types are specified, the default one (or the one specified by \
-         --machine-type) will be used."
-      stake_machine_type_typ
-      ()
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"stake-machine-type"
+        ~placeholder:"<machine_type>,<machine_type>,<machine_type>, ..."
+        ~description:
+          "Specify the machine type used by the stake. The nth machine type \
+           will be assigned to the nth stake specified with [--stake]. If less \
+           machine types are specified, the default one (or the one specified \
+           by --machine-type) will be used."
+        stake_machine_type_typ
+        ()
+    in
+    Option.fold ~none:config.stake_machine_type ~some:Fun.id from_cli
 
   let dal_producers_slot_indices =
-    Clap.default
-      ~section
-      ~long:"producer-slot-indices"
-      ~description:
-        "Specify the slot indices for DAL producers to run. The number of DAL \
-         producers run is the size of the list unless `--producers` is also \
-         specified, in that case it takes precedence over this argument."
-      (Clap.list_of_int "producer_slot_indices")
-      []
+    config.dal_producers_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"producer-slot-indices"
+        ~description:
+          "Specify the slot indices for DAL producers to run. The number of \
+           DAL producers run is the size of the list unless `--producers` is \
+           also specified, in that case it takes precedence over this \
+           argument."
+        (Clap.list_of_int "producer_slot_indices")
+        []
 
   let producers =
     Clap.default_int
@@ -399,35 +414,42 @@ module Dal () : Dal = struct
          continue incrementing from the last specified index. For example, to \
          start 5 producers from index 5, use `--producers 5 \
          --producer-slot-indices 5`."
-      (List.length dal_producers_slot_indices)
+      (Option.value
+         ~default:(List.length dal_producers_slot_indices)
+         config.producers)
 
   let producer_machine_type =
-    Clap.optional_string
-      ~section
-      ~long:"producer-machine-type"
-      ~description:"Machine type used for the DAL producers"
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"producer-machine-type"
+        ~description:"Machine type used for the DAL producers"
+        ()
+    in
+    Option.fold ~none:config.producer_machine_type ~some:Option.some from_cli
 
   let observer_slot_indices =
-    Clap.default
-      ~section
-      ~long:"observer-slot-indices"
-      ~placeholder:"<slot_index>,<slot_index>,<slot_index>, ..."
-      ~description:
-        "For each slot index specified, an observer will be created to observe \
-         this slot index."
-      (Clap.list_of_int "observer_slot_indices")
-      []
+    config.observer_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"observer-slot-indices"
+        ~placeholder:"<slot_index>,<slot_index>,<slot_index>, ..."
+        ~description:
+          "For each slot index specified, an observer will be created to \
+           observe this slot index."
+        (Clap.list_of_int "observer_slot_indices")
+        []
 
   let observer_pkhs =
-    Clap.list_string
-      ~section
-      ~long:"observer-pkh"
-      ~placeholder:"<pkh>"
-      ~description:
-        "Enable to run a DAL node following the same topics as the baker pkh \
-         given in input"
-      ()
+    config.observer_pkhs
+    @ Clap.list_string
+        ~section
+        ~long:"observer-pkh"
+        ~placeholder:"<pkh>"
+        ~description:
+          "Enable to run a DAL node following the same topics as the baker pkh \
+           given in input"
+        ()
 
   let protocol =
     let protocol_typ =
@@ -448,10 +470,17 @@ module Dal () : Dal = struct
       ~placeholder:"<protocol_name> (such as alpha, oxford,...)"
       ~description:"Specify the economic protocol used for this test"
       protocol_typ
-      (Network.default_protocol network)
+      (Option.value ~default:(Network.default_protocol network) config.protocol)
 
   let data_dir =
-    Clap.optional_string ~section ~long:"data-dir" ~placeholder:"<data_dir>" ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"data-dir"
+        ~placeholder:"<data_dir>"
+        ()
+    in
+    Option.fold ~none:config.data_dir ~some:Option.some from_cli
 
   let tezlink =
     Clap.flag
@@ -459,26 +488,37 @@ module Dal () : Dal = struct
       ~set_long:"tezlink"
       ~unset_long:"no-tezlink"
       ~description:"Run Tezlink"
-      false
+      (Option.value ~default:false config.tezlink)
 
   let etherlink =
     Clap.flag
       ~section
       ~set_long:"etherlink"
       (* If --tezlink is given, there is no need to also pass --etherlink *)
-      tezlink
+      (Option.value ~default:tezlink config.etherlink)
 
   let etherlink_sequencer =
     (* We want the sequencer to be active by default if etherlink is activated. *)
-    Clap.flag ~section ~unset_long:"no-etherlink-sequencer" etherlink
+    Clap.flag
+      ~section
+      ~unset_long:"no-etherlink-sequencer"
+      (Option.value ~default:etherlink config.etherlink_sequencer)
 
   let etherlink_producers =
-    Clap.default_int ~section ~long:"etherlink-producers" 0
+    Clap.default_int
+      ~section
+      ~long:"etherlink-producers"
+      (Option.value ~default:0 config.etherlink_producers)
 
   let etherlink_chain_id =
-    Clap.optional_int ~section ~long:"etherlink-chain-id" ()
+    let from_cli = Clap.optional_int ~section ~long:"etherlink-chain-id" () in
+    Option.fold ~none:config.etherlink_chain_id ~some:Option.some from_cli
 
-  let echo_rollup = Clap.flag ~section ~set_long:"echo-rollup" false
+  let echo_rollup =
+    Clap.flag
+      ~section
+      ~set_long:"echo-rollup"
+      (Option.value ~default:false config.echo_rollup)
 
   let disconnect =
     let disconnect_typ =
@@ -493,19 +533,23 @@ module Dal () : Dal = struct
       let show (d, r) = Format.sprintf "%d,%d" d r in
       Clap.typ ~name:"disconnect" ~dummy:(10, 10) ~parse ~show
     in
-    Clap.optional
-      ~section
-      ~long:"disconnect"
-      ~placeholder:"<disconnect_frequency>,<levels_disconnected>"
-      ~description:
-        "If this argument is provided, bakers will disconnect in turn each \
-         <disconnect_frequency> levels, and each will reconnect after a delay \
-         of <levels_disconnected> levels."
-      disconnect_typ
-      ()
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"disconnect"
+        ~placeholder:"<disconnect_frequency>,<levels_disconnected>"
+        ~description:
+          "If this argument is provided, bakers will disconnect in turn each \
+           <disconnect_frequency> levels, and each will reconnect after a \
+           delay of <levels_disconnected> levels."
+        disconnect_typ
+        ()
+    in
+    Option.fold ~none:config.disconnect ~some:Option.some from_cli
 
   let etherlink_dal_slots =
-    Clap.list_int ~section ~long:"etherlink-dal-slots" ()
+    config.etherlink_dal_slots
+    @ Clap.list_int ~section ~long:"etherlink-dal-slots" ()
 
   let teztale =
     Clap.flag
@@ -513,41 +557,56 @@ module Dal () : Dal = struct
       ~set_long:"teztale"
       ~unset_long:"no-teztale"
       ~description:"Runs teztale"
-      false
+      (Option.value ~default:false config.teztale)
 
   let octez_release =
-    Clap.optional_string
-      ~section
-      ~long:"octez-release"
-      ~placeholder:"<tag>"
-      ~description:
-        "Use the octez release <tag> instead of local octez binaries."
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"octez-release"
+        ~placeholder:"<tag>"
+        ~description:
+          "Use the octez release <tag> instead of local octez binaries."
+        ()
+    in
+    Option.fold ~none:config.octez_release ~some:Option.some from_cli
 
   let memtrace =
     Clap.flag
       ~section
       ~set_long:"memtrace"
       ~description:"Use memtrace on all the services"
-      false
+      (Option.value ~default:false config.memtrace)
 
   let bootstrap_node_identity_file =
-    Clap.optional_string
-      ~section
-      ~long:"bootstrap-node-identity"
-      ~description:
-        "The bootstrap node identity file. Warning: this argument may be \
-         removed in a future release."
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"bootstrap-node-identity"
+        ~description:
+          "The bootstrap node identity file. Warning: this argument may be \
+           removed in a future release."
+        ()
+    in
+    Option.fold
+      ~none:config.bootstrap_node_identity_file
+      ~some:Option.some
+      from_cli
 
   let bootstrap_dal_node_identity_file =
-    Clap.optional_string
-      ~section
-      ~long:"bootstrap-dal-node-identity"
-      ~description:
-        "The bootstrap DAL node identity file. Warning: this argument may be \
-         removed in a future release."
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"bootstrap-dal-node-identity"
+        ~description:
+          "The bootstrap DAL node identity file. Warning: this argument may be \
+           removed in a future release."
+        ()
+    in
+    Option.fold
+      ~none:config.bootstrap_dal_node_identity_file
+      ~some:Option.some
+      from_cli
 
   let refresh_binaries =
     Clap.flag
@@ -561,7 +620,7 @@ module Dal () : Dal = struct
          Furthermore, it is not the recommended way to do so, but this option \
          also allows to use a docker image without binaries (like the provided \
          debian one) and to copy the local binaries to the proxy."
-      false
+      (Option.value ~default:false config.refresh_binaries)
 
   let node_external_rpc_server =
     Clap.flag
@@ -569,7 +628,7 @@ module Dal () : Dal = struct
       ~set_long:"node-external-rpc-server"
       ~unset_long:"no-node-external-rpc-server"
       ~description:"Use the external RPC server on the L1 nodes"
-      false
+      (Option.value ~default:false config.node_external_rpc_server)
 
   let with_dal =
     Clap.flag
@@ -580,7 +639,7 @@ module Dal () : Dal = struct
         "No bootstrap DAL node is run and bakers do not run a DAL node \
          (default is 'false'). DAL nodes can be activated via other options \
          such as [--producers]."
-      true
+      (Option.value ~default:true config.with_dal)
 
   let proxy_localhost =
     Clap.flag
@@ -591,24 +650,25 @@ module Dal () : Dal = struct
         "All agents run on the proxy VM if the proxy mode is activated. This \
          can be used to solve a bug with the Tezt Cloud library. This option \
          will be removed once the bug is fixed"
-      false
+      (Option.value ~default:false config.proxy_localhost)
 
   let disable_shard_validation =
     Clap.flag
       ~section
       ~set_long:"disable-shard-validation"
       ~description:"All DAL nodes will bypass the shard validation stage."
-      false
+      (Option.value ~default:false config.disable_shard_validation)
 
   let ignore_pkhs =
-    Clap.list_string
-      ~section
-      ~long:"ignore-pkhs"
-      ~placeholder:"<pkh> <pkh>"
-      ~description:
-        "Specify a list of public key hashes for which all the producers will \
-         not publish the associated shards."
-      ()
+    config.ignore_pkhs
+    @ Clap.list_string
+        ~section
+        ~long:"ignore-pkhs"
+        ~placeholder:"<pkh> <pkh>"
+        ~description:
+          "Specify a list of public key hashes for which all the producers \
+           will not publish the associated shards."
+        ()
 
   let ppx_profiling =
     Clap.flag
@@ -617,17 +677,18 @@ module Dal () : Dal = struct
       ~description:
         "Enable PPX profiling on all components. The level of verbosity is by \
          default `Debug` and the format of the output is `txt`. "
-      false
+      (Option.value ~default:false config.ppx_profiling)
 
   let ppx_profiling_backends =
-    Clap.list_string
-      ~section
-      ~long:"ppx-profiling-backends"
-      ~description:
-        "Select the backends used by the profiler, bypassing the defaults \
-         selection: always `txt` and `json`, and also `prometheus` if \
-         `--prometheus` and `opentelemetry` if `--opentelemetry`."
-      ()
+    config.ppx_profiling_backends
+    @ Clap.list_string
+        ~section
+        ~long:"ppx-profiling-backends"
+        ~description:
+          "Select the backends used by the profiler, bypassing the defaults \
+           selection: always `txt` and `json`, and also `prometheus` if \
+           `--prometheus` and `opentelemetry` if `--opentelemetry`."
+        ()
 
   let enable_network_health_monitoring =
     Clap.flag
@@ -637,7 +698,7 @@ module Dal () : Dal = struct
       ~description:
         "If specified, the network health monitoring app.\n\
          Recommendation: enable only for public dal bootstrap node deployments"
-      false
+      (Option.value ~default:false config.enable_network_health_monitoring)
 end
 
 module type Layer1 = sig

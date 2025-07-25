@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 open Agent_kind
-open Scenarios_cli
+open Scenarios_configuration
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
