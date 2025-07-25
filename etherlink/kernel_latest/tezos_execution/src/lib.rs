@@ -453,7 +453,6 @@ pub fn apply_operation<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
-    use primitive_types::H256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519, UnknownSignature};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -516,20 +515,17 @@ mod tests {
 
     fn sign_operation(
         sk: &SecretKeyEd25519,
-        branch: &H256,
+        branch: &BlockHash,
         content: &ManagerOperationContent,
-    ) -> UnknownSignature {
+    ) -> Result<UnknownSignature, tezos_tezlink::operation::SignatureErrors> {
         let serialized_unsigned_operation =
-            tezos_tezlink::operation::serialize_unsigned_operation(
-                &(*branch).into(),
-                content,
-            )
-            .unwrap();
+            tezos_tezlink::operation::serialize_unsigned_operation(branch, content)
+                .unwrap();
 
         let signature = sk
             .sign(serialized_unsigned_operation)
             .expect("Signature should have succeeded");
-        signature.into()
+        Ok(signature.into())
     }
 
     const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
@@ -551,7 +547,7 @@ mod tests {
         source: Bootstrap,
         content: OperationContent,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
+        let branch = TezBlock::genesis_block_hash().into();
         let manager_op = ManagerOperation {
             source: source.pkh,
             fee: fee.into(),
@@ -562,10 +558,10 @@ mod tests {
         }
         .into();
 
-        let signature = sign_operation(&source.sk, &branch, &manager_op);
+        let signature = sign_operation(&source.sk, &branch, &manager_op).unwrap();
 
         Operation {
-            branch: BlockHash::from(branch),
+            branch,
             content: manager_op,
             signature,
         }
