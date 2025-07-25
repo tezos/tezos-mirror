@@ -211,6 +211,31 @@ pub type NomResult<'a, T> = nom::IResult<NomInput<'a>, T, NomError<'a>>;
 /// Traits defining message decoding using `nom` primitives.
 pub trait NomReader<'a>: Sized {
     fn nom_read(input: &'a [u8]) -> NomResult<'a, Self>;
+    /// Parses a value of type `T` from the input, consuming all of it.
+    ///
+    /// This is a convenience wrapper around the internal `nom` parser for `T`.
+    /// It returns an error
+    /// if:
+    ///     - The parser fails,
+    ///     - There is remaining unconsumed input,
+    ///     - Or more input was needed (`Incomplete`).
+    ///
+    /// ⚠️ This function is **not** compatible with `nom` combinators like `alt`, `many0`, etc.,
+    /// because it returns a `Result` instead of `IResult`. It is intended for top-level,
+    /// exact parsing only.
+    ///
+    /// Use the underlying `nom_read` function if you need composability within `nom`.
+    fn nom_read_exact(input: &'a [u8]) -> Result<Self, NomError<'a>> {
+        let (_, parsed) = all_consuming(Self::nom_read)(input).map_err(|err| match err {
+            Err::Error(e) | Err::Failure(e) => e,
+            Err::Incomplete(_) => DecodeError {
+                input,
+                kind: DecodeErrorKind::Nom(ErrorKind::Eof),
+                other: None,
+            },
+        })?;
+        Ok(parsed)
+    }
 }
 
 impl NomReader<'_> for Zarith {
