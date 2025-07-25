@@ -278,10 +278,10 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   in
   let* blk_b = Block.bake ~policy:(By_account slashed_account) genesis in
   let* preattestation1 =
-    Op.raw_preattestation ~delegate:slashed_account blk_a
+    Op.raw_preattestation ~manager_pkh:slashed_account blk_a
   in
   let* preattestation2 =
-    Op.raw_preattestation ~delegate:slashed_account blk_b
+    Op.raw_preattestation ~manager_pkh:slashed_account blk_b
   in
   let preattestation1, preattestation2 =
     order_ops preattestation1 preattestation2
@@ -307,8 +307,8 @@ let test_may_not_bake_again_after_full_deposit_slash () =
   in
   let* blk_a = Block.bake ~policy:(By_account slashed_account) ~operation b in
   let* blk_b = Block.bake ~policy:(By_account slashed_account) b in
-  let* attestation1 = Op.raw_attestation ~delegate:slashed_account blk_a in
-  let* attestation2 = Op.raw_attestation ~delegate:slashed_account blk_b in
+  let* attestation1 = Op.raw_attestation ~manager_pkh:slashed_account blk_a in
+  let* attestation2 = Op.raw_attestation ~manager_pkh:slashed_account blk_b in
   let attestation1, attestation2 = order_ops attestation1 attestation2 in
   let double_attestation_op =
     Op.double_attestation (B blk_a) attestation1 attestation2
