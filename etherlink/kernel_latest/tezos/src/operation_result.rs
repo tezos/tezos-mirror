@@ -6,10 +6,12 @@
 
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/apply_result.ml` to represent the result of an operation
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
+use nom::error::ParseError;
 use std::fmt::Debug;
 use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
+use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::types::Narith;
 use tezos_enc::BinWriter;
 use tezos_nom::NomReader;
@@ -87,10 +89,76 @@ impl From<TransferError> for OperationError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum OperationError {
     Validation(ValidityError),
     Apply(ApplyOperationError),
+}
+
+// In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
+// we cannot use the rust binary json crate to produce compatible bson data because
+// this crate uses Float pointer instructions (which is incompatible with the PVM).
+// To avoid reimplementing full bson support, we convert errors to strings and
+// manually encode them in bson. This gives us error which can be decoded using
+// Tezos data encoding but with less structure than what Tezos L1 produces.
+impl BinWriter for OperationError {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
+            // Convert the error to a String
+            let error = format!("{:?}", error);
+            let encoded_error = error.as_bytes();
+            let size_of_string: u32 = encoded_error
+                .len()
+                .try_into()
+                .map_err(|err| tezos_enc::BinError::custom(format!("{}", err)))?;
+            // Tag for a BSON string is 0x82 (1 byte)
+            let bson_tag_size = 1;
+            // Size of a BSON object is encoded on 4 bytes
+            let bson_size = 4;
+            // Size of a BSON string is encoded on 4 bytes
+            let bson_string_size = 4;
+            // Tag for BSON string termination is on 1 byte
+            let bson_string_end_tag_size = 1;
+            // Tag for BSON termination is on 1 byte
+            let bson_end_tag_size = 1;
+            // A BSON object starts with its size
+            let mut bson = (bson_tag_size
+                + bson_size
+                + bson_string_size
+                + size_of_string
+                + bson_string_end_tag_size
+                + bson_end_tag_size)
+                .to_le_bytes()
+                .to_vec();
+            // In BSON, 0x82 is the tag for a String
+            bson.push(0x82_u8);
+            // In BSON, a String is encoded with its size on 4 bytes.
+            // But also an end bytes (byte 0), this is why we encode
+            // size + 1
+            bson.extend_from_slice(
+                &(size_of_string + bson_string_end_tag_size).to_le_bytes(),
+            );
+            bson.extend_from_slice(encoded_error);
+            bson.push(0x00);
+            // This is a little hack, but an OperationError will always be encoded in a list of OperationError.
+            // This zero byte represent the end of an item. Doing this prevent to rewrite multiple BinWriter
+            // implementation.
+            bson.push(0x00);
+            tezos_enc::bytes(bson, out)?;
+            Ok(())
+        })(self, output)
+    }
+}
+
+// As we're encoding the OperationError with a single String, the NomReader function is broken.
+// This is not an issue as we never deserialize OperationError outside of tests.
+impl NomReader<'_> for OperationError {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        Err(nom::Err::Error(DecodeError::from_error_kind(
+            input,
+            nom::error::ErrorKind::Fail,
+        )))
+    }
 }
 
 impl From<ValidityError> for OperationError {
@@ -174,26 +242,15 @@ pub struct TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct OperationErrors {
+    #[encoding(dynamic, list)]
     pub errors: Vec<OperationError>,
 }
 
 impl From<Vec<OperationError>> for OperationErrors {
     fn from(value: Vec<OperationError>) -> Self {
         OperationErrors { errors: value }
-    }
-}
-
-impl BinWriter for OperationErrors {
-    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
-        tezos_enc::dynamic(tezos_enc::unit)(&(), output)
-    }
-}
-
-impl NomReader<'_> for OperationErrors {
-    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
-        tezos_nom::dynamic(|input| Ok((input, vec![].into())))(input)
     }
 }
 
@@ -331,6 +388,62 @@ mod tests {
     use crate::operation::{ManagerOperation, TransferContent};
     use pretty_assertions::assert_eq;
 
+    fn dummy_failed_operation() -> OperationDataAndMetadata {
+        OperationDataAndMetadata::OperationWithMetadata (
+                OperationBatchWithMetadata {
+                    operations: vec![OperationWithMetadata {
+                        content: ManagerOperationContent::Transfer(
+                            ManagerOperation {
+                                source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                fee: 255.into(),
+                                counter: 1.into(),
+                                gas_limit: 0.into(),
+                                storage_limit: 0.into(),
+                                operation: TransferContent {
+                                    amount: 27942405962072064.into(),
+                                    destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+                                    parameters: None,
+                                }
+                            }),
+                        receipt: OperationResultSum::Transfer(
+                                    OperationResult {
+                                        balance_updates: vec![],
+                                        result: ContentResult::Failed(
+                                            vec![
+                                                    OperationError::Apply(
+                                                        ApplyOperationError::Transfer(
+                                                            TransferError::BalanceTooLow(
+                                                                BalanceTooLow {
+                                                                    contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                                                    balance: 10_u64.into(),
+                                                                    amount: 21_u64.into()
+                                                                }
+                                                            )
+                                                        )
+                                                    ),
+                                                    OperationError::Apply(
+                                                        ApplyOperationError::Transfer(
+                                                            TransferError::BalanceTooLow(
+                                                                BalanceTooLow {
+                                                                    contract: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+                                                                    balance: 55_u64.into(),
+                                                                    amount: 1111_u64.into()
+                                                                }
+                                                            )
+                                                        )
+                                                    )
+                                                ].into()),
+                                        internal_operation_results: vec![]
+                                    }
+                                )
+                    }],
+                    signature:  UnknownSignature::from_base58_check(
+                       "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
+                    ).unwrap(),
+                }
+            )
+    }
+
     fn dummy_test_result_operation() -> OperationDataAndMetadata {
         OperationDataAndMetadata::OperationWithMetadata (
                  OperationBatchWithMetadata {
@@ -401,65 +514,29 @@ mod tests {
     }
 
     /*
-        octez-codec encode alpha.operation.data_and_metadata from '{
-        "contents": [
-            {
-                "kind": "transaction",
-                "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-                "fee": "255",
-                "counter": "1",
-                "gas_limit": "0",
-                "storage_limit": "0",
-                "amount": "27942405962072064",
-                "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-                "metadata": {
-                    "operation_result": {
-                        "status": "failed",
-                        "errors": []
-                    }
-                }
-            }
-        ],
-        "signature": "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
-    }'
+        octez-codec encode alpha.operation.data_and_metadata from '{ "contents":
+      [ { "kind": "transaction",
+          "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx", "fee": "255",
+          "counter": "1", "gas_limit": "0", "storage_limit": "0",
+          "amount": "27942405962072064",
+          "destination": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+          "metadata":
+            { "operation_result":
+                { "status": "failed",
+                  "errors":
+                    [ "Apply(Transfer(BalanceTooLow(BalanceTooLow { contract: \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\", balance: Narith(10), amount: Narith(21) })))",
+                      "Apply(Transfer(BalanceTooLow(BalanceTooLow { contract: \"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\", balance: Narith(55), amount: Narith(1111) })))" ] } } } ],
+    "signature":
+      "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT" }'
          */
     #[test]
     fn tezos_compatibility_for_failed_operation_with_metadata() {
-        let operation =
-            OperationDataAndMetadata::OperationWithMetadata (
-                OperationBatchWithMetadata {
-                    operations: vec![OperationWithMetadata {
-                        content: ManagerOperationContent::Transfer(
-                            ManagerOperation {
-                                source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                fee: 255.into(),
-                                counter: 1.into(),
-                                gas_limit: 0.into(),
-                                storage_limit: 0.into(),
-                                operation: TransferContent {
-                                    amount: 27942405962072064.into(),
-                                    destination: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                                    parameters: None,
-                                }
-                            }),
-                        receipt: OperationResultSum::Transfer(
-                                    OperationResult {
-                                        balance_updates: vec![],
-                                        result: ContentResult::Failed(vec![].into()),
-                                        internal_operation_results: vec![]
-                                    }
-                                )
-                    }],
-                    signature:  UnknownSignature::from_base58_check(
-                       "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT"
-                    ).unwrap(),
-                }
-            );
+        let operation = dummy_failed_operation();
         let mut output = vec![];
         operation
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "00000000476c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000010000000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
+        let operation_and_receipt_bytes = "00000001c56c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000010000017e000000baba00000082b00000004170706c79285472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d2929290000000000bcbc00000082b20000004170706c79285472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d292929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
