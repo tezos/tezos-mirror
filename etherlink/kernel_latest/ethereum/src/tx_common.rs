@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2022-2024 TriliTech <contact@trili.tech>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -52,6 +53,82 @@ impl From<TxSigError> for SigError {
     fn from(e: TxSigError) -> Self {
         SigError::TxSigError(e)
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct WrappedSignedAuthorization {
+    inner: revm::context::transaction::SignedAuthorization,
+}
+
+impl Encodable for WrappedSignedAuthorization {
+    fn rlp_append(&self, stream: &mut RlpStream) {
+        stream.begin_list(7);
+        stream.append(&U256(self.inner.inner().chain_id().into_limbs()));
+        let address_h160 = std::convert::TryInto::<[u8; 20]>::try_into(
+            self.inner.inner().address().0.as_slice(),
+        )
+        // Can never fail `Address` is just a wrapper on `FixedBytes<N:20>`
+        // and `H160` expects a `[u8; 20]`.
+        .unwrap();
+        stream.append(&H160(address_h160));
+        stream.append(&self.inner.inner().nonce());
+        stream.append(&self.inner.y_parity());
+        stream.append(&U256(self.inner.r().into_limbs()));
+        stream.append(&U256(self.inner.s().into_limbs()));
+    }
+}
+
+fn revm_u256(value: &U256) -> Option<revm::primitives::U256> {
+    let mut bytes = vec![0; 32];
+    value.to_little_endian(&mut bytes);
+    Some(revm::primitives::U256::from_le_bytes::<32>(
+        bytes.try_into().ok()?,
+    ))
+}
+
+impl Decodable for WrappedSignedAuthorization {
+    fn decode(rlp: &Rlp) -> Result<Self, DecoderError> {
+        if !rlp.is_list() {
+            Err(DecoderError::RlpExpectedToBeList)
+        } else {
+            let mut it = rlp.iter();
+            let chain_id: U256 = decode_field(&next(&mut it)?, "chain_id")?;
+            let address: H160 = decode_field(&next(&mut it)?, "address")?;
+            let nonce: u64 = decode_field(&next(&mut it)?, "nonce")?;
+            let y_parity: u8 = decode_field(&next(&mut it)?, "y_parity")?;
+            let r: U256 = decode_field(&next(&mut it)?, "r")?;
+            let s: U256 = decode_field(&next(&mut it)?, "s")?;
+            if it.next().is_some() {
+                return Err(DecoderError::RlpIncorrectListLen);
+            }
+            Ok(Self {
+                inner: revm::context::transaction::SignedAuthorization::new_unchecked(
+                    revm::context::transaction::Authorization {
+                        chain_id: revm_u256(&chain_id).unwrap_or_default(),
+                        address: revm::primitives::Address::from(
+                            address.as_fixed_bytes(),
+                        ),
+                        nonce,
+                    },
+                    y_parity,
+                    revm_u256(&r).unwrap_or_default(),
+                    revm_u256(&s).unwrap_or_default(),
+                ),
+            })
+        }
+    }
+}
+
+pub type AuthorizationList = Vec<WrappedSignedAuthorization>;
+
+#[inline]
+pub fn signed_authorization(
+    authorization_list: AuthorizationList,
+) -> Vec<revm::context::transaction::SignedAuthorization> {
+    authorization_list
+        .into_iter()
+        .map(|s_a| s_a.inner)
+        .collect()
 }
 
 /// Data common for all kind of Ethereum transactions
@@ -108,6 +185,11 @@ pub struct EthereumTransactionCommon {
     /// which are going to be accessed during transaction execution.
     /// For more information see https://eips.ethereum.org/EIPS/eip-2930
     pub access_list: AccessList,
+    /// Authorization list specifies a list of signed authorization tuples,
+    /// enabling externally owned accounts (EOAs) to delegate execution context
+    /// to designated smart contract code.
+    /// For more information see https://eips.ethereum.org/EIPS/eip-7702
+    pub authorization_list: AuthorizationList,
     /// If transaction is unsigned then this field is None
     /// See encoding details in <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md>
     pub signature: Option<TxSignature>,
@@ -126,6 +208,7 @@ impl EthereumTransactionCommon {
         value: U256,
         data: Vec<u8>,
         access_list: AccessList,
+        authorization_list: AuthorizationList,
         signature: Option<TxSignature>,
     ) -> Self {
         Self {
@@ -139,6 +222,7 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
+            authorization_list,
             signature,
         }
     }
@@ -171,7 +255,7 @@ impl EthereumTransactionCommon {
         }
     }
 
-    // RLP decoding of legacy tx
+    // RLP decoding of a Legacy transaction.
     fn rlp_decode_legacy_tx(decoder: &Rlp) -> Result<Self, DecoderError> {
         // If we don't have 9 elements, then list has incorrect length
         if decoder.item_count() != Ok(9) {
@@ -234,13 +318,13 @@ impl EthereumTransactionCommon {
             to,
             value,
             data,
-            // default value for access_list
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature,
         })
     }
 
-    // RLP decoding of EIP-2930 tx
+    // RLP decoding of an EIP-2930 transaction.
     fn rlp_decode_eip2930_tx(decoder: &Rlp) -> Result<Self, DecoderError> {
         // It's either:
         // - 8 fields fields for an unsigned tx
@@ -278,10 +362,12 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
+            authorization_list: AuthorizationList::default(),
             signature,
         })
     }
 
+    // RLP decoding of an EIP-1559 transaction.
     fn rlp_decode_eip1559_tx(decoder: &Rlp) -> Result<Self, DecoderError> {
         // It's either:
         // - 9 fields fields for an unsigned tx
@@ -320,6 +406,53 @@ impl EthereumTransactionCommon {
             value,
             data,
             access_list,
+            authorization_list: AuthorizationList::default(),
+            signature,
+        })
+    }
+
+    // RLP decoding of an EIP-7702 transaction.
+    fn rlp_decode_eip7702_tx(decoder: &Rlp) -> Result<Self, DecoderError> {
+        // It's either:
+        // - 10 fields fields for an unsigned tx
+        // - 13 fields for a signed tx
+        if decoder.item_count() != Ok(10) && decoder.item_count() != Ok(13) {
+            return Err(DecoderError::RlpIncorrectListLen);
+        }
+
+        let mut it = decoder.iter();
+        let chain_id: U256 = decode_field(&next(&mut it)?, "chain_id")?;
+        let nonce: u64 = decode_field(&next(&mut it)?, "nonce")?;
+        let max_priority_fee_per_gas =
+            decode_field(&next(&mut it)?, "max_priority_fee_per_gas")?;
+        let max_fee_per_gas = decode_field(&next(&mut it)?, "max_fee_per_gas")?;
+        let gas_limit: u64 = decode_field(&next(&mut it)?, "gas_limit")?;
+        let to: Option<H160> = decode_option(&next(&mut it)?, "to")?;
+        let value: U256 = decode_field(&next(&mut it)?, "value")?;
+        let data: Vec<u8> = decode_field(&next(&mut it)?, "data")?;
+        let access_list: AccessList = decode_list(&next(&mut it)?, "access_list")?;
+        let authorization_list: AuthorizationList =
+            decode_list(&next(&mut it)?, "authorization_list")?;
+
+        let vrs = Self::rlp_decode_vrs(&mut it)?;
+        let signature = match vrs {
+            Some((v, r, s)) => TxSignature::new(v, r, s)
+                .map(Option::Some)
+                .map_err(|_| DecoderError::Custom("Invalid signature")),
+            None => Ok(None),
+        }?;
+        Ok(EthereumTransactionCommon {
+            type_: TransactionType::Eip7702,
+            chain_id: Some(chain_id),
+            nonce,
+            max_priority_fee_per_gas,
+            max_fee_per_gas,
+            gas_limit,
+            to,
+            value,
+            data,
+            access_list,
+            authorization_list,
             signature,
         })
     }
@@ -335,6 +468,7 @@ impl EthereumTransactionCommon {
             TransactionType::Legacy => Self::rlp_decode_legacy_tx(decoder),
             TransactionType::Eip2930 => Self::rlp_decode_eip2930_tx(decoder),
             TransactionType::Eip1559 => Self::rlp_decode_eip1559_tx(decoder),
+            TransactionType::Eip7702 => Self::rlp_decode_eip7702_tx(decoder),
         }?;
         Ok(tx)
     }
@@ -438,11 +572,39 @@ impl EthereumTransactionCommon {
         }
     }
 
+    fn rlp_encode_eip7702_tx(&self, stream: &mut RlpStream) {
+        if self.signature.is_some() {
+            // If there is a signature, there will be 13 fields
+            stream.begin_list(13);
+        } else {
+            // Otherwise, there won't be signature
+            stream.begin_list(10);
+        }
+
+        // In that case the chain id is mandatory, as such this unwrapping is safe
+        stream.append(&self.chain_id.unwrap());
+        stream.append(&self.nonce);
+        stream.append(&self.max_priority_fee_per_gas);
+        stream.append(&self.max_fee_per_gas);
+        stream.append(&self.gas_limit);
+        append_option(stream, &self.to);
+        stream.append(&self.value);
+        append_vec(stream, &self.data);
+        stream.append_list(&self.access_list);
+        stream.append_list(&self.authorization_list);
+
+        // If tx is NOT legacy and unsigned: DON'T append anything like (0, 0, 0)
+        if let Some(sig) = &self.signature {
+            sig.rlp_append(stream)
+        }
+    }
+
     fn to_rlp_any(self: &EthereumTransactionCommon, stream: &mut RlpStream) {
         match &self.type_ {
             TransactionType::Legacy => self.rlp_encode_legacy_tx(stream),
             TransactionType::Eip2930 => self.rlp_encode_eip2930_tx(stream),
             TransactionType::Eip1559 => self.rlp_encode_eip1559_tx(stream),
+            TransactionType::Eip7702 => self.rlp_encode_eip7702_tx(stream),
         }
     }
 
@@ -521,6 +683,9 @@ impl EthereumTransactionCommon {
         } else if first == 0x02 {
             let decoder = Rlp::new(&bytes[1..]);
             Self::from_rlp_any(&decoder, TransactionType::Eip1559)
+        } else if first == 0x04 {
+            let decoder = Rlp::new(&bytes[1..]);
+            Self::from_rlp_any(&decoder, TransactionType::Eip7702)
         } else {
             let decoder = Rlp::new(bytes);
             Self::from_rlp_any(&decoder, TransactionType::Legacy)
@@ -545,7 +710,9 @@ impl EthereumTransactionCommon {
         let mut rlp_enc = stream.out().to_vec();
         match self.type_ {
             TransactionType::Legacy => rlp_enc,
-            TransactionType::Eip2930 | TransactionType::Eip1559 => {
+            TransactionType::Eip2930
+            | TransactionType::Eip1559
+            | TransactionType::Eip7702 => {
                 let tag = From::from(self.type_);
                 rlp_enc.insert(0, tag);
                 rlp_enc
@@ -652,6 +819,7 @@ mod test {
             value: U256::from(1000000000000000000u64),
             data: vec![],
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(
                 37,
                 string_to_h256_unsafe(
@@ -690,6 +858,7 @@ mod test {
                 )
                 .unwrap()],
             }],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(
                 0,
                 string_to_h256_unsafe(
@@ -714,6 +883,7 @@ mod test {
             value: U256::from(0),
             data: hex::decode("a9059cbb000000000000000000000000a9d1e08c7793af67e9d92fe308d5697fb81d3e43000000000000000000000000000000000000000000000000f020482e89b73c14").unwrap(),
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(
                 0,
                 string_to_h256_unsafe(
@@ -880,6 +1050,7 @@ mod test {
             value,
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(38, r, s)),
         }
     }
@@ -952,6 +1123,7 @@ mod test {
             value,
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
         let signed_data = "f90150808509502f900082520894423163e58aabec5daa3dd1130b759d24bef0f6ea8711c37937e08000b8e4deace8f5000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000041bca408a6b4029b42883aeb2c25087cab76cb58000000000000000000000000000000000000000000000000002386f26fc10000000000000000000000000000000000000000000000000000002357a49c7d75f600000000000000000000000000000000000000000000000000000000640b5549000000000000000000000000710bda329b2a6224e4b44833de30f38e7f81d564000000000000000000000000000000000000000000000000000000000000000025a025dd6c973368c45ddfc17f5148e3f468a2e3f2c51920cbe9556a64942b0ab2eba031da07ce40c24b0a01f46fb2abc028b5ccd70dbd1cb330725323edc49a2a9558";
@@ -1013,6 +1185,7 @@ mod test {
             value,
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
 
@@ -1058,6 +1231,8 @@ mod test {
             value,
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: Some(TxSignature::new_unsafe(37, r, s)),
         };
         let signed_data = "f903732e8506c50218ba8304312294ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b880a8db2d41b89b009b903043593564c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000064023c1700000000000000000000000000000000000000000000000000000000000000030b090c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000000000000000000000000000000000000000001e0000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000a8db2d41b89b009000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000002ab0c205a56c1e000000000000000000000000000000000000000000000000000000a8db2d41b89b00900000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000009eb6299e4bb6669e42cb295a254c8492f67ae2c600000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000025a0c78be9ab81c622c08f7098eefc250935365fb794dfd94aec0fea16c32adec45aa05721614264d8490c6866f110c1594151bbcc4fac43758adae644db6bc3314d06";
@@ -1096,6 +1271,8 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: Some(TxSignature::new_unsafe(
                 38,
                 string_to_h256_unsafe(
@@ -1143,6 +1320,8 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: Some(TxSignature::new_unsafe(
                 38,
                 string_to_h256_unsafe(
@@ -1190,6 +1369,8 @@ mod test {
             value: U256::from(1000000000u64),
             data: vec![],
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: None,
         };
 
@@ -1309,6 +1490,8 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: Some(TxSignature::new_unsafe(
                 37,
                 string_to_h256_unsafe(
@@ -1346,6 +1529,8 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: None,
         };
 
@@ -1380,6 +1565,8 @@ mod test {
             value: U256::from(760460536160301065u64),
             data,
             access_list: vec![],
+            authorization_list: AuthorizationList::default(),
+
             signature: None,
         };
 
@@ -1657,6 +1844,45 @@ mod test {
         let tx_decoded =
             EthereumTransactionCommon::from_bytes(&hex::decode(tx_encoded).unwrap())
                 .unwrap();
+        let tx_reencoded = hex::encode(tx_decoded.to_bytes());
+        assert_eq!(tx_encoded, tx_reencoded);
+    }
+
+    #[test]
+    fn test_eip7702() {
+        let tx_encoded = "04f8c98205390101843b9aca00830186a0946ce4d79d4e77402e1ef3417fdda433aa744c6e1c8080c0f85ef85c82053994d77420f73b4612a7a99dba8c2afd30a1886b03440280a0591b9a1ef4d69710bf7952a2ea7cc88ae32380f85242c523952d8b93d1e51084a001d9c219c8a62ef8d46f19b5a0960e950b3df0ca96ca46703748d41c2170cc7080a095dcd3e32651557e9bd09f4da8d05293b6bbb9946cd35aef5c8e99c0d6fa98a5a0597a2d4d61b846c19f1187b45ef891f499dc9962314e2251fc93c98c92fd4bb3";
+        let tx_decoded =
+            EthereumTransactionCommon::from_bytes(&hex::decode(tx_encoded).unwrap())
+                .unwrap();
+        assert_eq!(tx_decoded.type_, TransactionType::Eip7702);
+        // "authorizationList": [
+        //    {
+        //      "chainId": "0x0539",
+        //      "address": "0xd77420f73b4612a7a99dba8c2afd30a1886b0344",
+        //      "nonce": "0x02",
+        //      "yParity": "0x00",
+        //      "r": "0x591b9a1ef4d69710bf7952a2ea7cc88ae32380f85242c523952d8b93d1e51084",
+        //      "s": "0x01d9c219c8a62ef8d46f19b5a0960e950b3df0ca96ca46703748d41c2170cc70"
+        //    }
+        // ]
+        assert_eq!(
+            signed_authorization(tx_decoded.authorization_list.clone()),
+            [
+                revm::context::transaction::SignedAuthorization::new_unchecked(
+                    revm::context::transaction::Authorization {
+                        chain_id: revm::primitives::U256::from(0x0539),
+                        address: revm::primitives::Address::from_str(
+                            "d77420f73b4612a7a99dba8c2afd30a1886b0344"
+                        )
+                        .unwrap(),
+                        nonce: 0x02
+                    },
+                    0x00,
+                    revm::primitives::U256::from_be_slice(&hex::decode("591b9a1ef4d69710bf7952a2ea7cc88ae32380f85242c523952d8b93d1e51084").unwrap()),
+                    revm::primitives::U256::from_be_slice(&hex::decode("01d9c219c8a62ef8d46f19b5a0960e950b3df0ca96ca46703748d41c2170cc70").unwrap())
+                )
+            ]
+        );
         let tx_reencoded = hex::encode(tx_decoded.to_bytes());
         assert_eq!(tx_encoded, tx_reencoded);
     }
