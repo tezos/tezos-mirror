@@ -52,7 +52,9 @@ export rust_version='1.86.0'
 # Installed via apk cargo
 export cargo_version='1.86.0'
 
-# Installed via apk opam
+# Installed via install_opam_static.sh
+# beware of updating opam to 2.4.0.
+# See https://gitlab.com/tezos/tezos/-/merge_requests/18809
 export opam_version='2.3.0'
 
 # Installed via apk python3-dev

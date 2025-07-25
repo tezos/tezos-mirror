@@ -11,6 +11,9 @@ ENV TZ=Etc/UTC
 ENV BLST_PORTABLE=true
 ENV VENV_PATH=$HOME/venv
 
+ARG OPAM_VERSION
+ENV OPAM_VERSION=${OPAM_VERSION}
+
 #hadolint ignore=DL3041
 RUN dnf -y update &&\
     dnf install -y rpmdevtools &&\

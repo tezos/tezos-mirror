@@ -40,6 +40,7 @@ docker build \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
   --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
+  --build-arg OPAM_VERSION="${opam_version}" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
   --cache-from="${DEP_IMAGE_PROTECTED}:master" \
   -t "$LOCAL_IMAGE_NAME" \
