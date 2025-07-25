@@ -14,8 +14,8 @@ use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinError;
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::{log, Level::*};
-use tezos_evm_runtime::runtime::Runtime;
+use tezos_evm_logging::{log, Level::*, Verbosity};
+use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{BalanceTooLow, TransferTarget, UpdateOrigin};
@@ -24,7 +24,7 @@ use tezos_tezlink::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
     },
     operation_result::{
-        produce_operation_result, Balance, BalanceUpdate, OperationError,
+        is_applied, produce_operation_result, Balance, BalanceUpdate, OperationError,
         OperationResultSum, Reveal, RevealError, RevealSuccess, TransferError,
         TransferSuccess,
     },
@@ -40,6 +40,8 @@ type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyKernelError {
+    #[error("Host failed with a runtime error {0}")]
+    HostRuntimeError(#[from] tezos_smart_rollup_host::runtime::RuntimeError),
     #[error("Apply operation failed on a storage manipulation {0}")]
     StorageError(tezos_storage::error::Error),
     #[error("Apply operation failed because of a b58 conversion {0}")]
@@ -354,19 +356,27 @@ pub fn apply_operation<Host: Runtime>(
         operation.content.clone().into();
 
     let source = &manager_operation.source;
-    log!(
+
+    let mut safe_host = SafeStorage {
         host,
+        world_state: context::contracts::root(context).unwrap(),
+    };
+
+    log!(
+        safe_host,
         Debug,
         "Going to run a Tezos Manager Operation from {}",
         source
     );
 
+    safe_host.start()?;
+
     let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
 
-    log!(host, Debug, "Verifying that the operation is valid");
+    log!(safe_host, Debug, "Verifying that the operation is valid");
 
     let validity_result = validate::is_valid_tezlink_operation(
-        host,
+        &safe_host,
         &account,
         &operation.branch,
         operation.content.into(),
@@ -376,28 +386,37 @@ pub fn apply_operation<Host: Runtime>(
     let new_balance = match validity_result {
         Ok(new_balance) => new_balance,
         Err(validity_err) => {
-            log!(host, Debug, "Operation is invalid, exiting apply_operation");
+            log!(
+                safe_host,
+                Debug,
+                "Operation is invalid, exiting apply_operation"
+            );
             // TODO: Don't force the receipt to a reveal receipt
             let receipt = produce_operation_result::<Reveal>(
                 vec![],
                 Err(OperationError::Validation(validity_err)),
             );
+            safe_host.revert()?;
             return Ok(OperationResultSum::Reveal(receipt));
         }
     };
 
-    log!(host, Debug, "Operation is valid");
+    log!(safe_host, Debug, "Operation is valid");
 
-    log!(host, Debug, "Updates balance to pay fees");
-    account.set_balance(host, &new_balance)?;
+    log!(safe_host, Debug, "Updates balance to pay fees");
+    account.set_balance(&mut safe_host, &new_balance)?;
 
     let (src_delta, block_fees) =
         compute_fees_balance_updates(source, &manager_operation.fee)
             .map_err(ApplyKernelError::BigIntError)?;
 
+    safe_host.promote()?;
+    safe_host.promote_trace()?;
+    safe_host.start()?;
+
     let receipt = match manager_operation.operation {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => {
-            let reveal_result = reveal(host, source, &mut account, &pk)?;
+            let reveal_result = reveal(&mut safe_host, source, &mut account, &pk)?;
             let manager_result =
                 produce_operation_result(vec![src_delta, block_fees], reveal_result);
             OperationResultSum::Reveal(manager_result)
@@ -407,13 +426,26 @@ pub fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            let transfer_result =
-                transfer(host, context, source, &amount, &destination, parameters)?;
+            let transfer_result = transfer(
+                &mut safe_host,
+                context,
+                source,
+                &amount,
+                &destination,
+                parameters,
+            )?;
             let manager_result =
                 produce_operation_result(vec![src_delta, block_fees], transfer_result);
             OperationResultSum::Transfer(manager_result)
         }
     };
+
+    if is_applied(&receipt) {
+        safe_host.promote()?;
+        safe_host.promote_trace()?;
+    } else {
+        safe_host.revert()?;
+    }
 
     Ok(receipt)
 }
@@ -664,6 +696,12 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let source = bootstrap1();
+
+        // We need to have something written in the durable storage
+        // to avoid getting an error when initializing the safe_storage
+        let other = bootstrap2();
+
+        init_account(&mut host, &other.pkh);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
