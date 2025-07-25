@@ -4,7 +4,7 @@
 
 set -eu
 
-OPAM_VERSION="${OPAM_VERSION:-2.3.0}"
+OPAM_VERSION="${OPAM_VERSION:?"Please call this script with OPAM_VERSION"}"
 
 # Architecture detection
 ARCH=$(uname -m)

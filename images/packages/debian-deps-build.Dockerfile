@@ -43,6 +43,10 @@ RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy &&
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+
+ARG OPAM_VERSION
+ENV OPAM_VERSION=${OPAM_VERSION}
+
 RUN /tmp/install_sccache_static.sh && \
     /tmp/install_datadog_static.sh && \
     /tmp/install_opam_static.sh
