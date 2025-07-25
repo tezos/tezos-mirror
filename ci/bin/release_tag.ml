@@ -62,7 +62,7 @@ let job_release_page ~test ?dependencies () =
     ~image:Images.ci_release
     ~stage:Stages.publish
     ~description:
-      "A job  to update the Octez release page. If running in a test pipleine, \
+      "A job to update the Octez release page. If running in a test pipleine, \
        the assets are pushed in the [release-page-test.nomadic-labs.com] \
        bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
        its [index.html] is updated accordingly."
@@ -92,6 +92,50 @@ let job_release_page ~test ?dependencies () =
          ])
     ["./scripts/releases/publish_release_page.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+
+(* Temporary job that uses [bin_release_page/release_page.ml]
+   to update the release page.
+   This will be removed once [job_release_page] uses it. *)
+let job_update_release_page ~test () =
+  job
+    ~__POS__
+    ~image:Images.CI.build
+    ~stage:Stages.publish
+    ~description:""
+    ~name:"publish:update-release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["index.md"; "index.html"])
+    ~variables:
+      (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
+         [
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+         ]
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com");
+           ("BUCKET_PATH", "/releases");
+           ("URL", "octez.tezos.com");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
+    ~before_script:["eval $(opam env)"]
+    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
+    [
+      "sudo apk add aws-cli pandoc";
+      "dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+       --title 'Octez releases' --bucket ${S3_BUCKET} --path \
+       '${BUCKET_PATH:-}' changelog binaries packages";
+      "aws s3 cp \"./index.html\" \"s3://${S3_BUCKET}${BUCKET_PATH}/\"";
+      "aws cloudfront create-invalidation --distribution-id \
+       \"$DISTRIBUTION_ID\" --paths \"/*\"";
+    ]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 

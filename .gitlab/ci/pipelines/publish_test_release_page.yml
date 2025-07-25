@@ -3,7 +3,29 @@
 
 stages:
 - start
+- images
 - publish
+
+oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  script:
+  - ./images/ci_create_ci_images.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -20,20 +42,30 @@ datadog_pipeline_trace:
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
-publish:release-page:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+publish:update-release-page:
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
   - gcp
   rules:
   - when: manual
     allow_failure: true
-  dependencies: []
+  dependencies:
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - eval $(opam env)
   script:
-  - ./scripts/releases/publish_release_page.sh
+  - sudo apk add aws-cli pandoc
+  - dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' --title
+    'Octez releases' --bucket ${S3_BUCKET} --path '${BUCKET_PATH:-}' changelog binaries
+    packages
+  - aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/"
+  - aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths
+    "/*"
+  after_script:
+  - cp /tmp/release_page*/index.md ./index.md
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
@@ -42,6 +74,5 @@ publish:release-page:
   artifacts:
     expire_in: 1 day
     paths:
-    - ./index.md
+    - index.md
     - index.html
-  retry: 0
