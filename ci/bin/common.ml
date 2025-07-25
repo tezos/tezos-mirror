@@ -263,6 +263,9 @@ let changeset_images_rust_sdk_bindings =
 
 let changeset_images = Changeset.make ["images/**/*"]
 
+let changeset_images_clientlibs =
+  Changeset.make ["images/client-libs-dependencies/**/*"]
+
 let changeset_base_images =
   Changeset.make ["images/base-images/**/*"; "scripts/ci/build-base-images.sh"]
 
@@ -416,17 +419,23 @@ let changeset_opam_jobs =
         "scripts/version.sh";
       ])
 
-let changeset_kaitai_e2e_files =
-  Changeset.(
-    changeset_base @ changeset_images
-    @ make
-        [
-          (* Regenerate the client-libs-dependencies image when the CI
-             scripts change. *)
-          "scripts/ci/**/*";
-          "src/**/*";
-          "client-libs/*kaitai*/**/*";
-        ])
+let changeset_kaitai_e2e_files, changeset_kaitai_checks_files =
+  (* this is an over approximation considering all scripts used
+     in both changesets, that mainly differ because of the image
+     use to run the jobs *)
+  let changeset_kaitai =
+    Changeset.make
+      [
+        "scripts/install_build_deps.js.sh";
+        "scripts/version.sh";
+        "src/**/*";
+        "client-libs/*kaitai*/**/*";
+        "scripts/ci/datadog_send_job_info.sh";
+        "scripts/slim-mode.sh";
+      ]
+  in
+  ( Changeset.(changeset_base @ changeset_images_clientlibs @ changeset_kaitai),
+    Changeset.(changeset_base @ changeset_images @ changeset_kaitai) )
 
 (** Set of OCaml files for type checking ([dune build @check]). *)
 let changeset_ocaml_check_files =
