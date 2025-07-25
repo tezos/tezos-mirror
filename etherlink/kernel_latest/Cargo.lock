@@ -3318,6 +3318,7 @@ dependencies = [
  "hex",
  "libsecp256k1",
  "primitive-types",
+ "revm",
  "rlp",
  "serde",
  "sha3",
