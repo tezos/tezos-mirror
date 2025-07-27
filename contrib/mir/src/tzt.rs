@@ -308,12 +308,12 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         _ => return Err("Big map elements must be a sequence".into()),
                     };
                     let descr: BTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
-                        .into_iter()
+                        .iter()
                         .map(|elt| {
                             match elt {
                                 // If Micheline::App stores its arguments in a Vec,
                                 // pattern match with a condition to ensure length is 2
-                                Micheline::App(Prim::Elt, ref kv, _) if kv.len() == 2 => {
+                                Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
                                     let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)
                                         .unwrap();

@@ -117,7 +117,7 @@ impl<'a> ContractScript<'a> {
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
             typecheck_value(&parameter, ctx, annotation_type)?;
             let mut result = parameter;
-            for direction in annotation_path.into_iter().rev() {
+            for direction in annotation_path.iter().rev() {
                 match direction {
                     Direction::Left => {
                         result = Micheline::prim1(arena, Prim::Left, result);
