@@ -499,10 +499,11 @@ impl<'a> TypedValue<'a> {
                 Left(l) => l.collect_big_maps(put_res),
                 Right(r) => r.collect_big_maps(put_res),
             },
-            Option(p) => match p {
-                Some(x) => x.collect_big_maps(put_res),
-                None => {}
-            },
+            Option(p) => {
+                if let Some(x) = p {
+                    x.collect_big_maps(put_res)
+                }
+            }
             List(l) => l.iter_mut().for_each(|v| v.collect_big_maps(put_res)),
             Set(_) => {
                 // Elements are comparable and so have no big maps
