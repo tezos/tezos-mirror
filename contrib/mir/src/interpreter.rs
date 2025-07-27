@@ -112,7 +112,7 @@ impl<'a> ContractScript<'a> {
         entrypoint: Option<Entrypoint>,
         ctx: &mut Ctx<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
-        let entrypoint = entrypoint.unwrap_or_else(Entrypoint::default);
+        let entrypoint = entrypoint.unwrap_or_default();
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
             typecheck_value(&parameter, ctx, annotation_type)?;

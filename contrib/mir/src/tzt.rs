@@ -119,7 +119,7 @@ fn populate_ctx_with_known_contracts(
 ) {
     // If other_contracts is not provided, then initialize with empty map,
     // or else initialize with the provided list of known contracts.
-    let mut known_contracts = m_other_contracts.unwrap_or(HashMap::new());
+    let mut known_contracts = m_other_contracts.unwrap_or_default();
 
     // If self address is provided, include that to the list of known contracts as well.
     // Use a default type of Unit, if parameter type is not provided.
