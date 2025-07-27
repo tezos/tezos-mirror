@@ -45,8 +45,8 @@ fn run_contract<'a>(
     ctx: &mut Ctx<'a>,
     parser: &'a Parser<'a>,
 ) {
-    let entrypoint = Entrypoint::try_from(entrypoint)
-        .expect("Entrypoint should be valid, check the string");
+    let entrypoint =
+        Entrypoint::try_from(entrypoint).expect("Entrypoint should be valid, check the string");
     let (_, new_storage) = contract_typechecked
         .interpret(ctx, &parser.arena, parameter, Some(entrypoint), storage)
         .unwrap();

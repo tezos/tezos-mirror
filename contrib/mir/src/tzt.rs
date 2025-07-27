@@ -315,8 +315,10 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                                 // pattern match with a condition to ensure length is 2
                                 Micheline::App(Prim::Elt, ref kv, _) if kv.len() == 2 => {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
-                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty).unwrap();
-                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty).unwrap();
+                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)
+                                        .unwrap();
+                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty)
+                                        .unwrap();
                                     Ok((k, v))
                                 }
                                 _ => { return Err("Each big map element must be of the form `Elt <key> <value>`."); }
