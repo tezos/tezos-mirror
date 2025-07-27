@@ -436,6 +436,7 @@ macro_rules! micheline_values {
                 | Prim::Left
                 | Prim::Right
                 | Prim::Lambda_rec
+                | Prim::Ticket
                 | Prim::Transfer_tokens
                 | Prim::Emit
                 | Prim::Create_contract
