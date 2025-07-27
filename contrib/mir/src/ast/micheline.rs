@@ -58,7 +58,7 @@ impl<'a> Micheline<'a> {
         // doesn't allocate in the arena, the call is safe.
         // See Note: alloc_extend
         #[allow(clippy::disallowed_methods)]
-        let buf = arena.alloc_extend(std::iter::repeat(Micheline::Seq(&[])).take(iter.len()));
+        let buf = arena.alloc_extend(std::iter::repeat_n(Micheline::Seq(&[]), iter.len()));
         let mut actual_len: usize = 0;
         for (dest, item) in buf.iter_mut().zip(&mut iter) {
             *dest = item;
