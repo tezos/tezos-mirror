@@ -1641,7 +1641,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let kty = parse_ty(ctx, kty)?;
             kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            stack.push(T::new_map(kty.clone(), vty.clone()));
+            stack.push(T::new_map(kty.clone(), vty));
             I::EmptyMap
         }
         (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
@@ -6112,7 +6112,7 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
+                id: Some(id0),
                 overlay: BTreeMap::from([(TypedValue::int(7), None)]),
                 key_type: Type::Int,
                 value_type: Type::Int
