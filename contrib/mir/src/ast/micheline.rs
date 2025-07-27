@@ -285,7 +285,6 @@ macro_rules! micheline_unsupported_instructions_common {
             | Prim::TICKET_DEPRECATED
             | Prim::CAST
             | Prim::RENAME
-            | Prim::IS_IMPLICIT_ACCOUNT
             | Prim::INDEX_ADDRESS
             | Prim::GET_ADDRESS_INDEX
     };

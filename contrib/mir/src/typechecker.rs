@@ -2140,6 +2140,14 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IMPLICIT_ACCOUNT, len 1),
         (App(IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
 
+        (App(IS_IMPLICIT_ACCOUNT, [], _), [.., T::Address]) => {
+            stack[0] = T::new_option(T::KeyHash);
+            I::IsImplicitAccount
+        }
+        (App(IS_IMPLICIT_ACCOUNT, [], _), [.., _]) => no_overload!(IS_IMPLICIT_ACCOUNT),
+        (App(IS_IMPLICIT_ACCOUNT, [], _), []) => no_overload!(IS_IMPLICIT_ACCOUNT, len 1),
+        (App(IS_IMPLICIT_ACCOUNT, expect_args!(0), _), _) => unexpected_micheline!(),
+
         (App(TOTAL_VOTING_POWER, [], _), ..) => {
             stack.push(T::Nat);
             I::TotalVotingPower
