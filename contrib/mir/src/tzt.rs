@@ -209,7 +209,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Code(ib) => set_tzt_field("code", &mut m_code, ib)?,
                 Input(stk) => {
                     // Save input to treat it last, after we have self_param and other_contracts
-                    if input_stk_backup != None {
+                    if input_stk_backup.is_some() {
                         return Err("Duplicate field 'input' in test".into());
                     }
                     input_stk_backup = Some(stk);
