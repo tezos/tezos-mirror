@@ -61,6 +61,8 @@ use self::entrypoint::Direction;
 pub struct Ticket<'a> {
     /// Ticketer, the address of the contract that issued the ticket.
     pub ticketer: AddressHash,
+    /// Type of the payload.
+    pub content_type: Type,
     /// Ticket payload.
     pub content: TypedValue<'a>,
     /// Ticket amount.
@@ -807,13 +809,15 @@ pub mod test_strategies {
                     .boxed()
             }
             T::Ticket(t) => {
-                (typed_value_by_type(t), (1u64..100u64))
-                    .prop_map(|(content, amount)| V::new_ticket(Ticket {
-                        ticketer: AddressHash::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
-                        content,
-                        amount: amount.into(),
-                    }
-                    ))
+                (Just(t.as_ref().clone()), typed_value_by_type(t), (1u64..100u64))
+                    .prop_map(|(content_type, content, amount)|
+                              V::new_ticket(Ticket {
+                                  ticketer: AddressHash::from_base58_check("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
+                                  content_type,
+                                  content,
+                                  amount: amount.into(),
+                              }
+                              ))
                     .boxed()
             }
             T::Option(t) => prop_oneof![

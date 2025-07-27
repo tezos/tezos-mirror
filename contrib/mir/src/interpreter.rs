@@ -1579,7 +1579,7 @@ fn interpret_one<'a>(
             let key = pop!(V::Key);
             stack.push(TypedValue::KeyHash(key.hash()))
         }
-        I::Ticket(_content_type) => {
+        I::Ticket(content_type) => {
             let content = pop!();
             let amount = pop!(V::Nat);
             ctx.gas.consume(interpret_cost::TICKET)?;
@@ -1590,6 +1590,7 @@ fn interpret_one<'a>(
             } else {
                 let ticket = Ticket {
                     ticketer: ctx.self_address.clone(),
+                    content_type: content_type.clone(),
                     content,
                     amount,
                 };
@@ -4793,6 +4794,7 @@ mod interpreter_tests {
         let expected_ticket = V::new_ticket(crate::ast::Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         });
 
@@ -4816,6 +4818,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         };
         let ticket_val = V::new_ticket(ticket.clone());
@@ -5078,6 +5081,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Unit,
             content: V::Unit,
         };
         let ticket_val = V::new_ticket(ticket.clone());
@@ -5134,6 +5138,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());
@@ -5166,6 +5171,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: ctx.self_address.clone(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());
@@ -5184,6 +5190,7 @@ mod interpreter_tests {
         let ticket = Ticket {
             ticketer: AddressHash::try_from("KT1BRd2ka5q2cPRdXALtXD1QZ38CPam2j1ye").unwrap(),
             amount: 100u32.into(),
+            content_type: Type::Nat,
             content: V::nat(10),
         };
         let ticket_left = V::new_ticket(ticket.clone());

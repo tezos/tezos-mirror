@@ -2506,17 +2506,22 @@ pub(crate) fn typecheck_value<'a>(
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
             )?))
         }
-        (T::Ticket(c), m) => {
+        (T::Ticket(content_type), m) => {
+            let content_type = content_type.as_ref();
             match typecheck_value(
                 m,
                 ctx,
-                &Type::new_pair(Type::Address, Type::new_pair(c.as_ref().clone(), Type::Nat)),
+                &Type::new_pair(
+                    Type::Address,
+                    Type::new_pair(content_type.clone(), Type::Nat),
+                ),
             ) {
                 Ok(TV::Pair(b)) => {
                     let address = irrefutable_match!(b.0; TV::Address);
                     let c = irrefutable_match!(b.1; TV::Pair);
                     TV::new_ticket(Ticket {
                         ticketer: address.hash,
+                        content_type: content_type.clone(),
                         content: c.0,
                         amount: irrefutable_match!(c.1; TV::Nat),
                     })
@@ -7597,6 +7602,7 @@ mod typecheck_tests {
         let mut ctx = Ctx::default();
         let ticket: super::Ticket = super::Ticket {
             ticketer: AddressHash::try_from("tz1T1K14rZ46m1GT1kPVwZWkSHxNSDZgM71h").unwrap(),
+            content_type: Type::Unit,
             content: TypedValue::Unit,
             amount: 5u32.into(),
         };

@@ -426,6 +426,7 @@ mod tests {
             stk![TypedValue::new_option(Some(TypedValue::new_ticket(
                 Ticket {
                     amount: 10u32.into(),
+                    content_type: Type::Int,
                     content: TypedValue::int(20),
                     ticketer: ctx.self_address
                 }
@@ -445,6 +446,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ticketer_address_hash,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
@@ -473,6 +475,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ctx.self_address,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
@@ -510,6 +513,7 @@ mod tests {
         let ticket = Ticket {
             ticketer: ctx.self_address,
             amount: 100u32.into(),
+            content_type: Type::Int,
             content: TypedValue::int(20),
         };
         run_e2e_test(
