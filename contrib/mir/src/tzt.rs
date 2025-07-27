@@ -321,7 +321,9 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                                         .unwrap();
                                     Ok((k, v))
                                 }
-                                _ => { return Err("Each big map element must be of the form `Elt <key> <value>`."); }
+                                _ => Err(
+                                    "Each big map element must be of the form `Elt <key> <value>`.",
+                                ),
                             }
                         })
                         .collect::<Result<BTreeMap<_, _>, _>>()?;

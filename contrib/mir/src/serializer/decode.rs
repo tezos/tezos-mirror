@@ -190,10 +190,10 @@ fn decode_int(bytes: &mut BytesIt) -> Result<Micheline<'static>, DecodeError> {
         }
     }
     bitvec.set_uninitialized(false);
-    return Ok(Micheline::Int(BigInt::from_bytes_le(
+    Ok(Micheline::Int(BigInt::from_bytes_le(
         sign,
         &bitvec.into_vec(),
-    )));
+    )))
 }
 
 fn get_bytes<'a>(bytes: &mut BytesIt<'a>) -> Result<&'a [u8], DecodeError> {
