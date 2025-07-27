@@ -1579,7 +1579,7 @@ fn interpret_one<'a>(
             let key = pop!(V::Key);
             stack.push(TypedValue::KeyHash(key.hash()))
         }
-        I::Ticket => {
+        I::Ticket(_content_type) => {
             let content = pop!();
             let amount = pop!(V::Nat);
             ctx.gas.consume(interpret_cost::TICKET)?;
@@ -4797,7 +4797,10 @@ mod interpreter_tests {
         });
 
         let start_milligas = ctx.gas.milligas();
-        assert_eq!(interpret(&[Ticket], &mut ctx, &mut stack), Ok(()));
+        assert_eq!(
+            interpret(&[Ticket(Type::Unit)], &mut ctx, &mut stack),
+            Ok(())
+        );
         assert_eq!(stack, stk![V::new_option(Some(expected_ticket))]);
         assert_eq!(
             start_milligas - ctx.gas.milligas(),

@@ -1997,8 +1997,9 @@ pub(crate) fn typecheck_instruction<'a>(
         (App(APPLY, expect_args!(0), _), _) => unexpected_micheline!(),
 
         (App(TICKET, [], _), [.., T::Nat, _]) => {
-            stack[0] = T::new_option(T::new_ticket(pop!()));
-            I::Ticket
+            let content_ty = pop!();
+            stack[0] = T::new_option(T::new_ticket(content_ty.clone()));
+            I::Ticket(content_ty)
         }
         (App(TICKET, [], _), [.., _, _]) => no_overload!(TICKET),
         (App(TICKET, [], _), [] | [_]) => no_overload!(TICKET, len 2),
@@ -7659,7 +7660,7 @@ mod typecheck_tests {
         let stk = &mut tc_stk![Type::Nat, Type::Unit];
         assert_eq!(
             typecheck_instruction(&parse("TICKET").unwrap(), &mut Ctx::default(), stk),
-            Ok(Instruction::Ticket)
+            Ok(Instruction::Ticket(Type::Unit))
         );
         assert_eq!(
             stk,

@@ -626,7 +626,7 @@ pub enum Instruction<'a> {
     Right,
     Lambda(Lambda<'a>),
     Exec,
-    Ticket,
+    Ticket(Type),
     HashKey,
     Apply {
         arg_ty: Type,
