@@ -18,20 +18,12 @@
      not requiring this data
 *)
 
-open Tezos
 open Scenarios_helpers
+open Tezos
+open Yes_crypto
 
 (** A baker account is its public key (pk) and its hash (pkh) *)
 type baker_account = {pk : string; pkh : string}
-
-let add_prometheus_source node cloud agent =
-  Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
-
-let yes_crypto_env =
-  String_map.add
-    Tezos_crypto.Helpers.yes_crypto_environment_variable
-    "y"
-    String_map.empty
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -765,16 +757,19 @@ let init ~(configuration : configuration) cloud next_agent =
         in
         Lwt.return stresstesters
   in
-  let* () = add_prometheus_source bootstrap_node cloud bootstrap_agent in
+  let* () =
+    add_prometheus_source ~node:bootstrap_node cloud bootstrap_agent "bootstrap"
+  in
   let* () =
     Lwt_list.iter_s
-      (fun ({agent; node; _} : baker) -> add_prometheus_source node cloud agent)
+      (fun ({agent; node; _} : baker) ->
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       bakers
   in
   let* () =
     Lwt_list.iter_s
       (fun ({agent; node; _} : stresstester) ->
-        add_prometheus_source node cloud agent)
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       stresstesters
   in
   Lwt.return {cloud; configuration; bootstrap; bakers; stresstesters}

@@ -12,6 +12,8 @@
 
 open Scenarios_configuration
 
+val yes_crypto_env : string String_map.t
+
 (** [should_enable_yes_crypto config] returns a flag
     indicating whether "yes-crypto" mode should be enabled (for [Scatter] and [Map])
     or disabled (for [Disabled]). *)
