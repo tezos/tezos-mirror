@@ -567,6 +567,7 @@ fn parse_ty_with_entrypoints<'a>(
     Ok(parsed_ty)
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_parameter_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
     parameter_ty: &Micheline<'a>,
