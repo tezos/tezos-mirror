@@ -2506,6 +2506,24 @@ pub(crate) fn typecheck_value<'a>(
                 matches!(raw, V::App(Prim::Lambda_rec, ..)),
             )?))
         }
+        (
+            T::Ticket(content_type),
+            V::App(Prim::Ticket, [ticketer, content_type_bis, content, amount], _),
+        ) => {
+            let content_type_bis = parse_ty(ctx, content_type_bis)?;
+            ensure_ty_eq(&mut ctx.gas, content_type, &content_type_bis)?;
+            let ticketer = typecheck_value(ticketer, ctx, &T::Address)?;
+            let ticketer = irrefutable_match!(ticketer; TV::Address);
+            let content = typecheck_value(content, ctx, content_type)?;
+            let amount = typecheck_value(amount, ctx, &T::Nat)?;
+            let amount = irrefutable_match!(amount; TV::Nat);
+            TV::new_ticket(Ticket {
+                ticketer: ticketer.hash,
+                content_type: content_type.as_ref().clone(),
+                content,
+                amount,
+            })
+        }
         (T::Ticket(content_type), m) => {
             let content_type = content_type.as_ref();
             match typecheck_value(
