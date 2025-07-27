@@ -359,8 +359,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         };
         match self {
             TV::Int(i) => V::Int(i),
-            TV::Nat(u) => V::Int(u.try_into().unwrap()),
-            TV::Mutez(u) => V::Int(u.try_into().unwrap()),
+            TV::Nat(u) => V::Int(u.into()),
+            TV::Mutez(u) => V::Int(u.into()),
             TV::Bool(true) => V::prim0(Prim::True),
             TV::Bool(false) => V::prim0(Prim::False),
             TV::String(s) => V::String(s),
