@@ -215,7 +215,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             }
         }
 
-        impl<'a> ExactSizeIterator for LinearizePairIter<'a> {}
+        impl ExactSizeIterator for LinearizePairIter<'_> {}
 
         match self {
             Nat => Micheline::prim0(Prim::nat),

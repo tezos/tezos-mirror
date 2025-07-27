@@ -264,7 +264,7 @@ impl<'a> InMemoryLazyStorage<'a> {
     }
 }
 
-impl<'a> Default for InMemoryLazyStorage<'a> {
+impl Default for InMemoryLazyStorage<'_> {
     fn default() -> Self {
         InMemoryLazyStorage::new()
     }
