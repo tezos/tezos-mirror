@@ -2441,7 +2441,7 @@ pub(crate) fn typecheck_value<'a>(
                 TV::Timestamp(int_value.into())
             } else {
                 // If integer parsing fails, try to parse as RFC3339 datetime
-                let dt = DateTime::parse_from_rfc3339(&n);
+                let dt = DateTime::parse_from_rfc3339(n);
                 match dt {
                     Ok(dt) => TV::Timestamp(dt.timestamp().into()),
                     Err(_) => return Err(invalid_value_for_type!()),

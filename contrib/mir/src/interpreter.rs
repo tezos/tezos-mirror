@@ -435,7 +435,7 @@ fn interpret_one<'a>(
                 if x2 == BigInt::zero() {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1, &x2.magnitude());
+                    let (quotient, remainder) = BigUint::div_rem(&x1, x2.magnitude());
                     if x2.sign() == Sign::Plus {
                         stack.push(V::new_option(Some(V::new_pair(
                             V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
@@ -456,7 +456,7 @@ fn interpret_one<'a>(
                 if x2 == BigUint::zero() {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2);
+                    let (quotient, remainder) = BigUint::div_rem(x1.magnitude(), &x2);
                     if x1.sign() != Sign::Minus {
                         stack.push(V::new_option(Some(V::new_pair(
                             V::Int(BigInt::from_biguint(Sign::Plus, quotient)),
@@ -484,7 +484,7 @@ fn interpret_one<'a>(
                 if x2.sign() == Sign::NoSign {
                     stack.push(V::Option(None));
                 } else {
-                    let (quotient, remainder) = BigUint::div_rem(&x1.magnitude(), &x2.magnitude());
+                    let (quotient, remainder) = BigUint::div_rem(x1.magnitude(), x2.magnitude());
                     match (x1.sign(), x2.sign()) {
                         (Sign::Minus, Sign::Minus) => {
                             stack.push(V::new_option(Some(if remainder > BigUint::zero() {
