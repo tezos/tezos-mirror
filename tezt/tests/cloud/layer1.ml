@@ -55,33 +55,6 @@ module Node = struct
   open Snapshot_helpers
   include Node
 
-  (** We are running a private network with yes-crypto enabled.
-      We don't want to connect with the real network.
-  *)
-  let isolated_config ~peers ~network ~delay =
-    [
-      No_bootstrap_peers;
-      Connections (List.length peers);
-      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network Network.(to_octez_network_options @@ to_public network);
-      Expected_pow 0;
-      Cors_origin "*";
-      Storage_maintenance_delay (string_of_int delay);
-    ]
-
-  (** [--private-mode] is mainly useful for the bootstrap node
-      because it is used first to bootstrap a node with real network peers
-      before being disconnected.
-      For the other node, it's an extra security but their ip/identity should
-      not be advertised to the external world anyway.
-  *)
-  let isolated_args peers =
-    Private_mode
-    :: List.fold_left
-         (fun acc peer -> Peer peer :: acc)
-         [Allow_yes_crypto; Force_history_mode_switch]
-         peers
-
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
      because of data not included in the snapshot.
@@ -128,7 +101,7 @@ module Node = struct
       Lwt.return_unit
     in
     toplog "Reset node config for private a yes-crypto network" ;
-    let config = isolated_config ~peers ~network ~delay:0 in
+    let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
     let* () = Node.config_reset node config in
     let* () =
       Node_helpers.may_add_migration_offset_to_config
@@ -137,7 +110,7 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let arguments = isolated_args peers in
+    let arguments = Node_helpers.isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     wait_for_ready node
 
@@ -151,7 +124,7 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
-    let config = isolated_config ~peers ~network ~delay in
+    let config = Node_helpers.isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
     let* () =
       Node_helpers.may_add_migration_offset_to_config
@@ -161,7 +134,7 @@ module Node = struct
         ~network
     in
     let* () = import_snapshot ~no_check:true ~name node snapshot in
-    let arguments = isolated_args peers in
+    let arguments = Node_helpers.isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
@@ -589,12 +562,14 @@ let number_of_bakers ~snapshot ~network cloud agent name =
       snapshot
   in
   let* () =
-    Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
+    Node.config_init
+      node
+      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () =
     Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
   in
-  let* () = Node.Agent.run node (Node.isolated_args []) in
+  let* () = Node.Agent.run node (Node_helpers.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
     Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent

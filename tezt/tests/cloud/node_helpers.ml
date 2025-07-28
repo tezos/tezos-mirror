@@ -24,6 +24,33 @@ let yes_wallet agent =
   let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
   Yes_wallet.Agent.create ~name agent
 
+(** We are running a private network with yes-crypto enabled.
+    We don't want to connect with the real network. *)
+let isolated_config ~peers ~network ~delay =
+  Node.
+    [
+      No_bootstrap_peers;
+      Connections (List.length peers);
+      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
+      Network Network.(to_octez_network_options @@ to_public network);
+      Expected_pow 0;
+      Cors_origin "*";
+      Storage_maintenance_delay (string_of_int delay);
+    ]
+
+(** [--private-mode] is mainly useful for the bootstrap node
+    because it is used first to bootstrap a node with real network peers
+    before being disconnected.
+    For the other node, it's an extra security but their ip/identity should
+    not be advertised to the external world anyway. *)
+let isolated_args peers =
+  Node.(
+    Private_mode
+    :: List.fold_left
+         (fun acc peer -> Peer peer :: acc)
+         [Allow_yes_crypto; Force_history_mode_switch]
+         peers)
+
 let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
     =
   let* level = get_snapshot_info_level node snapshot in
@@ -99,7 +126,7 @@ let may_init_from_snapshot node ?data_dir ?dal_config ~network ~snapshot
       match snapshot_file_path with
       | Some snapshot_file_path ->
           let* () =
-            add_migration_offset_to_config
+            may_add_migration_offset_to_config
               ~migration_offset
               ~network
               node
@@ -173,29 +200,14 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       Node.[No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
       @ yes_crypto_arg @ arguments
   in
-  match network with
-  | #Network.public -> (
-      match data_dir with
-      | Some _ ->
-          let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
-          let* () = Node.wait_for_ready node in
-          Lwt.return node
-      | None ->
-          toplog "Launching the node %s." name ;
-          let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
-          toplog "Waiting for the node %s to be ready." name ;
-          let* () = Node.wait_for_ready node in
-          toplog "Node %s is ready." name ;
-          let* () = Node.wait_for_synchronisation ~statuses:["synced"] node in
-          toplog "Node %s is bootstrapped" name ;
-          Lwt.return node)
-  | _ (* private network *) -> (
-      match data_dir with
-      | None ->
-          let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
-          let* () = Node.wait_for_ready node in
-          Lwt.return node
-      | Some _ ->
-          let* () = Node.Agent.run ?env ?ppx_profiling node arguments in
-          let* () = Node.wait_for_ready node in
-          Lwt.return node)
+  toplog "Launching the node %s." name ;
+  let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
+  toplog "Waiting for the node %s to be ready." name ;
+  let* () = Node.wait_for_ready node in
+  toplog "Node %s is ready." name ;
+  let* () =
+    if is_public network && Option.is_none data_dir then
+      Node.wait_for_synchronisation ~statuses:["synced"] node
+    else Lwt.return_unit
+  in
+  Lwt.return node

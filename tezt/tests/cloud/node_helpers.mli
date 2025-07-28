@@ -18,6 +18,11 @@
 (** Shortcut to create a "yes-wallet" for the given agent. *)
 val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
 
+val isolated_config :
+  peers:string list -> network:Network.t -> delay:int -> Node.argument list
+
+val isolated_args : string list -> Node.argument list
+
 (** Initialize an L1 node for the given configuration.
 
     If a [~snapshot] is provided and [?data_dir] is omitted, the node will be
