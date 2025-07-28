@@ -302,25 +302,35 @@ let changeset_octez_or_kernels =
     @ make ["scripts/ci/**/*"; "kernels.mk"; "etherlink.mk"])
 
 (** Only if documentation has changed *)
+
+let octez_docs_base_folders =
+  [
+    "src";
+    "tezt";
+    "brassaia";
+    "irmin";
+    "client-libs";
+    "etherlink";
+    "data-encoding";
+    "vendors";
+  ]
+
 let changeset_octez_docs =
   Changeset.(
     changeset_base
+    (* TODO refine scripts *)
+    @ make ["scripts/**/*/"; "script-inputs/**/*/"]
+    @ make
+        (octez_docs_base_folders |> List.map (fun x -> String.cat x "/**/*.ml*"))
     @ make
         [
-          "scripts/**/*/";
-          "script-inputs/**/*/";
-          "src/**/*";
-          "tezt/**/*";
-          "brassaia/**/*";
-          "irmin/**/*";
-          "client-libs/**/*";
-          "etherlink/**/*";
-          "data-encoding/**/*";
-          "vendors/**/*";
           "dune";
           "dune-project";
           "dune-workspace";
+          "**/*.rst";
+          (* Nota: stays as it is, many non-rst files in this folder *)
           "docs/**/*";
+          "grafazos/doc/**/*";
         ])
 
 (** Only if reStructured Text files have changed *)
