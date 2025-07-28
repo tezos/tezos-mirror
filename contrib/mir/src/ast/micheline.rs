@@ -442,6 +442,7 @@ pub(crate) use {
 };
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_helpers {
 
     /// Helper to reduce syntactic noise when constructing Micheline applications in tests.

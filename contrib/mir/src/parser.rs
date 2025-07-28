@@ -82,6 +82,7 @@ pub(crate) fn spanned_lexer(
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_helpers {
     use super::*;
 

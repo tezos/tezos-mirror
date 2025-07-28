@@ -679,6 +679,7 @@ pub struct ContractScript<'a> {
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_strategies {
     use proptest::prelude::*;
 
