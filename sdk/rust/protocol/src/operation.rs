@@ -7,7 +7,7 @@
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
 use tezos_crypto_rs::{hash::BlsSignature, public_key::PublicKey, public_key_hash::PublicKeyHash};
-use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith};
+use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 #[encoding(tags = "u8")]
@@ -43,14 +43,25 @@ pub struct RevealContent {
 pub struct TransactionContent {
     pub amount: Narith,
     pub destination: Contract,
-    pub parameters: Option<Parameter>,
+    pub parameters: WithDefaultValue<Parameters>,
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
-pub struct Parameter {
+pub struct Parameters {
     pub entrypoint: Entrypoint,
     #[encoding(dynamic, bytes)]
     pub value: Vec<u8>,
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Parameters {
+            entrypoint: Entrypoint::default(),
+            // This is the binary representation of the Michelson "Unit" value as produced by
+            // octez-client convert data "Unit" from Michelson to binary
+            value: vec![0x03, 0x0b],
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
@@ -165,7 +176,7 @@ mod tests {
     }
 
     /*
-    octez-codec encode "022-PsRiotum.operation.contents" from '{
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "transaction",
       "source": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
       "fee": "405",
@@ -192,18 +203,18 @@ mod tests {
                 amount: 1_000_000_u64.into(),
                 destination: Contract::from_b58check("KT1EY9XA4Z5tybQN5zmVUL5cntku1zTCBLTv")
                     .unwrap(),
-                parameters: Some(Parameter {
+                parameters: Parameters {
                     entrypoint: Entrypoint::try_from("B").unwrap(),
-                    // mir::ast::Micheline::String("Hello".into()).encode(),
-                    value: vec![0x01, 0x00, 0x00, 0x00, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f],
-                }),
+                    // octez-client convert data '"Hello"' from Michelson to binary
+                    value: hex::decode("010000000548656c6c6f").unwrap(),
+                }
+                .into(),
             },
             gas_limit: 1380_u64.into(),
             storage_limit: 0_u64.into(),
         });
 
-        let mut encoded_operation = Vec::new();
-        operation.bin_write(&mut encoded_operation).unwrap();
+        let encoded_operation = operation.to_bytes().unwrap();
 
         let bytes = hex::decode("6c0002298c03ed7d454a101eb7022bc95f7e5f41ac78950302e40a00c0843d014151d57ddff98da8cd49f0f2cbf89465bcf267a400ffff01420000000a010000000548656c6c6f").unwrap();
         assert_eq!(bytes, encoded_operation);
@@ -214,7 +225,7 @@ mod tests {
     }
 
     /*
-    octez-codec encode "022-PsRiotum.operation.contents" from '{
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "transaction",
       "source": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
       "fee": "987",
@@ -235,14 +246,13 @@ mod tests {
                 amount: 10.into(),
                 destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
                     .unwrap(),
-                parameters: None,
+                parameters: Parameters::default().into(),
             },
             gas_limit: 0.into(),
             storage_limit: 1405.into(),
         });
 
-        let mut encoded_operation = Vec::new();
-        operation.bin_write(&mut encoded_operation).unwrap();
+        let encoded_operation = operation.to_bytes().unwrap();
 
         let bytes = hex::decode("6c00e7670f32038107a59a2b9cfefae36ea21f5aa63cdb07c80300fd0a0a000002298c03ed7d454a101eb7022bc95f7e5f41ac7800").unwrap();
         assert_eq!(bytes, encoded_operation);
@@ -253,7 +263,51 @@ mod tests {
     }
 
     /*
-    octez-codec encode "022-PsRiotum.operation.contents" from '{
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "transaction",
+      "source": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "fee": "987",
+      "counter": "456",
+      "gas_limit": "0",
+      "storage_limit": "1405",
+      "amount": "10",
+      "destination": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "parameters": {
+        "entrypoint": "default",
+        "value": {
+          "prim": "Unit"
+        }
+      }
+    }'
+    */
+    #[test]
+    fn transaction_transfer_with_parameters_encoding() {
+        let operation = OperationContent::Transaction(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+            fee: 987.into(),
+            counter: 456.into(),
+            operation: TransactionContent {
+                amount: 10.into(),
+                destination: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")
+                    .unwrap(),
+                parameters: Parameters::default().into(),
+            },
+            gas_limit: 0.into(),
+            storage_limit: 1405.into(),
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6c00e7670f32038107a59a2b9cfefae36ea21f5aa63cdb07c80300fd0a0a000002298c03ed7d454a101eb7022bc95f7e5f41ac7800").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
       "kind": "transaction",
       "source": "tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn",
       "fee": "7",
@@ -280,18 +334,18 @@ mod tests {
                 amount: 0.into(),
                 destination: Contract::from_b58check("tz4Uzyxg26DJyM4pc1V2pUvLpdsR5jdyzYsZ")
                     .unwrap(),
-                parameters: Some(Parameter {
+                parameters: Parameters {
                     entrypoint: Entrypoint::try_from("remove_delegate").unwrap(),
-                    // Micheline::App(Prim::Unit, &[], NO_ANNS).encode(),
-                    value: vec![0x03, 0x0b],
-                }),
+                    // octez-client convert data "Unit" from Michelson to binary
+                    value: hex::decode("030b").unwrap(),
+                }
+                .into(),
             },
             gas_limit: 0.into(),
             storage_limit: 0.into(),
         });
 
-        let mut encoded_operation = Vec::new();
-        operation.bin_write(&mut encoded_operation).unwrap();
+        let encoded_operation = operation.to_bytes().unwrap();
 
         let bytes = hex::decode("6c02ebfd1371b542831b4be730161d08885c5312e44207ff200000000003db557924e5a295652eff2c1f141d5a5b72b9cc91ff0400000002030b").unwrap();
         assert_eq!(bytes, encoded_operation);

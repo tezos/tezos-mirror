@@ -419,6 +419,53 @@ impl<'de> serde::Deserialize<'de> for Bytes {
     }
 }
 
+/// This is a wrapper to encode an `A` as an `Option<A>` such that
+/// `A::default()` is encoded as `None`.
+#[derive(PartialEq, Debug, Clone)]
+pub struct WithDefaultValue<A: PartialEq + Default + Clone> {
+    as_option: Option<A>,
+}
+
+impl<A: PartialEq + Default + Clone> From<A> for WithDefaultValue<A> {
+    fn from(a: A) -> Self {
+        let as_option = if a == A::default() { None } else { Some(a) };
+        Self { as_option }
+    }
+}
+
+impl<A: PartialEq + Default + Clone> WithDefaultValue<A> {
+    pub fn into(self) -> A {
+        self.as_option.unwrap_or_default()
+    }
+}
+
+impl<A> BinWriter for WithDefaultValue<A>
+where
+    A: BinWriter + PartialEq + Default + Clone,
+{
+    fn bin_write(&self, out: &mut Vec<u8>) -> crate::enc::BinResult {
+        crate::enc::field(
+            "WithDefaultValue::as_option",
+            crate::enc::optional_field(A::bin_write),
+        )(&self.as_option, out)
+    }
+}
+
+impl<'a, A> NomReader<'a> for WithDefaultValue<A>
+where
+    A: NomReader<'a> + PartialEq + Default + Clone,
+{
+    fn nom_read(bytes: &'a [u8]) -> crate::nom::NomResult<'a, Self> {
+        nom::combinator::map(
+            crate::nom::field(
+                "WithDefaultValue::as_option",
+                crate::nom::optional_field(A::nom_read),
+            ),
+            |as_option| WithDefaultValue { as_option },
+        )(bytes)
+    }
+}
+
 /// Represents `true` value in binary format.
 pub const BYTE_VAL_TRUE: u8 = 0xFF;
 /// Represents `false` value in binary format.
