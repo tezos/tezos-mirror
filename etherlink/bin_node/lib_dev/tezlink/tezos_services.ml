@@ -448,13 +448,6 @@ module Tezlink_protocols = struct
   module Shell_impl = Tezos_shell_services.Block_services
 
   type protocols = Shell_impl.protocols
-
-  let current =
-    Shell_impl.
-      {
-        current_protocol = Imported_protocol.hash;
-        next_protocol = Imported_protocol.hash;
-      }
 end
 
 module Adaptive_issuance_services = struct

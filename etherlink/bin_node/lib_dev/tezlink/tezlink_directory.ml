@@ -63,8 +63,6 @@ let check_block =
         (Unsupported_block_parameter
            (Tezos_shell_services.Block_services.to_string block))
 
-let protocols () = Lwt_result_syntax.return Tezlink_protocols.current
-
 let version () =
   (* TODO: #7857 need proper implementation *)
   Lwt_result_syntax.return Tezlink_mock.version
@@ -118,11 +116,20 @@ module type HEADER = sig
     (Tezos_shell_services.Block_services.version * Block_services.block_info)
     tzresult
     Lwt.t
+
+  val protocols : Tezlink_protocols.protocols
 end
 
 module Make_block_header (Block_services : BLOCK_SERVICES) :
   HEADER with module Block_services = Block_services = struct
   module Block_services = Block_services
+
+  let protocols =
+    Tezlink_protocols.Shell_impl.
+      {
+        current_protocol = Block_services.Proto.hash;
+        next_protocol = Block_services.Next_proto.hash;
+      }
 
   let tezlink_block_to_shell_header (block : L2_types.Tezos_block.t) :
       Block_header.shell_header tzresult =
@@ -295,12 +302,6 @@ let build_block_static_directory ~l2_chain_id
          let*? block = check_block block in
          Backend.current_level chain block ~offset:query.offset)
        ~convert_output:Protocol_types.Level.convert
-  |> register
-       ~service:Tezos_services.protocols
-       ~impl:(fun {block; chain} _query () ->
-         let*? `Main = check_chain chain in
-         let*? _block = check_block block in
-         protocols ())
   |> register
        ~service:Tezos_services.contract_info
        ~impl:(fun ({block; chain}, contract) _query () ->
@@ -493,6 +494,12 @@ let register_dynamic_block_services ~l2_chain_id
            let* tezlink_block = Backend.block chain block in
            Lwt_result_syntax.return tezlink_block)
          ~convert_output:Block_header.tezlink_block_to_shell_header
+    |> register
+         ~service:Tezos_services.protocols
+         ~impl:(fun {block; chain} _query () ->
+           let*? `Main = check_chain chain in
+           let*? _block = check_block block in
+           return Block_header.protocols)
     |> Tezos_rpc.Directory.map (fun (((), chain), block) ->
            make_env chain block)
   in
