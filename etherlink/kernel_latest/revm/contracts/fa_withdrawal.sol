@@ -6,6 +6,7 @@ pragma solidity ^0.8.24;
 
 contract FAWithdrawal {
     uint256 public withdrawalCounter;
+    bool private locked;
 
     event Withdrawal(
         uint256 indexed ticketHash,
@@ -55,13 +56,20 @@ contract FAWithdrawal {
         uint256 inboxMsgId;
     }
 
+    modifier nonReentrant() {
+        require(!locked, "Reentrancy is not allowed");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     function decode(
         bytes memory input
     ) internal pure returns (FaDepositWithProxy memory) {
         return abi.decode(input, (FaDepositWithProxy));
     }
 
-    function claim(uint256 depositId) external payable {
+    function claim(uint256 depositId) external payable nonReentrant {
         address system = 0x0000000000000000000000000000000000000000;
         address ticketTable = 0xFf00000000000000000000000000000000000004;
 
@@ -137,7 +145,7 @@ contract FAWithdrawal {
         uint256 amount,
         bytes22 ticketer,
         bytes memory content
-    ) external payable {
+    ) external payable nonReentrant {
         address outboxSender = 0xFF00000000000000000000000000000000000003;
         address ticketTable = 0xFf00000000000000000000000000000000000004;
 
@@ -210,7 +218,7 @@ contract FAWithdrawal {
         bytes memory content,
         string memory fastWithdrawalContract,
         bytes memory payload
-    ) external payable {
+    ) external payable nonReentrant {
         address outboxSender = 0xFF00000000000000000000000000000000000003;
         address ticketTable = 0xFf00000000000000000000000000000000000004;
 

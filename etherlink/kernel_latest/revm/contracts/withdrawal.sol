@@ -6,6 +6,7 @@ pragma solidity ^0.8.24;
 
 contract XTZWithdrawal {
     uint256 public withdrawalCounter;
+    bool private locked;
 
     event Withdrawal(
         uint256 amount,
@@ -23,6 +24,13 @@ contract XTZWithdrawal {
         address l2Caller
     );
 
+    modifier nonReentrant() {
+        require(!locked, "Reentrancy is not allowed");
+        locked = true;
+        _;
+        locked = false;
+    }
+
     // Convert wei to mutez (1 mutez = 10^12 Wei)
     function mutez_from_wei(uint256 weiAmount) private pure returns (uint256) {
         uint256 factor = 1e12;
@@ -37,7 +45,9 @@ contract XTZWithdrawal {
         return mutezAmount;
     }
 
-    function withdraw_base58(string memory target) external payable {
+    function withdraw_base58(
+        string memory target
+    ) external payable nonReentrant {
         // Outbox precompile is known
         address outboxSender = 0xFF00000000000000000000000000000000000003;
 
@@ -74,7 +84,7 @@ contract XTZWithdrawal {
         string memory target,
         string memory fastWithdrawalContract,
         bytes memory payload
-    ) external payable {
+    ) external payable nonReentrant {
         // Outbox precompile is known
         address outboxSender = 0xFF00000000000000000000000000000000000003;
 
