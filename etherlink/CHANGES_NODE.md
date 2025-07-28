@@ -10,17 +10,9 @@
 
 ### Metrics changes
 
-- Fixes the traces generated for HTTP requests performed to a GCP KMS. (!18771)
-
 ### Command-line interface changes
 
 ### Execution changes
-
-- Enforces stricter validation for the JSON configuration file. Previously,
-  the parser would silently ignore any content that appeared after the first
-  valid JSON object. Now, any extraneous data will cause the function to return
-  an error. (!18745)
-- Fixes GCP KMS token refresh. (!18795)
 
 ### Storage changes
 
@@ -32,6 +24,31 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.36 (2025-07-28)
+
+This is a bug fix release that improves validation and reliability. It enforces
+stricter checks on JSON configuration files by returning an error for any
+extraneous content, fixes incorrect trace generation for HTTP requests to GCP
+KMS, and resolves issues with GCP KMS token refresh.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
+- Enforces stricter validation for the JSON configuration file. Previously,
+  the parser would silently ignore any content that appeared after the first
+  valid JSON object. Now, any extraneous data will cause the function to return
+  an error. (!18745)
+
+### Metrics changes
+
+- Fixes the traces generated for HTTP requests performed to a GCP KMS. (!18771)
+
+### Execution changes
+
+- Fixes GCP KMS token refresh. (!18795)
 
 ## Version 0.35 (2025-07-18)
 
