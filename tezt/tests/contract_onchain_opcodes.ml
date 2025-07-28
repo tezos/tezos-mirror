@@ -853,6 +853,91 @@ module Tickets = struct
       ]
 end
 
+(* Test that operation metadata contains newly added address through
+   INDEX_ADDRESS, but not those already in the storage. *)
+let test_index_address_diffs ~protocols =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"Contract onchain opcodes: test internal_reveal diffs"
+    ~tags:["contract"; "onchain"; "opcodes"]
+    ~supports:(Protocol.From_protocol 24)
+    (fun protocol ->
+      let* _node, client = Client.init_with_protocol ~protocol `Client () in
+      let burn_cap = Tez.one in
+      let bootstrap1 = Account.Bootstrap.keys.(1) in
+      let bootstrap2 = Account.Bootstrap.keys.(2) in
+      let get_first_transaction_address_registry_diff client =
+        let* head_block_operations =
+          Client.RPC.call client
+          @@ RPC.get_chain_block_operations
+               ~metadata:true
+               ~force_metadata:true
+               ()
+        in
+        let first_transaction_address_registry_diff =
+          JSON.(
+            head_block_operations |=> 3 |=> 0 |-> "contents" |=> 0
+            |-> "metadata" |-> "operation_result" |-> "address_registry_diff"
+            |> as_list)
+        in
+        return
+        @@ List.map
+             (fun diff ->
+               JSON.
+                 (diff |-> "address" |> as_string, diff |-> "counter" |> as_int))
+             first_transaction_address_registry_diff
+      in
+
+      let call_and_check_diff contract address expected =
+        let* () =
+          Client.transfer
+            ~giver:bootstrap1.alias
+            ~receiver:contract
+            ~amount:Tez.zero
+            ~arg:("\"" ^ address ^ "\"")
+            ~burn_cap
+            client
+        in
+        let* () = Client.bake_for_and_wait client in
+        let* diffs = get_first_transaction_address_registry_diff client in
+        Check.((diffs = expected) (list (tuple2 string int)))
+          ~error_msg:"Expected diff %R, but got %L" ;
+        unit
+      in
+
+      let* contract, _address =
+        Client.originate_contract_at
+          ~amount:(Tez.of_int 1000)
+          ~src:"bootstrap1"
+          ~init:"None"
+          ~burn_cap
+          client
+          ["opcodes"; "index_address"]
+          protocol
+      in
+      let* () = Client.bake_for_and_wait client in
+
+      (* First diff should only contain bootstrap1 address. *)
+      let* () =
+        call_and_check_diff
+          contract
+          bootstrap1.public_key_hash
+          [(bootstrap1.public_key_hash, 1)]
+      in
+
+      (* Second call with another address, counter has been incremented. *)
+      let* () =
+        call_and_check_diff
+          contract
+          bootstrap2.public_key_hash
+          [(bootstrap2.public_key_hash, 2)]
+      in
+
+      (* Third call with an already revealed address, the diff is empty. *)
+      let* () = call_and_check_diff contract bootstrap2.public_key_hash [] in
+      unit)
+    protocols
+
 let register ~protocols =
   List.iter
     (fun (title, body) ->
@@ -885,4 +970,5 @@ let register ~protocols =
       ("test_level", test_level);
       ("test_big_map_origination", test_big_map_origination);
     ] ;
-  Tickets.register ~protocols
+  Tickets.register ~protocols ;
+  test_index_address_diffs ~protocols
