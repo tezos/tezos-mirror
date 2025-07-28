@@ -141,7 +141,7 @@ _`Attesting`
     The process of asserting that some other operation is valid.
     When a block_ is created and propagated on the network, delegates that have
     `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_ in the next block.
-    These attestation operations assert that the previous block is valid and can also include attestations that DAL_ shard_\ s are available.
+    Beyond serving in the L1 consensus protocol for attesting block_\ s, attestation operations provide specific fields used in the DAL_ for attesting available shard_\ s.
 
 _`Attesting rights`
     See `baking rights`_.
