@@ -404,13 +404,6 @@ let compute_future_frozen_rights block account_map =
               CycleMap.find (Block.current_cycle block) acc.frozen_rights
               |> Option.value ~default:Tez.zero
             in
-            let current_rights_state =
-              if
-                Tez.(
-                  current_rights_state < block.constants.minimal_frozen_stake)
-              then Tez.zero
-              else current_rights_state
-            in
             let* current_rights_rpc =
               Context.Delegate.initial_frozen_deposits (B block) acc.pkh
             in
@@ -429,13 +422,27 @@ let compute_future_frozen_rights block account_map =
                   current_cycle
                   (block.constants.consensus_rights_delay + 1)
               in
-              let frozen_rights =
-                CycleMap.add
-                  future_cycle
-                  (current_total_frozen_deposits_with_limits acc)
-                  acc.frozen_rights
+              let total_staked_after_limits =
+                current_total_frozen_deposits_with_limits acc
               in
-              return (String.Map.add key {acc with frozen_rights} acc_map)
+              let* current_baking_power =
+                Context.get_current_baking_power (B block) acc.pkh
+              in
+              let total_baking_power = Tez.of_mutez current_baking_power in
+              if
+                Tez.(
+                  total_staked_after_limits
+                  >= block.constants.minimal_frozen_stake
+                  && total_baking_power >= block.constants.minimal_stake)
+              then
+                let frozen_rights =
+                  CycleMap.add
+                    future_cycle
+                    total_staked_after_limits
+                    acc.frozen_rights
+                in
+                return (String.Map.add key {acc with frozen_rights} acc_map)
+              else return acc_map
           else return acc_map)
     account_map
     account_map
