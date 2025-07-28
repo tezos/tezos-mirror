@@ -50,9 +50,72 @@ let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
           |> Node.Config_file.update_network_with_user_activated_upgrades
                [(migration_level, Network.next_protocol network)])
 
+let may_init_from_snapshot node ?data_dir ?dal_config ~network ~snapshot
+    ?migration_offset ~name agent =
+  match data_dir with
+  | Some _ -> Lwt.return_unit
+  | None -> (
+      toplog
+        "No data dir given, we will attempt to bootstrap the node from a \
+         rolling snapshot." ;
+      toplog "Initializing node configuration for %s" name ;
+      let* () = Node.config_init node [Cors_origin "*"] in
+      let* snapshot_file_path =
+        if is_public network then
+          let* snapshot_file_path =
+            ensure_snapshot ~agent ~name ~network:(to_public network) snapshot
+          in
+          Lwt.return_some snapshot_file_path
+        else
+          let* snapshot_file_path = ensure_snapshot_opt ~agent ~name snapshot in
+          let* snapshot_network =
+            match snapshot_file_path with
+            | Some path ->
+                let* network = get_snapshot_info_network node path in
+                Lwt.return_some network
+            | None -> Lwt.return_none
+          in
+          (* Set network *)
+          let* () =
+            Node.Config_file.(
+              update
+                node
+                (match snapshot_network with
+                | Some "mainnet" -> set_mainnet_network ()
+                | Some "ghostnet" -> set_ghostnet_network ()
+                | Some "rionet" -> set_rionet_network ()
+                | Some "seoulnet" -> set_seoulnet_network ()
+                | _ -> set_sandbox_network))
+          in
+          let* () =
+            match dal_config with
+            | None -> Lwt.return_unit
+            | Some config ->
+                Node.Config_file.(
+                  update node (set_network_with_dal_config config))
+          in
+          Lwt.return snapshot_file_path
+      in
+      match snapshot_file_path with
+      | Some snapshot_file_path ->
+          let* () =
+            add_migration_offset_to_config
+              ~migration_offset
+              ~network
+              node
+              snapshot_file_path
+          in
+          import_snapshot
+            ~delete_snapshot_file:(snapshot = No_snapshot)
+            ~no_check:true
+            ~name
+            node
+            snapshot_file_path
+      | None -> Lwt.return_unit)
+
 let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
-    ~rpc_external ~name network ~with_yes_crypto ~snapshot ?ppx_profiling cloud
-    agent =
+    ?migration_offset ~rpc_external ~name network ~with_yes_crypto ~snapshot
+    ?ppx_profiling cloud agent =
   toplog "Initializing an L1 node for %s" name ;
   let net_addr =
     if is_public network then
@@ -79,33 +142,26 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       cloud
       agent
   in
+  let* () =
+    may_init_from_snapshot
+      node
+      ?data_dir
+      ?dal_config
+      ~network
+      ~snapshot
+      ?migration_offset
+      ~name
+      agent
+  in
+  let* () = may_copy_node_identity_file agent node identity_file in
   match network with
   | #Network.public -> (
-      let network = Network.to_public network in
       match data_dir with
       | Some _ ->
-          let* () = may_copy_node_identity_file agent node identity_file in
           let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
           let* () = Node.wait_for_ready node in
           Lwt.return node
       | None ->
-          toplog
-            "No data dir given, we will attempt to bootstrap the node from a \
-             rolling snapshot." ;
-          let* () = may_copy_node_identity_file agent node identity_file in
-          toplog "Initializing node configuration for %s" name ;
-          let* () = Node.config_init node [] in
-          let* snapshot_file_path =
-            ensure_snapshot ~agent ~name ~network snapshot
-          in
-          let* () =
-            import_snapshot
-              ~delete_snapshot_file:(snapshot = No_snapshot)
-              ~no_check:true
-              ~name
-              node
-              snapshot_file_path
-          in
           toplog "Launching the node %s." name ;
           let* () =
             Node.Agent.run
@@ -131,41 +187,6 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       in
       match data_dir with
       | None ->
-          let* () = Node.config_init node [Cors_origin "*"] in
-          let* snapshot_path = ensure_snapshot_opt ~agent ~name snapshot in
-          let* snapshot_network =
-            match snapshot_path with
-            | Some path ->
-                let* network = get_snapshot_info_network node path in
-                Lwt.return_some network
-            | None -> Lwt.return_none
-          in
-          (* Set network *)
-          let* () =
-            Node.Config_file.update
-              node
-              (match snapshot_network with
-              | Some "mainnet" -> Node.Config_file.set_mainnet_network ()
-              | Some "ghostnet" -> Node.Config_file.set_ghostnet_network ()
-              | Some "rionet" -> Node.Config_file.set_rionet_network ()
-              | Some "seoulnet" -> Node.Config_file.set_seoulnet_network ()
-              | _ -> Node.Config_file.set_sandbox_network)
-          in
-          let* () =
-            match dal_config with
-            | None -> Lwt.return_unit
-            | Some config ->
-                Node.Config_file.update
-                  node
-                  (Node.Config_file.set_network_with_dal_config config)
-          in
-          let* () = may_copy_node_identity_file agent node identity_file in
-          let* () =
-            match snapshot_path with
-            | Some snapshot_path ->
-                import_snapshot ~no_check:true ~name node snapshot_path
-            | None -> Lwt.return_unit
-          in
           let* () =
             Node.Agent.run
               ?ppx_profiling
@@ -192,7 +213,6 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
               [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
             @ yes_crypto_arg @ arguments
           in
-          let* () = may_copy_node_identity_file agent node identity_file in
           let* () = Node.Agent.run ?env ?ppx_profiling node arguments in
           let* () = Node.wait_for_ready node in
           Lwt.return node)

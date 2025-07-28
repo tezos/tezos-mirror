@@ -45,6 +45,7 @@ val init :
   ?identity_file:string ->
   ?dal_config:Tezos_crypto_dal_octez_dal_config.Dal_config.t ->
   ?env:string String_map.t ->
+  ?migration_offset:int ->
   rpc_external:bool ->
   name:string ->
   Network.t ->
