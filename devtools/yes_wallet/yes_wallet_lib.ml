@@ -343,7 +343,7 @@ let get_contracts (module P : Sigs.PROTOCOL) ?dump_contracts context
              },
              0,
              0 ))
-      ~f:(fun acc contract ->
+      ~f:(fun contract acc ->
         let*? contract_list_acc, total_info_acc, nb_account, nb_failures =
           acc
         in
@@ -603,7 +603,7 @@ let get_rich_accounts (module P : Sigs.PROTOCOL) context
       let* accounts =
         Lwt.catch
           (fun () ->
-            P.Contract.fold context ~init:(Ok []) ~f:(fun acc contract ->
+            P.Contract.fold context ~init:(Ok []) ~f:(fun contract acc ->
                 let*? acc in
                 let* balance = P.Contract.balance context contract in
                 if balance >= min_threshold_tz then

@@ -62,10 +62,14 @@ module Get_delegates = struct
       Alpha_context.Contract.get_manager_key context public_key_hash
       |> Lwt.map Environment.wrap_tzresult
 
+    (* FIXME: Expose and use the fold through Internal_for_tests. *)
     let fold context ~init ~f =
-      let open Lwt_syntax in
-      let* l = list context in
-      Lwt_list.fold_left_s f init l
+      Storage.Contract.fold
+        (Alpha_context.Internal_for_tests.to_raw context)
+        ~order:`Undefined
+        ~init
+        ~f:(fun (contract : Contract_repr.t) v ->
+          f (Obj.magic contract : contract) v)
 
     let balance ctxt t = get_balance ctxt t |> Lwt.map Environment.wrap_tzresult
 
