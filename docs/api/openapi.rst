@@ -126,6 +126,8 @@ protocol can be found at:
 
 - `alpha-smart-rollup-node-openapi <../_static/alpha-smart-rollup-node-openapi.html>`__ (version master)
 
+.. _dal-node-openapi:
+
 DAL Node
 ~~~~~~~~
 
