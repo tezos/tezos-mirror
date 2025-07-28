@@ -6,8 +6,6 @@
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
 use mir::ast::michelson_address::entrypoint;
-use nom::error::{ErrorKind, ParseError};
-use nom::Finish;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
@@ -16,7 +14,7 @@ use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
-    nom::{error::DecodeError, NomError, NomReader},
+    nom::NomReader,
 };
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use thiserror::Error;
@@ -70,22 +68,6 @@ pub struct Operation {
 }
 
 impl Operation {
-    pub fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
-        let mut data = Vec::new();
-        self.bin_write(&mut data)?;
-        Ok(data)
-    }
-
-    pub fn try_from_bytes(data: &[u8]) -> Result<Self, DecodeError<&[u8]>> {
-        let (remaining, operation) = Self::nom_read(data).finish()?;
-        if !remaining.is_empty() {
-            return Err(NomError::from_error_kind(remaining, ErrorKind::NonEmpty));
-        }
-        Ok(operation)
-    }
-}
-
-impl Operation {
     // The `rlp_append` function from the Encodable trait can't fail but `to_bytes`
     // return a result. To avoid unwrapping and risk a panic we're not implementing
     // the trait exactly, but we expose a serialization function.
@@ -105,7 +87,7 @@ impl Operation {
 impl Decodable for Operation {
     fn decode(rlp: &rlp::Rlp) -> Result<Self, rlp::DecoderError> {
         let raw: Vec<u8> = rlp.as_val()?;
-        Operation::try_from_bytes(&raw)
+        Operation::nom_read_exact(&raw)
             .map_err(|_| rlp::DecoderError::Custom("Operation::try_from_bytes failed"))
     }
 }
@@ -343,7 +325,7 @@ mod tests {
         let bytes = operation
             .to_bytes()
             .expect("Encoding reveal operation should have succeeded");
-        let operation_from_bytes = Operation::try_from_bytes(&bytes)
+        let operation_from_bytes = Operation::nom_read_exact(&bytes)
             .expect("Decoding reveal operation should have succeeded");
 
         assert_eq!(operation, operation_from_bytes);
@@ -391,7 +373,7 @@ mod tests {
         // This bytes sequence comes from the command just above the test
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86b00ba3bed311a5d7b06dc4daf3c94c5c406927e4bcf930202a90100009d05b06ea36a6ad464d94dc07a38b77b80b577c1ae51bbd8d20105cd5aed496c006a5d4040e14a4bda5b95a7ddf892d52662afd037ddf6564f52505054c299ea9e7d6397dc00930bc3b2fa8a755924935bbdab183ed7b27168fb626e4a3321fe09").unwrap();
 
-        let operation = Operation::try_from_bytes(&operation_bytes)
+        let operation = Operation::nom_read_exact(&operation_bytes)
             .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
@@ -438,7 +420,7 @@ mod tests {
         // This bytes sequence comes from the command just above the test
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c00e7670f32038107a59a2b9cfefae36ea21f5aa63c8b0201a90100c0843d000002298c03ed7d454a101eb7022bc95f7e5f41ac780026d58f30f5f8caf70878ad4efc82d71cff01b76e584958411e5a89ea2a8908e37ffc28f0af92fa651c32f6cc7362d9c735344d590360864fbf0b156c3443b108").unwrap();
 
-        let operation = Operation::try_from_bytes(&operation_bytes)
+        let operation = Operation::nom_read_exact(&operation_bytes)
             .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);
@@ -521,7 +503,7 @@ mod tests {
         // This bytes sequence comes from the command just above the test
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c0002298c03ed7d454a101eb7022bc95f7e5f41ac78950302e40a00c0843d014151d57ddff98da8cd49f0f2cbf89465bcf267a400ffff01420000000a010000000548656c6c6f3f391b739b8583427a69f0879cc5c5fd30bced4fcfc680fc37a39960e82dec2efbba8feae60b24f7fb4fdb4e553d9d9a34ac9c93b9e966da21b37ece0d63b00c").unwrap();
 
-        let operation = Operation::try_from_bytes(&operation_bytes)
+        let operation = Operation::nom_read_exact(&operation_bytes)
             .expect("Decoding operation should have succeeded");
 
         assert_eq!(operation, expected_operation);

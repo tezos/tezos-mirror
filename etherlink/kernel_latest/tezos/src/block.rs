@@ -4,12 +4,9 @@
 
 use crate::enc_wrappers::{BlockHash, BlockNumber, OperationHash};
 use crate::operation_result::OperationDataAndMetadata;
-use nom::error::ParseError;
-use nom::Finish;
 use primitive_types::H256;
 use tezos_crypto_rs::blake2b::digest_256;
 use tezos_data_encoding::enc as tezos_enc;
-use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::nom::{self as tezos_nom};
 use tezos_enc::{BinError, BinWriter};
 use tezos_nom::NomReader;
@@ -73,28 +70,13 @@ impl TezBlock {
             ..block
         })
     }
-
-    pub fn to_bytes(&self) -> Result<Vec<u8>, BinError> {
-        let mut output = vec![];
-        self.bin_write(&mut output)?;
-        Ok(output)
-    }
-
-    pub fn try_from_bytes(bytes: &[u8]) -> Result<Self, DecodeError<&[u8]>> {
-        let (remaining, block) = Self::nom_read(bytes).finish()?;
-        if !remaining.is_empty() {
-            return Err(DecodeError::from_error_kind(
-                remaining,
-                nom::error::ErrorKind::NonEmpty,
-            ));
-        }
-        Ok(block)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use primitive_types::H256;
+    use tezos_data_encoding::enc::BinWriter;
+    use tezos_data_encoding::nom::NomReader;
     use tezos_smart_rollup::types::Timestamp;
 
     use crate::operation_result::{
@@ -109,7 +91,7 @@ mod tests {
             .to_bytes()
             .expect("Block encoding should have succeeded");
         let decoded_block =
-            TezBlock::try_from_bytes(&bytes).expect("Block should be decodable");
+            TezBlock::nom_read_exact(&bytes).expect("Block should be decodable");
         assert_eq!(block, decoded_block, "Roundtrip failed on {:?}", block)
     }
 
