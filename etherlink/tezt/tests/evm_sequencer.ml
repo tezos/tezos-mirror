@@ -13479,6 +13479,125 @@ let test_eip2930_storage_access =
        %R but got %L" ;
   unit
 
+let test_eip7702 =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "eip7702"]
+    ~title:"Check EIP-7702's semantic correctness"
+      (* See: https://eips.ethereum.org/EIPS/eip-7702. *)
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let sponsored =
+    Eth_account.
+      {
+        address = "0x202dFc8a729ac2cdE90D3B0e7A0424b6Ed6f6c34";
+        private_key =
+          "0x7d597ae2d861eda61e148e757478c9a07d950be9f355958195f1fc75a0cdd8b2";
+      }
+  in
+  (* To show the benefits of having EIP-7702 we'll use an EOA with 0 balance
+     on purpose. *)
+  let*@ balance = Rpc.get_balance ~address:sponsored.address sequencer in
+  Check.((balance = Wei.zero) Wei.typ)
+    ~error_msg:
+      "Expected balance of the sponsored address of zero wei, got %L wei" ;
+  let endpoint = Evm_node.endpoint sequencer in
+  let* eip7702 = Solidity_contracts.eip7702 evm_version in
+  let* () = Eth_cli.add_abi ~label:eip7702.label ~abi:eip7702.abi () in
+  (* We start by deploying a simple contract that emits a log. This will be
+     the delegation contract that will be executed from the EOA's address. *)
+  let* eip7702_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip7702.abi
+         ~bin:eip7702.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let base_tx ~nonce ~authorization =
+    Cast.craft_tx
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~authorization
+      ~address:sponsored.address
+      ~arguments:[]
+      ~legacy:false
+      ()
+  in
+  (* The EOA can sign with no money the authorization list. Here the delegation
+     is done to `eip7702_contract`.*)
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:eip7702_contract
+      ~private_key:sponsored.private_key
+      ~endpoint
+  in
+  (* We craft the EIP-7702 transaction thanks to cast. The sponsor that has the
+     necessary balance will use the signed authorization and post in on chain. *)
+  let* raw_set_eoa = base_tx ~nonce:1 ~authorization:signed_auth in
+  let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{type_; _} =
+    Rpc.get_transaction_receipt ~tx_hash:set_eoa_hash sequencer
+  in
+  (* Type 4 = EIP-7702 *)
+  Check.((type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected tx.type of %R, got %L" ;
+  (* We can retrieve the authorization list from the transaction object: *)
+  let*@! Transaction.{authorizationList; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:set_eoa_hash sequencer
+  in
+  (match authorizationList with
+  | Some [{address; _}] ->
+      Check.(
+        (String.lowercase_ascii address
+        = String.lowercase_ascii eip7702_contract)
+          string)
+        ~error_msg:"Expected msg.sender of %R, got %L"
+  | Some _ -> failwith "Authorization list should only contain one element."
+  | None -> failwith "Authorization list should not be empty.") ;
+  (* The EOA now has code that can be called. We can even reuse the abi label
+     from the delegation contract. *)
+  let* call_eoa_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.contract_send
+         ~source_private_key:whale.private_key
+         ~endpoint
+         ~abi_label:eip7702.label
+         ~address:sponsored.address (* EOA's account *)
+         ~method_call:"emitEvent()")
+      sequencer
+  in
+  let*@! Transaction.{logs; _} =
+    Rpc.get_transaction_receipt ~tx_hash:call_eoa_hash sequencer
+  in
+  (* Exactly one event emitted, see the code of `eip7702_contract`. *)
+  let Transaction.{data; _} = List.hd logs in
+  let data_without_padding = "0x" ^ String.sub data 26 40 in
+  Check.(
+    (String.lowercase_ascii data_without_padding
+    = String.lowercase_ascii whale.address)
+      string)
+    ~error_msg:"Expected msg.sender of %R, got %L" ;
+  let*@ code = Rpc.get_code ~address:sponsored.address sequencer in
+  (* `0xef0100` is the current prefix of EIP-7702 transactions, see the
+      exact specification for more details. *)
+  let expected_code =
+    "0xef0100" ^ String.(lowercase_ascii @@ sub eip7702_contract 2 40)
+  in
+  Check.((code = expected_code) string) ~error_msg:"Expected code of %R, got %L" ;
+  unit
+
 let protocols = Protocol.all
 
 let () =
@@ -13649,4 +13768,5 @@ let () =
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
   test_claim_deposit_event [Alpha] ;
-  test_eip2930_storage_access [Alpha]
+  test_eip2930_storage_access [Alpha] ;
+  test_eip7702 [Alpha]
