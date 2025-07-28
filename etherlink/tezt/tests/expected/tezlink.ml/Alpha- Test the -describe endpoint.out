@@ -31,9 +31,12 @@ Available services:
   - GET /health_check
       Assess the health of the RPC server 
   + tezlink/
-    - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
-    - GET /tezlink/chains/<chain_id>/chain_id
-        The chain unique identifier. 
+    + chains/<chain_id>/
+      - /tezlink/chains/<chain_id>/blocks/<block_id> <dynamic>
+      - GET /tezlink/chains/<chain_id>/chain_id
+          The chain unique identifier. 
+      - GET /tezlink/chains/<chain_id>/is_bootstrapped
+          The bootstrap status of a chain 
     - GET /tezlink/describe
         RPCs documentation and input/output schema 
     - POST /tezlink/injection/operation
@@ -92,9 +95,12 @@ Warning:
 
 Available services:
   
-  - /chains/<chain_id>/blocks/<block_id> <dynamic>
-  - GET /chains/<chain_id>/chain_id
-      The chain unique identifier. 
+  + chains/<chain_id>/
+    - /chains/<chain_id>/blocks/<block_id> <dynamic>
+    - GET /chains/<chain_id>/chain_id
+        The chain unique identifier. 
+    - GET /chains/<chain_id>/is_bootstrapped
+        The bootstrap status of a chain 
   - POST /injection/operation
       Inject an operation in node and broadcast it. Returns the ID of the
       operation. The `signedOperationContents` should be constructed using

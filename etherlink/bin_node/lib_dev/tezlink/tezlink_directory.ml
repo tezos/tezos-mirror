@@ -551,6 +551,13 @@ let register_chain_services ~l2_chain_id
            Lwt_result_syntax.return (l2_chain_id, chain))
          ~convert_output:(fun (l2_chain_id, chain) ->
            tezlink_to_tezos_chain_id ~l2_chain_id chain)
+    |> register
+         ~service:Tezos_services.is_bootstrapped
+         ~impl:(fun _chain () () ->
+           Lwt_result_syntax.return
+             ( true,
+               Tezos_shell_services.Chain_validator_worker_state.Synchronised
+                 {is_chain_stuck = false} ))
     |> Tezos_rpc.Directory.map (fun ((), chain) -> Lwt.return chain)
   in
   Tezos_rpc.Directory.merge

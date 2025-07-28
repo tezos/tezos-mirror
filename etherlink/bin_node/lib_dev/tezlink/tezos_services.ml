@@ -664,6 +664,18 @@ let bootstrapped :
     Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Monitor_services.S.bootstrapped
 
+let is_bootstrapped :
+    ( [`GET],
+      chain,
+      chain,
+      unit,
+      unit,
+      bool
+      * Tezos_shell_services.Chain_validator_worker_state.synchronisation_status
+    )
+    Tezos_rpc.Service.t =
+  import_service Tezos_shell_services.Chain_services.S.is_bootstrapped
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/7965 *)
 (* We need a proper implementation *)
 let simulate_operation :
