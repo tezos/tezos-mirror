@@ -4322,7 +4322,11 @@ and parse_instr :
       let instr = {apply = (fun k -> IIs_implicit_account (loc, k))} in
       let stack = Item_t (key_hash_option_t, rest) in
       typed ctxt loc instr stack
-  | Prim (loc, I_INDEX_ADDRESS, [], annot), Item_t (Address_t, rest) ->
+  | Prim (loc, (I_INDEX_ADDRESS as prim), [], annot), Item_t (Address_t, rest)
+    ->
+      (* Indexing an address is forbidden in views as it is stateful, which
+         defeats views semantics. *)
+      let*? () = Tc_context.check_not_in_view loc ~legacy tc_context prim in
       let*? () = check_var_annot loc annot in
       let instr = {apply = (fun k -> IIndex_address (loc, k))} in
       let stack = Item_t (Nat_t, rest) in
