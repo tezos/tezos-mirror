@@ -154,6 +154,25 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       agent
   in
   let* () = may_copy_node_identity_file agent node identity_file in
+  let arguments =
+    if Option.is_none data_dir then
+      (* We've just imported a rolling snapshot keeping few history.
+         To switch to the configured history mode, which may have
+         longer history, we need the --force-history-mode-switch
+         option. *) Node.Force_history_mode_switch :: arguments
+    else arguments
+  in
+  let arguments =
+    if is_public network then
+      Node.[Synchronisation_threshold 1; Cors_origin "*"; Expected_pow 26]
+      @ arguments
+    else
+      let yes_crypto_arg =
+        if with_yes_crypto then Node.[Allow_yes_crypto] else []
+      in
+      Node.[No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
+      @ yes_crypto_arg @ arguments
+  in
   match network with
   | #Network.public -> (
       match data_dir with
@@ -163,18 +182,7 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
           Lwt.return node
       | None ->
           toplog "Launching the node %s." name ;
-          let* () =
-            Node.Agent.run
-              ?ppx_profiling
-              ?env
-              node
-              (* We've just imported a rolling snapshot keeping few history.
-                 To switch to the configured history mode, which may have
-                 longer history, we need the --force-history-mode-switch
-                 option. *)
-              (Force_history_mode_switch :: Synchronisation_threshold 1
-             :: Expected_pow 26 :: Cors_origin "*" :: arguments)
-          in
+          let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
           toplog "Waiting for the node %s to be ready." name ;
           let* () = Node.wait_for_ready node in
           toplog "Node %s is ready." name ;
@@ -182,37 +190,12 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
           toplog "Node %s is bootstrapped" name ;
           Lwt.return node)
   | _ (* private network *) -> (
-      let yes_crypto_arg =
-        if with_yes_crypto then [Node.Allow_yes_crypto] else []
-      in
       match data_dir with
       | None ->
-          let* () =
-            Node.Agent.run
-              ?ppx_profiling
-              ?env
-              node
-              (Node.
-                 [
-                   No_bootstrap_peers;
-                   Synchronisation_threshold 0;
-                   Cors_origin "*";
-                   (* We've just imported a rolling snapshot keeping few
-                      history. To switch to the configured history mode, which
-                      may have longer history, we need the
-                      --force-history-mode-switch option. *)
-                   Force_history_mode_switch;
-                 ]
-              @ yes_crypto_arg @ arguments)
-          in
+          let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
           let* () = Node.wait_for_ready node in
           Lwt.return node
       | Some _ ->
-          let arguments =
-            Node.
-              [No_bootstrap_peers; Synchronisation_threshold 0; Cors_origin "*"]
-            @ yes_crypto_arg @ arguments
-          in
           let* () = Node.Agent.run ?env ?ppx_profiling node arguments in
           let* () = Node.wait_for_ready node in
           Lwt.return node)
