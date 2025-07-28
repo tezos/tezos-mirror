@@ -536,6 +536,7 @@ let _floodgate_bin =
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         efunc_core;
+        octez_rpc_http |> open_;
         octez_rpc_http_client_unix;
         octez_clic;
         evm_node_lib_dev |> open_;

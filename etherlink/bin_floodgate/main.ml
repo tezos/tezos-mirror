@@ -103,6 +103,15 @@ module Arg = struct
       ~long:"rpc-endpoint"
       ~doc:"Endpoint used to fetch the state of the chain"
 
+  let ws_endpoint =
+    Tezos_clic.arg
+      ~placeholder:"URL"
+      ~long:"ws-endpoint"
+      ~doc:
+        "Enable websocket new heads subscription instead of the blueprint \
+         follower using the provided endpoint."
+      Parameter.endpoint
+
   let signer ~long ~short ~doc =
     Tezos_clic.arg ~doc ~long ~short ~placeholder:"SIGNER" Parameter.signer
 
@@ -233,10 +242,11 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args13
+      args14
         verbose
         relay_endpoint
         rpc_endpoint
+        ws_endpoint
         controller
         max_active_eoa
         max_transaction_batch_length
@@ -251,6 +261,7 @@ let run_command =
     (fun ( verbose,
            relay_endpoint,
            rpc_endpoint,
+           ws_endpoint,
            controller,
            max_active_eoa,
            max_transaction_batch_length,
@@ -270,6 +281,7 @@ let run_command =
       Floodgate.run
         ~relay_endpoint
         ~rpc_endpoint
+        ~ws_endpoint
         ~controller
         ~max_active_eoa
         ~max_transaction_batch_length

@@ -10,6 +10,7 @@ val run :
   scenario:[< `ERC20 | `XTZ] ->
   relay_endpoint:Uri.t ->
   rpc_endpoint:Uri.t ->
+  ws_endpoint:Uri.t option ->
   controller:Signer.t ->
   max_active_eoa:int ->
   max_transaction_batch_length:int option ->
