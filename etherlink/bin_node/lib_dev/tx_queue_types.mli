@@ -12,6 +12,8 @@ module type L2_transaction = sig
 
   type address
 
+  type nonce
+
   val address_encoding : address Data_encoding.t
 
   val hash_of_tx_object : legacy -> Ethereum_types.hash
@@ -20,7 +22,16 @@ module type L2_transaction = sig
 
   val from_address_of_tx_object : legacy -> address
 
-  val nonce_of_tx_object : legacy -> Ethereum_types.quantity
+  val bitset_add_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+
+  val bitset_remove_nonce : Nonce_bitset.t -> nonce -> Nonce_bitset.t tzresult
+
+  val next_nonce : nonce -> Z.t
+
+  (* Used only for the [Content] request. *)
+  val nonce_to_z_opt : nonce -> Z.t option
+
+  val nonce_of_tx_object : legacy -> nonce
 
   val transaction_object_from_legacy : legacy -> t
 
@@ -37,7 +48,12 @@ module Eth_transaction_object :
     with type t = Transaction_object.t
      and type legacy = Ethereum_types.legacy_transaction_object
      and type address = Ethereum_types.address
+     and type nonce = Ethereum_types.quantity
      and module AddressMap = Ethereum_types.AddressMap
 
+type tezlink_batch_nonces = {first : Z.t; length : int}
+
 module Tezlink_operation :
-  L2_transaction with type legacy = Tezos_types.Operation.t
+  L2_transaction
+    with type legacy = Tezos_types.Operation.t
+     and type nonce = tezlink_batch_nonces

@@ -41,113 +41,6 @@ type endpoint = Services_backend_sig.endpoint =
   | Rpc of Uri.t
   | Websocket of Websocket_client.t
 
-(** [Nonce_bitset] registers known nonces from transactions that went
-    through the tx_queue from a specific sender address. With this
-    structure it's easy to do bookkeeping of address' nonce without
-    going through all the transactions of the queue.
-
-    The invariants are that for any nonce_bitset [nb]:
-
-    - When creating [nb], [nb.next_nonce] is the next valid nonce for
-    the state.
-
-    - When adding a nonce [n] to [nb], [n] must be superior or equal
-    to [nb.next_nonce]. This is enforced by the validation in
-    {!Validate.is_tx_valid}.
-
-    - [nb.next_nonce] can only increase over time. This is enforced by
-    [shift] and [offset].
- *)
-module Nonce_bitset = struct
-  module Bitset = Tezos_base.Bitset
-
-  (** [t] allows to register for a given address all nonces that are
-      currently used by transaction in the tx_queue. *)
-  type t = {
-    next_nonce : Z.t;
-        (** [next_nonce] is the base value for any position found in
-            {!field:bitset}. It’s set to be the next expected nonce
-            for a given address, which is the nonce found in the
-            backend. *)
-    bitset : Bitset.t;
-  }
-
-  (** [create ~next_nonce] creates a {!t} struct with empty [bitset]. *)
-  let create ~next_nonce = {next_nonce; bitset = Bitset.empty}
-
-  (** [offset ~nonce1 ~nonce2] computes the difference between
-      [nonce1] and [nonce2].
-
-      Fails if [nonce2 > nonce1] or if the difference between the two is
-      more than {!Int.max_int}. *)
-  let offset ~nonce1 ~nonce2 =
-    let open Result_syntax in
-    if Z.gt nonce2 nonce1 then
-      error_with
-        "Internal: invalid nonce diff. nonce2 %a must be inferior or equal to \
-         nonce1 %a."
-        Z.pp_print
-        nonce2
-        Z.pp_print
-        nonce1
-    else
-      let offset = Z.(nonce1 - nonce2) in
-      if Z.fits_int offset then return (Z.to_int offset)
-      else
-        error_with
-          "Internal: invalid nonce offset, it's too large to fit in an integer."
-
-  (** [add bitset_nonce ~nonce] adds the nonce [nonce] to [bitset_nonce]. *)
-  let add {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
-    let* bitset = Bitset.add bitset offset_position in
-    return {next_nonce; bitset}
-
-  (** [remove bitset_nonce ~nonce] removes the nonce [nonce] from
-      [bitset_nonce].
-
-      If [nonce] is strictly inferior to [bitset_nonce.next_nonce] then
-      it's a no-op because nonce can't exist in the bitset. *)
-  let remove {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    if Z.lt nonce next_nonce then
-      (* no need to remove a nonce that can't exist in the bitset *)
-      return {next_nonce; bitset}
-    else
-      let* offset_position = offset ~nonce1:nonce ~nonce2:next_nonce in
-      let* bitset = Bitset.remove bitset offset_position in
-      return {next_nonce; bitset}
-
-  (** [shift bitset_nonce ~nonce] shifts the bitset of [bitset_nonce]
-      so the next_nonce is now [nonce]. Shifting the bitset means
-      that nonces that are inferior to [nonce] are dropped.
-
-      Fails if [nonce] is strictly inferior to
-      [bitset_nonce.next_nonce]. *)
-  let shift {next_nonce; bitset} ~nonce =
-    let open Result_syntax in
-    let* offset = offset ~nonce1:nonce ~nonce2:next_nonce in
-    let* bitset = Bitset.shift_right bitset ~offset in
-    return {next_nonce = nonce; bitset}
-
-  (** [is_empty bitset_nonce] checks if the bitset is empty, i.e. no
-      position is at 1. *)
-  let is_empty {bitset; _} = Bitset.is_empty bitset
-
-  (** [next_gap bitset_nonce] returns the next available nonce. *)
-  let next_gap {next_nonce; bitset} =
-    let offset_position = Z.(trailing_zeros @@ lognot @@ Bitset.to_z bitset) in
-    Z.(next_nonce + of_int offset_position)
-
-  (** [shift_then_next_gap bitset_nonce ~shift_nonce] calls {!shift
-      ~nonce:shift_nonce} then {!next_gap bitset_nonce}. *)
-  let shift_then_next_gap bitset_nonce ~shift_nonce =
-    let open Result_syntax in
-    let* bitset_nonce = shift bitset_nonce ~nonce:shift_nonce in
-    return @@ next_gap bitset_nonce
-end
-
 module Address_nonce = struct
   module S = String.Hashtbl
 
@@ -166,7 +59,7 @@ module Address_nonce = struct
     if Nonce_bitset.is_empty nonce_bitset then S.remove nonces addr
     else S.replace nonces addr nonce_bitset
 
-  let add nonces ~addr ~next_nonce ~nonce =
+  let add nonces ~addr ~next_nonce ~nonce ~add =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     let* nonce_bitset =
@@ -192,9 +85,10 @@ module Address_nonce = struct
       | None -> return @@ Nonce_bitset.create ~next_nonce
     in
     let* nonce_bitset =
-      (* Only adds [nonce] if [bitset_nonce.next_nonce] is inferior or
-         equal. If [nonce_bitset.next_nonce > nonce] then there is no
-         need to add because [nonce] is already in the past.
+      (* [add] should take care of only adding [nonce] if
+         [bitset_nonce.next_nonce] is inferior or equal. If
+         [nonce_bitset.next_nonce > nonce] then there is no need to
+         add because [nonce] is already in the past.
 
          This is follow-up to the previous comment where we are in a
          rare ce condition of the transaction is being validated while
@@ -202,19 +96,17 @@ module Address_nonce = struct
          such case we simply don't register the nonce, and the
          transaction will be dropped by the upstream node when
          receiving it. *)
-      if Z.gt nonce_bitset.Nonce_bitset.next_nonce nonce then
-        return nonce_bitset
-      else Nonce_bitset.add nonce_bitset ~nonce
+      add nonce_bitset nonce
     in
     let () = S.replace nonces addr nonce_bitset in
     return_unit
 
-  let confirm_nonce nonces ~addr ~nonce =
+  let confirm_nonce nonces ~addr ~nonce ~next =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let next_nonce = Z.succ nonce in
+        let next_nonce = next nonce in
         if Z.gt nonce_bitset.Nonce_bitset.next_nonce next_nonce then
           (* A tx with a superior nonce was already confirmed, nothing
              to confirm.
@@ -230,12 +122,12 @@ module Address_nonce = struct
           return_unit
     | None -> return_unit
 
-  let remove nonces ~addr ~nonce =
+  let remove nonces ~addr ~nonce ~rm =
     let open Result_syntax in
     let nonce_bitset = S.find nonces addr in
     match nonce_bitset with
     | Some nonce_bitset ->
-        let* nonce_bitset = Nonce_bitset.remove nonce_bitset ~nonce in
+        let* nonce_bitset = rm nonce_bitset nonce in
         update nonces addr nonce_bitset ;
         return_unit
     | None -> return_unit
@@ -737,7 +629,7 @@ struct
           let addr =
             Tx.address_to_string (Tx.from_address_of_tx_object tx_object)
           in
-          let (Qty tx_nonce) = Tx.nonce_of_tx_object tx_object in
+          let tx_nonce = Tx.nonce_of_tx_object tx_object in
           let pending_callback (reason : pending_variant) =
             let open Lwt_syntax in
             let* res =
@@ -752,6 +644,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~rm:Tx.bitset_remove_nonce
               | `Confirmed ->
                   let* () =
                     Tx_queue_events.transaction_confirmed
@@ -762,6 +655,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~next:Tx.next_nonce
             in
             let* () =
               match res with
@@ -803,6 +697,7 @@ struct
                        state.address_nonce
                        ~addr
                        ~nonce:tx_nonce
+                       ~rm:Tx.bitset_remove_nonce
             in
             let* () =
               match res with
@@ -846,13 +741,14 @@ struct
                   state.tx_per_address
                   (Tx.from_address_of_tx_object tx_object) ;
                 Transaction_objects.add state.tx_object tx_object ;
-                let Ethereum_types.(Qty next_nonce) = next_nonce in
+                let (Qty next_nonce) = next_nonce in
                 let*? () =
                   Address_nonce.add
                     state.address_nonce
                     ~addr
                     ~next_nonce
                     ~nonce:tx_nonce
+                    ~add:Tx.bitset_add_nonce
                 in
                 Queue.add
                   {
@@ -920,7 +816,7 @@ struct
           return_unit
       | Nonce {next_nonce; address} ->
           protect @@ fun () ->
-          let Ethereum_types.(Qty next_nonce) = next_nonce in
+          let (Qty next_nonce) = next_nonce in
           let*? next_gap =
             Address_nonce.next_gap
               state.address_nonce
@@ -935,7 +831,6 @@ struct
       | Is_locked -> protect @@ fun () -> return (is_locked state)
       | Content ->
           protect @@ fun () ->
-          let open Ethereum_types in
           let process_transactions tx_map lookup_fn acc =
             String.Hashtbl.fold
               (fun hash value acc ->
@@ -947,11 +842,17 @@ struct
                         acc
                       |> Option.value ~default:Ethereum_types.NonceMap.empty
                     in
+                    let tx_nonce_opt =
+                      Tx.nonce_of_tx_object obj |> Tx.nonce_to_z_opt
+                    in
                     let updated_nonce_map =
-                      Ethereum_types.NonceMap.add
-                        (Qty.to_z (Tx.nonce_of_tx_object obj))
-                        obj
-                        existing_nonce_map
+                      match tx_nonce_opt with
+                      | Some tx_nonce ->
+                          Ethereum_types.NonceMap.add
+                            tx_nonce
+                            obj
+                            existing_nonce_map
+                      | None -> existing_nonce_map
                     in
                     Tx.AddressMap.add
                       (Tx.from_address_of_tx_object obj)

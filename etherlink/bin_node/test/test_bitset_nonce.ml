@@ -12,7 +12,9 @@
     Invocation:   dune exec etherlink/bin_node/test/test_bitset_nonce.exe
     Subject:      Tests for Nonce_bitset
 *)
-open Evm_node_lib_dev.Tx_queue.Internal_for_tests
+open Evm_node_lib_dev
+
+open Tx_queue.Internal_for_tests
 
 let comparable_bitset =
   Check.(
@@ -73,6 +75,14 @@ let add ~__LOC__ bitset ~nonce ~expected =
   check_bitset ~__LOC__ bitset ~expected ;
   bitset
 
+let add_many ~__LOC__ bitset ~nonce ~expected ~length =
+  let bitset =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Nonce_bitset.add_many bitset ~nonce:Z.(of_int nonce) ~length
+  in
+  check_bitset ~__LOC__ bitset ~expected ;
+  bitset
+
 let shift ~__LOC__ bitset ~nonce ~expected =
   let bitset =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -85,6 +95,14 @@ let remove ~__LOC__ bitset ~nonce ~expected =
   let bitset =
     WithExceptions.Result.get_ok ~loc:__LOC__
     @@ Nonce_bitset.remove bitset ~nonce:Z.(of_int nonce)
+  in
+  check_bitset ~__LOC__ bitset ~expected ;
+  bitset
+
+let remove_many ~__LOC__ bitset ~nonce ~expected ~length =
+  let bitset =
+    WithExceptions.Result.get_ok ~loc:__LOC__
+    @@ Nonce_bitset.remove_many bitset ~nonce:Z.(of_int nonce) ~length
   in
   check_bitset ~__LOC__ bitset ~expected ;
   bitset
@@ -105,32 +123,63 @@ let shift_then_next_gap_nonce ~__LOC__ ~shift_nonce bitset ~expected =
 let add_shift_then_remove =
   test_register ~title:"Add, shift and remove" ~tags:["bitset_nonce"]
   @@ fun () ->
-  let nonce = 0 in
-  let bitset = create ~__LOC__ ~next_nonce:nonce in
-  let bitset = add ~__LOC__ bitset ~nonce:0 ~expected:(nonce, [0]) in
-  let bitset = add ~__LOC__ bitset ~nonce:1 ~expected:(nonce, [0; 1]) in
-  let bitset = add ~__LOC__ bitset ~nonce:2 ~expected:(nonce, [0; 1; 2]) in
-  let bitset = add ~__LOC__ bitset ~nonce:3 ~expected:(nonce, [0; 1; 2; 3]) in
-  let nonce = 1 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0; 1; 2]) in
+  let bitset = create ~__LOC__ ~next_nonce:0 in
+  let bitset = add ~__LOC__ bitset ~nonce:0 ~expected:(0, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:1 ~expected:(0, [0; 1]) in
+  let bitset = add ~__LOC__ bitset ~nonce:2 ~expected:(0, [0; 1; 2]) in
+  let bitset = add ~__LOC__ bitset ~nonce:3 ~expected:(0, [0; 1; 2; 3]) in
 
-  let nonce = 2 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0; 1]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:1 ~expected:(1, [0; 1; 2]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:2 ~expected:(2, [0; 1]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:3 ~expected:(3, [0]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:4 ~expected:(4, []) in
 
-  let nonce = 3 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:4 ~expected:(4, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:5 ~expected:(4, [0; 1]) in
+  let bitset = add ~__LOC__ bitset ~nonce:6 ~expected:(4, [0; 1; 2]) in
+  let bitset = add ~__LOC__ bitset ~nonce:7 ~expected:(4, [0; 1; 2; 3]) in
 
-  let nonce = 4 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, []) in
+  let bitset = remove ~__LOC__ bitset ~nonce:4 ~expected:(4, [1; 2; 3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:5 ~expected:(4, [2; 3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:6 ~expected:(4, [3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:7 ~expected:(4, []) in
 
-  let bitset = add ~__LOC__ bitset ~nonce:4 ~expected:(nonce, [0]) in
-  let bitset = add ~__LOC__ bitset ~nonce:5 ~expected:(nonce, [0; 1]) in
-  let bitset = add ~__LOC__ bitset ~nonce:6 ~expected:(nonce, [0; 1; 2]) in
-  let bitset = add ~__LOC__ bitset ~nonce:7 ~expected:(nonce, [0; 1; 2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:4 ~expected:(nonce, [1; 2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:5 ~expected:(nonce, [2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:6 ~expected:(nonce, [3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:7 ~expected:(nonce, []) in
+  let* () =
+    Log.info "cardinal %d" (Tezos_base.Bitset.cardinal bitset.bitset) ;
+    if not (Nonce_bitset.is_empty bitset) then Test.fail "bitset is not empty"
+    else unit
+  in
+  unit
+
+let add_shift_then_remove_many =
+  test_register ~title:"Add_many, shift and remove_many" ~tags:["bitset_nonce"]
+  @@ fun () ->
+  let bitset = create ~__LOC__ ~next_nonce:0 in
+  let bitset = add_many ~__LOC__ bitset ~nonce:0 ~length:1 ~expected:(0, [0]) in
+  let bitset =
+    add_many ~__LOC__ bitset ~nonce:1 ~length:2 ~expected:(0, [0; 1; 2])
+  in
+  let bitset =
+    add_many ~__LOC__ bitset ~nonce:3 ~length:3 ~expected:(0, [0; 1; 2; 3; 4; 5])
+  in
+
+  let bitset = shift ~__LOC__ bitset ~nonce:1 ~expected:(1, [0; 1; 2; 3; 4]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:2 ~expected:(2, [0; 1; 2; 3]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:3 ~expected:(3, [0; 1; 2]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:4 ~expected:(4, [0; 1]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:5 ~expected:(5, [0]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:6 ~expected:(6, []) in
+
+  let bitset =
+    add_many ~__LOC__ bitset ~nonce:6 ~length:4 ~expected:(6, [0; 1; 2; 3])
+  in
+
+  let bitset =
+    remove_many ~__LOC__ bitset ~nonce:6 ~length:2 ~expected:(6, [2; 3])
+  in
+  let bitset =
+    remove_many ~__LOC__ bitset ~nonce:8 ~length:2 ~expected:(6, [])
+  in
 
   let* () =
     Log.info "cardinal %d" (Tezos_base.Bitset.cardinal bitset.bitset) ;
@@ -195,6 +244,7 @@ module Address_nonce_helpers = struct
          ~addr
          ~next_nonce:(Z.of_int next_nonce)
          ~nonce:(Z.of_int nonce)
+         ~add:(fun bitset nonce -> Nonce_bitset.add bitset ~nonce)
 
   let next_gap_nonce nonces ~addr ~__LOC__ ~next_nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
@@ -202,11 +252,19 @@ module Address_nonce_helpers = struct
 
   let confirm_nonce nonces ~addr ~__LOC__ ~nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Address_nonce.confirm_nonce nonces ~addr ~nonce:(Z.of_int nonce)
+    @@ Address_nonce.confirm_nonce
+         nonces
+         ~addr
+         ~nonce:(Z.of_int nonce)
+         ~next:Z.succ
 
   let remove_nonce nonces ~addr ~__LOC__ ~nonce =
     WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Address_nonce.remove nonces ~addr ~nonce:(Z.of_int nonce)
+    @@ Address_nonce.remove
+         nonces
+         ~addr
+         ~nonce:(Z.of_int nonce)
+         ~rm:(fun bitset nonce -> Nonce_bitset.remove bitset ~nonce)
 
   let add nonces ~addr ~__LOC__ ~next_nonce ~nonce ~expected =
     add_nonce nonces ~addr ~__LOC__ ~next_nonce ~nonce ;
@@ -271,6 +329,7 @@ let test_address_nonces =
 
 let () =
   add_shift_then_remove ;
+  add_shift_then_remove_many ;
   test_next_gap_nonce ;
   test_address_nonces
 
