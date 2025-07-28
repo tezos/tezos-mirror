@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -42,6 +42,7 @@ val craft_tx :
   gas_price:int ->
   ?legacy:bool ->
   ?access_list:(string * string list) list ->
+  ?authorization:string ->
   address:string ->
   ?signature:string ->
   ?arguments:string list ->
@@ -73,6 +74,7 @@ val craft_deploy_tx :
   gas_price:int ->
   ?legacy:bool ->
   ?access_list:(string * string list) list ->
+  ?authorization:string ->
   data:string ->
   unit ->
   string Lwt.t
