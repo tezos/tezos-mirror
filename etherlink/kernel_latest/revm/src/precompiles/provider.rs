@@ -73,7 +73,6 @@ impl EtherlinkPrecompiles {
                     context,
                     is_static,
                     inputs,
-                    address,
                     gas_limit,
                 )
                 .map_err(|e| e.to_string())?;
@@ -85,7 +84,6 @@ impl EtherlinkPrecompiles {
                     context,
                     is_static,
                     inputs,
-                    address,
                     gas_limit,
                 )?;
                 Ok(Some(result))
