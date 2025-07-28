@@ -30,6 +30,7 @@ use std::{
     collections::VecDeque,
     fmt::{Debug, Display},
 };
+use tezos_data_encoding::nom::NomReader;
 use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_execution::context;
@@ -460,7 +461,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
         let operations = bytes
             .iter()
             .map(|bytes| {
-                Operation::try_from_bytes(bytes).map_err(|decode_error| {
+                Operation::nom_read_exact(bytes).map_err(|decode_error| {
                     error::Error::NomReadError(format!("{:?}", decode_error))
                 })
             })

@@ -1,5 +1,7 @@
 use primitive_types::{H256, U256};
 use rlp::DecoderError;
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::{block::EthBlock, rlp_helpers::VersionedEncoding};
 use tezos_smart_rollup::types::Timestamp;
 use tezos_tezlink::block::TezBlock;
@@ -87,7 +89,7 @@ impl L2Block {
                 Ok(L2Block::Etherlink(Box::new(EthBlock::from_bytes(bytes)?)))
             }
             ChainFamily::Michelson => {
-                let block = TezBlock::try_from_bytes(bytes)
+                let block = TezBlock::nom_read_exact(bytes)
                     .map_err(|_| DecoderError::Custom("Binary decoding error"))?;
                 Ok(L2Block::Tezlink(block))
             }
