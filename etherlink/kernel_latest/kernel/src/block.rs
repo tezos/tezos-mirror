@@ -587,8 +587,7 @@ mod tests {
     use super::*;
     use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_tezlink::enc_wrappers::BlockHash;
-    use tezos_tezlink::operation::ManagerOperationContent;
+    use tezos_tezlink::operation::sign_operation;
     use tezos_tezlink::operation::Parameter;
 
     use crate::block_storage;
@@ -617,8 +616,6 @@ mod tests {
     use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
-    use tezos_crypto_rs::hash::UnknownSignature;
-    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
@@ -687,27 +684,6 @@ mod tests {
         }
     }
 
-    fn sign_operation(
-        sk: &SecretKeyEd25519,
-        branch: &H256,
-        content: &ManagerOperationContent,
-    ) -> UnknownSignature {
-        // Watermark comes from `src/lib_crypto/signature_v2.ml`
-        // The watermark for a ManagerOperation is always `Generic_operation`
-        // encoded with `0x03`
-        let mut serialized_unsigned_operation = vec![3_u8];
-
-        let branch = branch.as_fixed_bytes();
-        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
-        content
-            .bin_write(&mut serialized_unsigned_operation)
-            .unwrap();
-        let signature = sk
-            .sign(serialized_unsigned_operation)
-            .expect("Signature should have succeeded");
-        signature.into()
-    }
-
     fn make_operation(
         fee: u64,
         counter: u64,
@@ -716,7 +692,7 @@ mod tests {
         source: Bootstrap,
         content: OperationContent,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
+        let branch = TezBlock::genesis_block_hash().into();
         let manager_op = ManagerOperation {
             source: source.pkh,
             fee: fee.into(),
@@ -727,10 +703,10 @@ mod tests {
         }
         .into();
 
-        let signature = sign_operation(&source.sk, &branch, &manager_op);
+        let signature = sign_operation(&source.sk, &branch, &manager_op).unwrap();
 
         Operation {
-            branch: BlockHash::from(branch),
+            branch,
             content: manager_op,
             signature,
         }
@@ -1096,8 +1072,8 @@ mod tests {
         let chain_config = dummy_tez_config();
         let mut config = dummy_configuration();
 
-        let boostrap = bootstrap1();
-        let src = boostrap.pkh.clone();
+        let bootstrap = bootstrap1();
+        let src = bootstrap.pkh.clone();
 
         let context = context::Context::from(&TEZLINK_SAFE_STORAGE_ROOT_PATH)
             .expect("Context creation should have succeeded");
@@ -1123,7 +1099,7 @@ mod tests {
         assert_eq!(Manager::NotRevealed(src), manager);
 
         // Reveal bootstrap 1 manager
-        let reveal = make_reveal_operation(0, 1, 0, 0, boostrap);
+        let reveal = make_reveal_operation(0, 1, 0, 0, bootstrap);
 
         store_blueprints::<_, MichelsonChainConfig>(
             &mut host,

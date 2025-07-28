@@ -453,18 +453,15 @@ pub fn apply_operation<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
-    use primitive_types::H256;
-    use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519, UnknownSignature};
-    use tezos_data_encoding::enc::BinWriter;
+    use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
-        enc_wrappers::BlockHash,
         operation::{
-            ManagerOperation, ManagerOperationContent, Operation, OperationContent,
-            Parameter, RevealContent, TransferContent,
+            sign_operation, ManagerOperation, Operation, OperationContent, Parameter,
+            RevealContent, TransferContent,
         },
         operation_result::{
             Balance, BalanceTooLow, BalanceUpdate, ContentResult, CounterError,
@@ -515,27 +512,6 @@ mod tests {
         }
     }
 
-    fn sign_operation(
-        sk: &SecretKeyEd25519,
-        branch: &H256,
-        content: &ManagerOperationContent,
-    ) -> UnknownSignature {
-        // Watermark comes from `src/lib_crypto/signature_v2.ml`
-        // The watermark for a ManagerOperation is always `Generic_operation`
-        // encoded with `0x03`
-        let mut serialized_unsigned_operation = vec![3_u8];
-
-        let branch = branch.as_fixed_bytes();
-        tezos_data_encoding::enc::put_bytes(branch, &mut serialized_unsigned_operation);
-        content
-            .bin_write(&mut serialized_unsigned_operation)
-            .unwrap();
-        let signature = sk
-            .sign(serialized_unsigned_operation)
-            .expect("Signature should have succeeded");
-        signature.into()
-    }
-
     const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
 
     static SCRIPT: &str = r#"
@@ -555,7 +531,7 @@ mod tests {
         source: Bootstrap,
         content: OperationContent,
     ) -> Operation {
-        let branch = TezBlock::genesis_block_hash();
+        let branch = TezBlock::genesis_block_hash().into();
         let manager_op = ManagerOperation {
             source: source.pkh,
             fee: fee.into(),
@@ -566,10 +542,10 @@ mod tests {
         }
         .into();
 
-        let signature = sign_operation(&source.sk, &branch, &manager_op);
+        let signature = sign_operation(&source.sk, &branch, &manager_op).unwrap();
 
         Operation {
-            branch: BlockHash::from(branch),
+            branch,
             content: manager_op,
             signature,
         }

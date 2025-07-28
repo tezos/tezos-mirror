@@ -2,16 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_crypto_rs::{hash::UnknownSignature, PublicKeySignatureVerifier};
-use tezos_data_encoding::enc::BinWriter;
-use tezos_data_encoding::{enc::BinError, types::Narith};
+use tezos_crypto_rs::hash::UnknownSignature;
+use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
 use tezos_tezlink::enc_wrappers::BlockHash;
-use tezos_tezlink::operation::ManagerOperationContent;
 use tezos_tezlink::{
-    operation::{ManagerOperation, OperationContent, RevealContent},
+    operation::{verify_signature, ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
 };
 
@@ -91,35 +89,6 @@ fn get_revealed_key<Host: Runtime>(
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(Ok(pk.clone())),
         _ => Ok(account.get_manager_key(host)?),
     }
-}
-
-fn verify_signature(
-    pk: &PublicKey,
-    branch: &BlockHash,
-    operation: &ManagerOperationContent,
-    signature: UnknownSignature,
-) -> Result<bool, BinError> {
-    // Watermark comes from `src/lib_crypto/signature_v2.ml`
-    // The watermark for a ManagerOperation is always `Generic_operation`
-    // encoded with `0x03`
-    let watermark = 3_u8;
-
-    let mut serialized_unsigned_operation = vec![watermark];
-
-    let branch: [u8; 32] = branch.0.to_fixed_bytes();
-    tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
-    operation.bin_write(&mut serialized_unsigned_operation)?;
-
-    let signature = &signature.into();
-
-    // The verify_signature function never returns false. If the verification
-    // is incorrect the function will return an Error and it's up to us to
-    // transform that into a `false` boolean if we want.
-    let check = pk
-        .verify_signature(signature, &serialized_unsigned_operation)
-        .unwrap_or(false);
-
-    Ok(check)
 }
 
 // Inspired from `check_gas_limit` in `src/proto_alpha/lib_protocol/gas_limit_repr.ml`

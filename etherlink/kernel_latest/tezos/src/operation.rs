@@ -11,13 +11,15 @@ use nom::Finish;
 use primitive_types::H256;
 use rlp::Decodable;
 use tezos_crypto_rs::blake2b::digest_256;
-use tezos_crypto_rs::hash::{BlsSignature, UnknownSignature};
+use tezos_crypto_rs::hash::{BlsSignature, SecretKeyEd25519, UnknownSignature};
+use tezos_crypto_rs::PublicKeySignatureVerifier;
 use tezos_data_encoding::types::Narith;
 use tezos_data_encoding::{
     enc::{BinError, BinWriter},
     nom::{error::DecodeError, NomError, NomReader},
 };
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use thiserror::Error;
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Parameter {
@@ -205,6 +207,64 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
             },
         }
     }
+}
+
+pub fn serialize_unsigned_operation(
+    branch: &BlockHash,
+    content: &ManagerOperationContent,
+) -> Result<Vec<u8>, BinError> {
+    // Watermark comes from `src/lib_crypto/signature_v2.ml`
+    // The watermark for a ManagerOperation is always `Generic_operation`
+    // encoded with `0x03`
+    let watermark = 3_u8;
+
+    let mut serialized_unsigned_operation = vec![watermark];
+
+    let branch: [u8; 32] = branch.0.to_fixed_bytes();
+    tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
+    content.bin_write(&mut serialized_unsigned_operation)?;
+
+    Ok(serialized_unsigned_operation)
+}
+
+#[derive(Error, Debug)]
+pub enum SignatureErrors {
+    #[error("Signing failed with encoding error {0}")]
+    BinError(#[from] BinError),
+    #[error("Signing failed with cryptographic error {0}")]
+    CryptoError(#[from] tezos_crypto_rs::CryptoError),
+}
+
+pub fn sign_operation(
+    sk: &SecretKeyEd25519,
+    branch: &BlockHash,
+    content: &ManagerOperationContent,
+) -> Result<UnknownSignature, SignatureErrors> {
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
+
+    let signature = sk.sign(serialized_unsigned_operation)?;
+
+    Ok(signature.into())
+}
+
+pub fn verify_signature(
+    pk: &PublicKey,
+    branch: &BlockHash,
+    operation: &ManagerOperationContent,
+    signature: UnknownSignature,
+) -> Result<bool, BinError> {
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, operation)?;
+
+    let signature = &signature.into();
+
+    // The verify_signature function never returns false. If the verification
+    // is incorrect the function will return an Error and it's up to us to
+    // transform that into a `false` boolean if we want.
+    let check = pk
+        .verify_signature(signature, &serialized_unsigned_operation)
+        .unwrap_or(false);
+
+    Ok(check)
 }
 
 #[cfg(test)]
