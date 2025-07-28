@@ -858,6 +858,8 @@ let get_total_supply ctxt = Storage.Contract.Total_supply.get ctxt
 module For_RPC = struct
   let list c = Storage.Contract.list c
 
+  let fold c = Storage.Contract.fold c
+
   let get_staked_balance ctxt =
     let open Lwt_result_syntax in
     function

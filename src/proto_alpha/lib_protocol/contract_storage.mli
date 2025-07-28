@@ -329,6 +329,13 @@ val get_total_supply : Raw_context.t -> Tez_repr.t tzresult Lwt.t
 module For_RPC : sig
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
+  val fold :
+    Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+
   val get_staked_balance :
     Raw_context.t -> Contract_repr.t -> Tez_repr.t option tzresult Lwt.t
 

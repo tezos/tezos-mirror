@@ -1912,6 +1912,13 @@ module Contract : sig
   module For_RPC : sig
     val list : context -> t list Lwt.t
 
+    val fold :
+      context ->
+      order:[`Sorted | `Undefined] ->
+      init:'a ->
+      f:(t -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+
     val get_staked_balance : context -> t -> Tez.t option tzresult Lwt.t
 
     val get_unstaked_frozen_balance :
