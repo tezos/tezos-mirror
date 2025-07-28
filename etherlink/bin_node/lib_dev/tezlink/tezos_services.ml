@@ -611,26 +611,6 @@ let chain_id :
     ([`GET], chain, chain, unit, unit, Chain_id.t) Tezos_rpc.Service.t =
   import_service Tezos_shell_services.Chain_services.S.chain_id
 
-let header :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Current_block_services.block_header )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.header
-
-let shell_header :
-    ( [`GET],
-      tezlink_rpc_context,
-      tezlink_rpc_context,
-      unit,
-      unit,
-      Block_header.shell_header )
-    Tezos_rpc.Service.t =
-  import_service Current_block_services.S.Header.shell_header
-
 let operation_hashes :
     ( [`GET],
       tezlink_rpc_context,
