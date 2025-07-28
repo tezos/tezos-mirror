@@ -140,7 +140,8 @@ _`Attestation threshold`
 _`Attesting`
     The process of asserting that some other operation is valid.
     When a block_ is created and propagated on the network, delegates that have
-    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_ in the next block.
+    `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
+    Attestation operations are included in the next block_.
     Beyond serving in the L1 consensus protocol for attesting block_\ s, attestation operations provide specific fields used in the DAL_ for attesting available shard_\ s.
 
 _`Attesting rights`

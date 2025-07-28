@@ -133,6 +133,7 @@ _`Attestation threshold`
     In the DAL, the minimum percentage of DAL shard_\ s that must be attested before the data is considered available to Smart Rollups.
 
 _`Attesting`
+    The process of asserting that some other operation is valid.
     When a block_ is created and propagated on the network, delegates that have
     `attesting rights`_ for the matching block level_ and round_ can emit an attestation operation_.
     Attestation operations are included in the next block_.
