@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023-2024 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2023-2024 Functori <contact@functori.com>                   *)
+(* Copyright (c) 2023-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -437,6 +437,12 @@ let eip2930_storage_access =
     ~source:(solidity_contracts_path ^ "/eip2930_storage_access.sol")
     ~label:"storageaccess"
     ~contract:"StorageAccess"
+
+let eip7702 =
+  compile_contract
+    ~source:(solidity_contracts_path ^ "/eip7702.sol")
+    ~label:"eip7702contract"
+    ~contract:"EIP7702Contract"
 
 let nested_delegatecalls_A =
   compile_contract
