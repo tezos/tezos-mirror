@@ -337,7 +337,6 @@ mod test {
         primitives::{hex::FromHex, Address, Bytes, U256},
         state::{AccountInfo, Bytecode},
     };
-    use serde_json::Value;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_host::runtime::Runtime;
     use utilities::{
@@ -689,78 +688,6 @@ mod test {
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
         assert_eq!(format!("{:?}", withdrawals), raw_expected_withdrawals);
-    }
-
-    #[test]
-    #[ignore]
-    fn create_withdrawal_contract() {
-        // TODO: Automate this
-        // This test sole purpose is generating the result of a CREATE operation
-        // Currently used as a script, do not remove `#[ignore]`
-
-        let mut host = MockKernelHost::default();
-        let mut world_state_handler = new_world_state_handler().unwrap();
-        let block_constants = block_constants_with_no_fees();
-
-        // TODO: use foundry-compilers here when kernel rust version is bumped to 1.87
-        // For the moment if you need to rebuild you can run:
-        // $ forge build etherlink/kernel_latest/revm/contracts/withdrawal.sol --out etherlink/kernel_latest/revm/contracts/out
-
-        // Read compiled XTZWithdrawal
-        let _file =
-            std::fs::read_to_string("contracts/out/withdrawal.sol/XTZWithdrawal.json")
-                .unwrap();
-        let _file =
-            std::fs::read_to_string("contracts/out/fa_withdrawal.sol/FAWithdrawal.json")
-                .unwrap();
-        let file = std::fs::read_to_string(
-            "contracts/out/internal_forwarder.sol/InternalForwarder.json",
-        )
-        .unwrap();
-        let json: Value = serde_json::from_str(&file).unwrap();
-        let hex = json["bytecode"]["object"].as_str().unwrap();
-        let deployed = Bytes::from_hex(hex).unwrap();
-
-        // Insert account information
-        let caller =
-            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
-        let caller_info = AccountInfo {
-            balance: U256::MAX,
-            nonce: 0,
-            code_hash: Default::default(),
-            code: None,
-        };
-        let mut storage_account = world_state_handler
-            .get_or_create(&host, &account_path(&caller).unwrap())
-            .unwrap();
-        storage_account.set_info(&mut host, caller_info).unwrap();
-
-        // Deploy XTZWithdrawal
-        let ExecutionOutcome { result, .. } = run_transaction(
-            &mut host,
-            DEFAULT_SPEC_ID,
-            &block_constants,
-            &mut world_state_handler,
-            EtherlinkPrecompiles::new(),
-            caller,
-            None,
-            deployed,
-            10_000_000,
-            0,
-            U256::ZERO,
-            AccessList(vec![]),
-            None,
-        )
-        .unwrap();
-
-        // Read and display the written bytecode
-        assert!(result.is_success());
-        let created_address = result.created_address().unwrap();
-        let created_account = world_state_handler
-            .get_or_create(&host, &account_path(&created_address).unwrap())
-            .unwrap();
-        let code = created_account.code(&host).unwrap();
-        println!("Create output = {:?}", code.clone());
     }
 
     #[test]
