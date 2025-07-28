@@ -130,7 +130,7 @@ _`Attestation quorum`
     As described in :doc:`The consensus algorithm<consensus>`, the minimal number of attestations that are needed to consider a block as pre-attested or attested.
 
 _`Attestation threshold`
-    In the DAL, the minimum percentage of DAL shard_\ s that must be attested by attesters before the data is considered to be attested and therefore available to Smart Rollups.
+    In the DAL, the minimum percentage of DAL shard_\ s that must be attested before the data is considered available to Smart Rollups.
 
 _`Attesting`
     When a block_ is created and propagated on the network, delegates that have
