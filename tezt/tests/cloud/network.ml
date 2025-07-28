@@ -130,6 +130,8 @@ let stake_repartition_encoding =
         (fun (network, max_nb_bakers) -> Mimic {network; max_nb_bakers});
     ]
 
+let is_public = function #public -> true | _ -> false
+
 let to_public = function
   | `Sandbox -> failwith "Sandbox is not public"
   | #public as p -> p

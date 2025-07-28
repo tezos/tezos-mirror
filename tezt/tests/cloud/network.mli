@@ -34,6 +34,8 @@ type stake_repartition =
 
 val stake_repartition_encoding : stake_repartition Data_encoding.t
 
+val is_public : t -> bool
+
 val to_public : t -> public
 
 (** Parse the given [string] into an available network option. *)
