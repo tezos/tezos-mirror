@@ -330,6 +330,7 @@ let changeset_octez_docs =
           "**/*.rst";
           (* Nota: stays as it is, many non-rst files in this folder *)
           "docs/**/*";
+          "grafazos/doc/**/*";
         ])
 
 (** Only if reStructured Text files have changed *)

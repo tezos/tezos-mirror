@@ -692,6 +692,7 @@ oc.build_x86_64-released:
     - dune-workspace
     - etherlink/**/*
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*
     - irmin/**/*.ml*
     - michelson_test_scripts/**/*
@@ -789,6 +790,7 @@ oc.build_x86_64-exp-dev-extra:
     - dune-workspace
     - etherlink/**/*
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*
     - irmin/**/*.ml*
     - michelson_test_scripts/**/*
@@ -940,6 +942,7 @@ oc.build_kernels:
     - etherlink.mk
     - etherlink/**/*
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - images/**/*
     - irmin/**/*
     - irmin/**/*.ml*
@@ -1027,6 +1030,7 @@ oc.build_dsn_node:
     - etherlink.mk
     - etherlink/**/*
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - images/**/*
     - irmin/**/*
     - irmin/**/*.ml*
@@ -3913,6 +3917,7 @@ documentation:odoc:
     - dune-project
     - dune-workspace
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
@@ -3980,6 +3985,7 @@ documentation:manuals:
     - dune-project
     - dune-workspace
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
@@ -4035,6 +4041,7 @@ documentation:docgen:
     - dune-project
     - dune-workspace
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
@@ -4099,6 +4106,7 @@ documentation:build_all:
     - dune-project
     - dune-workspace
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
@@ -4151,6 +4159,7 @@ documentation:linkcheck:
     - dune-project
     - dune-workspace
     - etherlink/**/*.ml*
+    - grafazos/doc/**/*
     - irmin/**/*.ml*
     - script-inputs/**/*/
     - scripts/**/*/
