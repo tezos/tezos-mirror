@@ -19,6 +19,7 @@ module Brassaia_memory =
 
 module Brassaia_memory_context =
   Tezos_protocol_environment.Brassaia_memory_context
+module Tezedge = Tezos_context_tezedge.Context
 
 let err_implementation_mismatch =
   Tezos_protocol_environment.err_implementation_mismatch
@@ -48,6 +49,7 @@ end
 
 module Duo_context = Duo_context_lib.Duo_context
 module Duo_memory_context = Duo_context_lib.Duo_memory_context
+module Duo_irmin_tezedge_context = Duo_context_lib.Duo_irmin_tezedge_context
 
 (** Values of type [index] are used to [checkout] contexts specified by their hash. *)
 type index =
@@ -57,6 +59,8 @@ type index =
   | Brassaia_memory_index of Brassaia_memory.index
   | Duo_index of Duo_context.index
   | Duo_memory_index of Duo_memory_context.index
+  | Tezedge_index of Tezedge.index
+  | Duo_irmin_tezedge_index of Duo_irmin_tezedge_context.index
 
 open Environment_context
 
@@ -73,14 +77,19 @@ let irmin_dir = "context"
 
 let brassaia_dir = "brassaia_context"
 
+let tezedge_dir = "tezedge_context"
+
 let backend_variable = "TEZOS_CONTEXT_BACKEND"
 
 let irmin_context_dir root = Filename.(concat root irmin_dir)
 
 let brassaia_context_dir root = Filename.(concat root brassaia_dir)
 
+let tezedge_context_dir root = Filename.(concat root tezedge_dir)
+
 let context_dir root =
   match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "tezedge" -> tezedge_context_dir root
   | "brassaia" -> brassaia_context_dir root
   | "irmin" | "duo" | (exception Not_found) -> irmin_context_dir root
   | s ->
@@ -125,6 +134,19 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
     in
     Brassaia.init ?patch_context ?readonly ?index_log_size brassaia_dir
   in
+  let tezedge_dir = tezedge_context_dir data_dir in
+  let init_tezedge_context () =
+    let* () = Events.(emit initializing_context) ("tezedge", tezedge_dir) in
+    let patch_context =
+      Option.map
+        (fun f context ->
+          let open Lwt_result_syntax in
+          let* context = f (Tezedge_context.wrap_context context) in
+          return @@ Tezedge_context.unwrap_disk_context context)
+        patch_context
+    in
+    Lwt.return (Tezedge.init ?patch_context tezedge_dir)
+  in
 
   let open Lwt_syntax in
   match kind with
@@ -157,6 +179,14 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
       in
       Duo_memory_index
         (Duo_memory_context.make_index irmin_index brassaia_index)
+  | `Tezedge ->
+      let* tezedge_index = init_tezedge_context () in
+      return (Tezedge_index tezedge_index)
+  | `Duo_tezedge ->
+      let* irmin_index = init_context () in
+      let+ tezedge_index = init_tezedge_context () in
+      Duo_irmin_tezedge_index
+        (Duo_irmin_tezedge_context.make_index irmin_index tezedge_index)
 
 (* Wrapper over init that uses an environment variable ('TEZOS_CONTEXT_BACKEND')
    to select the backend between Memory|Brassaia_memory and Disk|Brassaia.
@@ -168,6 +198,16 @@ let init ~kind ?patch_context ?readonly ?index_log_size ~data_dir () =
      like records and create a section for each call *)
   () [@profiler.record {verbosity = Notice} "Context init"] ;
   match Sys.getenv backend_variable |> String.lowercase_ascii with
+  | "tezedge" ->
+      init ~kind:`Tezedge ?patch_context ?readonly ?index_log_size ~data_dir ()
+  | "duo_tezedge" ->
+      init
+        ~kind:`Duo_tezedge
+        ?patch_context
+        ?readonly
+        ?index_log_size
+        ~data_dir
+        ()
   | "brassaia" -> (
       match kind with
       | `Disk ->
@@ -227,6 +267,10 @@ let index (context : Environment_context.t) =
       Duo_index (Duo_context.index ctxt)
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_index (Duo_memory_context.index ctxt)
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge_index (Tezedge.index ctxt)
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_index (Duo_irmin_tezedge_context.index ctxt)
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem (context : Environment_context.t) key =
@@ -240,6 +284,9 @@ let mem (context : Environment_context.t) key =
   | Context {kind = Duo_context.Context; ctxt; _} -> Duo_context.mem ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.mem ctxt key
+  | Context {kind = Tezedge_context.Context; ctxt; _} -> Tezedge.mem ctxt key
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.mem ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let mem_tree (context : Environment_context.t) key =
@@ -257,6 +304,10 @@ let mem_tree (context : Environment_context.t) key =
       Duo_context.mem_tree ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.mem_tree ctxt key
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.mem_tree ctxt key
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.mem_tree ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let find (context : Environment_context.t) key =
@@ -272,6 +323,9 @@ let find (context : Environment_context.t) key =
   | Context {kind = Duo_context.Context; ctxt; _} -> Duo_context.find ctxt key
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.find ctxt key
+  | Context {kind = Tezedge_context.Context; ctxt; _} -> Tezedge.find ctxt key
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.find ctxt key
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add (context : Environment_context.t) key data =
@@ -297,6 +351,12 @@ let add (context : Environment_context.t) key data =
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt = Duo_memory_context.add ctxt key data in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.add ctxt key data in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Duo_irmin_tezedge_context.add ctxt key data in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
@@ -328,6 +388,20 @@ let fold_value ?depth (context : Environment_context.t) key ~order ~init ~f =
       Duo_memory_context.fold ?depth ctxt key ~order ~init ~f:(fun k tree acc ->
           let v () = Duo_memory_context.Tree.to_value tree in
           f k v acc)
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.fold ?depth ctxt key ~order ~init ~f:(fun k tree acc ->
+          let v () = Tezedge.Tree.to_value tree in
+          f k v acc)
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.fold
+        ?depth
+        ctxt
+        key
+        ~order
+        ~init
+        ~f:(fun k tree acc ->
+          let v () = Duo_irmin_tezedge_context.Tree.to_value tree in
+          f k v acc)
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_protocol (context : Environment_context.t) proto_hash =
@@ -353,6 +427,12 @@ let add_protocol (context : Environment_context.t) proto_hash =
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt = Duo_memory_context.add_protocol ctxt proto_hash in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.add_protocol ctxt proto_hash in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Duo_irmin_tezedge_context.add_protocol ctxt proto_hash in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_protocol (context : Environment_context.t) =
@@ -370,6 +450,10 @@ let get_protocol (context : Environment_context.t) =
       Duo_context.get_protocol ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.get_protocol ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.get_protocol ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.get_protocol ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
@@ -405,6 +489,14 @@ let add_predecessor_block_metadata_hash (context : Environment_context.t) hash =
         Duo_memory_context.add_predecessor_block_metadata_hash ctxt hash
       in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.add_predecessor_block_metadata_hash ctxt hash in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt =
+        Duo_irmin_tezedge_context.add_predecessor_block_metadata_hash ctxt hash
+      in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
@@ -436,6 +528,14 @@ let add_predecessor_ops_metadata_hash (context : Environment_context.t) hash =
         Duo_memory_context.add_predecessor_ops_metadata_hash ctxt hash
       in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.add_predecessor_ops_metadata_hash ctxt hash in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt =
+        Duo_irmin_tezedge_context.add_predecessor_ops_metadata_hash ctxt hash
+      in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let hash ~time ?message (context : Environment_context.t) =
@@ -454,6 +554,10 @@ let hash ~time ?message (context : Environment_context.t) =
       Duo_context.hash ~time ?message ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.hash ~time ?message ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.hash ~time ?message ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.hash ~time ?message ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let get_test_chain (context : Environment_context.t) =
@@ -472,6 +576,10 @@ let get_test_chain (context : Environment_context.t) =
       Duo_context.get_test_chain ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.get_test_chain ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.get_test_chain ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.get_test_chain ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let add_test_chain (context : Environment_context.t) status =
@@ -497,6 +605,12 @@ let add_test_chain (context : Environment_context.t) status =
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       let+ ctxt = Duo_memory_context.add_test_chain ctxt status in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.add_test_chain ctxt status in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Duo_irmin_tezedge_context.add_test_chain ctxt status in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
@@ -527,6 +641,14 @@ let fork_test_chain (context : Environment_context.t) ~protocol ~expiration =
         Duo_memory_context.fork_test_chain ctxt ~protocol ~expiration
       in
       Duo_memory_context.wrap_context ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      let+ ctxt = Tezedge.fork_test_chain ctxt ~protocol ~expiration in
+      Tezedge_context.wrap_context ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      let+ ctxt =
+        Duo_irmin_tezedge_context.fork_test_chain ctxt ~protocol ~expiration
+      in
+      Duo_irmin_tezedge_context.wrap_context ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit ~time ?message (context : Environment_context.t) =
@@ -545,6 +667,10 @@ let commit ~time ?message (context : Environment_context.t) =
       Duo_context.commit ~time ?message ctxt
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.commit ~time ?message ctxt
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.commit ~time ?message ctxt
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.commit ~time ?message ctxt
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let gc context_index context_hash =
@@ -557,6 +683,7 @@ let gc context_index context_hash =
   | Brassaia_memory_index index -> Brassaia_memory.gc index context_hash
   | Duo_index index -> Duo_context.gc index context_hash
   | Duo_memory_index index -> Duo_memory_context.gc index context_hash
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
 
 let wait_gc_completion context_index =
   match[@profiler.span_s
@@ -569,6 +696,7 @@ let wait_gc_completion context_index =
   | Brassaia_memory_index index -> Brassaia_memory.wait_gc_completion index
   | Duo_index index -> Duo_context.wait_gc_completion index
   | Duo_memory_index index -> Duo_memory_context.wait_gc_completion index
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
 
 let is_gc_allowed context_index =
   match[@profiler.span_f {verbosity = Notice} ["context_ops"; "is_gc_allowed"]]
@@ -580,6 +708,9 @@ let is_gc_allowed context_index =
   | Brassaia_memory_index index -> Brassaia_memory.is_gc_allowed index
   | Duo_index index -> Duo_context.is_gc_allowed index
   | Duo_memory_index index -> Duo_memory_context.is_gc_allowed index
+  | Tezedge_index _ -> false (* FIXME *)
+  | Duo_irmin_tezedge_index index ->
+      Duo_irmin_tezedge_context.is_gc_allowed index
 
 let split context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "split"]]
@@ -591,6 +722,7 @@ let split context_index =
   | Brassaia_memory_index index -> Brassaia_memory.split index
   | Duo_index index -> Duo_context.split index
   | Duo_memory_index index -> Duo_memory_context.split index
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
 
 let sync context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "sync"]]
@@ -602,6 +734,8 @@ let sync context_index =
   | Brassaia_memory_index index -> Brassaia_memory.sync index
   | Duo_index index -> Duo_context.sync index
   | Duo_memory_index index -> Duo_memory_context.sync index
+  | Tezedge_index _ -> Lwt.return_unit (* FIXME *)
+  | Duo_irmin_tezedge_index index -> Duo_irmin_tezedge_context.sync index
 
 let commit_test_chain_genesis (context : Environment_context.t) block_header =
   match[@profiler.span_s
@@ -620,6 +754,10 @@ let commit_test_chain_genesis (context : Environment_context.t) block_header =
       Duo_context.commit_test_chain_genesis ctxt block_header
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.commit_test_chain_genesis ctxt block_header
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.commit_test_chain_genesis ctxt block_header
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.commit_test_chain_genesis ctxt block_header
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let compute_testchain_genesis (context : Environment_context.t) block_hash =
@@ -639,6 +777,10 @@ let compute_testchain_genesis (context : Environment_context.t) block_hash =
       Duo_context.compute_testchain_genesis block_hash
   | Context {kind = Duo_memory_context.Context; _} ->
       Duo_memory_context.compute_testchain_genesis block_hash
+  | Context {kind = Tezedge_context.Context; _} ->
+      Tezedge.compute_testchain_genesis block_hash
+  | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
+      Duo_irmin_tezedge_context.compute_testchain_genesis block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let merkle_tree (context : Environment_context.t) leaf_kind path =
@@ -675,6 +817,10 @@ let merkle_tree_v2 (context : Environment_context.t) leaf_kind path =
       Duo_context.merkle_tree_v2 ctxt leaf_kind path
   | Context {kind = Duo_memory_context.Context; ctxt; _} ->
       Duo_memory_context.merkle_tree_v2 ctxt leaf_kind path
+  | Context {kind = Tezedge_context.Context; ctxt; _} ->
+      Tezedge.merkle_tree_v2 ctxt leaf_kind path
+  | Context {kind = Duo_irmin_tezedge_context.Context; ctxt; _} ->
+      Duo_irmin_tezedge_context.merkle_tree_v2 ctxt leaf_kind path
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let commit_genesis context_index ~chain_id ~time ~protocol =
@@ -692,6 +838,10 @@ let commit_genesis context_index ~chain_id ~time ~protocol =
       Brassaia.commit_genesis index ~chain_id ~time ~protocol
   | Brassaia_memory_index index ->
       Brassaia_memory.commit_genesis index ~chain_id ~time ~protocol
+  | Tezedge_index index ->
+      Tezedge.commit_genesis index ~chain_id ~time ~protocol
+  | Duo_irmin_tezedge_index index ->
+      Duo_irmin_tezedge_context.commit_genesis index ~chain_id ~time ~protocol
   | Duo_index index ->
       Duo_context.commit_genesis index ~chain_id ~time ~protocol
   | Duo_memory_index index ->
@@ -714,6 +864,11 @@ let checkout context_index context_hash =
   | Brassaia_memory_index index ->
       let+ ctxt = Brassaia_memory.checkout index context_hash in
       Option.map Brassaia_memory_context.wrap_memory_context ctxt
+  | Tezedge_index index ->
+      let context = Tezedge.checkout index context_hash in
+      Lwt.return (Option.map Tezedge_context.wrap_context context)
+  | Duo_irmin_tezedge_index index ->
+      Duo_irmin_tezedge_context.checkout index context_hash
   | Duo_index index -> Duo_context.checkout index context_hash
   | Duo_memory_index index -> Duo_memory_context.checkout index context_hash
 
@@ -736,6 +891,11 @@ let checkout_exn context_index context_hash =
   | Brassaia_memory_index index ->
       let+ ctxt = Brassaia_memory.checkout_exn index context_hash in
       Brassaia_memory_context.wrap_memory_context ctxt
+  | Tezedge_index index ->
+      let+ ctxt = Tezedge.checkout_exn index context_hash in
+      Tezedge_context.wrap_context ctxt
+  | Duo_irmin_tezedge_index index ->
+      Duo_irmin_tezedge_context.checkout_exn index context_hash
   | Duo_index index -> Duo_context.checkout_exn index context_hash
   | Duo_memory_index index -> Duo_memory_context.checkout_exn index context_hash
 
@@ -749,6 +909,9 @@ let exists context_index context_hash =
   | Brassaia_memory_index index -> Brassaia_memory.exists index context_hash
   | Duo_index index -> Duo_context.exists index context_hash
   | Duo_memory_index index -> Duo_memory_context.exists index context_hash
+  | Tezedge_index index -> Lwt.return (Tezedge.exists index context_hash)
+  | Duo_irmin_tezedge_index index ->
+      Duo_irmin_tezedge_context.exists index context_hash
 
 let close context_index =
   match[@profiler.span_s {verbosity = Notice} ["context_ops"; "close"]]
@@ -760,6 +923,7 @@ let close context_index =
   | Brassaia_memory_index index -> Brassaia_memory.close index
   | Duo_index index -> Duo_context.close index
   | Duo_memory_index index -> Duo_memory_context.close index
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false
 
 let compute_testchain_chain_id (context : Environment_context.t) block_hash =
   match[@profiler.span_f
@@ -778,6 +942,10 @@ let compute_testchain_chain_id (context : Environment_context.t) block_hash =
       Duo_context.compute_testchain_chain_id block_hash
   | Context {kind = Duo_memory_context.Context; _} ->
       Duo_memory_context.compute_testchain_chain_id block_hash
+  | Context {kind = Tezedge_context.Context; _} ->
+      Tezedge.compute_testchain_chain_id block_hash
+  | Context {kind = Duo_irmin_tezedge_context.Context; _} ->
+      Duo_irmin_tezedge_context.compute_testchain_chain_id block_hash
   | Context t -> err_impl_mismatch ~got:t.impl_name
 
 let export_snapshot context_index context_hash ~path =
@@ -791,6 +959,7 @@ let export_snapshot context_index context_hash ~path =
   | Duo_index index -> Duo_context.export_snapshot index context_hash ~path
   | Duo_memory_index index ->
       Duo_memory_context.export_snapshot index context_hash ~path
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false
 
 let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   let open Lwt_syntax in
@@ -817,6 +986,7 @@ let integrity_check ?ppf ~root ~auto_repair ~always ~heads context_index =
   | Brassaia_memory_index _ ->
       Fmt.failwith
         "An in memory context doesn't need to be checked for integrity"
+  | Tezedge_index _ | Duo_irmin_tezedge_index _ -> assert false (* FIXME *)
   | Duo_index _ ->
       let* () =
         Context.Checks.Pack.Integrity_check.run

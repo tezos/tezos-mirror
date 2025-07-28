@@ -27,4 +27,5 @@ It contains the following libraries:
 - {{!module-Tezos_signer_backends}Tezos_signer_backends}: Tezos: remote-signature backends for `octez-client`
 - {{!module-Tezos_signer_services}Tezos_signer_services}: Tezos: descriptions of RPCs exported by `tezos-signer`
 - {{!module-Tezos_store}Tezos_store}: Store for `octez-node`
+- {{!module-Tezos_tezedge_context}Tezos_tezedge_context}
 - {{!module-Tezos_validation}Tezos_validation}: Library for block validation

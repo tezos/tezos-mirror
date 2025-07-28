@@ -1,0 +1,16 @@
+[package]
+name = "rust_tezos_context"
+version = "0.1.0"
+edition = "2024"
+
+[build]
+rustflags = ["-C", "link-args=-Wl,-undefined,dynamic_lookup"]
+
+[dependencies]
+ocaml = "*"
+tezos_context = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible"}
+tezos_context_api = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible" }
+crypto = { git = "https://github.com/vch9/tezedge", branch = "octez-compatible" }
+
+[build-dependencies]
+ocaml-build = { version = "1.0.0", features = ["dune"] }

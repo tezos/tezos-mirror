@@ -9,7 +9,8 @@
   octez-libs.base
   octez-proto-libs.protocol-environment
   octez-libs.tezos-context-brassaia
-  octez-libs.tezos-context)
+  octez-libs.tezos-context
+  octez-shell-libs.tezedge-context)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags

@@ -1718,6 +1718,7 @@ opam:all_7:
       - tezt-tezos
       - tezos-openapi
       - octez-rustzcash-deps
+      - octez-rust-tezos-context
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
