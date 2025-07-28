@@ -107,32 +107,26 @@ let shift_then_next_gap_nonce ~__LOC__ ~shift_nonce bitset ~expected =
 let add_shift_then_remove =
   test_register ~title:"Add, shift and remove" ~tags:["bitset_nonce"]
   @@ fun () ->
-  let nonce = 0 in
-  let bitset = create ~__LOC__ ~next_nonce:nonce in
-  let bitset = add ~__LOC__ bitset ~nonce:0 ~expected:(nonce, [0]) in
-  let bitset = add ~__LOC__ bitset ~nonce:1 ~expected:(nonce, [0; 1]) in
-  let bitset = add ~__LOC__ bitset ~nonce:2 ~expected:(nonce, [0; 1; 2]) in
-  let bitset = add ~__LOC__ bitset ~nonce:3 ~expected:(nonce, [0; 1; 2; 3]) in
-  let nonce = 1 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0; 1; 2]) in
+  let bitset = create ~__LOC__ ~next_nonce:0 in
+  let bitset = add ~__LOC__ bitset ~nonce:0 ~expected:(0, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:1 ~expected:(0, [0; 1]) in
+  let bitset = add ~__LOC__ bitset ~nonce:2 ~expected:(0, [0; 1; 2]) in
+  let bitset = add ~__LOC__ bitset ~nonce:3 ~expected:(0, [0; 1; 2; 3]) in
 
-  let nonce = 2 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0; 1]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:1 ~expected:(1, [0; 1; 2]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:2 ~expected:(2, [0; 1]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:3 ~expected:(3, [0]) in
+  let bitset = shift ~__LOC__ bitset ~nonce:4 ~expected:(4, []) in
 
-  let nonce = 3 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:4 ~expected:(4, [0]) in
+  let bitset = add ~__LOC__ bitset ~nonce:5 ~expected:(4, [0; 1]) in
+  let bitset = add ~__LOC__ bitset ~nonce:6 ~expected:(4, [0; 1; 2]) in
+  let bitset = add ~__LOC__ bitset ~nonce:7 ~expected:(4, [0; 1; 2; 3]) in
 
-  let nonce = 4 in
-  let bitset = shift ~__LOC__ bitset ~nonce ~expected:(nonce, []) in
-
-  let bitset = add ~__LOC__ bitset ~nonce:4 ~expected:(nonce, [0]) in
-  let bitset = add ~__LOC__ bitset ~nonce:5 ~expected:(nonce, [0; 1]) in
-  let bitset = add ~__LOC__ bitset ~nonce:6 ~expected:(nonce, [0; 1; 2]) in
-  let bitset = add ~__LOC__ bitset ~nonce:7 ~expected:(nonce, [0; 1; 2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:4 ~expected:(nonce, [1; 2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:5 ~expected:(nonce, [2; 3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:6 ~expected:(nonce, [3]) in
-  let bitset = remove ~__LOC__ bitset ~nonce:7 ~expected:(nonce, []) in
+  let bitset = remove ~__LOC__ bitset ~nonce:4 ~expected:(4, [1; 2; 3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:5 ~expected:(4, [2; 3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:6 ~expected:(4, [3]) in
+  let bitset = remove ~__LOC__ bitset ~nonce:7 ~expected:(4, []) in
 
   let* () =
     Log.info "cardinal %d" (Tezos_base.Bitset.cardinal bitset.bitset) ;
