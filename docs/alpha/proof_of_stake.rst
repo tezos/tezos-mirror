@@ -187,7 +187,7 @@ Proof-of-stake parameters
    * - ``BLOCKS_PER_CYCLE``
      - 1800 blocks
    * - ``CONSENSUS_RIGHTS_DELAY``
-     - 2 cycles
+     - 1 cycle
    * - ``MINIMAL_STAKE``
      - 6,000 ꜩ
    * - ``MINIMAL_FROZEN_STAKE``
