@@ -13,7 +13,7 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
-let init_tzkt ~agent ~tezlink_sandbox_endpoint =
+let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   let spawn_run ?name cmd args =
     Agent.docker_run_command ?name agent cmd args
   in
@@ -86,6 +86,20 @@ let init_tzkt ~agent ~tezlink_sandbox_endpoint =
       (Client.string_of_endpoint tezlink_sandbox_endpoint)
   in
   let* () = sed "host=db" "host=localhost" in
+
+  (* Change the port of the API and indexer to take available ports
+     (or given port for the API). *)
+  let indexer_port = Agent.next_available_port agent in
+  let api_port =
+    match tzkt_api_port with
+    | None -> Agent.next_available_port agent
+    | Some api_port -> api_port
+  in
+  let* () = sed "http://localhost:5001" (sf "http://0.0.0.0:%d" indexer_port) in
+  let* () = sed "http://localhost:5000" (sf "http://0.0.0.0:%d" api_port) in
+  let () = toplog "Tzkt indexer will be available at port %d" indexer_port in
+  let () = toplog "Tzkt API will be available at port %d" api_port in
+
   (* Compile and publish the Tzkt indexer along the API *)
   let compile_tzkt target dir =
     run "dotnet" ["publish"; sf "tzkt/%s" target; "-o"; dir]
@@ -239,7 +253,10 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           tezlink_sequencer_agent
       in
       let* () =
-        init_tzkt ~agent:tezlink_sequencer_agent ~tezlink_sandbox_endpoint
+        init_tzkt
+          ~tzkt_api_port:Cli.tzkt_api_port
+          ~agent:tezlink_sequencer_agent
+          ~tezlink_sandbox_endpoint
       in
       let () = toplog "Starting main loop" in
       loop 0)
