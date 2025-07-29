@@ -97,7 +97,7 @@ module type PROTOCOL = sig
       Signature.public_key_hash ->
       Signature.public_key tzresult Lwt.t
 
-    val fold : context -> init:'a -> f:('a -> contract -> 'a Lwt.t) -> 'a Lwt.t
+    val fold : context -> init:'a -> f:(contract -> 'a -> 'a Lwt.t) -> 'a Lwt.t
 
     val balance : context -> contract -> Tez.t tzresult Lwt.t
 
