@@ -1192,6 +1192,16 @@ module Stack_utils = struct
                  continuation = k;
                  reconstruct = (fun k -> IIndex_address (loc, k));
                }
+      | IGet_address_index (loc, k), Item_t (_, s) ->
+          let* b = option_t dummy nat_t in
+          let s = Item_t (b, s) in
+          return
+          @@ Ex_split_kinstr
+               {
+                 cont_init_stack = s;
+                 continuation = k;
+                 reconstruct = (fun k -> IGet_address_index (loc, k));
+               }
       | ( ICreate_contract {loc; storage_type; code; k},
           Item_t (_, Item_t (_, Item_t (_, s))) ) ->
           return
