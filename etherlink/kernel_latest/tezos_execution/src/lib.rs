@@ -179,10 +179,11 @@ pub fn transfer_external<Host: Runtime>(
     log!(
         host,
         Debug,
-        "Applying a transfer operation from {} to {:?} of {:?} mutez",
+        "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
         src,
         dest,
-        amount
+        amount,
+        parameter
     );
 
     let src_contract = Contract::Implicit(src.clone());
