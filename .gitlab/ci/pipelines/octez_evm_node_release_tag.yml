@@ -206,7 +206,7 @@ docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -228,7 +228,7 @@ gitlab:octez-evm-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
@@ -247,7 +247,7 @@ docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - docker:merge_manifests
   dependencies: []

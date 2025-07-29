@@ -71,7 +71,7 @@ grafazos.gitlab_release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - grafazos.build
   dependencies:
@@ -88,7 +88,7 @@ grafazos.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true

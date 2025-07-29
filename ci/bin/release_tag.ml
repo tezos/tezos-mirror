@@ -99,6 +99,52 @@ let job_release_page ~test ?dependencies () =
          ])
     ["./scripts/releases/publish_release_page.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~tag:Gcp_not_interruptible
+
+(* Temporary job that uses [bin_release_page/release_page.ml]
+   to update the release page.
+   This will be removed once [job_release_page] uses it. *)
+let job_update_release_page ~test () =
+  job
+    ~__POS__
+    ~image:Images.CI.build
+    ~stage:Stages.publish
+    ~description:""
+    ~name:"publish:update-release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["index.md"; "index.html"])
+    ~variables:
+      (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
+         [
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+         ]
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com");
+           ("BUCKET_PATH", "/releases");
+           ("URL", "octez.tezos.com");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
+    ~before_script:["eval $(opam env)"]
+    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
+    [
+      "sudo apk add aws-cli pandoc";
+      "dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
+       --title 'Octez releases' --bucket ${S3_BUCKET} --path \
+       '${BUCKET_PATH:-}' changelog binaries packages";
+      "aws s3 cp \"./index.html\" \"s3://${S3_BUCKET}${BUCKET_PATH}/\"";
+      "aws cloudfront create-invalidation --distribution-id \
+       \"$DISTRIBUTION_ID\" --paths \"/*\"";
+    ]
+    ~tag:Gcp_not_interruptible
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -198,6 +244,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         "./scripts/ci/gitlab-release.sh";
       ]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
   in
   let job_gitlab_publish ~dependencies () : Tezos_ci.tezos_job =
     let before_script =
@@ -223,6 +270,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
         | _ -> "");
       ]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
   in
   let jobs_dnf_repository = Rpm_repository.jobs Release in
   let jobs_debian_repository = Debian_repository.jobs Release in
@@ -266,6 +314,7 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
       ~name:"opam:release"
       [("./scripts/ci/opam-release.sh" ^ if dry_run then " --dry-run" else "")]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
   in
   let job_promote_to_latest_test =
     Common.job_docker_promote_to_latest
@@ -390,6 +439,7 @@ let octez_evm_node_jobs ?(test = false) () =
       ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
   in
   let job_docker_promote_to_latest ~ci_docker_hub () : tezos_job =
     job_docker_authenticated
@@ -403,6 +453,7 @@ let octez_evm_node_jobs ?(test = false) () =
          ./scripts/ci/octez-evm-node-release.sh";
       ]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
   in
   [
     (* Stage: start *)

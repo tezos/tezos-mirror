@@ -761,6 +761,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~__POS__
     ~stage:Stages.publish
     ~name:"docker:merge_manifests"
+    ~tag:Gcp_not_interruptible
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
       (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
@@ -778,6 +779,7 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
     ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~tag:Gcp_not_interruptible
 
 type bin_package_target = Rpm
 
@@ -1408,5 +1410,6 @@ module Documentation = struct
       ?rules
       ["./scripts/ci/doc_publish.sh"]
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+      ~tag:Gcp_not_interruptible
     |> enable_cargo_cache |> enable_sccache
 end

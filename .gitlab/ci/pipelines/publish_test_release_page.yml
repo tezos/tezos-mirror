@@ -46,7 +46,7 @@ publish:release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true

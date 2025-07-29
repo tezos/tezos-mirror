@@ -151,7 +151,7 @@ apt_repo_debian:
   image: debian:bookworm
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-debian
   - oc.build-data_packages
