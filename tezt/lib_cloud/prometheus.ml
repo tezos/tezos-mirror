@@ -17,6 +17,21 @@ let target_jingoo_template target =
 
 type job = {name : string; metrics_path : string; targets : target list}
 
+let pp_job fmt (job : job) =
+  Format.fprintf
+    fmt
+    "{%a}"
+    (Format.pp_print_list
+       ~pp_sep:(fun fmt () -> Format.fprintf fmt ",")
+       (fun fmt (target : target) ->
+         Format.fprintf
+           fmt
+           "%s(%s:%d)"
+           target.app_name
+           target.address
+           target.port))
+    job.targets
+
 let job_jingoo_template job =
   let open Jingoo.Jg_types in
   Tobj
@@ -215,14 +230,31 @@ let reload t =
   Process.run "docker" ["kill"; "--signal"; "SIGHUP"; t.name]
 
 let add_job (t : t) ?(metrics_path = "/metrics") ~name targets =
-  let source = {name; metrics_path; targets} in
-  if List.exists (fun (job : job) -> job.name = source.name) t.jobs then (
-    Log.warn "Prometheus: trying to add duplicate job : %s. Ignoring." name ;
-    Lwt.return_unit)
-  else (
-    t.jobs <- source :: t.jobs ;
-    write_configuration_file t ;
-    reload t)
+  let new_job = {name; metrics_path; targets} in
+  let jobs =
+    match List.find_opt (fun (job : job) -> name = job.name) t.jobs with
+    | None ->
+        Log.report
+          "Prometheus: adding job %s with %a"
+          new_job.name
+          pp_job
+          new_job ;
+        List.rev (new_job :: t.jobs)
+    | Some job ->
+        let targets = List.sort_uniq compare (targets @ job.targets) in
+        let new_job = {new_job with targets} in
+        Log.report
+          "Prometheus: replacing job %s with %a"
+          new_job.name
+          pp_job
+          new_job ;
+        List.map
+          (fun (job : job) -> if job.name = name then new_job else job)
+          t.jobs
+  in
+  t.jobs <- jobs ;
+  write_configuration_file t ;
+  reload t
 
 let default_group_name = "tezt"
 
