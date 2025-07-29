@@ -100,6 +100,7 @@ fn reveal<Host: Runtime>(
 
     // Set the public key as the manager
     account.set_manager_public_key(host, public_key)?;
+    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
     account.increment_counter(host)?;
 
     log!(host, Debug, "Reveal operation succeed");
@@ -149,7 +150,7 @@ pub fn transfer<Host: Runtime>(
     };
 
     // Delegate to appropriate handler
-    match dest {
+    let success = match dest {
         Contract::Implicit(dest_key_hash) => {
             if parameter.is_some() {
                 return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
@@ -213,7 +214,10 @@ pub fn transfer<Host: Runtime>(
                 Err(err) => Ok(Err(err.into())),
             }
         }
-    }
+    };
+    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
+    src_account.increment_counter(host)?;
+    success
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
