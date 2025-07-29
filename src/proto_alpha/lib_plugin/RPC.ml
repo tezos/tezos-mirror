@@ -3898,17 +3898,27 @@ module Attestation_rights = struct
     let rights =
       Slot.Map.fold
         (fun first_slot
-             ( {
-                 Consensus_key.delegate;
-                 consensus_pk = _;
-                 consensus_pkh = consensus_key;
-                 companion_pk = _;
-                 companion_pkh = _;
-               },
-               attestation_power,
-               _dal_power )
+             ({
+                consensus_key =
+                  {
+                    Consensus_key.delegate;
+                    consensus_pk = _;
+                    consensus_pkh = consensus_key;
+                    companion_pk = _;
+                    companion_pkh = _;
+                  };
+                attesting_power;
+                dal_power = _;
+              } :
+               Consensus_key.power)
              acc ->
-          {delegate; consensus_key; first_slot; attestation_power} :: acc)
+          {
+            delegate;
+            consensus_key;
+            first_slot;
+            attestation_power = attesting_power;
+          }
+          :: acc)
         rights
         []
     in

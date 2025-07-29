@@ -355,6 +355,12 @@ module Internal_for_tests : sig
   val add_cycles : t -> int -> t
 end
 
+type consensus_power = {
+  consensus_key : consensus_pk;
+  attesting_power : int;
+  dal_power : int;
+}
+
 module type CONSENSUS = sig
   type t
 
@@ -368,21 +374,22 @@ module type CONSENSUS = sig
 
   type round
 
-  type consensus_pk
+  (** Info on the power of a given member of the consensus committee.
+      Contains a consensus_pk, its attesting power and its DAL power. *)
+  type consensus_power
 
   (** Returns a map where from the initial slot of each attester in the TB
       committee for a given level, to the attester's public key and its
       consensus power and DAL power. *)
-  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_attestations : t -> consensus_power slot_map option
 
   (** See {!allowed_attestations}. *)
-  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_preattestations : t -> consensus_power slot_map option
 
   (** Returns a map that associates a level with a slot map.
       The slot map links a delegate's public key to a tuple containing
       (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
-  val allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option
+  val allowed_consensus : t -> consensus_power slot_map level_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -401,9 +408,9 @@ module type CONSENSUS = sig
       operation. *)
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
-    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
+    allowed_attestations:consensus_power slot_map option ->
+    allowed_preattestations:consensus_power slot_map option ->
+    allowed_consensus:consensus_power slot_map level_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -465,7 +472,7 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type consensus_pk := consensus_pk
+     and type consensus_power := consensus_power
 
 module Sc_rollup_in_memory_inbox : sig
   val current_messages : t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t

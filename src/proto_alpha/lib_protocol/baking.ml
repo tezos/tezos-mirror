@@ -108,7 +108,8 @@ let attesting_rights (ctxt : t) level =
     (ctxt, Signature.Public_key_hash.Map.empty)
     slots
 
-let attesting_rights_by_first_slot ctxt level =
+let attesting_rights_by_first_slot ctxt level :
+    (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*? slots =
     Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
@@ -117,19 +118,19 @@ let attesting_rights_by_first_slot ctxt level =
   let* ctxt, (_, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
-        let+ ctxt, consensus_pk =
+        let+ ctxt, consensus_key =
           Stake_distribution.slot_owner ctxt level slot
         in
         let initial_slot, delegates_map =
           match
             Signature.Public_key_hash.Map.find
-              consensus_pk.delegate
+              consensus_key.delegate
               delegates_map
           with
           | None ->
               ( slot,
                 Signature.Public_key_hash.Map.add
-                  consensus_pk.delegate
+                  consensus_key.delegate
                   slot
                   delegates_map )
           | Some initial_slot -> (initial_slot, delegates_map)
@@ -143,9 +144,22 @@ let attesting_rights_by_first_slot ctxt level =
           Slot.Map.update
             initial_slot
             (function
-              | None -> Some (consensus_pk, 1, in_dal_committee)
-              | Some (consensus_pk, count, dal_count) ->
-                  Some (consensus_pk, count + 1, dal_count + in_dal_committee))
+              | None ->
+                  Some
+                    {
+                      consensus_key;
+                      attesting_power = 1;
+                      dal_power = in_dal_committee;
+                    }
+              | Some
+                  ({consensus_key; attesting_power; dal_power} :
+                    Consensus_key.power) ->
+                  Some
+                    {
+                      consensus_key;
+                      attesting_power = attesting_power + 1;
+                      dal_power = dal_power + in_dal_committee;
+                    })
             slots_map
         in
         (ctxt, (delegates_map, slots_map)))

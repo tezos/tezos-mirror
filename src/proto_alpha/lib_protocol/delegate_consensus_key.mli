@@ -50,6 +50,13 @@ type pk = Raw_context.consensus_pk = {
   companion_pkh : Bls.Public_key_hash.t option;
 }
 
+(** The attesting and dal power related to the associated consensus key *)
+type power = Raw_context.consensus_power = {
+  consensus_key : pk;
+  attesting_power : int;
+  dal_power : int;
+}
+
 (** The public key hash of a consensus key and the associated delegate. *)
 type t = {
   delegate : Signature.Public_key_hash.t;

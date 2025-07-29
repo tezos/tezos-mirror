@@ -2293,8 +2293,7 @@ let find_in_slot_map slot slot_map =
       | None ->
           (* This should not happen: operation validation should have failed. *)
           tzfail Faulty_validation_wrong_slot
-      | Some (consensus_key, power, dal_power) ->
-          return (consensus_key, power, dal_power))
+      | Some x -> return x)
 
 let record_preattestation ctxt (mode : mode) (content : consensus_content) :
     (context * Kind.preattestation contents_result_list) tzresult Lwt.t =
@@ -2320,7 +2319,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power, _dal_power =
+      let*? {consensus_key; attesting_power = power; dal_power = _} =
         find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
@@ -2371,14 +2370,17 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? consensus_key, power, dal_power =
+      let*? {consensus_key; attesting_power; dal_power} =
         find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
-        Consensus.record_attestation ctxt ~initial_slot:consensus.slot ~power
+        Consensus.record_attestation
+          ctxt
+          ~initial_slot:consensus.slot
+          ~power:attesting_power
       in
       let*? ctxt = record_dal_content ctxt consensus.slot ~dal_power dal in
-      return (ctxt, mk_attestation_result consensus_key power)
+      return (ctxt, mk_attestation_result consensus_key attesting_power)
   | Partial_construction _ ->
       (* In mempool mode, attestations are allowed for various levels
          and rounds. We do not record attestations because we could get
@@ -2404,16 +2406,25 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
-            let* {delegate; consensus_pkh; _}, power, dal_power =
+            let* {
+                   consensus_key = {delegate; consensus_pkh; _};
+                   attesting_power;
+                   dal_power;
+                 } =
               find_in_slot_map slot slot_map
             in
             let* ctxt =
-              Consensus.record_attestation ctxt ~initial_slot:slot ~power
+              Consensus.record_attestation
+                ctxt
+                ~initial_slot:slot
+                ~power:attesting_power
             in
             let* ctxt = record_dal_content ctxt slot ~dal_power dal in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
-              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
+              ( ctxt,
+                (key, attesting_power) :: consensus_keys,
+                attesting_power + consensus_power ))
           (ctxt, [], 0)
           committee
       in
@@ -2453,19 +2464,25 @@ let record_preattestations_aggregate ctxt (mode : mode)
         let open Result_syntax in
         List.fold_left_e
           (fun (ctxt, consensus_keys, consensus_power) slot ->
-            let* {delegate; consensus_pkh; _}, power, _dal_power =
+            let* {
+                   consensus_key = {delegate; consensus_pkh; _};
+                   attesting_power;
+                   dal_power = _;
+                 } =
               find_in_slot_map slot slot_map
             in
             let* ctxt =
               Consensus.record_preattestation
                 ctxt
                 ~initial_slot:slot
-                ~power
+                ~power:attesting_power
                 round
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
-              (ctxt, (key, power) :: consensus_keys, power + consensus_power))
+              ( ctxt,
+                (key, attesting_power) :: consensus_keys,
+                attesting_power + consensus_power ))
           (ctxt, [], 0)
           committee
       in
@@ -2974,7 +2991,7 @@ let record_attesting_participation ctxt dal_attestation =
   | Some validators ->
       Slot.Map.fold_es
         (fun initial_slot
-             ((consensus_pk : Consensus_key.pk), power, dal_power)
+             ({consensus_key; attesting_power; dal_power} : Consensus_key.power)
              ctxt ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
@@ -2984,13 +3001,13 @@ let record_attesting_participation ctxt dal_attestation =
           let* ctxt =
             Delegate.record_attesting_participation
               ctxt
-              ~delegate:consensus_pk.delegate
+              ~delegate:consensus_key.delegate
               ~participation
-              ~attesting_power:power
+              ~attesting_power
           in
           Dal_apply.record_participation
             ctxt
-            consensus_pk.delegate
+            consensus_key.delegate
             initial_slot
             ~dal_power
             dal_attestation)

@@ -91,6 +91,12 @@ let consensus_pk_encoding =
        (opt "delegate" Signature.Public_key_hash.encoding)
        (opt "companion_pk" Bls.Public_key.encoding))
 
+type consensus_power = {
+  consensus_key : consensus_pk;
+  attesting_power : int;
+  dal_power : int;
+}
+
 module Raw_consensus = struct
   (** Consensus operations are indexed by their [initial slots]. Given
       a delegate, the [initial slot] is the lowest slot assigned to
@@ -99,21 +105,20 @@ module Raw_consensus = struct
   type t = {
     current_attestation_power : int;
         (** Number of attestation slots recorded for the current block. *)
-    allowed_attestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+    allowed_attestations : consensus_power Slot_repr.Map.t option;
         (** Attestations rights for the current block. Only an attestation for
             the lowest slot in the block can be recorded. The map associates to
             each initial slot the [pkh] associated to this slot with its
             consensus attestation power and DAL attestation power. This is
             [None] only in mempool mode. *)
-    allowed_preattestations : (consensus_pk * int * int) Slot_repr.Map.t option;
+    allowed_preattestations : consensus_power Slot_repr.Map.t option;
         (** Preattestations rights for the current block. Only a preattestation
             for the lowest slot in the block can be recorded. The map associates
             to each initial slot the [pkh] associated to this slot with its
             consensus attestation power and DAL attestation power. This is
             [None] only in mempool mode, or in application mode when there is no
             locked round (so the block cannot contain any preattestations). *)
-    allowed_consensus :
-      (consensus_pk * int * int) Slot_repr.Map.t Level_repr.Map.t option;
+    allowed_consensus : consensus_power Slot_repr.Map.t Level_repr.Map.t option;
         (** In mempool mode, hold delegates minimal slots for all allowed
             levels. [None] in all other modes. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
@@ -2144,14 +2149,13 @@ module type CONSENSUS = sig
 
   type round
 
-  type consensus_pk
+  type consensus_power
 
-  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_attestations : t -> consensus_power slot_map option
 
-  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_preattestations : t -> consensus_power slot_map option
 
-  val allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option
+  val allowed_consensus : t -> consensus_power slot_map level_map option
 
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
@@ -2161,9 +2165,9 @@ module type CONSENSUS = sig
 
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
-    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
+    allowed_attestations:consensus_power slot_map option ->
+    allowed_preattestations:consensus_power slot_map option ->
+    allowed_consensus:consensus_power slot_map level_map option ->
     t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
@@ -2196,7 +2200,7 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type consensus_pk := consensus_pk = struct
+     and type consensus_power := consensus_power = struct
   let[@inline] update_consensus_with ctxt f =
     {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
 
