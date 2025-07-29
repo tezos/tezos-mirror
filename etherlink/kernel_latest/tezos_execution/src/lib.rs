@@ -188,10 +188,7 @@ pub fn transfer_external<Host: Runtime>(
 
     let src_contract = Contract::Implicit(src.clone());
     let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
-
-    // Init MIR parser and context
     let parser = Parser::new();
-    let mut ctx = Ctx::default();
     let (entrypoint, value) = match parameter {
         Some(param) => (
             Some(param.entrypoint),
@@ -223,6 +220,7 @@ pub fn transfer_external<Host: Runtime>(
         Contract::Originated(_) => {
             let mut dest_contract =
                 TezlinkOriginatedAccount::from_contract(context, dest)?;
+            let mut ctx = Ctx::default();
             let receipt = match transfer_tez(
                 host,
                 context,
