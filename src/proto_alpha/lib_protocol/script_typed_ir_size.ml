@@ -580,6 +580,7 @@ and kinstr_size :
     | IImplicit_account (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IIs_implicit_account (loc, k) -> ret_succ_adding accu (base1 loc k)
     | IIndex_address (loc, k) -> ret_succ_adding accu (base1 loc k)
+    | IGet_address_index (loc, k) -> ret_succ_adding accu (base1 loc k)
     | ICreate_contract {loc; storage_type; code; k} ->
         ret_succ_adding
           (accu ++ ty_size storage_type ++ expr_size code)

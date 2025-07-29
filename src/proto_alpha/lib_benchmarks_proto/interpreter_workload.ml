@@ -1575,6 +1575,7 @@ let extract_ir_sized_step :
       Instructions.xor_bytes (Size.bytes x) (Size.bytes y)
   | INot_bytes (_, _), (x, _) -> Instructions.not_bytes (Size.bytes x)
   | IIndex_address (_, _), _ -> assert false
+  | IGet_address_index _, _ -> assert false
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =

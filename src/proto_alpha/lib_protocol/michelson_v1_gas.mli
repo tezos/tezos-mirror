@@ -359,6 +359,8 @@ module Cost_of : sig
 
     val index_address : Gas.cost
 
+    val get_address_index : Gas.cost
+
     val create_contract : Gas.cost
 
     val set_delegate : Gas.cost

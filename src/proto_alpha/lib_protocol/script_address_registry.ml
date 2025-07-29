@@ -15,3 +15,6 @@ let index ctxt contract =
     else [Alpha_context.Address_registry.{address = contract; counter = index}]
   in
   return (ctxt, index, diff)
+
+let get ctxt contract =
+  Alpha_context.Address_registry_storage.find ctxt contract

@@ -1388,6 +1388,34 @@ module Raw = struct
                 ks
                 res
                 stack
+          | IGet_address_index (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                let* ctxt, res =
+                  Script_address_registry.get ctxt address.destination
+                in
+                return (res, ctxt)
+              in
+              let*? res =
+                match res with
+                | None -> ok None
+                | Some res -> (
+                    match Script_int.is_nat (Script_int.of_zint res) with
+                    (* Note that this case is impossible, as the counter is handled
+                       by the protocol. If the counter is negative, this implies the
+                       protocol code is broken. *)
+                    | None ->
+                        Result_syntax.tzfail Address_registry_invalid_counter
+                    | Some n -> ok (Some n))
+              in
+              (step [@ocaml.tailcall])
+                (ctxt, sc, address_registry_diffs)
+                gas
+                k
+                ks
+                res
+                stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id
