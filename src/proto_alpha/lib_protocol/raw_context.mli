@@ -357,7 +357,7 @@ end
 
 type consensus_power = {
   consensus_key : consensus_pk;
-  attesting_power : int;
+  attestation_power : Attestation_power_repr.t;
   dal_power : int;
 }
 
@@ -399,9 +399,9 @@ module type CONSENSUS = sig
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
 
-  (** [attestation power ctx] returns the attestation power of the
+  (** [attestation power ctx] returns the attestation power and stake of the
      current block. *)
-  val current_attestation_power : t -> int
+  val current_attestation_power : t -> Attestation_power_repr.t
 
   (** Initializes the map of allowed attestations and preattestations, this
       function must be called only once and before applying any consensus
@@ -419,7 +419,8 @@ module type CONSENSUS = sig
       The attestation should be valid in the sense that
       [Int_map.find_opt initial_slot allowed_attestation ctx = Some
       (pkh, power)].  *)
-  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation :
+    t -> initial_slot:slot -> power:Attestation_power_repr.t -> t tzresult
 
   (** [record_preattestation ctx ~initial_slot ~power round
      payload_hash power] records a preattestation for a proposal at
@@ -429,7 +430,11 @@ module type CONSENSUS = sig
      [Int_map.find_opt initial_slot allowed_preattestation ctx = Some
      (pkh, power)].  *)
   val record_preattestation :
-    t -> initial_slot:slot -> power:int -> round -> t tzresult
+    t ->
+    initial_slot:slot ->
+    power:Attestation_power_repr.t ->
+    round ->
+    t tzresult
 
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
       forbidden delegates, which prevents this delegate from baking or
@@ -457,7 +462,7 @@ module type CONSENSUS = sig
 
   (** [locked_round_evidence ctx] returns the round of the recorded
      preattestations as well as their power. *)
-  val locked_round_evidence : t -> (round * int) option
+  val locked_round_evidence : t -> (round * Attestation_power_repr.t) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 

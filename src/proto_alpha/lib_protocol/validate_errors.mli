@@ -94,6 +94,7 @@ module Consensus : sig
         hash : Operation_hash.t;
       }
     | Empty_aggregation_committee
+    | All_bakers_attest_not_implemented
 end
 
 (** Errors that may arise while validating a voting operation. *)

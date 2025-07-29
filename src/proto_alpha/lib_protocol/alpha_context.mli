@@ -2257,7 +2257,11 @@ module Consensus_key : sig
     consensus_pkh : Signature.Public_key_hash.t;
   }
 
-  type power = {consensus_key : pk; attesting_power : int; dal_power : int}
+  type power = {
+    consensus_key : pk;
+    attestation_power : Attestation_power_repr.t;
+    dal_power : int;
+  }
 
   val encoding : t Data_encoding.t
 
@@ -2361,6 +2365,7 @@ module Delegate : sig
     delegate:public_key_hash ->
     participation:level_participation ->
     attesting_power:int ->
+    staking_weight:Int64.t ->
     context tzresult Lwt.t
 
   val record_dal_participation :

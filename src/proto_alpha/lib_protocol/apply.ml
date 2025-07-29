@@ -2319,17 +2319,17 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? {consensus_key; attesting_power = power; dal_power = _} =
+      let*? {consensus_key; attestation_power; dal_power = _} =
         find_in_slot_map content.slot (Consensus.allowed_preattestations ctxt)
       in
       let*? ctxt =
         Consensus.record_preattestation
           ctxt
           ~initial_slot:content.slot
-          ~power
+          ~power:attestation_power
           content.round
       in
-      return (ctxt, mk_preattestation_result consensus_key power)
+      return (ctxt, mk_preattestation_result consensus_key attestation_power)
   | Partial_construction _ ->
       (* In mempool mode, preattestations are allowed for various levels
          and rounds. We do not record preattestations because we could get
@@ -2342,7 +2342,11 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
         let level = Level.from_raw ctxt content.level in
         Stake_distribution.slot_owner ctxt level content.slot
       in
-      return (ctxt, mk_preattestation_result consensus_key 0 (* Fake power. *))
+      return
+        ( ctxt,
+          mk_preattestation_result
+            consensus_key
+            Attestation_power_repr.zero (* Fake power. *) )
 
 let record_dal_content ctxt slot ~dal_power = function
   | None -> Result.return ctxt
@@ -2370,17 +2374,17 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
   in
   match mode with
   | Application _ | Full_construction _ ->
-      let*? {consensus_key; attesting_power; dal_power} =
+      let*? {consensus_key; attestation_power; dal_power} =
         find_in_slot_map consensus.slot (Consensus.allowed_attestations ctxt)
       in
       let*? ctxt =
         Consensus.record_attestation
           ctxt
           ~initial_slot:consensus.slot
-          ~power:attesting_power
+          ~power:attestation_power
       in
       let*? ctxt = record_dal_content ctxt consensus.slot ~dal_power dal in
-      return (ctxt, mk_attestation_result consensus_key attesting_power)
+      return (ctxt, mk_attestation_result consensus_key attestation_power)
   | Partial_construction _ ->
       (* In mempool mode, attestations are allowed for various levels
          and rounds. We do not record attestations because we could get
@@ -2393,7 +2397,11 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
         let level = Level.from_raw ctxt consensus.level in
         Stake_distribution.slot_owner ctxt level consensus.slot
       in
-      return (ctxt, mk_attestation_result consensus_key 0 (* Fake power. *))
+      return
+        ( ctxt,
+          mk_attestation_result
+            consensus_key
+            Attestation_power_repr.zero (* Fake power. *) )
 
 let record_attestations_aggregate ctxt (mode : mode) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
@@ -2408,7 +2416,7 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
           (fun (ctxt, consensus_keys, consensus_power) (slot, dal) ->
             let* {
                    consensus_key = {delegate; consensus_pkh; _};
-                   attesting_power;
+                   attestation_power;
                    dal_power;
                  } =
               find_in_slot_map slot slot_map
@@ -2417,15 +2425,15 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
               Consensus.record_attestation
                 ctxt
                 ~initial_slot:slot
-                ~power:attesting_power
+                ~power:attestation_power
             in
             let* ctxt = record_dal_content ctxt slot ~dal_power dal in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
-                attesting_power + consensus_power ))
-          (ctxt, [], 0)
+                (key, attestation_power) :: consensus_keys,
+                Attestation_power_repr.add attestation_power consensus_power ))
+          (ctxt, [], Attestation_power_repr.zero)
           committee
       in
       let result =
@@ -2466,7 +2474,7 @@ let record_preattestations_aggregate ctxt (mode : mode)
           (fun (ctxt, consensus_keys, consensus_power) slot ->
             let* {
                    consensus_key = {delegate; consensus_pkh; _};
-                   attesting_power;
+                   attestation_power;
                    dal_power = _;
                  } =
               find_in_slot_map slot slot_map
@@ -2475,15 +2483,15 @@ let record_preattestations_aggregate ctxt (mode : mode)
               Consensus.record_preattestation
                 ctxt
                 ~initial_slot:slot
-                ~power:attesting_power
+                ~power:attestation_power
                 round
             in
             let key = ({delegate; consensus_pkh} : Consensus_key.t) in
             return
               ( ctxt,
-                (key, attesting_power) :: consensus_keys,
-                attesting_power + consensus_power ))
-          (ctxt, [], 0)
+                (key, attestation_power) :: consensus_keys,
+                Attestation_power_repr.add attestation_power consensus_power ))
+          (ctxt, [], Attestation_power_repr.zero)
           committee
       in
       let result =
@@ -2991,7 +2999,8 @@ let record_attesting_participation ctxt dal_attestation =
   | Some validators ->
       Slot.Map.fold_es
         (fun initial_slot
-             ({consensus_key; attesting_power; dal_power} : Consensus_key.power)
+             ({consensus_key; attestation_power; dal_power} :
+               Consensus_key.power)
              ctxt ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
@@ -3003,7 +3012,8 @@ let record_attesting_participation ctxt dal_attestation =
               ctxt
               ~delegate:consensus_key.delegate
               ~participation
-              ~attesting_power
+              ~attesting_power:attestation_power.slots
+              ~staking_weight:attestation_power.stake
           in
           Dal_apply.record_participation
             ctxt
@@ -3237,8 +3247,14 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt, reward_bonus =
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
+      let all_bakers_attest_enabled =
+        Stake_distribution.check_all_bakers_attest_at_level ctxt level
+      in
       let*? rewards_bonus =
-        Baking.bonus_baking_reward ctxt ~attestation_power
+        if all_bakers_attest_enabled then
+          error Validate_errors.Consensus.All_bakers_attest_not_implemented
+          (* TODO ABAAB *)
+        else Baking.bonus_baking_reward ctxt ~attestation_power
       in
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)

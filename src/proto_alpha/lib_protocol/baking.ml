@@ -60,6 +60,8 @@ let () =
 
 let bonus_baking_reward ctxt ~attestation_power =
   let open Result_syntax in
+  (* TODO ABAAB *)
+  let attestation_power = attestation_power.Attestation_power_repr.slots in
   let consensus_threshold_size = Constants.consensus_threshold_size ctxt in
   let* baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
@@ -148,16 +150,25 @@ let attesting_rights_by_first_slot ctxt level :
                   Some
                     {
                       consensus_key;
-                      attesting_power = 1;
+                      attestation_power =
+                        {
+                          Attestation_power_repr.slots = 1;
+                          (* TODO *) stake = 0L;
+                        };
                       dal_power = in_dal_committee;
                     }
               | Some
-                  ({consensus_key; attesting_power; dal_power} :
+                  ({consensus_key; attestation_power; dal_power} :
                     Consensus_key.power) ->
                   Some
                     {
                       consensus_key;
-                      attesting_power = attesting_power + 1;
+                      attestation_power =
+                        (* TODO *)
+                        {
+                          attestation_power with
+                          slots = attestation_power.slots + 1;
+                        };
                       dal_power = dal_power + in_dal_committee;
                     })
             slots_map

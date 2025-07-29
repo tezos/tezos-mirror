@@ -62,8 +62,10 @@ type level_participation = Participated | Didn't_participate
 (* Note that the participation for the last block of a cycle is
    recorded in the next cycle. *)
 let record_attesting_participation ctxt ~delegate ~participation
-    ~attesting_power =
+    ~attesting_power ~staking_weight =
   let open Lwt_result_syntax in
+  ignore staking_weight ;
+  (* TODO *)
   match participation with
   | Participated -> Stake_storage.set_active ctxt delegate
   | Didn't_participate -> (

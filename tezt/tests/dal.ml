@@ -9310,7 +9310,7 @@ let create_tz4_accounts_stake_and_wait ~funders ~client ~node nb_to_create =
        new_tz4_accounts
        companions
 
-let test_aggregation_required_to_pass_quorum _protocol dal_parameters _cryptobox
+let test_aggregation_required_to_pass_quorum protocol dal_parameters _cryptobox
     node client dal_node =
   let slot_index = 0 in
   let* () = Dal_RPC.(call dal_node (patch_profiles [Operator slot_index])) in
@@ -9354,7 +9354,10 @@ let test_aggregation_required_to_pass_quorum _protocol dal_parameters _cryptobox
   let aggregated_attestation_consensus_power =
     JSON.(
       aggregated_attestation |-> "contents" |> as_list |> List.hd |-> "metadata"
-      |-> "total_consensus_power" |> as_int)
+      |-> "total_consensus_power"
+      |> fun x ->
+      if Protocol.number protocol >= 024 then x |-> "slots" |> as_int
+      else x |> as_int)
   in
   let* constants =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()

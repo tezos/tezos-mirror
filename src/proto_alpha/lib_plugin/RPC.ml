@@ -3907,7 +3907,7 @@ module Attestation_rights = struct
                     companion_pk = _;
                     companion_pkh = _;
                   };
-                attesting_power;
+                attestation_power;
                 dal_power = _;
               } :
                Consensus_key.power)
@@ -3916,7 +3916,7 @@ module Attestation_rights = struct
             delegate;
             consensus_key;
             first_slot;
-            attestation_power = attesting_power;
+            attestation_power = attestation_power.slots;
           }
           :: acc)
         rights

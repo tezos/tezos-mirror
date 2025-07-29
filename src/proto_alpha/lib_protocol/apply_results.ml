@@ -888,26 +888,26 @@ type 'kind contents_result =
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : int;
+      consensus_power : Attestation_power_repr.t;
     }
       -> Kind.preattestation contents_result
   | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : int;
+      consensus_power : Attestation_power_repr.t;
     }
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * int) list;
-      total_consensus_power : int;
+      committee : (Consensus_key.t * Attestation_power_repr.t) list;
+      total_consensus_power : Attestation_power_repr.t;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * int) list;
-      total_consensus_power : int;
+      committee : (Consensus_key.t * Attestation_power_repr.t) list;
+      total_consensus_power : Attestation_power_repr.t;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
@@ -1035,7 +1035,7 @@ module Encoding = struct
     obj4
       (dft "balance_updates" Receipt.balance_updates_encoding [])
       (req "delegate" Signature.Public_key_hash.encoding)
-      (req "consensus_power" int31)
+      (req "consensus_power" Attestation_power_repr.encoding)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
   let consensus_aggregate_result_encoding =
@@ -1047,8 +1047,8 @@ module Encoding = struct
          (list
             (merge_objs
                Consensus_key.encoding
-               (obj1 (req "consensus_power" int31)))))
-      (req "total_consensus_power" int31)
+               (obj1 (req "consensus_power" Attestation_power_repr.encoding)))))
+      (req "total_consensus_power" Attestation_power_repr.encoding)
 
   type case =
     | Case : {
