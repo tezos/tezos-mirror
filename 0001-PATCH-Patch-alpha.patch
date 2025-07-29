@@ -1,7 +1,7 @@
-From fb0ceb2ba897d078b50db262c9201f90785846ca Mon Sep 17 00:00:00 2001
+From 4d0c02fa252a44102ba4a57785aa3ae03867be5c Mon Sep 17 00:00:00 2001
 From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Tue, 29 Jul 2025 10:15:01 +0200
-Subject: [PATCH] Patch Alpha
+Date: Tue, 29 Jul 2025 10:05:07 +0200
+Subject: [PATCH 1/1] [PATCH] Patch alpha
 
 ---
  src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
@@ -436,7 +436,7 @@ index a6427f2920..794e352b9f 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 6ff16578bf..68e00a4c35 100644
+index 71278484f2..79492ea048 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
 @@ -224,11 +224,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -459,8 +459,8 @@ index 6ff16578bf..68e00a4c35 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         let* ctxt = Storage.Address_registry.Next.init ctxt in
-         let* ctxt, cpt = Storage.Address_registry.Next.incr ctxt in
+         let* ctxt = Storage.Contract.Address_registry.Next.init ctxt in
+         let* ctxt, cpt = Storage.Contract.Address_registry.Next.incr ctxt in
 @@ -241,11 +249,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
      | S023 ->
@@ -481,8 +481,8 @@ index 6ff16578bf..68e00a4c35 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         let* ctxt = Storage.Address_registry.Next.init ctxt in
-         let* ctxt, cpt = Storage.Address_registry.Next.incr ctxt in
+         let* ctxt = Storage.Contract.Address_registry.Next.init ctxt in
+         let* ctxt, cpt = Storage.Contract.Address_registry.Next.incr ctxt in
 @@ -257,10 +273,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
@@ -559,7 +559,7 @@ index 70a79eb8f4..9724bc4246 100644
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index 99843f8ea5..fa02437f56 100644
+index 9450ce87cd..a500612a3f 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
 @@ -1841,7 +1841,7 @@ type execution_result = {
@@ -595,7 +595,7 @@ index 99843f8ea5..fa02437f56 100644
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index 351c5aad13..682793a050 100644
+index 706dbb8bfe..d310cf88f6 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
 @@ -5238,17 +5238,21 @@ let parse_script :
