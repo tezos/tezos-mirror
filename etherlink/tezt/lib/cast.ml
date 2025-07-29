@@ -131,3 +131,15 @@ let calldata ?(args = []) signature =
 let call ?(args = []) signature ~endpoint ~address =
   spawn_command_and_read_string
     (("call" :: address :: signature :: args) @ ["--rpc-url"; endpoint])
+
+let wallet_sign_auth ~authorization ~private_key ~endpoint =
+  spawn_command_and_read_string
+    [
+      "wallet";
+      "sign-auth";
+      authorization;
+      "--private-key";
+      private_key;
+      "--rpc-url";
+      endpoint;
+    ]

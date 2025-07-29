@@ -98,3 +98,9 @@ val call :
   endpoint:string ->
   address:string ->
   string Lwt.t
+
+(** [wallet_sign_auth ~authorization ~private_key ~endpoint] signs with [private_key]
+    a delegation authorization to address [authorization]. The [endpoint] will be used
+    to retrieve the chain id and the nonce of the signer. *)
+val wallet_sign_auth :
+  authorization:string -> private_key:string -> endpoint:string -> string Lwt.t
