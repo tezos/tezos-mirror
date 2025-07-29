@@ -903,7 +903,7 @@ opam:release:
   retry: 0
 
 publish:release-page:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
   - gcp
@@ -911,16 +911,22 @@ publish:release-page:
   - when: manual
     allow_failure: true
   needs:
+  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   dependencies:
+  - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - sudo apk add aws-cli pandoc
+  - eval $(opam env)
   script:
   - ./scripts/releases/publish_release_page.sh
+  after_script:
+  - cp /tmp/release_page*/index.md ./index.md
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
