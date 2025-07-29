@@ -236,7 +236,7 @@ documentation:publish:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:ci:amd64
   - documentation:build_all

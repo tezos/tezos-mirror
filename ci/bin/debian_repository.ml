@@ -84,6 +84,7 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~name
     ~id_tokens:Tezos_ci.id_tokens
     ~image
+    ~tag:Gcp_not_interruptible
     ?retry
     ~before_script:
       (before_script

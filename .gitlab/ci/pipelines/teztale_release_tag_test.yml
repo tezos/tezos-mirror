@@ -72,7 +72,7 @@ teztale.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - teztale.build:static-x86_64
   - teztale.build:static-arm64
@@ -173,7 +173,7 @@ teztale.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true

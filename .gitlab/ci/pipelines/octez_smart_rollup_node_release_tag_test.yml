@@ -206,7 +206,7 @@ rollup-node.docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - rollup-node.docker:amd64
   - rollup-node.docker:arm64
@@ -228,7 +228,7 @@ rollup-node.gitlab:octez-smart-rollup-node-release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - rollup-node.build:static-x86_64-binaries
   - rollup-node.build:static-arm64-binaries

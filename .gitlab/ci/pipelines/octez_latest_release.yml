@@ -24,7 +24,7 @@ docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   dependencies: []
   timeout: 60 minutes
   before_script:

@@ -26,6 +26,7 @@ let job_gitlab_release =
     ~name:"gitlab:release"
     ["./teztale/scripts/releases/create_gitlab_release.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~tag:Gcp_not_interruptible
 
 let job_release_page ~test () =
   job
@@ -69,6 +70,7 @@ let job_release_page ~test () =
          ])
     ["./teztale/scripts/releases/publish_release_page.sh"]
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+    ~tag:Gcp_not_interruptible
 
 let jobs ~test ?(dry_run = false) () =
   (* If the release is a dry run, we do not publish a gitlab release page. *)

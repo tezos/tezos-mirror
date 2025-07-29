@@ -256,7 +256,7 @@ docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -278,7 +278,7 @@ gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - docker:merge_manifests
   - oc.build:static-x86_64-linux-binaries
@@ -414,7 +414,7 @@ apt_repo_debian:
   image: debian:bookworm
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -513,7 +513,7 @@ apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-ubuntu
   - oc.build-data_packages
@@ -687,7 +687,7 @@ rpm_repo_rockylinux:
   image: rockylinux:9.3
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
@@ -864,7 +864,7 @@ rpm_repo_fedora:
   image: fedora:39
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-fedora
   - oc.build-fedora-data
@@ -915,7 +915,7 @@ grafazos.gitlab_release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - grafazos.build
   dependencies:
@@ -932,7 +932,7 @@ grafazos.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true
@@ -961,7 +961,7 @@ teztale.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - teztale.build:static-x86_64
   - teztale.build:static-arm64
@@ -1062,7 +1062,7 @@ teztale.publish:release-page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true

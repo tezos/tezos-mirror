@@ -186,7 +186,7 @@ apt_repo_debian:
   image: debian:bookworm
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -285,7 +285,7 @@ apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-ubuntu
   - oc.build-data_packages

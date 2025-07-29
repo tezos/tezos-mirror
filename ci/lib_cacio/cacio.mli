@@ -168,6 +168,7 @@ module type COMPONENT_API = sig
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?tag:Tezos_ci.tag ->
     string ->
     string list ->
     job

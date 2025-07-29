@@ -46,6 +46,7 @@ type job = {
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
+  tag : Tezos_ci.tag option;
 }
 
 type trigger = Auto | Manual
@@ -305,6 +306,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     variables;
                     script;
                     artifacts;
+                    tag;
                   };
                 trigger;
                 only_if_changed;
@@ -362,6 +364,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ?retry
                 ?variables
                 ?artifacts
+                ?tag
                 script
         in
         result := UID_map.add uid result_node !result ;
@@ -409,6 +412,7 @@ module type COMPONENT_API = sig
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
+    ?tag:Tezos_ci.tag ->
     string ->
     string list ->
     job
@@ -439,7 +443,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let only_if_changed = Tezos_ci.Changeset.make Component.paths
 
   let job ~__POS__:source_location ~stage ~description ~image ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts name script =
+      ?(needs_legacy = []) ?variables ?artifacts ?tag name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -465,6 +469,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       variables;
       script;
       artifacts;
+      tag;
     }
 
   let register_before_merging_jobs jobs =

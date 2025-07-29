@@ -235,7 +235,7 @@ docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.docker:amd64
   - oc.docker:arm64
@@ -257,7 +257,7 @@ gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - docker:merge_manifests
   - oc.build:static-x86_64-linux-binaries
@@ -393,7 +393,7 @@ apt_repo_debian:
   image: debian:bookworm
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-debian
   - oc.build-data_packages
@@ -492,7 +492,7 @@ apt_repo_ubuntu:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-ubuntu
   - oc.build-data_packages
@@ -666,7 +666,7 @@ rpm_repo_rockylinux:
   image: rockylinux:9.3
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
@@ -843,7 +843,7 @@ rpm_repo_fedora:
   image: fedora:39
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-fedora
   - oc.build-fedora-data
@@ -870,7 +870,7 @@ opam:release:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -885,7 +885,7 @@ publish:release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true

@@ -174,7 +174,7 @@ rpm_repo_rockylinux:
   image: rockylinux:9.3
   stage: publish
   tags:
-  - gcp
+  - gcp_not_interruptible
   needs:
   - oc.build-rockylinux
   - oc.build-rockylinux-data
