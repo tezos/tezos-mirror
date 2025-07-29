@@ -542,35 +542,61 @@ module Dal_node = struct
           ~l1_node_endpoint
           ()
       in
-      let name = Dal_node.name node in
+      let node_name = Dal_node.name node in
       let executable = Dal_node.path node in
       let metric_name = "service_manager_process_alive" in
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let on_alive_callback ~alive =
         Cloud.push_metric
           cloud
-          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~help:(Format.asprintf "'Process %s is alive'" node_name)
           ~typ:`Gauge
           ~name:metric_name
           ~labels:
             [
               ("agent", Agent.name agent);
-              ("name", name);
+              ("name", node_name);
               ("executable", executable);
               ("kind", "alive");
             ]
           (if alive then 1.0 else 0.0)
       in
+      Cloud.service_register
+        ~name:node_name
+        ~executable
+        ~on_alive_callback
+        agent ;
       let alert =
         Alerts.service_manager_process_down
           ~agent:(Agent.name agent)
           executable
           receiver
           metric_name
-          name
+          node_name
       in
       let* () = Cloud.add_alert cloud ~alert in
-      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
+      let* () =
+        (* Prometheus source *)
+        let app_name =
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
+        in
+        let target =
+          Cloud.{agent; port = Dal_node.metrics_port node; app_name}
+        in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:(Dal_node.name node))
+            [target]
+        in
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+          receiver
+      in
       Lwt.return node
 
     let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs
