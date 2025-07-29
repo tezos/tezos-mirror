@@ -110,7 +110,6 @@ fn reveal<Host: Runtime>(
         consumed_gas: 0_u64.into(),
     }))
 }
-
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
     src_contract: &Contract,
@@ -169,10 +168,24 @@ pub fn transfer<Host: Runtime>(
     let src_contract = Contract::Implicit(src.clone());
     let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
 
+    // Init MIR parser and context
+    let parser = Parser::default();
+    let mut ctx = Ctx::default();
+    let (entrypoint, value) = match parameter {
+        Some(param) => (
+            Some(param.entrypoint),
+            match Micheline::decode_raw(&parser.arena, &param.value) {
+                Ok(value) => value,
+                Err(err) => return Ok(Err(TransferError::from(err).into())),
+            },
+        ),
+        None => (None, Micheline::from(())),
+    };
+
     // Delegate to appropriate handler
     let success = match dest {
         Contract::Implicit(dest_key_hash) => {
-            if parameter.is_some() {
+            if Micheline::from(()) != value {
                 return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
             }
             let allocated = TezlinkImplicitAccount::allocate(host, context, dest)?;
@@ -223,20 +236,6 @@ pub fn transfer<Host: Runtime>(
 
             let code = dest_contract.code(host)?;
             let storage = dest_contract.storage(host)?;
-
-            // Init MIR parser and context
-            let parser = Parser::default();
-            let mut ctx = Ctx::default();
-            let (entrypoint, value) = match parameter {
-                Some(param) => (
-                    Some(param.entrypoint),
-                    match Micheline::decode_raw(&parser.arena, &param.value) {
-                        Ok(value) => value,
-                        Err(err) => return Ok(Err(TransferError::from(err).into())),
-                    },
-                ),
-                None => (None, Micheline::from(())),
-            };
             let new_storage = execute_smart_contract(
                 code, storage, entrypoint, value, &parser, &mut ctx,
             );
