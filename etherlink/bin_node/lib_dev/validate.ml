@@ -8,7 +8,7 @@
 
 open Ethereum_types
 
-type error += Gas_limit_too_low of string
+type error += Gas_limit_too_low of string | Prague_not_enabled
 
 let () =
   register_error_kind
@@ -24,7 +24,17 @@ let () =
         gas_limit)
     Data_encoding.(obj1 (req "gas_limit" string))
     (function Gas_limit_too_low gas_limit -> Some gas_limit | _ -> None)
-    (fun gas_limit -> Gas_limit_too_low gas_limit)
+    (fun gas_limit -> Gas_limit_too_low gas_limit) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_prague_not_enabled"
+    ~title:"Prague is not enabled"
+    ~description:"Prague is not enabled yet on the kernel"
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Prague is not enabled yet on the kernel")
+    Data_encoding.empty
+    (function Prague_not_enabled -> Some () | _ -> None)
+    (fun () -> Prague_not_enabled)
 
 let ( let** ) v f =
   let open Lwt_result_syntax in
@@ -252,8 +262,17 @@ let valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx =
 let is_tx_valid ?max_number_of_chunks
     ((module Backend_rpc : Services_backend_sig.S) as backend_rpc) ~mode tx_raw
     =
+  let open Lwt_result_syntax in
   let hash = Ethereum_types.hash_raw_tx tx_raw in
+  let* state = Backend_rpc.Reader.get_state () in
+  let* storage_version =
+    Durable_storage.storage_version (Backend_rpc.Reader.read state)
+  in
   let**? tx = Transaction.decode tx_raw in
+  let* () =
+    when_ (tx.transaction_type = Transaction.Eip7702 && storage_version < 37)
+    @@ fun () -> fail [Prague_not_enabled]
+  in
   valid_transaction_object ?max_number_of_chunks ~backend_rpc ~hash ~mode tx
 
 type validation_config = {

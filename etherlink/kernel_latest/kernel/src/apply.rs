@@ -306,7 +306,9 @@ fn config_to_revm_specid(config: &Config) -> revm::primitives::hardfork::SpecId 
     // This is a hack-ish way to derive the spec id from Sputnik's
     // configuration. The last case is the very first EVM version
     // that we supported (:= Shanghai).
-    if config.selfdestruct_deprecated {
+    if config.is_prague {
+        revm::primitives::hardfork::SpecId::PRAGUE
+    } else if config.selfdestruct_deprecated {
         revm::primitives::hardfork::SpecId::CANCUN
     } else {
         revm::primitives::hardfork::SpecId::SHANGHAI

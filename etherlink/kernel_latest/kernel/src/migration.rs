@@ -396,6 +396,10 @@ fn migrate_to<Host: Runtime>(
                 Ok(MigrationStatus::None)
             }
         }
+        StorageVersion::V37 => {
+            store_evm_version(host, &EVMVersion::Prague)?;
+            Ok(MigrationStatus::Done)
+        }
     }
 }
 

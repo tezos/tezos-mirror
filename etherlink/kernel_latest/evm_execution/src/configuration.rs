@@ -10,8 +10,9 @@ use crate::read_evm_version;
 #[derive(Default)]
 pub enum EVMVersion {
     Shanghai,
-    #[default]
     Cancun,
+    #[default]
+    Prague,
 }
 
 impl EVMVersion {
@@ -19,6 +20,7 @@ impl EVMVersion {
         match x {
             0 => Some(EVMVersion::Shanghai),
             1 => Some(EVMVersion::Cancun),
+            2 => Some(EVMVersion::Prague),
             _ => None,
         }
     }
@@ -27,6 +29,7 @@ impl EVMVersion {
         match self {
             EVMVersion::Shanghai => 0,
             EVMVersion::Cancun => 1,
+            EVMVersion::Prague => 2,
         }
     }
 
@@ -42,6 +45,7 @@ impl EVMVersion {
         let config = match self {
             EVMVersion::Shanghai => Config::shanghai(),
             EVMVersion::Cancun => Config::cancun(),
+            EVMVersion::Prague => Config::prague(),
         };
 
         // The current implementation doesn't support EVM's call stack limit of 1024.
