@@ -336,7 +336,7 @@ module Node = struct
           ~metrics_port
           arguments
       in
-      let name = Node.name node in
+      let node_name = Node.name node in
       let executable = Node.path node in
       (* FIXME: The following metric and alert definition should belong to the
          service_manager module. Unfortunately, for the metrics to be registered,
@@ -353,25 +353,56 @@ module Node = struct
           executable
           receiver
           metric_name
-          name
+          node_name
       in
       let* () = Cloud.add_alert cloud ~alert in
       let on_alive_callback ~alive =
         Cloud.push_metric
           cloud
-          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~help:(Format.asprintf "'Process %s is alive'" node_name)
           ~typ:`Gauge
           ~name:metric_name
           ~labels:
             [
               ("agent", Agent.name agent);
-              ("name", name);
+              ("name", node_name);
               ("executable", executable);
               ("kind", "alive");
             ]
           (if alive then 1.0 else 0.0)
       in
-      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
+      let* () =
+        (* Prometheus *)
+        let app_name =
+          Format.asprintf
+            "%s:%s:%s"
+            (Agent.name agent)
+            (Option.value ~default:path name)
+            path
+        in
+        let target = Cloud.{agent; port = Node.metrics_port node; app_name} in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:(Node.name node))
+            [target]
+        in
+        (* Prometheus process-exporter *)
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+            (* The label 'groupname' is filled by prometheus-process-exporter from the names
+               given in command line. The alerts must match the same groupname *)
+          receiver
+      in
+      Cloud.service_register
+        ~name:node_name
+        ~executable
+        ~on_alive_callback
+        agent ;
       Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
