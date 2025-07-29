@@ -1320,4 +1320,59 @@ mod tests {
             "Counter should not have been incremented"
         );
     }
+
+    #[test]
+    fn apply_transfer_with_argument_to_implicit_fails() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        let dest = bootstrap2();
+
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Implicit(dest.pkh),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: parser.parse("0").unwrap().encode(),
+            }),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(ApplyOperationError::Transfer(
+                    TransferError::NonSmartContractExecutionCall,
+                ))]
+                .into(),
+            ),
+            internal_operation_results: vec![],
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
 }
