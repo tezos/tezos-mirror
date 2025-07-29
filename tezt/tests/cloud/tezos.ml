@@ -139,6 +139,149 @@ module Alerts = struct
       ~severity:Alert.Critical
       ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
       ()
+
+  let process_exporter_high_cpu ~agent_name ~appname ~groupname receiver =
+    Alert.make
+      ~name:"ProcessExporterProcessHighCPUUsage"
+      ~description:
+        "'The executable has been using more than 80% CPU for 5 minutes'"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high cpu usage of process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~severity:Warning
+      ~expr:
+        (Format.asprintf
+           {|'rate(namedprocess_namegroup_cpu_seconds_total{app="%s", groupname="%s"}[5m]) > 0.8'|}
+           appname
+           groupname)
+      ~route:(Alert.route receiver)
+      ()
+
+  (* expected_mem is the expected *resident* memory usage in GiB, 2GiB if not specified *)
+  let process_exporter_high_mem ~agent_name ~appname ?expected_mem ~groupname
+      receiver =
+    let expected_mem =
+      match expected_mem with
+      | None -> 2 * 1024 * 1024 * 1024 (* 2G by default *)
+      | Some sz -> sz * 1024 * 1024 * 1024
+    in
+    Alert.make
+      ~name:"ProcessExporterProcessHighMemory"
+      ~description:"'The executable is using a large amount of memory'"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high memory usage of process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~severity:Warning
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_memory_bytes{app="%s",groupname="%s", memtype="resident"} > %d'|}
+           appname
+           groupname
+           expected_mem)
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_increase_mem ~agent_name ~appname ~groupname receiver =
+    Alert.make
+      ~name:"ProcessExporterProcessMemoryIncreaseFromOneDayAvg"
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_memory_bytes{app="%s",groupname="%s"} > avg_over_time(namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"}[1d] offset 1d) * 1.5'|}
+           appname
+           groupname
+           appname
+           groupname)
+      ~for_:"30m"
+      ~severity:Warning
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] increase of %s memory usage'"
+           agent_name
+           groupname)
+      ~description:
+        {|'The process memory usage is more than 50% higher than the average from the previous 24h'|}
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_increase_mem_threshold ~agent_name ~appname ~groupname
+      receiver =
+    Alert.make
+      ~name:"ProcessExporterMemoryIncreaseThreshold"
+      ~expr:
+        (Format.asprintf
+           {|(
+            namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"} /
+            avg_over_time(namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"}[30m] offset 1h)
+            - 1
+          ) * 100 > 10
+          and
+          time() - process_start_time_seconds{app="%s", groupname="%s"} > 4 * 3600|}
+           appname
+           groupname
+           appname
+           groupname
+           appname
+           groupname)
+      ~for_:"15m"
+      ~severity:Warning
+      ~summary:
+        (Format.asprintf
+           {|'[%s.process_exporter]: %s memory usage increased compared to reference'|}
+           agent_name
+           groupname)
+      ~description:
+        (Format.asprintf
+           "The %s memory usage has increased compared to the reference period"
+           groupname)
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_high_open_files ~agent_name ~appname ~groupname receiver
+      =
+    Alert.make
+      ~name:"ProcessExporterProcessHighOpenFiles"
+      ~description:
+        "The executable is using more than 70% of its file descriptor quota"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high number of open files for process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~route:(Alert.route receiver)
+      ~severity:Alert.Warning
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_open_filedesc{app="%s", groupname="%s"} / process_max_fds{app="%s"} > 0.7'|}
+           appname
+           groupname
+           appname)
+      ()
+
+  let add_process_exporter_alerts ~cloud ~agent_name ~appname ~groupname
+      receiver =
+    Log.report
+      "Process_monitoring: adding alerts for %s on agent %s"
+      groupname
+      agent_name ;
+    Lwt_list.iter_p
+      (fun alert ->
+        let alert = alert ~agent_name ~appname ~groupname receiver in
+        let* () = Cloud.add_alert cloud ~alert in
+        Lwt.return_unit)
+      [
+        process_exporter_high_cpu;
+        process_exporter_high_mem ?expected_mem:None;
+        process_exporter_increase_mem;
+        process_exporter_increase_mem_threshold;
+        process_exporter_high_open_files;
+      ]
 end
 
 module Node = struct
