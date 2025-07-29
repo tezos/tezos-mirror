@@ -200,7 +200,7 @@ fn encode_micheline(mich: &Micheline, out: &mut Vec<u8>) {
     }
 }
 
-impl<'a> Micheline<'a> {
+impl Micheline<'_> {
     /// Serialize a value.
     pub fn encode(&self) -> Vec<u8> {
         self.encode_starting_with(&[])
@@ -220,7 +220,7 @@ impl<'a> Micheline<'a> {
     }
 }
 
-impl<'a> BinWriter for Micheline<'a> {
+impl BinWriter for Micheline<'_> {
     fn bin_write(&self, out: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
         encode_micheline(self, out);
         Ok(())

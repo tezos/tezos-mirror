@@ -88,6 +88,7 @@ pub(crate) use irrefutable_match;
 mod tests {
     #[derive(Debug)]
     enum Tuple {
+        #[allow(dead_code)]
         Tuple1(&'static str),
         Tuple3(&'static str, &'static str, &'static str),
     }

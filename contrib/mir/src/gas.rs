@@ -501,7 +501,7 @@ pub mod interpret_cost {
         (25 + (sz >> 1)).as_gas_cost()
     }
 
-    pub fn not_bytes(b: &Vec<u8>) -> Result<u32, OutOfGas> {
+    pub fn not_bytes(b: &[u8]) -> Result<u32, OutOfGas> {
         let sz = Checked::from(b.len());
         (30 + (sz >> 1)).as_gas_cost()
     }
@@ -512,7 +512,7 @@ pub mod interpret_cost {
         Checked::from(w1 + 130).as_gas_cost()
     }
 
-    pub fn lsl_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsl_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_2 > 0 {
@@ -528,7 +528,7 @@ pub mod interpret_cost {
         Checked::from((sz >> 1) + 45).as_gas_cost()
     }
 
-    pub fn lsr_bytes(i1: &Vec<u8>, i2: &usize) -> Result<u32, OutOfGas> {
+    pub fn lsr_bytes(i1: &[u8], i2: &usize) -> Result<u32, OutOfGas> {
         let size_1 = i1.len();
         let size_2 = *i2;
         let w1 = if size_1 >= (size_2 >> 3) {

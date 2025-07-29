@@ -567,6 +567,7 @@ fn parse_ty_with_entrypoints<'a>(
     Ok(parsed_ty)
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_parameter_ty_with_entrypoints<'a>(
     ctx: &mut Ctx,
     parameter_ty: &Micheline<'a>,
@@ -1640,7 +1641,7 @@ pub(crate) fn typecheck_instruction<'a>(
             let kty = parse_ty(ctx, kty)?;
             kty.ensure_prop(&mut ctx.gas, TypeProperty::Comparable)?;
             let vty = parse_ty(ctx, vty)?;
-            stack.push(T::new_map(kty.clone(), vty.clone()));
+            stack.push(T::new_map(kty.clone(), vty));
             I::EmptyMap
         }
         (App(EMPTY_MAP, expect_args!(2), _), _) => unexpected_micheline!(),
@@ -2441,7 +2442,7 @@ pub(crate) fn typecheck_value<'a>(
                 TV::Timestamp(int_value.into())
             } else {
                 // If integer parsing fails, try to parse as RFC3339 datetime
-                let dt = DateTime::parse_from_rfc3339(&n);
+                let dt = DateTime::parse_from_rfc3339(n);
                 match dt {
                     Ok(dt) => TV::Timestamp(dt.timestamp().into()),
                     Err(_) => return Err(invalid_value_for_type!()),
@@ -6111,7 +6112,7 @@ mod typecheck_tests {
                 &Type::new_big_map(Type::Int, Type::Int)
             ),
             Ok(TypedValue::BigMap(BigMap {
-                id: Some(id0.clone()),
+                id: Some(id0),
                 overlay: BTreeMap::from([(TypedValue::int(7), None)]),
                 key_type: Type::Int,
                 value_type: Type::Int

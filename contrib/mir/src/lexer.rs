@@ -298,7 +298,7 @@ fn lex_macro(lex: &mut Lexer) -> Result<Macro, PrimError> {
     let mut inner = Macro::lexer(slice);
     let next = inner.next().ok_or_else(|| PrimError(slice.to_string()))?;
     // check if lexed token is at EOF
-    if matches!(inner.next(), Some(_)) {
+    if inner.next().is_some() {
         return Err(PrimError(slice.to_string()));
     }
     next.map_err(|_| PrimError(slice.to_string()))

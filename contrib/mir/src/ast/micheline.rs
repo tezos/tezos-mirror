@@ -58,7 +58,7 @@ impl<'a> Micheline<'a> {
         // doesn't allocate in the arena, the call is safe.
         // See Note: alloc_extend
         #[allow(clippy::disallowed_methods)]
-        let buf = arena.alloc_extend(std::iter::repeat(Micheline::Seq(&[])).take(iter.len()));
+        let buf = arena.alloc_extend(std::iter::repeat_n(Micheline::Seq(&[]), iter.len()));
         let mut actual_len: usize = 0;
         for (dest, item) in buf.iter_mut().zip(&mut iter) {
             *dest = item;
@@ -109,49 +109,49 @@ impl<'a> Micheline<'a> {
     }
 }
 
-impl<'a> From<i128> for Micheline<'a> {
+impl From<i128> for Micheline<'_> {
     fn from(x: i128) -> Self {
         Micheline::Int(x.into())
     }
 }
 
-impl<'a> From<BigInt> for Micheline<'a> {
+impl From<BigInt> for Micheline<'_> {
     fn from(x: BigInt) -> Self {
         Micheline::Int(x)
     }
 }
 
-impl<'a> From<BigUint> for Micheline<'a> {
+impl From<BigUint> for Micheline<'_> {
     fn from(x: BigUint) -> Self {
         Micheline::Int(x.into())
     }
 }
 
-impl<'a> From<String> for Micheline<'a> {
+impl From<String> for Micheline<'_> {
     fn from(x: String) -> Self {
         Micheline::String(x)
     }
 }
 
-impl<'a> From<Vec<u8>> for Micheline<'a> {
+impl From<Vec<u8>> for Micheline<'_> {
     fn from(x: Vec<u8>) -> Self {
         Micheline::Bytes(x)
     }
 }
 
-impl<'a> From<()> for Micheline<'a> {
+impl From<()> for Micheline<'_> {
     fn from(_: ()) -> Self {
         Micheline::App(Prim::Unit, &[], NO_ANNS)
     }
 }
 
-impl<'a> From<bool> for Micheline<'a> {
+impl From<bool> for Micheline<'_> {
     fn from(x: bool) -> Self {
         Micheline::prim0(if x { Prim::True } else { Prim::False })
     }
 }
 
-impl<'a> From<&str> for Micheline<'a> {
+impl From<&str> for Micheline<'_> {
     fn from(s: &str) -> Self {
         Micheline::from(s.to_owned())
     }
@@ -442,6 +442,7 @@ pub(crate) use {
 };
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_helpers {
 
     /// Helper to reduce syntactic noise when constructing Micheline applications in tests.

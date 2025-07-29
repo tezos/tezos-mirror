@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 
-use crate::ast::Type;
 use crate::ast::annotations::FieldAnnotation;
+use crate::ast::Type;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{map, map_res, verify};

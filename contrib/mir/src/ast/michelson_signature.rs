@@ -384,6 +384,7 @@ impl Signature {
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod tests {
     use super::*;
     use crate::ast::{byte_repr_trait::ByteReprTrait, michelson_key::Key};

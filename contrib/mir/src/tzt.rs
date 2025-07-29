@@ -119,7 +119,7 @@ fn populate_ctx_with_known_contracts(
 ) {
     // If other_contracts is not provided, then initialize with empty map,
     // or else initialize with the provided list of known contracts.
-    let mut known_contracts = m_other_contracts.unwrap_or(HashMap::new());
+    let mut known_contracts = m_other_contracts.unwrap_or_default();
 
     // If self address is provided, include that to the list of known contracts as well.
     // Use a default type of Unit, if parameter type is not provided.
@@ -209,7 +209,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 Code(ib) => set_tzt_field("code", &mut m_code, ib)?,
                 Input(stk) => {
                     // Save input to treat it last, after we have self_param and other_contracts
-                    if input_stk_backup != None {
+                    if input_stk_backup.is_some() {
                         return Err("Duplicate field 'input' in test".into());
                     }
                     input_stk_backup = Some(stk);
@@ -308,18 +308,22 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                         _ => return Err("Big map elements must be a sequence".into()),
                     };
                     let descr: BTreeMap<TypedValue<'a>, TypedValue<'a>> = elts
-                        .into_iter()
+                        .iter()
                         .map(|elt| {
                             match elt {
                                 // If Micheline::App stores its arguments in a Vec,
                                 // pattern match with a condition to ensure length is 2
-                                Micheline::App(Prim::Elt, ref kv, _) if kv.len() == 2 => {
+                                Micheline::App(Prim::Elt, kv, _) if kv.len() == 2 => {
                                     let (k_raw, v_raw) = (&kv[0], &kv[1]);
-                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty).unwrap();
-                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty).unwrap();
+                                    let k = typecheck_value(k_raw, &mut Ctx::default(), &key_ty)
+                                        .unwrap();
+                                    let v = typecheck_value(v_raw, &mut Ctx::default(), &val_ty)
+                                        .unwrap();
                                     Ok((k, v))
                                 }
-                                _ => { return Err("Each big map element must be of the form `Elt <key> <value>`."); }
+                                _ => Err(
+                                    "Each big map element must be of the form `Elt <key> <value>`.",
+                                ),
                             }
                         })
                         .collect::<Result<BTreeMap<_, _>, _>>()?;

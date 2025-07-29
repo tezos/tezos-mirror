@@ -215,7 +215,7 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             }
         }
 
-        impl<'a> ExactSizeIterator for LinearizePairIter<'a> {}
+        impl ExactSizeIterator for LinearizePairIter<'_> {}
 
         match self {
             Nat => Micheline::prim0(Prim::nat),
@@ -359,8 +359,8 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
         };
         match self {
             TV::Int(i) => V::Int(i),
-            TV::Nat(u) => V::Int(u.try_into().unwrap()),
-            TV::Mutez(u) => V::Int(u.try_into().unwrap()),
+            TV::Nat(u) => V::Int(u.into()),
+            TV::Mutez(u) => V::Int(u.into()),
             TV::Bool(true) => V::prim0(Prim::True),
             TV::Bool(false) => V::prim0(Prim::False),
             TV::String(s) => V::String(s),
@@ -679,6 +679,7 @@ pub struct ContractScript<'a> {
 }
 
 #[cfg(test)]
+#[allow(missing_docs)]
 pub mod test_strategies {
     use proptest::prelude::*;
 
