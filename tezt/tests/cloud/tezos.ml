@@ -292,13 +292,9 @@ module Node = struct
         ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
         ?name ?net_addr cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
-        Cloud.register_binary
-          cloud
-          ~agents:[agent]
-          ~group
-          ~name:(Filename.basename path)
-          ()
+        Cloud.register_binary cloud ~agents:[agent] ~group ~name:binary_name ()
       in
       let* () =
         Cloud.register_binary
@@ -479,6 +475,7 @@ module Dal_node = struct
         ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
         ?disable_shard_validation ?ignore_pkhs ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
         Cloud.register_binary
           cloud
@@ -643,13 +640,9 @@ module Sc_rollup_node = struct
         ?default_operator ?operators ?dal_node ~base_dir cloud agent mode
         l1_node =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
-        Cloud.register_binary
-          cloud
-          ~agents:[agent]
-          ~group
-          ~name:(Filename.basename path)
-          ()
+        Cloud.register_binary cloud ~agents:[agent] ~group ~name:binary_name ()
       in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
