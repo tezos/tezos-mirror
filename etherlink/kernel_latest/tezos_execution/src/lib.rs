@@ -848,6 +848,11 @@ mod tests {
         });
 
         assert_eq!(receipt, expected_receipt);
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
     }
 
     // Test an invalid operation where the provided public key is inconsistent for the source
@@ -1073,6 +1078,13 @@ mod tests {
         // Verify that source and destination balances changed
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+
+        // Verify that the source's counter has been incremented
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Bootstrap 1 successfully transfers 30 mutez to itself
@@ -1302,5 +1314,10 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
     }
 }
