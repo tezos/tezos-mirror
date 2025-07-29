@@ -4331,6 +4331,12 @@ and parse_instr :
       let instr = {apply = (fun k -> IIndex_address (loc, k))} in
       let stack = Item_t (Nat_t, rest) in
       typed ctxt loc instr stack
+  | Prim (loc, I_GET_ADDRESS_INDEX, [], annot), Item_t (Address_t, rest) ->
+      let*? () = check_var_annot loc annot in
+      let instr = {apply = (fun k -> IGet_address_index (loc, k))} in
+      let*? ty = option_t loc Nat_t in
+      let stack = Item_t (ty, rest) in
+      typed ctxt loc instr stack
   | ( Prim (loc, (I_CREATE_CONTRACT as prim), [(Seq _ as code)], annot),
       Item_t
         (Option_t (Key_hash_t, _, _), Item_t (Mutez_t, Item_t (ginit, rest))) )

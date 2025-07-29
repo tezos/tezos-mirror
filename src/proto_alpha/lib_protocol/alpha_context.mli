@@ -693,6 +693,7 @@ module Script : sig
     | I_BYTES
     | I_NAT
     | I_INDEX_ADDRESS
+    | I_GET_ADDRESS_INDEX
     | T_bool
     | T_contract
     | T_int

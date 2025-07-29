@@ -29,3 +29,5 @@ let index ctxt contract =
   match existing_counter with
   | Some c -> return (ctxt, c, [])
   | None -> set_counter ctxt contract
+
+let get ctxt contract = Alpha_context.Address_registry.find ctxt contract
