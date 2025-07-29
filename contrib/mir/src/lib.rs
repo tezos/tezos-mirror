@@ -852,7 +852,7 @@ mod tests {
 
     #[test]
     fn implicit_account() {
-        let key_hash = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
         run_e2e_test(
             &Arena::new(),
             "IMPLICIT_ACCOUNT",
@@ -868,9 +868,9 @@ mod tests {
 
     #[test]
     fn voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
-        let key_hash_3 = KeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_3 = PublicKeyHash::try_from("tz3hpojUX9dYL5KLusv42SCBiggB77a2QLGx").unwrap();
         run_e2e_test(
             &Arena::new(),
             "VOTING_POWER",
@@ -905,8 +905,8 @@ mod tests {
 
     #[test]
     fn total_voting_power() {
-        let key_hash_1 = KeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
-        let key_hash_2 = KeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
+        let key_hash_1 = PublicKeyHash::try_from("tz3d9na7gPpt5jxdjGBFzoGQigcStHB8w1uq").unwrap();
+        let key_hash_2 = PublicKeyHash::try_from("tz4T8ydHwYeoLHmLNcECYVq3WkMaeVhZ81h7").unwrap();
         run_e2e_test(
             &Arena::new(),
             "TOTAL_VOTING_POWER",

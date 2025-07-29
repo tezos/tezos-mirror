@@ -17,6 +17,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
+use tezos_data_encoding::nom::NomReader;
 
 pub mod type_props;
 
@@ -2425,13 +2426,21 @@ pub(crate) fn typecheck_value<'a>(
         (T::KeyHash, V::String(str)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_READABLE)?;
             TV::KeyHash(
-                KeyHash::from_base58_check(str)
-                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e))?,
+                PublicKeyHash::from_b58check(str)
+                    .map_err(|e| TcError::ByteReprError(T::KeyHash, e.into()))?,
             )
         }
         (T::KeyHash, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            TV::KeyHash(KeyHash::from_bytes(bs).map_err(|e| TcError::ByteReprError(T::KeyHash, e))?)
+            match PublicKeyHash::nom_read(bs) {
+                Ok((remaining, hash)) if remaining.is_empty() => TV::KeyHash(hash),
+                _ => {
+                    return Err(TcError::ByteReprError(
+                        T::KeyHash,
+                        ByteReprError::WrongFormat("public key hash, optimized".into()),
+                    ))
+                }
+            }
         }
         (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
         (T::Timestamp, V::String(n)) => {
@@ -6378,13 +6387,16 @@ mod typecheck_tests {
             ))
         );
         assert_matches!(
-        typecheck_instruction(
-            &parse("PUSH address \"tz9foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
-            &mut Ctx::default(),
-            &mut tc_stk![],
+            typecheck_instruction(
+                &parse("PUSH address \"tz9foobarfoobarfoobarfoobarfoobarfoo\"").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
             ),
-            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(s))) if s == "tz9"
-            );
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
+        );
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address \"tz\"").unwrap(),
@@ -6416,13 +6428,16 @@ mod typecheck_tests {
             Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
             );
         assert_matches!(
-        typecheck_instruction(
-            &parse("PUSH address 0x00fffe0000000000000000000000000000000000000000").unwrap(),
-            &mut Ctx::default(),
-            &mut tc_stk![],
+            typecheck_instruction(
+                &parse("PUSH address 0x00fffe0000000000000000000000000000000000000000").unwrap(),
+                &mut Ctx::default(),
+                &mut tc_stk![],
             ),
-            Err(TcError::ByteReprError(Type::Address, ByteReprError::UnknownPrefix(p))) if p == "0xff"
-            );
+            Err(TcError::ByteReprError(
+                Type::Address,
+                ByteReprError::WrongFormat(_)
+            ))
+        );
         assert_matches!(
             typecheck_instruction(
                 &parse("PUSH address 0x00").unwrap(),

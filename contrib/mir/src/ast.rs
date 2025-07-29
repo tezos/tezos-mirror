@@ -15,7 +15,6 @@ mod comparable;
 pub mod micheline;
 pub mod michelson_address;
 pub mod michelson_key;
-pub mod michelson_key_hash;
 pub mod michelson_lambda;
 pub mod michelson_list;
 pub mod michelson_operation;
@@ -32,7 +31,8 @@ use std::{
 };
 /// Reexported from [tezos_crypto_rs::hash]. Typechecked values of the Michelson
 /// type `chain_id`.
-pub use tezos_crypto_rs::hash::ChainId;
+pub use tezos_crypto_rs::{hash::ChainId, public_key_hash::PublicKeyHash};
+pub use tezos_data_encoding::enc::BinWriter;
 use typed_arena::Arena;
 
 use crate::lexer::Prim;
@@ -46,7 +46,6 @@ pub use byte_repr_trait::{ByteReprError, ByteReprTrait};
 pub use micheline::IntoMicheline;
 pub use michelson_address::*;
 pub use michelson_key::Key;
-pub use michelson_key_hash::KeyHash;
 pub use michelson_lambda::{Closure, Lambda};
 pub use michelson_list::MichelsonList;
 pub use michelson_operation::{
@@ -335,7 +334,7 @@ pub enum TypedValue<'a> {
     Key(Key),
     Signature(Signature),
     Lambda(Closure<'a>),
-    KeyHash(KeyHash),
+    KeyHash(PublicKeyHash),
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
     Timestamp(BigInt),
@@ -402,7 +401,7 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Key(k) => V::Bytes(k.to_bytes_vec()),
             TV::Signature(s) => V::Bytes(s.to_bytes_vec()),
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
-            TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
+            TV::KeyHash(s) => V::Bytes(s.to_bytes().unwrap()),
             TV::Timestamp(s) => V::Int(s),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
@@ -894,7 +893,7 @@ pub mod test_strategies {
                 Just(V::Signature( Signature::from_base58_check("BLsigAmLKnuw12tethjMmotFPaQ6u4XCKrVk6c15dkRXKkjDDjHywbhS3nd4rBT31yrCvvQrS2HntWhDRu7sX8Vvek53zBUwQHqfcHRiVKVj1ehq8CBYs1Z7XW2rkL2XkVNHua4cnvxY7F").unwrap())).boxed(),
             T::KeyHash =>
                 Just(V::KeyHash(
-                    KeyHash::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
+                    PublicKeyHash::from_b58check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
                 )).boxed(),
             #[cfg(feature = "bls")]
             T::Bls12381Fr =>

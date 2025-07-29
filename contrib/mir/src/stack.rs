@@ -447,7 +447,7 @@ mod tests {
     fn drain_top_0() {
         let mut stk = stk![1, 2, 3, 4];
         let drained = stk.drain_top(0);
-        assert_eq!(drained.collect::<Vec<_>>(), vec![]);
+        assert!(drained.collect::<Vec<_>>().is_empty());
         assert_eq!(stk, stk![1, 2, 3, 4]);
     }
 

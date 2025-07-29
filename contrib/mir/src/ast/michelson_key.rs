@@ -11,13 +11,11 @@
 use tezos_crypto_rs::hash::PublicKeyBls;
 use tezos_crypto_rs::{
     hash::{HashTrait, PublicKeyEd25519, PublicKeyP256, PublicKeySecp256k1},
+    public_key_hash::PublicKeyHash,
     PublicKeyWithHash,
 };
 
-use super::{
-    byte_repr_trait::{ByteReprError, ByteReprTrait},
-    KeyHash,
-};
+use super::byte_repr_trait::{ByteReprError, ByteReprTrait};
 
 macro_rules! key_type_and_impls {
     ($($(#[$meta:meta])* $con:ident($ty:ident)),* $(,)*) => {
@@ -111,14 +109,14 @@ impl Key {
     pub const MIN_BYTE_SIZE: usize = 32;
 
     /// Construct a [KeyHash] from the key. Essentially hashes the key.
-    pub fn hash(&self) -> KeyHash {
+    pub fn hash(&self) -> PublicKeyHash {
         use Key::*;
         match self {
-            Ed25519(hash) => KeyHash::Tz1(hash.pk_hash()),
-            Secp256k1(hash) => KeyHash::Tz2(hash.pk_hash()),
-            P256(hash) => KeyHash::Tz3(hash.pk_hash()),
+            Ed25519(hash) => PublicKeyHash::Ed25519(hash.pk_hash()),
+            Secp256k1(hash) => PublicKeyHash::Secp256k1(hash.pk_hash()),
+            P256(hash) => PublicKeyHash::P256(hash.pk_hash()),
             #[cfg(feature = "bls")]
-            Bls(hash) => KeyHash::Tz4(hash.pk_hash()),
+            Bls(hash) => PublicKeyHash::Bls(hash.pk_hash()),
         }
     }
 }
@@ -205,7 +203,7 @@ mod tests {
         for (b58, _, hash) in FIXTURES {
             assert_eq!(
                 Key::from_base58_check(b58).unwrap().hash(),
-                KeyHash::from_base58_check(hash).unwrap(),
+                PublicKeyHash::from_b58check(hash).unwrap(),
             );
         }
     }
