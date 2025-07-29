@@ -334,9 +334,6 @@ let init_public_network cloud (configuration : configuration)
             in
             Lwt.return_some dal_node
         in
-        let* () =
-          add_prometheus_source cloud agent "bootstrap" ?dal_node ~node
-        in
         let client = Client.create ~endpoint:(Node node) () in
         let node_rpc_endpoint =
           Endpoint.make
@@ -748,14 +745,6 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ~ppx_profiling:configuration.ppx_profiling
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_bootstrap_node
-  in
-  let* () =
-    add_prometheus_source
-      ~node:bootstrap_node
-      ?dal_node:dal_bootstrap_node
-      cloud
-      agent
-      "bootstrap"
   in
   let node_rpc_endpoint =
     Endpoint.make
