@@ -441,6 +441,7 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         make
           ~initial_points:get_initial_points
           ~events_logging:(Logging.event ~verbose:config.verbose)
+          ~batching_interval:Constants.batch_time_interval
           ~self
           rng
           limits
@@ -531,11 +532,17 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
         Node_context.warn_if_attesters_not_delegates ctxt profile
     | _ -> return_unit
   in
+  Gossipsub.Worker.Validate_message_hook.set_batch
+    (Message_validation.gossipsub_batch_validation
+       ctxt
+       cryptobox
+       ~head_level
+       proto_parameters) ;
   Gossipsub.Worker.Validate_message_hook.set
     (Message_validation.gossipsub_app_messages_validation
        ctxt
        cryptobox
-       head_level
+       ~head_level
        proto_parameters) ;
   let is_prover_profile = Profile_manager.is_prover_profile profile_ctxt in
   (* Initialize amplificator if in prover profile.
