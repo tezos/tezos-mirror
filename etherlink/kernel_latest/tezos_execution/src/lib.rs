@@ -175,7 +175,7 @@ pub fn transfer_external<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: Option<Parameter>,
-) -> ExecutionResult<TransferTarget> {
+) -> ExecutionResult<TransferSuccess> {
     log!(
         host,
         Debug,
@@ -207,7 +207,7 @@ pub fn transfer_external<Host: Runtime>(
         Contract::Implicit(dest_key_hash) => {
             let mut dest_account =
                 TezlinkImplicitAccount::from_public_key_hash(context, dest_key_hash)?;
-            let receipt = match transfer_tez(
+            transfer_tez(
                 host,
                 context,
                 &src_contract,
@@ -216,13 +216,7 @@ pub fn transfer_external<Host: Runtime>(
                 dest,
                 &mut dest_account,
                 &value,
-            )? {
-                Ok(receipt) => receipt,
-                Err(err) => {
-                    return Ok(Err(err));
-                }
-            };
-            Ok(Ok(TransferTarget::ToContrat(receipt)))
+            )
         }
 
         Contract::Originated(_) => {
@@ -252,10 +246,10 @@ pub fn transfer_external<Host: Runtime>(
             match new_storage {
                 Ok(new_storage) => {
                     let _ = dest_contract.set_storage(host, &new_storage);
-                    Ok(Ok(TransferTarget::ToContrat(TransferSuccess {
+                    Ok(Ok(TransferSuccess {
                         storage: Some(new_storage),
                         ..receipt
-                    })))
+                    }))
                 }
 
                 Err(err) => Ok(Err(err.into())),
@@ -452,8 +446,10 @@ pub fn apply_operation<Host: Runtime>(
                 &destination,
                 parameters,
             )?;
-            let manager_result =
-                produce_operation_result(vec![src_delta, block_fees], transfer_result);
+            let manager_result = produce_operation_result(
+                vec![src_delta, block_fees],
+                transfer_result.map(TransferTarget::ToContrat),
+            );
             OperationResultSum::Transfer(manager_result)
         }
     };
