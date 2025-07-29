@@ -374,11 +374,7 @@ module Node = struct
       let* () =
         (* Prometheus *)
         let app_name =
-          Format.asprintf
-            "%s:%s:%s"
-            (Agent.name agent)
-            (Option.value ~default:path name)
-            path
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
         in
         let target = Cloud.{agent; port = Node.metrics_port node; app_name} in
         let* () =
@@ -705,6 +701,28 @@ module Sc_rollup_node = struct
       let rpc_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
       let metrics_addr = "0.0.0.0" in
+      (* Prometheus *)
+      let* () =
+        let app_name =
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
+        in
+        let target = Cloud.{agent; port = metrics_port; app_name} in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:path)
+            [target]
+        in
+        (* Prometheus process exporter *)
+        let receiver = service_manager_receiver (Cloud.notifier cloud) in
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+          receiver
+      in
       create
         ?name
         ?default_operator
