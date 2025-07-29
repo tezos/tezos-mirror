@@ -218,7 +218,7 @@ pub fn transfer_external<Host: Runtime>(
         }
 
         Contract::Originated(_) => {
-            let mut dest_contract =
+            let mut dest_account =
                 TezlinkOriginatedAccount::from_contract(context, dest)?;
             let mut ctx = Ctx::default();
             let receipt = match transfer_tez(
@@ -228,7 +228,7 @@ pub fn transfer_external<Host: Runtime>(
                 &mut src_account,
                 amount,
                 dest,
-                &mut dest_contract,
+                &mut dest_account,
                 &value,
             )? {
                 Ok(receipt) => receipt,
@@ -237,14 +237,14 @@ pub fn transfer_external<Host: Runtime>(
                 }
             };
 
-            let code = dest_contract.code(host)?;
-            let storage = dest_contract.storage(host)?;
+            let code = dest_account.code(host)?;
+            let storage = dest_account.storage(host)?;
             let new_storage = execute_smart_contract(
                 code, storage, entrypoint, value, &parser, &mut ctx,
             );
             match new_storage {
                 Ok(new_storage) => {
-                    let _ = dest_contract.set_storage(host, &new_storage);
+                    let _ = dest_account.set_storage(host, &new_storage);
                     Ok(Ok(TransferSuccess {
                         storage: Some(new_storage),
                         ..receipt
