@@ -110,19 +110,24 @@ fn reveal<Host: Runtime>(
         consumed_gas: 0_u64.into(),
     }))
 }
+#[allow(clippy::too_many_arguments)]
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
+    context: &context::Context,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
     param: &Micheline,
-) -> ExecutionResult<Vec<BalanceUpdate>> {
+) -> ExecutionResult<TransferSuccess> {
+    let mut allocated_destination_contract = false;
     if let Contract::Implicit(_) = dest_contract {
         if &Micheline::from(()) != param {
             return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
         }
+        allocated_destination_contract =
+            TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
     }
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
@@ -130,7 +135,6 @@ pub fn transfer_tez<Host: Runtime>(
 
     // Check source balance
     let current_src_balance = src_account.balance(host)?.0;
-
     let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
         None => {
             log!(host, Debug, "Balance is too low");
@@ -150,7 +154,17 @@ pub fn transfer_tez<Host: Runtime>(
         dest_account,
         &amount.0,
     )?;
-    Ok(Ok(vec![src_update, dest_update]))
+    Ok(Ok(TransferSuccess {
+        storage: None,
+        lazy_storage_diff: None,
+        balance_updates: vec![src_update, dest_update],
+        ticket_receipt: vec![],
+        originated_contracts: vec![],
+        consumed_gas: 0_u64.into(),
+        storage_size: 0_u64.into(),
+        paid_storage_size_diff: 0_u64.into(),
+        allocated_destination_contract,
+    }))
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts.
@@ -191,11 +205,11 @@ pub fn transfer<Host: Runtime>(
     // Delegate to appropriate handler
     let success = match dest {
         Contract::Implicit(dest_key_hash) => {
-            let allocated = TezlinkImplicitAccount::allocate(host, context, dest)?;
             let mut dest_account =
                 TezlinkImplicitAccount::from_public_key_hash(context, dest_key_hash)?;
-            let balance_updates = match transfer_tez(
+            let receipt = match transfer_tez(
                 host,
+                context,
                 &src_contract,
                 &mut src_account,
                 amount,
@@ -203,29 +217,20 @@ pub fn transfer<Host: Runtime>(
                 &mut dest_account,
                 &value,
             )? {
-                Ok(balance_updates) => balance_updates,
+                Ok(receipt) => receipt,
                 Err(err) => {
                     return Ok(Err(err));
                 }
             };
-            Ok(Ok(TransferTarget::ToContrat(TransferSuccess {
-                storage: None,
-                lazy_storage_diff: None,
-                balance_updates,
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
-                consumed_gas: 0_u64.into(),
-                storage_size: 0_u64.into(),
-                paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: allocated,
-            })))
+            Ok(Ok(TransferTarget::ToContrat(receipt)))
         }
 
         Contract::Originated(_) => {
             let mut dest_contract =
                 TezlinkOriginatedAccount::from_contract(context, dest)?;
-            let balance_updates = match transfer_tez(
+            let receipt = match transfer_tez(
                 host,
+                context,
                 &src_contract,
                 &mut src_account,
                 amount,
@@ -233,7 +238,7 @@ pub fn transfer<Host: Runtime>(
                 &mut dest_contract,
                 &value,
             )? {
-                Ok(balance_updates) => balance_updates,
+                Ok(receipt) => receipt,
                 Err(err) => {
                     return Ok(Err(err));
                 }
@@ -249,14 +254,7 @@ pub fn transfer<Host: Runtime>(
                     let _ = dest_contract.set_storage(host, &new_storage);
                     Ok(Ok(TransferTarget::ToContrat(TransferSuccess {
                         storage: Some(new_storage),
-                        lazy_storage_diff: None,
-                        balance_updates,
-                        ticket_receipt: vec![],
-                        originated_contracts: vec![],
-                        consumed_gas: 0_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
-                        allocated_destination_contract: false,
+                        ..receipt
                     })))
                 }
 
