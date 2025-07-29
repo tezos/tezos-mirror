@@ -669,6 +669,9 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
   alpha__smart_rollup__outbox__message_tag:
     0: atomic_transaction_batch
     1: atomic_transaction_batch_typed

@@ -606,6 +606,9 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
   alpha__smart_rollup__inbox__message_tag:
     0: internal
     1: external
