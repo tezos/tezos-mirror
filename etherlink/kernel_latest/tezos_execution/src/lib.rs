@@ -117,7 +117,13 @@ pub fn transfer_tez<Host: Runtime>(
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
+    param: &Micheline,
 ) -> ExecutionResult<Vec<BalanceUpdate>> {
+    if let Contract::Implicit(_) = dest_contract {
+        if &Micheline::from(()) != param {
+            return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
+        }
+    }
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
             .map_err(ApplyKernelError::BigIntError)?;
@@ -185,9 +191,6 @@ pub fn transfer<Host: Runtime>(
     // Delegate to appropriate handler
     let success = match dest {
         Contract::Implicit(dest_key_hash) => {
-            if Micheline::from(()) != value {
-                return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
-            }
             let allocated = TezlinkImplicitAccount::allocate(host, context, dest)?;
             let mut dest_account =
                 TezlinkImplicitAccount::from_public_key_hash(context, dest_key_hash)?;
@@ -198,6 +201,7 @@ pub fn transfer<Host: Runtime>(
                 amount,
                 dest,
                 &mut dest_account,
+                &value,
             )? {
                 Ok(balance_updates) => balance_updates,
                 Err(err) => {
@@ -227,6 +231,7 @@ pub fn transfer<Host: Runtime>(
                 amount,
                 dest,
                 &mut dest_contract,
+                &value,
             )? {
                 Ok(balance_updates) => balance_updates,
                 Err(err) => {
