@@ -45,6 +45,9 @@ pub enum RevealError {
     PreviouslyRevealedKey(PublicKey),
     InconsistentHash(PublicKeyHash),
     InconsistentPublicKey(PublicKeyHash),
+    UnretrievableManager,
+    FailedToIncrementCounter,
+    FailedToWriteManager,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]

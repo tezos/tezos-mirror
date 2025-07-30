@@ -82,38 +82,42 @@ fn reveal<Host: Runtime>(
     provided_hash: &PublicKeyHash,
     account: &mut TezlinkImplicitAccount,
     public_key: &PublicKey,
-) -> ExecutionResult<RevealSuccess> {
+) -> Result<RevealSuccess, RevealError> {
     log!(host, Debug, "Applying a reveal operation");
-    let manager = account.manager(host)?;
+    let manager = account
+        .manager(host)
+        .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
-        Manager::Revealed(pk) => {
-            return Ok(Err(RevealError::PreviouslyRevealedKey(pk).into()))
-        }
+        Manager::Revealed(pk) => return Err(RevealError::PreviouslyRevealedKey(pk)),
         Manager::NotRevealed(pkh) => pkh,
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
     if &expected_hash != provided_hash {
-        return Ok(Err(RevealError::InconsistentHash(expected_hash).into()));
+        return Err(RevealError::InconsistentHash(expected_hash));
     }
 
     // Check the public key
     let pkh_from_pk = public_key.pk_hash();
     if expected_hash != pkh_from_pk {
-        return Ok(Err(RevealError::InconsistentPublicKey(expected_hash).into()));
+        return Err(RevealError::InconsistentPublicKey(expected_hash));
     }
 
     // Set the public key as the manager
-    account.set_manager_public_key(host, public_key)?;
+    account
+        .set_manager_public_key(host, public_key)
+        .map_err(|_| RevealError::FailedToWriteManager)?;
     // TODO : Counter Increment should be done after successful validation (see issue  #8031)
-    account.increment_counter(host)?;
+    account
+        .increment_counter(host)
+        .map_err(|_| RevealError::FailedToIncrementCounter)?;
 
     log!(host, Debug, "Reveal operation succeed");
 
-    Ok(Ok(RevealSuccess {
+    Ok(RevealSuccess {
         consumed_gas: 0_u64.into(),
-    }))
+    })
 }
 
 fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
@@ -550,9 +554,11 @@ fn apply_operation<Host: Runtime>(
     } = validation_info;
     match operation.operation {
         OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
-            let reveal_result = reveal(host, &operation.source, &mut source_account, pk)?;
-            let manager_result =
-                produce_operation_result(validation_balance_updates, reveal_result);
+            let reveal_result = reveal(host, &operation.source, &mut source_account, pk);
+            let manager_result = produce_operation_result(
+                validation_balance_updates,
+                reveal_result.map_err(|e| e.into()),
+            );
             Ok(OperationResultSum::Reveal(manager_result))
         }
         OperationContent::Transfer(TransferContent {
