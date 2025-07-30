@@ -45,7 +45,6 @@ let test_describe_endpoint =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
-      ~enable_revm:false
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())
@@ -465,7 +464,6 @@ let test_tezlink_constants =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:true
-      ~enable_revm:false
       ~l2_chains
       ~rpc_server:Evm_node.Resto
       ~spawn_rpc:(Port.fresh ())

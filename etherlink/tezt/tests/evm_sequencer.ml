@@ -744,7 +744,6 @@ let test_patch_state =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
-    ~enable_revm:false
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
@@ -1317,7 +1316,6 @@ let test_send_transaction_to_delayed_inbox =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
-    ~use_revm:activate_revm_registration
   @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol
     ->
   let* raw_transfer =
@@ -1475,7 +1473,6 @@ let test_delayed_transfer_is_included =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -1540,7 +1537,6 @@ let test_largest_delayed_transfer_is_included =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -1941,7 +1937,6 @@ let test_invalid_delayed_transaction =
     ~enable_fa_bridge:false
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2074,7 +2069,6 @@ let test_fa_withdrawal_is_included =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2226,7 +2220,6 @@ let test_fa_reentrant_deposit_reverts =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2783,7 +2776,6 @@ let test_get_balance_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {
            sequencer;
            sc_rollup_node;
@@ -2984,7 +2976,6 @@ let test_extended_block_param =
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
@@ -3188,7 +3179,6 @@ let test_sequencer_is_reimbursed =
     ~sequencer_pool_address
     ~tags:["evm"; "sequencer"; "transaction"; "reimbursed"]
     ~title:"Sequencer is reimbursed for DA fees"
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer = sequencer_node; _} _protocol ->
   let* balance =
     Eth_cli.balance
@@ -7597,8 +7587,7 @@ let test_trace_transaction =
   in
   register_all
     ~__FILE__
-    ~kernels:Kernel.[Latest]
-      (* Re-enable on [Mainnet] when the next upgrade happens. *)
+    ~kernels:Kernel.[Mainnet]
     ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
     ~time_between_blocks:Nothing
@@ -7676,7 +7665,7 @@ let test_trace_transaction =
 let test_trace_transaction_on_invalid_transaction =
   register_all
     ~__FILE__
-    ~kernels:Kernel.all
+    ~kernels:[Kernel.Mainnet]
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
     ~time_between_blocks:Nothing
@@ -7764,8 +7753,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 let test_trace_transaction_call =
   register_all
     ~__FILE__
-    ~kernels:Kernel.[Latest; Mainnet]
-      (* Re-enable on [Mainnet] when the next upgrade happens. *)
+    ~kernels:Kernel.[Mainnet]
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
@@ -7867,7 +7855,6 @@ let test_trace_transaction_call_trace =
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
@@ -7976,7 +7963,6 @@ let test_trace_transaction_calltracer_failed_create =
        creation reverts but is included"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8032,7 +8018,6 @@ let test_trace_delegate_call =
     ~title:"calltracer correctly display delegate call infos"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8113,7 +8098,6 @@ let test_trace_transaction_calltracer_all_types =
       "debug_traceTransaction with calltracer can produce all the call types"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8204,7 +8188,6 @@ let test_trace_transaction_call_tracer_with_logs =
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8265,7 +8248,6 @@ let test_trace_transaction_call_trace_certain_depth =
     ~title:"debug_traceTransaction with calltracer to see difficult depth"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8345,7 +8327,6 @@ let test_trace_transaction_call_revert =
        handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8401,8 +8382,7 @@ let test_trace_transaction_call_trace_revert =
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
-  @@ fun {sequencer; evm_version; enable_revm; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_tracer_revert = Solidity_contracts.call_tracer_revert evm_version in
@@ -8478,13 +8458,9 @@ let test_trace_transaction_call_trace_revert =
   (* Skip item 1 in call_list, it's a create *)
   let call = List.nth call_list 2 in
   let call = List.hd JSON.(call |-> "calls" |> as_list) in
-  if enable_revm then
-    check_error_and_revert_reason ~error:"ReentrancySentryOOG" call
-  else check_error_and_revert_reason ~error:"OutOfGas" call ;
+  check_error_and_revert_reason ~error:"ReentrancySentryOOG" call ;
   let call = List.nth call_list 3 in
-  if enable_revm then
-    check_error_and_revert_reason ~error:"InvalidFEOpcode" call
-  else check_error_and_revert_reason ~error:"InvalidCode(Opcode(254))" call ;
+  check_error_and_revert_reason ~error:"InvalidFEOpcode" call ;
   let call = List.nth call_list 4 in
   check_error_and_revert_reason
     ~error:"execution reverted"
@@ -8503,7 +8479,6 @@ let test_trace_transaction_calltracer_multiple_txs =
       "debug_traceTransaction handles blocks containing several transactions"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
@@ -8578,7 +8553,6 @@ let test_trace_transaction_calltracer_on_simple_transfer =
     ~title:"debug_traceTransaction can trace a simple transfer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8611,7 +8585,6 @@ let test_trace_transaction_calltracer_precompiles =
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8724,7 +8697,6 @@ let test_trace_transaction_calltracer_deposit =
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "deposit"]
     ~title:"debug_traceTransaction with calltracer can trace deposits"
-    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -8799,7 +8771,6 @@ let test_trace_transaction_calltracer_on_nested_delegatecalls =
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let source_private_key, address_eoa =
@@ -9052,7 +9023,7 @@ let test_fast_withdraw_feature_flag_deactivated =
     ~commitment_period
     ~challenge_window
     ~enable_fast_withdrawal:false
-    ~kernels:[Kernel.Latest]
+    ~kernels:[Kernel.Mainnet]
   @@ fun {client; sc_rollup_address; l1_contracts; sc_rollup_node; sequencer; _}
              _protocol ->
   let admin = Constant.bootstrap5 in
@@ -9302,7 +9273,6 @@ let test_fast_withdrawal_l2_caller =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
     ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {sequencer; evm_version; _} _protocol ->
   let fast_withdrawal_contract_address =
@@ -9377,7 +9347,6 @@ let test_deposit_and_fast_withdraw =
     ~challenge_window
     ~enable_fast_withdrawal:true
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
     ~kernels:[Kernel.Mainnet; Kernel.Latest]
   @@ fun {
            sequencer;
@@ -9386,9 +9355,11 @@ let test_deposit_and_fast_withdraw =
            l1_contracts;
            proxy;
            sc_rollup_node;
+           kernel;
            _;
          }
              _protocol ->
+  let enable_revm = Kernel.supports_revm kernel in
   let {exchanger; _} = l1_contracts in
   let* fast_withdrawal_contract_address =
     Client.originate_contract
@@ -9510,6 +9481,7 @@ let test_deposit_and_fast_withdraw =
       ~service_provider_pkh
       ~fast_withdrawal_contract_address
       ~service_provider_proxy
+      ~enable_revm
       client
       receipt
   in
@@ -9561,7 +9533,6 @@ let test_deposit_and_fa_fast_withdraw =
     ~additional_uses:[Constant.octez_codec]
     ~enable_fa_bridge:true
     ~enable_fast_fa_withdrawal:true
-    ~use_revm:activate_revm_registration
   @@ fun {
            sequencer;
            sc_rollup_address;
@@ -9569,10 +9540,11 @@ let test_deposit_and_fa_fast_withdraw =
            l1_contracts;
            proxy;
            sc_rollup_node;
-           enable_revm;
+           kernel;
            _;
          }
              _protocol ->
+  let enable_revm = Kernel.supports_revm kernel in
   let* fast_withdrawal_contract_address =
     Client.originate_contract
       ~alias:"fast_withdrawal_contract_address"
@@ -9761,7 +9733,7 @@ let test_deposit_and_fa_fast_withdraw =
 let test_trace_call =
   register_all
     ~__FILE__
-    ~kernels:[Latest]
+    ~kernels:[Mainnet]
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
@@ -10752,7 +10724,6 @@ let test_configuration_service =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
-      ~enable_revm:false
       protocol
   in
   let* proxy_config = Rpc.configuration proxy in
@@ -11470,7 +11441,6 @@ let test_node_correctly_uses_batcher_heap =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
-    ~enable_revm:false
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -11651,7 +11621,7 @@ let test_trace_block_struct_logger =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
-    ~kernels:Kernel.all
+    ~kernels:[Kernel.Mainnet]
   @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
   let* trace_result =
@@ -11823,7 +11793,6 @@ let test_rpc_getLogs_with_earliest_fail =
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -11881,7 +11850,6 @@ let test_estimate_gas_with_block_param =
     ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* gas_consumer = Solidity_contracts.even_block_gas_consumer evm_version in
@@ -11941,7 +11909,6 @@ let test_transaction_object expected_type_ name make_transaction =
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
     ~use_dal:Register_without_feature
-    ~use_revm:activate_revm_registration
     ~title:
       (sf "RPC returns the correct transaction object for %s transactions" name)
   @@ fun {sequencer; _} _protocol ->
@@ -12048,7 +12015,6 @@ let test_tx_queue =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~use_revm:activate_revm_registration
     ~enable_tx_queue:
       (Config
          {
@@ -12175,7 +12141,6 @@ let test_tx_queue_clear =
     ~use_dal:Register_without_feature
     ~websockets:false
     ~use_multichain:Register_without_feature
-    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {
            client;
@@ -12279,7 +12244,6 @@ let test_tx_queue_nonce =
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
     ~use_multichain:Register_without_feature
-    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
@@ -12579,7 +12543,6 @@ let test_tx_queue_limit =
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
     ~use_multichain:Register_without_feature
-    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
@@ -12785,9 +12748,6 @@ let test_deposit_event =
       ~time_between_blocks:Nothing
       ~mainnet_compat:false
       ~enable_dal:false
-        (* TODO: temporary, needs migration to set custom precompile's
-           bytecode. *)
-      ~enable_revm:false
       ~enable_multichain:false
       protocol
   in
@@ -12824,13 +12784,11 @@ let test_deposit_event =
 
   unit
 
-let test_withdrawal_events ~enable_revm =
+let test_withdrawal_events =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "withdrawal"; "event"]
-    ~title:
-      ("Regression test for the withdrawal events"
-      ^ if enable_revm then " (with revm)" else "")
+    ~title:"Regression test for the withdrawal events"
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12849,9 +12807,6 @@ let test_withdrawal_events ~enable_revm =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
-        (* TODO: temporary, needs migration to set custom precompile's
-           bytecode. *)
-      ~enable_revm
       ~enable_fast_withdrawal:true
       protocol
   in
@@ -12915,13 +12870,11 @@ let test_withdrawal_events ~enable_revm =
 
   unit
 
-let test_fa_deposit_and_withdrawals_events ~enable_revm =
+let test_fa_deposit_and_withdrawals_events =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "fa_bridge"; "event"]
-    ~title:
-      ("Regression test for the FA deposit and withdrawal events"
-      ^ if enable_revm then " (with revm)" else "")
+    ~title:"Regression test for the FA deposit and withdrawal events"
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -12941,9 +12894,6 @@ let test_fa_deposit_and_withdrawals_events ~enable_revm =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
-        (* TODO: temporary, needs migration to set custom precompile's
-           bytecode. *)
-      ~enable_revm
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol
@@ -13062,7 +13012,6 @@ let test_block_producer_validation =
          })
     ~title:"Test part of the validation is done when producing blocks."
     ~use_multichain:Register_without_feature
-    ~use_revm:activate_revm_registration
   (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; observer; _} _protocol ->
   let* () =
@@ -13354,7 +13303,6 @@ let test_fa_deposit_can_be_claimed =
     ~enable_fa_bridge:true
     ~use_multichain:Register_without_feature
     ~maximum_allowed_ticks:2_000_000_000L
-    ~use_revm:activate_revm_registration
     ~title:"Claims are operational"
   @@ fun {client; sequencer; sc_rollup_address; evm_version; l1_contracts; _}
              _protocol ->
@@ -13404,13 +13352,11 @@ let test_fa_deposit_can_be_claimed =
 
   unit
 
-let test_claim_deposit_event ~enable_revm =
+let test_claim_deposit_event =
   Protocol.register_regression_test
     ~__FILE__
     ~tags:["evm"; "fa_bridge"; "claim"; "deposit"; "event"]
-    ~title:
-      ("Regression test for the claimed FA deposit event"
-      ^ if enable_revm then " (with revm)" else "")
+    ~title:"Regression test for the claimed FA deposit event"
     ~uses:(fun _protocol ->
       [
         Constant.octez_smart_rollup_node;
@@ -13429,7 +13375,6 @@ let test_claim_deposit_event ~enable_revm =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
-      ~enable_revm
       ~enable_fa_bridge:true
       ~enable_fast_fa_withdrawal:true
       protocol
@@ -13454,7 +13399,6 @@ let test_eip2930_storage_access =
     ~title:"Check EIP-2930's semantic correctness"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-    ~use_revm:activate_revm_registration
   @@ fun {sequencer; evm_version; _} _protocol ->
   let whale = Eth_account.bootstrap_accounts.(0) in
   let* eip2930_storage_access =
@@ -13698,13 +13642,10 @@ let () =
   test_tx_queue_limit [Alpha] ;
   test_observer_periodic_snapshot [Alpha] ;
   test_deposit_event [Alpha] ;
-  test_withdrawal_events [Alpha] ~enable_revm:false ;
-  test_withdrawal_events [Alpha] ~enable_revm:true ;
-  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:false ;
-  test_fa_deposit_and_withdrawals_events [Alpha] ~enable_revm:true ;
+  test_withdrawal_events [Alpha] ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ;
   test_block_producer_validation [Alpha] ;
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
-  test_claim_deposit_event [Alpha] ~enable_revm:false ;
-  test_claim_deposit_event [Alpha] ~enable_revm:true ;
+  test_claim_deposit_event [Alpha] ;
   test_eip2930_storage_access [Alpha]

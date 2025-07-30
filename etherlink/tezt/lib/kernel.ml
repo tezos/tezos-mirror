@@ -27,7 +27,19 @@ let of_tag_use u =
 
 let supports_dal = function Mainnet -> false | Latest -> true
 
-let supports_revm = function Mainnet -> false | Latest -> true
+let supports_revm = function
+  | kernel when kernel = Constant.WASM.evm_kernel -> true
+  | _ -> false
+
+let of_tag tag =
+  let contain_exp ~exp =
+    let re = Str.regexp_string exp in
+    try
+      ignore (Str.search_forward re tag 0) ;
+      true
+    with Not_found -> false
+  in
+  if contain_exp ~exp:"mainnet" then Mainnet else Latest
 
 (* Select the appropriate EVM version for the specified kernel.
 
