@@ -100,6 +100,7 @@ fn reveal<Host: Runtime>(
 
     // Set the public key as the manager
     account.set_manager_public_key(host, public_key)?;
+    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
     account.increment_counter(host)?;
 
     log!(host, Debug, "Reveal operation succeed");
@@ -149,7 +150,7 @@ pub fn transfer<Host: Runtime>(
     };
 
     // Delegate to appropriate handler
-    match dest {
+    let success = match dest {
         Contract::Implicit(dest_key_hash) => {
             if parameter.is_some() {
                 return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
@@ -213,7 +214,10 @@ pub fn transfer<Host: Runtime>(
                 Err(err) => Ok(Err(err.into())),
             }
         }
-    }
+    };
+    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
+    src_account.increment_counter(host)?;
+    success
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -844,6 +848,11 @@ mod tests {
         });
 
         assert_eq!(receipt, expected_receipt);
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
     }
 
     // Test an invalid operation where the provided public key is inconsistent for the source
@@ -1069,6 +1078,13 @@ mod tests {
         // Verify that source and destination balances changed
         assert_eq!(source.balance(&host).unwrap(), 5_u64.into());
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
+
+        // Verify that the source's counter has been incremented
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Bootstrap 1 successfully transfers 30 mutez to itself
@@ -1298,5 +1314,10 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
     }
 }
