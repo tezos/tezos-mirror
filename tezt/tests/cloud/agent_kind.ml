@@ -68,7 +68,7 @@ module Logs = struct
     (* This is not compatible with the --proxy mode as the Agent's location of
        the proxy might differ from the localhost one. *)
     let tezt_root_path = Agent.temp_execution_path () in
-    Log.info "Retrieving logs from %s" agent_name ;
+    Log.info "Retrieving logs from %s" daemon_name ;
     match Agent.runner agent with
     | None ->
         Log.warn "Cannot retrieve logs for %s: no runner for agent" agent_name ;

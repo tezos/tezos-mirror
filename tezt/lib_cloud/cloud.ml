@@ -53,7 +53,15 @@ let shutdown ?exn t =
       Lwt.return_unit)
     else Lwt.return_unit
   in
-  let* () = Lwt_list.iter_s (fun a -> Agent.run_shutdown_callback a) t.agents in
+  (* Shutdown the service managers before alert_manager *)
+  let* () =
+    Lwt_list.iter_s
+      (fun agent ->
+        match Agent.service_manager agent with
+        | None -> Lwt.return_unit
+        | Some sm -> Service_manager.shutdown sm)
+      t.agents
+  in
   Log.info "Shutting down processes..." ;
   let* () =
     Lwt.catch
@@ -114,13 +122,6 @@ let shutdown ?exn t =
           "unable to shutdown Prometheus properly: %s"
           (Printexc.to_string exn) ;
         Lwt.return_unit)
-  in
-  (* Shutdown the service managers before alert_manager *)
-  let () =
-    List.iter
-      (fun agent ->
-        Option.iter Service_manager.shutdown (Agent.service_manager agent))
-      t.agents
   in
   let* () =
     if Option.is_some t.alert_manager then Alert_manager.shutdown ()
@@ -629,7 +630,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           ~next_available_port
           ~vm_name:None
           ~process_monitor
-          ~daily_logs_destination:Env.retrieve_daily_logs
+          ~daily_logs_dir:Env.retrieve_daily_logs
           ()
       in
       f
@@ -744,7 +745,7 @@ let agents t =
               ~next_available_port
               ~vm_name:(Some (Format.asprintf "%s-orchestrator" Env.tezt_cloud))
               ~process_monitor
-              ~daily_logs_destination:Env.retrieve_daily_logs
+              ~daily_logs_dir:Env.retrieve_daily_logs
               ()
           in
           [default_agent]
@@ -848,7 +849,7 @@ let agents_by_service_name = Hashtbl.create 10
 
 let service_name agent name = Format.asprintf "%s-%s" (Agent.name agent) name
 
-let service_register ~name ~executable ?on_alive_callback agent =
+let service_register ~name ~executable ?on_alive_callback ~on_shutdown agent =
   match Agent.service_manager agent with
   | None -> ()
   | Some service_manager ->
@@ -858,6 +859,7 @@ let service_register ~name ~executable ?on_alive_callback agent =
         ~name
         ~executable
         ?on_alive_callback
+        ~on_shutdown
         service_manager
 
 let notify_service_start ~name ~pid =

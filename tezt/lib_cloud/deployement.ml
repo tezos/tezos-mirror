@@ -70,7 +70,7 @@ module Remote = struct
     let os = vm_configuration.os in
     let auto_approve = Env.auto_approve in
     let prometheus_port = Env.prometheus_port in
-    let daily_logs_destination = Env.retrieve_daily_logs in
+    let daily_logs_dir = Env.retrieve_daily_logs in
     let* () =
       Terraform.VM.deploy
         ~auto_approve
@@ -124,7 +124,7 @@ module Remote = struct
         ~next_available_port
         ~vm_name:(Some vm_name)
         ~process_monitor
-        ~daily_logs_destination
+        ~daily_logs_dir
         ()
       |> Lwt.return
     in
@@ -532,7 +532,7 @@ module Ssh_host = struct
         ~point:(Runner.address (Some runner), ssh_listening_port)
         ~ssh_id:(Env.ssh_private_key_filename ())
         ~process_monitor:None
-        ~daily_logs_destination:Env.retrieve_daily_logs
+        ~daily_logs_dir:Env.retrieve_daily_logs
         ()
     in
     Lwt.return agent
@@ -600,7 +600,7 @@ module Ssh_host = struct
               ~process_monitor:None
               ~point:(host, ssh_port)
               ~ssh_id:(Env.ssh_private_key_filename ())
-              ~daily_logs_destination:Env.retrieve_daily_logs
+              ~daily_logs_dir:Env.retrieve_daily_logs
               ()
           in
           Lwt.return agent)
@@ -745,7 +745,7 @@ module Localhost = struct
                ~next_available_port:(fun () -> next_port point)
                ~vm_name:None
                ~process_monitor
-               ~daily_logs_destination:Env.retrieve_daily_logs
+               ~daily_logs_dir:Env.retrieve_daily_logs
                ())
     in
     Lwt.return {number_of_vms; processes; base_port; ports_per_vm; agents}

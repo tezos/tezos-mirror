@@ -389,24 +389,24 @@ module Node = struct
                given in command line. The alerts must match the same groupname *)
           receiver
       in
+      let on_shutdown =
+        match Agent.daily_logs_dir agent with
+        | None -> []
+        | Some destination_root ->
+            [
+              (fun () ->
+                Agent_kind.Logs.scp_logs
+                  ~destination_root
+                  ~daemon_name:name
+                  agent);
+            ]
+      in
       Cloud.service_register
         ~name:node_name
         ~executable
         ~on_alive_callback
+        ~on_shutdown
         agent ;
-      let () =
-        match Agent.daily_logs_destination agent with
-        | None -> ()
-        | Some destination_root ->
-            Agent.register_shutdown_callback agent (fun () ->
-                let* () =
-                  Agent_kind.Logs.scp_logs
-                    ~destination_root
-                    ~daemon_name:name
-                    agent
-                in
-                Lwt.return_unit)
-      in
       Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
@@ -565,24 +565,22 @@ module Dal_node = struct
             ]
           (if alive then 1.0 else 0.0)
       in
-      Cloud.service_register
-        ~name:node_name
-        ~executable
-        ~on_alive_callback
-        agent ;
-      let () =
-        match Agent.daily_logs_destination agent with
-        | None -> ()
-        | Some destination_root ->
-            Agent.register_shutdown_callback agent (fun () ->
-                let* () =
-                  Agent_kind.Logs.scp_logs
-                    ~destination_root
-                    ~daemon_name:name
-                    agent
-                in
-                Lwt.return_unit)
+      let alert =
+        Alert.make
+          ~name:"ServiceManagerProcessDown"
+          ~description:
+            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+          ~summary:
+            (Format.asprintf
+               "'[%s.service_manager] the process [%s] is down'"
+               (Agent.name agent)
+               executable)
+          ~route:(Alert.route receiver)
+          ~severity:Alert.Critical
+          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+          ()
       in
+      let* () = Cloud.add_alert cloud ~alert in
       let alert =
         Alerts.service_manager_process_down
           ~agent:(Agent.name agent)
@@ -609,6 +607,24 @@ module Dal_node = struct
           ~groupname:binary_name
           receiver
       in
+      let on_shutdown =
+        match Agent.daily_logs_dir agent with
+        | None -> []
+        | Some destination_root ->
+            [
+              (fun () ->
+                Agent_kind.Logs.scp_logs
+                  ~destination_root
+                  ~daemon_name:name
+                  agent);
+            ]
+      in
+      Cloud.service_register
+        ~name
+        ~executable
+        ~on_alive_callback
+        ~on_shutdown
+        agent ;
       Lwt.return node
 
     let create ?net_port ?path ~name ?disable_shard_validation ?ignore_pkhs

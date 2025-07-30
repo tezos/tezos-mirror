@@ -10,6 +10,7 @@ type service = {
   mutable executable : string option;
   on_alive_callback : alive:bool -> unit;
   mutable pid : int option;
+  mutable on_shutdown : (unit -> unit Lwt.t) list;
 }
 
 type t = {
@@ -93,7 +94,7 @@ let register_service ~name ~executable
     ?(on_alive_callback =
       fun ~alive ->
         ignore alive ;
-        ()) t =
+        ()) ~on_shutdown t =
   (* Start only when needed *)
   let () = if Hashtbl.length t.services = 0 then start t else () in
   (* Get the real executable name *)
@@ -101,12 +102,14 @@ let register_service ~name ~executable
   if Sys.file_exists executable then
     let executable = Unix.realpath executable in
     let service =
-      {executable = Some executable; on_alive_callback; pid = None}
+      {executable = Some executable; on_alive_callback; pid = None; on_shutdown}
     in
     let () = Hashtbl.add t.services name service in
     Log.info "%s: Registering service: %s (%s)" section name executable
   else
-    let service = {executable = None; on_alive_callback; pid = None} in
+    let service =
+      {executable = None; on_alive_callback; pid = None; on_shutdown}
+    in
     let () = Hashtbl.add t.services name service in
     Log.info "%s: Registering service: %s (%s)" section name executable
 
@@ -135,4 +138,21 @@ let notify_stop_service ~name t =
       let () = Log.info "%s: Notify stop service %s" section name in
       service.pid <- None
 
-let shutdown t = Lwt.wakeup t.worker_waker ()
+let shutdown t =
+  let on_shutdown_callbacks =
+    Hashtbl.fold
+      (fun name service acc -> (name, service.on_shutdown) :: acc)
+      t.services
+      []
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun (name, callbacks) ->
+        Log.info
+          "Running service manager shutdown callback for service: %s"
+          name ;
+        Lwt_list.iter_s (fun callback -> callback ()) callbacks)
+      on_shutdown_callbacks
+  in
+  Lwt.wakeup t.worker_waker () ;
+  Lwt.return_unit
