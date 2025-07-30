@@ -143,22 +143,21 @@ pub fn transfer_tez<Host: Runtime>(
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<TransferSuccess, TransferError> {
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
-            .map_err(ApplyKernelError::BigIntError)?;
+            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     // Check source balance
     let current_src_balance = &src_balance.0;
     let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
         None => {
             log!(host, Debug, "Balance is too low");
-            let error = TransferError::BalanceTooLow(BalanceTooLow {
+            return Err(TransferError::BalanceTooLow(BalanceTooLow {
                 contract: src_contract.clone(),
                 balance: current_src_balance.into(),
                 amount: amount.clone(),
-            });
-            return Ok(Err(error.into()));
+            }));
         }
         Some(new_source_balance) => new_source_balance,
     };
@@ -168,8 +167,9 @@ pub fn transfer_tez<Host: Runtime>(
         new_source_balance,
         dest_account,
         &amount.0,
-    )?;
-    Ok(Ok(TransferSuccess {
+    )
+    .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
         balance_updates: vec![src_update, dest_update],
@@ -179,7 +179,7 @@ pub fn transfer_tez<Host: Runtime>(
         storage_size: 0_u64.into(),
         paid_storage_size_diff: 0_u64.into(),
         allocated_destination_contract: false,
-    }))
+    })
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -269,7 +269,7 @@ pub fn transfer<'a, Host: Runtime>(
             // Allocate the implicit account if it doesn't exist
             let allocated =
                 TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
-            match transfer_tez(
+            let success = transfer_tez(
                 host,
                 src_contract,
                 src_account,
@@ -277,13 +277,13 @@ pub fn transfer<'a, Host: Runtime>(
                 amount,
                 dest_contract,
                 &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
-            )? {
-                Ok(success) => Ok(Ok(TransferSuccess {
-                    allocated_destination_contract: allocated,
-                    ..success
-                })),
-                Err(error) => Ok(Err(error)),
-            }
+            )
+            .map_err(|e| e.into())
+            .map(|success| TransferSuccess {
+                allocated_destination_contract: allocated,
+                ..success
+            });
+            Ok(success)
         }
         Contract::Originated(_) => {
             let mut dest_account =
@@ -296,18 +296,18 @@ pub fn transfer<'a, Host: Runtime>(
                 amount,
                 dest_contract,
                 &mut dest_account,
-            )? {
-                Ok(success) => success,
-                Err(error) => return Ok(Err(error)),
+            ) {
+                Ok(receipt) => receipt,
+                Err(e) => {
+                    return Ok(Err(e.into()));
+                }
             };
             ctx.sender = address_from_contract(src_contract.clone());
             let code = dest_account.code(host)?;
             let storage = dest_account.storage(host)?;
-            let result =
-                execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
             // TODO: this has already been computed by transfer_tez, avoid refetching it from storage
             let dest_balance = dest_account.balance(host)?;
-            match result {
+            match execute_smart_contract(code, storage, entrypoint, param, parser, ctx) {
                 Ok((internal_operations, new_storage)) => {
                     dest_account.set_storage(host, &new_storage)?;
                     let _internal_receipt = execute_internal_operations(
@@ -319,7 +319,7 @@ pub fn transfer<'a, Host: Runtime>(
                         &dest_balance,
                         parser,
                         ctx,
-                    )?;
+                    );
                     Ok(Ok(TransferSuccess {
                         storage: Some(new_storage),
                         ..receipt
