@@ -778,63 +778,46 @@ let enc_git_strategy = function
 let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
     ?(before_script = []) ?cache ?id_tokens ?interruptible
     ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
-    ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
-    ?(cpu = Runner.CPU.Normal) ?(storage = Runner.Storage.Network) ?git_strategy
-    ?coverage ?retry ?parallel ?description ?(dev_infra = false) ~__POS__ ?image
-    ?template ~stage ~name script : tezos_job =
+    ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
+    ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
+    ?git_strategy ?coverage ?retry ?parallel ?description ?(dev_infra = false)
+    ~__POS__ ?image ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
-    match (arch, tag, cpu, storage) with
-    | _, _, Tezt, _ -> failwith "TODO (next commit)"
-    | Some Arm64, _, (High | Very_high), _ ->
-        failwith
-          "[job] cannot specify both [arch=Arm64] and [cpu=High] or \
-           [cpu=Very_high] in job '%s'."
-          name
-    | Some Arm64, _, _, Network ->
-        failwith
-          "[job] cannot specify both [arch=Arm64] and [storage=Network] in job \
-           '%s'."
-          name
-    | None, None, Normal, Ramfs ->
-        failwith
-          "[job] cannot specify both [cpu=Normal] and [storage=Ramfs] in job \
-           '%s'."
-          name
-    | None, _, High, Ramfs | Some _, _, High, Ramfs ->
-        failwith
-          "[job] cannot specify both [cpu=High] and [storage=Ramfs] in job \
-           '%s'."
-          name
-    | Some _, Some _, High, Network
-    | None, Some _, High, Network
-    | Some _, None, High, Network
-    | None, None, High, Network ->
-        if dev_infra then Gcp_high_cpu_dev else Gcp_high_cpu
-    | Some _, Some _, Very_high, Network
-    | None, Some _, Very_high, Network
-    | Some _, None, Very_high, Network
-    | None, None, Very_high, Network ->
-        if dev_infra then Gcp_very_high_cpu_dev else Gcp_very_high_cpu
-    | Some _, Some _, Very_high, Ramfs
-    | None, Some _, Very_high, Ramfs
-    | Some _, None, Very_high, Ramfs
-    | None, None, Very_high, Ramfs ->
-        if dev_infra then Gcp_very_high_cpu_ramfs_dev
-        else Gcp_very_high_cpu_ramfs
-    | Some arch, None, Normal, _ -> (
-        match arch with
-        | Amd64 -> if dev_infra then Gcp_dev else Gcp
-        | Arm64 -> Gcp_arm64)
-    | None, Some tag, _, _ -> tag
-    | None, None, Normal, Network ->
-        (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
-        Gcp
-    | Some _, Some _, Normal, _ ->
-        failwith
-          "[job] cannot specify both [arch] and [tags] at the same time in job \
-           '%s'."
-          name
+    let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
+    let show show_fun = function
+      | None -> "(unspecified)"
+      | Some x -> show_fun x
+    in
+    let arch_string = show Runner.Arch.show_uniform arch in
+    let cpu_string = show Runner.CPU.show cpu in
+    let storage_string = show Runner.Storage.show storage in
+    match tag with
+    | None -> (
+        match Runner.Tag.choose ~provider ?arch ?cpu ?storage () with
+        | None ->
+            failwith
+              "job %S: no suitable runner tag found for arch = %s, cpu = %s, \
+               storage = %s"
+              name
+              arch_string
+              cpu_string
+              storage_string
+        | Some tag -> tag)
+    | Some Dynamic ->
+        (* Cannot check, assume the user knows what they are doing. *)
+        Dynamic
+    | Some tag ->
+        if not (Runner.Tag.has ~provider ?arch ?cpu ?storage tag) then
+          failwith
+            "job %S: requested tag %s is not compatible with arch = %s, cpu = \
+             %s, storage = %s"
+            name
+            (Runner.Tag.show tag)
+            arch_string
+            cpu_string
+            storage_string ;
+        tag
   in
   if rules = Some [] then
     failwith "The job '%s' cannot have empty [rules]." name ;
