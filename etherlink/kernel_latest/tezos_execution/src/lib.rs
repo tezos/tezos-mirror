@@ -141,7 +141,7 @@ pub fn transfer_tez<Host: Runtime>(
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<(TransferSuccess, AppliedBalanceChanges), TransferError> {
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
@@ -159,7 +159,7 @@ pub fn transfer_tez<Host: Runtime>(
         }
         Some(new_source_balance) => new_source_balance,
     };
-    apply_balance_changes(
+    let applied_balance_changes = apply_balance_changes(
         host,
         src_account,
         new_source_balance,
@@ -167,17 +167,20 @@ pub fn transfer_tez<Host: Runtime>(
         &amount.0,
     )
     .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
-    Ok(TransferSuccess {
-        storage: None,
-        lazy_storage_diff: None,
-        balance_updates: vec![src_update, dest_update],
-        ticket_receipt: vec![],
-        originated_contracts: vec![],
-        consumed_gas: 0_u64.into(),
-        storage_size: 0_u64.into(),
-        paid_storage_size_diff: 0_u64.into(),
-        allocated_destination_contract: false,
-    })
+    Ok((
+        TransferSuccess {
+            storage: None,
+            lazy_storage_diff: None,
+            balance_updates: vec![src_update, dest_update],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_gas: 0_u64.into(),
+            storage_size: 0_u64.into(),
+            paid_storage_size_diff: 0_u64.into(),
+            allocated_destination_contract: false,
+        },
+        applied_balance_changes,
+    ))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -271,7 +274,7 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?,
             )
-            .map(|success| TransferSuccess {
+            .map(|(success, _applied_balance_changes)| TransferSuccess {
                 allocated_destination_contract: allocated,
                 ..success
             })
@@ -280,7 +283,7 @@ pub fn transfer<'a, Host: Runtime>(
             let mut dest_account =
                 TezlinkOriginatedAccount::from_contract(context, dest_contract)
                     .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
-            let receipt = transfer_tez(
+            let (receipt, applied_balance_changes) = transfer_tez(
                 host,
                 src_contract,
                 src_account,
@@ -296,10 +299,6 @@ pub fn transfer<'a, Host: Runtime>(
             let storage = dest_account
                 .storage(host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
-            // TODO: this has already been computed by transfer_tez, avoid refetching it from storage
-            let dest_balance = dest_account
-                .balance(host)
-                .map_err(|_| TransferError::FailedToFetchDestinationContractBalance)?;
             let (internal_operations, new_storage) =
                 execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
             dest_account
@@ -311,7 +310,7 @@ pub fn transfer<'a, Host: Runtime>(
                 internal_operations,
                 dest_contract,
                 &mut dest_account,
-                &dest_balance,
+                &applied_balance_changes.new_dest_balance,
                 parser,
                 ctx,
             );
@@ -429,6 +428,12 @@ fn compute_balance_updates(
     Ok((src_update, dest_update))
 }
 
+pub struct AppliedBalanceChanges {
+    #[allow(dead_code)]
+    new_src_balance: Narith,
+    new_dest_balance: Narith,
+}
+
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
@@ -436,12 +441,16 @@ fn apply_balance_changes(
     new_src_balance: num_bigint::BigUint,
     dest_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
-) -> Result<(), ApplyKernelError> {
-    src_account.set_balance(host, &new_src_balance.into())?;
+) -> Result<AppliedBalanceChanges, ApplyKernelError> {
+    let new_src_balance = new_src_balance.into();
+    src_account.set_balance(host, &new_src_balance)?;
     let dest_balance = dest_account.balance(host)?.0;
-    let new_dest_balance = &dest_balance + amount;
-    dest_account.set_balance(host, &new_dest_balance.into())?;
-    Ok(())
+    let new_dest_balance = (&dest_balance + amount).into();
+    dest_account.set_balance(host, &new_dest_balance)?;
+    Ok(AppliedBalanceChanges {
+        new_src_balance,
+        new_dest_balance,
+    })
 }
 
 /// Executes the entrypoint logic of an originated smart contract and returns the new storage.
