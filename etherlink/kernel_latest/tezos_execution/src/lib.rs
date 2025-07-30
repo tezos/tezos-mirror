@@ -139,6 +139,7 @@ pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
+    src_balance: &Narith,
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
@@ -148,7 +149,7 @@ pub fn transfer_tez<Host: Runtime>(
             .map_err(ApplyKernelError::BigIntError)?;
 
     // Check source balance
-    let current_src_balance = src_account.balance(host)?.0;
+    let current_src_balance = &src_balance.0;
     let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
         None => {
             log!(host, Debug, "Balance is too low");
@@ -181,12 +182,14 @@ pub fn transfer_tez<Host: Runtime>(
     }))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_contract: &Contract,
     sender_account: &mut TezlinkOriginatedAccount,
+    sender_balance: &Narith,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
 ) -> ExecutionResult<()> {
@@ -210,6 +213,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     context,
                     sender_contract,
                     sender_account,
+                    sender_balance,
                     &amount,
                     &dest_contract,
                     destination_address.entrypoint,
@@ -249,6 +253,7 @@ pub fn transfer<'a, Host: Runtime>(
     context: &context::Context,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
+    src_balance: &Narith,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: Entrypoint,
@@ -268,6 +273,7 @@ pub fn transfer<'a, Host: Runtime>(
                 host,
                 src_contract,
                 src_account,
+                src_balance,
                 amount,
                 dest_contract,
                 &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
@@ -286,6 +292,7 @@ pub fn transfer<'a, Host: Runtime>(
                 host,
                 src_contract,
                 src_account,
+                src_balance,
                 amount,
                 dest_contract,
                 &mut dest_account,
@@ -298,6 +305,8 @@ pub fn transfer<'a, Host: Runtime>(
             let storage = dest_account.storage(host)?;
             let result =
                 execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
+            // TODO: this has already been computed by transfer_tez, avoid refetching it from storage
+            let dest_balance = dest_account.balance(host)?;
             match result {
                 Ok((internal_operations, new_storage)) => {
                     dest_account.set_storage(host, &new_storage)?;
@@ -307,6 +316,7 @@ pub fn transfer<'a, Host: Runtime>(
                         internal_operations,
                         dest_contract,
                         &mut dest_account,
+                        &dest_balance,
                         parser,
                         ctx,
                     )?;
@@ -326,6 +336,7 @@ pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     src: &PublicKeyHash,
+    src_balance: &Narith,
     amount: &Narith,
     dest: &Contract,
     parameter: Option<Parameter>,
@@ -361,6 +372,7 @@ pub fn transfer_external<Host: Runtime>(
         context,
         &src_contract,
         &mut src_account,
+        src_balance,
         amount,
         dest,
         entrypoint,
@@ -548,7 +560,7 @@ fn apply_operation<Host: Runtime>(
     validation_info: ValidationInfo,
 ) -> Result<OperationResultSum, ApplyKernelError> {
     let ValidationInfo {
-        new_source_balance: _,
+        new_source_balance,
         mut source_account,
         balance_updates: validation_balance_updates,
     } = validation_info;
@@ -570,6 +582,7 @@ fn apply_operation<Host: Runtime>(
                 host,
                 context,
                 &operation.source,
+                &new_source_balance,
                 amount,
                 destination,
                 parameters.clone(),
