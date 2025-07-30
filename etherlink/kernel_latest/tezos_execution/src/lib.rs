@@ -494,16 +494,14 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let validity_result = validate::is_valid_tezlink_operation(
+    let validation_info = match validate::is_valid_tezlink_operation(
         &safe_host,
         &account,
         &operation.branch,
         operation.content.into(),
         operation.signature,
-    )?;
-
-    let new_balance = match validity_result {
-        Ok(new_balance) => new_balance,
+    )? {
+        Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(
                 safe_host,
@@ -523,7 +521,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    account.set_balance(&mut safe_host, &new_balance)?;
+    account.set_balance(&mut safe_host, &validation_info.new_source_balance)?;
 
     let (src_delta, block_fees) =
         compute_fees_balance_updates(source, &manager_operation.fee)

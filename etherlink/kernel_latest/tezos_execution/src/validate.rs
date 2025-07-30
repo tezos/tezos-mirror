@@ -115,13 +115,17 @@ fn check_storage_limit(
     }
 }
 
+pub struct ValidationInfo {
+    pub new_source_balance: Narith,
+}
+
 pub fn is_valid_tezlink_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     branch: &BlockHash,
     operation: ManagerOperation<OperationContent>,
     signature: UnknownSignature,
-) -> Result<Result<Narith, ValidityError>, ApplyKernelError> {
+) -> Result<Result<ValidationInfo, ValidityError>, ApplyKernelError> {
     // Account must exist in the durable storage
     if !account.allocated(host)? {
         log!(
@@ -183,7 +187,9 @@ pub fn is_valid_tezlink_operation<Host: Runtime>(
     let verify = verify_signature(&pk, branch, &operation.into(), signature)?;
 
     if verify {
-        Ok(Ok(new_balance))
+        Ok(Ok(ValidationInfo {
+            new_source_balance: new_balance,
+        }))
     } else {
         log!(
             host,
