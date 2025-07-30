@@ -123,6 +123,167 @@ let service_manager_receiver notifier =
       {{ end }}|}
         ()
 
+module Alerts = struct
+  let service_manager_process_down ~(agent : string) executable receiver
+      metric_name name =
+    Alert.make
+      ~name:"ServiceManagerProcessDown"
+      ~description:
+        {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+      ~summary:
+        (Format.asprintf
+           "'[%s.service_manager] the process [%s] is down'"
+           agent
+           executable)
+      ~route:(Alert.route receiver)
+      ~severity:Alert.Critical
+      ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+      ()
+
+  let process_exporter_high_cpu ~agent_name ~appname ~groupname receiver =
+    Alert.make
+      ~name:"ProcessExporterProcessHighCPUUsage"
+      ~description:
+        "'The executable has been using more than 80% CPU for 5 minutes'"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high cpu usage of process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~severity:Warning
+      ~expr:
+        (Format.asprintf
+           {|'rate(namedprocess_namegroup_cpu_seconds_total{app="%s", groupname="%s"}[5m]) > 0.8'|}
+           appname
+           groupname)
+      ~route:(Alert.route receiver)
+      ()
+
+  (* expected_mem is the expected *resident* memory usage in GiB, 2GiB if not specified *)
+  let process_exporter_high_mem ~agent_name ~appname ?expected_mem ~groupname
+      receiver =
+    let expected_mem =
+      match expected_mem with
+      | None -> 2 * 1024 * 1024 * 1024 (* 2G by default *)
+      | Some sz -> sz * 1024 * 1024 * 1024
+    in
+    Alert.make
+      ~name:"ProcessExporterProcessHighMemory"
+      ~description:"'The executable is using a large amount of memory'"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high memory usage of process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~severity:Warning
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_memory_bytes{app="%s",groupname="%s", memtype="resident"} > %d'|}
+           appname
+           groupname
+           expected_mem)
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_increase_mem ~agent_name ~appname ~groupname receiver =
+    Alert.make
+      ~name:"ProcessExporterProcessMemoryIncreaseFromOneDayAvg"
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_memory_bytes{app="%s",groupname="%s"} > avg_over_time(namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"}[1d] offset 1d) * 1.5'|}
+           appname
+           groupname
+           appname
+           groupname)
+      ~for_:"30m"
+      ~severity:Warning
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] increase of %s memory usage'"
+           agent_name
+           groupname)
+      ~description:
+        {|'The process memory usage is more than 50% higher than the average from the previous 24h'|}
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_increase_mem_threshold ~agent_name ~appname ~groupname
+      receiver =
+    Alert.make
+      ~name:"ProcessExporterMemoryIncreaseThreshold"
+      ~expr:
+        (Format.asprintf
+           {|(
+            namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"} /
+            avg_over_time(namedprocess_namegroup_memory_bytes{app="%s", groupname="%s"}[30m] offset 1h)
+            - 1
+          ) * 100 > 10
+          and
+          time() - process_start_time_seconds{app="%s", groupname="%s"} > 4 * 3600|}
+           appname
+           groupname
+           appname
+           groupname
+           appname
+           groupname)
+      ~for_:"15m"
+      ~severity:Warning
+      ~summary:
+        (Format.asprintf
+           {|'[%s.process_exporter]: %s memory usage increased compared to reference'|}
+           agent_name
+           groupname)
+      ~description:
+        (Format.asprintf
+           "The %s memory usage has increased compared to the reference period"
+           groupname)
+      ~route:(Alert.route receiver)
+      ()
+
+  let process_exporter_high_open_files ~agent_name ~appname ~groupname receiver
+      =
+    Alert.make
+      ~name:"ProcessExporterProcessHighOpenFiles"
+      ~description:
+        "The executable is using more than 70% of its file descriptor quota"
+      ~summary:
+        (Format.asprintf
+           "'[%s.process_exporter] high number of open files for process [%s]'"
+           agent_name
+           groupname)
+      ~for_:"5m"
+      ~route:(Alert.route receiver)
+      ~severity:Alert.Warning
+      ~expr:
+        (Format.asprintf
+           {|'namedprocess_namegroup_open_filedesc{app="%s", groupname="%s"} / process_max_fds{app="%s"} > 0.7'|}
+           appname
+           groupname
+           appname)
+      ()
+
+  let add_process_exporter_alerts ~cloud ~agent_name ~appname ~groupname
+      receiver =
+    Log.report
+      "Process_monitoring: adding alerts for %s on agent %s"
+      groupname
+      agent_name ;
+    Lwt_list.iter_p
+      (fun alert ->
+        let alert = alert ~agent_name ~appname ~groupname receiver in
+        let* () = Cloud.add_alert cloud ~alert in
+        Lwt.return_unit)
+      [
+        process_exporter_high_cpu;
+        process_exporter_high_mem ?expected_mem:None;
+        process_exporter_increase_mem;
+        process_exporter_increase_mem_threshold;
+        process_exporter_high_open_files;
+      ]
+end
+
 module Node = struct
   include Tezt_tezos.Node
 
@@ -131,13 +292,9 @@ module Node = struct
         ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
         ?name ?net_addr cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
-        Cloud.register_binary
-          cloud
-          ~agents:[agent]
-          ~group
-          ~name:(Filename.basename path)
-          ()
+        Cloud.register_binary cloud ~agents:[agent] ~group ~name:binary_name ()
       in
       let* () =
         Cloud.register_binary
@@ -179,7 +336,7 @@ module Node = struct
           ~metrics_port
           arguments
       in
-      let name = Node.name node in
+      let node_name = Node.name node in
       let executable = Node.path node in
       (* FIXME: The following metric and alert definition should belong to the
          service_manager module. Unfortunately, for the metrics to be registered,
@@ -191,37 +348,57 @@ module Node = struct
       let metric_name = "service_manager_process_alive" in
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let alert =
-        Alert.make
-          ~name:"ServiceManagerProcessDown"
-          ~description:
-            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
-          ~summary:
-            (Format.asprintf
-               "'[%s.service_manager] the process [%s] is down'"
-               (Agent.name agent)
-               executable)
-          ~route:(Alert.route receiver)
-          ~severity:Alert.Critical
-          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
-          ()
+        Alerts.service_manager_process_down
+          ~agent:(Agent.name agent)
+          executable
+          receiver
+          metric_name
+          node_name
       in
       let* () = Cloud.add_alert cloud ~alert in
       let on_alive_callback ~alive =
         Cloud.push_metric
           cloud
-          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~help:(Format.asprintf "'Process %s is alive'" node_name)
           ~typ:`Gauge
           ~name:metric_name
           ~labels:
             [
               ("agent", Agent.name agent);
-              ("name", name);
+              ("name", node_name);
               ("executable", executable);
               ("kind", "alive");
             ]
           (if alive then 1.0 else 0.0)
       in
-      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
+      let* () =
+        (* Prometheus *)
+        let app_name =
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
+        in
+        let target = Cloud.{agent; port = Node.metrics_port node; app_name} in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:(Node.name node))
+            [target]
+        in
+        (* Prometheus process-exporter *)
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+            (* The label 'groupname' is filled by prometheus-process-exporter from the names
+               given in command line. The alerts must match the same groupname *)
+          receiver
+      in
+      Cloud.service_register
+        ~name:node_name
+        ~executable
+        ~on_alive_callback
+        agent ;
       Lwt.return node
 
     let init ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
@@ -325,6 +502,7 @@ module Dal_node = struct
         ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
         ?disable_shard_validation ?ignore_pkhs ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
         Cloud.register_binary
           cloud
@@ -360,42 +538,61 @@ module Dal_node = struct
           ~l1_node_endpoint
           ()
       in
-      let name = Dal_node.name node in
+      let node_name = Dal_node.name node in
       let executable = Dal_node.path node in
       let metric_name = "service_manager_process_alive" in
       let receiver = service_manager_receiver (Cloud.notifier cloud) in
       let on_alive_callback ~alive =
         Cloud.push_metric
           cloud
-          ~help:(Format.asprintf "'Process %s is alive'" name)
+          ~help:(Format.asprintf "'Process %s is alive'" node_name)
           ~typ:`Gauge
           ~name:metric_name
           ~labels:
             [
               ("agent", Agent.name agent);
-              ("name", name);
+              ("name", node_name);
               ("executable", executable);
               ("kind", "alive");
             ]
           (if alive then 1.0 else 0.0)
       in
+      Cloud.service_register
+        ~name:node_name
+        ~executable
+        ~on_alive_callback
+        agent ;
       let alert =
-        Alert.make
-          ~name:"ServiceManagerProcessDown"
-          ~description:
-            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
-          ~summary:
-            (Format.asprintf
-               "'[%s.service_manager] the process [%s] is down'"
-               (Agent.name agent)
-               executable)
-          ~route:(Alert.route receiver)
-          ~severity:Alert.Critical
-          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
-          ()
+        Alerts.service_manager_process_down
+          ~agent:(Agent.name agent)
+          executable
+          receiver
+          metric_name
+          node_name
       in
       let* () = Cloud.add_alert cloud ~alert in
-      Cloud.service_register ~name ~executable ~on_alive_callback agent ;
+      let* () =
+        (* Prometheus source *)
+        let app_name =
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
+        in
+        let target =
+          Cloud.{agent; port = Dal_node.metrics_port node; app_name}
+        in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:(Dal_node.name node))
+            [target]
+        in
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+          receiver
+      in
       Lwt.return node
 
     let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs
@@ -496,18 +693,36 @@ module Sc_rollup_node = struct
         ?default_operator ?operators ?dal_node ~base_dir cloud agent mode
         l1_node =
       let* path = Agent.copy agent ~source:path in
+      let binary_name = Filename.basename path in
       let* () =
-        Cloud.register_binary
-          cloud
-          ~agents:[agent]
-          ~group
-          ~name:(Filename.basename path)
-          ()
+        Cloud.register_binary cloud ~agents:[agent] ~group ~name:binary_name ()
       in
       let runner = Agent.runner agent in
       let rpc_port = Agent.next_available_port agent in
       let metrics_port = Agent.next_available_port agent in
       let metrics_addr = "0.0.0.0" in
+      (* Prometheus *)
+      let* () =
+        let app_name =
+          Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
+        in
+        let target = Cloud.{agent; port = metrics_port; app_name} in
+        let* () =
+          Cloud.add_prometheus_source
+            cloud
+            ~name:(Option.value name ~default:path)
+            [target]
+        in
+        (* Prometheus process exporter *)
+        let receiver = service_manager_receiver (Cloud.notifier cloud) in
+        Alerts.add_process_exporter_alerts
+          ~cloud
+          ~agent_name:(Agent.name agent)
+          ~appname:
+            target.app_name (* reuse the app_name from prometheus source *)
+          ~groupname:binary_name
+          receiver
+      in
       create
         ?name
         ?default_operator

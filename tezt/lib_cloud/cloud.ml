@@ -814,7 +814,7 @@ let register_binary cloud ?agents ?(group = "tezt-cloud") ~name () =
               in
               let app_name =
                 Format.asprintf
-                  "%s-prometheus-process-exporter"
+                  "%s:prometheus-process-exporter"
                   (Agent.name agent)
               in
               let target =
