@@ -63,6 +63,7 @@ type component = {
   name : string;
   path : string;
   binaries_path : version -> string;
+  url : string;
 }
 
 type section = {title : string; content : content}
@@ -187,7 +188,7 @@ let binaries_links ~component ~arch binaries =
         if Filename.basename binary = "sha256sums.txt" then
           link
             (Filename.basename binary)
-            ("https://" ^ component.path ^ "/" ^ binary)
+            ("https://" ^ component.url ^ "/" ^ binary)
         else
           let command =
             Format.asprintf
@@ -202,7 +203,7 @@ let binaries_links ~component ~arch binaries =
             [
               link
                 (Filename.basename binary)
-                ("https://" ^ component.path ^ "/" ^ binary);
+                ("https://" ^ component.url ^ "/" ^ binary);
               Text " ";
               Text
                 (Format.sprintf
@@ -375,6 +376,16 @@ let () =
       ~placeholder:"PATH"
       ""
   in
+  let url =
+    Clap.default_string
+      ~long:"url"
+      ~description:
+        "URL of the bucket. `https://` should not be included.\n\
+         For example, to build the tezos/tezos release page the URL value \
+         should be `octez.tezos.com`"
+      ~placeholder:"URL"
+      bucket
+  in
   let asset_types =
     Clap.(
       list
@@ -422,6 +433,7 @@ let () =
               (match version.rc with
               | Some n -> Format.sprintf "-rc%s" @@ string_of_int n
               | None -> ""));
+      url;
     }
   in
   let versions = get_versions ~component in
