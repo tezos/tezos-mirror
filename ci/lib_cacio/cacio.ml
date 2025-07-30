@@ -33,12 +33,27 @@ let show_stage = function
 
 type need = Job | Artifacts
 
+type sccache_config = {
+  key : string option;
+  error_log : string option;
+  idle_timeout : string option;
+  log : string option;
+  path : string option;
+  cache_size : string option;
+}
+
+let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
+  {key; error_log; idle_timeout; log; path; cache_size}
+
 type job = {
   uid : int;
   source_location : string * int * int * int;
   name : string;
   stage : stage;
   description : string;
+  arch : Tezos_ci.arch option;
+  cpu : Tezos_ci.cpu option;
+  storage : Tezos_ci.storage option;
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
@@ -47,6 +62,8 @@ type job = {
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
   tag : Tezos_ci.tag option;
+  cargo_cache : bool;
+  sccache : sccache_config option;
 }
 
 type trigger = Auto | Manual
@@ -299,6 +316,9 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     name;
                     stage;
                     description;
+                    arch;
+                    cpu;
+                    storage;
                     image;
                     needs;
                     needs_legacy;
@@ -307,10 +327,12 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     script;
                     artifacts;
                     tag;
+                    cargo_cache;
+                    sccache;
                   };
                 trigger;
                 only_if_changed;
-              } ->
+              } -> (
               (* Convert dependencies recursively. *)
               let dependencies =
                 let needs =
@@ -357,6 +379,9 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ~name
                 ~stage:(convert_stage stage)
                 ~description
+                ?arch
+                ?cpu
+                ?storage
                 ~image
                 ~dependencies:(Dependent dependencies)
                 ?rules
@@ -366,6 +391,18 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ?artifacts
                 ?tag
                 script
+              |> (if cargo_cache then Tezos_ci.enable_cargo_cache else Fun.id)
+              |>
+              match sccache with
+              | None -> Fun.id
+              | Some {key; error_log; idle_timeout; log; path; cache_size} ->
+                  Tezos_ci.enable_sccache
+                    ?key
+                    ?error_log
+                    ?idle_timeout
+                    ?log
+                    ?path
+                    ?cache_size)
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -407,12 +444,17 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
+    ?arch:Tezos_ci.arch ->
+    ?cpu:Tezos_ci.cpu ->
+    ?storage:Tezos_ci.storage ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?tag:Tezos_ci.tag ->
+    ?cargo_cache:bool ->
+    ?sccache:sccache_config ->
     string ->
     string list ->
     job
@@ -442,8 +484,9 @@ end
 module Make (Component : COMPONENT) : COMPONENT_API = struct
   let only_if_changed = Tezos_ci.Changeset.make Component.paths
 
-  let job ~__POS__:source_location ~stage ~description ~image ?(needs = [])
-      ?(needs_legacy = []) ?variables ?artifacts ?tag name script =
+  let job ~__POS__:source_location ~stage ~description ?arch ?cpu ?storage
+      ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts ?tag
+      ?(cargo_cache = false) ?sccache name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -462,6 +505,9 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       name;
       stage;
       description;
+      arch;
+      cpu;
+      storage;
       image;
       needs;
       needs_legacy;
@@ -470,6 +516,8 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       script;
       artifacts;
       tag;
+      cargo_cache;
+      sccache;
     }
 
   let register_before_merging_jobs jobs =

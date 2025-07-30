@@ -104,7 +104,10 @@ let variables : variables =
 (** {3 Components} *)
 
 (* This must be done before registering shared pipelines. *)
+
 let () = Grafazos.register ()
+
+let () = Teztale.register ()
 
 (** {3 General pipelines} *)
 
@@ -162,8 +165,6 @@ let () =
   let octez_evm_node_release_tag_re =
     "/^octez-evm-node-v\\d+\\.\\d+(?:\\-rc\\d+)?$/"
   in
-  (* Matches Teztale release tags, e.g. [teztale-v1.2]. *)
-  let teztale_release_tag_re = "/^teztale-v\\d+\\.\\d+$/" in
   (* Matches smart rollup node release tags,
      e.g. [octez-smart-rollup-node-v1.2], [octez-smart-rollup-node-v20250625] or
      [octez-smart-rollup-node-v1.2-rc4]. *)
@@ -192,11 +193,7 @@ let () =
   let has_non_release_tag =
     let release_tags =
       octez_release_tags
-      @ [
-          octez_evm_node_release_tag_re;
-          teztale_release_tag_re;
-          octez_smart_rollup_node_release_tag_re;
-        ]
+      @ [octez_evm_node_release_tag_re; octez_smart_rollup_node_release_tag_re]
       @ !Hooks.release_tags
     in
     If.(Predefined_vars.ci_commit_tag != null && not (has_any_tag release_tags))
@@ -276,18 +273,6 @@ let () =
     ~description:
       "Dry-run pipeline for 'octez_minor_release_tag'.\n\n\
        This pipeline checks that 'octez_minor_release_tag' pipelines work as \
-       intended, without publishing any release. Developers or release \
-       managers can create this pipeline by pushing a tag to a fork of \
-       'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
-  (* TODO: We should be able to register this pipeline in [teztale/ci]. *)
-  register
-    "teztale_release_tag_test"
-    If.(not_on_tezos_namespace && push && has_tag_match teztale_release_tag_re)
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Teztale.Release.jobs ~test:true ())
-    ~description:
-      "Test release pipeline for Teztale.\n\n\
-       This pipeline checks that 'teztale_release_tag' pipelines work as \
        intended, without publishing any release. Developers or release \
        managers can create this pipeline by pushing a tag to a fork of \
        'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;

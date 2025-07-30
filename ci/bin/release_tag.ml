@@ -42,6 +42,40 @@ type release_tag_pipeline_type =
   | Schedule_test
 
 let monitoring_child_pipeline =
+  (* The Teztale build job is defined using Cacio, which does not provide a way
+     to include it in the monitoring child pipeline, because we plan to remove
+     this child pipeline. In the meantime, we redefine the job here. *)
+  let job_teztale_build ?cpu ~arch ?storage () =
+    let arch_string = arch_to_string arch in
+    job
+      ~__POS__
+      ~arch
+      ?cpu
+      ?storage
+      ~name:("teztale.build:static-" ^ arch_string)
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~variables:[("PROFILE", "static")]
+      ~artifacts:
+        (Gitlab_ci.Util.artifacts
+           ~name:"teztale-binaries"
+           ~expire_in:Never
+           ~when_:On_success
+           ["teztale-binaries/" ^ arch_string ^ "/octez-teztale-*"])
+      ~before_script:
+        [
+          "./scripts/ci/take_ownership.sh";
+          ". ./scripts/version.sh";
+          "eval $(opam env)";
+        ]
+      ~after_script:
+        [
+          "mkdir -p ./teztale-binaries/" ^ arch_string;
+          "mv octez-teztale-* ./teztale-binaries/" ^ arch_string ^ "/";
+        ]
+      ["make teztale"]
+    |> enable_cargo_cache |> enable_sccache
+  in
   Pipeline.register_child
     "octez_monitoring"
     ~description:"Octez monitoring jobs"
@@ -52,8 +86,8 @@ let monitoring_child_pipeline =
       [
         job_datadog_pipeline_trace;
         job_build_layer1_profiling ~expire_in:Never ();
-        Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
-        Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ~cpu:Very_high ();
+        job_teztale_build ~arch:Arm64 ~storage:Ramfs ();
+        job_teztale_build ~arch:Amd64 ~cpu:Very_high ();
       ]
 
 let job_release_page ~test ?dependencies () =
@@ -349,13 +383,9 @@ let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
        match (test, release_tag_pipeline_type) with
        | false, (Release_tag | Beta_release_tag | Non_release_tag) ->
            !Tezos_ci.Hooks.global_release
-           @ Teztale.Release.jobs ~test:false ~dry_run:false ()
        | true, (Release_tag | Beta_release_tag | Non_release_tag) ->
            !Tezos_ci.Hooks.global_test_release
-           @ Teztale.Release.jobs ~test:true ~dry_run:false ()
-       | true, Schedule_test ->
-           !Tezos_ci.Hooks.global_scheduled_test_release
-           @ Teztale.Release.jobs ~test:true ~dry_run:true ()
+       | true, Schedule_test -> !Tezos_ci.Hooks.global_scheduled_test_release
        | false, Schedule_test ->
            failwith
              "test = false is inconsistent with release_tag_pipeline_type = \
