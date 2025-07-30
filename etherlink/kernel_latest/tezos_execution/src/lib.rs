@@ -4,6 +4,7 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
@@ -31,6 +32,7 @@ use tezos_tezlink::{
     },
 };
 use thiserror::Error;
+use validate::ValidationInfo;
 
 extern crate alloc;
 pub mod account_storage;
@@ -522,38 +524,8 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let receipt = match manager_operation.operation {
-        OperationContent::Reveal(RevealContent { pk, proof: _ }) => {
-            let reveal_result = reveal(
-                &mut safe_host,
-                source,
-                &mut validation_info.source_account,
-                &pk,
-            )?;
-            let manager_result =
-                produce_operation_result(validation_info.balance_updates, reveal_result);
-            OperationResultSum::Reveal(manager_result)
-        }
-        OperationContent::Transfer(TransferContent {
-            amount,
-            destination,
-            parameters,
-        }) => {
-            let transfer_result = transfer_external(
-                &mut safe_host,
-                context,
-                source,
-                &amount,
-                &destination,
-                parameters,
-            )?;
-            let manager_result = produce_operation_result(
-                validation_info.balance_updates,
-                transfer_result.map(TransferTarget::ToContrat),
-            );
-            OperationResultSum::Transfer(manager_result)
-        }
-    };
+    let receipt =
+        apply_operation(&mut safe_host, context, &manager_operation, validation_info)?;
 
     if is_applied(&receipt) {
         safe_host.promote()?;
@@ -563,6 +535,46 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     }
 
     Ok(receipt)
+}
+
+fn apply_operation<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    operation: &ManagerOperation<OperationContent>,
+    validation_info: ValidationInfo,
+) -> Result<OperationResultSum, ApplyKernelError> {
+    let ValidationInfo {
+        new_source_balance: _,
+        mut source_account,
+        balance_updates: validation_balance_updates,
+    } = validation_info;
+    match operation.operation {
+        OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
+            let reveal_result = reveal(host, &operation.source, &mut source_account, pk)?;
+            let manager_result =
+                produce_operation_result(validation_balance_updates, reveal_result);
+            Ok(OperationResultSum::Reveal(manager_result))
+        }
+        OperationContent::Transfer(TransferContent {
+            ref amount,
+            ref destination,
+            ref parameters,
+        }) => {
+            let transfer_result = transfer_external(
+                host,
+                context,
+                &operation.source,
+                amount,
+                destination,
+                parameters.clone(),
+            )?;
+            let manager_result = produce_operation_result(
+                validation_balance_updates,
+                transfer_result.map(TransferTarget::ToContrat),
+            );
+            Ok(OperationResultSum::Transfer(manager_result))
+        }
+    }
 }
 
 #[cfg(test)]
