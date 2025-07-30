@@ -167,6 +167,56 @@ pub fn transfer_tez<Host: Runtime>(
     }))
 }
 
+/// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+#[allow(clippy::too_many_arguments)]
+pub fn transfer<'a, Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
+    amount: &Narith,
+    dest_contract: &Contract,
+    dest_account: &mut impl TezlinkAccount,
+    entrypoint: Option<Entrypoint>,
+    param: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
+) -> ExecutionResult<TransferSuccess> {
+    let receipt = match transfer_tez(
+        host,
+        context,
+        src_contract,
+        src_account,
+        amount,
+        dest_contract,
+        dest_account,
+        &param,
+    )? {
+        Ok(success) => success,
+        Err(error) => return Ok(Err(error)),
+    };
+    if let Contract::Originated(_) = dest_contract {
+        let dest_account =
+            TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
+        let code = dest_account.code(host)?;
+        let storage = dest_account.storage(host)?;
+        let new_storage =
+            execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
+        match new_storage {
+            Ok(new_storage) => {
+                dest_account.set_storage(host, &new_storage)?;
+                Ok(Ok(TransferSuccess {
+                    storage: Some(new_storage),
+                    ..receipt
+                }))
+            }
+            Err(err) => Ok(Err(err.into())),
+        }
+    } else {
+        Ok(Ok(receipt))
+    }
+}
+
 // Handles manager transfer operations.
 pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
@@ -221,7 +271,7 @@ pub fn transfer_external<Host: Runtime>(
             let mut dest_account =
                 TezlinkOriginatedAccount::from_contract(context, dest)?;
             let mut ctx = Ctx::default();
-            let receipt = match transfer_tez(
+            transfer(
                 host,
                 context,
                 &src_contract,
@@ -229,30 +279,11 @@ pub fn transfer_external<Host: Runtime>(
                 amount,
                 dest,
                 &mut dest_account,
-                &value,
-            )? {
-                Ok(receipt) => receipt,
-                Err(err) => {
-                    return Ok(Err(err));
-                }
-            };
-
-            let code = dest_account.code(host)?;
-            let storage = dest_account.storage(host)?;
-            let new_storage = execute_smart_contract(
-                code, storage, entrypoint, value, &parser, &mut ctx,
-            );
-            match new_storage {
-                Ok(new_storage) => {
-                    dest_account.set_storage(host, &new_storage)?;
-                    Ok(Ok(TransferSuccess {
-                        storage: Some(new_storage),
-                        ..receipt
-                    }))
-                }
-
-                Err(err) => Ok(Err(err.into())),
-            }
+                entrypoint,
+                value,
+                &parser,
+                &mut ctx,
+            )
         }
     };
     // TODO : Counter Increment should be done after successful validation (see issue  #8031)
