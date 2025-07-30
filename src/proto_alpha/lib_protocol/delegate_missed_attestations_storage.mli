@@ -57,7 +57,6 @@ val record_attesting_participation :
   delegate:Signature.Public_key_hash.t ->
   participation:level_participation ->
   attesting_power:int ->
-  staking_weight:Int64.t ->
   Raw_context.t tzresult Lwt.t
 
 (** Update the participation of a delegate as a DAL attester in the current

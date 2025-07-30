@@ -3013,7 +3013,6 @@ let record_attesting_participation ctxt dal_attestation =
               ~delegate:consensus_key.delegate
               ~participation
               ~attesting_power:attestation_power.slots
-              ~staking_weight:attestation_power.stake
           in
           Dal_apply.record_participation
             ctxt

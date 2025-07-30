@@ -2365,7 +2365,6 @@ module Delegate : sig
     delegate:public_key_hash ->
     participation:level_participation ->
     attesting_power:int ->
-    staking_weight:Int64.t ->
     context tzresult Lwt.t
 
   val record_dal_participation :
