@@ -42,6 +42,8 @@ Follow these steps to run a DAL node along with a layer 1 node and a baker.
 
       octez-dal-node config init --endpoint http://127.0.0.1:8732 --attester-profiles="$MY_ADDRESS" --data-dir my-attester-tezos-dal-node
 
+   If you are switching from running the DAL node on a different network, use an empty directory instead of re-using the directory from another network.
+
    You can specify parameters such as the RPC node in the ``config init`` command or in the ``run`` command.
    These commands have the same parameters. For information about them, run ``octez-dal-node config init --help`` or see :ref:`DAL node commands <dal-node-commands>`.
 
