@@ -20,12 +20,13 @@ module Arch = struct
 end
 
 module CPU = struct
-  type t = Normal | High | Very_high
+  type t = Normal | High | Very_high | Tezt
 
   let show = function
     | Normal -> "normal"
     | High -> "high"
     | Very_high -> "very_high"
+    | Tezt -> "tezt"
 end
 
 module Storage = struct
@@ -126,8 +127,7 @@ module Tag = struct
     | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
     | Gcp_very_high_cpu_ramfs_dev ->
         Some Very_high
-    | Gcp_tezt | Gcp_tezt_dev ->
-        failwith "not implemented: Runner.Tag.cpu for Tezt runners"
+    | Gcp_tezt | Gcp_tezt_dev -> Some Tezt
     | Dynamic -> None
 
   let storage : t -> Storage.t option = function

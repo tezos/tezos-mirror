@@ -785,6 +785,7 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
     match (arch, tag, cpu, storage) with
+    | _, _, Tezt, _ -> failwith "TODO (next commit)"
     | Some Arm64, _, (High | Very_high), _ ->
         failwith
           "[job] cannot specify both [arch=Arm64] and [cpu=High] or \

@@ -42,6 +42,7 @@ module CPU : sig
     | Normal  (** Use the default runners. *)
     | High  (** Use more powerful runners. *)
     | Very_high  (** Use even more powerful runners. *)
+    | Tezt  (** Use even more powerful runners, for Tezt jobs. *)
 
   (** Convert a CPU specification into a string. *)
   val show : t -> string
