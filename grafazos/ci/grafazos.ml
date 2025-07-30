@@ -42,7 +42,6 @@ let job_gitlab_release =
     ~description:"Create a GitLab release for Grafazos."
     ~needs:[(Artifacts, job_build Build)]
     ["./grafazos/scripts/releases/create_gitlab_release.sh"]
-    ~tag:Gcp_not_interruptible
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
@@ -77,7 +76,6 @@ let job_release_page =
             ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
           ])
     ["./grafazos/scripts/releases/publish_release_page.sh"]
-    ~tag:Gcp_not_interruptible
 
 let register () =
   CI.register_before_merging_jobs [(Auto, job_build Test)] ;
