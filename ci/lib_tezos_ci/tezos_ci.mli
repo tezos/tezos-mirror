@@ -375,19 +375,12 @@ val enc_git_strategy : git_strategy -> string
 
 (** Define a job.
 
-    This smart constructor for {!Gitlab_ci.Types.job} additionally:
+    This is a smart constructor for {!Gitlab_ci.Types.job}.
+
+    This function handles dependencies as follows.
 
     - Translates each {!dependency} to [needs:] and [dependencies:]
-    keywords as detailed in the documentation of {!dependency}.
-    - Adds [tag:] based on [arch] and [tag]:
-
-      - If only [tag] is set, then it is passed as is to the job's [tags:]
-        field. The runners of the tezos/tezos CI all use singleton tags,
-        hence we only allow one tag per job.
-      - Setting both [arch] and [tag] throws an error.
-      - Omitting both [arch] and [tag] is equivalent to setting
-        [~tag:Gcp] or, equivalently, omitting tag and setting
-        [~arch:Amd64].
+      keywords as detailed in the documentation of {!dependency}.
 
     - [image_dependencies] is a list of internal !{Image.t}s that this
       job uses indirectly, i.e. not in it's [image:] field. For
@@ -396,26 +389,39 @@ val enc_git_strategy : git_strategy -> string
       if this list includes an external image.
 
     - If both a [template] and an [image] are provided, then a
-    run-time error is raised to prevent overriding the image defined
-    in the GitLab template.
+      run-time error is raised to prevent overriding the image defined
+      in the GitLab template.
 
     - If the [image] used is {!Internal} and [tag] is set to
-    {!Dynamic} then a run-time error is generated as the required
-    architecture for the internal image cannot be statically
-    deduced.
+      {!Dynamic} then a run-time error is generated as the required
+      architecture for the internal image cannot be statically
+      deduced.
 
-    - The [cpu] parameter specifies the CPU allocation for the job,
-      allowing it to run on a GCP GitLab runner with normal, high,
-      or very high CPU capacity.
+    This function accepts the following arguments to specify requirements
+    on the runners that are to run the job.
 
-    - The [dev_infra] parameter allows to run the job on the dev infrastructure.
-      This parameter is used for tests only and should not be merged in
-      production.
+    - [dev_infra] specifies the cloud provider account to use.
+      [false] is [GCP] or [AWS], [true] is [GCP_dev].
+      If omitted, any account may be used.
 
-    - If [interruptible_runner] is specified,
-      restrict the set of allowed runner tags accordingly.
-      Typically you would set it to [false] for publish jobs,
-      and leave it unspecified for most other jobs. *)
+    - [arch] specifies a required CPU architecture.
+      If omitted, any architecture may be used.
+
+    - [cpu] specifies the required CPU power.
+      If omitted, any CPU may be used.
+
+    - [storage] specifies the required storage method.
+      If omitted, any storage method may be used.
+
+    - [interruptible_runner] specifies whether it is acceptable that the runner
+      may be interrupted, for instance because of the spot instance mechanism.
+      If omitted, either interruptible and non-interruptible runners may be used.
+
+    From these requirements, the function selects a runner tag, using {!Runner.Tag.choose}.
+    This takes the first tag that is compatible with your requirements,
+    from a list of tags ordered in a priority list located in [runner.ml].
+    You may also specify the runner [tag] explicitly instead,
+    in which case the function simply checks that your requirements are compatible. *)
 val job :
   ?arch:Runner.Arch.t ->
   ?after_script:string list ->
