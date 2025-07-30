@@ -91,7 +91,7 @@ aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}${BUCKET_PATH}/" --regio
 
 echo "Building release page"
 dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' \
-  --title 'Octez releases' --bucket "${S3_BUCKET}" --path \
+  --title 'Octez releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
   "${BUCKET_PATH:-}" changelog binaries packages
 
 echo "Syncing html files to remote s3 bucket"
