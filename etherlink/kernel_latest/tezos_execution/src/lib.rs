@@ -532,7 +532,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.start()?;
 
     let receipt =
-        apply_operation(&mut safe_host, context, &manager_operation, validation_info)?;
+        apply_operation(&mut safe_host, context, &manager_operation, validation_info);
 
     if is_applied(&receipt) {
         safe_host.promote()?;
@@ -549,7 +549,7 @@ fn apply_operation<Host: Runtime>(
     context: &Context,
     operation: &ManagerOperation<OperationContent>,
     validation_info: ValidationInfo,
-) -> Result<OperationResultSum, ApplyKernelError> {
+) -> OperationResultSum {
     let ValidationInfo {
         new_source_balance,
         mut source_account,
@@ -562,7 +562,7 @@ fn apply_operation<Host: Runtime>(
                 validation_balance_updates,
                 reveal_result.map_err(|e| e.into()),
             );
-            Ok(OperationResultSum::Reveal(manager_result))
+            OperationResultSum::Reveal(manager_result)
         }
         OperationContent::Transfer(TransferContent {
             ref amount,
@@ -585,7 +585,7 @@ fn apply_operation<Host: Runtime>(
                     .map(TransferTarget::ToContrat)
                     .map_err(|e| e.into()),
             );
-            Ok(OperationResultSum::Transfer(manager_result))
+            OperationResultSum::Transfer(manager_result)
         }
     }
 }
