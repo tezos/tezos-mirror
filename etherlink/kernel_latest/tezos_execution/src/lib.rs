@@ -518,10 +518,6 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         .source_account
         .set_balance(&mut safe_host, &validation_info.new_source_balance)?;
 
-    let (src_delta, block_fees) =
-        compute_fees_balance_updates(source, &manager_operation.fee)
-            .map_err(ApplyKernelError::BigIntError)?;
-
     safe_host.promote()?;
     safe_host.promote_trace()?;
     safe_host.start()?;
@@ -535,7 +531,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
                 &pk,
             )?;
             let manager_result =
-                produce_operation_result(vec![src_delta, block_fees], reveal_result);
+                produce_operation_result(validation_info.balance_updates, reveal_result);
             OperationResultSum::Reveal(manager_result)
         }
         OperationContent::Transfer(TransferContent {
@@ -552,7 +548,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
                 parameters,
             )?;
             let manager_result = produce_operation_result(
-                vec![src_delta, block_fees],
+                validation_info.balance_updates,
                 transfer_result.map(TransferTarget::ToContrat),
             );
             OperationResultSum::Transfer(manager_result)

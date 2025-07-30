@@ -16,7 +16,7 @@ use tezos_tezlink::{
 use crate::{
     account_storage::{Manager, TezlinkImplicitAccount},
     context::Context,
-    ApplyKernelError,
+    ApplyKernelError, BalanceUpdate,
 };
 
 impl TezlinkImplicitAccount {
@@ -119,6 +119,7 @@ fn check_storage_limit(
 pub struct ValidationInfo {
     pub new_source_balance: Narith,
     pub source_account: TezlinkImplicitAccount,
+    pub balance_updates: Vec<BalanceUpdate>,
 }
 
 pub fn validate_operation<Host: Runtime>(
@@ -189,19 +190,24 @@ pub fn validate_operation<Host: Runtime>(
         }
     };
 
-    let verify = verify_signature(&pk, branch, &content.into(), signature.clone())?;
+    let verify = verify_signature(&pk, branch, &operation.content, signature.clone())?;
 
-    if verify {
-        Ok(Ok(ValidationInfo {
-            new_source_balance: new_balance,
-            source_account: account,
-        }))
-    } else {
+    if !verify {
         log!(
             host,
             tezos_evm_logging::Level::Debug,
             "Invalid operation: Signature is invalid"
         );
-        Ok(Err(ValidityError::InvalidSignature))
+        return Ok(Err(ValidityError::InvalidSignature));
     }
+
+    let (src_delta, block_fees) =
+        crate::compute_fees_balance_updates(&content.source, &content.fee)
+            .map_err(ApplyKernelError::BigIntError)?;
+
+    Ok(Ok(ValidationInfo {
+        new_source_balance: new_balance,
+        source_account: account,
+        balance_updates: vec![src_delta, block_fees],
+    }))
 }
