@@ -466,7 +466,7 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-pub fn apply_operation<Host: Runtime>(
+pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
@@ -596,7 +596,7 @@ mod tests {
 
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        apply_operation, context, OperationError,
+        context, validate_and_apply_operation, OperationError,
     };
 
     #[derive(Clone)]
@@ -814,9 +814,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -844,9 +849,14 @@ mod tests {
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -874,9 +884,14 @@ mod tests {
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -917,9 +932,14 @@ mod tests {
 
         // Applying the operation
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         // Reveal operation should fail
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
@@ -967,9 +987,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
@@ -1019,9 +1044,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -1056,9 +1086,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
@@ -1114,9 +1149,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1178,9 +1218,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1257,9 +1302,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1354,8 +1404,9 @@ mod tests {
                 value: Micheline::from(requested_amount as i128).encode(),
             }),
         );
-        let res = apply_operation(&mut host, &context, operation)
-            .expect("apply_operation should not have failed with a kernel error");
+        let res = validate_and_apply_operation(&mut host, &context, operation).expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
         println!("Result: {:?}", res);
         assert_eq!(
             faucet.balance(&host).unwrap(),
@@ -1399,9 +1450,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let storage = Some(storage_value);
 
@@ -1490,9 +1546,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1555,9 +1616,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1611,9 +1677,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
