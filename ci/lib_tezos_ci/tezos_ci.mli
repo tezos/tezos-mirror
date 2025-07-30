@@ -8,7 +8,7 @@
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
 
-module Rules : module type of Rules
+module Rules = Rules
 
 (** The name of a {!tezos_job} as given to [~name] of {!job}.
 
