@@ -129,25 +129,14 @@ fn address_from_contract(contract: Contract) -> AddressHash {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
-    context: &context::Context,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
-    param: &Micheline,
 ) -> ExecutionResult<TransferSuccess> {
-    let mut allocated_destination_contract = false;
-    if let Contract::Implicit(_) = dest_contract {
-        if &Micheline::from(()) != param {
-            return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
-        }
-        allocated_destination_contract =
-            TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
-    }
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
             .map_err(ApplyKernelError::BigIntError)?;
@@ -182,7 +171,7 @@ pub fn transfer_tez<Host: Runtime>(
         consumed_gas: 0_u64.into(),
         storage_size: 0_u64.into(),
         paid_storage_size_diff: 0_u64.into(),
-        allocated_destination_contract,
+        allocated_destination_contract: false,
     }))
 }
 
@@ -210,37 +199,18 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                match &dest_contract {
-                    Contract::Implicit(_) => transfer_tez(
-                        host,
-                        context,
-                        sender_contract,
-                        sender_account,
-                        &amount,
-                        &dest_contract,
-                        &mut TezlinkImplicitAccount::from_contract(
-                            context,
-                            &dest_contract,
-                        )?,
-                        &param.into_micheline_optimized_legacy(&parser.arena),
-                    ),
-                    Contract::Originated(_) => transfer(
-                        host,
-                        context,
-                        sender_contract,
-                        sender_account,
-                        &amount,
-                        &dest_contract,
-                        &mut TezlinkOriginatedAccount::from_contract(
-                            context,
-                            &dest_contract,
-                        )?,
-                        Some(destination_address.entrypoint),
-                        param.into_micheline_optimized_legacy(&parser.arena),
-                        parser,
-                        ctx,
-                    ),
-                }
+                transfer(
+                    host,
+                    context,
+                    sender_contract,
+                    sender_account,
+                    &amount,
+                    &dest_contract,
+                    Some(destination_address.entrypoint),
+                    param.into_micheline_optimized_legacy(&parser.arena),
+                    parser,
+                    ctx,
+                )
             }
             _ => {
                 return Ok(Err(ApplyOperationError::UnSupportedOperation(
@@ -275,54 +245,75 @@ pub fn transfer<'a, Host: Runtime>(
     src_account: &mut impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
-    dest_account: &mut impl TezlinkAccount,
     entrypoint: Option<Entrypoint>,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
 ) -> ExecutionResult<TransferSuccess> {
-    let receipt = match transfer_tez(
-        host,
-        context,
-        src_contract,
-        src_account,
-        amount,
-        dest_contract,
-        dest_account,
-        &param,
-    )? {
-        Ok(success) => success,
-        Err(error) => return Ok(Err(error)),
-    };
-    if let Contract::Originated(_) = dest_contract {
-        ctx.sender = address_from_contract(src_contract.clone());
-        let mut dest_account =
-            TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
-        let code = dest_account.code(host)?;
-        let storage = dest_account.storage(host)?;
-        let result =
-            execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
-        match result {
-            Ok((internal_operations, new_storage)) => {
-                dest_account.set_storage(host, &new_storage)?;
-                let _internal_receipt = execute_internal_operations(
-                    host,
-                    context,
-                    internal_operations,
-                    dest_contract,
-                    &mut dest_account,
-                    parser,
-                    ctx,
-                )?;
-                Ok(Ok(TransferSuccess {
-                    storage: Some(new_storage),
-                    ..receipt
-                }))
+    match dest_contract {
+        Contract::Implicit(pkh) => {
+            let is_entrypoint_default =
+                entrypoint.is_none() || entrypoint == Some(Entrypoint::default());
+            if param != Micheline::from(()) || !is_entrypoint_default {
+                return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
             }
-            Err(err) => Ok(Err(err.into())),
+            // Allocate the implicit account if it doesn't exist
+            let allocated =
+                TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
+            match transfer_tez(
+                host,
+                src_contract,
+                src_account,
+                amount,
+                dest_contract,
+                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
+            )? {
+                Ok(success) => Ok(Ok(TransferSuccess {
+                    allocated_destination_contract: allocated,
+                    ..success
+                })),
+                Err(error) => Ok(Err(error)),
+            }
         }
-    } else {
-        Ok(Ok(receipt))
+        Contract::Originated(_) => {
+            let mut dest_account =
+                TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
+            let receipt = match transfer_tez(
+                host,
+                src_contract,
+                src_account,
+                amount,
+                dest_contract,
+                &mut dest_account,
+            )? {
+                Ok(success) => success,
+                Err(error) => return Ok(Err(error)),
+            };
+            ctx.sender = address_from_contract(src_contract.clone());
+            let code = dest_account.code(host)?;
+            let storage = dest_account.storage(host)?;
+            let result =
+                execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
+            match result {
+                Ok((internal_operations, new_storage)) => {
+                    dest_account.set_storage(host, &new_storage)?;
+                    let _internal_receipt = execute_internal_operations(
+                        host,
+                        context,
+                        internal_operations,
+                        dest_contract,
+                        &mut dest_account,
+                        parser,
+                        ctx,
+                    )?;
+                    Ok(Ok(TransferSuccess {
+                        storage: Some(new_storage),
+                        ..receipt
+                    }))
+                }
+                Err(err) => Ok(Err(err.into())),
+            }
+        }
     }
 }
 
@@ -358,44 +349,22 @@ pub fn transfer_external<Host: Runtime>(
         ),
         None => (None, Micheline::from(())),
     };
+    let mut ctx = Ctx::default();
+    ctx.source = address_from_contract(src_contract.clone());
 
     // Delegate to appropriate handler
-    let success = match dest {
-        Contract::Implicit(dest_key_hash) => {
-            let mut dest_account =
-                TezlinkImplicitAccount::from_public_key_hash(context, dest_key_hash)?;
-            transfer_tez(
-                host,
-                context,
-                &src_contract,
-                &mut src_account,
-                amount,
-                dest,
-                &mut dest_account,
-                &value,
-            )
-        }
-
-        Contract::Originated(_) => {
-            let mut dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest)?;
-            let mut ctx = Ctx::default();
-            ctx.source = address_from_contract(src_contract.clone());
-            transfer(
-                host,
-                context,
-                &src_contract,
-                &mut src_account,
-                amount,
-                dest,
-                &mut dest_account,
-                entrypoint,
-                value,
-                &parser,
-                &mut ctx,
-            )
-        }
-    };
+    let success = transfer(
+        host,
+        context,
+        &src_contract,
+        &mut src_account,
+        amount,
+        dest,
+        entrypoint,
+        value,
+        &parser,
+        &mut ctx,
+    );
     // TODO : Counter Increment should be done after successful validation (see issue  #8031)
     src_account.increment_counter(host)?;
     success
