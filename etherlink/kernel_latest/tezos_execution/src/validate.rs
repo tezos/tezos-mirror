@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
-use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::{
-    operation::{verify_signature, ManagerOperation, OperationContent, RevealContent},
+    operation::{
+        verify_signature, ManagerOperation, Operation, OperationContent, RevealContent,
+    },
     operation_result::{CounterError, ValidityError},
 };
 
@@ -124,12 +124,12 @@ pub struct ValidationInfo {
 pub fn validate_operation<Host: Runtime>(
     host: &Host,
     context: &Context,
-    branch: &BlockHash,
-    operation: ManagerOperation<OperationContent>,
-    signature: UnknownSignature,
+    operation: &Operation,
 ) -> Result<Result<ValidationInfo, ValidityError>, ApplyKernelError> {
-    let account =
-        TezlinkImplicitAccount::from_public_key_hash(context, &operation.source)?;
+    let branch = &operation.branch;
+    let content: ManagerOperation<OperationContent> = operation.content.clone().into();
+    let signature = &operation.signature;
+    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)?;
 
     // Account must exist in the durable storage
     if !account.allocated(host)? {
@@ -141,12 +141,12 @@ pub fn validate_operation<Host: Runtime>(
         return Ok(Err(ValidityError::EmptyImplicitContract));
     }
 
-    if let Err(err) = account.check_counter_increment(host, &operation.counter)? {
+    if let Err(err) = account.check_counter_increment(host, &content.counter)? {
         // Counter verification failed, return the error
         return Ok(Err(err));
     }
 
-    let pk = match get_revealed_key(host, &account, &operation.operation)? {
+    let pk = match get_revealed_key(host, &account, &content.operation)? {
         Err(err) => {
             // Retrieve public key failed, return the error
             return Ok(Err(err));
@@ -155,7 +155,7 @@ pub fn validate_operation<Host: Runtime>(
     };
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
-    if let Err(err) = check_gas_limit(&1040000_u64.into(), &operation.gas_limit) {
+    if let Err(err) = check_gas_limit(&1040000_u64.into(), &content.gas_limit) {
         // Gas limit verification failed, return the error
         log!(
             host,
@@ -166,7 +166,7 @@ pub fn validate_operation<Host: Runtime>(
     }
 
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
-    if let Err(err) = check_storage_limit(&60000_u64.into(), &operation.storage_limit) {
+    if let Err(err) = check_storage_limit(&60000_u64.into(), &content.storage_limit) {
         // Storage limit verification failed, return the error
         log!(
             host,
@@ -177,7 +177,7 @@ pub fn validate_operation<Host: Runtime>(
     }
 
     // The manager account must be solvent to pay the announced fees.
-    let new_balance = match account.simulate_spending(host, &operation.fee)? {
+    let new_balance = match account.simulate_spending(host, &content.fee)? {
         Some(new_balance) => new_balance,
         None => {
             log!(
@@ -185,11 +185,11 @@ pub fn validate_operation<Host: Runtime>(
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Can't pay the fees"
             );
-            return Ok(Err(ValidityError::CantPayFees(operation.fee)));
+            return Ok(Err(ValidityError::CantPayFees(content.fee)));
         }
     };
 
-    let verify = verify_signature(&pk, branch, &operation.into(), signature)?;
+    let verify = verify_signature(&pk, branch, &content.into(), signature.clone())?;
 
     if verify {
         Ok(Ok(ValidationInfo {
