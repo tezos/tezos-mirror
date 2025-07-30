@@ -228,7 +228,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 )
                 .into()));
             }
-        }?;
+        };
         match internal_receipt {
             Ok(receipt) => {
                 log!(
@@ -239,7 +239,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 );
             }
             Err(error) => {
-                return Ok(Err(error));
+                return Ok(Err(error.into()));
             }
         }
     }
@@ -260,35 +260,36 @@ pub fn transfer<'a, Host: Runtime>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
             if param != Micheline::from(()) || !entrypoint.is_default() {
-                return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
+                return Err(TransferError::NonSmartContractExecutionCall);
             }
             // Allocate the implicit account if it doesn't exist
             let allocated =
-                TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
-            let success = transfer_tez(
+                TezlinkImplicitAccount::allocate(host, context, dest_contract)
+                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
+            transfer_tez(
                 host,
                 src_contract,
                 src_account,
                 src_balance,
                 amount,
                 dest_contract,
-                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
+                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?,
             )
-            .map_err(|e| e.into())
             .map(|success| TransferSuccess {
                 allocated_destination_contract: allocated,
                 ..success
-            });
-            Ok(success)
+            })
         }
         Contract::Originated(_) => {
             let mut dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
-            let receipt = match transfer_tez(
+                TezlinkOriginatedAccount::from_contract(context, dest_contract)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let receipt = transfer_tez(
                 host,
                 src_contract,
                 src_account,
@@ -296,37 +297,37 @@ pub fn transfer<'a, Host: Runtime>(
                 amount,
                 dest_contract,
                 &mut dest_account,
-            ) {
-                Ok(receipt) => receipt,
-                Err(e) => {
-                    return Ok(Err(e.into()));
-                }
-            };
+            )?;
             ctx.sender = address_from_contract(src_contract.clone());
-            let code = dest_account.code(host)?;
-            let storage = dest_account.storage(host)?;
+            let code = dest_account
+                .code(host)
+                .map_err(|_| TransferError::FailedToFetchContractCode)?;
+            let storage = dest_account
+                .storage(host)
+                .map_err(|_| TransferError::FailedToFetchContractStorage)?;
             // TODO: this has already been computed by transfer_tez, avoid refetching it from storage
-            let dest_balance = dest_account.balance(host)?;
-            match execute_smart_contract(code, storage, entrypoint, param, parser, ctx) {
-                Ok((internal_operations, new_storage)) => {
-                    dest_account.set_storage(host, &new_storage)?;
-                    let _internal_receipt = execute_internal_operations(
-                        host,
-                        context,
-                        internal_operations,
-                        dest_contract,
-                        &mut dest_account,
-                        &dest_balance,
-                        parser,
-                        ctx,
-                    );
-                    Ok(Ok(TransferSuccess {
-                        storage: Some(new_storage),
-                        ..receipt
-                    }))
-                }
-                Err(err) => Ok(Err(err.into())),
-            }
+            let dest_balance = dest_account
+                .balance(host)
+                .map_err(|_| TransferError::FailedToFetchDestinationContractBalance)?;
+            let (internal_operations, new_storage) =
+                execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
+            dest_account
+                .set_storage(host, &new_storage)
+                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            let _internal_receipt = execute_internal_operations(
+                host,
+                context,
+                internal_operations,
+                dest_contract,
+                &mut dest_account,
+                &dest_balance,
+                parser,
+                ctx,
+            );
+            Ok(TransferSuccess {
+                storage: Some(new_storage),
+                ..receipt
+            })
         }
     }
 }
@@ -379,10 +380,10 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
-    );
-    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
+    )
+    .map_err(|e| e.into());
     src_account.increment_counter(host)?;
-    success
+    Ok(success)
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.

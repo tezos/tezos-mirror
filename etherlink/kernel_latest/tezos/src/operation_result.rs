@@ -81,6 +81,16 @@ pub enum TransferError {
     FailedToComputeBalanceUpdate,
     #[error("Failed to apply balance changes")]
     FailedToApplyBalanceChanges,
+    #[error("Failed to fetch destination account")]
+    FailedToFetchDestinationAccount,
+    #[error("Failed to fetch contract code")]
+    FailedToFetchContractCode,
+    #[error("Failed to fetch contract storage")]
+    FailedToFetchContractStorage,
+    #[error("Failed to fetch destination contract balance")]
+    FailedToFetchDestinationContractBalance,
+    #[error("Failed to update contract storage")]
+    FailedToUpdateContractStorage,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
