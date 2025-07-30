@@ -7,6 +7,24 @@
 
 (** Information about CI runners. *)
 
+module Provider : sig
+  (** Cloud provider accounts.
+
+      In most cases, you want to use [GCP].
+
+      [AWS] is only used in very specific cases.
+
+      [GCP_dev] can be used for testing changes to the infrastructure itself
+      (do the changes in the staging environment, run some test pipelines
+      where jobs are modified to use this [GCP_dev] account,
+      without committing the changes to the infrastructure to prod).
+      On [master], no job should be using [GCP_dev]. *)
+  type t = GCP | GCP_dev | AWS
+
+  (** Convert a cloud provider specification to a string. *)
+  val show : t -> string
+end
+
 module Arch : sig
   (** Runner CPU architectures. *)
   type t = Amd64 | Arm64
@@ -80,6 +98,9 @@ module Tag : sig
   (** Convert a tag to a string, suitable to be used in [tag:] clauses. *)
   val show : t -> string
 
+  (** Get the cloud provider specification of a runner from its tag. *)
+  val provider : t -> Provider.t option
+
   (** Get the architecture of a runner from its tag. *)
   val arch : t -> Arch.t option
 
@@ -92,7 +113,13 @@ module Tag : sig
   (** Test if a tag has exactly some properties.
 
       Cannot be called on tag [Dynamic]. *)
-  val has : ?arch:Arch.t -> ?cpu:CPU.t -> ?storage:Storage.t -> t -> bool
+  val has :
+    ?provider:Provider.t ->
+    ?arch:Arch.t ->
+    ?cpu:CPU.t ->
+    ?storage:Storage.t ->
+    t ->
+    bool
 
   (** Choose a runner according to some constraints.
 
@@ -100,5 +127,10 @@ module Tag : sig
       If multiple runners satisfy the constraints, return the first one
       according to an internal priority list. *)
   val choose :
-    ?arch:Arch.t -> ?cpu:CPU.t -> ?storage:Storage.t -> unit -> t option
+    ?provider:Provider.t ->
+    ?arch:Arch.t ->
+    ?cpu:CPU.t ->
+    ?storage:Storage.t ->
+    unit ->
+    t option
 end

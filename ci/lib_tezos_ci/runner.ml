@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Provider = struct
+  type t = GCP | GCP_dev | AWS
+
+  let show = function GCP -> "GCP" | GCP_dev -> "GCP_dev" | AWS -> "AWS"
+end
+
 module Arch = struct
   type t = Amd64 | Arm64
 
@@ -93,6 +99,16 @@ module Tag = struct
     | Aws_specific -> "aws_specific"
     | Dynamic -> Gitlab_ci.Var.encode dynamic_var
 
+  let provider : t -> Provider.t option = function
+    | Gcp_arm64 | Gcp | Gcp_not_interruptible | Gcp_tezt | Gcp_high_cpu
+    | Gcp_very_high_cpu | Gcp_very_high_cpu_ramfs ->
+        Some GCP
+    | Gcp_dev_arm64 | Gcp_dev | Gcp_not_interruptible_dev | Gcp_tezt_dev
+    | Gcp_high_cpu_dev | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs_dev ->
+        Some GCP_dev
+    | Aws_specific -> Some AWS
+    | Dynamic -> None
+
   let arch : t -> Arch.t option = function
     | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
     | Gcp | Gcp_dev | Gcp_not_interruptible | Gcp_not_interruptible_dev
@@ -124,8 +140,8 @@ module Tag = struct
         Some Ramfs
     | Dynamic -> None
 
-  let has ?arch:requested_arch ?cpu:requested_cpu ?storage:requested_storage tag
-      =
+  let has ?provider:requested_provider ?arch:requested_arch ?cpu:requested_cpu
+      ?storage:requested_storage tag =
     let is get_from_tag = function
       | None -> true
       | Some requested -> (
@@ -133,9 +149,10 @@ module Tag = struct
           | None -> invalid_arg "cannot call Runner.Tag.has on Dynamic"
           | Some actual -> actual = requested)
     in
-    is arch requested_arch && is cpu requested_cpu
+    is provider requested_provider
+    && is arch requested_arch && is cpu requested_cpu
     && is storage requested_storage
 
-  let choose ?arch ?cpu ?storage () =
-    List.find_opt (has ?arch ?cpu ?storage) list
+  let choose ?provider ?arch ?cpu ?storage () =
+    List.find_opt (has ?provider ?arch ?cpu ?storage) list
 end
