@@ -206,7 +206,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     sender_account,
                     &amount,
                     &dest_contract,
-                    Some(destination_address.entrypoint),
+                    destination_address.entrypoint,
                     param.into_micheline_optimized_legacy(&parser.arena),
                     parser,
                     ctx,
@@ -245,16 +245,14 @@ pub fn transfer<'a, Host: Runtime>(
     src_account: &mut impl TezlinkAccount,
     amount: &Narith,
     dest_contract: &Contract,
-    entrypoint: Option<Entrypoint>,
+    entrypoint: Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
 ) -> ExecutionResult<TransferSuccess> {
     match dest_contract {
         Contract::Implicit(pkh) => {
-            let is_entrypoint_default =
-                entrypoint.is_none() || entrypoint == Some(Entrypoint::default());
-            if param != Micheline::from(()) || !is_entrypoint_default {
+            if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
             }
             // Allocate the implicit account if it doesn't exist
@@ -341,13 +339,13 @@ pub fn transfer_external<Host: Runtime>(
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
-            Some(param.entrypoint),
+            param.entrypoint,
             match Micheline::decode_raw(&parser.arena, &param.value) {
                 Ok(value) => value,
                 Err(err) => return Ok(Err(TransferError::from(err).into())),
             },
         ),
-        None => (None, Micheline::from(())),
+        None => (Entrypoint::default(), Micheline::from(())),
     };
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
@@ -442,7 +440,7 @@ fn apply_balance_changes(
 fn execute_smart_contract<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
-    entrypoint: Option<Entrypoint>,
+    entrypoint: Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
@@ -457,7 +455,7 @@ fn execute_smart_contract<'a>(
         ctx,
         &parser.arena,
         value,
-        entrypoint,
+        Some(entrypoint),
         storage_micheline,
     )?;
 
