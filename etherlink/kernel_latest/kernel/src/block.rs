@@ -31,7 +31,6 @@ use anyhow::Context;
 use block_in_progress::EthBlockInProgress;
 use evm::Config;
 use evm_execution::account_storage::{init_account_storage, EthereumAccountStorage};
-use evm_execution::precompiles::PrecompileBTreeMap;
 use evm_execution::trace::TracerInput;
 use primitive_types::{H160, H256, U256};
 use tezos_ethereum::block::BlockConstants;
@@ -134,7 +133,6 @@ fn compute<Host: Runtime>(
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_in_progress: &mut EthBlockInProgress,
     block_constants: &BlockConstants,
-    precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -176,7 +174,6 @@ fn compute<Host: Runtime>(
             host,
             outbox_queue,
             block_constants,
-            precompiles,
             &transaction,
             block_in_progress.index,
             evm_account_storage,
@@ -315,7 +312,6 @@ pub fn compute_bip<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     mut block_in_progress: EthBlockInProgress,
-    precompiles: &PrecompileBTreeMap<Host>,
     tick_counter: &mut TickCounter,
     sequencer_pool_address: Option<H160>,
     limits: &EvmLimits,
@@ -339,7 +335,6 @@ pub fn compute_bip<Host: Runtime>(
         outbox_queue,
         &mut block_in_progress,
         &constants,
-        precompiles,
         &mut evm_account_storage,
         sequencer_pool_address,
         limits,
@@ -471,7 +466,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         world_state: OwnedPath::from(&chain_config.storage_root_path()),
     };
     let outbox_queue = OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX)?;
-    let precompiles = chain_config.precompiles_set(config.enable_fa_bridge);
 
     // Check if there's a BIP in storage to resume its execution
     let (block_in_progress_provenance, block_in_progress) =
@@ -521,7 +515,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
         &mut safe_host,
         &outbox_queue,
         block_in_progress,
-        &precompiles,
         &mut tick_counter,
         sequencer_pool_address,
         config.maximum_allowed_ticks,
@@ -613,7 +606,6 @@ mod tests {
         account_path, init_account_storage, EthereumAccountStorage,
     };
     use evm_execution::configuration::EVMVersion;
-    use evm_execution::precompiles::precompile_set;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
     use tezos_data_encoding::types::Narith;
@@ -1663,7 +1655,6 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let block_constants = first_block(&mut host);
-        let precompiles = precompile_set(false);
 
         //provision sender account
         let sender = H160::from_str("af1276cbb260bb13deddb4209ae99ae6e497f446").unwrap();
@@ -1701,7 +1692,6 @@ mod tests {
             &OutboxQueue::new(&WITHDRAWAL_OUTBOX_QUEUE, u32::MAX).unwrap(),
             &mut block_in_progress,
             &block_constants,
-            &precompiles,
             &mut evm_account_storage,
             None,
             &EvmLimits::default(),

@@ -16,8 +16,7 @@ use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
-    is_revm_enabled, read_last_info_per_level_timestamp, read_sequencer_pool_address,
-    read_tracer_input,
+    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, error::StorageError, storage};
@@ -27,12 +26,11 @@ use crate::{parsable, parsing, retrieve_chain_id};
 use evm::Config;
 use evm_execution::account_storage::account_path;
 use evm_execution::trace::TracerInput;
+use evm_execution::EthereumError;
 use evm_execution::{
     account_storage,
     handler::{ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult},
-    precompiles,
 };
-use evm_execution::{run_transaction, EthereumError};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
@@ -375,14 +373,13 @@ impl Evaluation {
         &self,
         host: &mut Host,
         tracer_input: Option<TracerInput>,
-        enable_fa_withdrawals: bool,
         evm_configuration: &Config,
     ) -> Result<SimulationResult<CallResult, String>, Error> {
         let chain_id = retrieve_chain_id(host)?;
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-        let mut evm_account_storage = account_storage::init_account_storage()
+        let evm_account_storage = account_storage::init_account_storage()
             .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
 
         // If the simulation is performed with the zero address and has a non
@@ -468,17 +465,14 @@ impl Evaluation {
             }
         };
 
-        let precompiles = precompiles::precompile_set::<Host>(enable_fa_withdrawals);
-
         let gas_price = if let Some(gas_price) = self.gas_price {
             U256::from(gas_price)
         } else {
             constants.block_fees.base_fee_per_gas()
         };
 
-        if let Ok(true) = is_revm_enabled(host) {
-            if from.is_zero() {
-                let mut simulation_caller =
+        if from.is_zero() {
+            let mut simulation_caller =
                     revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
                         &revm::primitives::Address::from_slice(&from.0),
                     )
@@ -487,132 +481,87 @@ impl Evaluation {
                             err.to_string(),
                         )))
                     })?;
-                let gas = self
-                    .gas
-                    .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
-                let max_gas_to_pay = constants.base_fee_per_gas() * gas;
-                if let Some(value) = self.value {
-                    simulation_caller
-                        .set_balance(
-                            host,
-                            revm::primitives::U256::from_le_slice(
-                                &(evm_execution::utilities::u256_to_le_bytes(
-                                    value + max_gas_to_pay,
-                                )),
-                            ),
-                        )
-                        .map_err(|err| {
-                            Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                                err.to_string(),
-                            )))
-                        })?;
-                } else {
-                    simulation_caller
-                        .set_balance(
-                            host,
-                            revm::primitives::U256::from_le_slice(
-                                &(evm_execution::utilities::u256_to_le_bytes(
-                                    max_gas_to_pay,
-                                )),
-                            ),
-                        )
-                        .map_err(|err| {
-                            Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                                err.to_string(),
-                            )))
-                        })?;
-                }
+            let gas = self
+                .gas
+                .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
+            let max_gas_to_pay = constants.base_fee_per_gas() * gas;
+            if let Some(value) = self.value {
+                simulation_caller
+                    .set_balance(
+                        host,
+                        revm::primitives::U256::from_le_slice(
+                            &(evm_execution::utilities::u256_to_le_bytes(
+                                value + max_gas_to_pay,
+                            )),
+                        ),
+                    )
+                    .map_err(|err| {
+                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                            err.to_string(),
+                        )))
+                    })?;
+            } else {
+                simulation_caller
+                    .set_balance(
+                        host,
+                        revm::primitives::U256::from_le_slice(
+                            &(evm_execution::utilities::u256_to_le_bytes(max_gas_to_pay)),
+                        ),
+                    )
+                    .map_err(|err| {
+                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                            err.to_string(),
+                        )))
+                    })?;
             }
+        }
 
-            match revm_run_transaction(
-                host,
-                &constants,
-                from,
-                self.to,
-                self.value.unwrap_or_default(),
-                self.gas
-                    .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT)),
-                self.data.clone(),
-                gas_price,
-                // TODO: Replace this by the decoded access lists if any.
-                empty_access_list(),
-                evm_configuration,
-                tracer_input,
-            ) {
-                Ok(Some(outcome)) if !self.with_da_fees => {
-                    let result: SimulationResult<CallResult, String> =
-                        Result::Ok(Some(outcome)).into();
+        match revm_run_transaction(
+            host,
+            &constants,
+            from,
+            self.to,
+            self.value.unwrap_or_default(),
+            self.gas
+                .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT)),
+            self.data.clone(),
+            gas_price,
+            // TODO: Replace this by the decoded access lists if any.
+            empty_access_list(),
+            evm_configuration,
+            tracer_input,
+        ) {
+            Ok(Some(outcome)) if !self.with_da_fees => {
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
 
-                    Ok(result)
-                }
-                Ok(Some(outcome)) => {
-                    let outcome = simulation_add_gas_for_fees(
-                        outcome,
-                        &constants.block_fees,
-                        &self.data,
-                    )
-                    .map_err(Error::Simulation)?;
-
-                    let result: SimulationResult<CallResult, String> =
-                        Result::Ok(Some(outcome)).into();
-
-                    Ok(result)
-                }
-                Ok(None) => {
-                    let result: SimulationResult<CallResult, String> =
-                        Result::Ok(None).into();
-
-                    Ok(result)
-                }
-                Err(err) => {
-                    let result: SimulationResult<CallResult, String> = Result::Err(
-                        EthereumError::WrappedError(Cow::Owned(err.to_string())),
-                    )
-                    .into();
-
-                    Ok(result)
-                }
+                Ok(result)
             }
-        } else {
-            match run_transaction(
-                host,
-                &constants,
-                &mut evm_account_storage,
-                &precompiles,
-                evm_configuration,
-                self.to,
-                from,
-                self.data.clone(),
-                self.gas.map_or(Some(MAXIMUM_GAS_LIMIT), |gas| {
-                    Some(u64::min(gas, MAXIMUM_GAS_LIMIT))
-                }),
-                gas_price,
-                self.value.unwrap_or_default(),
-                false,
-                tracer_input,
-                // TODO: Replace this by the decoded access lists if any.
-                empty_access_list(),
-            ) {
-                Ok(Some(outcome)) if !self.with_da_fees => {
-                    let result: SimulationResult<CallResult, String> =
-                        Result::Ok(Some(outcome)).into();
+            Ok(Some(outcome)) => {
+                let outcome = simulation_add_gas_for_fees(
+                    outcome,
+                    &constants.block_fees,
+                    &self.data,
+                )
+                .map_err(Error::Simulation)?;
 
-                    Ok(result)
-                }
-                Ok(Some(outcome)) => {
-                    let outcome = simulation_add_gas_for_fees(
-                        outcome,
-                        &constants.block_fees,
-                        &self.data,
-                    )
-                    .map_err(Error::Simulation)?;
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(Some(outcome)).into();
 
-                    let result: SimulationResult<CallResult, String> =
-                        Result::Ok(Some(outcome)).into();
+                Ok(result)
+            }
+            Ok(None) => {
+                let result: SimulationResult<CallResult, String> =
+                    Result::Ok(None).into();
 
-                    Ok(result)
-                }
-                result => Ok(result.into()),
+                Ok(result)
+            }
+            Err(err) => {
+                let result: SimulationResult<CallResult, String> =
+                    Result::Err(EthereumError::WrappedError(Cow::Owned(err.to_string())))
+                        .into();
+
+                Ok(result)
             }
         }
     }
@@ -745,7 +694,6 @@ impl<T: Encodable + Decodable> VersionedEncoding for SimulationResult<T, String>
 
 pub fn start_simulation_mode<Host: Runtime>(
     host: &mut Host,
-    enable_fa_withdrawals: bool,
     evm_configuration: &Config,
 ) -> Result<(), anyhow::Error> {
     log!(host, Debug, "Starting simulation mode ");
@@ -753,12 +701,7 @@ pub fn start_simulation_mode<Host: Runtime>(
     match simulation {
         Message::Evaluation(simulation) => {
             let tracer_input = read_tracer_input(host)?;
-            let outcome = simulation.run(
-                host,
-                tracer_input,
-                enable_fa_withdrawals,
-                evm_configuration,
-            )?;
+            let outcome = simulation.run(host, tracer_input, evm_configuration)?;
             storage::store_simulation_result(host, outcome)
         }
     }
@@ -767,7 +710,7 @@ pub fn start_simulation_mode<Host: Runtime>(
 #[cfg(test)]
 mod tests {
 
-    use evm_execution::configuration::EVMVersion;
+    use evm_execution::{configuration::EVMVersion, precompiles::PrecompileBTreeMap};
     use primitive_types::H256;
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
@@ -863,7 +806,6 @@ mod tests {
             crate::block::GAS_LIMIT,
             H160::zero(),
         );
-        let precompiles = precompiles::precompile_set::<Host>(false);
         let mut evm_account_storage = account_storage::init_account_storage().unwrap();
 
         let callee = None;
@@ -880,7 +822,7 @@ mod tests {
             host,
             &block,
             &mut evm_account_storage,
-            &precompiles,
+            &PrecompileBTreeMap::new(),
             &EVMVersion::current_test_config(),
             callee,
             caller,
@@ -918,8 +860,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
@@ -945,8 +886,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "simulation should have succeeded");
         let outcome = outcome.unwrap();
@@ -978,8 +918,7 @@ mod tests {
             with_da_fees: false,
             timestamp: None,
         };
-        let outcome =
-            evaluation.run(&mut host, None, false, &EVMVersion::current_test_config());
+        let outcome = evaluation.run(&mut host, None, &EVMVersion::current_test_config());
 
         assert!(outcome.is_ok(), "evaluation should have succeeded");
         let outcome = outcome.unwrap();
