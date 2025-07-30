@@ -170,7 +170,8 @@ module Pipeline : sig
   val describe_pipeline : string -> unit
 end
 
-(** Add variable enabling sccache.
+module Cache : sig
+  (** Add variable enabling sccache.
 
     This function should be applied to jobs that build rust files and
     which has a configured sccache Gitlab CI cache.
@@ -190,37 +191,38 @@ end
     variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
     [SCCACHE_LOG] respectively. See the sccache documentation for more
     information on these variables. *)
-val enable_sccache :
-  ?key:string ->
-  ?error_log:string ->
-  ?idle_timeout:string ->
-  ?log:string ->
-  ?path:string ->
-  ?cache_size:string ->
-  tezos_job ->
-  tezos_job
+  val enable_sccache :
+    ?key:string ->
+    ?error_log:string ->
+    ?idle_timeout:string ->
+    ?log:string ->
+    ?path:string ->
+    ?cache_size:string ->
+    tezos_job ->
+    tezos_job
 
-(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+  (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
     This function should only be applied to jobs that have a GitLab CI
     cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
     function calls this function, so there is no need to apply both).
     Exceptions can be made for jobs that must have CARGO_HOME set to
     something different than {!cargo_home}. *)
-val enable_networked_cargo : tezos_job -> tezos_job
+  val enable_networked_cargo : tezos_job -> tezos_job
 
-(** Adds a GitLab CI cache for the CARGO_HOME folder.
+  (** Adds a GitLab CI cache for the CARGO_HOME folder.
 
     More precisely, we only cache the non-SCM dependencies in the
     sub-directory [registry/cache]. *)
-val enable_cargo_cache : tezos_job -> tezos_job
+  val enable_cargo_cache : tezos_job -> tezos_job
 
-(** Enable caching of Cargo's target folder which stores files which
+  (** Enable caching of Cargo's target folder which stores files which
     can speed up subsequent compilation passes.
 
     All folders are stored in a single cacheable directory to work
     around GitLab's restriction on the number caches a job may have. *)
-val enable_cargo_target_caches : ?key:string -> tezos_job -> tezos_job
+  val enable_cargo_target_caches : ?key:string -> tezos_job -> tezos_job
+end
 
 (** A facility for registering images for [image:] keywords.
 

@@ -18,6 +18,7 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
+open Tezos_ci.Cache
 
 (* types for the repositories pipelines.
    - Release: we run all the release jobs, but no tests

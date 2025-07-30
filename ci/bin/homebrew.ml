@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Tezos_ci
+open Tezos_ci.Cache
 
 type homebrew_pipeline = Full | Release
 

@@ -391,12 +391,13 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ?artifacts
                 ?tag
                 script
-              |> (if cargo_cache then Tezos_ci.enable_cargo_cache else Fun.id)
+              |> (if cargo_cache then Tezos_ci.Cache.enable_cargo_cache
+                  else Fun.id)
               |>
               match sccache with
               | None -> Fun.id
               | Some {key; error_log; idle_timeout; log; path; cache_size} ->
-                  Tezos_ci.enable_sccache
+                  Tezos_ci.Cache.enable_sccache
                     ?key
                     ?error_log
                     ?idle_timeout

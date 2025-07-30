@@ -19,6 +19,7 @@ open Common
 open Gitlab_ci
 open Gitlab_ci.Util
 open Tezos_ci
+open Tezos_ci.Cache
 
 let rules_always = [job_rule ~when_:Always ()]
 

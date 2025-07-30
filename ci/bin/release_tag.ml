@@ -16,6 +16,7 @@
    GitLab}, the associated artifacts, and to push releases to opam. *)
 
 open Tezos_ci
+open Tezos_ci.Cache
 open Common
 
 (** Type of release tag pipelines.
