@@ -686,12 +686,12 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
 
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
-    ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
-    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
-    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
-    ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
-    ?event_sections_levels ?operator_profiles ?history_mode ?prover
-    ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
+    ?blocks_per_cycle ?delay_increment_per_round ?redundancy_factor ?slot_size
+    ?number_of_shards ?number_of_slots ?attestation_lag ?attestation_threshold
+    ?traps_fraction ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?incentives_enable ?dal_rewards_weight ?activation_timestamp
+    ?bootstrap_profile ?event_sections_levels ?operator_profiles ?history_mode
+    ?prover ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
     ?disable_amplification ?ignore_pkhs variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -712,6 +712,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~custom_constants
         ?minimal_block_delay
         ?delay_increment_per_round
+        ?blocks_per_cycle
         ?redundancy_factor
         ?slot_size
         ?number_of_slots
@@ -11200,6 +11201,10 @@ let register ~protocols =
     ~activation_timestamp:Now
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+      (* when consensus_rights_delay = 1 and attestation_lag = 16,
+         blocks_per_cycle must be at least 16:
+         attestation_lag <= consensus_rights_delay * blocks_per_cycle *)
+    ~blocks_per_cycle:16
     "dal attester with baker daemon"
     test_attester_with_daemon
     protocols ;
