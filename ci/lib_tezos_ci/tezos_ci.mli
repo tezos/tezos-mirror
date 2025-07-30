@@ -201,6 +201,9 @@ module Cache : sig
     tezos_job ->
     tezos_job
 
+  (** Value of [CARGO_HOME] *)
+  val cargo_home : string
+
   (** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
 
     This function should only be applied to jobs that have a GitLab CI
