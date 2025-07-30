@@ -244,7 +244,7 @@ pub fn transfer_external<Host: Runtime>(
             );
             match new_storage {
                 Ok(new_storage) => {
-                    let _ = dest_account.set_storage(host, &new_storage);
+                    dest_account.set_storage(host, &new_storage)?;
                     Ok(Ok(TransferSuccess {
                         storage: Some(new_storage),
                         ..receipt
