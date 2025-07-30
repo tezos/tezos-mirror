@@ -150,7 +150,8 @@ let schedule_extended_test_rex = rex "^\\[schedule_extended_test\\] "
 let () =
   (* Register a test to benefit from error handling of Test.run,
      as well as [Background.start] etc. *)
-  ( Test.register ~__FILE__ ~title:"update records" ~tags:["update"] @@ fun () ->
+  ( Test.register ~__FILE__ ~title:"update Tezt test records" ~tags:["update"]
+  @@ fun () ->
     let* pipeline_id =
       match cli_from with
       | Pipeline pipeline_id -> return pipeline_id
