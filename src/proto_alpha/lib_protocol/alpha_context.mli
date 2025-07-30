@@ -1759,8 +1759,6 @@ module Contract : sig
 
   val must_be_allocated : context -> t -> unit tzresult Lwt.t
 
-  val list : context -> t list Lwt.t
-
   (** Functions related to both implicit accounts and originated contracts. *)
 
   (** See {!Contract_storage.get_balance}. *)
@@ -1912,6 +1910,15 @@ module Contract : sig
 
   (** Functions used exclusively for RPC calls *)
   module For_RPC : sig
+    val list : context -> t list Lwt.t
+
+    val fold :
+      context ->
+      order:[`Sorted | `Undefined] ->
+      init:'a ->
+      f:(t -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+
     val get_staked_balance : context -> t -> Tez.t option tzresult Lwt.t
 
     val get_unstaked_frozen_balance :

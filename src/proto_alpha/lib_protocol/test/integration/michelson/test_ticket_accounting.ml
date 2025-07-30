@@ -193,7 +193,7 @@ let two_ticketers block =
   let open Lwt_result_syntax in
   let* result = Incremental.begin_construction block in
   let ctxt = Incremental.alpha_ctxt result in
-  let*! cs = Contract.list ctxt in
+  let*! cs = Contract.For_RPC.list ctxt in
   match cs with c1 :: c2 :: _ -> return (c1, c2) | _ -> assert false
 
 let ticket_list_script =

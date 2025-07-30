@@ -503,8 +503,6 @@ let must_be_allocated c contract =
       | Implicit pkh -> tzfail (Empty_implicit_contract pkh)
       | Originated _ -> tzfail (Non_existing_contract contract))
 
-let list c = Storage.Contract.list c
-
 let fresh_contract_from_current_nonce c =
   let open Result_syntax in
   let+ c, nonce = Raw_context.increment_origination_nonce c in
@@ -858,6 +856,10 @@ let simulate_spending ctxt ~balance ~amount source =
 let get_total_supply ctxt = Storage.Contract.Total_supply.get ctxt
 
 module For_RPC = struct
+  let list c = Storage.Contract.list c
+
+  let fold c = Storage.Contract.fold c
+
   let get_staked_balance ctxt =
     let open Lwt_result_syntax in
     function

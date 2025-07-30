@@ -175,7 +175,7 @@ let new_contracts ~before ~after =
   let all_contracts current_block =
     let* result = Incremental.begin_construction current_block in
     let ctxt = Incremental.alpha_ctxt result in
-    let*! cs = Contract.list ctxt in
+    let*! cs = Contract.For_RPC.list ctxt in
     return cs
   in
   let* cs1 = all_contracts before in

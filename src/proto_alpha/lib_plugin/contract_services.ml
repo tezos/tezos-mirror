@@ -413,7 +413,7 @@ end
 let register () =
   let open Lwt_result_syntax in
   register0 ~chunked:true S.list (fun ctxt () () ->
-      let*! result = Contract.list ctxt in
+      let*! result = Contract.For_RPC.list ctxt in
       return result) ;
   let register_field_gen ~filter_contract ~wrap_result ~chunked s f =
     opt_register1 ~chunked s (fun ctxt contract () () ->
