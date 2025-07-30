@@ -1,0 +1,16 @@
+parameter (mutez %fund);
+storage unit;
+code
+  {
+    UNPAIR;
+    SENDER;
+    CONTRACT unit;
+    ASSERT_SOME;
+    SWAP;
+    UNIT;
+    TRANSFER_TOKENS;
+    NIL operation;
+    SWAP;
+    CONS;
+    PAIR
+  }

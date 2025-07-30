@@ -4,12 +4,13 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
 use tezos_data_encoding::enc::BinError;
@@ -18,6 +19,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
+use tezos_tezlink::operation_result::{ApplyOperationError, TransferTarget};
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -25,7 +27,7 @@ use tezos_tezlink::{
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
         OperationError, OperationResultSum, Reveal, RevealError, RevealSuccess,
-        TransferError, TransferSuccess, TransferTarget, UpdateOrigin,
+        TransferError, TransferSuccess, UpdateOrigin,
     },
 };
 use thiserror::Error;
@@ -49,6 +51,8 @@ pub enum ApplyKernelError {
     BigIntError(num_bigint::TryFromBigIntError<num_bigint::BigInt>),
     #[error("Serialization failed because of {0}")]
     BinaryError(String),
+    #[error("Apply operation failed because of an unsupported address error")]
+    MirAddressUnsupportedError,
 }
 
 // 'FromBase58CheckError' doesn't implement PartialEq and Eq
@@ -110,32 +114,35 @@ fn reveal<Host: Runtime>(
     }))
 }
 
-/// Handles manager transfer operations for both implicit and originated contracts.
-pub fn transfer<Host: Runtime>(
-    host: &mut Host,
-    context: &context::Context,
-    src: &PublicKeyHash,
-    amount: &Narith,
-    dest: &Contract,
-    parameter: Option<Parameter>,
-) -> ExecutionResult<TransferTarget> {
-    log!(
-        host,
-        Debug,
-        "Applying a transfer operation from {} to {:?} of {:?} mutez",
-        src,
-        dest,
-        amount
-    );
+fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
+    match address {
+        AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
+        AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
+        AddressHash::Sr1(_) => Err(ApplyKernelError::MirAddressUnsupportedError),
+    }
+}
 
-    let src_contract = Contract::Implicit(src.clone());
-    let (src_update, dest_update) = compute_balance_updates(&src_contract, dest, amount)
-        .map_err(ApplyKernelError::BigIntError)?;
+fn address_from_contract(contract: Contract) -> AddressHash {
+    match contract {
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
+        Contract::Implicit(hash) => AddressHash::Implicit(hash),
+    }
+}
+
+pub fn transfer_tez<Host: Runtime>(
+    host: &mut Host,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
+    amount: &Narith,
+    dest_contract: &Contract,
+    dest_account: &mut impl TezlinkAccount,
+) -> ExecutionResult<TransferSuccess> {
+    let (src_update, dest_update) =
+        compute_balance_updates(src_contract, dest_contract, amount)
+            .map_err(ApplyKernelError::BigIntError)?;
 
     // Check source balance
-    let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
     let current_src_balance = src_account.balance(host)?.0;
-
     let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
         None => {
             log!(host, Debug, "Balance is too low");
@@ -148,73 +155,213 @@ pub fn transfer<Host: Runtime>(
         }
         Some(new_source_balance) => new_source_balance,
     };
+    apply_balance_changes(
+        host,
+        src_account,
+        new_source_balance,
+        dest_account,
+        &amount.0,
+    )?;
+    Ok(Ok(TransferSuccess {
+        storage: None,
+        lazy_storage_diff: None,
+        balance_updates: vec![src_update, dest_update],
+        ticket_receipt: vec![],
+        originated_contracts: vec![],
+        consumed_gas: 0_u64.into(),
+        storage_size: 0_u64.into(),
+        paid_storage_size_diff: 0_u64.into(),
+        allocated_destination_contract: false,
+    }))
+}
 
-    // Delegate to appropriate handler
-    let success = match dest {
-        Contract::Implicit(dest_key_hash) => {
-            if parameter.is_some() {
+pub fn execute_internal_operations<'a, Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    internal_operations: impl Iterator<Item = OperationInfo<'a>>,
+    sender_contract: &Contract,
+    sender_account: &mut TezlinkOriginatedAccount,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
+) -> ExecutionResult<()> {
+    for internal_op in internal_operations {
+        log!(
+            host,
+            Debug,
+            "Executing internal operation: {:?}",
+            internal_op
+        );
+        let internal_receipt = match internal_op.operation {
+            mir::ast::Operation::TransferTokens(TransferTokens {
+                param,
+                destination_address,
+                amount,
+            }) => {
+                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let dest_contract = contract_from_address(destination_address.hash)?;
+                transfer(
+                    host,
+                    context,
+                    sender_contract,
+                    sender_account,
+                    &amount,
+                    &dest_contract,
+                    destination_address.entrypoint,
+                    param.into_micheline_optimized_legacy(&parser.arena),
+                    parser,
+                    ctx,
+                )
+            }
+            _ => {
+                return Ok(Err(ApplyOperationError::UnSupportedOperation(
+                    "Unsupported internal operation".to_string(),
+                )
+                .into()));
+            }
+        }?;
+        match internal_receipt {
+            Ok(receipt) => {
+                log!(
+                    host,
+                    Debug,
+                    "Internal operation executed successfully: {:?}",
+                    receipt
+                );
+            }
+            Err(error) => {
+                return Ok(Err(error));
+            }
+        }
+    }
+    Ok(Ok(()))
+}
+
+/// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
+#[allow(clippy::too_many_arguments)]
+pub fn transfer<'a, Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
+    amount: &Narith,
+    dest_contract: &Contract,
+    entrypoint: Entrypoint,
+    param: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
+) -> ExecutionResult<TransferSuccess> {
+    match dest_contract {
+        Contract::Implicit(pkh) => {
+            if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
             }
-            let allocated = TezlinkImplicitAccount::allocate(host, context, dest)?;
-            let mut dest_account =
-                TezlinkImplicitAccount::from_public_key_hash(context, dest_key_hash)?;
-            apply_balance_changes(
+            // Allocate the implicit account if it doesn't exist
+            let allocated =
+                TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
+            match transfer_tez(
                 host,
-                &mut src_account,
-                new_source_balance.clone(),
-                &mut dest_account,
-                &amount.0,
-            )?;
-
-            Ok(Ok(TransferTarget::ToContrat(TransferSuccess {
-                storage: None,
-                lazy_storage_diff: None,
-                balance_updates: vec![src_update, dest_update],
-                ticket_receipt: vec![],
-                originated_contracts: vec![],
-                consumed_gas: 0_u64.into(),
-                storage_size: 0_u64.into(),
-                paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: allocated,
-            })))
+                src_contract,
+                src_account,
+                amount,
+                dest_contract,
+                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
+            )? {
+                Ok(success) => Ok(Ok(TransferSuccess {
+                    allocated_destination_contract: allocated,
+                    ..success
+                })),
+                Err(error) => Ok(Err(error)),
+            }
         }
-
         Contract::Originated(_) => {
-            let mut dest_contract =
-                TezlinkOriginatedAccount::from_contract(context, dest)?;
-            apply_balance_changes(
+            let mut dest_account =
+                TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
+            let receipt = match transfer_tez(
                 host,
-                &mut src_account,
-                new_source_balance.clone(),
-                &mut dest_contract,
-                &amount.0,
-            )?;
-
-            let code = dest_contract.code(host)?;
-            let storage = dest_contract.storage(host)?;
-
-            let new_storage = execute_smart_contract(code, storage, &parameter);
-
-            match new_storage {
-                Ok(new_storage) => {
-                    let _ = dest_contract.set_storage(host, &new_storage);
-                    Ok(Ok(TransferTarget::ToContrat(TransferSuccess {
+                src_contract,
+                src_account,
+                amount,
+                dest_contract,
+                &mut dest_account,
+            )? {
+                Ok(success) => success,
+                Err(error) => return Ok(Err(error)),
+            };
+            ctx.sender = address_from_contract(src_contract.clone());
+            let code = dest_account.code(host)?;
+            let storage = dest_account.storage(host)?;
+            let result =
+                execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
+            match result {
+                Ok((internal_operations, new_storage)) => {
+                    dest_account.set_storage(host, &new_storage)?;
+                    let _internal_receipt = execute_internal_operations(
+                        host,
+                        context,
+                        internal_operations,
+                        dest_contract,
+                        &mut dest_account,
+                        parser,
+                        ctx,
+                    )?;
+                    Ok(Ok(TransferSuccess {
                         storage: Some(new_storage),
-                        lazy_storage_diff: None,
-                        balance_updates: vec![src_update, dest_update],
-                        ticket_receipt: vec![],
-                        originated_contracts: vec![],
-                        consumed_gas: 0_u64.into(),
-                        storage_size: 0_u64.into(),
-                        paid_storage_size_diff: 0_u64.into(),
-                        allocated_destination_contract: false,
-                    })))
+                        ..receipt
+                    }))
                 }
-
                 Err(err) => Ok(Err(err.into())),
             }
         }
+    }
+}
+
+// Handles manager transfer operations.
+pub fn transfer_external<Host: Runtime>(
+    host: &mut Host,
+    context: &context::Context,
+    src: &PublicKeyHash,
+    amount: &Narith,
+    dest: &Contract,
+    parameter: Option<Parameter>,
+) -> ExecutionResult<TransferSuccess> {
+    log!(
+        host,
+        Debug,
+        "Applying an external transfer operation from {} to {:?} of {:?} mutez with parameters {:?}",
+        src,
+        dest,
+        amount,
+        parameter
+    );
+
+    let src_contract = Contract::Implicit(src.clone());
+    let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
+    let parser = Parser::new();
+    let (entrypoint, value) = match parameter {
+        Some(param) => (
+            param.entrypoint,
+            match Micheline::decode_raw(&parser.arena, &param.value) {
+                Ok(value) => value,
+                Err(err) => return Ok(Err(TransferError::from(err).into())),
+            },
+        ),
+        None => (Entrypoint::default(), Micheline::from(())),
     };
+    let mut ctx = Ctx::default();
+    ctx.source = address_from_contract(src_contract.clone());
+
+    let success = transfer(
+        host,
+        context,
+        &src_contract,
+        &mut src_account,
+        amount,
+        dest,
+        entrypoint,
+        value,
+        &parser,
+        &mut ctx,
+    );
     // TODO : Counter Increment should be done after successful validation (see issue  #8031)
     src_account.increment_counter(host)?;
     success
@@ -288,40 +435,35 @@ fn apply_balance_changes(
     Ok(())
 }
 
-/// Executes the entrypoint logic of an originated smart contract and returns the new storage and consumed gas.
-fn execute_smart_contract(
+/// Executes the entrypoint logic of an originated smart contract and returns the new storage.
+fn execute_smart_contract<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
-    parameter: &Option<Parameter>,
-) -> Result<Vec<u8>, TransferError> {
-    let parser = Parser::new();
+    entrypoint: Entrypoint,
+    value: Micheline<'a>,
+    parser: &'a Parser<'a>,
+    ctx: &mut Ctx<'a>,
+) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
+    // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
+    let contract_typechecked = contract_micheline.typecheck_script(ctx)?;
+    let storage_micheline = Micheline::decode_raw(&parser.arena, &storage)?;
 
-    let (entrypoint, value) = match parameter {
-        Some(param) => (
-            Some(param.entrypoint.clone()),
-            Micheline::decode_raw(&parser.arena, &param.value)?,
-        ),
-        None => (None, Micheline::from(())),
-    };
-
-    let mut ctx = Ctx::default();
-    let contract_typechecked = contract_micheline.typecheck_script(&mut ctx)?;
-
-    let storage = Micheline::decode_raw(&parser.arena, &storage)?;
-
-    let (_, new_storage) = contract_typechecked.interpret(
-        &mut ctx,
+    // Execute the contract
+    let (internal_operations, new_storage) = contract_typechecked.interpret(
+        ctx,
         &parser.arena,
         value,
-        entrypoint,
-        storage,
+        Some(entrypoint),
+        storage_micheline,
     )?;
 
+    // Encode the new storage
     let new_storage = new_storage
         .into_micheline_optimized_legacy(&parser.arena)
         .encode();
-    Ok(new_storage)
+
+    Ok((internal_operations, new_storage))
 }
 
 pub fn apply_operation<Host: Runtime>(
@@ -403,7 +545,7 @@ pub fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            let transfer_result = transfer(
+            let transfer_result = transfer_external(
                 &mut safe_host,
                 context,
                 source,
@@ -411,8 +553,10 @@ pub fn apply_operation<Host: Runtime>(
                 &destination,
                 parameters,
             )?;
-            let manager_result =
-                produce_operation_result(vec![src_delta, block_fees], transfer_result);
+            let manager_result = produce_operation_result(
+                vec![src_delta, block_fees],
+                transfer_result.map(TransferTarget::ToContrat),
+            );
             OperationResultSum::Transfer(manager_result)
         }
     };
@@ -429,7 +573,9 @@ pub fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{TezlinkImplicitAccount, TezlinkOriginatedAccount};
+    use crate::{account_storage::TezlinkOriginatedAccount, TezlinkImplicitAccount};
+    use mir::ast::{Entrypoint, Micheline};
+    use pretty_assertions::assert_eq;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
@@ -1160,6 +1306,68 @@ mod tests {
     }
 
     #[test]
+    fn apply_transfer_to_originated_faucet() {
+        let mut host = MockKernelHost::default();
+        let context = context::Context::init_context();
+        let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
+        let src = bootstrap1();
+        let desthash =
+            ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
+                .expect("ContractKt1Hash b58 conversion should have succeeded");
+        // Setup accounts with 50 mutez in their balance
+        let requester = init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+        let (code, storage) = (
+            r#"
+                        parameter (mutez %fund);
+                        storage unit;
+                        code
+                        {
+                            UNPAIR;
+                            SENDER;
+                            CONTRACT unit;
+                            IF_NONE { FAILWITH } {};
+                            SWAP;
+                            UNIT;
+                            TRANSFER_TOKENS;
+                            NIL operation;
+                            SWAP;
+                            CONS;
+                            PAIR
+                        }
+            "#,
+            "Unit",
+        );
+        let faucet = init_contract(&mut host, &desthash, code, storage, &1000.into());
+        let requested_amount = 100;
+        let operation = make_transfer_operation(
+            fees,
+            1,
+            4,
+            5,
+            src.clone(),
+            0.into(),
+            Contract::Originated(desthash).clone(),
+            Some(Parameter {
+                entrypoint: Entrypoint::try_from("fund")
+                    .expect("Entrypoint should be valid"),
+                value: Micheline::from(requested_amount as i128).encode(),
+            }),
+        );
+        let res = apply_operation(&mut host, &context, operation)
+            .expect("apply_operation should not have failed with a kernel error");
+        println!("Result: {:?}", res);
+        assert_eq!(
+            faucet.balance(&host).unwrap(),
+            (faucet_balance - requested_amount).into()
+        );
+        assert_eq!(
+            requester.balance(&host).unwrap(),
+            (requester_balance + requested_amount - fees).into()
+        ); // The faucet should have transferred 100 mutez to the source
+    }
+
+    #[test]
     fn apply_transfer_with_execution() {
         let mut host = MockKernelHost::default();
         let parser = mir::parser::Parser::new();
@@ -1319,5 +1527,116 @@ mod tests {
             0.into(),
             "Counter should not have been incremented"
         );
+    }
+
+    #[test]
+    fn apply_transfer_with_argument_to_implicit_fails() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        let dest = bootstrap2();
+
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Implicit(dest.pkh),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: parser.parse("0").unwrap().encode(),
+            }),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(ApplyOperationError::Transfer(
+                    TransferError::NonSmartContractExecutionCall,
+                ))]
+                .into(),
+            ),
+            internal_operation_results: vec![],
+        });
+
+        assert_eq!(receipt, expected_receipt);
+    }
+
+    #[test]
+    fn apply_transfer_with_non_default_entrypoint_to_implicit_fails() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        let dest = bootstrap2();
+
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Implicit(dest.pkh),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::try_from("non_default")
+                    .expect("Entrypoint should be valid"),
+                value: parser.parse("0").unwrap().encode(),
+            }),
+        );
+
+        let receipt =
+            apply_operation(&mut host, &context::Context::init_context(), operation)
+                .expect("apply_operation should not have failed with a kernel error");
+
+        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh)),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result: ContentResult::Failed(
+                vec![OperationError::Apply(ApplyOperationError::Transfer(
+                    TransferError::NonSmartContractExecutionCall,
+                ))]
+                .into(),
+            ),
+            internal_operation_results: vec![],
+        });
+
+        assert_eq!(receipt, expected_receipt);
     }
 }
