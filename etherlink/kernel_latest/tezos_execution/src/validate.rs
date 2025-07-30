@@ -15,6 +15,7 @@ use tezos_tezlink::{
 
 use crate::{
     account_storage::{Manager, TezlinkImplicitAccount},
+    context::Context,
     ApplyKernelError,
 };
 
@@ -117,15 +118,19 @@ fn check_storage_limit(
 
 pub struct ValidationInfo {
     pub new_source_balance: Narith,
+    pub source_account: TezlinkImplicitAccount,
 }
 
 pub fn validate_operation<Host: Runtime>(
     host: &Host,
-    account: &TezlinkImplicitAccount,
+    context: &Context,
     branch: &BlockHash,
     operation: ManagerOperation<OperationContent>,
     signature: UnknownSignature,
 ) -> Result<Result<ValidationInfo, ValidityError>, ApplyKernelError> {
+    let account =
+        TezlinkImplicitAccount::from_public_key_hash(context, &operation.source)?;
+
     // Account must exist in the durable storage
     if !account.allocated(host)? {
         log!(
@@ -141,7 +146,7 @@ pub fn validate_operation<Host: Runtime>(
         return Ok(Err(err));
     }
 
-    let pk = match get_revealed_key(host, account, &operation.operation)? {
+    let pk = match get_revealed_key(host, &account, &operation.operation)? {
         Err(err) => {
             // Retrieve public key failed, return the error
             return Ok(Err(err));
@@ -189,6 +194,7 @@ pub fn validate_operation<Host: Runtime>(
     if verify {
         Ok(Ok(ValidationInfo {
             new_source_balance: new_balance,
+            source_account: account,
         }))
     } else {
         log!(

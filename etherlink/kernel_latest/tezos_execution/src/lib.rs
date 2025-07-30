@@ -490,13 +490,11 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     safe_host.start()?;
 
-    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
-
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let validation_info = match validate::validate_operation(
+    let mut validation_info = match validate::validate_operation(
         &safe_host,
-        &account,
+        context,
         &operation.branch,
         operation.content.into(),
         operation.signature,
@@ -521,7 +519,9 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    account.set_balance(&mut safe_host, &validation_info.new_source_balance)?;
+    validation_info
+        .source_account
+        .set_balance(&mut safe_host, &validation_info.new_source_balance)?;
 
     let (src_delta, block_fees) =
         compute_fees_balance_updates(source, &manager_operation.fee)
@@ -533,7 +533,12 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     let receipt = match manager_operation.operation {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => {
-            let reveal_result = reveal(&mut safe_host, source, &mut account, &pk)?;
+            let reveal_result = reveal(
+                &mut safe_host,
+                source,
+                &mut validation_info.source_account,
+                &pk,
+            )?;
             let manager_result =
                 produce_operation_result(vec![src_delta, block_fees], reveal_result);
             OperationResultSum::Reveal(manager_result)
