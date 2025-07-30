@@ -24,6 +24,9 @@ module CPU : sig
     | Normal  (** Use the default runners. *)
     | High  (** Use more powerful runners. *)
     | Very_high  (** Use even more powerful runners. *)
+
+  (** Convert a CPU specification into a string. *)
+  val show : t -> string
 end
 
 module Storage : sig
@@ -31,6 +34,9 @@ module Storage : sig
   type t =
     | Network  (** Use the default runners. *)
     | Ramfs  (** Use runners with ramfs storage. *)
+
+  (** Convert a storage method into a string. *)
+  val show : t -> string
 end
 
 module Tag : sig
@@ -76,4 +82,23 @@ module Tag : sig
 
   (** Get the architecture of a runner from its tag. *)
   val arch : t -> Arch.t option
+
+  (** Get the CPU specification of a runner from its tag. *)
+  val cpu : t -> CPU.t option
+
+  (** Get the storage method of a runner from its tag. *)
+  val storage : t -> Storage.t option
+
+  (** Test if a tag has exactly some properties.
+
+      Cannot be called on tag [Dynamic]. *)
+  val has : ?arch:Arch.t -> ?cpu:CPU.t -> ?storage:Storage.t -> t -> bool
+
+  (** Choose a runner according to some constraints.
+
+      If no runner satisfy the constraints, return [None].
+      If multiple runners satisfy the constraints, return the first one
+      according to an internal priority list. *)
+  val choose :
+    ?arch:Arch.t -> ?cpu:CPU.t -> ?storage:Storage.t -> unit -> t option
 end
