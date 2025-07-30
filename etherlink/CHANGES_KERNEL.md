@@ -21,6 +21,11 @@ Its storage version is 36.
     - [`KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r`](https://better-call.dev/mainnet/KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r) for the slow upgrade governance
     - [`KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R`](https://better-call.dev/mainnet/KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R) for the fast upgrade governance
     - [`KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf`](https://better-call.dev/mainnet/KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf) for the sequencer governance
+- REVM is activated (!18883):
+  - Fixed the 1024-call stack depth limit as per EVM specification (previously 256).
+  - Improved smart contract execution performances.
+  - Reduced overall tick consumption.
+  - Better maintainability and alignment with upcoming Ethereum forks and EVM feature updates.
 
 ### Bug fixes
 
