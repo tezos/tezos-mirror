@@ -122,6 +122,13 @@ fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelEr
     }
 }
 
+fn address_from_contract(contract: Contract) -> AddressHash {
+    match contract {
+        Contract::Originated(kt1) => AddressHash::Kt1(kt1),
+        Contract::Implicit(hash) => AddressHash::Implicit(hash),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
@@ -288,6 +295,7 @@ pub fn transfer<'a, Host: Runtime>(
         Err(error) => return Ok(Err(error)),
     };
     if let Contract::Originated(_) = dest_contract {
+        ctx.sender = address_from_contract(src_contract.clone());
         let mut dest_account =
             TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
         let code = dest_account.code(host)?;
@@ -372,6 +380,7 @@ pub fn transfer_external<Host: Runtime>(
             let mut dest_account =
                 TezlinkOriginatedAccount::from_contract(context, dest)?;
             let mut ctx = Ctx::default();
+            ctx.source = address_from_contract(src_contract.clone());
             transfer(
                 host,
                 context,
