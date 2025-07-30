@@ -19,18 +19,16 @@ use crate::storage::{
     read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
-use crate::{error::Error, error::StorageError, storage};
+use crate::{error::Error, storage};
 
 use crate::{parsable, parsing, retrieve_chain_id};
 
 use evm::Config;
-use evm_execution::account_storage::account_path;
+use evm_execution::handler::{
+    ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult,
+};
 use evm_execution::trace::TracerInput;
 use evm_execution::EthereumError;
-use evm_execution::{
-    account_storage,
-    handler::{ExecutionOutcome, ExecutionResult as ExecutionOutcomeResult},
-};
 use primitive_types::{H160, U256};
 use rlp::{Decodable, DecoderError, Encodable, Rlp};
 use tezos_ethereum::access_list::empty_access_list;
@@ -379,24 +377,6 @@ impl Evaluation {
         let minimum_base_fee_per_gas = crate::retrieve_minimum_base_fee_per_gas(host);
         let da_fee = crate::retrieve_da_fee(host)?;
         let coinbase = read_sequencer_pool_address(host).unwrap_or_default();
-        let evm_account_storage = account_storage::init_account_storage()
-            .map_err(|_| Error::Storage(StorageError::AccountInitialisation))?;
-
-        // If the simulation is performed with the zero address and has a non
-        // null value, the simulation will fail with out of funds.
-        // This can be problematic as some tools doesn't provide the `from`
-        // field but provide a non null `value`.
-        //
-        // We solve the issue by giving funds before the simulation to the
-        // zero address if necessary.
-        let from = self.from.unwrap_or(H160::zero());
-        if let Some(value) = self.value {
-            if from.is_zero() {
-                let mut account =
-                    evm_account_storage.get_or_create(host, &account_path(&from)?)?;
-                account.balance_add(host, value)?;
-            }
-        }
 
         let constants = match block_storage::read_current(
             host,
@@ -471,20 +451,30 @@ impl Evaluation {
             constants.block_fees.base_fee_per_gas()
         };
 
+        let from = self.from.unwrap_or(H160::zero());
+
+        let mut simulation_caller =
+            revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
+                &revm::primitives::Address::from_slice(&from.0),
+            )
+            .map_err(|err| {
+                Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                    err.to_string(),
+                )))
+            })?;
+        let gas = self
+            .gas
+            .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
+        let max_gas_to_pay = constants.base_fee_per_gas() * gas;
+
+        // If the simulation is performed with the zero address and has a non
+        // null value, the simulation will fail with out of funds.
+        // This can be problematic as some tools doesn't provide the `from`
+        // field but provide a non null `value`.
+        //
+        // We solve the issue by giving funds before the simulation to the
+        // zero address if necessary.
         if from.is_zero() {
-            let mut simulation_caller =
-                    revm_etherlink::storage::world_state_handler::StorageAccount::from_address(
-                        &revm::primitives::Address::from_slice(&from.0),
-                    )
-                    .map_err(|err| {
-                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                            err.to_string(),
-                        )))
-                    })?;
-            let gas = self
-                .gas
-                .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
-            let max_gas_to_pay = constants.base_fee_per_gas() * gas;
             if let Some(value) = self.value {
                 simulation_caller
                     .set_balance(
@@ -500,21 +490,25 @@ impl Evaluation {
                             err.to_string(),
                         )))
                     })?;
-            } else {
-                simulation_caller
-                    .set_balance(
-                        host,
-                        revm::primitives::U256::from_le_slice(
-                            &(evm_execution::utilities::u256_to_le_bytes(max_gas_to_pay)),
-                        ),
-                    )
-                    .map_err(|err| {
-                        Error::Simulation(EthereumError::WrappedError(Cow::Owned(
-                            err.to_string(),
-                        )))
-                    })?;
             }
         }
+
+        let balance = simulation_caller.balance(host).map_err(|err| {
+            Error::Simulation(EthereumError::WrappedError(Cow::Owned(err.to_string())))
+        })?;
+        simulation_caller
+            .set_balance(
+                host,
+                balance
+                    + revm::primitives::U256::from_le_slice(
+                        &(evm_execution::utilities::u256_to_le_bytes(max_gas_to_pay)),
+                    ),
+            )
+            .map_err(|err| {
+                Error::Simulation(EthereumError::WrappedError(Cow::Owned(
+                    err.to_string(),
+                )))
+            })?;
 
         match revm_run_transaction(
             host,
@@ -710,7 +704,9 @@ pub fn start_simulation_mode<Host: Runtime>(
 #[cfg(test)]
 mod tests {
 
-    use evm_execution::{configuration::EVMVersion, precompiles::PrecompileBTreeMap};
+    use evm_execution::{
+        account_storage, configuration::EVMVersion, precompiles::PrecompileBTreeMap,
+    };
     use primitive_types::H256;
     use tezos_ethereum::{block::BlockConstants, tx_signature::TxSignature};
     use tezos_evm_runtime::runtime::MockKernelHost;
