@@ -91,6 +91,8 @@ pub enum TransferError {
     FailedToFetchDestinationContractBalance,
     #[error("Failed to update contract storage")]
     FailedToUpdateContractStorage,
+    #[error("An internal operation failed: {0}")]
+    FailedToApplyInternalOperation(String),
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {

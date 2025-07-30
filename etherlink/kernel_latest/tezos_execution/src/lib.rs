@@ -20,7 +20,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
-use tezos_tezlink::operation_result::{ApplyOperationError, TransferTarget};
+use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -192,7 +192,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_balance: &Narith,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> ExecutionResult<()> {
+) -> Result<(), TransferError> {
     for internal_op in internal_operations {
         log!(
             host,
@@ -207,7 +207,8 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 amount,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
-                let dest_contract = contract_from_address(destination_address.hash)?;
+                let dest_contract = contract_from_address(destination_address.hash)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
                 transfer(
                     host,
                     context,
@@ -223,27 +224,19 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 )
             }
             _ => {
-                return Ok(Err(ApplyOperationError::UnSupportedOperation(
+                return Err(TransferError::FailedToApplyInternalOperation(
                     "Unsupported internal operation".to_string(),
-                )
-                .into()));
+                ));
             }
-        };
-        match internal_receipt {
-            Ok(receipt) => {
-                log!(
-                    host,
-                    Debug,
-                    "Internal operation executed successfully: {:?}",
-                    receipt
-                );
-            }
-            Err(error) => {
-                return Ok(Err(error.into()));
-            }
-        }
+        }?;
+        log!(
+            host,
+            Debug,
+            "Internal operation executed successfully: {:?}",
+            internal_receipt
+        );
     }
-    Ok(Ok(()))
+    Ok(())
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
