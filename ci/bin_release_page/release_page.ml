@@ -18,7 +18,7 @@ module Storage = struct
     Format.printf "Getting %s from %s@." file path ;
     let command =
       Format.sprintf
-        "aws s3 cp \"%s/%s\" \"%s\""
+        "aws s3 cp \"s3://%s/%s\" \"%s\""
         path
         file
         (Filename.concat temp_dir target)
@@ -35,7 +35,9 @@ module Storage = struct
   let get_folder_content ~path =
     let command =
       (* awk is used to print only the last field from each line. *)
-      Format.sprintf "aws s3 ls \"%s\" --recursive | awk '{print $NF}'" path
+      Format.sprintf
+        "aws s3 ls \"s3://%s\" --recursive | awk '{print $NF}'"
+        path
     in
     let ic = Unix.open_process_in command in
     let result = ref [] in
@@ -393,13 +395,13 @@ let () =
       name = component;
       path =
         (* For octez, the path is root of the bucket. *)
-        (if component = "octez" then Format.sprintf "s3://%s%s" bucket path
-         else Format.sprintf "s3://%s%s/%s" bucket path component);
+        (if component = "octez" then Format.sprintf "%s%s" bucket path
+         else Format.sprintf "%s%s/%s" bucket path component);
       binaries_path =
         (fun version ->
           if component = "octez" then
             Format.sprintf
-              "s3://%s%s/%s-v%i.%i%s/binaries"
+              "%s%s/%s-v%i.%i%s/binaries"
               bucket
               path
               component
@@ -410,7 +412,7 @@ let () =
               | None -> "")
           else
             Format.sprintf
-              "s3://%s%s/%s/%s-v%i.%i%s/binaries"
+              "%s%s/%s/%s-v%i.%i%s/binaries"
               bucket
               path
               component
