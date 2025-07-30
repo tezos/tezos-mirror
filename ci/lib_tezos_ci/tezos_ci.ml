@@ -1476,6 +1476,25 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
 
 (** {2 Caches} *)
 module Cache = struct
+  let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
+      ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
+    let key =
+      Option.value
+        ~default:
+          ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+        key
+    in
+    job
+    |> append_variables
+         [
+           ("DUNE_CACHE", "enabled");
+           ("DUNE_CACHE_STORAGE_MODE", if copy_mode then "copy" else "hardlink");
+           ("DUNE_CACHE_ROOT", path);
+         ]
+    |> append_cache (cache ?policy ~key [path])
+    |> append_after_script
+         ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
+
   let enable_sccache ?key ?error_log ?idle_timeout ?log
       ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
     let key =
