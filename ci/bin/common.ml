@@ -133,11 +133,13 @@ let enable_kernels =
 (** Return a tuple (ARCHITECTURES, <archs>) based on the type
     of repository pipeline. *)
 let archs_variables pipeline =
-  let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
-  let all = List.map Tezos_ci.arch_to_string_alt [Amd64; Arm64] in
-  match pipeline with
-  | Partial -> [("ARCHITECTURES", String.concat " " amd64)]
-  | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
+  let archs : Runner.Arch.t list =
+    match pipeline with Partial -> [Amd64] | Full | Release -> [Amd64; Arm64]
+  in
+  [
+    ( "ARCHITECTURES",
+      String.concat " " (List.map Runner.Arch.show_uniform archs) );
+  ]
 
 let make_job_build_packages ~__POS__ ~name ~matrix ~script ~dependencies
     ~variables ~image =
@@ -574,12 +576,12 @@ let changeset_mir_tzt =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal) ?storage
+let job_build_static_binaries ~__POS__ ~arch ?(cpu = Runner.CPU.Normal) ?storage
     ?(executable_files = "script-inputs/octez-released-executables")
     ?(experimental_executables = "script-inputs/octez-experimental-executables")
     ?version_executable ?(release = false) ?rules ?dependencies ?retry () :
     tezos_job =
-  let arch_string = arch_to_string arch in
+  let arch_string = Runner.Arch.show_easy_to_distinguish arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
     (* Extend the lifespan to prevent failure for external tools using artifacts. *)
@@ -647,7 +649,7 @@ type docker_build_type =
 (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
 let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
     docker_build_type : tezos_job =
-  let arch_string = arch_to_string_alt arch in
+  let arch_string = Runner.Arch.show_uniform arch in
   let ci_docker_hub =
     match docker_build_type with
     | Release | Octez_evm_node_release | Experimental -> true
@@ -740,7 +742,7 @@ let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
     ?(release = false) ?dependencies ?(sccache_size = "5G") () =
-  let arch_string = arch_to_string arch in
+  let arch_string = Runner.Arch.show_easy_to_distinguish arch in
   let name =
     sf
       "oc.build_%s-%s"
@@ -919,7 +921,7 @@ module Tezt = struct
       by {!job_select_tezts} as [~job_select_tezts]. Then the
       constructed tezt job will only run the tezts selected by the
       selection job. *)
-  let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
+  let job ~__POS__ ?rules ?parallel ?(tag = Runner.Tag.Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
       ?(before_script = before_script ~source_version:true ~eval_opam:false [])

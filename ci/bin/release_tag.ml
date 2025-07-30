@@ -47,7 +47,7 @@ let monitoring_child_pipeline =
      to include it in the monitoring child pipeline, because we plan to remove
      this child pipeline. In the meantime, we redefine the job here. *)
   let job_teztale_build ?cpu ~arch ?storage () =
-    let arch_string = arch_to_string arch in
+    let arch_string = Runner.Arch.show_easy_to_distinguish arch in
     job
       ~__POS__
       ~arch

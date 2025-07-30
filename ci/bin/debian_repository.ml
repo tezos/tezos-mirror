@@ -64,13 +64,6 @@ let ubuntu_package_release_matrix ?(ramfs = false) = function
         ];
       ]
 
-let archs_variables pipeline =
-  let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
-  let all = List.map Tezos_ci.arch_to_string_alt [Amd64; Arm64] in
-  match pipeline with
-  | Partial -> [("ARCHITECTURES", String.concat " " amd64)]
-  | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
-
 (* Push .deb artifacts to storagecloud apt repository. *)
 let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?dependencies ~prefix ~variables ?retry ~image script : tezos_job =

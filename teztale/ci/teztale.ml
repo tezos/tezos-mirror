@@ -14,7 +14,7 @@ end)
 let job_build =
   Cacio.parameterize @@ fun mode ->
   Cacio.parameterize @@ fun arch ->
-  let arch_string = Tezos_ci.arch_to_string arch in
+  let arch_string = Tezos_ci.Runner.Arch.show_easy_to_distinguish arch in
   CI.job
     ("build-" ^ arch_string)
     ~__POS__

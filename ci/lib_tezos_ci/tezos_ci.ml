@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 module Rules = Rules
+module Runner = Runner
 open Gitlab_ci.Util
 
 let failwith fmt = Format.kasprintf (fun s -> failwith s) fmt
@@ -717,60 +718,6 @@ module Changeset = struct
   let ( @ ) = union
 end
 
-type arch = Amd64 | Arm64
-
-let arch_to_string = function Amd64 -> "x86_64" | Arm64 -> "arm64"
-
-let arch_to_string_alt = function Amd64 -> "amd64" | Arm64 -> "arm64"
-
-let dynamic_tag_var = Gitlab_ci.Var.make "TAGS"
-
-type tag =
-  | Gcp
-  | Gcp_arm64
-  | Gcp_dev
-  | Gcp_dev_arm64
-  | Gcp_not_interruptible
-  | Gcp_not_interruptible_dev
-  | Gcp_tezt
-  | Gcp_tezt_dev
-  | Gcp_high_cpu
-  | Gcp_high_cpu_dev
-  | Gcp_very_high_cpu
-  | Gcp_very_high_cpu_dev
-  | Gcp_very_high_cpu_ramfs
-  | Gcp_very_high_cpu_ramfs_dev
-  | Aws_specific
-  | Dynamic
-
-let string_of_tag = function
-  | Gcp -> "gcp"
-  | Gcp_arm64 -> "gcp_arm64"
-  | Gcp_dev -> "gcp_dev"
-  | Gcp_dev_arm64 -> "gcp_dev_arm64"
-  | Gcp_not_interruptible -> "gcp_not_interruptible"
-  | Gcp_not_interruptible_dev -> "gcp_not_interruptible_dev"
-  | Gcp_tezt -> "gcp_tezt"
-  | Gcp_tezt_dev -> "gcp_tezt_dev"
-  | Gcp_high_cpu -> "gcp_high_cpu"
-  | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
-  | Gcp_very_high_cpu -> "gcp_very_high_cpu"
-  | Gcp_very_high_cpu_dev -> "gcp_very_high_cpu_dev"
-  | Gcp_very_high_cpu_ramfs -> "gcp_very_high_cpu_ramfs"
-  | Gcp_very_high_cpu_ramfs_dev -> "gcp_very_high_cpu_ramfs_dev"
-  | Aws_specific -> "aws_specific"
-  | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
-
-(** The architecture of the runner associated to a tag . *)
-let arch_of_tag = function
-  | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
-  | Gcp | Gcp_dev | Gcp_not_interruptible | Gcp_not_interruptible_dev | Gcp_tezt
-  | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev | Gcp_very_high_cpu
-  | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
-  | Gcp_very_high_cpu_ramfs_dev | Aws_specific ->
-      Some Amd64
-  | Dynamic -> None
-
 type dependency =
   | Job of tezos_job
   | Optional of tezos_job
@@ -823,31 +770,20 @@ let resolve_dependencies job_name dependencies =
 
 type git_strategy = Fetch | Clone | No_strategy
 
-(** The list of available CPU profiling tags for runners. *)
-type cpu =
-  | Normal  (** Target default Gitlab runner pool. *)
-  | High  (** Target GCP high runner pool. *)
-  | Very_high  (** Target GCP very high runner pool. *)
-
-(** The list of storage profiling tags for runners. *)
-type storage =
-  | Network  (** Target default storage runner pool. *)
-  | Ramfs  (** Target ramfs storage runner pool. *)
-
 let enc_git_strategy = function
   | Fetch -> "fetch"
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
-    ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
-    ?(image_dependencies = []) ?services ?variables ?rules
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal)
-    ?(storage = Network) ?git_strategy ?coverage ?retry ?parallel ?description
-    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
-    tezos_job =
+let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
+    ?(before_script = []) ?cache ?id_tokens ?interruptible
+    ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
+    ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag
+    ?(cpu = Runner.CPU.Normal) ?(storage = Runner.Storage.Network) ?git_strategy
+    ?coverage ?retry ?parallel ?description ?(dev_infra = false) ~__POS__ ?image
+    ?template ~stage ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
-  let tag =
+  let tag : Runner.Tag.t =
     match (arch, tag, cpu, storage) with
     | Some Arm64, _, (High | Very_high), _ ->
         failwith
@@ -901,7 +837,7 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
   in
   if rules = Some [] then
     failwith "The job '%s' cannot have empty [rules]." name ;
-  let arch = if Option.is_some arch then arch else arch_of_tag tag in
+  let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
   (match (image, arch) with
   | Some (Internal {image = Image image_path; _}), None ->
       failwith
@@ -909,10 +845,10 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
          known cannot use the image '%s' since it is Internal. Set a static \
          tag or use an external image."
         name
-        (string_of_tag tag)
+        (Runner.Tag.show tag)
         image_path
   | _ -> ()) ;
-  let tags = Some [string_of_tag tag] in
+  let tags = Some [Runner.Tag.show tag] in
   (match (parallel : Gitlab_ci.Types.parallel option) with
   | Some (Vector n) when n < 2 ->
       failwith
@@ -1604,9 +1540,10 @@ module Images = struct
         ?storage
         ~skip_docker_initialization:true
         ~stage
-        ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:rust-toolchain:" ^ Runner.Arch.show_uniform arch)
         ~description:
-          ("Build internal rust-toolchain images for " ^ arch_to_string_alt arch)
+          ("Build internal rust-toolchain images for "
+          ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts
@@ -1638,10 +1575,10 @@ module Images = struct
         ~arch
         ?storage
         ~stage
-        ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:rust-sdk-bindings:" ^ Runner.Arch.show_uniform arch)
         ~description:
           ("Build internal rust-sdk-bindings images for "
-         ^ arch_to_string_alt arch)
+          ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts
@@ -1665,7 +1602,7 @@ module Images = struct
         ~__POS__
         ~arch
         ~stage
-        ~name:("oc.docker:jsonnet:" ^ arch_to_string_alt arch)
+        ~name:("oc.docker:jsonnet:" ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts ~reports:(reports ~dotenv:"jsonnet_image_tag.env" ()) [])
@@ -1683,7 +1620,7 @@ module Images = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
     let job_docker_ci arch ?storage () =
-      let variables = Some [("ARCH", arch_to_string_alt arch)] in
+      let variables = Some [("ARCH", Runner.Arch.show_uniform arch)] in
       let retry =
         match arch with
         | Amd64 -> None
@@ -1700,8 +1637,9 @@ module Images = struct
         ~skip_docker_initialization:true
         ~stage
         ~timeout:(Minutes 90)
-        ~name:("oc.docker:ci:" ^ arch_to_string_alt arch)
-        ~description:("Build internal CI images for " ^ arch_to_string_alt arch)
+        ~name:("oc.docker:ci:" ^ Runner.Arch.show_uniform arch)
+        ~description:
+          ("Build internal CI images for " ^ Runner.Arch.show_uniform arch)
         ~ci_docker_hub:false
         ~artifacts:
           (artifacts ~reports:(reports ~dotenv:"ci_image_tag.env" ()) [])

@@ -51,9 +51,9 @@ type job = {
   name : string;
   stage : stage;
   description : string;
-  arch : Tezos_ci.arch option;
-  cpu : Tezos_ci.cpu option;
-  storage : Tezos_ci.storage option;
+  arch : Tezos_ci.Runner.Arch.t option;
+  cpu : Tezos_ci.Runner.CPU.t option;
+  storage : Tezos_ci.Runner.Storage.t option;
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
@@ -61,7 +61,7 @@ type job = {
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
-  tag : Tezos_ci.tag option;
+  tag : Tezos_ci.Runner.Tag.t option;
   cargo_cache : bool;
   sccache : sccache_config option;
 }
@@ -445,15 +445,15 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
-    ?arch:Tezos_ci.arch ->
-    ?cpu:Tezos_ci.cpu ->
-    ?storage:Tezos_ci.storage ->
+    ?arch:Tezos_ci.Runner.Arch.t ->
+    ?cpu:Tezos_ci.Runner.CPU.t ->
+    ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
-    ?tag:Tezos_ci.tag ->
+    ?tag:Tezos_ci.Runner.Tag.t ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     string ->

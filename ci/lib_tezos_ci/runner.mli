@@ -1,0 +1,79 @@
+(*****************************************************************************)
+(*                                                                           *)
+(* SPDX-License-Identifier: MIT                                              *)
+(* Copyright (c) 2025 Nomadic Labs. <contact@nomadic-labs.com>               *)
+(*                                                                           *)
+(*****************************************************************************)
+
+(** Information about CI runners. *)
+
+module Arch : sig
+  (** Runner CPU architectures. *)
+  type t = Amd64 | Arm64
+
+  (** Convert a CPU architecture to a string (["amd64"] or ["arm64"]). *)
+  val show_uniform : t -> string
+
+  (** Convert a CPU architecture to a string (["x86_64"] or ["arm64"]). *)
+  val show_easy_to_distinguish : t -> string
+end
+
+module CPU : sig
+  (** Runner CPU powers. *)
+  type t =
+    | Normal  (** Use the default runners. *)
+    | High  (** Use more powerful runners. *)
+    | Very_high  (** Use even more powerful runners. *)
+end
+
+module Storage : sig
+  (** Runner storage methods. *)
+  type t =
+    | Network  (** Use the default runners. *)
+    | Ramfs  (** Use runners with ramfs storage. *)
+end
+
+module Tag : sig
+  (** Runner tags. *)
+  type t =
+    | Gcp  (** GCP prod AMD64 runner, general purpose. *)
+    | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
+    | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
+    | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
+    | Gcp_not_interruptible
+        (** GCP prod AMD64 runner, suitable for jobs that should not be interrupted. *)
+    | Gcp_not_interruptible_dev
+        (** GCP dev AMD64 runner, suitable for jobs that should not be interrupted. *)
+    | Gcp_tezt
+        (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+    | Gcp_tezt_dev
+        (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
+    | Gcp_high_cpu
+        (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
+    | Gcp_high_cpu_dev
+        (** GCP dev AMD64 runner, suitable for jobs needing high CPU. *)
+    | Gcp_very_high_cpu
+        (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
+    | Gcp_very_high_cpu_dev
+        (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
+    | Gcp_very_high_cpu_ramfs
+        (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
+    | Gcp_very_high_cpu_ramfs_dev
+        (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
+    | Aws_specific
+        (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
+    | Dynamic
+        (** The runner is dynamically set through the CI variable {!dynamic_tag_var}. *)
+
+  (** The variable to set enabling dynamic runner selection.
+
+      To dynamically set the runner of a job through a CI/CD variable,
+      assign to this variable using [variables:] or [parallel:matrix:]. *)
+  val dynamic_var : Gitlab_ci.Var.t
+
+  (** Convert a tag to a string, suitable to be used in [tag:] clauses. *)
+  val show : t -> string
+
+  (** Get the architecture of a runner from its tag. *)
+  val arch : t -> Arch.t option
+end

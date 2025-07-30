@@ -21,7 +21,7 @@ let job_docker_authenticated ~name =
 
 (** Creates a Docker build job of the given [arch]. *)
 let job_docker_build ~__POS__ ~arch ~test ?storage () : tezos_job =
-  let arch_string = arch_to_string_alt arch in
+  let arch_string = Runner.Arch.show_uniform arch in
   let variables =
     [
       ("DOCKER_BUILD_TARGET", "without-evm-artifacts");
@@ -42,7 +42,7 @@ let job_docker_build ~__POS__ ~arch ~test ?storage () : tezos_job =
     ["./scripts/ci/docker_release.sh"]
 
 let job_build_static_binaries ~__POS__ ~arch ?cpu ?storage () : tezos_job =
-  let arch_string = arch_to_string arch in
+  let arch_string = Runner.Arch.show_easy_to_distinguish arch in
   let name = "build:static-" ^ arch_string ^ "-binaries" in
   let artifacts =
     (* Extend the lifespan to prevent failure for external tools using artifacts. *)
