@@ -93,6 +93,8 @@ pub enum TransferError {
     FailedToUpdateContractStorage,
     #[error("An internal operation failed: {0}")]
     FailedToApplyInternalOperation(String),
+    #[error("Failed to increment counter")]
+    FailedToIncrementCounter,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {

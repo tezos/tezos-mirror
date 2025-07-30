@@ -39,8 +39,6 @@ pub mod account_storage;
 pub mod context;
 mod validate;
 
-type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
-
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyKernelError {
     #[error("Host failed with a runtime error {0}")]
@@ -326,15 +324,17 @@ pub fn transfer<'a, Host: Runtime>(
 }
 
 // Handles manager transfer operations.
+#[allow(clippy::too_many_arguments)]
 pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     src: &PublicKeyHash,
+    src_account: &mut TezlinkImplicitAccount,
     src_balance: &Narith,
     amount: &Narith,
     dest: &Contract,
     parameter: Option<Parameter>,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<TransferSuccess, TransferError> {
     log!(
         host,
         Debug,
@@ -346,15 +346,11 @@ pub fn transfer_external<Host: Runtime>(
     );
 
     let src_contract = Contract::Implicit(src.clone());
-    let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
             param.entrypoint,
-            match Micheline::decode_raw(&parser.arena, &param.value) {
-                Ok(value) => value,
-                Err(err) => return Ok(Err(TransferError::from(err).into())),
-            },
+            Micheline::decode_raw(&parser.arena, &param.value)?,
         ),
         None => (Entrypoint::default(), Micheline::from(())),
     };
@@ -365,7 +361,7 @@ pub fn transfer_external<Host: Runtime>(
         host,
         context,
         &src_contract,
-        &mut src_account,
+        src_account,
         src_balance,
         amount,
         dest,
@@ -373,10 +369,11 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
-    )
-    .map_err(|e| e.into());
-    src_account.increment_counter(host)?;
-    Ok(success)
+    );
+    src_account
+        .increment_counter(host)
+        .map_err(|_| TransferError::FailedToIncrementCounter)?;
+    success
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -576,14 +573,17 @@ fn apply_operation<Host: Runtime>(
                 host,
                 context,
                 &operation.source,
+                &mut source_account,
                 &new_source_balance,
                 amount,
                 destination,
                 parameters.clone(),
-            )?;
+            );
             let manager_result = produce_operation_result(
                 validation_balance_updates,
-                transfer_result.map(TransferTarget::ToContrat),
+                transfer_result
+                    .map(TransferTarget::ToContrat)
+                    .map_err(|e| e.into()),
             );
             Ok(OperationResultSum::Transfer(manager_result))
         }
