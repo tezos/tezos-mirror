@@ -140,8 +140,16 @@ module Tag = struct
         Some Ramfs
     | Dynamic -> None
 
+  let interruptible : t -> bool option = function
+    | Gcp_not_interruptible | Gcp_not_interruptible_dev -> Some false
+    | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
+    | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Aws_specific | Gcp_arm64
+    | Gcp_dev_arm64 | Gcp_very_high_cpu_ramfs | Gcp_very_high_cpu_ramfs_dev ->
+        Some true
+    | Dynamic -> None
+
   let has ?provider:requested_provider ?arch:requested_arch ?cpu:requested_cpu
-      ?storage:requested_storage tag =
+      ?storage:requested_storage ?interruptible:requested_interruptible tag =
     let is get_from_tag = function
       | None -> true
       | Some requested -> (
@@ -152,7 +160,8 @@ module Tag = struct
     is provider requested_provider
     && is arch requested_arch && is cpu requested_cpu
     && is storage requested_storage
+    && is interruptible requested_interruptible
 
-  let choose ?provider ?arch ?cpu ?storage () =
-    List.find_opt (has ?provider ?arch ?cpu ?storage) list
+  let choose ?provider ?arch ?cpu ?storage ?interruptible () =
+    List.find_opt (has ?provider ?arch ?cpu ?storage ?interruptible) list
 end

@@ -780,8 +780,9 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
     ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
     ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
-    ?git_strategy ?coverage ?retry ?parallel ?description ?(dev_infra = false)
-    ~__POS__ ?image ?template ~stage ~name script : tezos_job =
+    ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
+    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
+    tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
     let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
@@ -794,7 +795,15 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
     let storage_string = show Runner.Storage.show storage in
     match tag with
     | None -> (
-        match Runner.Tag.choose ~provider ?arch ?cpu ?storage () with
+        match
+          Runner.Tag.choose
+            ~provider
+            ?arch
+            ?cpu
+            ?storage
+            ?interruptible:interruptible_runner
+            ()
+        with
         | None ->
             failwith
               "job %S: no suitable runner tag found for arch = %s, cpu = %s, \
@@ -808,7 +817,16 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
         (* Cannot check, assume the user knows what they are doing. *)
         Dynamic
     | Some tag ->
-        if not (Runner.Tag.has ~provider ?arch ?cpu ?storage tag) then
+        if
+          not
+            (Runner.Tag.has
+               ~provider
+               ?arch
+               ?cpu
+               ?storage
+               ?interruptible:interruptible_runner
+               tag)
+        then
           failwith
             "job %S: requested tag %s is not compatible with arch = %s, cpu = \
              %s, storage = %s"

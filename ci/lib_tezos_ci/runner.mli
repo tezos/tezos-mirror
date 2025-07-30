@@ -111,6 +111,11 @@ module Tag : sig
   (** Get the storage method of a runner from its tag. *)
   val storage : t -> Storage.t option
 
+  (** Get whether a runner can interrupt itself unprompted.
+
+      Interruptible runners should be avoided for publish jobs. *)
+  val interruptible : t -> bool option
+
   (** Test if a tag has exactly some properties.
 
       Cannot be called on tag [Dynamic]. *)
@@ -119,6 +124,7 @@ module Tag : sig
     ?arch:Arch.t ->
     ?cpu:CPU.t ->
     ?storage:Storage.t ->
+    ?interruptible:bool ->
     t ->
     bool
 
@@ -132,6 +138,7 @@ module Tag : sig
     ?arch:Arch.t ->
     ?cpu:CPU.t ->
     ?storage:Storage.t ->
+    ?interruptible:bool ->
     unit ->
     t option
 end

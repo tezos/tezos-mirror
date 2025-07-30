@@ -410,7 +410,12 @@ val enc_git_strategy : git_strategy -> string
 
     - The [dev_infra] parameter allows to run the job on the dev infrastructure.
       This parameter is used for tests only and should not be merged in
-      production.*)
+      production.
+
+    - If [interruptible_runner] is specified,
+      restrict the set of allowed runner tags accordingly.
+      Typically you would set it to [false] for publish jobs,
+      and leave it unspecified for most other jobs. *)
 val job :
   ?arch:Runner.Arch.t ->
   ?after_script:string list ->
@@ -429,6 +434,7 @@ val job :
   ?tag:Runner.Tag.t ->
   ?cpu:Runner.CPU.t ->
   ?storage:Runner.Storage.t ->
+  ?interruptible_runner:bool ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
