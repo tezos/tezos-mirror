@@ -350,7 +350,6 @@ pub fn transfer_external<Host: Runtime>(
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
 
-    // Delegate to appropriate handler
     let success = transfer(
         host,
         context,
