@@ -190,7 +190,7 @@ pub fn transfer_external<Host: Runtime>(
     let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
 
     // Init MIR parser and context
-    let parser = Parser::default();
+    let parser = Parser::new();
     let mut ctx = Ctx::default();
     let (entrypoint, value) = match parameter {
         Some(param) => (
