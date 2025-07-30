@@ -146,27 +146,14 @@ pub fn transfer_tez<Host: Runtime>(
         compute_balance_updates(src_contract, dest_contract, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
-    // Check source balance
-    let current_src_balance = &src_balance.0;
-    let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
-        None => {
-            log!(host, Debug, "Balance is too low");
-            return Err(TransferError::BalanceTooLow(BalanceTooLow {
-                contract: src_contract.clone(),
-                balance: current_src_balance.into(),
-                amount: amount.clone(),
-            }));
-        }
-        Some(new_source_balance) => new_source_balance,
-    };
     let applied_balance_changes = apply_balance_changes(
         host,
+        src_contract,
         src_account,
-        new_source_balance,
+        src_balance,
         dest_account,
         &amount.0,
-    )
-    .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    )?;
     Ok((
         TransferSuccess {
             storage: None,
@@ -437,16 +424,34 @@ pub struct AppliedBalanceChanges {
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
+    src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
-    new_src_balance: num_bigint::BigUint,
+    src_balance: &Narith,
     dest_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
-) -> Result<AppliedBalanceChanges, ApplyKernelError> {
-    let new_src_balance = new_src_balance.into();
-    src_account.set_balance(host, &new_src_balance)?;
-    let dest_balance = dest_account.balance(host)?.0;
+) -> Result<AppliedBalanceChanges, TransferError> {
+    let new_src_balance = match src_balance.0.checked_sub(amount) {
+        None => {
+            log!(host, Debug, "Balance is too low");
+            return Err(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: src_contract.clone(),
+                balance: src_balance.clone(),
+                amount: amount.into(),
+            }));
+        }
+        Some(new_source_balance) => new_source_balance.into(),
+    };
+    src_account
+        .set_balance(host, &new_src_balance)
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    let dest_balance = dest_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
+        .0;
     let new_dest_balance = (&dest_balance + amount).into();
-    dest_account.set_balance(host, &new_dest_balance)?;
+    dest_account
+        .set_balance(host, &new_dest_balance)
+        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
     Ok(AppliedBalanceChanges {
         new_src_balance,
         new_dest_balance,

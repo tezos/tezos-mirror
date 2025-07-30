@@ -87,10 +87,12 @@ pub enum TransferError {
     FailedToFetchContractCode,
     #[error("Failed to fetch contract storage")]
     FailedToFetchContractStorage,
-    #[error("Failed to fetch destination contract balance")]
-    FailedToFetchDestinationContractBalance,
+    #[error("Failed to fetch destination balance")]
+    FailedToFetchDestinationBalance,
     #[error("Failed to update contract storage")]
     FailedToUpdateContractStorage,
+    #[error("Failed to update destination balance")]
+    FailedToUpdateDestinationBalance,
     #[error("An internal operation failed: {0}")]
     FailedToApplyInternalOperation(String),
     #[error("Failed to increment counter")]
