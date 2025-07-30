@@ -14,17 +14,12 @@ open Scenarios_helpers
 open Tezos
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
+  (* Set of functions helpful for Tzkt setup *)
   let spawn_run ?name cmd args =
     Agent.docker_run_command ?name agent cmd args
   in
   let run ?name cmd args = spawn_run ?name cmd args |> Process.check in
-
-  (* Start and initialize TZKT's PGSQL database *)
-  let* () = run "psql" ["--version"] in
-  let* () = run "service" ["postgresql"; "start"] in
-  (* For some reason, postgres is not immediatly available after the
-     service start command. *)
-  let* () = Lwt_unix.sleep 1. in
+  (* Run a psql command (a specific database can be set as a target) *)
   let psql ?db command =
     run
       "sudo"
@@ -32,18 +27,49 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       @ (match db with None -> [] | Some db -> [db])
       @ ["-c"; command])
   in
+  (* Compile and publish the Tzkt indexer along the API *)
+  let compile_tzkt target dir =
+    run "dotnet" ["publish"; sf "tzkt/%s" target; "-o"; dir]
+  in
+  (* Tzkt optional arg have a specific format.
+     Argument name is separated with ":" and
+     argument value is separated with ";". *)
+  let tzkt_arg options values =
+    let option = String.concat ":" options in
+    let value = String.concat ";" values in
+    sf "--%s=%S" option value
+  in
 
-  (* Remove the tzkt repo if it already exists. *)
+  (* Constants for Tzkt initialization. Helpful to prevent
+     error when setting indexer and API argument *)
+  let tzkt_db = "tzkt_db" in
+  let tzkt_db_user = "tzkt" in
+  let tzkt_indexer_output = "/root/tzkt-sync" in
+  let tzkt_api_output = "/root/tzkt-api" in
+
+  (* Start and initialize TZKT's PGSQL database *)
+  let* () = run "service" ["postgresql"; "start"] in
+  (* For some reason, postgres is not immediatly available after the
+     service start command. *)
+  let* () = Lwt_unix.sleep 1. in
+
+  (* Remove the tzkt repo if it already exists. Also drop
+     everything related to the database if it already exists. *)
   let* () = run "rm" ["-rf"; "tzkt"] in
-  (* Drop everything related to the database if it already exists. *)
-  let* () = psql "DROP DATABASE IF EXISTS tzkt_db;" in
-  let* () = psql "DROP USER IF EXISTS tzkt;" in
+  let* () = psql (sf "DROP DATABASE IF EXISTS %s;" tzkt_db) in
+  let* () = psql (sf "DROP USER IF EXISTS %s;" tzkt_db_user) in
 
   (* Setup the database for Tzkt indexer. *)
-  let* () = psql "CREATE DATABASE tzkt_db;" in
-  let* () = psql "CREATE USER tzkt WITH ENCRYPTED PASSWORD 'qwerty';" in
-  let* () = psql "GRANT ALL PRIVILEGES ON DATABASE tzkt_db TO tzkt;" in
-  let* () = psql ~db:"tzkt_db" "GRANT ALL ON SCHEMA public TO tzkt;" in
+  let* () = psql (sf "CREATE DATABASE %s;" tzkt_db) in
+  let* () =
+    psql (sf "CREATE USER %s WITH ENCRYPTED PASSWORD 'qwerty';" tzkt_db_user)
+  in
+  let* () =
+    psql (sf "GRANT ALL PRIVILEGES ON DATABASE %s TO %s;" tzkt_db tzkt_db_user)
+  in
+  let* () =
+    psql ~db:tzkt_db (sf "GRANT ALL ON SCHEMA public TO %s;" tzkt_db_user)
+  in
 
   (* Clone TZKT sources on `proto23` branch as it supports Seoul. *)
   let* () =
@@ -51,43 +77,14 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
       "git"
       ["clone"; "-b"; "proto23"; "https://github.com/baking-bad/tzkt"; "tzkt"]
   in
-  (* Replace the regexp [origin] by the string [replacement] in all
-     files under "./tzkt" except in the ".git" and ".github"
-     directories. *)
-  let sed origin replacement =
-    run
-      "find"
-      [
-        "tzkt";
-        "-type";
-        "f";
-        "-not";
-        "-path";
-        "'*/\\.git/*'";
-        "-not";
-        "-path";
-        "'*/\\.github/*'";
-        "-exec";
-        "sed";
-        "-i";
-        sf "s|%s|%s|g" origin replacement;
-        "{}";
-        "+";
-      ]
-  in
-  (* We use sed to patch TZKT sources. We change:
-     - the RPC endpoint, to use the local tezlink endpoint instead of TZKT's mainnet node,
-     - the database server to use localhost.
-     Alternatively, we could generate a configuration file to set the TZKT_TezosNode__Endpoint
-     and TZKT_ConnectionStrings__DefaultConnection configuration variables. *)
-  let* () =
-    sed
-      "https://rpc\\.tzkt\\.io/mainnet"
-      (Client.string_of_endpoint tezlink_sandbox_endpoint)
-  in
-  let* () = sed "host=db" "host=localhost" in
+  (* Compile Tzkt indexer and API. The output of the compilation is sent
+     to different directory to prevent collision. *)
+  let* () = compile_tzkt "Tzkt.Sync" tzkt_indexer_output in
+  let* () = compile_tzkt "Tzkt.Api" tzkt_api_output in
+  (* Remove the tzkt repo as we don't need it anymore. *)
+  let* () = run "rm" ["-rf"; "tzkt"] in
 
-  (* Change the port of the API and indexer to take available ports
+  (* Get available port for the API and indexer.
      (or given port for the API). *)
   let indexer_port = Agent.next_available_port agent in
   let api_port =
@@ -95,27 +92,73 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
     | None -> Agent.next_available_port agent
     | Some api_port -> api_port
   in
-  let* () = sed "http://localhost:5001" (sf "http://0.0.0.0:%d" indexer_port) in
-  let* () = sed "http://localhost:5000" (sf "http://0.0.0.0:%d" api_port) in
+  (* Print a log for the tezt-cloud user to retrieve the port of the indexer or API *)
   let () = toplog "Tzkt indexer will be available at port %d" indexer_port in
   let () = toplog "Tzkt API will be available at port %d" api_port in
 
-  (* Compile and publish the Tzkt indexer along the API *)
-  let compile_tzkt target dir =
-    run "dotnet" ["publish"; sf "tzkt/%s" target; "-o"; dir]
+  (* Prepare multiple argument for Tzkt indexer and API start. *)
+  (* Set our endpoint for Tzkt instead of the default "https://rpc.tzkt.io/mainnet/".*)
+  let endpoint_arg =
+    tzkt_arg
+      ["TezosNode"; "Endpoint"]
+      [Client.string_of_endpoint tezlink_sandbox_endpoint]
   in
-  let* () = compile_tzkt "Tzkt.Sync" "tzkt-sync" in
-  let* () = compile_tzkt "Tzkt.Api" "tzkt-api" in
+  (* Tell Tzkt that the database is available on localhost at port 5432. *)
+  (* We can't set a specific argument in this command so we must set every values. *)
+  let database_arg =
+    tzkt_arg
+      ["ConnectionStrings"; "DefaultConnection"]
+      [
+        "host=localhost";
+        "port=5432";
+        sf "database=%s" tzkt_db;
+        sf "username=%s" tzkt_db_user;
+        "password=qwerty";
+        "command timeout=600";
+      ]
+  in
+  (* Argument to deploy the indexer and API at the port we selected.
+     Note that http://0.0.0.0/ instead of http://localhost/ is important
+     to make them available from outside. *)
+  let indexer_port_arg =
+    tzkt_arg
+      ["Kestrel"; "Endpoints"; "Http"; "Url"]
+      [sf "http://0.0.0.0:%d" indexer_port]
+  in
+  let api_port_arg =
+    tzkt_arg
+      ["Kestrel"; "Endpoints"; "Http"; "Url"]
+      [sf "http://0.0.0.0:%d" api_port]
+  in
+
   (* Run the Tzkt indexer and Tzkt API *)
   let* () =
     run
       ~name:"tzkt-indexer"
       "sh"
-      ["-c"; "cd /root/tzkt-sync && dotnet Tzkt.Sync.dll"]
+      [
+        "-c";
+        sf
+          "cd %s && dotnet Tzkt.Sync.dll %s %s %s"
+          tzkt_indexer_output
+          endpoint_arg
+          database_arg
+          indexer_port_arg;
+      ]
   and* () =
-    run ~name:"tzkt-api" "sh" ["-c"; "cd /root/tzkt-api && dotnet Tzkt.Api.dll"]
+    run
+      ~name:"tzkt-api"
+      "sh"
+      [
+        "-c";
+        sf
+          "cd %s && dotnet Tzkt.Api.dll %s %s %s"
+          tzkt_api_output
+          endpoint_arg
+          database_arg
+          api_port_arg;
+      ]
   in
-  let* () = run "rm" ["-rf"; "tzkt"] in
   unit
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
