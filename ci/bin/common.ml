@@ -18,6 +18,7 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
+open Tezos_ci.Cache
 
 (* types for the repositories pipelines.
    - Release: we run all the release jobs, but no tests
@@ -25,14 +26,6 @@ open Tezos_ci
    - Full: we run the complete test matrix
 *)
 type repository_pipeline = Full | Partial | Release
-
-let cargo_home =
-  (* Note:
-     - We want [CARGO_HOME] to be in a sub-folder of
-       {!ci_project_dir} to enable GitLab CI caching.
-     - We want [CARGO_HOME] to be hidden from dune
-       (thus the dot-prefix). *)
-  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
 
 (** The default [before_script:] section.
 
@@ -134,48 +127,6 @@ let enable_coverage_report job : tezos_job =
 let enable_kernels =
   Tezos_ci.append_variables
     [("CC", "clang"); ("NATIVE_TARGET", "x86_64-unknown-linux-musl")]
-
-(** {2 Caches} *)
-
-(* Common GitLab CI caches *)
-
-(** Add variable enabling dune cache.
-
-    This function can be applied to jobs that run dune.
-
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_dune_cache"], and this function also sets the
-    environment dir [DUNE_CACHE_ROOT] such that dune stores its caches
-    there.
-
-    - [cache_size] sets the maximum size of the cache.
-
-   - [copy_mode], if [true] (default is [false]) sets
-    {{:https://dune.readthedocs.io/en/stable/caching.html#cache-storage-mode}Dune
-    Cache Storage Mode} to [copy]. If [false], [hardlink] mode is
-    used, which is typically more performant but requires that the
-    build and cache folder be on the same volume. *)
-let enable_dune_cache ?key ?(path = "$CI_PROJECT_DIR/_dune_cache")
-    ?(cache_size = "5GB") ?(copy_mode = false) ?policy job =
-  let key =
-    Option.value
-      ~default:
-        ("dune_cache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  job
-  |> append_variables
-       [
-         ("DUNE_CACHE", "enabled");
-         ("DUNE_CACHE_STORAGE_MODE", if copy_mode then "copy" else "hardlink");
-         ("DUNE_CACHE_ROOT", path);
-       ]
-  |> append_cache (cache ?policy ~key [path])
-  |> append_after_script
-       ["eval $(opam env)"; "dune cache trim --size=" ^ cache_size]
 
 (** {2 Child repositories pipelines} *)
 

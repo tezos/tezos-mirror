@@ -14,6 +14,7 @@
 open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
+open Tezos_ci.Cache
 open Common
 
 let build_debian_packages_image =
