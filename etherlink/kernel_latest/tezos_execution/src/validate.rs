@@ -119,7 +119,7 @@ pub struct ValidationInfo {
     pub new_source_balance: Narith,
 }
 
-pub fn is_valid_tezlink_operation<Host: Runtime>(
+pub fn validate_operation<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     branch: &BlockHash,

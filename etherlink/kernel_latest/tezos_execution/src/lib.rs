@@ -494,7 +494,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let validation_info = match validate::is_valid_tezlink_operation(
+    let validation_info = match validate::validate_operation(
         &safe_host,
         &account,
         &operation.branch,
