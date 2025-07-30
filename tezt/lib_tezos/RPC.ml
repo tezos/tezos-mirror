@@ -2015,3 +2015,6 @@ let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
           baking_power = frozen_stake + delegated_stake;
         })
     bakers_with_pow
+
+let get_stake_info ?(chain = "main") ?(block = "head") () =
+  make GET ["chains"; chain; "blocks"; block; "helpers"; "stake_info"] Fun.id

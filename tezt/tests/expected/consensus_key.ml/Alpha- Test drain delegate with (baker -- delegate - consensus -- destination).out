@@ -225,6 +225,24 @@ This sequence of operations was run:
       [PUBLIC_KEY_HASH] ... +ꜩ38000.025708
 
 
+./octez-client rpc get /chains/main/blocks/head/helpers/stake_info
+[ "7333333414117",
+  [ [ { "delegate": "[PUBLIC_KEY_HASH]",
+        "consensus_pkh": "[PUBLIC_KEY_HASH]" },
+      "1466666732452" ],
+    [ { "delegate": "[PUBLIC_KEY_HASH]",
+        "consensus_pkh": "[PUBLIC_KEY_HASH]" },
+      "1466666666666" ],
+    [ { "delegate": "[PUBLIC_KEY_HASH]",
+        "consensus_pkh": "[PUBLIC_KEY_HASH]" },
+      "1466666666666" ],
+    [ { "delegate": "[PUBLIC_KEY_HASH]",
+        "consensus_pkh": "[PUBLIC_KEY_HASH]" },
+      "1466666666666" ],
+    [ { "delegate": "[PUBLIC_KEY_HASH]",
+        "consensus_pkh": "[PUBLIC_KEY_HASH]" },
+      "1466666681667" ] ] ]
+
 ./octez-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
 { "deactivated": false, "is_forbidden": false,
   "participation":

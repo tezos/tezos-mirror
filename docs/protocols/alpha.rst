@@ -42,6 +42,10 @@ Breaking Changes
 RPC Changes
 -----------
 
+- Added ``GET /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``,
+  which returns the staking power distribution for all the active delegates
+  at the current cycle. (MR :gl:`!18019`)
+
 Operation receipts
 ------------------
 
