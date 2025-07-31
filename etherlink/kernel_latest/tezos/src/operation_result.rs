@@ -42,6 +42,7 @@ pub enum ValidityError {
     FailedToComputeFeeBalanceUpdate,
     FailedToFetchCounter,
     FailedToFetchManagerKey,
+    FailedToFetchBalance,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]

@@ -186,9 +186,9 @@ pub fn validate_operation<Host: Runtime>(
     }
 
     // The manager account must be solvent to pay the announced fees.
-    let new_balance = match account.simulate_spending(host, &content.fee)? {
-        Some(new_balance) => new_balance,
-        None => {
+    let new_balance = match account.simulate_spending(host, &content.fee) {
+        Ok(Some(new_balance)) => new_balance,
+        Ok(None) => {
             log!(
                 host,
                 tezos_evm_logging::Level::Debug,
@@ -196,6 +196,7 @@ pub fn validate_operation<Host: Runtime>(
             );
             return Ok(Err(ValidityError::CantPayFees(content.fee)));
         }
+        Err(_) => return Ok(Err(ValidityError::FailedToFetchBalance)),
     };
 
     let verify = verify_signature(&pk, branch, &operation.content, signature.clone())?;
