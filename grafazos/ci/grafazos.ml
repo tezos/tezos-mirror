@@ -92,15 +92,9 @@ let register () =
     ~description:"Daily tests to run for Grafazos."
     [(Auto, job_build Test)] ;
   CI.register_global_release_jobs
-    [
-      (Auto, job_gitlab_release);
-      (Manual, job_release_page `real `build_dependencies);
-    ] ;
+    [(Manual, job_release_page `real `build_dependencies)] ;
   CI.register_global_test_release_jobs
-    [
-      (Auto, job_gitlab_release);
-      (Manual, job_release_page `test `build_dependencies);
-    ] ;
+    [(Manual, job_release_page `test `build_dependencies)] ;
   CI.register_global_scheduled_test_release_jobs
     [
       (* Explicitly include the build job so that it has trigger [Auto]. *)
