@@ -518,14 +518,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
     let mut validation_info =
-        match validate::validate_operation(&safe_host, context, &operation)? {
+        match validate::validate_operation(&safe_host, context, &operation) {
             Ok(validation_info) => validation_info,
             Err(validity_err) => {
-                log!(
-                    safe_host,
-                    Debug,
-                    "Operation is invalid, exiting apply_operation"
-                );
+                log!(safe_host, Debug, "Operation is invalid: {:?}", validity_err);
                 // TODO: Don't force the receipt to a reveal receipt
                 let receipt = produce_operation_result::<Reveal>(
                     vec![],
