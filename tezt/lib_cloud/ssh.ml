@@ -24,3 +24,18 @@ let public_key () =
     Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_filename]
   in
   Lwt.return content
+
+let common_options = ["-o"; "StrictHostKeyChecking=no"]
+
+let ssh_options = common_options
+
+(* Default options required to properly run scp command. As scp command's syntax
+   is close to the ssh one, we reuse the [ssh_options]. This might be breaking
+   if incompatible ssh options are used.
+
+   The [-O] option forces the use of the SCP protocol, instead of the SFTP
+   protocol. This may be necessary for servers that do not implement SFTP, for
+   backwards-compatibility for particular filename wildcard patterns and for
+   expanding paths with a ‘~’ prefix for older SFTP servers.
+*)
+let scp_options = ["-O"] @ common_options

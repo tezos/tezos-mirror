@@ -39,16 +39,15 @@ let string_docker_command agent =
       let ssh_id = runner.Runner.ssh_id in
       String.concat
         " "
-        [
-          "ssh";
-          Format.asprintf "root@%s" (fst point);
-          "-p";
-          string_of_int (snd point);
-          "-o";
-          "StrictHostKeyChecking=no";
-          "-i";
-          ssh_id |> Option.get;
-        ]
+        ([
+           "ssh";
+           Format.asprintf "root@%s" (fst point);
+           "-p";
+           string_of_int (snd point);
+           "-i";
+           ssh_id |> Option.get;
+         ]
+        @ runner.options)
 
 let string_vm_command agent =
   match Agent.cmd_wrapper agent with

@@ -128,7 +128,7 @@ let encoding =
                 I don't have a good proposition that keeps a nice UX and is secure at the moment.
             *)
             Runner.create
-              ~options:["-o"; "StrictHostKeyChecking=no"]
+              ~options:Ssh.ssh_options
               ~ssh_user:"root"
               ~ssh_id
               ~ssh_port
@@ -184,7 +184,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
         Test.fail "Agent.make was not initialized correctly"
     | Some (address, ssh_port), Some ssh_id ->
         Runner.create
-          ~options:["-o"; "StrictHostKeyChecking=no"]
+          ~options:Ssh.ssh_options
           ~ssh_user
           ~ssh_id
           ~ssh_port
@@ -337,13 +337,10 @@ let copy agent ~consistency_check ~is_directory ~source ~destination =
             runner.Runner.ssh_port
         in
         let* () =
-          (* FIXME: I forgot why we enforce [-0]. *)
           Process.run
             "scp"
             ((if is_directory then ["-r"] else [])
-            @ ["-O"]
-            @ ["-o"; "StrictHostKeyChecking=no"]
-            @ identity @ port @ [source] @ [destination])
+            @ Ssh.scp_options @ identity @ port @ [source] @ [destination])
         in
         Lwt.return_unit
 

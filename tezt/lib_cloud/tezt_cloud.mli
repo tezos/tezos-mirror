@@ -8,6 +8,7 @@
 module Path = Path
 module Agent = Agent
 module Types = Types
+module Ssh = Ssh
 
 module Chronos : sig
   (** A scheduler task. *)

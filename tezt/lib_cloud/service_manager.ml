@@ -99,19 +99,15 @@ let register_service ~name ~executable
   let () = if Hashtbl.length t.services = 0 then start t else () in
   (* Get the real executable name *)
   (* Note: this only works on remote vm *)
-  if Sys.file_exists executable then
-    let executable = Unix.realpath executable in
-    let service =
-      {executable = Some executable; on_alive_callback; pid = None; on_shutdown}
+  let service =
+    let executable =
+      if Sys.file_exists executable then Some (Unix.realpath executable)
+      else None
     in
-    let () = Hashtbl.add t.services name service in
-    Log.info "%s: Registering service: %s (%s)" section name executable
-  else
-    let service =
-      {executable = None; on_alive_callback; pid = None; on_shutdown}
-    in
-    let () = Hashtbl.add t.services name service in
-    Log.info "%s: Registering service: %s (%s)" section name executable
+    {executable; on_alive_callback; pid = None; on_shutdown}
+  in
+  let () = Hashtbl.add t.services name service in
+  Log.info "%s: Registering service: %s (%s)" section name executable
 
 let notify_start_service ~name ~pid t =
   match Hashtbl.find_opt t.services name with
