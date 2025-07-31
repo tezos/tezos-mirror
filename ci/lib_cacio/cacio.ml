@@ -46,11 +46,15 @@ let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
   {key; error_log; idle_timeout; log; path; cache_size}
 
 (* Conditions are disjunctions: the job is included in the pipeline if
-   ANY file in [changed] changed. *)
-type condition = {changed : Tezos_ci.Changeset.t}
+   ANY file in [changed] changed, or if the merge request has ANY of the [label]s. *)
+type condition = {changed : Tezos_ci.Changeset.t; label : String_set.t}
 
-let merge_conditions {changed = changed1} {changed = changed2} =
-  {changed = Tezos_ci.Changeset.union changed1 changed2}
+let merge_conditions {changed = changed1; label = label1}
+    {changed = changed2; label = label2} =
+  {
+    changed = Tezos_ci.Changeset.union changed1 changed2;
+    label = String_set.union label1 label2;
+  }
 
 type job = {
   uid : int;
@@ -356,16 +360,37 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                  and the [trigger]. *)
               let rules =
                 if with_condition then
-                  Some
+                  let when_ : Gitlab_ci.Types.when_ =
+                    match trigger with
+                    | Auto | Immediate -> On_success
+                    | Manual -> Manual
+                  in
+                  let labels =
+                    match String_set.elements only_if.label with
+                    | [] -> []
+                    | first_label :: other_labels ->
+                        [
+                          Gitlab_ci.Util.job_rule
+                            ~if_:
+                              (List.fold_left
+                                 (fun acc label ->
+                                   Gitlab_ci.If.(
+                                     acc || Tezos_ci.Rules.has_mr_label label))
+                                 (Tezos_ci.Rules.has_mr_label first_label)
+                                 other_labels)
+                            ~when_
+                            ();
+                        ]
+                  in
+                  let changes =
                     [
                       Gitlab_ci.Util.job_rule
                         ~changes:(Tezos_ci.Changeset.encode only_if.changed)
-                        ~when_:
-                          (match trigger with
-                          | Auto | Immediate -> On_success
-                          | Manual -> Manual)
+                        ~when_
                         ();
                     ]
+                  in
+                  Some (labels @ changes)
                 else
                   match trigger with
                   | Auto | Immediate -> None
