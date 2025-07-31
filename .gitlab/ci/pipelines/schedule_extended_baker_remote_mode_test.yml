@@ -16,6 +16,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,6 +38,7 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -70,6 +72,7 @@ tezt:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -129,6 +132,7 @@ tezt-time-sensitive:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -187,6 +191,7 @@ tezt-slow:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -246,6 +251,7 @@ tezt-extra:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -306,6 +312,7 @@ tezt-flaky:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -369,6 +376,7 @@ oc.build_x86_64-released:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -424,6 +432,7 @@ oc.build_x86_64-exp-dev-extra:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -474,6 +483,7 @@ oc.build_kernels:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
@@ -513,6 +523,7 @@ oc.tezt:fetch-records:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log
     --from last-successful-schedule-extended-test --info
@@ -537,6 +548,7 @@ datadog_pipeline_trace:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE

@@ -16,6 +16,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,6 +38,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -63,6 +65,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -93,6 +96,7 @@ rollup-node.build:static-arm64-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -138,6 +142,7 @@ rollup-node.build:static-x86_64-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -169,6 +174,7 @@ rollup-node.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -191,6 +197,7 @@ rollup-node.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -215,6 +222,7 @@ rollup-node.docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
   services:
@@ -239,6 +247,7 @@ rollup-node.gitlab:octez-smart-rollup-node-release:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/rollup_node/releases/create_gitlab_release.sh
   retry: 0

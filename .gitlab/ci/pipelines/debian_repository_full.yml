@@ -23,6 +23,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -38,6 +39,7 @@ oc.docker-systemd_tests_debian:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
   services:
@@ -67,6 +69,7 @@ oc.docker-systemd_tests_ubuntu:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-systemd-tests.Dockerfile
   services:
@@ -96,6 +99,7 @@ oc.docker-build-debian-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
   services:
@@ -131,6 +135,7 @@ oc.build-debian:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -168,6 +173,7 @@ oc.build-data_packages:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -199,6 +205,7 @@ apt_repo_debian:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
@@ -220,6 +227,7 @@ oc.docker-build-ubuntu-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
   services:
@@ -255,6 +263,7 @@ oc.build-ubuntu:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -298,6 +307,7 @@ apt_repo_ubuntu:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
@@ -325,6 +335,7 @@ oc.lintian_debian:
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
   - apt-get install lintian parallel -y
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/lintian_debian_packages.sh debian bookworm
   variables: {}
@@ -340,6 +351,7 @@ oc.install_bin_debian_bookworm:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-bin-deb.sh debian bookworm
   variables:
@@ -359,6 +371,7 @@ oc.install_bin_debian_bookworm_systemd_test:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -387,6 +400,7 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -416,6 +430,7 @@ oc.install_bin_debian_bookworm_systemd_agnostic_baker:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -445,6 +460,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -475,6 +491,7 @@ oc.lintian_ubuntu:
   - export DEBIAN_FRONTEND=noninteractive
   - apt-get update
   - apt-get install lintian parallel -y
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble
   variables: {}
@@ -490,6 +507,7 @@ oc.install_bin_ubunty_jammy:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu jammy
   variables:
@@ -506,6 +524,7 @@ oc.install_bin_ubunty_noble:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-bin-deb.sh ubuntu noble
   variables:
@@ -525,6 +544,7 @@ oc.install_bin_ubuntu_noble_systemd:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/install-bin-deb.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -553,6 +573,7 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
     images/packages/debian-systemd-tests.Dockerfile
@@ -581,6 +602,7 @@ oc.upgrade_bin_ubuntu_noble_systemd_test:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/deb/upgrade-systemd-test.sh
     images/packages/debian-systemd-tests.Dockerfile

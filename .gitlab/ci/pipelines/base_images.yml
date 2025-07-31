@@ -20,6 +20,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -35,6 +36,7 @@ oc.base-images.debian:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
   services:
@@ -59,6 +61,7 @@ oc.base-images.ubuntu:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/build-base-images.sh images/base-images/Dockerfile.debian
   services:
@@ -83,6 +86,7 @@ oc.base-images.fedora:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
   services:
@@ -107,6 +111,7 @@ oc.base-images.rockylinux:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/build-base-images.sh images/base-images/Dockerfile.rpm
   services:

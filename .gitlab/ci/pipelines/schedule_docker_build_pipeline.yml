@@ -16,6 +16,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,6 +38,7 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -57,6 +59,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -83,6 +86,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -102,6 +106,7 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -126,6 +131,7 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -150,6 +156,7 @@ docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
   services:

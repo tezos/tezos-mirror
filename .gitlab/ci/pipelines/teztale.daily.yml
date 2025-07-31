@@ -15,6 +15,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -36,6 +37,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -62,6 +64,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -89,6 +92,7 @@ teztale.build-arm64:
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/take_ownership.sh
@@ -133,6 +137,7 @@ teztale.build-x86_64:
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/take_ownership.sh

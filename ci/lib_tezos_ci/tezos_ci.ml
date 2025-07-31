@@ -944,7 +944,9 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
       artifacts;
       (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
       before_script =
-        Some (". ./scripts/ci/datadog_send_job_info.sh" :: before_script);
+        Some
+          ((". ./scripts/ci/datadog_send_job_info.sh" :: before_script)
+          @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]);
       cache;
       id_tokens;
       image = Option.map Image.image image;

@@ -23,6 +23,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -38,6 +39,7 @@ oc.docker-build-rockylinux-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
   services:
@@ -66,6 +68,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   services:
@@ -100,6 +103,7 @@ oc.build-rockylinux:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -145,6 +149,7 @@ oc.build-rockylinux-data:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -190,6 +195,7 @@ rpm_repo_rockylinux:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
   variables:
@@ -211,6 +217,7 @@ oc.docker-build-fedora-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
   services:
@@ -240,6 +247,7 @@ oc.docker-systemd-tests-rpm-fedora:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   services:
@@ -275,6 +283,7 @@ oc.build-fedora:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -321,6 +330,7 @@ oc.build-fedora-data:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -367,6 +377,7 @@ rpm_repo_fedora:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh fedora 39 42
   variables:
@@ -389,6 +400,7 @@ oc.install_bin_fedora_39.doc:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-bin-rpm.sh fedora 39
   variables: {}
@@ -407,6 +419,7 @@ oc.install_bin_fedora_39_systemd:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
     images/packages/rpm-systemd-tests.Dockerfile
@@ -431,6 +444,7 @@ oc.install_bin_rockylinux_9.3.doc:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   variables: {}
@@ -449,6 +463,7 @@ oc.install_bin_rockylinux_93_systemd:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
     images/packages/rpm-systemd-tests.Dockerfile

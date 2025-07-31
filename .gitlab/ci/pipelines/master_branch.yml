@@ -18,6 +18,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -39,6 +40,7 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -59,6 +61,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -102,6 +105,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -147,6 +151,7 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -194,6 +199,7 @@ oc.build_arm64-released:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -250,6 +256,7 @@ oc.build_arm64-exp-dev-extra:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -289,6 +296,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -309,6 +317,7 @@ oc.unified_coverage:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - mkdir -p _coverage_report
   - dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
@@ -346,6 +355,7 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -370,6 +380,7 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -394,6 +405,7 @@ docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
   services:
@@ -426,6 +438,7 @@ publish_kernel_sdk:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk publish-sdk-deps

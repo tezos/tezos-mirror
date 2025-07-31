@@ -19,6 +19,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -41,6 +42,7 @@ oc.docker:jsonnet:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
   services:
@@ -61,6 +63,7 @@ oc.docker:client-libs-dependencies:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_client_libs_dependencies_build.sh
   services:
@@ -81,6 +84,7 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -102,6 +106,7 @@ oc.docker:rust-sdk-bindings:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_sdk_bindings_build.sh
   services:
@@ -122,6 +127,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -153,6 +159,7 @@ trigger:
   timeout: 10 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo 'Trigger pipeline!'
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
@@ -171,6 +178,7 @@ sanity_ci:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make --silent -C manifest check
   - make --silent -C ci check
@@ -190,6 +198,7 @@ docker:hadolint:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
@@ -221,6 +230,7 @@ oc.ocaml_fmt:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/lint.sh --check-ocamlformat
   - dune build --profile=dev @fmt
@@ -252,6 +262,7 @@ oc.semgrep:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "OCaml code linting. For information on how to reproduce locally, check out
     scripts/semgrep/README.md"
@@ -285,6 +296,7 @@ oc.misc_checks:
   - . ./scripts/version.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/lint_misc_check.sh
   - scripts/check_wasm_pvm_regressions.sh check
@@ -310,6 +322,7 @@ check_jsonnet:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   - cd ../
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/lint.sh --check-jsonnet-format
   - scripts/lint.sh --check-jsonnet-lint
@@ -331,6 +344,7 @@ check_rust_fmt:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/check-format-rust.sh
 
@@ -352,6 +366,7 @@ documentation:rst-check:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make --silent -C docs sphinx-check
 
@@ -378,6 +393,7 @@ nix:
   - . ./scripts/ci/datadog_send_job_info.sh
   - mkdir -p ~/.config/nix
   - echo 'extra-experimental-features = flakes nix-command' > ~/.config/nix/nix.conf
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - nix run .#ci-check-version-sh-lock
   artifacts:
@@ -396,6 +412,7 @@ commit_titles:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/check_commit_messages.sh || exit $?
 
@@ -430,6 +447,7 @@ oc.build_arm64-released:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -488,6 +506,7 @@ oc.build_arm64-exp-dev-extra:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -573,6 +592,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -648,6 +668,7 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -736,6 +757,7 @@ oc.build_x86_64-released:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -838,6 +860,7 @@ oc.build_x86_64-exp-dev-extra:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
@@ -905,6 +928,7 @@ wasm-runtime-check:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - etherlink/lib_wasm_runtime/lint.sh
@@ -979,6 +1003,7 @@ oc.build_kernels:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
@@ -1067,6 +1092,7 @@ oc.build_dsn_node:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk octez-dsn-node
@@ -1127,6 +1153,7 @@ oc.tezt:fetch-records:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log
     --from last-successful-schedule-extended-test --info
@@ -1165,6 +1192,7 @@ build_octez_source:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
@@ -1219,6 +1247,7 @@ etherlink.build:static-x86_64:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make evm-node-static
@@ -1275,6 +1304,7 @@ etherlink.build:static-arm64:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make evm-node-static
@@ -1344,6 +1374,7 @@ build-layer1-profiling:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - scripts/slim-mode.sh on
@@ -1406,6 +1437,7 @@ select_tezts:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/select_tezts.sh || exit $?
   artifacts:
@@ -1522,6 +1554,7 @@ kaitai_checks:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez encodings
@@ -1568,6 +1601,7 @@ kaitai_e2e_checks:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./client-libs/kaitai-struct-files/scripts/kaitai_e2e.sh client-libs/kaitai-struct-files/files
     2>/dev/null
@@ -1604,6 +1638,7 @@ oc.check_lift_limits_patch:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - '[ $(git apply --numstat src/bin_tps_evaluation/lift_limits.patch | cut -f3) =
@@ -1642,6 +1677,7 @@ oc.python_check:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/lint_misc_python_check.sh
 
@@ -1698,6 +1734,7 @@ oc.integration:compiler-rejections:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_rejections
@@ -1751,6 +1788,7 @@ oc.script:test-gen-genesis:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - cd scripts/gen-genesis
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune build gen_genesis.exe
 
@@ -1797,6 +1835,7 @@ oc.script:snapshot_alpha_and_link:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/script:snapshot_alpha_and_link.sh
@@ -1857,6 +1896,7 @@ oc.script:test_octez_release_versions:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/test_octez_release_version.sh
 
@@ -1883,6 +1923,7 @@ oc.script:b58_prefix:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring
     --disable=invalid-name
@@ -1915,6 +1956,7 @@ oc.test-liquidity-baking-scripts:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
 
@@ -1931,6 +1973,7 @@ oc:scripts:release_script_values:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - scripts/ci/test_release_values.sh
 
@@ -1960,6 +2003,7 @@ mir_unit:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cargo test --manifest-path contrib/mir/Cargo.toml
   variables:
@@ -1992,6 +2036,7 @@ mir_tzt:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
   variables:
@@ -2030,6 +2075,7 @@ test_sdk_rust:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C sdk/rust check
@@ -2076,6 +2122,7 @@ test_sdk_bindings:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C contrib/sdk-bindings check
@@ -2123,6 +2170,7 @@ test_kernels:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk check
@@ -2172,6 +2220,7 @@ test_etherlink_kernel:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk check
@@ -2219,6 +2268,7 @@ test_etherlink_firehose:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C etherlink/firehose check
@@ -2259,6 +2309,7 @@ audit_riscv_deps:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv audit
@@ -2305,6 +2356,7 @@ check_riscv_kernels:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
@@ -2353,6 +2405,7 @@ test_evm_compatibility:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
@@ -2401,6 +2454,7 @@ ocaml-check:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune build @check --stop-on-first-error
   after_script:
@@ -2468,6 +2522,7 @@ oc.unit:non-proto-x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
@@ -2537,6 +2592,7 @@ oc.unit:etherlink-x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
@@ -2624,6 +2680,7 @@ oc.unit:other-x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
@@ -2711,6 +2768,7 @@ oc.unit:proto-x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
@@ -2794,6 +2852,7 @@ oc.unit:non-proto-arm64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make $MAKE_TARGETS
@@ -2861,6 +2920,7 @@ oc.unit:webassembly-x86_64:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make test-webassembly
 
@@ -2917,6 +2977,7 @@ oc.unit:protocol_compiles:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - dune build @runtest_compile_protocol
@@ -2949,6 +3010,7 @@ de.unit:x86_64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune runtest data-encoding
 
@@ -2974,6 +3036,7 @@ de.unit:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune runtest data-encoding
 
@@ -2999,6 +3062,7 @@ resto.unit:x86_64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune runtest resto
 
@@ -3024,6 +3088,7 @@ resto.unit:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune runtest resto
 
@@ -3042,6 +3107,7 @@ oc.install_opam_noble:
   timeout: 2 hours
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/install-opam.sh
   variables:
@@ -3064,6 +3130,7 @@ oc.compile_sources_doc_bookworm:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/introduction/compile-sources.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
@@ -3124,6 +3191,7 @@ tezt:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3218,6 +3286,7 @@ tezt-time-sensitive:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3312,6 +3381,7 @@ tezt-slow:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3403,6 +3473,7 @@ tezt-extra:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3495,6 +3566,7 @@ tezt-flaky:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3584,6 +3656,7 @@ tezt:static-binaries:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - mv octez-binaries/x86_64/octez-* .
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3672,6 +3745,7 @@ tezt-riscv-slow-sequential:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -3757,6 +3831,7 @@ oc.unified_coverage:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/report_coverage.sh || exit $?
   variables:
@@ -3797,6 +3872,7 @@ documentation:install_python_bookworm:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
@@ -3848,6 +3924,7 @@ documentation:odoc:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export OPAMFETCH='wget'
@@ -3914,6 +3991,7 @@ documentation:manuals:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C docs -j octez-gen
   artifacts:
@@ -3972,6 +4050,7 @@ documentation:docgen:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C docs -j docexes-gen
@@ -4034,6 +4113,7 @@ documentation:build_all:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C docs -j sphinx
   - make -C docs -j _build/octezdoc.txt
@@ -4090,6 +4170,7 @@ documentation:linkcheck:
   - . ./scripts/version.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - make -C docs redirectcheck
   - make -C docs linkcheck
@@ -4116,6 +4197,7 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -4147,6 +4229,7 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -4173,6 +4256,7 @@ oc.script.docker_verify_image_arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_verify_signature.sh
   services:
@@ -4196,6 +4280,7 @@ oc.script.docker_verify_image_amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_verify_signature.sh
   services:
@@ -4231,6 +4316,7 @@ teztale.build-arm64:
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/take_ownership.sh
@@ -4280,6 +4366,7 @@ teztale.build-x86_64:
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/take_ownership.sh
@@ -4320,6 +4407,7 @@ grafazos.build:
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec

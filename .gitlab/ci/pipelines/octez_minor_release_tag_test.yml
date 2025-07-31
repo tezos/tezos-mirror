@@ -16,6 +16,7 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -37,6 +38,7 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -63,6 +65,7 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
@@ -95,6 +98,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -141,6 +145,7 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
@@ -173,6 +178,7 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -197,6 +203,7 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
   services:
@@ -218,6 +225,7 @@ oc.install-release-homebrew:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/install-gsutil.sh
   - apt install -y git build-essential
@@ -244,6 +252,7 @@ docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
   services:
@@ -271,6 +280,7 @@ gitlab:release:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
@@ -303,6 +313,7 @@ oc.docker-build-debian-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
   services:
@@ -338,6 +349,7 @@ oc.build-debian:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -375,6 +387,7 @@ oc.build-data_packages:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
@@ -406,6 +419,7 @@ apt_repo_debian:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
   variables:
@@ -427,6 +441,7 @@ oc.docker-build-ubuntu-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
   services:
@@ -462,6 +477,7 @@ oc.build-ubuntu:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -505,6 +521,7 @@ apt_repo_ubuntu:
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
   - apt install -y apt-utils debsigs jq
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
   variables:
@@ -526,6 +543,7 @@ oc.docker-build-rockylinux-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
   services:
@@ -554,6 +572,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   services:
@@ -588,6 +607,7 @@ oc.build-rockylinux:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -633,6 +653,7 @@ oc.build-rockylinux-data:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -678,6 +699,7 @@ rpm_repo_rockylinux:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
   variables:
@@ -699,6 +721,7 @@ oc.docker-build-fedora-dependencies:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
   services:
@@ -728,6 +751,7 @@ oc.docker-systemd-tests-rpm-fedora:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
   services:
@@ -763,6 +787,7 @@ oc.build-fedora:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -809,6 +834,7 @@ oc.build-fedora-data:
     policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -855,6 +881,7 @@ rpm_repo_fedora:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh fedora 39 42
   variables:
@@ -878,6 +905,7 @@ docker:promote_to_latest:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_promote_to_latest.sh
   services:
@@ -898,6 +926,7 @@ opam:release:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/opam-release.sh --dry-run
   retry: 0
@@ -923,6 +952,7 @@ publish:release-page:
   - . ./scripts/ci/datadog_send_job_info.sh
   - sudo apk add aws-cli pandoc
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/releases/publish_release_page.sh
   after_script:
