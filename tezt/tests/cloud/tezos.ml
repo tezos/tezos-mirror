@@ -290,7 +290,7 @@ module Node = struct
   module Agent = struct
     let create ?(group = "L1") ?rpc_external ?(metadata_size_limit = true)
         ?(arguments = []) ?data_dir ?(path = Uses.path Constant.octez_node)
-        ?name ?net_addr cloud agent =
+        ~name ?net_addr cloud agent =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
       let* () =
@@ -326,7 +326,7 @@ module Node = struct
       let node =
         create
           ?data_dir
-          ?name
+          ~name
           ~path
           ?runner
           ?rpc_external
@@ -377,12 +377,7 @@ module Node = struct
           Format.asprintf "%s:prometheus-process-exporter" (Agent.name agent)
         in
         let target = Cloud.{agent; port = Node.metrics_port node; app_name} in
-        let* () =
-          Cloud.add_prometheus_source
-            cloud
-            ~name:(Option.value name ~default:(Node.name node))
-            [target]
-        in
+        let* () = Cloud.add_prometheus_source cloud ~name [target] in
         (* Prometheus process-exporter *)
         Alerts.add_process_exporter_alerts
           ~cloud
@@ -394,10 +389,23 @@ module Node = struct
                given in command line. The alerts must match the same groupname *)
           receiver
       in
+      let on_shutdown =
+        match Agent.daily_logs_dir agent with
+        | None -> []
+        | Some destination_root ->
+            [
+              (fun () ->
+                Agent_kind.Logs.scp_logs
+                  ~destination_root
+                  ~daemon_name:name
+                  agent);
+            ]
+      in
       Cloud.service_register
         ~name:node_name
         ~executable
         ~on_alive_callback
+        ~on_shutdown
         agent ;
       Lwt.return node
 
@@ -499,7 +507,7 @@ module Dal_node = struct
 
   module Agent = struct
     let create_from_endpoint ?(group = "DAL") ?net_port
-        ?(path = Uses.path Constant.octez_dal_node) ?name ?rpc_port
+        ?(path = Uses.path Constant.octez_dal_node) ~name ?rpc_port
         ?disable_shard_validation ?ignore_pkhs ~l1_node_endpoint cloud agent =
       let* path = Agent.copy agent ~source:path in
       let binary_name = Filename.basename path in
@@ -527,7 +535,7 @@ module Dal_node = struct
       let listen_addr = Format.asprintf "0.0.0.0:%d" net_port in
       let node =
         create_from_endpoint
-          ?name
+          ~name
           ~path
           ?runner
           ~rpc_port
@@ -557,11 +565,22 @@ module Dal_node = struct
             ]
           (if alive then 1.0 else 0.0)
       in
-      Cloud.service_register
-        ~name:node_name
-        ~executable
-        ~on_alive_callback
-        agent ;
+      let alert =
+        Alert.make
+          ~name:"ServiceManagerProcessDown"
+          ~description:
+            {|This alert is raised when a process monitored by the service_manager is detected as being not running. This happens typically when the process pid is not found anymore in the process tree, or the pid has been recycled and does not correspond to the executable that was run initially|}
+          ~summary:
+            (Format.asprintf
+               "'[%s.service_manager] the process [%s] is down'"
+               (Agent.name agent)
+               executable)
+          ~route:(Alert.route receiver)
+          ~severity:Alert.Critical
+          ~expr:(Format.asprintf {|%s{name="%s"} < 1|} metric_name name)
+          ()
+      in
+      let* () = Cloud.add_alert cloud ~alert in
       let alert =
         Alerts.service_manager_process_down
           ~agent:(Agent.name agent)
@@ -579,12 +598,7 @@ module Dal_node = struct
         let target =
           Cloud.{agent; port = Dal_node.metrics_port node; app_name}
         in
-        let* () =
-          Cloud.add_prometheus_source
-            cloud
-            ~name:(Option.value name ~default:(Dal_node.name node))
-            [target]
-        in
+        let* () = Cloud.add_prometheus_source cloud ~name [target] in
         Alerts.add_process_exporter_alerts
           ~cloud
           ~agent_name:(Agent.name agent)
@@ -593,14 +607,32 @@ module Dal_node = struct
           ~groupname:binary_name
           receiver
       in
+      let on_shutdown =
+        match Agent.daily_logs_dir agent with
+        | None -> []
+        | Some destination_root ->
+            [
+              (fun () ->
+                Agent_kind.Logs.scp_logs
+                  ~destination_root
+                  ~daemon_name:name
+                  agent);
+            ]
+      in
+      Cloud.service_register
+        ~name
+        ~executable
+        ~on_alive_callback
+        ~on_shutdown
+        agent ;
       Lwt.return node
 
-    let create ?net_port ?path ?name ?disable_shard_validation ?ignore_pkhs
+    let create ?net_port ?path ~name ?disable_shard_validation ?ignore_pkhs
         ~node agent =
       create_from_endpoint
         ?net_port
         ?path
-        ?name
+        ~name
         ?disable_shard_validation
         ?ignore_pkhs
         ~l1_node_endpoint:(Node.as_rpc_endpoint node)

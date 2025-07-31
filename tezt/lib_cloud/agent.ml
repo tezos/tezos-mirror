@@ -69,6 +69,8 @@ type t = {
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
   service_manager : Service_manager.t option;
+  daily_logs_dir : string option;
+  mutable on_shutdown : (unit -> unit Lwt.t) list;
 }
 
 let ssh_id () = Env.ssh_private_key_filename ()
@@ -87,19 +89,23 @@ let encoding =
            configuration;
            process_monitor;
            service_manager = _;
+           daily_logs_dir;
+           on_shutdown = _;
          } ->
       ( vm_name,
         zone,
         point,
         next_available_port (),
         configuration,
-        process_monitor ))
+        process_monitor,
+        daily_logs_dir ))
     (fun ( vm_name,
            zone,
            point,
            next_available_port,
            configuration,
-           process_monitor ) ->
+           process_monitor,
+           daily_logs_dir ) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -139,15 +145,18 @@ let encoding =
         configuration;
         process_monitor;
         service_manager = None;
-        (* As of now, this encoding is only used when reattaching *)
+        daily_logs_dir;
+        on_shutdown =
+          [] (* As of now, this encoding is only used when reattaching *);
       })
-    (obj6
+    (obj7
        (req "vm_name" (option string))
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
        (req "configuration" Configuration.encoding)
-       (opt "process_monitor" Process_monitor.encoding))
+       (opt "process_monitor" Process_monitor.encoding)
+       (opt "daily_logs_dir" string))
 
 (* Getters *)
 
@@ -163,8 +172,10 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
+let daily_logs_dir {daily_logs_dir; _} = daily_logs_dir
+
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
-    ~process_monitor () =
+    ~process_monitor ~daily_logs_dir () =
   let ssh_user = "root" in
   let runner =
     match (point, ssh_id) with
@@ -190,6 +201,8 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     zone;
     process_monitor;
     service_manager = Service_manager.init () |> Option.some;
+    daily_logs_dir;
+    on_shutdown = [];
   }
 
 let cmd_wrapper {zone; vm_name; _} =
@@ -212,6 +225,14 @@ let path_of agent binary = agent.configuration.vm.binaries_path // binary
 let process_monitor agent = agent.process_monitor
 
 let service_manager t = t.service_manager
+
+let temp_execution_path () =
+  (* This assumes that Tezt.Temp.file always returns the same result for the
+     same process. *)
+  Temp.dir ""
+
+let register_shutdown_callback t callback =
+  t.on_shutdown <- callback :: t.on_shutdown
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with

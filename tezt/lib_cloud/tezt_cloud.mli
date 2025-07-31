@@ -214,20 +214,23 @@ module Cloud : sig
     unit ->
     unit Lwt.t
 
-  (** [service_register: name executable on_alive_callback agent] register a
-      service, ie, a long running background process, that we want to monitor
-      for launch and crash.
+  (** [service_register: name executable on_alive_callback on_shutdowan agent]
+      register a service, ie, a long running background process, that we want to
+      monitor for launch and crash.
       [name] is a unique name to identify the service.
       [on_alive_callback] is a callback whose argument is a boolean which
       represent the service started if true, or the service was shutdown if
       false. This callback is called regularly, and expects to be update some
       metrics.
+      [on_shutdown] is a list of callbacks that will be called as soon as the
+      shutdown of a service will be triggered.
       TODO: change arguments executable and pid to a abstraction for tezt Daemon.t
             and merge register_binary functionality into register_service *)
   val service_register :
     name:string ->
     executable:string ->
     ?on_alive_callback:(alive:bool -> unit) ->
+    on_shutdown:(unit -> unit Lwt.t) list ->
     Agent.t ->
     unit
 
@@ -257,6 +260,9 @@ module Tezt_cloud_cli : sig
   val prometheus : bool
 
   val scenario_specific_json : (string * Data_encoding.Json.t) option
+
+  (** Equivalent to [Cli.retrieve_daily_logs] *)
+  val retrieve_daily_logs : string option
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

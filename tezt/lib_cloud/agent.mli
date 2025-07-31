@@ -50,11 +50,12 @@ module Configuration : sig
     t
 end
 
-(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name ()]
-    creates an [agent] from the given parameters. [~next_available_port] should
-    always provide an available port or raise [Not_found] otherwise.
-    [~vm_name] is the name of the VM. [?ssh_id] and [?point] are used to potentially
-    create a [runner] for the [agent]. *)
+(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
+    ~daily_logs_dir ()] creates an [agent] from the given parameters.
+    [~next_available_port] should always provide an available port or raise
+    [Not_found] otherwise. [~vm_name] is the name of the VM. [?ssh_id] and
+    [?point] are used to potentially create a [runner] for the [agent].
+    [daily_logs_dir] stands for the path to the agent's daily logs. *)
 val make :
   ?zone:string ->
   ?ssh_id:string ->
@@ -63,6 +64,7 @@ val make :
   next_available_port:(unit -> int) ->
   vm_name:string option ->
   process_monitor:Process_monitor.t option ->
+  daily_logs_dir:string option ->
   unit ->
   t
 
@@ -88,6 +90,9 @@ val runner : t -> Runner.t option
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
 
+(** [daily_logs_dir agent] daily logs directory associated to the agent. *)
+val daily_logs_dir : t -> string option
+
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option
 
@@ -99,6 +104,13 @@ val process_monitor : t -> Process_monitor.t option
 
 (** Returns the service manager if any *)
 val service_manager : t -> Service_manager.t option
+
+(** Returns the path in which the agent aims it's data. *)
+val temp_execution_path : unit -> string
+
+(** Register a callback that will be executed as soon as the agent is shutting
+    down. *)
+val register_shutdown_callback : t -> (unit -> unit Lwt.t) -> unit
 
 (** Run a command on the docker image run by the agent.
 

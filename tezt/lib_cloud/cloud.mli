@@ -60,6 +60,7 @@ val service_register :
   name:string ->
   executable:string ->
   ?on_alive_callback:(alive:bool -> unit) ->
+  on_shutdown:(unit -> unit Lwt.t) list ->
   Agent.t ->
   unit
 

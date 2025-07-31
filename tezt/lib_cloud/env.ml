@@ -109,6 +109,8 @@ let process_monitoring = Cli.process_monitoring
 
 let log_rotation = Cli.log_rotation
 
+let retrieve_daily_logs = Cli.retrieve_daily_logs
+
 let init () =
   if tezt_cloud = "" then
     Test.fail

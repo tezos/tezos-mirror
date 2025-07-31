@@ -147,6 +147,9 @@ val binaries_path : string
     Use 0 to disable log-rotation *)
 val log_rotation : int
 
+(* Daily log path retrieval if set. *)
+val retrieve_daily_logs : string option
+
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
 
