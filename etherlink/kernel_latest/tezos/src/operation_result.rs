@@ -40,6 +40,7 @@ pub enum ValidityError {
     InvalidSignature,
     FailedToFetchAccount,
     FailedToComputeFeeBalanceUpdate,
+    FailedToFetchCounter,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]

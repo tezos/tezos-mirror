@@ -28,13 +28,15 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
         counter: &Narith,
-    ) -> Result<Result<(), ValidityError>, tezos_storage::error::Error> {
-        let contract_counter = self.counter(host)?;
+    ) -> Result<(), ValidityError> {
+        let contract_counter = self
+            .counter(host)
+            .map_err(|_| ValidityError::FailedToFetchCounter)?;
         // The provided counter value must be the successor of the manager's counter.
         let expected_counter = Narith(&contract_counter.0 + 1_u64);
 
         if &expected_counter == counter {
-            Ok(Ok(()))
+            Ok(())
         } else if expected_counter.0 > counter.0 {
             let error = CounterError {
                 expected: expected_counter,
@@ -45,7 +47,7 @@ impl TezlinkImplicitAccount {
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Source counter is in the past"
             );
-            Ok(Err(ValidityError::CounterInThePast(error)))
+            Err(ValidityError::CounterInThePast(error))
         } else {
             let error = CounterError {
                 expected: expected_counter,
@@ -56,7 +58,7 @@ impl TezlinkImplicitAccount {
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Source counter is in the future"
             );
-            Ok(Err(ValidityError::CounterInTheFuture(error)))
+            Err(ValidityError::CounterInTheFuture(error))
         }
     }
 
@@ -146,7 +148,7 @@ pub fn validate_operation<Host: Runtime>(
         return Ok(Err(ValidityError::EmptyImplicitContract));
     }
 
-    if let Err(err) = account.check_counter_increment(host, &content.counter)? {
+    if let Err(err) = account.check_counter_increment(host, &content.counter) {
         // Counter verification failed, return the error
         return Ok(Err(err));
     }
