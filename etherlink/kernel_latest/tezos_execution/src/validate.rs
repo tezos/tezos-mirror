@@ -206,8 +206,10 @@ pub fn validate_operation<Host: Runtime>(
     }
 
     let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(&content.source, &content.fee)
-            .map_err(ApplyKernelError::BigIntError)?;
+        match crate::compute_fees_balance_updates(&content.source, &content.fee) {
+            Err(_) => return Ok(Err(ValidityError::FailedToComputeFeeBalanceUpdate)),
+            Ok(v) => v,
+        };
 
     Ok(Ok(ValidationInfo {
         new_source_balance: new_balance,

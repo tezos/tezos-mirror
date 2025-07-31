@@ -39,6 +39,7 @@ pub enum ValidityError {
     StorageLimitTooHigh,
     InvalidSignature,
     FailedToFetchAccount,
+    FailedToComputeFeeBalanceUpdate,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
