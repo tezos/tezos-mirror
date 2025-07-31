@@ -490,6 +490,8 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
+    ?only_if_changed:string list ->
+    ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
@@ -523,11 +525,12 @@ end
    but in practice this would be less convenient since all functions need at least
    one of them. *)
 module Make (Component : COMPONENT) : COMPONENT_API = struct
-  let only_if_changed = Tezos_ci.Changeset.make Component.paths
+  let default_only_if_changed = Tezos_ci.Changeset.make Component.paths
 
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
-      ?storage ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts
-      ?(cargo_cache = false) ?sccache name script =
+      ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
+      ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false) ?sccache
+      name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -553,7 +556,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       needs_legacy;
-      only_if = {changed = only_if_changed};
+      only_if =
+        {
+          changed =
+            (match only_if_changed with
+            | None -> default_only_if_changed
+            | Some list -> Tezos_ci.Changeset.make list);
+          label = String_set.of_list force_if_label;
+        };
       variables;
       script;
       artifacts;

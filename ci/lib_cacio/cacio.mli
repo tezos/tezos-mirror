@@ -168,10 +168,12 @@ module type COMPONENT_API = sig
       Jobs themselves do not carry their [!trigger].
       Instead, each pipeline can decide to add jobs with a different trigger.
 
-      When added to the [before_merging] pipeline,
-      jobs are given a [changes] clause which is the union of:
-      - the component [paths];
-      - the [changes] clauses of reverse dependencies.
+      When added to the [before_merging] or [merge_train] pipeline,
+      jobs are only included to the pipeline if
+      any file listed in [only_if_changed] has been modified,
+      or if the merge request has any label listed in [force_if_label].
+      [only_if_changed] can include glob patterns such as [dir/**/*.ml].
+      Its default value is the [paths] of the current component.
 
       The job will not start before all [needs] and [needs_legacy] jobs succeed.
       Additionally, [needs] are automatically added to pipelines in which the job
@@ -196,6 +198,8 @@ module type COMPONENT_API = sig
     ?cpu:Tezos_ci.Runner.CPU.t ->
     ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
+    ?only_if_changed:string list ->
+    ?force_if_label:string list ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
@@ -302,3 +306,6 @@ module Make (_ : COMPONENT) : COMPONENT_API
     - Docker images are only pushed to Docker Hub in actual release pipelines,
       not test release pipelines (those can use the GitLab registry instead for instance);
     - ... *)
+
+(** Another idea would be to have the default ~force_if_label be ["ci--" ^ component_name].
+    Or to automatically add this label to the list. *)
