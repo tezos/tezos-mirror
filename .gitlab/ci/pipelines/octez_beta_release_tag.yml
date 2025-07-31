@@ -19,6 +19,8 @@ oc.docker:ci:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -42,6 +44,8 @@ oc.docker:jsonnet:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -63,6 +67,8 @@ oc.docker:ci:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -92,6 +98,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -125,6 +133,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
@@ -172,6 +181,7 @@ oc.build:static-arm64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -203,6 +213,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -228,6 +240,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -254,6 +268,8 @@ oc.install-release-homebrew:
   - ./scripts/packaging/homebrew_install.sh
   - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
   - ./scripts/packaging/homebrew_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
     name: build-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -277,6 +293,8 @@ docker:merge_manifests:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -306,6 +324,8 @@ gitlab:release:
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   id_tokens:
     GCP_ID_TOKEN:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
@@ -338,6 +358,8 @@ oc.docker-build-debian-dependencies:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -377,6 +399,7 @@ oc.build-debian:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -413,6 +436,8 @@ oc.build-data_packages:
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     FLAVOUR: build
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
@@ -444,6 +469,8 @@ apt_repo_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
@@ -466,6 +493,8 @@ oc.docker-build-ubuntu-dependencies:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -505,6 +534,7 @@ oc.build-ubuntu:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -546,6 +576,8 @@ apt_repo_ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
@@ -568,6 +600,8 @@ oc.docker-build-rockylinux-dependencies:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -597,6 +631,8 @@ oc.docker-systemd-tests-rpm-rockylinux:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -635,6 +671,7 @@ oc.build-rockylinux:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh binaries
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -681,6 +718,7 @@ oc.build-rockylinux-data:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh zcash
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -724,6 +762,8 @@ rpm_repo_rockylinux:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
@@ -746,6 +786,8 @@ oc.docker-build-fedora-dependencies:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -776,6 +818,8 @@ oc.docker-systemd-tests-rpm-fedora:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -815,6 +859,7 @@ oc.build-fedora:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh binaries
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -862,6 +907,7 @@ oc.build-fedora-data:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh zcash
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     FLAVOUR: build
@@ -906,6 +952,8 @@ rpm_repo_fedora:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh fedora 39 42
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     ARCHITECTURES: amd64 arm64
     GNUPGHOME: $CI_PROJECT_DIR/.gnupg
@@ -947,6 +995,7 @@ teztale.build-arm64:
   - mkdir -p ./teztale-binaries/arm64
   - mv octez-teztale-* ./teztale-binaries/arm64/
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -992,6 +1041,7 @@ teztale.build-x86_64:
   - mkdir -p ./teztale-binaries/x86_64
   - mv octez-teztale-* ./teztale-binaries/x86_64/
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -1023,6 +1073,8 @@ teztale.gitlab_release:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./teztale/scripts/releases/create_gitlab_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
 teztale.release_page:
@@ -1046,6 +1098,8 @@ teztale.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./teztale/scripts/releases/publish_release_page.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     S3_BUCKET: site-prod.octez.tezos.com/releases
     URL: octez.tezos.com
@@ -1075,6 +1129,8 @@ grafazos.build:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   - make
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
     name: grafazos-dashboards
     expire_in: 1 day
@@ -1098,6 +1154,8 @@ grafazos.gitlab_release:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
 grafazos.release_page:
@@ -1119,6 +1177,8 @@ grafazos.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/publish_release_page.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     S3_BUCKET: site-prod.octez.tezos.com/releases
     URL: octez.tezos.com

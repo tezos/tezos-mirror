@@ -20,6 +20,8 @@ oc.docker:jsonnet:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -44,6 +46,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
@@ -63,6 +67,8 @@ grafazos.build:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   - make
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
     name: grafazos-dashboards
     expire_in: 1 day
@@ -86,6 +92,8 @@ grafazos.gitlab_release:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
 grafazos.release_page:
@@ -107,6 +115,8 @@ grafazos.release_page:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/publish_release_page.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747

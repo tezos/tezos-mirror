@@ -21,6 +21,8 @@ oc.docker:ci:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -43,6 +45,8 @@ oc.docker:rust-toolchain:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -64,6 +68,8 @@ oc.docker:ci:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -110,6 +116,7 @@ oc.build:static-x86_64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
@@ -156,6 +163,7 @@ oc.build:static-arm64-linux-binaries:
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -204,6 +212,7 @@ oc.build_arm64-released:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -261,6 +270,7 @@ oc.build_arm64-exp-dev-extra:
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -301,6 +311,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.unified_coverage:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -323,6 +335,8 @@ oc.unified_coverage:
   - dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
     --info --log-file _coverage_report/download_coverage.log
   - ./scripts/ci/report_coverage.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     PROJECT: $CI_PROJECT_PATH
     DEFAULT_BRANCH: $CI_COMMIT_SHA
@@ -358,6 +372,8 @@ oc.docker:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -383,6 +399,8 @@ oc.docker:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -408,6 +426,8 @@ docker:merge_manifests:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -444,6 +464,7 @@ publish_kernel_sdk:
   - make -f kernels.mk publish-sdk-deps
   - SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     CARGO_NET_OFFLINE: "false"

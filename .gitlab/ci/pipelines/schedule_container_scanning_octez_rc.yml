@@ -21,6 +21,8 @@ oc.docker:ci:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -46,6 +48,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 container_scanning:
   stage: test
@@ -58,6 +62,8 @@ container_scanning:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - gtcs scan
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     GIT_STRATEGY: fetch
     CS_IMAGE: tezos/tezos:octez-v22.0-rc3
@@ -86,3 +92,5 @@ container_scanning_slack_notification:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/ci/container_scanning_slack_notification.sh tezos/tezos:octez-v22.0-rc3
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

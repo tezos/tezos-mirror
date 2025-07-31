@@ -23,6 +23,8 @@ oc.docker:ci:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -45,6 +47,8 @@ oc.docker:ci:arm64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -74,6 +78,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -107,6 +113,7 @@ build-layer1-profiling:
   - mkdir -p octez-binaries/x86_64/
   - mv octez-node octez-binaries/x86_64/
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     PROFILE: static
@@ -145,6 +152,7 @@ teztale.build:static-arm64:
   script:
   - make teztale
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - mkdir -p ./teztale-binaries/arm64
   - mv octez-teztale-* ./teztale-binaries/arm64/
   - ./scripts/ci/sccache-stop.sh
@@ -187,6 +195,7 @@ teztale.build:static-x86_64:
   script:
   - make teztale
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - mkdir -p ./teztale-binaries/x86_64
   - mv octez-teztale-* ./teztale-binaries/x86_64/
   - ./scripts/ci/sccache-stop.sh

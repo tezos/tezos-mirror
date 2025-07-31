@@ -18,6 +18,8 @@ oc.docker:ci:amd64:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -43,6 +45,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 container_scanning_latest:
   image: aquasec/trivy:latest
@@ -62,6 +66,8 @@ container_scanning_latest:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/ci/container_scanning_generate_reports.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
@@ -89,6 +95,8 @@ container_scanning_octez-evm-node-latest:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/ci/container_scanning_generate_reports.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
@@ -116,6 +124,8 @@ container_scanning_master:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . ./scripts/ci/container_scanning_generate_reports.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TRIVY_NO_PROGRESS: "true"
     TRIVY_CACHE_DIR: .trivycache/
@@ -149,6 +159,8 @@ container_scanning_merge_reports:
     remediations: map(.remediations[])}'' gl-container-scanning-report-latest.json
     gl-container-scanning-report-octez-evm-node-latest.json gl-container-scanning-report-master.json
     > gl-container-scanning-report.json'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
     reports:
       container_scanning: gl-container-scanning-report.json

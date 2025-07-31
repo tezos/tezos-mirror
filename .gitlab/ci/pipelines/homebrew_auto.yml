@@ -25,6 +25,8 @@ datadog_pipeline_trace:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.install-homebrew:
   image: debian:bookworm
@@ -46,6 +48,8 @@ oc.install-homebrew:
   - apt-get install -y autoconf cmake g++ libev-dev libffi-dev libgmp-dev libprotobuf-dev
     libsqlite3-dev protobuf-compiler libhidapi-dev pkg-config zlib1g-dev libpq-dev
   - ./scripts/packaging/test_homebrew_install.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     CARGO_NET_OFFLINE: "false"
 
@@ -63,6 +67,8 @@ oc.build-homebrew:
   - ./scripts/ci/install-gsutil.sh
   - apt-get update && apt-get install -y git curl
   - ./scripts/packaging/homebrew_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     CARGO_NET_OFFLINE: "false"
 
@@ -83,5 +89,7 @@ oc.install-homebrew-macosx:
   - ./scripts/packaging/homebrew_install.sh
   - eval $(/opt/homebrew/bin/brew shellenv)
   - ./scripts/packaging/test_homebrew_install.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     TAGS: saas-macos-medium-m1
