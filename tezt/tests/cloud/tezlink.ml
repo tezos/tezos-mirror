@@ -21,7 +21,7 @@ module Tzkt_process = struct
 
     let base_default_name = "tzkt"
 
-    let default_colors = Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
+    let default_colors = Evm_node.daemon_default_colors
   end
 
   include Daemon.Make (Parameters)
