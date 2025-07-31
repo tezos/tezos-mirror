@@ -92,14 +92,14 @@ module UID_map = Map.Make (Int)
    in the original list with different triggers.
 
    Step 3: the [fix_graph] function converts the [job_graph] into a [fixed_job_graph].
-   This function fixes triggers and changesets.
+   This function fixes triggers and conditions.
    By "fix" we mean not only that we set them to corrected values,
    but also that these corrected values are a fixpoint.
    More precisely:
    - triggers are fixed so that if a job has trigger [Auto],
      then all of its dependencies also have trigger [Auto];
-   - changesets are fixed so that if changing a file causes a job to be included,
-     then changing this file also causes all dependencies of this job to be included.
+   - conditions are fixed so that if a condition causes a job to be included,
+     then this condition also causes all dependencies of this job to be included.
 
    At this point, we took the *intent* of the user (given in step 1),
    and corrected it to something that actually makes sense.
@@ -205,7 +205,7 @@ type fixed_job_graph_node = {
 
 type fixed_job_graph = fixed_job_graph_node UID_map.t
 
-(* Compute the final values for [only_if_changed] and [trigger]s.
+(* Compute the final values for conditions and [trigger]s.
    Assumes there are no cycles.
    See GRAPH TRANSFORMATIONS above (step 3). *)
 let fix_graph (graph : job_graph) : fixed_job_graph =
@@ -287,11 +287,10 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 (* Convert jobs to [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS above (step 4).
 
-   If [with_changes] is [true], the job [rules] will contain a [changes] clause.
-   If it is [false], [only_if_changed] is ignored.
-   [changes] clauses are typically only used in merge request pipelines
-   such as [before_merging]. *)
-let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
+   If [with_condition] is [true], the job [rules] will include its conditions.
+   If it is [false], its conditions are ignored.
+   Conditions are typically only used in merge request pipelines such as [before_merging]. *)
+let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -350,10 +349,10 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 | Artifacts -> Tezos_ci.Artifacts dep
               in
               (* Compute [rules] from on the job's fixed changeset,
-                 whether we actually want the [changes] clause ([with_changes]),
+                 whether we actually want the condition ([with_condition]),
                  and the [trigger]. *)
               let rules =
-                if with_changes then
+                if with_condition then
                   Some
                     [
                       Gitlab_ci.Util.job_rule
@@ -431,10 +430,10 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
 
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
-let convert_jobs ~with_changes (jobs : (trigger * job) list) :
+let convert_jobs ~with_condition (jobs : (trigger * job) list) :
     Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
-  |> convert_graph ~with_changes
+  |> convert_graph ~with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -555,11 +554,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
           in
           (trigger, job)
     in
-    let jobs = convert_jobs ~with_changes:true jobs in
+    let jobs = convert_jobs ~with_condition:true jobs in
     Tezos_ci.Hooks.before_merging := jobs @ !Tezos_ci.Hooks.before_merging
 
   let register_master_jobs jobs =
-    let jobs = convert_jobs ~with_changes:false jobs in
+    let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.master := jobs @ !Tezos_ci.Hooks.master
 
   let full_pipeline_name name = sf "%s.%s" Component.name name
@@ -580,22 +579,22 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       name
       ~description
-      ~jobs:(convert_jobs ~with_changes:false jobs)
+      ~jobs:(convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (full_pipeline_name name)))
 
   let register_global_release_jobs jobs =
-    let jobs = convert_jobs ~with_changes:false jobs in
+    let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.global_release := jobs @ !Tezos_ci.Hooks.global_release
 
   let register_global_test_release_jobs jobs =
-    let jobs = convert_jobs ~with_changes:false jobs in
+    let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.global_test_release :=
       jobs @ !Tezos_ci.Hooks.global_test_release
 
   let register_global_scheduled_test_release_jobs jobs =
-    let jobs = convert_jobs ~with_changes:false jobs in
+    let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.global_scheduled_test_release :=
       jobs @ !Tezos_ci.Hooks.global_scheduled_test_release
 
@@ -629,7 +628,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "release"
       ~description:(sf "Release %s." Component.name)
-      ~jobs:(convert_jobs ~with_changes:false jobs)
+      ~jobs:(convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           on_tezos_namespace && push && has_tag_match release_tag_rex))
@@ -640,7 +639,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     register_pipeline
       "test_release"
       ~description:(sf "Release %s (test)." Component.name)
-      ~jobs:(convert_jobs ~with_changes:false jobs)
+      ~jobs:(convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           not_on_tezos_namespace && push && has_tag_match release_tag_rex))
