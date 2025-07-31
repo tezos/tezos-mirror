@@ -164,7 +164,8 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
           database_arg
           indexer_port_arg;
       ]
-  and* () =
+  in
+  let* () =
     Tzkt_process.run
       ?runner
       "sh"
