@@ -87,10 +87,12 @@ fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     content: &OperationContent,
-) -> Result<Result<PublicKey, ValidityError>, ApplyKernelError> {
+) -> Result<PublicKey, ValidityError> {
     match content {
-        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(Ok(pk.clone())),
-        _ => Ok(account.get_manager_key(host)?),
+        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
+        _ => account
+            .get_manager_key(host)
+            .map_err(|_| ValidityError::FailedToFetchManagerKey)?,
     }
 }
 
@@ -153,7 +155,7 @@ pub fn validate_operation<Host: Runtime>(
         return Ok(Err(err));
     }
 
-    let pk = match get_revealed_key(host, &account, &content.operation)? {
+    let pk = match get_revealed_key(host, &account, &content.operation) {
         Err(err) => {
             // Retrieve public key failed, return the error
             return Ok(Err(err));
