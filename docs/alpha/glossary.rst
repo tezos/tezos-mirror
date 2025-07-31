@@ -137,7 +137,7 @@ _`Baker`
 
     When using :ref:`Octez <octez>`, baking and other consensus actions are handled by the baker
     daemon, on behalf of one or more delegate_ accounts.
-    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf, participating to governance and to the DAL.
+    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf, participating in governance and in the DAL.
 
 _`Baking`
     The act of creating a new block_ by a baker_.
