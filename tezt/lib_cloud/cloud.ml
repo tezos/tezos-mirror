@@ -160,7 +160,7 @@ let wait_ssh_server_running agent =
               runner
               (Runner.Shell.cmd [] "echo" ["-n"; "check"])
           in
-          Process.spawn cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
+          Process.spawn cmd (runner.options @ args)
         in
         let* _ = Env.wait_process ~is_ready ~run () in
         Lwt.return_unit
@@ -330,8 +330,7 @@ let attach agent =
         (Runner.Shell.cmd [] "screen" ["-S"; "tezt-cloud"; "-X"; "stuff"; "^C"])
     in
     let* () =
-      Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-      |> Process.check
+      Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
     in
     let cmd, args =
       Runner.wrap_with_ssh
@@ -339,8 +338,7 @@ let attach agent =
         (Runner.Shell.cmd [] "stdbuf" ["-oL"; "tail"; "-F"; "screenlog.0"])
     in
     let _p =
-      Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-      |> Process.check
+      Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
     in
     let* _ = Input.eof in
     let* () =
@@ -390,8 +388,7 @@ let attach agent =
     Lwt.catch
       (fun () ->
         let* () =
-          Process.spawn ~hooks cmd (["-o"; "StrictHostKeyChecking=no"] @ args)
-          |> Process.check
+          Process.spawn ~hooks cmd (runner.options @ args) |> Process.check
         in
         Lwt.return_unit)
       (fun exn ->
