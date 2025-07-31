@@ -128,7 +128,7 @@ let encoding =
                 I don't have a good proposition that keeps a nice UX and is secure at the moment.
             *)
             Runner.create
-              ~options:["-o"; "StrictHostKeyChecking=no"]
+              ~options:Ssh.ssh_options
               ~ssh_user:"root"
               ~ssh_id
               ~ssh_port
@@ -184,7 +184,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
         Test.fail "Agent.make was not initialized correctly"
     | Some (address, ssh_port), Some ssh_id ->
         Runner.create
-          ~options:["-o"; "StrictHostKeyChecking=no"]
+          ~options:Ssh.ssh_options
           ~ssh_user
           ~ssh_id
           ~ssh_port

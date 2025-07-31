@@ -24,3 +24,7 @@ let public_key () =
     Process.run_and_read_stdout ~name:"cat" "cat" [ssh_public_key_filename]
   in
   Lwt.return content
+
+let common_options = ["-o"; "StrictHostKeyChecking=no"]
+
+let ssh_options = common_options
