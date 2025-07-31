@@ -13,8 +13,7 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
-use tezos_data_encoding::enc::BinError;
+use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
@@ -32,47 +31,12 @@ use tezos_tezlink::{
         TransferError, TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
-use thiserror::Error;
 use validate::ValidationInfo;
 
 extern crate alloc;
 pub mod account_storage;
 pub mod context;
 mod validate;
-
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum ApplyKernelError {
-    #[error("Host failed with a runtime error {0}")]
-    HostRuntimeError(#[from] tezos_smart_rollup_host::runtime::RuntimeError),
-    #[error("Apply operation failed on a storage manipulation {0}")]
-    StorageError(tezos_storage::error::Error),
-    #[error("Apply operation failed because of a b58 conversion {0}")]
-    Base58Error(String),
-    #[error("Apply operation failed because of a big integer conversion error {0}")]
-    BigIntError(num_bigint::TryFromBigIntError<num_bigint::BigInt>),
-    #[error("Serialization failed because of {0}")]
-    BinaryError(String),
-}
-
-// 'FromBase58CheckError' doesn't implement PartialEq and Eq
-// Use the String representation instead
-impl From<FromBase58CheckError> for ApplyKernelError {
-    fn from(err: FromBase58CheckError) -> Self {
-        Self::Base58Error(err.to_string())
-    }
-}
-
-impl From<tezos_storage::error::Error> for ApplyKernelError {
-    fn from(value: tezos_storage::error::Error) -> Self {
-        Self::StorageError(value)
-    }
-}
-
-impl From<BinError> for ApplyKernelError {
-    fn from(value: BinError) -> Self {
-        Self::BinaryError(format!("{:?}", value))
-    }
-}
 
 fn reveal<Host: Runtime>(
     host: &mut Host,
