@@ -3649,60 +3649,6 @@ tezt-riscv-slow-sequential:
     when: always
   retry: 2
 
-documentation:install_python_noble:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-documentation:install_python_jammy:
-  image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-documentation:install_python_bookworm:
-  image: debian:bookworm
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: always
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build

@@ -4130,34 +4130,6 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-documentation:install_python_bookworm:
-  image: debian:bookworm
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - docs/developer/install-python-debian-ubuntu.sh
-    - poetry.lock
-    - pyproject.toml
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
@@ -4607,6 +4579,33 @@ documentation.rst-check:
   script:
   - . $HOME/.venv/bin/activate
   - make --silent -C docs sphinx-check
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.install_python_bookworm:
+  image: debian:bookworm
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - docs/developer/install-python-debian-ubuntu.sh
+    - poetry.lock
+    - pyproject.toml
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
+    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 

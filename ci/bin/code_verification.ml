@@ -1958,69 +1958,6 @@ let jobs pipeline_type =
 
   (* Doc jobs *)
   let doc =
-    let jobs_install_python =
-      (* Creates a job that tests installation of the python environment in [image] *)
-      let job_install_python ~__POS__ ~name ~image ~project ~branch =
-        job
-          ~__POS__
-          ~name
-          ~image
-          ~stage:Stages.test
-          ~dependencies:dependencies_needs_start
-          ~rules:
-            (make_rules
-               ~changes:
-                 (Changeset.make
-                    [
-                      "docs/developer/install-python-debian-ubuntu.sh";
-                      "pyproject.toml";
-                      "poetry.lock";
-                    ])
-               ~manual:Yes
-               ~label:"ci--docs"
-               ())
-          [
-            sf
-              "./docs/developer/install-python-debian-ubuntu.sh %s %s"
-              project
-              branch;
-          ]
-      in
-      (* The set of python installation test jobs. Since python is
-         today less used, we do the bulk of the tests in scheduled pipelines
-         and we only test debian_bookworm in a merge pipeline *)
-      match pipeline_type with
-      | Schedule_extended_test ->
-          [
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_noble"
-              ~image:Images.ubuntu_noble
-              ~project:"tezos/tezos"
-              ~branch:"master";
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_jammy"
-              ~image:Images.ubuntu_jammy
-              ~project:"tezos/tezos"
-              ~branch:"master";
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_bookworm"
-              ~image:Images.debian_bookworm
-              ~project:"tezos/tezos"
-              ~branch:"master";
-          ]
-      | Before_merging | Merge_train ->
-          [
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_bookworm"
-              ~image:Images.debian_bookworm
-              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
-          ]
-    in
     let jobs_documentation : tezos_job list =
       let rules =
         make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
@@ -2079,7 +2016,7 @@ let jobs pipeline_type =
         job_documentation_linkcheck;
       ]
     in
-    jobs_install_python @ jobs_documentation
+    jobs_documentation
   in
 
   (* Manual jobs *)
