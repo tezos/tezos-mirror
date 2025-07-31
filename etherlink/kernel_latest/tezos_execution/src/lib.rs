@@ -251,6 +251,9 @@ pub fn transfer<'a, Host: Runtime>(
             let allocated =
                 TezlinkImplicitAccount::allocate(host, context, dest_contract)
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
+            let mut dest_account =
+                TezlinkImplicitAccount::from_public_key_hash(context, pkh)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
             transfer_tez(
                 host,
                 src_contract,
@@ -258,8 +261,7 @@ pub fn transfer<'a, Host: Runtime>(
                 src_balance,
                 amount,
                 dest_contract,
-                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?,
+                &mut dest_account,
             )
             .map(|(success, _applied_balance_changes)| TransferSuccess {
                 allocated_destination_contract: allocated,
