@@ -130,7 +130,11 @@ pub fn validate_operation<Host: Runtime>(
     let branch = &operation.branch;
     let content: ManagerOperation<OperationContent> = operation.content.clone().into();
     let signature = &operation.signature;
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)?;
+    let account =
+        match TezlinkImplicitAccount::from_public_key_hash(context, &content.source) {
+            Err(_) => return Ok(Err(ValidityError::FailedToFetchAccount)),
+            Ok(account) => account,
+        };
 
     // Account must exist in the durable storage
     if !account.allocated(host)? {

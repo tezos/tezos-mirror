@@ -38,6 +38,7 @@ pub enum ValidityError {
     GasLimitTooHigh,
     StorageLimitTooHigh,
     InvalidSignature,
+    FailedToFetchAccount,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
