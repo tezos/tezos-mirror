@@ -66,7 +66,7 @@ type job = {
   sccache : sccache_config option;
 }
 
-type trigger = Auto | Manual
+type trigger = Auto | Immediate | Manual
 
 let fresh_uid =
   let last = ref (-1) in
@@ -236,6 +236,9 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
                 let merge_triggers a b =
                   match (a, b) with
                   | Manual, Manual -> Manual
+                  | Immediate, (Auto | Immediate | Manual)
+                  | (Auto | Manual), Immediate ->
+                      Immediate
                   | Auto, (Auto | Manual) | Manual, Auto ->
                       (* If a job is supposed to run automatically,
                          its dependencies must run automatically as well. *)
@@ -357,13 +360,13 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                         ~changes:(Tezos_ci.Changeset.encode only_if_changed)
                         ~when_:
                           (match trigger with
-                          | Auto -> On_success
+                          | Auto | Immediate -> On_success
                           | Manual -> Manual)
                         ();
                     ]
                 else
                   match trigger with
-                  | Auto -> None
+                  | Auto | Immediate -> None
                   | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
               in
               let interruptible =
@@ -543,11 +546,14 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       (* Here we re-allocate the jobs with the same UID to override [needs_legacy].
          But only these re-allocated jobs will be in the pipeline,
          so there is no risk of actually duplicating them. *)
-      Fun.flip List.map jobs @@ fun (need, job) ->
-      let job =
-        {job with needs_legacy = (Job, job_trigger) :: job.needs_legacy}
-      in
-      (need, job)
+      Fun.flip List.map jobs @@ fun (trigger, job) ->
+      match trigger with
+      | Immediate -> (trigger, job)
+      | Auto | Manual ->
+          let job =
+            {job with needs_legacy = (Job, job_trigger) :: job.needs_legacy}
+          in
+          (trigger, job)
     in
     let jobs = convert_jobs ~with_changes:true jobs in
     Tezos_ci.Hooks.before_merging := jobs @ !Tezos_ci.Hooks.before_merging
