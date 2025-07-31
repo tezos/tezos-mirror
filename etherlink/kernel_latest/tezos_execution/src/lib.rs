@@ -452,6 +452,16 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
+fn burn_fees<Host: Runtime>(
+    host: &mut Host,
+    validation_info: &mut ValidationInfo,
+) -> Result<(), ValidityError> {
+    validation_info
+        .source_account
+        .set_balance(host, &validation_info.new_source_balance)
+        .map_err(|_| ValidityError::FailedToUpdateBalance)
+}
+
 pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
@@ -491,17 +501,11 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    if validation_info
-        .source_account
-        .set_balance(&mut safe_host, &validation_info.new_source_balance)
-        .is_err()
-    {
+    if let Err(validity_err) = burn_fees(&mut safe_host, &mut validation_info) {
         log!(safe_host, Debug, "Could not update balance!");
         safe_host.revert()?;
-        return Err(OperationError::Validation(
-            ValidityError::FailedToUpdateBalance,
-        ));
-    };
+        return Err(OperationError::Validation(validity_err));
+    }
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
