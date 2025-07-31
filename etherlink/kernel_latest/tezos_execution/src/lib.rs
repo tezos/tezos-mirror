@@ -1456,7 +1456,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let storage = Some(storage_value);
+        let storage = Some(storage_value.clone());
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1510,6 +1510,12 @@ mod tests {
             1.into(),
             "Counter should have been incremented"
         );
+
+        assert_eq!(
+            destination.storage(&host).unwrap(),
+            storage_value,
+            "Storage has not been updated"
+        )
     }
 
     #[test]
@@ -1592,6 +1598,12 @@ mod tests {
             1.into(),
             "Counter should have been incremented"
         );
+
+        assert_eq!(
+            destination.storage(&host).unwrap(),
+            parser.parse(initial_storage).unwrap().encode(),
+            "Storage should not have been updated"
+        )
     }
 
     #[test]
