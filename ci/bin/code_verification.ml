@@ -714,7 +714,8 @@ let jobs pipeline_type =
     job
       ~__POS__
       ~arch:Amd64
-      ~name:("etherlink.build:static-" ^ arch_to_string Amd64)
+      ~name:
+        ("etherlink.build:static-" ^ Runner.Arch.show_easy_to_distinguish Amd64)
       ~image:Images.CI.build
       ~stage:Stages.build
       ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
@@ -741,7 +742,8 @@ let jobs pipeline_type =
       ~__POS__
       ~arch:Arm64
       ~storage:Ramfs
-      ~name:("etherlink.build:static-" ^ arch_to_string Arm64)
+      ~name:
+        ("etherlink.build:static-" ^ Runner.Arch.show_easy_to_distinguish Arm64)
       ~image:Images.CI.build
       ~stage:Stages.build
       ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
@@ -1050,7 +1052,7 @@ let jobs pipeline_type =
         ["./scripts/ci/lint_misc_python_check.sh"]
     in
     let jobs_unit : tezos_job list =
-      let build_dependencies = function
+      let build_dependencies : Runner.Arch.t -> _ = function
         | Amd64 ->
             Dependent
               [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra]
@@ -1070,9 +1072,9 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ?storage ~name
-          ~make_targets () : tezos_job =
-        let arch_string = arch_to_string arch in
+          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Runner.CPU.Normal)
+          ?storage ~name ~make_targets () : tezos_job =
+        let arch_string = Runner.Arch.show_easy_to_distinguish arch in
         let script = ["make $MAKE_TARGETS"] in
         let dependencies = build_dependencies arch in
         let variables =
@@ -1217,7 +1219,7 @@ let jobs pipeline_type =
       let de_unit arch ?storage () =
         job
           ~__POS__
-          ~name:("de.unit:" ^ arch_to_string arch)
+          ~name:("de.unit:" ^ Runner.Arch.show_easy_to_distinguish arch)
           ~arch
           ?storage
           ~image:Images.CI.test
@@ -1236,7 +1238,7 @@ let jobs pipeline_type =
       let resto_unit arch ?storage () =
         job
           ~__POS__
-          ~name:("resto.unit:" ^ arch_to_string arch)
+          ~name:("resto.unit:" ^ Runner.Arch.show_easy_to_distinguish arch)
           ~arch
           ?storage
           ~image:Images.CI.test

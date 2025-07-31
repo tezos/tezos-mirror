@@ -8,7 +8,8 @@
 (** A GitLab CI job annotated with Octez-specific meta-data. *)
 type tezos_job
 
-module Rules : module type of Rules
+module Rules = Rules
+module Runner = Runner
 
 (** The name of a {!tezos_job} as given to [~name] of {!job}.
 
@@ -317,58 +318,6 @@ module Changeset : sig
   val ( @ ) : t -> t -> t
 end
 
-(** Represents architectures. *)
-type arch = Amd64 | Arm64
-
-(** String representation of architectures ([Amd64] is ["x86_64"]) *)
-val arch_to_string : arch -> string
-
-(** Alternative string representation of architectures ([Amd64] is ["amd64"]) *)
-val arch_to_string_alt : arch -> string
-
-(** The list of available runner tags. *)
-type tag =
-  | Gcp  (** GCP prod AMD64 runner, general purpose. *)
-  | Gcp_arm64  (** GCP prod ARM64 runner, general purpose. *)
-  | Gcp_dev  (** GCP dev AMD64 runner, general purpose. *)
-  | Gcp_dev_arm64  (** GCP dev ARM64 runner, general purpose. *)
-  | Gcp_not_interruptible
-      (** GCP prod AMD64 runner, suitable for jobs that should not be interrupted. *)
-  | Gcp_not_interruptible_dev
-      (** GCP dev AMD64 runner, suitable for jobs that should not be interrupted. *)
-  | Gcp_tezt
-      (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
-  | Gcp_tezt_dev
-      (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
-  | Gcp_high_cpu
-      (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
-  | Gcp_high_cpu_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing high CPU. *)
-  | Gcp_very_high_cpu
-      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
-  | Gcp_very_high_cpu_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
-  | Gcp_very_high_cpu_ramfs
-      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
-  | Gcp_very_high_cpu_ramfs_dev
-      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
-  | Aws_specific
-      (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
-  | Dynamic
-      (** The runner is dynamically set through the CI variable {!dynamic_tag_var}. *)
-
-(** The variable to set enabling dynamic runner selection.
-
-    To dynamically set the runner of a job through a CI/CD variable,
-    assign to this variable using [variables:] or [parallel:matrix:]. *)
-val dynamic_tag_var : Gitlab_ci.Var.t
-
-(** The architecture of the runner associated to a tag if statically known. *)
-val arch_of_tag : tag -> arch option
-
-(** The string representation of a tag. *)
-val string_of_tag : tag -> string
-
 (** A job dependency.
 
     - A job that depends on [Job j] will not start until [j] finishes.
@@ -424,30 +373,14 @@ type git_strategy =
     CI/CD YAML variable [GIT_STRATEGY]. *)
 val enc_git_strategy : git_strategy -> string
 
-type cpu =
-  | Normal  (** Target default Gitlab runner pool. *)
-  | High  (** Target GCP high runner pool. *)
-  | Very_high  (** Target GCP very high runner pool. *)
-
-type storage =
-  | Network  (** Target default storage runner pool. *)
-  | Ramfs  (** Target ramfs storage runner pool. *)
-
 (** Define a job.
 
-    This smart constructor for {!Gitlab_ci.Types.job} additionally:
+    This is a smart constructor for {!Gitlab_ci.Types.job}.
+
+    This function handles dependencies as follows.
 
     - Translates each {!dependency} to [needs:] and [dependencies:]
-    keywords as detailed in the documentation of {!dependency}.
-    - Adds [tag:] based on [arch] and [tag]:
-
-      - If only [tag] is set, then it is passed as is to the job's [tags:]
-        field. The runners of the tezos/tezos CI all use singleton tags,
-        hence we only allow one tag per job.
-      - Setting both [arch] and [tag] throws an error.
-      - Omitting both [arch] and [tag] is equivalent to setting
-        [~tag:Gcp] or, equivalently, omitting tag and setting
-        [~arch:Amd64].
+      keywords as detailed in the documentation of {!dependency}.
 
     - [image_dependencies] is a list of internal !{Image.t}s that this
       job uses indirectly, i.e. not in it's [image:] field. For
@@ -456,24 +389,41 @@ type storage =
       if this list includes an external image.
 
     - If both a [template] and an [image] are provided, then a
-    run-time error is raised to prevent overriding the image defined
-    in the GitLab template.
+      run-time error is raised to prevent overriding the image defined
+      in the GitLab template.
 
     - If the [image] used is {!Internal} and [tag] is set to
-    {!Dynamic} then a run-time error is generated as the required
-    architecture for the internal image cannot be statically
-    deduced.
+      {!Dynamic} then a run-time error is generated as the required
+      architecture for the internal image cannot be statically
+      deduced.
 
-    - The [cpu] parameter specifies the CPU allocation for the job,
-      allowing it to run on a GCP GitLab runner with normal, high,
-      or very high CPU capacity.
+    This function accepts the following arguments to specify requirements
+    on the runners that are to run the job.
 
-    - The [dev_infra] parameter allows to run the job on the dev infrastructure.
-      This parameter is used for tests only and should not be merged in
-      production.*)
+    - [dev_infra] specifies the cloud provider account to use.
+      [false] is [GCP] or [AWS], [true] is [GCP_dev].
+      If omitted, any account may be used.
 
+    - [arch] specifies a required CPU architecture.
+      If omitted, any architecture may be used.
+
+    - [cpu] specifies the required CPU power.
+      If omitted, any CPU may be used.
+
+    - [storage] specifies the required storage method.
+      If omitted, any storage method may be used.
+
+    - [interruptible_runner] specifies whether it is acceptable that the runner
+      may be interrupted, for instance because of the spot instance mechanism.
+      If omitted, either interruptible and non-interruptible runners may be used.
+
+    From these requirements, the function selects a runner tag, using {!Runner.Tag.choose}.
+    This takes the first tag that is compatible with your requirements,
+    from a list of tags ordered in a priority list located in [runner.ml].
+    You may also specify the runner [tag] explicitly instead,
+    in which case the function simply checks that your requirements are compatible. *)
 val job :
-  ?arch:arch ->
+  ?arch:Runner.Arch.t ->
   ?after_script:string list ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?artifacts:Gitlab_ci.Types.artifacts ->
@@ -487,9 +437,10 @@ val job :
   ?variables:Gitlab_ci.Types.variables ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?timeout:Gitlab_ci.Types.time_interval ->
-  ?tag:tag ->
-  ?cpu:cpu ->
-  ?storage:storage ->
+  ?tag:Runner.Tag.t ->
+  ?cpu:Runner.CPU.t ->
+  ?storage:Runner.Storage.t ->
+  ?interruptible_runner:bool ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
@@ -593,9 +544,9 @@ val job_docker_authenticated :
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?dependencies:dependencies ->
   ?image_dependencies:Image.t list ->
-  ?arch:arch ->
-  ?storage:storage ->
-  ?tag:tag ->
+  ?arch:Runner.Arch.t ->
+  ?storage:Runner.Storage.t ->
+  ?tag:Runner.Tag.t ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?timeout:Gitlab_ci.Types.time_interval ->
@@ -714,7 +665,8 @@ module Images : sig
   val jsonnet_master : Image.t
 
   module CI : sig
-    val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
+    val job_docker_ci :
+      Runner.Arch.t -> ?storage:Runner.Storage.t -> unit -> tezos_job
 
     val runtime : Image.t
 

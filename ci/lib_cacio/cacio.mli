@@ -185,15 +185,15 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
-    ?arch:Tezos_ci.arch ->
-    ?cpu:Tezos_ci.cpu ->
-    ?storage:Tezos_ci.storage ->
+    ?provider:Tezos_ci.Runner.Provider.t ->
+    ?arch:Tezos_ci.Runner.Arch.t ->
+    ?cpu:Tezos_ci.Runner.CPU.t ->
+    ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
-    ?tag:Tezos_ci.tag ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     string ->

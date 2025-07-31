@@ -51,9 +51,10 @@ type job = {
   name : string;
   stage : stage;
   description : string;
-  arch : Tezos_ci.arch option;
-  cpu : Tezos_ci.cpu option;
-  storage : Tezos_ci.storage option;
+  provider : Tezos_ci.Runner.Provider.t option;
+  arch : Tezos_ci.Runner.Arch.t option;
+  cpu : Tezos_ci.Runner.CPU.t option;
+  storage : Tezos_ci.Runner.Storage.t option;
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
@@ -61,7 +62,6 @@ type job = {
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
-  tag : Tezos_ci.tag option;
   cargo_cache : bool;
   sccache : sccache_config option;
 }
@@ -316,6 +316,7 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     name;
                     stage;
                     description;
+                    provider;
                     arch;
                     cpu;
                     storage;
@@ -326,7 +327,6 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                     variables;
                     script;
                     artifacts;
-                    tag;
                     cargo_cache;
                     sccache;
                   };
@@ -374,11 +374,17 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 | Build | Test -> None
                 | Publish -> Some {max = 0; when_ = []}
               in
+              let dev_infra =
+                match provider with
+                | None | Some GCP | Some AWS -> false
+                | Some GCP_dev -> true
+              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
                 ~stage:(convert_stage stage)
                 ~description
+                ~dev_infra
                 ?arch
                 ?cpu
                 ?storage
@@ -386,10 +392,14 @@ let convert_graph ~with_changes (graph : fixed_job_graph) : tezos_job_graph =
                 ~dependencies:(Dependent dependencies)
                 ?rules
                 ~interruptible
+                ?interruptible_runner:
+                  (if interruptible then (* Can be interruptible, or not. *)
+                     None
+                   else (* Cannot be interruptible. *)
+                     Some false)
                 ?retry
                 ?variables
                 ?artifacts
-                ?tag
                 script
               |> (if cargo_cache then Tezos_ci.Cache.enable_cargo_cache
                   else Fun.id)
@@ -445,15 +455,15 @@ module type COMPONENT_API = sig
     __POS__:string * int * int * int ->
     stage:stage ->
     description:string ->
-    ?arch:Tezos_ci.arch ->
-    ?cpu:Tezos_ci.cpu ->
-    ?storage:Tezos_ci.storage ->
+    ?provider:Tezos_ci.Runner.Provider.t ->
+    ?arch:Tezos_ci.Runner.Arch.t ->
+    ?cpu:Tezos_ci.Runner.CPU.t ->
+    ?storage:Tezos_ci.Runner.Storage.t ->
     image:Tezos_ci.Image.t ->
     ?needs:(need * job) list ->
     ?needs_legacy:(need * Tezos_ci.tezos_job) list ->
     ?variables:Gitlab_ci.Types.variables ->
     ?artifacts:Gitlab_ci.Types.artifacts ->
-    ?tag:Tezos_ci.tag ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
     string ->
@@ -485,8 +495,8 @@ end
 module Make (Component : COMPONENT) : COMPONENT_API = struct
   let only_if_changed = Tezos_ci.Changeset.make Component.paths
 
-  let job ~__POS__:source_location ~stage ~description ?arch ?cpu ?storage
-      ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts ?tag
+  let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
+      ?storage ~image ?(needs = []) ?(needs_legacy = []) ?variables ?artifacts
       ?(cargo_cache = false) ?sccache name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
@@ -506,6 +516,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       name;
       stage;
       description;
+      provider;
       arch;
       cpu;
       storage;
@@ -516,7 +527,6 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       variables;
       script;
       artifacts;
-      tag;
       cargo_cache;
       sccache;
     }
