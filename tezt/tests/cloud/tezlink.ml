@@ -26,10 +26,16 @@ module Tzkt_process = struct
 
   include Daemon.Make (Parameters)
 
-  let run ?runner ~suffix cmd args =
+  let run ?runner ~suffix ~path ~dll ~endpoint ~db ~port () =
     let process_name = sf "%s-%s" Parameters.base_default_name suffix in
-    let daemon = create ?runner ~name:process_name ~path:cmd () in
-    run ?runner daemon () args
+    let daemon = create ?runner ~name:process_name ~path:"sh" () in
+    run
+      ?runner
+      daemon
+      ()
+      [
+        "-c"; sf "cd %s && dotnet Tzkt.%s.dll %s %s %s" path dll endpoint db port;
+      ]
 end
 
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
@@ -156,31 +162,23 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
     Tzkt_process.run
       ?runner
       ~suffix:"indexer"
-      "sh"
-      [
-        "-c";
-        sf
-          "cd %s && dotnet Tzkt.Sync.dll %s %s %s"
-          tzkt_indexer_output
-          endpoint_arg
-          database_arg
-          indexer_port_arg;
-      ]
+      ~path:tzkt_indexer_output
+      ~dll:"Sync"
+      ~endpoint:endpoint_arg
+      ~db:database_arg
+      ~port:indexer_port_arg
+      ()
   in
   let* () =
     Tzkt_process.run
       ?runner
       ~suffix:"api"
-      "sh"
-      [
-        "-c";
-        sf
-          "cd %s && dotnet Tzkt.Api.dll %s %s %s"
-          tzkt_api_output
-          endpoint_arg
-          database_arg
-          api_port_arg;
-      ]
+      ~path:tzkt_api_output
+      ~dll:"Api"
+      ~endpoint:endpoint_arg
+      ~db:database_arg
+      ~port:api_port_arg
+      ()
   in
   unit
 
