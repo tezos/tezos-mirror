@@ -542,17 +542,6 @@ let jobs pipeline_type =
         ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
         ["scripts/check-format-rust.sh"]
     in
-    let job_check_rst =
-      job
-        ~__POS__
-        ~name:"documentation:rst-check"
-        ~image:Images.CI.test_master
-        ~dependencies
-        ~stage
-        ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
-        ~before_script:(before_script ~init_python_venv:true [])
-        ["make --silent -C docs sphinx-check"]
-    in
     let job_commit_titles : tezos_job =
       let allow_failure : allow_failure_job =
         match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
@@ -590,7 +579,6 @@ let jobs pipeline_type =
       job_oc_misc_checks;
       job_check_jsonnet;
       job_check_rust_fmt;
-      job_check_rst;
     ]
     @ mr_only_jobs
   in

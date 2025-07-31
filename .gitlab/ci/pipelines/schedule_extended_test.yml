@@ -314,26 +314,6 @@ check_rust_fmt:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation:rst-check:
-  image: ${ci_image_name_protected}/test:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - when: always
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make --silent -C docs sphinx-check
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build

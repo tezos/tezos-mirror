@@ -375,30 +375,6 @@ check_rust_fmt:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation:rst-check:
-  image: ${ci_image_name_protected}/test:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make --silent -C docs sphinx-check
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 nix:
   image: nixos/nix:2.22.1
   stage: sanity
@@ -4677,6 +4653,28 @@ oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
+
+documentation.rst-check:
+  image: ${ci_image_name_protected}/test:amd64--master
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.rst'
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . $HOME/.venv/bin/activate
+  - make --silent -C docs sphinx-check
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}

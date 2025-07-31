@@ -1,0 +1,42 @@
+# This file was automatically generated, do not edit.
+# Edit file ci/bin/main.ml instead.
+
+stages:
+- start
+- test
+
+datadog_pipeline_trace:
+  image: datadog/ci:v2.44.0
+  stage: start
+  tags:
+  - gcp
+  dependencies: []
+  allow_failure: true
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
+  - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
+    --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.rst-check:
+  image: ${ci_image_name_protected}/test:amd64--master
+  stage: test
+  tags:
+  - gcp
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . $HOME/.venv/bin/activate
+  - make --silent -C docs sphinx-check
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

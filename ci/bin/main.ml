@@ -112,6 +112,8 @@ let () = Grafazos.register ()
 
 let () = Teztale.register ()
 
+let () = Documentation.register ()
+
 (** {3 General pipelines} *)
 
 let () =
