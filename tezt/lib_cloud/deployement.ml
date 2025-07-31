@@ -5,6 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+let dns_set_subdomain agent domain =
+  let agent_ip = Agent.point agent |> Option.get |> fst in
+  Gcloud.DNS.set_subdomain ~agent_ip ~domain
+
 (* Infrastructure to deploy on Google Cloud *)
 module Remote = struct
   type point_info = {workspace_name : string; gcp_name : string}
@@ -164,36 +168,6 @@ module Remote = struct
     in
     match agents with [agent] -> Lwt.return agent | _ -> assert false
 
-  (* Register the specified domain in an appropriate GCP zone *)
-  let dns_add_record agent domain =
-    let* res = Gcloud.DNS.find_zone_for_subdomain domain in
-    match res with
-    | None ->
-        let () =
-          Log.report
-            ~color:Log.Color.FG.yellow
-            "The domain '%s' is not a subdomain of an authorized GCP zone. \
-             Skipping."
-            domain
-        in
-        Lwt.return_unit
-    | Some (zone, _) ->
-        let* ip = Gcloud.DNS.get_value ~zone ~domain in
-        let* () =
-          match ip with
-          | None -> Lwt.return_unit
-          | Some ip -> Gcloud.DNS.remove_subdomain ~zone ~name:domain ~value:ip
-        in
-        let ip = Agent.point agent |> Option.get |> fst in
-        let* () = Gcloud.DNS.add_subdomain ~zone ~name:domain ~value:ip in
-        let () =
-          Log.report
-            ~color:Log.Color.FG.green
-            "DNS registered successfully: '%s'"
-            domain
-        in
-        Lwt.return_unit
-
   (*
       Deployment requires to create new VMs and organizing them per group of
       configuration. Each configuration leads to one terraform workspace.
@@ -266,7 +240,7 @@ module Remote = struct
         let* domains = Env.dns_domains () in
         let* () =
           Lwt_list.iter_s
-            (fun domainname -> dns_add_record agent domainname)
+            (fun domainname -> dns_set_subdomain agent domainname)
             domains
         in
         Lwt.return {agents = agent :: agents}
@@ -605,6 +579,12 @@ module Ssh_host = struct
           in
           Lwt.return agent)
         configurations
+    in
+    let* domains = Env.dns_domains () in
+    let* () =
+      Lwt_list.iter_s
+        (fun domainname -> dns_set_subdomain proxy domainname)
+        domains
     in
     let agents = proxy :: agents in
     Lwt.return {point = (user, host, port); agents}
