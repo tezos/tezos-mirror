@@ -15,3 +15,8 @@ val public_key : unit -> string Lwt.t
 
 (* Default options required to properly run through ssh. *)
 val ssh_options : string list
+
+(* Default options required to properly run scp command. As scp command's syntax
+   is close to the ssh one, we reuse the [ssh_options]. This might be breaking
+   if incompatible ssh options are used. *)
+val scp_options : string list

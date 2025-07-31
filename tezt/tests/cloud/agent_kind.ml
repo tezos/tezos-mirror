@@ -107,9 +107,7 @@ module Logs = struct
           (fun () ->
             Process.run
               "scp"
-              (["-r"] @ ["-O"]
-              @ ["-o"; "StrictHostKeyChecking=no"]
-              @ identity @ port
+              (Ssh.scp_options @ ["-r"] @ identity @ port
               @ [source // daemon_name // "daily_logs"]
               @ [local_path // "daily_logs"]))
           (fun exn ->

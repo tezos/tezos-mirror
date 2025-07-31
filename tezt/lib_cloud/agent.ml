@@ -337,13 +337,10 @@ let copy agent ~consistency_check ~is_directory ~source ~destination =
             runner.Runner.ssh_port
         in
         let* () =
-          (* FIXME: I forgot why we enforce [-0]. *)
           Process.run
             "scp"
             ((if is_directory then ["-r"] else [])
-            @ ["-O"]
-            @ ["-o"; "StrictHostKeyChecking=no"]
-            @ identity @ port @ [source] @ [destination])
+            @ Ssh.scp_options @ identity @ port @ [source] @ [destination])
         in
         Lwt.return_unit
 
