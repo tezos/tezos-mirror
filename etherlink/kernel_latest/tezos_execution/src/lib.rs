@@ -52,8 +52,6 @@ pub enum ApplyKernelError {
     BigIntError(num_bigint::TryFromBigIntError<num_bigint::BigInt>),
     #[error("Serialization failed because of {0}")]
     BinaryError(String),
-    #[error("Apply operation failed because of an unsupported address error")]
-    MirAddressUnsupportedError,
 }
 
 // 'FromBase58CheckError' doesn't implement PartialEq and Eq
@@ -119,11 +117,11 @@ fn reveal<Host: Runtime>(
     })
 }
 
-fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
+fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError> {
     match address {
         AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
         AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
-        AddressHash::Sr1(_) => Err(ApplyKernelError::MirAddressUnsupportedError),
+        AddressHash::Sr1(_) => Err(TransferError::MirAddressUnsupportedError),
     }
 }
 
@@ -196,8 +194,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 amount,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
-                let dest_contract = contract_from_address(destination_address.hash)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+                let dest_contract = contract_from_address(destination_address.hash)?;
                 transfer(
                     host,
                     context,

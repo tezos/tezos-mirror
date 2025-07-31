@@ -103,6 +103,8 @@ pub enum TransferError {
     FailedToApplyInternalOperation(String),
     #[error("Failed to increment counter")]
     FailedToIncrementCounter,
+    #[error("Apply operation failed because of an unsupported address error")]
+    MirAddressUnsupportedError,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
