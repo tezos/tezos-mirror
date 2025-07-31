@@ -19,6 +19,7 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
@@ -28,7 +29,7 @@ use tezos_tezlink::{
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
         OperationError, OperationResultSum, Reveal, RevealError, RevealSuccess,
-        TransferError, TransferSuccess, UpdateOrigin,
+        TransferError, TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
 use thiserror::Error;
@@ -495,7 +496,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
-) -> Result<OperationResultSum, ApplyKernelError> {
+) -> Result<OperationResultSum, RuntimeError> {
     let manager_operation: ManagerOperation<OperationContent> =
         operation.content.clone().into();
 
@@ -535,9 +536,20 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    validation_info
+    if validation_info
         .source_account
-        .set_balance(&mut safe_host, &validation_info.new_source_balance)?;
+        .set_balance(&mut safe_host, &validation_info.new_source_balance)
+        .is_err()
+    {
+        log!(safe_host, Debug, "Could not update balance!");
+        // TODO: Don't force the receipt to a reveal receipt
+        let receipt = produce_operation_result::<Reveal>(
+            vec![],
+            Err(ValidityError::FailedToUpdateBalance.into()),
+        );
+        safe_host.revert()?;
+        return Ok(OperationResultSum::Reveal(receipt));
+    };
 
     safe_host.promote()?;
     safe_host.promote_trace()?;

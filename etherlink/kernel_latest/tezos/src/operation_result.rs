@@ -43,6 +43,7 @@ pub enum ValidityError {
     FailedToFetchCounter,
     FailedToFetchManagerKey,
     FailedToFetchBalance,
+    FailedToUpdateBalance,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
