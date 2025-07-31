@@ -130,6 +130,8 @@ let stake_repartition_encoding =
         (fun (network, max_nb_bakers) -> Mimic {network; max_nb_bakers});
     ]
 
+let is_public = function #public -> true | _ -> false
+
 let to_public = function
   | `Sandbox -> failwith "Sandbox is not public"
   | #public as p -> p
@@ -172,6 +174,10 @@ let block_time : t -> int = function
   | `Mainnet -> 8
   | `Ghostnet -> 5
   | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
+
+let next_protocol : t -> Protocol.t = function
+  | `Mainnet | `Ghostnet | `Rionet -> S023
+  | _ -> Alpha
 
 let public_rpc_endpoint testnet =
   Endpoint.make

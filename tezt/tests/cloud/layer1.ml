@@ -18,20 +18,12 @@
      not requiring this data
 *)
 
-open Tezos
 open Scenarios_helpers
+open Tezos
+open Yes_crypto
 
 (** A baker account is its public key (pk) and its hash (pkh) *)
 type baker_account = {pk : string; pkh : string}
-
-let add_prometheus_source node cloud agent =
-  Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
-
-let yes_crypto_env =
-  String_map.add
-    Tezos_crypto.Helpers.yes_crypto_environment_variable
-    "y"
-    String_map.empty
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -54,63 +46,6 @@ let nb_stresstester network tps =
 module Node = struct
   open Snapshot_helpers
   include Node
-
-  (** We are running a private network with yes-crypto enabled.
-      We don't want to connect with the real network.
-  *)
-  let isolated_config ~peers ~network ~delay =
-    [
-      No_bootstrap_peers;
-      Connections (List.length peers);
-      Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network Network.(to_octez_network_options @@ to_public network);
-      Expected_pow 0;
-      Cors_origin "*";
-      Storage_maintenance_delay (string_of_int delay);
-    ]
-
-  (** [--private-mode] is mainly useful for the bootstrap node
-      because it is used first to bootstrap a node with real network peers
-      before being disconnected.
-      For the other node, it's an extra security but their ip/identity should
-      not be advertised to the external world anyway.
-  *)
-  let isolated_args peers =
-    Private_mode
-    :: List.fold_left
-         (fun acc peer -> Peer peer :: acc)
-         [Allow_yes_crypto; Force_history_mode_switch]
-         peers
-
-  (** [add_migration_offset_to_config node snapshot ~migration_offset ~network] adds an
-      entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
-      to upgrade to the next protocol of [~network]. This entry is is parametrised by the
-      information obtained from [snapshot]. *)
-  let add_migration_offset_to_config node snapshot ~migration_offset ~network =
-    let* level = get_snapshot_info_level node snapshot in
-    match migration_offset with
-    | None -> Lwt.return_unit
-    | Some migration_offset ->
-        let* network_config =
-          match network with
-          | `Mainnet -> Lwt.return Node.Config_file.mainnet_network_config
-          | `Ghostnet -> Lwt.return Node.Config_file.ghostnet_network_config
-          | _ ->
-              Lwt.fail_with
-                "Migration scenarios are only supported for Mainnet and \
-                 Ghostnet."
-        in
-        let migration_level = level + migration_offset in
-        toplog "Add UAU entry for level : %d" migration_level ;
-        Node.Config_file.update node (fun json ->
-            JSON.put
-              ( "network",
-                JSON.annotate
-                  ~origin:"add_migration_offset_to_config"
-                  network_config )
-              json
-            |> Node.Config_file.update_network_with_user_activated_upgrades
-                 [(migration_level, Protocol.Alpha)])
 
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
@@ -158,12 +93,16 @@ module Node = struct
       Lwt.return_unit
     in
     toplog "Reset node config for private a yes-crypto network" ;
-    let config = isolated_config ~peers ~network ~delay:0 in
+    let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
     let* () = Node.config_reset node config in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
     in
-    let arguments = isolated_args peers in
+    let arguments = Node_helpers.isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     wait_for_ready node
 
@@ -177,13 +116,17 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
-    let config = isolated_config ~peers ~network ~delay in
+    let config = Node_helpers.isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
     let* () =
-      add_migration_offset_to_config node snapshot ~migration_offset ~network
+      Node_helpers.may_add_migration_offset_to_config
+        node
+        snapshot
+        ~migration_offset
+        ~network
     in
     let* () = import_snapshot ~no_check:true ~name node snapshot in
-    let arguments = isolated_args peers in
+    let arguments = Node_helpers.isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
@@ -195,10 +138,6 @@ module Node = struct
   let client ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
     Client.Agent.create ~name ~endpoint:(Client.Node node) agent
-
-  let yes_wallet agent =
-    let name = Tezt_cloud.Agent.name agent ^ "-yes-wallet" in
-    Yes_wallet.Agent.create ~name agent
 
   (** Initialize the node,
       create the associated client,
@@ -216,7 +155,7 @@ module Node = struct
         migration_offset
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
         ~node
@@ -247,7 +186,7 @@ module Node = struct
         (agent, node, name)
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
         (fun {pkh = alias; pk = public_key} ->
@@ -270,7 +209,7 @@ module Node = struct
         (agent, node, name)
     in
     let* client = client ~node agent in
-    let* yes_wallet = yes_wallet agent in
+    let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
     let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -615,12 +554,14 @@ let number_of_bakers ~snapshot ~network cloud agent name =
       snapshot
   in
   let* () =
-    Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
+    Node.config_init
+      node
+      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () =
     Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
   in
-  let* () = Node.Agent.run node (Node.isolated_args []) in
+  let* () = Node.Agent.run node (Node_helpers.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
     Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
@@ -816,16 +757,19 @@ let init ~(configuration : configuration) cloud next_agent =
         in
         Lwt.return stresstesters
   in
-  let* () = add_prometheus_source bootstrap_node cloud bootstrap_agent in
+  let* () =
+    add_prometheus_source ~node:bootstrap_node cloud bootstrap_agent "bootstrap"
+  in
   let* () =
     Lwt_list.iter_s
-      (fun ({agent; node; _} : baker) -> add_prometheus_source node cloud agent)
+      (fun ({agent; node; _} : baker) ->
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       bakers
   in
   let* () =
     Lwt_list.iter_s
       (fun ({agent; node; _} : stresstester) ->
-        add_prometheus_source node cloud agent)
+        add_prometheus_source ~node cloud agent (Agent.name agent))
       stresstesters
   in
   Lwt.return {cloud; configuration; bootstrap; bakers; stresstesters}

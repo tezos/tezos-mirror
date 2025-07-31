@@ -18,6 +18,11 @@
 (** Shortcut to create a "yes-wallet" for the given agent. *)
 val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
 
+val isolated_config :
+  peers:string list -> network:Network.t -> delay:int -> Node.argument list
+
+val isolated_args : string list -> Node.argument list
+
 (** Initialize an L1 node for the given configuration.
 
     If a [~snapshot] is provided and [?data_dir] is omitted, the node will be
@@ -28,12 +33,24 @@ val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
     whereas for private networks, it binds to [127.0.0.1].
 *)
 
+(** [may_add_migration_offset_to_config node snapshot ~migration_offset ~network] may add an
+    entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
+    to upgrade to the next protocol of [~network]. This entry is is parametrised by the
+    information obtained from [snapshot]. *)
+val may_add_migration_offset_to_config :
+  Node.t ->
+  string ->
+  migration_offset:int option ->
+  network:Network.t ->
+  unit Lwt.t
+
 val init :
   ?arguments:Node.argument list ->
   ?data_dir:string ->
   ?identity_file:string ->
   ?dal_config:Tezos_crypto_dal_octez_dal_config.Dal_config.t ->
   ?env:string String_map.t ->
+  ?migration_offset:int ->
   rpc_external:bool ->
   name:string ->
   Network.t ->

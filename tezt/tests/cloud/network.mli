@@ -34,6 +34,8 @@ type stake_repartition =
 
 val stake_repartition_encoding : stake_repartition Data_encoding.t
 
+val is_public : t -> bool
+
 val to_public : t -> public
 
 (** Parse the given [string] into an available network option. *)
@@ -44,6 +46,8 @@ val default_protocol : t -> Protocol.t
 
 (** Block time value for the network *)
 val block_time : t -> int
+
+val next_protocol : t -> Protocol.t
 
 (** Endpoint publicly available with RPC opened *)
 val public_rpc_endpoint : public -> Endpoint.t
