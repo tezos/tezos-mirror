@@ -150,9 +150,10 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   in
 
   (* Run the Tzkt indexer and Tzkt API *)
+  let runner = Agent.runner agent in
   let* () =
-    run
-      ~name:"tzkt-indexer"
+    Tzkt_process.run
+      ?runner
       "sh"
       [
         "-c";
@@ -164,8 +165,8 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
           indexer_port_arg;
       ]
   and* () =
-    run
-      ~name:"tzkt-api"
+    Tzkt_process.run
+      ?runner
       "sh"
       [
         "-c";
