@@ -68,10 +68,6 @@ fn reveal<Host: Runtime>(
     account
         .set_manager_public_key(host, public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
-    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
-    account
-        .increment_counter(host)
-        .map_err(|_| RevealError::FailedToIncrementCounter)?;
 
     log!(host, Debug, "Reveal operation succeed");
 
@@ -306,7 +302,7 @@ pub fn transfer_external<Host: Runtime>(
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
 
-    let success = transfer(
+    transfer(
         host,
         context,
         &src_contract,
@@ -318,11 +314,7 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
-    );
-    src_account
-        .increment_counter(host)
-        .map_err(|_| TransferError::FailedToIncrementCounter)?;
-    success
+    )
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -452,14 +444,19 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-fn burn_fees<Host: Runtime>(
+fn burn_fees_and_increment_counter<Host: Runtime>(
     host: &mut Host,
     validation_info: &mut ValidationInfo,
 ) -> Result<(), ValidityError> {
     validation_info
         .source_account
         .set_balance(host, &validation_info.new_source_balance)
-        .map_err(|_| ValidityError::FailedToUpdateBalance)
+        .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+
+    validation_info
+        .source_account
+        .increment_counter(host)
+        .map_err(|_| ValidityError::FailedToIncrementCounter)
 }
 
 pub fn validate_and_apply_operation<Host: Runtime>(
@@ -501,8 +498,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    if let Err(validity_err) = burn_fees(&mut safe_host, &mut validation_info) {
-        log!(safe_host, Debug, "Could not update balance!");
+
+    if let Err(validity_err) =
+        burn_fees_and_increment_counter(&mut safe_host, &mut validation_info)
+    {
         safe_host.revert()?;
         return Err(OperationError::Validation(validity_err));
     }
@@ -981,8 +980,8 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
             account.counter(&host).unwrap(),
-            0.into(),
-            "Counter should not have been incremented"
+            1.into(),
+            "Counter should have been incremented"
         );
     }
 
@@ -1534,8 +1533,8 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
             source.counter(&host).unwrap(),
-            0.into(),
-            "Counter should not have been incremented"
+            1.into(),
+            "Counter should have been incremented"
         );
     }
 

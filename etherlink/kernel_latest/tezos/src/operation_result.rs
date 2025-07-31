@@ -60,6 +60,8 @@ pub enum ValidityError {
     FailedToFetchBalance,
     #[error("Failed to update balance")]
     FailedToUpdateBalance,
+    #[error("Failed to increment counter.")]
+    FailedToIncrementCounter,
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -72,8 +74,6 @@ pub enum RevealError {
     InconsistentPublicKey(PublicKeyHash),
     #[error("Could not retrieve manager.")]
     UnretrievableManager,
-    #[error("Failed to increment counter.")]
-    FailedToIncrementCounter,
     #[error("Failed to write manager.")]
     FailedToWriteManager,
 }
@@ -123,8 +123,6 @@ pub enum TransferError {
     FailedToUpdateDestinationBalance,
     #[error("An internal operation failed: {0}")]
     FailedToApplyInternalOperation(String),
-    #[error("Failed to increment counter")]
-    FailedToIncrementCounter,
     #[error("Apply operation failed because of an unsupported address error")]
     MirAddressUnsupportedError,
 }
