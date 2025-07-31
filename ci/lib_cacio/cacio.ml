@@ -45,6 +45,13 @@ type sccache_config = {
 let sccache ?key ?error_log ?idle_timeout ?log ?path ?cache_size () =
   {key; error_log; idle_timeout; log; path; cache_size}
 
+(* Conditions are disjunctions: the job is included in the pipeline if
+   ANY file in [changed] changed. *)
+type condition = {changed : Tezos_ci.Changeset.t}
+
+let merge_conditions {changed = changed1} {changed = changed2} =
+  {changed = Tezos_ci.Changeset.union changed1 changed2}
+
 type job = {
   uid : int;
   source_location : string * int * int * int;
@@ -58,7 +65,7 @@ type job = {
   image : Tezos_ci.Image.t;
   needs : (need * job) list;
   needs_legacy : (need * Tezos_ci.tezos_job) list;
-  only_if_changed : Tezos_ci.Changeset.t;
+  only_if : condition;
   variables : Gitlab_ci.Types.variables option;
   script : string list;
   artifacts : Gitlab_ci.Types.artifacts option;
@@ -197,11 +204,7 @@ let make_graph (jobs : (trigger * job) list) : job_graph =
     UID_map.empty
     jobs
 
-type fixed_job_graph_node = {
-  job : job;
-  trigger : trigger;
-  only_if_changed : Tezos_ci.Changeset.t;
-}
+type fixed_job_graph_node = {job : job; trigger : trigger; only_if : condition}
 
 type fixed_job_graph = fixed_job_graph_node UID_map.t
 
@@ -211,7 +214,7 @@ type fixed_job_graph = fixed_job_graph_node UID_map.t
 let fix_graph (graph : job_graph) : fixed_job_graph =
   (* To build the graph, we take all jobs from [graph], fix them,
      and add them to [result].
-     But before we fix a job, we need the [trigger] and [only_if_changed]
+     But before we fix a job, we need the [trigger] and [only_if]
      of its reverse dependencies.
      So we need to fix those reverse dependencies first.
      [fix_uid] takes the UID of a job, fixes and adds its reverse dependencies recursively,
@@ -258,12 +261,12 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
               in
               (* Fix the changeset, i.e. add the union of the changesets
                  of reverse dependencies. *)
-              let only_if_changed =
+              let only_if =
                 rev_deps
-                |> List.map (fun node -> node.only_if_changed)
-                |> List.fold_left Tezos_ci.Changeset.union job.only_if_changed
+                |> List.map (fun node -> node.only_if)
+                |> List.fold_left merge_conditions job.only_if
               in
-              {job; trigger; only_if_changed}
+              {job; trigger; only_if}
         in
         result := UID_map.add uid result_node !result ;
         result_node
@@ -325,7 +328,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                     image;
                     needs;
                     needs_legacy;
-                    only_if_changed = _;
+                    only_if = _;
                     variables;
                     script;
                     artifacts;
@@ -333,7 +336,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                     sccache;
                   };
                 trigger;
-                only_if_changed;
+                only_if;
               } -> (
               (* Convert dependencies recursively. *)
               let dependencies =
@@ -356,7 +359,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                   Some
                     [
                       Gitlab_ci.Util.job_rule
-                        ~changes:(Tezos_ci.Changeset.encode only_if_changed)
+                        ~changes:(Tezos_ci.Changeset.encode only_if.changed)
                         ~when_:
                           (match trigger with
                           | Auto | Immediate -> On_success
@@ -525,7 +528,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       image;
       needs;
       needs_legacy;
-      only_if_changed;
+      only_if = {changed = only_if_changed};
       variables;
       script;
       artifacts;
