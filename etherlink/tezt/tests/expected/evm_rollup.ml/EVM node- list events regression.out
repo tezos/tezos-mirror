@@ -1181,6 +1181,14 @@ importing_snapshot:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+invalidated_token:
+  description: authentication token was invalidated before its expired date
+  level: warning
+  section: evm_node.dev.gcp_kms
+  json format:
+    { /* invalidated_token version 0 */
+      "invalidated_token.v0": any }
+  
 is_ready:
   description: the EVM node RPC server ({backend}) is listening to {addr}:{port} {websockets}
   level: notice

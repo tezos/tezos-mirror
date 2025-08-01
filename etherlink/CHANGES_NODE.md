@@ -14,6 +14,9 @@
 
 ### Execution changes
 
+- Makes the sequencer resilient to GCP KMS authentication tokens invalidation.
+  (!18901)
+
 ### Storage changes
 
 ### Documentation changes
