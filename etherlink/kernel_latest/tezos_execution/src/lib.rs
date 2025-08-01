@@ -515,9 +515,14 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
-) -> Result<OperationResultSum, OperationError> {
+) -> Result<Vec<OperationResultSum>, OperationError> {
     let branch = operation.branch;
-    let content: ManagerOperation<OperationContent> = operation.content.clone().into();
+    let content: Vec<ManagerOperation<OperationContent>> = operation
+        .content
+        .into_iter()
+        .map(|op| op.into())
+        .collect::<Vec<ManagerOperation<OperationContent>>>();
+
     let signature = operation.signature;
 
     let mut safe_host = SafeStorage {
@@ -533,7 +538,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         &mut safe_host,
         context,
         &branch,
-        vec![content.clone()],
+        content.clone(),
         signature,
     ) {
         Ok(validation_info) => validation_info,
@@ -555,7 +560,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.start()?;
 
     let (receipts, applied) =
-        apply_batch(&mut safe_host, context, vec![content], validation_info);
+        apply_batch(&mut safe_host, context, content, validation_info);
 
     log!(safe_host, Debug, "Receipts: {:#?}", receipts);
 
@@ -576,7 +581,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         safe_host.revert()?;
     }
 
-    Ok(receipts[0].clone())
+    Ok(receipts)
 }
 
 fn apply_batch<Host: Runtime>(
@@ -773,25 +778,29 @@ mod tests {
         gas_limit: u64,
         storage_limit: u64,
         source: Bootstrap,
-        content: OperationContent,
+        content: Vec<OperationContent>,
     ) -> Operation {
         let branch = TezBlock::genesis_block_hash().into();
-        let manager_op: ManagerOperationContent = ManagerOperation {
-            source: source.pkh,
-            fee: fee.into(),
-            counter: counter.into(),
-            operation: content,
-            gas_limit: gas_limit.into(),
-            storage_limit: storage_limit.into(),
-        }
-        .into();
+        let content = content
+            .into_iter()
+            .map(|c| -> ManagerOperationContent {
+                ManagerOperation {
+                    source: source.pkh.clone(),
+                    fee: fee.into(),
+                    counter: counter.into(),
+                    operation: c,
+                    gas_limit: gas_limit.into(),
+                    storage_limit: storage_limit.into(),
+                }
+                .into()
+            })
+            .collect::<Vec<ManagerOperationContent>>();
 
-        let signature =
-            sign_operation(&source.sk, &branch, vec![manager_op.clone()]).unwrap();
+        let signature = sign_operation(&source.sk, &branch, content.clone()).unwrap();
 
         Operation {
             branch,
-            content: manager_op,
+            content,
             signature,
         }
     }
@@ -809,10 +818,10 @@ mod tests {
             gas_limit,
             storage_limit,
             source.clone(),
-            OperationContent::Reveal(RevealContent {
+            vec![OperationContent::Reveal(RevealContent {
                 pk: source.pk,
                 proof: None,
-            }),
+            })],
         )
     }
 
@@ -833,11 +842,11 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer(TransferContent {
+            vec![OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
                 parameters,
-            }),
+            })],
         )
     }
 
@@ -1040,7 +1049,7 @@ mod tests {
         );
 
         // Reveal operation should fail
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(source.pkh)),
@@ -1057,7 +1066,7 @@ mod tests {
                 vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
             ),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(
             account.counter(&host).unwrap(),
@@ -1098,7 +1107,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(source.pkh)),
@@ -1115,7 +1124,7 @@ mod tests {
                 vec![RevealError::InconsistentHash(inconsistent_pkh).into()].into(),
             ),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
@@ -1191,7 +1200,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(source.pkh)),
@@ -1208,7 +1217,7 @@ mod tests {
                 consumed_gas: 0_u64.into(),
             }),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(receipt, expected_receipt);
 
@@ -1260,7 +1269,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(source.pkh.clone())),
@@ -1283,7 +1292,7 @@ mod tests {
                 .into(),
             ),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(receipt, expected_receipt);
 
@@ -1333,7 +1342,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
@@ -1369,7 +1378,7 @@ mod tests {
                 allocated_destination_contract: false,
             })),
             internal_operation_results: vec![],
-        });
+        })];
         assert_eq!(receipt, expected_receipt);
 
         // Verify that source and destination balances changed
@@ -1417,7 +1426,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
@@ -1453,7 +1462,7 @@ mod tests {
                 allocated_destination_contract: false,
             })),
             internal_operation_results: vec![],
-        });
+        })];
 
         // Verify that balance was only debited for fees
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
@@ -1580,7 +1589,7 @@ mod tests {
 
         let storage = Some(storage_value.clone());
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
@@ -1618,7 +1627,7 @@ mod tests {
                 allocated_destination_contract: false,
             })),
             internal_operation_results: vec![],
-        });
+        })];
 
         // Verify that source and destination balances changed
         // 30 for transfer + 15 for fees, 5 should be left
@@ -1686,7 +1695,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh)),
@@ -1706,7 +1715,7 @@ mod tests {
             )
         )].into()),
             internal_operation_results: vec![],
-        });
+        })];
 
         // Verify that source and destination balances changed
         // Transfer should be free as it got reverted + 15 for fees, 5 should be left
@@ -1763,7 +1772,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh)),
@@ -1783,7 +1792,7 @@ mod tests {
                 .into(),
             ),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(receipt, expected_receipt);
     }
@@ -1824,7 +1833,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Transfer(OperationResult {
+        let expected_receipt = vec![OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
                 BalanceUpdate {
                     balance: Balance::Account(Contract::Implicit(src.pkh)),
@@ -1844,7 +1853,7 @@ mod tests {
                 .into(),
             ),
             internal_operation_results: vec![],
-        });
+        })];
 
         assert_eq!(receipt, expected_receipt);
     }

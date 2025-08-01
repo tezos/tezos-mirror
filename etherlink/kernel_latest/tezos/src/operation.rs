@@ -5,6 +5,7 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
+use crate::operation_result::{OperationResultSum, OperationWithMetadata};
 use mir::ast::michelson_address::entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
@@ -64,7 +65,7 @@ pub struct ManagerOperation<C> {
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
-    pub content: ManagerOperationContent,
+    pub content: Vec<ManagerOperationContent>,
     pub signature: UnknownSignature,
 }
 
@@ -254,6 +255,21 @@ pub fn verify_signature(
     Ok(check)
 }
 
+pub fn zip_operations(
+    operation: Operation,
+    receipt: Vec<OperationResultSum>,
+) -> Vec<OperationWithMetadata> {
+    operation
+        .content
+        .into_iter()
+        .zip(receipt)
+        .map(|(c, r)| OperationWithMetadata {
+            content: c,
+            receipt: r,
+        })
+        .collect::<Vec<OperationWithMetadata>>()
+}
+
 #[cfg(test)]
 fn make_dummy_operation(
     operation: OperationContent,
@@ -269,7 +285,7 @@ fn make_dummy_operation(
 
     Operation {
         branch,
-        content: ManagerOperation {
+        content: vec![ManagerOperation {
             source,
             fee: 1_u64.into(),
             counter: 10_u64.into(),
@@ -277,7 +293,7 @@ fn make_dummy_operation(
             storage_limit: 45_u64.into(),
             operation,
         }
-        .into(),
+        .into()],
         signature,
     }
 }
@@ -355,7 +371,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigbuPiC4jLnc17xWVXMRgKiWsTsckZ2jBeHYVamUWi2m8MBXGsL6SPf9SadUEzXM7D5NfpJiYnr5BhcVfm2zwrLGuvNSGVM").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Reveal(ManagerOperation {
+            content: vec![ManagerOperationContent::Reveal(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
                 )
@@ -371,7 +387,7 @@ mod tests {
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 
@@ -401,7 +417,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigT4yGRRhiMZCjGigdhopaXkshKrwDbYrPw3jGFZGkjpvpT57a6KmLa4mFVKBTNHR8NrmyMEt9Pgusac5HLqUoJie2MB5Pd").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
                 )
@@ -418,7 +434,7 @@ mod tests {
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 
@@ -479,7 +495,7 @@ mod tests {
 
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -501,7 +517,7 @@ mod tests {
                 },
                 gas_limit: 1380_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 

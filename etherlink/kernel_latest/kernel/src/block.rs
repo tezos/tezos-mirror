@@ -578,12 +578,6 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tezos_crypto_rs::hash::SecretKeyEd25519;
-    use tezos_ethereum::tx_common::AuthorizationList;
-    use tezos_execution::account_storage::TezlinkAccount;
-    use tezos_tezlink::operation::sign_operation;
-    use tezos_tezlink::operation::Parameter;
-
     use crate::block_storage;
     use crate::blueprint::Blueprint;
     use crate::blueprint_storage::store_inbox_blueprint;
@@ -609,16 +603,19 @@ mod tests {
     use evm_execution::configuration::EVMVersion;
     use primitive_types::{H160, U256};
     use std::str::FromStr;
+    use tezos_crypto_rs::hash::SecretKeyEd25519;
     use tezos_data_encoding::types::Narith;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::{
         TransactionHash, TransactionStatus, TransactionType, TRANSACTION_HASH_SIZE,
     };
+    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_ethereum::tx_common::EthereumTransactionCommon;
     use tezos_evm_runtime::extensions::WithGas;
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_evm_runtime::runtime::Runtime;
     use tezos_execution::account_storage::Manager;
+    use tezos_execution::account_storage::TezlinkAccount;
     use tezos_execution::account_storage::TezlinkImplicitAccount;
     use tezos_execution::context;
     use tezos_smart_rollup::types::Contract;
@@ -627,6 +624,8 @@ mod tests {
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::path::concat;
     use tezos_smart_rollup_host::path::RefPath;
+    use tezos_tezlink::operation::sign_operation;
+    use tezos_tezlink::operation::Parameter;
 
     fn read_current_number(host: &impl Runtime) -> anyhow::Result<U256> {
         Ok(crate::blueprint_storage::read_current_blueprint_header(host)?.number)
@@ -684,29 +683,32 @@ mod tests {
         gas_limit: u64,
         storage_limit: u64,
         source: Bootstrap,
-        content: OperationContent,
+        content: Vec<OperationContent>,
     ) -> Operation {
         let branch = TezBlock::genesis_block_hash().into();
-        let manager_op: ManagerOperationContent = ManagerOperation {
-            source: source.pkh,
-            fee: fee.into(),
-            counter: counter.into(),
-            operation: content,
-            gas_limit: gas_limit.into(),
-            storage_limit: storage_limit.into(),
-        }
-        .into();
+        let content = content
+            .into_iter()
+            .map(|c| -> ManagerOperationContent {
+                ManagerOperation {
+                    source: source.pkh.clone(),
+                    fee: fee.into(),
+                    counter: counter.into(),
+                    operation: c,
+                    gas_limit: gas_limit.into(),
+                    storage_limit: storage_limit.into(),
+                }
+                .into()
+            })
+            .collect::<Vec<ManagerOperationContent>>();
 
-        let signature =
-            sign_operation(&source.sk, &branch, vec![manager_op.clone()]).unwrap();
+        let signature = sign_operation(&source.sk, &branch, content.clone()).unwrap();
 
         Operation {
             branch,
-            content: manager_op,
+            content,
             signature,
         }
     }
-
     fn make_reveal_operation(
         fee: u64,
         counter: u64,
@@ -720,10 +722,10 @@ mod tests {
             gas_limit,
             storage_limit,
             source.clone(),
-            OperationContent::Reveal(RevealContent {
+            vec![OperationContent::Reveal(RevealContent {
                 pk: source.pk,
                 proof: None,
-            }),
+            })],
         )
     }
 
@@ -744,11 +746,11 @@ mod tests {
             gas_limit,
             storage_limit,
             source,
-            OperationContent::Transfer(TransferContent {
+            vec![OperationContent::Transfer(TransferContent {
                 amount,
                 destination,
                 parameters,
-            }),
+            })],
         )
     }
 
