@@ -1290,9 +1290,8 @@ let jobs pipeline_type =
         ~image:Images.CI.build
         ~dependencies:dependencies_needs_start
         ~rules:(make_rules ~changes:changeset_octez ())
-        ~before_script:
-          (before_script ~eval_opam:true ["cd scripts/gen-genesis"])
-        ["dune build gen_genesis.exe"]
+        ~before_script:(before_script ~eval_opam:true [])
+        ["dune build scripts/gen-genesis/gen_genesis.exe"]
     in
     let job_oc_script_snapshot_alpha_and_link : tezos_job =
       job

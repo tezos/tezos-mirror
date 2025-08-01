@@ -1843,10 +1843,9 @@ oc.script:test-gen-genesis:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
-  - cd scripts/gen-genesis
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - dune build gen_genesis.exe
+  - dune build scripts/gen-genesis/gen_genesis.exe
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
