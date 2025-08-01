@@ -258,22 +258,6 @@ let triage ctxt head_level proto_parameters batch =
         else
           match gossipsub_message_id_validation ctxt proto_parameters id with
           | `Valid ->
-              (* We register traps only if the message id is valid, but before
-                 cryptographic check. *)
-              let store = Node_context.get_store ctxt in
-              let traps_store = Store.traps store in
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                  The [proto_parameters] are those for the last known finalized
-                  level, which may differ from those of the slot level. This
-                  will be an issue when the value of the [traps_fraction]
-                  changes. (We cannot use {!Node_context.get_proto_parameters},
-                  as it is not monad-free; we'll need to use mapping from levels
-                  to parameters.) *)
-              Slot_manager.maybe_register_trap
-                traps_store
-                ~traps_fraction:proto_parameters.traps_fraction
-                id
-                message ;
               (* The shard is added to the right batch.
                  Since the message id check has already been performed, we have
                  the guarantee that all shards associated to a given
@@ -314,6 +298,9 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     in
     List.iter (fun (index, error) -> result.(index) <- error) not_valid ;
 
+    let store = Node_context.get_store ctxt in
+    let traps_store = Store.traps store in
+
     Batch_tbl.iter
       (fun {level; slot_index} batch_list ->
         let shards, proofs =
@@ -339,7 +326,23 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
         in
         match res with
         | Ok () ->
-            List.iter (fun {index; _} -> result.(index) <- `Valid) batch_list
+            List.iter
+              (fun {index; id; message} ->
+                (* We register traps only if the message is valid. *)
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                    The [proto_parameters] are those for the last known finalized
+                    level, which may differ from those of the slot level. This
+                    will be an issue when the value of the [traps_fraction]
+                    changes. (We cannot use {!Node_context.get_proto_parameters},
+                    as it is not monad-free; we'll need to use mapping from levels
+                    to parameters.) *)
+                Slot_manager.maybe_register_trap
+                  traps_store
+                  ~traps_fraction:proto_parameters.traps_fraction
+                  id
+                  message ;
+                result.(index) <- `Valid)
+              batch_list
         | Error err ->
             let validation_error = string_of_validation_error err in
             Event.emit_dont_wait__batch_validation_error
