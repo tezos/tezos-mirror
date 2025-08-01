@@ -28,22 +28,37 @@ pub struct CounterError {
     pub found: Narith,
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ValidityError {
+    #[error("Counter in the past: {0:?}.")]
     CounterInThePast(CounterError),
+    #[error("Counter in the future: {0:?}.")]
     CounterInTheFuture(CounterError),
+    #[error("Missing manager contract.")]
     MissingManagerContract,
+    #[error("The manager key for {0} has not been revealed yet.")]
     UnrevealedManagerKey(PublicKeyHash),
+    #[error("Cannot pay {0:?} in fees.")]
     CantPayFees(Narith),
+    #[error("Empty implicit contract.")]
     EmptyImplicitContract,
+    #[error("Gas limit is too high.")]
     GasLimitTooHigh,
+    #[error("Storage limit is too high.")]
     StorageLimitTooHigh,
+    #[error("Invalid signature.")]
     InvalidSignature,
+    #[error("Failed to fetch account")]
     FailedToFetchAccount,
+    #[error("Failed to compute fee balance update")]
     FailedToComputeFeeBalanceUpdate,
+    #[error("Failed to fetch counter")]
     FailedToFetchCounter,
+    #[error("Failed to fetch manager key")]
     FailedToFetchManagerKey,
+    #[error("Failed to fetch balance")]
     FailedToFetchBalance,
+    #[error("Failed to update balance")]
     FailedToUpdateBalance,
 }
 
