@@ -857,11 +857,7 @@ module type AUTOMATON = sig
       messages (with their associated set of peers) is passed to the [callback]
       function, which pushes an event [Batch_to_treat batch] on the stream of
       events the automaton should handle. *)
-  val handle_receive_message_batch :
-    callback:((receive_message * Peer.Set.t) list -> unit) ->
-    time_interval:float ->
-    receive_message ->
-    [`Receive_message] monad
+  val handle_receive_message_batch : receive_message -> [`Receive_message] monad
 
   (** [publish { topic; message_id; message }] allows to publish a message
       on the gossip network from the local node. The function returns a set of peers

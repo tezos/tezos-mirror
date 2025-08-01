@@ -130,7 +130,9 @@ module Make (C : AUTOMATON_CONFIG) :
     | Invalid_message : [`Receive_message] output
     | Unknown_validity : [`Receive_message] output
     | Outdated : [`Receive_message] output
-    | Included_in_batch : [`Receive_message] output
+    | To_include_in_batch :
+        (receive_message * Peer.Set.t)
+        -> [`Receive_message] output
     | Batch_result :
         (receive_message * [`Receive_message] output) list
         -> [`Treated_batch] output
@@ -1210,38 +1212,21 @@ module Make (C : AUTOMATON_CONFIG) :
          IHave message? *)
       Route_message {to_route} |> return
 
-    let handle_batch =
-      let msg_batch = Queue.create () in
-      let running = ref false in
-      let start_batch_timer time callback =
-        let open Lwt_syntax in
-        Lwt.async (fun () ->
-            let* () = Lwt_unix.sleep time in
-            let batch = List.of_seq (Queue.to_seq msg_batch) in
-            Queue.clear msg_batch ;
-            running := false ;
-            callback batch ;
-            return_unit)
-      in
-      fun ~callback ~time_interval ({sender; topic; _} as receive_message) ->
-        let open Monad.Syntax in
-        let*? peers_in_mesh = initial_message_checks receive_message in
-        let* to_route = peers_to_route sender peers_in_mesh topic in
-        Queue.push (receive_message, to_route) msg_batch ;
-        if not !running then (
-          running := true ;
-          start_batch_timer time_interval callback) ;
-        return Included_in_batch
+    let handle_batch ({sender; topic; message_id; _} as receive_message) =
+      let open Monad.Syntax in
+      let*? peers_in_mesh = initial_message_checks receive_message in
+      let*? () = check_message_id_valid sender topic message_id in
+      let* to_route = peers_to_route sender peers_in_mesh topic in
+      return (To_include_in_batch (receive_message, to_route))
   end
 
   let handle_receive_message_sequentially :
       receive_message -> [`Receive_message] output Monad.t =
    fun receive_message -> Receive_message.handle_sequentially receive_message
 
-  let handle_receive_message_batch ~callback ~time_interval :
+  let handle_receive_message_batch :
       receive_message -> [`Receive_message] output Monad.t =
-   fun receive_message ->
-    Receive_message.handle_batch ~callback ~time_interval receive_message
+   fun receive_message -> Receive_message.handle_batch receive_message
 
   let check_message_batch batch =
     let unfolded_batch =
@@ -2502,7 +2487,7 @@ module Make (C : AUTOMATON_CONFIG) :
           "Route_message %a"
           Fmt.Dump.(record [field "to_route" Fun.id pp_peer_set])
           to_route
-    | Included_in_batch -> fprintf fmtr "Included in batch"
+    | To_include_in_batch _ -> fprintf fmtr "To include in batch"
     | Already_received -> fprintf fmtr "Already_received"
     | Batch_result _res -> fprintf fmtr "Batch_result"
     | Not_subscribed -> fprintf fmtr "Not_subscribed"
