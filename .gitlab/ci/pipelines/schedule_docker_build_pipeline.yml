@@ -16,8 +16,11 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -37,8 +40,11 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -57,8 +63,11 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -83,10 +92,13 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -102,8 +114,11 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -126,8 +141,11 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -150,8 +168,11 @@ docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:

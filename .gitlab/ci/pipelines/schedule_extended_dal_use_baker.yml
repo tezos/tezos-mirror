@@ -16,8 +16,11 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -37,8 +40,11 @@ oc.docker:rust-toolchain:amd64:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -70,6 +76,7 @@ tezt:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -86,6 +93,8 @@ tezt:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
@@ -129,6 +138,7 @@ tezt-time-sensitive:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -145,6 +155,8 @@ tezt-time-sensitive:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -time_sensitive
@@ -187,6 +199,7 @@ tezt-slow:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -202,6 +215,8 @@ tezt-slow:
     --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
     --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
     --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
@@ -246,6 +261,7 @@ tezt-extra:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -262,6 +278,8 @@ tezt-extra:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -extra
@@ -306,6 +324,7 @@ tezt-flaky:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
     CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
@@ -322,6 +341,8 @@ tezt-flaky:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -flaky
@@ -369,10 +390,12 @@ oc.build_x86_64-released:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
@@ -424,10 +447,12 @@ oc.build_x86_64-exp-dev-extra:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
@@ -474,11 +499,13 @@ oc.build_kernels:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     CC: clang
@@ -513,10 +540,12 @@ oc.tezt:fetch-records:
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log
     --from last-successful-schedule-extended-test --info
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/filter_corrupted_records.sh
   artifacts:
     expire_in: 4 hours
@@ -537,7 +566,10 @@ datadog_pipeline_trace:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

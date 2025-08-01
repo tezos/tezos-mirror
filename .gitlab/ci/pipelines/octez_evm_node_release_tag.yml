@@ -16,8 +16,11 @@ oc.docker:ci:amd64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -37,8 +40,11 @@ oc.docker:ci:arm64:
   timeout: 90 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -63,10 +69,13 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -93,10 +102,12 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
@@ -138,10 +149,12 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
   after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
@@ -169,8 +182,11 @@ oc.docker:amd64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -191,8 +207,11 @@ oc.docker:arm64:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -215,8 +234,11 @@ docker:merge_manifests:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -239,8 +261,11 @@ gitlab:octez-evm-node-release:
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_gitlab_octez_evm_node_release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
 docker:promote_to_latest:
@@ -255,8 +280,11 @@ docker:promote_to_latest:
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:

@@ -775,8 +775,8 @@ let enc_git_strategy = function
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
-    ?(before_script = []) ?cache ?id_tokens ?interruptible
+let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
+    ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
     ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
     ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
@@ -939,12 +939,17 @@ let job ?(arch : Runner.Arch.t option) ?after_script ?allow_failure ?artifacts
   let job : Gitlab_ci.Types.job =
     {
       name;
-      after_script;
+      after_script =
+        Some
+          (". ./scripts/ci/datadog_send_job_cache_info.sh 'after'"
+         :: after_script);
       allow_failure;
       artifacts;
       (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
       before_script =
-        Some (". ./scripts/ci/datadog_send_job_info.sh" :: before_script);
+        Some
+          ((". ./scripts/ci/datadog_send_job_info.sh" :: before_script)
+          @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]);
       cache;
       id_tokens;
       image = Option.map Image.image image;
