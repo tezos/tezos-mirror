@@ -62,13 +62,19 @@ pub enum ValidityError {
     FailedToUpdateBalance,
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum RevealError {
+    #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
+    #[error("The public key hash {0} is inconsistent.")]
     InconsistentHash(PublicKeyHash),
+    #[error("The public key hash {0} is inconsistent with the public key provided.")]
     InconsistentPublicKey(PublicKeyHash),
+    #[error("Could not retrieve manager.")]
     UnretrievableManager,
+    #[error("Failed to increment counter.")]
     FailedToIncrementCounter,
+    #[error("Failed to write manager.")]
     FailedToWriteManager,
 }
 
