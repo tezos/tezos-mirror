@@ -2,14 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
+use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::PublicKey;
+use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::{
-    operation::{
-        verify_signature, ManagerOperation, Operation, OperationContent, RevealContent,
-    },
+    operation::{verify_signature, ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
 };
 
@@ -129,11 +129,10 @@ pub struct ValidationInfo {
 pub fn validate_operation<Host: Runtime>(
     host: &Host,
     context: &Context,
-    operation: &Operation,
+    branch: &BlockHash,
+    content: &ManagerOperation<OperationContent>,
+    signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
-    let branch = &operation.branch;
-    let content: ManagerOperation<OperationContent> = operation.content.clone().into();
-    let signature = &operation.signature;
     let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
@@ -164,12 +163,12 @@ pub fn validate_operation<Host: Runtime>(
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Can't pay the fees"
             );
-            return Err(ValidityError::CantPayFees(content.fee));
+            return Err(ValidityError::CantPayFees(content.fee.clone()));
         }
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
 
-    match verify_signature(&pk, branch, &operation.content, signature.clone()) {
+    match verify_signature(&pk, branch, &(content.clone().into()), signature.clone()) {
         Ok(true) => (),
         _ => return Err(ValidityError::InvalidSignature),
     }

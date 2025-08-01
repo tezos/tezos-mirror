@@ -13,11 +13,13 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
+use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
@@ -447,9 +449,12 @@ fn execute_smart_contract<'a>(
 fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    operation: &Operation,
+    branch: &BlockHash,
+    content: &ManagerOperation<OperationContent>,
+    signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
-    let mut validation_info = validate::validate_operation(host, context, operation)?;
+    let mut validation_info =
+        validate::validate_operation(host, context, branch, content, signature)?;
 
     validation_info
         .source_account
@@ -469,8 +474,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     context: &context::Context,
     operation: Operation,
 ) -> Result<OperationResultSum, OperationError> {
+    let branch = operation.branch;
     let manager_operation: ManagerOperation<OperationContent> =
         operation.content.clone().into();
+    let signature = operation.signature;
 
     let source = &manager_operation.source;
 
@@ -490,7 +497,13 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let validation_info = match execute_validation(&mut safe_host, context, &operation) {
+    let validation_info = match execute_validation(
+        &mut safe_host,
+        context,
+        &branch,
+        &manager_operation,
+        signature,
+    ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             safe_host.revert()?;
