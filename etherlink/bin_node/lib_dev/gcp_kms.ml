@@ -8,6 +8,7 @@
 type 'a handler = {
   pool : Octez_connpool.t;
   key_path : string;
+  config : Configuration.gcp_kms;
   gcp_key : Configuration.gcp_key;
   public_key : 'a;
   mutable auth_token : string;
@@ -267,7 +268,7 @@ let digest hash payload =
   | Blake2B -> Tezos_crypto.(Blake2B.to_string @@ Blake2B.hash_bytes [payload])
   | Keccak256 -> Digestif.KECCAK_256.(to_raw_string @@ digest_bytes payload)
 
-let sign_rpc kms_handler digest =
+let rec sign_rpc ~allow_refresh kms_handler digest =
   let open Lwt_result_syntax in
   Octez_telemetry.Trace.with_tzresult
     ~service_name
@@ -296,6 +297,11 @@ let sign_rpc kms_handler digest =
         failwith
           "Could not decode the response of the kms (%s)"
           (Ezjsonm.read_error_description err)
+  else if allow_refresh && Cohttp.Response.status response = `Unauthorized then (
+    let*! () = Gcp_kms_events.invalidated_token () in
+    let*! token = get_token kms_handler.config in
+    kms_handler.auth_token <- token ;
+    sign_rpc ~allow_refresh:false kms_handler digest)
   else failwith "KMS failed %a" Cohttp.Response.pp_hum response
 
 let signature_of_b64encoded algo b64_sig =
@@ -326,7 +332,7 @@ let signature_of_b64encoded algo b64_sig =
 let sign kms_handler hash payload =
   let open Lwt_result_syntax in
   let digest = digest hash payload in
-  let* b64_sig = sign_rpc kms_handler digest in
+  let* b64_sig = sign_rpc ~allow_refresh:true kms_handler digest in
   signature_of_b64encoded (signature_algorithm kms_handler) b64_sig
 
 let assert_authentication_method config =
@@ -369,6 +375,7 @@ let from_gcp_key (config : Configuration.gcp_kms) gcp_key =
           gcp_key.key
           gcp_key.version;
       gcp_key;
+      config;
       public_key = ();
       auth_token;
     }

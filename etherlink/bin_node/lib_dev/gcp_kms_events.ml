@@ -26,6 +26,14 @@ let new_token =
     ~level:Info
     ()
 
+let invalidated_token =
+  declare_0
+    ~section
+    ~name:"invalidated_token"
+    ~msg:"authentication token was invalidated before its expired date"
+    ~level:Warning
+    ()
+
 let cannot_refresh_access_token =
   declare_1
     ~section
@@ -40,3 +48,5 @@ let is_ready pk = emit is_ready pk
 let cannot_refresh_access_token pk = emit cannot_refresh_access_token pk
 
 let new_token = emit new_token
+
+let invalidated_token = emit invalidated_token
