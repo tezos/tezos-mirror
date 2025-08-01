@@ -302,62 +302,101 @@ let gossipsub_batch_validation ctxt cryptobox ~head_level proto_parameters batch
     let store = Node_context.get_store ctxt in
     let traps_store = Store.traps store in
 
-    Batch_tbl.iter
-      (fun {level; slot_index} batch_list ->
-        let shards, proofs =
-          List.fold_left
-            (fun (shards, proofs) {message; id; _} ->
-              let Types.Message.{share; shard_proof} = message in
-              let Types.Message_id.{shard_index; _} = id in
-              let shard = Cryptobox.{share; index = shard_index} in
-              (shard :: shards, shard_proof :: proofs))
-            ([], [])
-            batch_list
-        in
-        (* We never add empty list in the to_check_in_batch table. *)
-        let {id = {commitment; _}; _} =
-          Option.value_f ~default:(fun () -> assert false) (List.hd batch_list)
-        in
-        let res =
-          Dal_metrics.sample_time
-            ~sampling_frequency:Constants.shards_verification_sampling_frequency
-            ~metric_updater:Dal_metrics.update_shards_verification_time
-            ~to_sample:(fun () ->
-              Cryptobox.verify_shard_multi cryptobox commitment shards proofs)
-        in
-        match res with
-        | Ok () ->
-            List.iter
-              (fun {index; id; message} ->
-                (* We register traps only if the message is valid. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
-                    The [proto_parameters] are those for the last known finalized
-                    level, which may differ from those of the slot level. This
-                    will be an issue when the value of the [traps_fraction]
-                    changes. (We cannot use {!Node_context.get_proto_parameters},
-                    as it is not monad-free; we'll need to use mapping from levels
-                    to parameters.) *)
-                Slot_manager.maybe_register_trap
-                  traps_store
-                  ~traps_fraction:proto_parameters.traps_fraction
-                  id
-                  message ;
-                result.(index) <- `Valid)
+    (* [treat_batch] does not invalidate a whole slot when a single shard is
+       invalid, otherwise it would be possible for a byzantine actor to craft
+       a wrong message with the id of the published slot to prevent the validation
+       of all the valid shards associated to this slot. *)
+    let rec treat_batch = function
+      | [] -> ()
+      | ({level; slot_index}, batch_list) :: remaining_to_treat -> (
+          let shards, proofs =
+            List.fold_left
+              (fun (shards, proofs) {message; id; _} ->
+                let Types.Message.{share; shard_proof} = message in
+                let Types.Message_id.{shard_index; _} = id in
+                let shard = Cryptobox.{share; index = shard_index} in
+                (shard :: shards, shard_proof :: proofs))
+              ([], [])
               batch_list
-        | Error err ->
-            let validation_error = string_of_validation_error err in
-            Event.emit_dont_wait__batch_validation_error
-              ~level
-              ~slot_index
-              ~validation_error ;
-            List.iter (fun {index; _} -> result.(index) <- `Invalid) batch_list
-        | exception exn ->
-            (* Don't crash if crypto raised an exception. *)
-            let validation_error = Printexc.to_string exn in
-            Event.emit_dont_wait__batch_validation_error
-              ~level
-              ~slot_index
-              ~validation_error ;
-            List.iter (fun {index; _} -> result.(index) <- `Invalid) batch_list)
-      to_check_in_batch ;
+          in
+          (* We never add empty list in the to_check_in_batch table. *)
+          let {id = {commitment; _}; _} =
+            Option.value_f
+              ~default:(fun () -> assert false)
+              (List.hd batch_list)
+          in
+          let res =
+            Dal_metrics.sample_time
+              ~sampling_frequency:
+                Constants.shards_verification_sampling_frequency
+              ~metric_updater:Dal_metrics.update_shards_verification_time
+              ~to_sample:(fun () ->
+                Cryptobox.verify_shard_multi cryptobox commitment shards proofs)
+          in
+          match res with
+          | Ok () ->
+              List.iter
+                (fun {index; id; message} ->
+                  (* We register traps only if the message is valid. *)
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7742
+                      The [proto_parameters] are those for the last known finalized
+                      level, which may differ from those of the slot level. This
+                      will be an issue when the value of the [traps_fraction]
+                      changes. (We cannot use {!Node_context.get_proto_parameters},
+                      as it is not monad-free; we'll need to use mapping from levels
+                      to parameters.) *)
+                  Slot_manager.maybe_register_trap
+                    traps_store
+                    ~traps_fraction:proto_parameters.traps_fraction
+                    id
+                    message ;
+                  result.(index) <- `Valid)
+                batch_list ;
+              treat_batch remaining_to_treat
+          | Error err ->
+              let validation_error = string_of_validation_error err in
+              Event.emit_dont_wait__batch_validation_error
+                ~level
+                ~slot_index
+                ~validation_error ;
+              let batch_size = List.length batch_list in
+              if batch_size = 1 then
+                List.iter
+                  (fun {index; _} -> result.(index) <- `Invalid)
+                  batch_list
+              else
+                (* Since [verify_multi] does not outputs which shards are the
+                   invalid ones and since we do not want to invalidate legitimate
+                   shards because a byzantine actor added some false shards, we
+                   revalidate all the shards by half recursiveley until we have
+                   identified the invalid shards. *)
+                let first_half, second_half =
+                  List.split_n (batch_size / 2) batch_list
+                in
+                treat_batch
+                  (({level; slot_index}, first_half)
+                  :: ({level; slot_index}, second_half)
+                  :: remaining_to_treat)
+          | exception exn ->
+              (* Don't crash if crypto raised an exception. *)
+              let validation_error = Printexc.to_string exn in
+              Event.emit_dont_wait__batch_validation_error
+                ~level
+                ~slot_index
+                ~validation_error ;
+              let batch_size = List.length batch_list in
+              if batch_size = 1 then
+                List.iter
+                  (fun {index; _} -> result.(index) <- `Invalid)
+                  batch_list
+              else
+                let first_half, second_half =
+                  List.split_n (batch_size / 2) batch_list
+                in
+                treat_batch
+                  (({level; slot_index}, first_half)
+                  :: ({level; slot_index}, second_half)
+                  :: remaining_to_treat))
+    in
+    treat_batch (Batch_tbl.to_seq to_check_in_batch |> List.of_seq) ;
     Array.to_list result
