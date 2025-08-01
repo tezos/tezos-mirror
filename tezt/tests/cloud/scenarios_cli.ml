@@ -902,7 +902,8 @@ module Tezlink () : Tezlink = struct
     Clap.optional_int
       ~section
       ~long:"tzkt-api-port"
-      ~description:"Set the port number of the TzKT API. Requires the tzkt option"
+      ~description:
+        "Set the port number of the TzKT API. Requires the tzkt option"
       ()
 
   let tzkt =
