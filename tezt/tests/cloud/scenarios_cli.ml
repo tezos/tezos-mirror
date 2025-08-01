@@ -868,6 +868,8 @@ module type Tezlink = sig
   val public_rpc_port : int option
 
   val tzkt_api_port : int option
+
+  val tzkt : bool
 end
 
 module Tezlink () : Tezlink = struct
@@ -900,6 +902,14 @@ module Tezlink () : Tezlink = struct
     Clap.optional_int
       ~section
       ~long:"tzkt-api-port"
-      ~description:"Set the port number of the TZKT API"
+      ~description:"Set the port number of the TzKT API. Requires the tzkt option"
       ()
+
+  let tzkt =
+    Clap.flag
+      ~section
+      ~set_long:"tzkt"
+      ~unset_long:"no-tzkt"
+      ~description:"Run the TzKT indexer and API"
+      true
 end
