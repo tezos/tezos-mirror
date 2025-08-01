@@ -1,6 +1,6 @@
 #!/bin/sh
 
-set -eu
+set -e
 
 # Check if the section argument ('before' or 'after') is provided.
 # We will use it in the tags sent to Datadog to give infos on the
