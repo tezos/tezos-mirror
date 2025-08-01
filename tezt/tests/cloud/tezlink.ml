@@ -26,8 +26,9 @@ module Tzkt_process = struct
 
   include Daemon.Make (Parameters)
 
-  let run ?runner cmd args =
-    let daemon = create ?runner ~path:cmd () in
+  let run ?runner ~suffix cmd args =
+    let process_name = sf "%s-%s" Parameters.base_default_name suffix in
+    let daemon = create ?runner ~name:process_name ~path:cmd () in
     run ?runner daemon () args
 end
 
@@ -154,6 +155,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   let* () =
     Tzkt_process.run
       ?runner
+      ~suffix:"indexer"
       "sh"
       [
         "-c";
@@ -168,6 +170,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   let* () =
     Tzkt_process.run
       ?runner
+      ~suffix:"api"
       "sh"
       [
         "-c";
