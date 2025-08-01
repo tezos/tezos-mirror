@@ -13,6 +13,25 @@ module Cli = Scenarios_cli
 open Scenarios_helpers
 open Tezos
 
+module Tzkt_process = struct
+  module Parameters = struct
+    type persistent_state = unit
+
+    type session_state = unit
+
+    let base_default_name = "tzkt"
+
+    let default_colors = Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
+  end
+
+  include Daemon.Make (Parameters)
+
+  let run ?runner ~suffix cmd args =
+    let process_name = sf "%s-%s" Parameters.base_default_name suffix in
+    let daemon = create ?runner ~name:process_name ~path:cmd () in
+    run ?runner daemon () args
+end
+
 let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   (* Set of functions helpful for Tzkt setup *)
   let spawn_run ?name cmd args =
@@ -132,9 +151,11 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   in
 
   (* Run the Tzkt indexer and Tzkt API *)
+  let runner = Agent.runner agent in
   let* () =
-    run
-      ~name:"tzkt-indexer"
+    Tzkt_process.run
+      ?runner
+      ~suffix:"indexer"
       "sh"
       [
         "-c";
@@ -145,9 +166,11 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
           database_arg
           indexer_port_arg;
       ]
-  and* () =
-    run
-      ~name:"tzkt-api"
+  in
+  let* () =
+    Tzkt_process.run
+      ?runner
+      ~suffix:"api"
       "sh"
       [
         "-c";
