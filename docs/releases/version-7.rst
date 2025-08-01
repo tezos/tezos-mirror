@@ -19,7 +19,9 @@ Version 7.5 fixes some issues with gas cost computation in the client for Delphi
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v7.5

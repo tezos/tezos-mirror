@@ -31,7 +31,7 @@ to connect to. Lowering the number of expected connections removes the spurious
 “Too few connections” warnings. Set it to ``1`` for our two-nodes network (and
 you would set it to ``0`` for a single-node network).
 
-More informations can be found in the :package-api:`api page of the octez node
+More information can be found in the :package-api:`api page of the octez node
 config <octez-node-config/Octez_node_config/Shared_arg/index.html#type-t>`: or
 by simply calling
 

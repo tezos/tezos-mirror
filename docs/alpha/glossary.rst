@@ -137,7 +137,7 @@ _`Baker`
 
     When using :ref:`Octez <octez>`, baking and other consensus actions are handled by the baker
     daemon, on behalf of one or more delegate_ accounts.
-    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf.
+    By extension, a baker designates the owner of such a delegate account, typically running the baker daemon on its behalf, participating in governance and in the DAL.
 
 _`Baking`
     The act of creating a new block_ by a baker_.
@@ -188,7 +188,7 @@ _`Cycle`
 .. _def_delegate_alpha:
 
 _`Delegate`
-    A `user account`_ that can participate in consensus and in governance.
+    A `user account`_ that can participate in consensus, in governance, and in the DAL.
     Actual participation is under further provisions, like having a `minimal stake`_.
     A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.

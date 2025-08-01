@@ -43,7 +43,9 @@ to remove costly computations in cases where they are not needed.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   git fetch
   git checkout v9.7

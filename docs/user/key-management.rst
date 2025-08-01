@@ -285,13 +285,17 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
-However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus
-key may sign a ``Drain_delegate`` operation to transfer the delegate's
-spendable balance to an arbitrary account. In :doc:`relevant
-RPCs<../api/openapi>` like
-``/chains/main/blocks/head/helpers/baking_rights``, both the
-delegate's manager and consensus keys are listed.
-As a consequence, the consensus key should be treated with equal care as the manager key.
+.. warning::
+
+   Note that the consensus key has also access to the delegate's spendable funds: indeed, the consensus
+   key may sign a ``Drain_delegate`` operation to transfer the delegate's
+   spendable balance to an arbitrary account. In :doc:`relevant
+   RPCs<../api/openapi>` like
+   ``/chains/main/blocks/head/helpers/baking_rights``, both the
+   delegate's manager and consensus keys are listed.
+   As a consequence, the consensus key should be treated with equal care as the manager key.
+
+Further possible options to counter the risk of fund draining by a compromised consensus key include: staking (nearly) all funds available on the baking key, leaving just a minimum to pay operation fees, and, rotating consensus key regularly, specially before unstaking tez. Note that the activation delay for new consensus key is one cycle shorter than the unstake finalization delay.
 
 Registering a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -22,7 +22,9 @@ and updates built-in network aliases.
 Update Instructions
 -------------------
 
-To update from sources::
+To update from sources:
+
+.. code-block:: shell
 
   # Removes tezos folder from PATH if added with Octez <= v13 instructions
   PATH=${PATH##"$HOME"/tezos/:}
