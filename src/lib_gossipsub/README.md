@@ -45,9 +45,12 @@ receives inputs from both the P2P and application layers, processes them using
 the automaton, and emits corresponding actions back to the P2P layer (messages,
 connections, disconnections) and the application layer (full messages).
 
-The WORKER module is designed to be agnostic to the underlying concurrency model.
+The WORKER module was designed to be agnostic to the underlying concurrency model.
 Rather than depending on a specific concurrency library (such as Lwt), it requires
 the host application to supply an I/O monad and stream implementation.
+It is no longer the case since merge request [!18848](https://gitlab.com/tezos/tezos/-/merge_requests/18848) which introduces the use of `Lwt.async` in the
+function `batch_accumulator` of the worker.
+
 This design allows the application to retain control over the event loop and
 execution model, enabling the worker to integrate cleanly into diverse runtime
 environments.

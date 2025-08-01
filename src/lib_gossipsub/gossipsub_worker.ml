@@ -275,6 +275,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | Sequentially
     | In_batches of {time_interval : float (* In seconds *)}
 
+  type batch_state =
+    | Pending
+    | Accumulating of (GS.receive_message * Peer.Set.t) list
+
   (** The worker's state is made of the gossipsub automaton's state,
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
@@ -389,7 +393,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         state
     | state, GS.Already_received
     | state, GS.Not_subscribed
-    | state, GS.Included_in_batch ->
+    | state, GS.To_include_in_batch _ ->
         state
     | state, GS.Unknown_validity ->
         Introspection.update_count_recv_unknown_validity_app_messages
@@ -765,6 +769,43 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     GS.apply_batch batch gossip_state
     |> update_gossip_state state |> handle_batch
 
+  (* This function uses Lwt.async, making the gossipsub library not independent
+     of the concurrency model anymore.
+     If independence from [Lwt] is considered useful to recover, a proposed
+     implementation could be:
+     https://gitlab.com/tezos/tezos/-/commit/a361dd827b43b601eb9de89e7187f9bcf7fc64d1
+     This implementation is not the current implementation, because it has the
+     disadvantage of having a "ticking clock" and accumulate whatever arrives
+     between two ticks. It was considered nicer to have the accumulation to
+     start at the reception of the first shard, because due to network latencies,
+     the reception will most probably not align well with the clock.
+
+     Even with current design, it happens to have the shards for a commitment
+     to be splitted between two batches. Increasing the frequency of this event
+     would probably not be an issue. *)
+  let batch_accumulator =
+    let current_batch = ref Pending in
+    fun output time_interval events_stream ->
+      match output with
+      | GS.To_include_in_batch content -> (
+          match !current_batch with
+          | Pending ->
+              let open Lwt_syntax in
+              Lwt.async (fun () ->
+                  let* () = Lwt_unix.sleep time_interval in
+                  let batch =
+                    match !current_batch with
+                    | Accumulating batch -> batch
+                    | Pending -> []
+                  in
+                  current_batch := Pending ;
+                  Stream.push (Batch_to_treat batch) events_stream ;
+                  return_unit) ;
+              current_batch := Accumulating [content]
+          | Accumulating prev_contents ->
+              current_batch := Accumulating (content :: prev_contents))
+      | _ -> ()
+
   (** Handling messages received from the P2P network. *)
   let apply_p2p_message ~self ({gossip_state; _} as state) from_peer = function
     | Message_with_header {message; topic; message_id} -> (
@@ -777,13 +818,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
              |> update_gossip_state state
              |> handle_receive_message receive_message
          | In_batches {time_interval} ->
-             GS.handle_receive_message_batch
-               ~callback:(fun batch ->
-                 Stream.push (Batch_to_treat batch) state.events_stream)
-               ~time_interval
-               receive_message
-               gossip_state
-             |> update_gossip_state state
+             let new_state, output =
+               GS.handle_receive_message_batch receive_message gossip_state
+             in
+             batch_accumulator output time_interval state.events_stream ;
+             update_gossip_state state (new_state, output)
              |> handle_receive_message receive_message)
         [@profiler.span_f
           {verbosity = Notice}
