@@ -1254,9 +1254,24 @@ module Make (C : AUTOMATON_CONFIG) :
     | Ok annotated_batch ->
         let* l =
           Monad.map_fold
-            (fun ((({sender; topic; _} as received_msg), peers), result) ->
+            (fun ( ( ({sender; topic; message_id; message} as received_msg),
+                     peers ),
+                   result )
+               ->
               match result with
-              | `Valid -> return (received_msg, Route_message {to_route = peers})
+              | `Valid ->
+                  let* () =
+                    put_message_in_cache
+                      ~peer:(Some sender)
+                      message_id
+                      message
+                      topic
+                  in
+                  let* () =
+                    update_score sender (fun stats ->
+                        Score.first_message_delivered stats topic)
+                  in
+                  return (received_msg, Route_message {to_route = peers})
               | `Outdated -> return (received_msg, Outdated)
               | `Unknown -> return (received_msg, Unknown_validity)
               | `Invalid ->
