@@ -147,23 +147,14 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ApplyOperationError {
-    Reveal(RevealError),
-    Transfer(TransferError),
+    #[error("Reveal error: {0}")]
+    Reveal(#[from] RevealError),
+    #[error("Transfer error: {0}")]
+    Transfer(#[from] TransferError),
+    #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
-}
-
-impl From<RevealError> for ApplyOperationError {
-    fn from(value: RevealError) -> Self {
-        Self::Reveal(value)
-    }
-}
-
-impl From<TransferError> for ApplyOperationError {
-    fn from(value: TransferError) -> Self {
-        Self::Transfer(value)
-    }
 }
 
 impl From<RevealError> for OperationError {
