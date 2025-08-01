@@ -169,11 +169,14 @@ impl From<TransferError> for OperationError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum OperationError {
-    Validation(ValidityError),
-    Apply(ApplyOperationError),
-    RuntimeError(RuntimeError),
+    #[error("Validation error: {0}")]
+    Validation(#[from] ValidityError),
+    #[error("Application error: {0}")]
+    Apply(#[from] ApplyOperationError),
+    #[error("Runtime error: {0}")]
+    RuntimeError(#[from] RuntimeError),
 }
 
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
@@ -239,18 +242,6 @@ impl NomReader<'_> for OperationError {
             input,
             nom::error::ErrorKind::Fail,
         )))
-    }
-}
-
-impl From<ValidityError> for OperationError {
-    fn from(value: ValidityError) -> Self {
-        Self::Validation(value)
-    }
-}
-
-impl From<ApplyOperationError> for OperationError {
-    fn from(value: ApplyOperationError) -> Self {
-        Self::Apply(value)
     }
 }
 
