@@ -800,7 +800,7 @@ mod tests {
         // to avoid getting an error when initializing the safe_storage
         let other = bootstrap2();
 
-        init_account(&mut host, &other.pkh);
+        let src_account = init_account(&mut host, &other.pkh);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
@@ -813,6 +813,12 @@ mod tests {
         let expected_error =
             OperationError::Validation(ValidityError::EmptyImplicitContract);
 
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -823,7 +829,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let _ = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh);
 
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
@@ -837,6 +843,12 @@ mod tests {
         let expected_error =
             OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
 
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -847,7 +859,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let _ = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh);
 
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
@@ -863,6 +875,13 @@ mod tests {
                 expected: 1_u64.into(),
                 found: 15_u64.into(),
             }));
+
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -917,6 +936,13 @@ mod tests {
             ),
             internal_operation_results: vec![],
         });
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
+
         assert_eq!(receipt, expected_receipt);
     }
 
@@ -991,7 +1017,7 @@ mod tests {
         let source = Bootstrap { pk, ..bootstrap1() };
 
         // Even if we don't use it we need to init the account
-        let _ = init_account(&mut host, &source.pkh);
+        let account = init_account(&mut host, &source.pkh);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
@@ -1002,6 +1028,12 @@ mod tests {
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
 
         assert_eq!(result, Err(expected_error));
     }
@@ -1063,6 +1095,12 @@ mod tests {
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::Revealed(pk));
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Test an invalid transfer operation, source has not enough balance to fullfil the Transfer
@@ -1130,6 +1168,12 @@ mod tests {
         // Verify that source only paid the fees and the destination balance is unchanged
         assert_eq!(source_account.balance(&host).unwrap(), 35.into());
         assert_eq!(destination_account.balance(&host).unwrap(), 50_u64.into());
+
+        assert_eq!(
+            source_account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
@@ -1293,6 +1337,13 @@ mod tests {
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
+        // Verify that the source's counter has been incremented
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     #[test]
@@ -1356,6 +1407,12 @@ mod tests {
             requester.balance(&host).unwrap(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
+
+        assert_eq!(
+            requester.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     #[test]
@@ -1447,6 +1504,12 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     #[test]
@@ -1523,6 +1586,7 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
         assert_eq!(
             source.counter(&host).unwrap(),
             1.into(),
