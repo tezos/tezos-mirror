@@ -17,6 +17,7 @@ use tezos_enc::BinWriter;
 use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
 use crate::operation::ManagerOperationContent;
@@ -160,6 +161,7 @@ impl From<TransferError> for OperationError {
 pub enum OperationError {
     Validation(ValidityError),
     Apply(ApplyOperationError),
+    RuntimeError(RuntimeError),
 }
 
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,

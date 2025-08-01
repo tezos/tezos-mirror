@@ -3340,6 +3340,7 @@ dependencies = [
  "rand 0.9.1",
  "rlp",
  "tezos-smart-rollup",
+ "tezos-smart-rollup-host",
  "tezos_crypto_rs",
  "tezos_data_encoding",
  "thiserror 1.0.69",
