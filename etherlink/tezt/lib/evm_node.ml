@@ -122,6 +122,9 @@ type mode =
 
 module Per_level_map = Map.Make (Int)
 
+let daemon_default_colors =
+  Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
+
 module Parameters = struct
   type persistent_state = {
     arguments : string list;
@@ -150,7 +153,7 @@ module Parameters = struct
 
   let base_default_name = "evm_node"
 
-  let default_colors = Log.Color.[|FG.green; FG.yellow; FG.cyan; FG.magenta|]
+  let default_colors = daemon_default_colors
 end
 
 open Parameters
