@@ -511,8 +511,11 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
-            let receipt =
-                tezos_execution::apply_operation(host, &context, operation.clone())?;
+            let receipt = tezos_execution::validate_and_apply_operation(
+                host,
+                &context,
+                operation.clone(),
+            )?;
 
             // Compute the hash of the operation
             let hash = operation.hash()?;

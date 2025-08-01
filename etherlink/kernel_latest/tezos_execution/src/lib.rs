@@ -4,6 +4,7 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
@@ -19,7 +20,7 @@ use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
-use tezos_tezlink::operation_result::{ApplyOperationError, TransferTarget};
+use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
     operation::{
         ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
@@ -31,13 +32,12 @@ use tezos_tezlink::{
     },
 };
 use thiserror::Error;
+use validate::ValidationInfo;
 
 extern crate alloc;
 pub mod account_storage;
 pub mod context;
 mod validate;
-
-type ExecutionResult<A> = Result<Result<A, OperationError>, ApplyKernelError>;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum ApplyKernelError {
@@ -80,38 +80,42 @@ fn reveal<Host: Runtime>(
     provided_hash: &PublicKeyHash,
     account: &mut TezlinkImplicitAccount,
     public_key: &PublicKey,
-) -> ExecutionResult<RevealSuccess> {
+) -> Result<RevealSuccess, RevealError> {
     log!(host, Debug, "Applying a reveal operation");
-    let manager = account.manager(host)?;
+    let manager = account
+        .manager(host)
+        .map_err(|_| RevealError::UnretrievableManager)?;
 
     let expected_hash = match manager {
-        Manager::Revealed(pk) => {
-            return Ok(Err(RevealError::PreviouslyRevealedKey(pk).into()))
-        }
+        Manager::Revealed(pk) => return Err(RevealError::PreviouslyRevealedKey(pk)),
         Manager::NotRevealed(pkh) => pkh,
     };
 
     // Ensure that the source of the operation is equal to the retrieved hash.
     if &expected_hash != provided_hash {
-        return Ok(Err(RevealError::InconsistentHash(expected_hash).into()));
+        return Err(RevealError::InconsistentHash(expected_hash));
     }
 
     // Check the public key
     let pkh_from_pk = public_key.pk_hash();
     if expected_hash != pkh_from_pk {
-        return Ok(Err(RevealError::InconsistentPublicKey(expected_hash).into()));
+        return Err(RevealError::InconsistentPublicKey(expected_hash));
     }
 
     // Set the public key as the manager
-    account.set_manager_public_key(host, public_key)?;
+    account
+        .set_manager_public_key(host, public_key)
+        .map_err(|_| RevealError::FailedToWriteManager)?;
     // TODO : Counter Increment should be done after successful validation (see issue  #8031)
-    account.increment_counter(host)?;
+    account
+        .increment_counter(host)
+        .map_err(|_| RevealError::FailedToIncrementCounter)?;
 
     log!(host, Debug, "Reveal operation succeed");
 
-    Ok(Ok(RevealSuccess {
+    Ok(RevealSuccess {
         consumed_gas: 0_u64.into(),
-    }))
+    })
 }
 
 fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
@@ -133,57 +137,50 @@ pub fn transfer_tez<Host: Runtime>(
     host: &mut Host,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
+    src_balance: &Narith,
     amount: &Narith,
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<(TransferSuccess, AppliedBalanceChanges), TransferError> {
     let (src_update, dest_update) =
         compute_balance_updates(src_contract, dest_contract, amount)
-            .map_err(ApplyKernelError::BigIntError)?;
+            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
-    // Check source balance
-    let current_src_balance = src_account.balance(host)?.0;
-    let new_source_balance = match current_src_balance.checked_sub(&amount.0) {
-        None => {
-            log!(host, Debug, "Balance is too low");
-            let error = TransferError::BalanceTooLow(BalanceTooLow {
-                contract: src_contract.clone(),
-                balance: current_src_balance.into(),
-                amount: amount.clone(),
-            });
-            return Ok(Err(error.into()));
-        }
-        Some(new_source_balance) => new_source_balance,
-    };
-    apply_balance_changes(
+    let applied_balance_changes = apply_balance_changes(
         host,
+        src_contract,
         src_account,
-        new_source_balance,
+        src_balance,
         dest_account,
         &amount.0,
     )?;
-    Ok(Ok(TransferSuccess {
-        storage: None,
-        lazy_storage_diff: None,
-        balance_updates: vec![src_update, dest_update],
-        ticket_receipt: vec![],
-        originated_contracts: vec![],
-        consumed_gas: 0_u64.into(),
-        storage_size: 0_u64.into(),
-        paid_storage_size_diff: 0_u64.into(),
-        allocated_destination_contract: false,
-    }))
+    Ok((
+        TransferSuccess {
+            storage: None,
+            lazy_storage_diff: None,
+            balance_updates: vec![src_update, dest_update],
+            ticket_receipt: vec![],
+            originated_contracts: vec![],
+            consumed_gas: 0_u64.into(),
+            storage_size: 0_u64.into(),
+            paid_storage_size_diff: 0_u64.into(),
+            allocated_destination_contract: false,
+        },
+        applied_balance_changes,
+    ))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     internal_operations: impl Iterator<Item = OperationInfo<'a>>,
     sender_contract: &Contract,
     sender_account: &mut TezlinkOriginatedAccount,
+    sender_balance: &Narith,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> ExecutionResult<()> {
+) -> Result<(), TransferError> {
     for internal_op in internal_operations {
         log!(
             host,
@@ -198,12 +195,14 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 amount,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
-                let dest_contract = contract_from_address(destination_address.hash)?;
+                let dest_contract = contract_from_address(destination_address.hash)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
                 transfer(
                     host,
                     context,
                     sender_contract,
                     sender_account,
+                    sender_balance,
                     &amount,
                     &dest_contract,
                     destination_address.entrypoint,
@@ -213,27 +212,19 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 )
             }
             _ => {
-                return Ok(Err(ApplyOperationError::UnSupportedOperation(
+                return Err(TransferError::FailedToApplyInternalOperation(
                     "Unsupported internal operation".to_string(),
-                )
-                .into()));
+                ));
             }
         }?;
-        match internal_receipt {
-            Ok(receipt) => {
-                log!(
-                    host,
-                    Debug,
-                    "Internal operation executed successfully: {:?}",
-                    receipt
-                );
-            }
-            Err(error) => {
-                return Ok(Err(error));
-            }
-        }
+        log!(
+            host,
+            Debug,
+            "Internal operation executed successfully: {:?}",
+            internal_receipt
+        );
     }
-    Ok(Ok(()))
+    Ok(())
 }
 
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
@@ -243,87 +234,95 @@ pub fn transfer<'a, Host: Runtime>(
     context: &context::Context,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
+    src_balance: &Narith,
     amount: &Narith,
     dest_contract: &Contract,
     entrypoint: Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
             if param != Micheline::from(()) || !entrypoint.is_default() {
-                return Ok(Err(TransferError::NonSmartContractExecutionCall.into()));
+                return Err(TransferError::NonSmartContractExecutionCall);
             }
             // Allocate the implicit account if it doesn't exist
             let allocated =
-                TezlinkImplicitAccount::allocate(host, context, dest_contract)?;
-            match transfer_tez(
-                host,
-                src_contract,
-                src_account,
-                amount,
-                dest_contract,
-                &mut TezlinkImplicitAccount::from_public_key_hash(context, pkh)?,
-            )? {
-                Ok(success) => Ok(Ok(TransferSuccess {
-                    allocated_destination_contract: allocated,
-                    ..success
-                })),
-                Err(error) => Ok(Err(error)),
-            }
-        }
-        Contract::Originated(_) => {
+                TezlinkImplicitAccount::allocate(host, context, dest_contract)
+                    .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let mut dest_account =
-                TezlinkOriginatedAccount::from_contract(context, dest_contract)?;
-            let receipt = match transfer_tez(
+                TezlinkImplicitAccount::from_public_key_hash(context, pkh)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            transfer_tez(
                 host,
                 src_contract,
                 src_account,
+                src_balance,
                 amount,
                 dest_contract,
                 &mut dest_account,
-            )? {
-                Ok(success) => success,
-                Err(error) => return Ok(Err(error)),
-            };
+            )
+            .map(|(success, _applied_balance_changes)| TransferSuccess {
+                allocated_destination_contract: allocated,
+                ..success
+            })
+        }
+        Contract::Originated(_) => {
+            let mut dest_account =
+                TezlinkOriginatedAccount::from_contract(context, dest_contract)
+                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+            let (receipt, applied_balance_changes) = transfer_tez(
+                host,
+                src_contract,
+                src_account,
+                src_balance,
+                amount,
+                dest_contract,
+                &mut dest_account,
+            )?;
             ctx.sender = address_from_contract(src_contract.clone());
-            let code = dest_account.code(host)?;
-            let storage = dest_account.storage(host)?;
-            let result =
-                execute_smart_contract(code, storage, entrypoint, param, parser, ctx);
-            match result {
-                Ok((internal_operations, new_storage)) => {
-                    dest_account.set_storage(host, &new_storage)?;
-                    let _internal_receipt = execute_internal_operations(
-                        host,
-                        context,
-                        internal_operations,
-                        dest_contract,
-                        &mut dest_account,
-                        parser,
-                        ctx,
-                    )?;
-                    Ok(Ok(TransferSuccess {
-                        storage: Some(new_storage),
-                        ..receipt
-                    }))
-                }
-                Err(err) => Ok(Err(err.into())),
-            }
+            let code = dest_account
+                .code(host)
+                .map_err(|_| TransferError::FailedToFetchContractCode)?;
+            let storage = dest_account
+                .storage(host)
+                .map_err(|_| TransferError::FailedToFetchContractStorage)?;
+            let (internal_operations, new_storage) =
+                execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
+            dest_account
+                .set_storage(host, &new_storage)
+                .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
+            let _internal_receipt = execute_internal_operations(
+                host,
+                context,
+                internal_operations,
+                dest_contract,
+                &mut dest_account,
+                &applied_balance_changes.new_dest_balance,
+                parser,
+                ctx,
+            );
+            Ok(TransferSuccess {
+                storage: Some(new_storage),
+                ..receipt
+            })
         }
     }
 }
 
 // Handles manager transfer operations.
+#[allow(clippy::too_many_arguments)]
 pub fn transfer_external<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     src: &PublicKeyHash,
+    src_account: &mut TezlinkImplicitAccount,
+    src_balance: &Narith,
     amount: &Narith,
     dest: &Contract,
     parameter: Option<Parameter>,
-) -> ExecutionResult<TransferSuccess> {
+) -> Result<TransferSuccess, TransferError> {
     log!(
         host,
         Debug,
@@ -335,15 +334,11 @@ pub fn transfer_external<Host: Runtime>(
     );
 
     let src_contract = Contract::Implicit(src.clone());
-    let mut src_account = TezlinkImplicitAccount::from_public_key_hash(context, src)?;
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
             param.entrypoint,
-            match Micheline::decode_raw(&parser.arena, &param.value) {
-                Ok(value) => value,
-                Err(err) => return Ok(Err(TransferError::from(err).into())),
-            },
+            Micheline::decode_raw(&parser.arena, &param.value)?,
         ),
         None => (Entrypoint::default(), Micheline::from(())),
     };
@@ -354,7 +349,8 @@ pub fn transfer_external<Host: Runtime>(
         host,
         context,
         &src_contract,
-        &mut src_account,
+        src_account,
+        src_balance,
         amount,
         dest,
         entrypoint,
@@ -362,8 +358,9 @@ pub fn transfer_external<Host: Runtime>(
         &parser,
         &mut ctx,
     );
-    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
-    src_account.increment_counter(host)?;
+    src_account
+        .increment_counter(host)
+        .map_err(|_| TransferError::FailedToIncrementCounter)?;
     success
 }
 
@@ -420,19 +417,47 @@ fn compute_balance_updates(
     Ok((src_update, dest_update))
 }
 
+pub struct AppliedBalanceChanges {
+    #[allow(dead_code)]
+    new_src_balance: Narith,
+    new_dest_balance: Narith,
+}
+
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
+    src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
-    new_src_balance: num_bigint::BigUint,
+    src_balance: &Narith,
     dest_account: &mut impl TezlinkAccount,
     amount: &num_bigint::BigUint,
-) -> Result<(), ApplyKernelError> {
-    src_account.set_balance(host, &new_src_balance.into())?;
-    let dest_balance = dest_account.balance(host)?.0;
-    let new_dest_balance = &dest_balance + amount;
-    dest_account.set_balance(host, &new_dest_balance.into())?;
-    Ok(())
+) -> Result<AppliedBalanceChanges, TransferError> {
+    let new_src_balance = match src_balance.0.checked_sub(amount) {
+        None => {
+            log!(host, Debug, "Balance is too low");
+            return Err(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: src_contract.clone(),
+                balance: src_balance.clone(),
+                amount: amount.into(),
+            }));
+        }
+        Some(new_source_balance) => new_source_balance.into(),
+    };
+    src_account
+        .set_balance(host, &new_src_balance)
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    let dest_balance = dest_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchDestinationBalance)?
+        .0;
+    let new_dest_balance = (&dest_balance + amount).into();
+    dest_account
+        .set_balance(host, &new_dest_balance)
+        .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+    Ok(AppliedBalanceChanges {
+        new_src_balance,
+        new_dest_balance,
+    })
 }
 
 /// Executes the entrypoint logic of an originated smart contract and returns the new storage.
@@ -466,7 +491,7 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-pub fn apply_operation<Host: Runtime>(
+pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
@@ -490,76 +515,40 @@ pub fn apply_operation<Host: Runtime>(
 
     safe_host.start()?;
 
-    let mut account = TezlinkImplicitAccount::from_public_key_hash(context, source)?;
-
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let validity_result = validate::is_valid_tezlink_operation(
-        &safe_host,
-        &account,
-        &operation.branch,
-        operation.content.into(),
-        operation.signature,
-    )?;
-
-    let new_balance = match validity_result {
-        Ok(new_balance) => new_balance,
-        Err(validity_err) => {
-            log!(
-                safe_host,
-                Debug,
-                "Operation is invalid, exiting apply_operation"
-            );
-            // TODO: Don't force the receipt to a reveal receipt
-            let receipt = produce_operation_result::<Reveal>(
-                vec![],
-                Err(OperationError::Validation(validity_err)),
-            );
-            safe_host.revert()?;
-            return Ok(OperationResultSum::Reveal(receipt));
-        }
-    };
+    let mut validation_info =
+        match validate::validate_operation(&safe_host, context, &operation)? {
+            Ok(validation_info) => validation_info,
+            Err(validity_err) => {
+                log!(
+                    safe_host,
+                    Debug,
+                    "Operation is invalid, exiting apply_operation"
+                );
+                // TODO: Don't force the receipt to a reveal receipt
+                let receipt = produce_operation_result::<Reveal>(
+                    vec![],
+                    Err(OperationError::Validation(validity_err)),
+                );
+                safe_host.revert()?;
+                return Ok(OperationResultSum::Reveal(receipt));
+            }
+        };
 
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    account.set_balance(&mut safe_host, &new_balance)?;
-
-    let (src_delta, block_fees) =
-        compute_fees_balance_updates(source, &manager_operation.fee)
-            .map_err(ApplyKernelError::BigIntError)?;
+    validation_info
+        .source_account
+        .set_balance(&mut safe_host, &validation_info.new_source_balance)?;
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let receipt = match manager_operation.operation {
-        OperationContent::Reveal(RevealContent { pk, proof: _ }) => {
-            let reveal_result = reveal(&mut safe_host, source, &mut account, &pk)?;
-            let manager_result =
-                produce_operation_result(vec![src_delta, block_fees], reveal_result);
-            OperationResultSum::Reveal(manager_result)
-        }
-        OperationContent::Transfer(TransferContent {
-            amount,
-            destination,
-            parameters,
-        }) => {
-            let transfer_result = transfer_external(
-                &mut safe_host,
-                context,
-                source,
-                &amount,
-                &destination,
-                parameters,
-            )?;
-            let manager_result = produce_operation_result(
-                vec![src_delta, block_fees],
-                transfer_result.map(TransferTarget::ToContrat),
-            );
-            OperationResultSum::Transfer(manager_result)
-        }
-    };
+    let receipt =
+        apply_operation(&mut safe_host, context, &manager_operation, validation_info);
 
     if is_applied(&receipt) {
         safe_host.promote()?;
@@ -569,6 +558,52 @@ pub fn apply_operation<Host: Runtime>(
     }
 
     Ok(receipt)
+}
+
+fn apply_operation<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    operation: &ManagerOperation<OperationContent>,
+    validation_info: ValidationInfo,
+) -> OperationResultSum {
+    let ValidationInfo {
+        new_source_balance,
+        mut source_account,
+        balance_updates: validation_balance_updates,
+    } = validation_info;
+    match operation.operation {
+        OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
+            let reveal_result = reveal(host, &operation.source, &mut source_account, pk);
+            let manager_result = produce_operation_result(
+                validation_balance_updates,
+                reveal_result.map_err(|e| e.into()),
+            );
+            OperationResultSum::Reveal(manager_result)
+        }
+        OperationContent::Transfer(TransferContent {
+            ref amount,
+            ref destination,
+            ref parameters,
+        }) => {
+            let transfer_result = transfer_external(
+                host,
+                context,
+                &operation.source,
+                &mut source_account,
+                &new_source_balance,
+                amount,
+                destination,
+                parameters.clone(),
+            );
+            let manager_result = produce_operation_result(
+                validation_balance_updates,
+                transfer_result
+                    .map(TransferTarget::ToContrat)
+                    .map_err(|e| e.into()),
+            );
+            OperationResultSum::Transfer(manager_result)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -596,7 +631,7 @@ mod tests {
 
     use crate::{
         account_storage::{Manager, TezlinkAccount},
-        apply_operation, context, OperationError,
+        context, validate_and_apply_operation, OperationError,
     };
 
     #[derive(Clone)]
@@ -814,9 +849,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -844,9 +884,14 @@ mod tests {
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -874,9 +919,14 @@ mod tests {
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -917,9 +967,14 @@ mod tests {
 
         // Applying the operation
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         // Reveal operation should fail
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
@@ -967,9 +1022,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
@@ -1019,9 +1079,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![],
@@ -1056,9 +1121,14 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Reveal(OperationResult {
             balance_updates: vec![
@@ -1114,9 +1184,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1178,9 +1253,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1257,9 +1337,14 @@ mod tests {
             None,
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1354,8 +1439,9 @@ mod tests {
                 value: Micheline::from(requested_amount as i128).encode(),
             }),
         );
-        let res = apply_operation(&mut host, &context, operation)
-            .expect("apply_operation should not have failed with a kernel error");
+        let res = validate_and_apply_operation(&mut host, &context, operation).expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
         println!("Result: {:?}", res);
         assert_eq!(
             faucet.balance(&host).unwrap(),
@@ -1399,9 +1485,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let storage = Some(storage_value);
 
@@ -1490,9 +1581,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1555,9 +1651,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1611,9 +1712,14 @@ mod tests {
             }),
         );
 
-        let receipt =
-            apply_operation(&mut host, &context::Context::init_context(), operation)
-                .expect("apply_operation should not have failed with a kernel error");
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
