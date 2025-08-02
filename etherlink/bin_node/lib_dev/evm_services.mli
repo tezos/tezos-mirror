@@ -5,6 +5,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type 'a monitor
+
+val close_monitor : 'a monitor -> unit
+
+val get_from_monitor : 'a monitor -> 'a option Lwt.t
+
 val get_smart_rollup_address :
   keep_alive:bool ->
   evm_node_endpoint:Uri.t ->
@@ -60,4 +66,4 @@ val monitor_blueprints :
 val monitor_messages :
   evm_node_endpoint:Uri.t ->
   Ethereum_types.quantity ->
-  Broadcast.message Lwt_stream.t tzresult Lwt.t
+  Broadcast.message monitor tzresult Lwt.t

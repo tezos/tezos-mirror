@@ -218,12 +218,12 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
       in
 
       match call_result with
-      | Ok blueprints_stream ->
+      | Ok monitor ->
           (stream_loop [@tailcall])
             ~multichain
             next_blueprint_number
             params
-            blueprints_stream
+            monitor
       | Error _ ->
           (catchup [@tailcall])
             ~multichain
@@ -231,13 +231,13 @@ let rec catchup ~multichain ~next_blueprint_number ~first_connection params :
             ~first_connection:false
             params)
 
-and stream_loop ~multichain (Qty next_blueprint_number) params stream =
+and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
   let open Lwt_result_syntax in
   Metrics.stop_bootstrapping () ;
   let*! candidate =
     Lwt.pick
       [
-        (let*! res = Lwt_stream.get stream in
+        (let*! res = Evm_services.get_from_monitor monitor in
          return res);
         timeout_from_tbb params.time_between_blocks;
       ]
@@ -251,7 +251,7 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
         ~multichain
         (Qty next_blueprint_number)
         params
-        stream
+        monitor
   | Ok (Some (Blueprint blueprint)) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
       let* () =
@@ -264,8 +264,9 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
             ~multichain
             (Qty (Z.succ next_blueprint_number))
             params
-            stream
+            monitor
       | `Restart_from level ->
+          Evm_services.close_monitor monitor ;
           (catchup [@tailcall])
             ~multichain
             ~next_blueprint_number:level
@@ -276,12 +277,15 @@ and stream_loop ~multichain (Qty next_blueprint_number) params stream =
               true
             params)
   | Ok None | Error [Timeout] ->
+      Evm_services.close_monitor monitor ;
       (catchup [@tailcall])
         ~multichain
         ~next_blueprint_number:(Qty next_blueprint_number)
         ~first_connection:false
         params
-  | Error err -> fail err
+  | Error err ->
+      Evm_services.close_monitor monitor ;
+      fail err
 
 let start ?(ping_tx_pool = true) ~multichain ~time_between_blocks
     ~evm_node_endpoint ~next_blueprint_number ~on_new_blueprint
