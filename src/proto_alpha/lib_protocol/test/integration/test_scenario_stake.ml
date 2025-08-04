@@ -150,7 +150,7 @@ let shorter_roundtrip_for_baker =
   let unstake_amount = Amount (Tez.of_mutez 222_000_000_000L) in
   let consensus_rights_delay =
     Default_parameters.constants_mainnet.consensus_rights_delay
-    (* mainnet value, = 2 *)
+    (* mainnet value, = 1 *)
   in
   let init_params =
     {limit_of_staking_over_baking = Q.one; edge_of_baking_over_staking = Q.one}
@@ -180,14 +180,11 @@ let shorter_roundtrip_for_baker =
   (* We unstake to have an amount in the last container for ufd *)
   --> unstake "delegate" unstake_amount
   --> next_cycle
-  (* We unstake either one, two or three cycles later *)
-  --> (Tag "unstake cycle (current-2)"
+  (* We unstake either one or two cycles later *)
+  --> (Tag "unstake cycle (current-1)"
        --> unstake "delegate" unstake_amount
-       --> next_cycle --> next_cycle
-      |+ Tag "unstake cycle (current-1)" --> next_cycle
-         --> unstake "delegate" unstake_amount
-         --> next_cycle
-      |+ Tag "unstake cycle (current)" --> next_cycle --> next_cycle
+       --> next_cycle
+      |+ Tag "unstake cycle (current)" --> next_cycle
          --> unstake "delegate" unstake_amount)
   (* Nothing is finalizable yet. If nothing else happens, next cycle the
      first unstake request will become finalizable. *)

@@ -155,9 +155,9 @@ formula<baking_power_overview_alpha>`.
 
 The baking rights are determined
 :ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_alpha>` in advance, which is
-currently ``2`` :ref:`cycles<def_cycle_alpha>`. More
+currently ``1`` :ref:`cycle<def_cycle_alpha>`. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
-the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
+the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+2`` are
 :doc:`randomly generated<randomness_generation>` based on the current
 :doc:`baking power<baking_power>` of each delegate that meets the
 :ref:`minimal power and own staked
@@ -386,7 +386,7 @@ Consensus related protocol parameters
    * - ``DELAY_INCREMENT_PER_ROUND``
      - 4s
    * - ``CONSENSUS_RIGHTS_DELAY``
-     - 2 cycles
+     - 1 cycle
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
      - 9
    * - ``LIMIT_OF_DELEGATION_OVER_BAKING``
@@ -402,11 +402,11 @@ Consensus related protocol parameters
    * - ``SLASHING_DELAY``
      - 1 cycle
    * - ``CONSENSUS_KEY_ACTIVATION_DELAY`` [#derived_cs]_
-     - 2 cycles
+     - 1 cycle
    * - ``ISSUANCE_MODIFICATION_DELAY`` [#derived_cs]_
-     - 2 cycles
+     - 1 cycle
    * - ``UNSTAKE_FINALIZATION_DELAY`` [#derived_cs+sd]_
-     - 3 cycles
+     - 2 cycles
 
 The above list of protocol parameters is a subset of the :ref:`protocol constants <protocol_constants_alpha>`.
 

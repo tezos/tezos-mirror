@@ -1,6 +1,6 @@
 
 ./octez-client rpc get /chains/main/blocks/head/context/constants/parametric
-{ "consensus_rights_delay": 2, "blocks_preservation_cycles": 1,
+{ "consensus_rights_delay": 1, "blocks_preservation_cycles": 1,
   "delegate_parameters_activation_delay": 3,
   "tolerated_inactivity_period": 1, "blocks_per_cycle": 200,
   "blocks_per_commitment": 25, "nonce_revelation_threshold": 50,
@@ -26,8 +26,8 @@
   "percentage_of_frozen_deposits_slashed_per_double_baking": 700,
   "max_slashing_per_block": 10000,
   "max_slashing_threshold": { "numerator": 1, "denominator": 3 },
-  "cache_script_size": 100000000, "cache_stake_distribution_cycles": 5,
-  "cache_sampler_state_cycles": 5,
+  "cache_script_size": 100000000, "cache_stake_distribution_cycles": 4,
+  "cache_sampler_state_cycles": 4,
   "dal_parametric":
     { "feature_enable": true, "incentives_enable": false,
       "number_of_slots": 32, "attestation_lag": 8,

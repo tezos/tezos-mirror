@@ -41,16 +41,16 @@ Overview
 At the end of :ref:`cycle<def_cycle_alpha>` ``n`` (that is, the
 beginning of cycle ``n + 1``), the protocol :doc:`randomly
 generates<randomness_generation>` the baking rights for cycle ``n +
-1 + CONSENSUS_RIGHTS_DELAY = n + 3``, using the **current baking
+1 + CONSENSUS_RIGHTS_DELAY = n + 2``, using the **current baking
 power** as the weight for each delegate that meets the
 :ref:`requirements<minimal_baking_power_alpha>`. (``CONSENSUS_RIGHTS_DELAY
-= 2`` is a :ref:`protocol constant<cs_constants_alpha>`.)
+= 1`` is a :ref:`protocol constant<cs_constants_alpha>`.)
 
 The ``.../delegates/<delegate_pkh>/baking_power`` RPC can be used to
 retrieve the current baking power of a delegate, that is, its baking
 power as of the end of the requested block ``<block_id>`` (see the
 note above on RPC paths). Therefore, the baking power used for the
-rights of cycle ``n + 3`` is the one returned by this RPC called on
+rights of cycle ``n + 2`` is the one returned by this RPC called on
 the last block of cycle ``n``.
 
 The baking power of a delegate is defined as:
@@ -230,14 +230,14 @@ For a given delegate, we define the following:
 Min-delegated-in-current-cycle
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-When computing baking rights for cycle ``n + 3`` at the end of cycle
+When computing baking rights for cycle ``n + 2`` at the end of cycle
 ``n``, the ``total_delegated`` value used for each delegate is
 actually the **minimum** of its ``total_delegated`` **over the whole
 cycle** ``n``, called ``min_delegated_in_current_cycle``. The purpose
 of this mechanism is to prevent any manipulation of baking rights
 through short-duration transfers. (Note that such a mechanism is not
 needed for staked tez because they are inherently :ref:`frozen for at
-least four cycles<staked_funds_management_alpha>`, so short-duration
+least three cycles<staked_funds_management_alpha>`, so short-duration
 staking is already not possible.)
 
 Since the Paris protocol, the considered minimum is the minimum at any
@@ -276,7 +276,7 @@ those of the ``<block_id>`` in the RPC path; it also returns the
 earliest level at the end of which this minimum has been reached in
 the current cycle. This means that calling the RPC on the last block
 of cycle ``n`` returns the value actually used during the generation
-of baking rights for cycle ``n + 3``.
+of baking rights for cycle ``n + 2``.
 
 
 Example
@@ -492,4 +492,4 @@ are :ref:`protocol constants<cs_constants_alpha>`.
 
 If any of these conditions is not met at the end of cycle ``n``, the delegate
 still has a *baking power* as computed above, but receives no *baking
-rights* at all for cycle ``n + 3``.
+rights* at all for cycle ``n + 2``.

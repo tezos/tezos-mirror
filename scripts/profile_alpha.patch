@@ -1,22 +1,22 @@
-From 48b33e443cd2a4fed3b16a34ef34e664be1d68a9 Mon Sep 17 00:00:00 2001
+From 3f9052a5dc75bd64a628b7c99d9b8f8f1f8184f8 Mon Sep 17 00:00:00 2001
 From: mattiasdrp <mattias@kojin.tech>
-Date: Wed, 2 Jul 2025 11:29:00 +0200
-Subject: [PATCH] Patch alpha
+Date: Tue, 22 Jul 2025 10:42:38 +0200
+Subject: [PATCH] Apply proto alpha profiling
 
 ---
  src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
- src/lib_protocol_environment/sigs/v15.ml      | 80 ++++++++++++++-----
- .../sigs/v15/profiler.mli                     | 36 +++++++++
+ src/lib_protocol_environment/sigs/v15.ml      | 82 ++++++++++++++-----
+ .../sigs/v15/profiler.mli                     | 36 ++++++++
  src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
  src/proto_alpha/lib_protocol/baking.ml        |  4 +-
  .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++----
  src/proto_alpha/lib_protocol/dune             |  2 +
- src/proto_alpha/lib_protocol/init_storage.ml  | 36 +++++++--
+ src/proto_alpha/lib_protocol/init_storage.ml  | 36 ++++++--
  src/proto_alpha/lib_protocol/raw_context.ml   | 13 +--
- src/proto_alpha/lib_protocol/script_cache.ml  | 19 ++---
+ src/proto_alpha/lib_protocol/script_cache.ml  | 19 +++--
  .../lib_protocol/script_interpreter.ml        | 11 +--
- .../lib_protocol/script_ir_translator.ml      | 40 +++++-----
- 12 files changed, 253 insertions(+), 85 deletions(-)
+ .../lib_protocol/script_ir_translator.ml      | 40 +++++----
+ 12 files changed, 254 insertions(+), 86 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v15/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v15.in.ml b/src/lib_protocol_environment/sigs/v15.in.ml
@@ -33,7 +33,7 @@ index e86731c9cb..05291026e6 100644
  
    module Context_hash : [%sig "v15/context_hash.mli"]
 diff --git a/src/lib_protocol_environment/sigs/v15.ml b/src/lib_protocol_environment/sigs/v15.ml
-index f412c985e9..313466717b 100644
+index f412c985e9..437c499bb4 100644
 --- a/src/lib_protocol_environment/sigs/v15.ml
 +++ b/src/lib_protocol_environment/sigs/v15.ml
 @@ -10060,6 +10060,48 @@ end
@@ -256,6 +256,14 @@ index f412c985e9..313466717b 100644
  
  
    module Riscv : sig
+@@ -12850,6 +12892,6 @@ val bytes_to_output_proof : bytes -> (output_proof, string) result
+ 
+ val get_current_level : state -> int32 option Lwt.t
+ end
+-# 146 "v15.in.ml"
++# 148 "v15.in.ml"
+ 
+ end
 diff --git a/src/lib_protocol_environment/sigs/v15/profiler.mli b/src/lib_protocol_environment/sigs/v15/profiler.mli
 new file mode 100644
 index 0000000000..3dc7a1c702
@@ -480,10 +488,10 @@ index 1a34312188..4cb8b2b008 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 788d4eec5b..13fbcf3ca2 100644
+index 229b019310..b30eadacec 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -218,31 +218,55 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -256,22 +256,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -524,7 +532,9 @@ index 788d4eec5b..13fbcf3ca2 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         return (ctxt, [])
+         let* ctxt =
+           cleanup_values_for_protocol_t ctxt previous_proto_constants level
+@@ -280,10 +296,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let* ctxt =
@@ -546,10 +556,10 @@ index 788d4eec5b..13fbcf3ca2 100644
    in
    return ctxt
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index 919dcfc69a..21e4fdb63f 100644
+index 17391ebd9d..a58a971293 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1608,12 +1608,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1723,12 +1723,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let+ ctxt =
@@ -696,5 +706,5 @@ index 6f1d8b6bee..43f5715b4a 100644
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
 -- 
-2.50.0
+2.50.1
 

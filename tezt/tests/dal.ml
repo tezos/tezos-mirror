@@ -686,12 +686,12 @@ let scenario_with_layer1_node ?attestation_threshold ?regression ?(tags = [])
 
 let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
     ?(uses = fun _ -> []) ?custom_constants ?minimal_block_delay
-    ?delay_increment_per_round ?redundancy_factor ?slot_size ?number_of_shards
-    ?number_of_slots ?attestation_lag ?attestation_threshold ?traps_fraction
-    ?commitment_period ?challenge_window ?(dal_enable = true) ?incentives_enable
-    ?dal_rewards_weight ?activation_timestamp ?bootstrap_profile
-    ?event_sections_levels ?operator_profiles ?history_mode ?prover
-    ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
+    ?blocks_per_cycle ?delay_increment_per_round ?redundancy_factor ?slot_size
+    ?number_of_shards ?number_of_slots ?attestation_lag ?attestation_threshold
+    ?traps_fraction ?commitment_period ?challenge_window ?(dal_enable = true)
+    ?incentives_enable ?dal_rewards_weight ?activation_timestamp
+    ?bootstrap_profile ?event_sections_levels ?operator_profiles ?history_mode
+    ?prover ?l1_history_mode ?wait_ready ?env ?disable_shard_validation
     ?disable_amplification ?ignore_pkhs variant scenario =
   let description = "Testing DAL node" in
   let tags = if List.mem team tags then tags else team :: tags in
@@ -712,6 +712,7 @@ let scenario_with_layer1_and_dal_nodes ?regression ?(tags = [])
         ~custom_constants
         ?minimal_block_delay
         ?delay_increment_per_round
+        ?blocks_per_cycle
         ?redundancy_factor
         ?slot_size
         ?number_of_slots
@@ -10364,7 +10365,7 @@ let create_account_and_reveal ?source ~amount ~alias client =
     - No delegates are denounced (there is no accuser running actually).
     - The attestable slots field of /dal_participation's result is equal to the
     number of attested slots counted in blocks metadata. *)
-let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
+let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
     _dal_node =
   let* proto_params =
     Node.RPC.call node @@ RPC.get_chain_block_context_constants ()
@@ -10726,14 +10727,15 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
            account.Account.public_key_hash
     in
     let* l =
-      Lwt.all
+      Lwt_list.map_s
+        participation
         [
-          participation baker;
-          participation attesting_dal_slot_10;
-          participation not_attesting_at_all;
-          participation not_attesting_dal;
-          participation not_sufficiently_attesting_dal_slot_10;
-          participation small_baker;
+          baker;
+          attesting_dal_slot_10;
+          not_attesting_at_all;
+          not_attesting_dal;
+          not_sufficiently_attesting_dal_slot_10;
+          small_baker;
         ]
     in
     match l with
@@ -10752,13 +10754,32 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
   (* We now bake the last block of the cycle, which should trigger TB and DAL
      rewards distribution. TB rewards are actually set to 0. *)
   let* () = bake_for ~delegates:(`For [baker.Account.public_key_hash]) client in
-  let* _json = Node.RPC.(call node @@ get_chain_block_metadata_raw ()) in
+  let* metadata = Node.RPC.(call node @@ get_chain_block_metadata_raw ()) in
   incr level ;
   let* current_level =
     Node.RPC.call node @@ RPC.get_chain_block_helper_current_level ()
   in
   assert (current_level.cycle_position = blocks_per_cycle - 1) ;
 
+  let balance_updates = JSON.(metadata |-> "balance_updates" |> as_list) in
+  let expected_to_lose_attesting_rewards =
+    if Protocol.number protocol >= 023 then
+      (* keep those that lost consensus attesting rewards because they haven't
+         revealed their nonces *)
+      List.filter_map
+        (fun json ->
+          let check json =
+            JSON.(json |-> "kind" |> as_string) |> String.equal "burned"
+            && JSON.(json |-> "category" |> as_string)
+               |> String.equal "lost attesting rewards"
+            && (not JSON.(json |-> "participation" |> as_bool))
+            && JSON.(json |-> "revelation" |> as_bool)
+          in
+          if check json then Some JSON.(json |-> "delegate" |> as_string)
+          else None)
+        balance_updates
+    else []
+  in
   (* We snapshot the balances of the delegates at the end of the cycle. *)
   let* ( _baker_bal2,
          attesting_dal_slot_10_bal2,
@@ -10879,22 +10900,28 @@ let test_dal_rewards_distribution _protocol dal_parameters cryptobox node client
           ~error_msg:
             ("account " ^ account.Account.public_key_hash
            ^ ", expected to have sufficient DAL participation? %R, but got %L")) ;
+      let expecting_attesting_rewards =
+        not
+        @@ List.mem account.public_key_hash expected_to_lose_attesting_rewards
+      in
+      let expected_attesting_rewards =
+        if expecting_attesting_rewards then
+          Tez.to_mutez tb_participation.RPC.expected_attesting_rewards
+        else 0
+      in
       let expected_dal_rewards =
-        if sufficient_dal_participation then
+        if sufficient_dal_participation && expecting_attesting_rewards then
           Tez.to_mutez dal_participation.expected_dal_rewards
         else 0
       in
-      let delta =
-        Tez.to_mutez tb_participation.RPC.expected_attesting_rewards
-        + expected_dal_rewards
-      in
+      let delta = expected_attesting_rewards + expected_dal_rewards in
       Log.info
         "[check] %s %s: %Ld = %Ld + %d + %d"
         account.Account.alias
         account.public_key_hash
         bal1
         bal2
-        (Tez.to_mutez tb_participation.expected_attesting_rewards)
+        expected_attesting_rewards
         expected_dal_rewards ;
       check_bal_incr ~__LOC__ account bal1 bal2 ~delta)
     [
@@ -11067,7 +11094,7 @@ let register ~protocols =
     ~attestation_threshold:30
     ~attestation_lag:2
     ~blocks_per_cycle:16
-    ~blocks_per_commitment:16 ;
+    ~blocks_per_commitment:17 (* so that there's no nonce revelation required *) ;
   scenario_with_layer1_node
     ~attestation_lag:5
     "slots attestation operation behavior"
@@ -11200,6 +11227,10 @@ let register ~protocols =
     ~activation_timestamp:Now
     ~number_of_slots:8
     ~operator_profiles:[0; 1; 2; 3; 4; 5; 6; 7]
+      (* when consensus_rights_delay = 1 and attestation_lag = 16,
+         blocks_per_cycle must be at least 16:
+         attestation_lag <= consensus_rights_delay * blocks_per_cycle *)
+    ~blocks_per_cycle:16
     "dal attester with baker daemon"
     test_attester_with_daemon
     protocols ;

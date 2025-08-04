@@ -49,7 +49,7 @@ Adaptive issuance rate
 ----------------------
 
 The adaptive issuance rate determines, at the end
-of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 3}`. The
+of cycle :math:`\IL{c}`, the issuance for cycle :math:`\IL{c + 2}`. The
 adaptive issuance rate is the sum of a :ref:`static rate <static_rate_alpha>`
 and a :ref:`dynamic rate <dynamic_rate_alpha>`. This value is kept within
 a minimal and a maximal value, to ensure nominal emissions remain within
@@ -72,7 +72,7 @@ Where:
 - ``issuance_modification_delay`` is a :ref:`derived protocol
   constant<protocol_constants_alpha>` which is set to the same value
   as ``CONSENSUS_RIGHTS_DELAY`` (see :ref:`active_stake_alpha`), that
-  is, 2 cycles.
+  is, 1 cycle.
 
 - ``total_supply(cycle)`` returns the total supply of tez at the end of the given ``cycle``.
 - ``total_frozen_stake(cycle)`` returns the total frozen stake at the given ``cycle``.

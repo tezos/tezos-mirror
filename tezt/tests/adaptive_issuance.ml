@@ -318,6 +318,12 @@ let test_staking =
   in
 
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
+  let* constants =
+    Client.RPC.call client_1 @@ RPC.get_chain_block_context_constants ()
+  in
+  let consensus_rights_delay =
+    JSON.(constants |-> "consensus_rights_delay" |> as_int)
+  in
 
   let* eosod = edge_of_staking_over_delegation client_1 in
 
@@ -686,7 +692,7 @@ let test_staking =
   let* () = bake_n ~endpoint ~protocol client_1 1 in
 
   let* () =
-    repeat 7 (fun () ->
+    repeat 5 (fun () ->
         let* () = bake_n ~endpoint ~protocol client_1 1 in
         let* b0 = check_and_return_balances ~check:!balances0 staker0 in
         let* b1 = check_and_return_balances ~check:!balances1 staker1 in
@@ -804,7 +810,7 @@ let test_staking =
     Client.spawn_unstake (Tez.of_int 500000) ~staker:staker0.alias client_1
   in
 
-  let* _ = Helpers.bake_n_cycles bake 2 client_1 in
+  let* _ = Helpers.bake_n_cycles bake consensus_rights_delay client_1 in
 
   let* () = Process.check ~expect_failure:false unstake0 in
 
@@ -1001,7 +1007,7 @@ let test_staking =
   let amount_slashed_from_baker_deposits =
     match eosod with
     | 2 -> 10_049_764_326
-    | 3 -> 10_049_764_732
+    | 3 -> if consensus_rights_delay = 1 then 10_049_761_010 else 10_049_764_732
     | _ -> Test.fail "Unexpected edge_of_staking_over_baking value: %d" eosod
   in
 
