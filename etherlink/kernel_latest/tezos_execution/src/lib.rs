@@ -18,7 +18,6 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
-use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
@@ -27,8 +26,8 @@ use tezos_tezlink::{
     },
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
-        OperationError, OperationResultSum, Reveal, RevealError, RevealSuccess,
-        TransferError, TransferSuccess, UpdateOrigin, ValidityError,
+        OperationError, OperationResultSum, RevealError, RevealSuccess, TransferError,
+        TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
 use validate::ValidationInfo;
@@ -457,7 +456,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
-) -> Result<OperationResultSum, RuntimeError> {
+) -> Result<OperationResultSum, OperationError> {
     let manager_operation: ManagerOperation<OperationContent> =
         operation.content.clone().into();
 
@@ -484,13 +483,8 @@ pub fn validate_and_apply_operation<Host: Runtime>(
             Ok(validation_info) => validation_info,
             Err(validity_err) => {
                 log!(safe_host, Debug, "Operation is invalid: {:?}", validity_err);
-                // TODO: Don't force the receipt to a reveal receipt
-                let receipt = produce_operation_result::<Reveal>(
-                    vec![],
-                    Err(OperationError::Validation(validity_err)),
-                );
                 safe_host.revert()?;
-                return Ok(OperationResultSum::Reveal(receipt));
+                return Err(OperationError::Validation(validity_err));
             }
         };
 
@@ -503,13 +497,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         .is_err()
     {
         log!(safe_host, Debug, "Could not update balance!");
-        // TODO: Don't force the receipt to a reveal receipt
-        let receipt = produce_operation_result::<Reveal>(
-            vec![],
-            Err(ValidityError::FailedToUpdateBalance.into()),
-        );
         safe_host.revert()?;
-        return Ok(OperationResultSum::Reveal(receipt));
+        return Err(OperationError::Validation(
+            ValidityError::FailedToUpdateBalance,
+        ));
     };
 
     safe_host.promote()?;
@@ -818,27 +809,16 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
-        let receipt = validate_and_apply_operation(
+        let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
             operation,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Failed(
-                vec![OperationError::Validation(
-                    ValidityError::EmptyImplicitContract,
-                )]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        });
+        let expected_error =
+            OperationError::Validation(ValidityError::EmptyImplicitContract);
 
-        assert_eq!(receipt, expected_receipt);
+        assert_eq!(result, Err(expected_error));
     }
 
     // Test that increasing the fees makes the operation fails
@@ -853,27 +833,16 @@ mod tests {
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
 
-        let receipt = validate_and_apply_operation(
+        let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
             operation,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Failed(
-                vec![OperationError::Validation(ValidityError::CantPayFees(
-                    100_u64.into(),
-                ))]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        });
+        let expected_error =
+            OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
 
-        assert_eq!(receipt, expected_receipt);
+        assert_eq!(result, Err(expected_error));
     }
 
     // Test that a wrong counter should make the operation fails
@@ -888,29 +857,18 @@ mod tests {
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
 
-        let receipt = validate_and_apply_operation(
+        let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
             operation,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Failed(
-                vec![OperationError::Validation(
-                    ValidityError::CounterInTheFuture(CounterError {
-                        expected: 1_u64.into(),
-                        found: 15_u64.into(),
-                    }),
-                )]
-                .into(),
-            ),
-            internal_operation_results: vec![],
-        });
-        assert_eq!(receipt, expected_receipt);
+        let expected_error =
+            OperationError::Validation(ValidityError::CounterInTheFuture(CounterError {
+                expected: 1_u64.into(),
+                found: 15_u64.into(),
+            }));
+        assert_eq!(result, Err(expected_error));
     }
 
     // At this point, tests are focused on the content of the operation. We should not revert with ValidityError anymore.
@@ -960,10 +918,7 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(
-                vec![OperationError::Apply(
-                    RevealError::PreviouslyRevealedKey(pk).into(),
-                )]
-                .into(),
+                vec![RevealError::PreviouslyRevealedKey(pk).into()].into(),
             ),
             internal_operation_results: vec![],
         });
@@ -1014,10 +969,7 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(
-                vec![OperationError::Apply(
-                    RevealError::InconsistentHash(inconsistent_pkh).into(),
-                )]
-                .into(),
+                vec![RevealError::InconsistentHash(inconsistent_pkh).into()].into(),
             ),
             internal_operation_results: vec![],
         });
@@ -1048,24 +1000,15 @@ mod tests {
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
-        let receipt = validate_and_apply_operation(
+        let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
             operation,
-        )
-        .expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let expected_receipt = OperationResultSum::Reveal(OperationResult {
-            balance_updates: vec![],
-            result: ContentResult::Failed(
-                vec![OperationError::Validation(ValidityError::InvalidSignature)].into(),
-            ),
-            internal_operation_results: vec![],
-        });
+        let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
 
-        assert_eq!(receipt, expected_receipt);
+        assert_eq!(result, Err(expected_error));
     }
 
     // Test a valid reveal operation, the manager should go from NotRevealed to Revealed
@@ -1176,14 +1119,12 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(
-                vec![OperationError::Apply(
-                    TransferError::BalanceTooLow(BalanceTooLow {
-                        contract: Contract::Implicit(source.pkh),
-                        balance: 35_u64.into(),
-                        amount: 100_u64.into(),
-                    })
-                    .into(),
-                )]
+                vec![TransferError::BalanceTooLow(BalanceTooLow {
+                    contract: Contract::Implicit(source.pkh),
+                    balance: 35_u64.into(),
+                    amount: 100_u64.into(),
+                })
+                .into()]
                 .into(),
             ),
             internal_operation_results: vec![],
@@ -1573,11 +1514,11 @@ mod tests {
                 },
             ],
             result:  ContentResult::Failed(vec![
-        OperationError::Apply(ApplyOperationError::Transfer(
+                ApplyOperationError::Transfer(
             TransferError::MichelsonContractInterpretError(
                 "runtime failure while running the script: failed with: String(\"This contract always fails\") of type String".into()
             )
-        ))].into()),
+        )].into()),
             internal_operation_results: vec![],
         });
 
@@ -1643,9 +1584,9 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(
-                vec![OperationError::Apply(ApplyOperationError::Transfer(
+                vec![ApplyOperationError::Transfer(
                     TransferError::NonSmartContractExecutionCall,
-                ))]
+                )]
                 .into(),
             ),
             internal_operation_results: vec![],
@@ -1704,9 +1645,9 @@ mod tests {
                 },
             ],
             result: ContentResult::Failed(
-                vec![OperationError::Apply(ApplyOperationError::Transfer(
+                vec![ApplyOperationError::Transfer(
                     TransferError::NonSmartContractExecutionCall,
-                ))]
+                )]
                 .into(),
             ),
             internal_operation_results: vec![],

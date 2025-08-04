@@ -41,7 +41,8 @@ use tezos_tezlink::{
     enc_wrappers::BlockNumber,
     operation::Operation,
     operation_result::{
-        OperationBatchWithMetadata, OperationDataAndMetadata, OperationWithMetadata,
+        OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
+        OperationWithMetadata,
     },
 };
 
@@ -511,11 +512,25 @@ impl ChainConfigTrait for MichelsonChainConfig {
 
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
-            let receipt = tezos_execution::validate_and_apply_operation(
+            let receipt = match tezos_execution::validate_and_apply_operation(
                 host,
                 &context,
                 operation.clone(),
-            )?;
+            ) {
+                Ok(receipt) => receipt,
+                Err(OperationError::Validation(err)) => {
+                    log!(
+                        host,
+                        Error,
+                        "Found an invalid operation, dropping it: {:?}",
+                        err
+                    );
+                    continue;
+                }
+                Err(OperationError::RuntimeError(err)) => {
+                    return Err(err.into());
+                }
+            };
 
             // Compute the hash of the operation
             let hash = operation.hash()?;

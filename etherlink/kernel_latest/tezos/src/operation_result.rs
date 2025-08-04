@@ -17,6 +17,7 @@ use tezos_enc::BinWriter;
 use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Contract;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
 use crate::operation::ManagerOperationContent;
@@ -27,32 +28,53 @@ pub struct CounterError {
     pub found: Narith,
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ValidityError {
+    #[error("Counter in the past: {0:?}.")]
     CounterInThePast(CounterError),
+    #[error("Counter in the future: {0:?}.")]
     CounterInTheFuture(CounterError),
+    #[error("Missing manager contract.")]
     MissingManagerContract,
+    #[error("The manager key for {0} has not been revealed yet.")]
     UnrevealedManagerKey(PublicKeyHash),
+    #[error("Cannot pay {0:?} in fees.")]
     CantPayFees(Narith),
+    #[error("Empty implicit contract.")]
     EmptyImplicitContract,
+    #[error("Gas limit is too high.")]
     GasLimitTooHigh,
+    #[error("Storage limit is too high.")]
     StorageLimitTooHigh,
+    #[error("Invalid signature.")]
     InvalidSignature,
+    #[error("Failed to fetch account")]
     FailedToFetchAccount,
+    #[error("Failed to compute fee balance update")]
     FailedToComputeFeeBalanceUpdate,
+    #[error("Failed to fetch counter")]
     FailedToFetchCounter,
+    #[error("Failed to fetch manager key")]
     FailedToFetchManagerKey,
+    #[error("Failed to fetch balance")]
     FailedToFetchBalance,
+    #[error("Failed to update balance")]
     FailedToUpdateBalance,
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum RevealError {
+    #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
+    #[error("The public key hash {0} is inconsistent.")]
     InconsistentHash(PublicKeyHash),
+    #[error("The public key hash {0} is inconsistent with the public key provided.")]
     InconsistentPublicKey(PublicKeyHash),
+    #[error("Could not retrieve manager.")]
     UnretrievableManager,
+    #[error("Failed to increment counter.")]
     FailedToIncrementCounter,
+    #[error("Failed to write manager.")]
     FailedToWriteManager,
 }
 
@@ -125,41 +147,22 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader)]
 pub enum ApplyOperationError {
-    Reveal(RevealError),
-    Transfer(TransferError),
+    #[error("Reveal error: {0}")]
+    Reveal(#[from] RevealError),
+    #[error("Transfer error: {0}")]
+    Transfer(#[from] TransferError),
+    #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
 }
 
-impl From<RevealError> for ApplyOperationError {
-    fn from(value: RevealError) -> Self {
-        Self::Reveal(value)
-    }
-}
-
-impl From<TransferError> for ApplyOperationError {
-    fn from(value: TransferError) -> Self {
-        Self::Transfer(value)
-    }
-}
-
-impl From<RevealError> for OperationError {
-    fn from(value: RevealError) -> Self {
-        Self::Apply(value.into())
-    }
-}
-
-impl From<TransferError> for OperationError {
-    fn from(value: TransferError) -> Self {
-        Self::Apply(value.into())
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum OperationError {
-    Validation(ValidityError),
-    Apply(ApplyOperationError),
+    #[error("Validation error: {0}")]
+    Validation(#[from] ValidityError),
+    #[error("Runtime error: {0}")]
+    RuntimeError(#[from] RuntimeError),
 }
 
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
@@ -168,7 +171,7 @@ pub enum OperationError {
 // To avoid reimplementing full bson support, we convert errors to strings and
 // manually encode them in bson. This gives us error which can be decoded using
 // Tezos data encoding but with less structure than what Tezos L1 produces.
-impl BinWriter for OperationError {
+impl BinWriter for ApplyOperationError {
     fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
         tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
             // Convert the error to a String
@@ -225,18 +228,6 @@ impl NomReader<'_> for OperationError {
             input,
             nom::error::ErrorKind::Fail,
         )))
-    }
-}
-
-impl From<ValidityError> for OperationError {
-    fn from(value: ValidityError) -> Self {
-        Self::Validation(value)
-    }
-}
-
-impl From<ApplyOperationError> for OperationError {
-    fn from(value: ApplyOperationError) -> Self {
-        Self::Apply(value)
     }
 }
 
@@ -310,14 +301,14 @@ pub struct TransferSuccess {
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
-pub struct OperationErrors {
+pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
-    pub errors: Vec<OperationError>,
+    pub errors: Vec<ApplyOperationError>,
 }
 
-impl From<Vec<OperationError>> for OperationErrors {
-    fn from(value: Vec<OperationError>) -> Self {
-        OperationErrors { errors: value }
+impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
+    fn from(value: Vec<ApplyOperationError>) -> Self {
+        ApplyOperationErrors { errors: value }
     }
 }
 
@@ -326,7 +317,7 @@ impl From<Vec<OperationError>> for OperationErrors {
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
-    Failed(OperationErrors),
+    Failed(ApplyOperationErrors),
 }
 
 /// A [Balance] updates can be triggered on different target
@@ -388,7 +379,7 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
 
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
-    result: Result<M::Success, OperationError>,
+    result: Result<M::Success, ApplyOperationError>,
 ) -> OperationResult<M> {
     match result {
         Ok(success) => OperationResult {
@@ -477,26 +468,22 @@ mod tests {
                                         balance_updates: vec![],
                                         result: ContentResult::Failed(
                                             vec![
-                                                    OperationError::Apply(
-                                                        ApplyOperationError::Transfer(
-                                                            TransferError::BalanceTooLow(
-                                                                BalanceTooLow {
-                                                                    contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
-                                                                    balance: 10_u64.into(),
-                                                                    amount: 21_u64.into()
-                                                                }
-                                                            )
+                                                    ApplyOperationError::Transfer(
+                                                        TransferError::BalanceTooLow(
+                                                            BalanceTooLow {
+                                                                contract: Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(),
+                                                                balance: 10_u64.into(),
+                                                                amount: 21_u64.into()
+                                                            }
                                                         )
                                                     ),
-                                                    OperationError::Apply(
-                                                        ApplyOperationError::Transfer(
-                                                            TransferError::BalanceTooLow(
-                                                                BalanceTooLow {
-                                                                    contract: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
-                                                                    balance: 55_u64.into(),
-                                                                    amount: 1111_u64.into()
-                                                                }
-                                                            )
+                                                    ApplyOperationError::Transfer(
+                                                        TransferError::BalanceTooLow(
+                                                            BalanceTooLow {
+                                                                contract: Contract::from_b58check("tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN").unwrap(),
+                                                                balance: 55_u64.into(),
+                                                                amount: 1111_u64.into()
+                                                            }
                                                         )
                                                     )
                                                 ].into()),
@@ -591,19 +578,18 @@ mod tests {
             { "operation_result":
                 { "status": "failed",
                   "errors":
-                    [ "Apply(Transfer(BalanceTooLow(BalanceTooLow { contract: \"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\", balance: Narith(10), amount: Narith(21) })))",
-                      "Apply(Transfer(BalanceTooLow(BalanceTooLow { contract: \"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\", balance: Narith(55), amount: Narith(1111) })))" ] } } } ],
+                    [ "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx\"))), balance: Narith(10), amount: Narith(21) }))",
+                      "Transfer(BalanceTooLow(BalanceTooLow { contract: Implicit(Ed25519(ContractTz1Hash(\"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN\"))), balance: Narith(55), amount: Narith(1111) }))" ] } } } ],
     "signature":
       "sigvVF2FguUHvZHytQ4AoRn4R6tSMteAt4nEHfYEbwQi3nXa3xvsgE93V1XYL99FYFUAH83iSpcAe7KxGaAeE1tLJ3M2jGJT" }'
          */
     #[test]
     fn tezos_compatibility_for_failed_operation_with_metadata() {
         let operation = dummy_failed_operation();
-        let mut output = vec![];
-        operation
-            .bin_write(output.as_mut())
+        let output = operation
+            .to_bytes()
             .expect("Operation with metadata should be encodable");
-        let operation_and_receipt_bytes = "00000001c56c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c0000000000010000017e000000baba00000082b00000004170706c79285472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d2929290000000000bcbc00000082b20000004170706c79285472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d292929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
+        let operation_and_receipt_bytes = "00000001b76c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000100000170000000b3b300000082a90000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d29290000000000b5b500000082ab0000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d2929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
