@@ -444,10 +444,13 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
-fn burn_fees_and_increment_counter<Host: Runtime>(
+fn execute_validation<Host: Runtime>(
     host: &mut Host,
-    validation_info: &mut ValidationInfo,
-) -> Result<(), ValidityError> {
+    context: &Context,
+    operation: &Operation,
+) -> Result<ValidationInfo, ValidityError> {
+    let mut validation_info = validate::validate_operation(host, context, operation)?;
+
     validation_info
         .source_account
         .set_balance(host, &validation_info.new_source_balance)
@@ -456,7 +459,9 @@ fn burn_fees_and_increment_counter<Host: Runtime>(
     validation_info
         .source_account
         .increment_counter(host)
-        .map_err(|_| ValidityError::FailedToIncrementCounter)
+        .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+    Ok(validation_info)
 }
 
 pub fn validate_and_apply_operation<Host: Runtime>(
@@ -485,26 +490,13 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let mut validation_info =
-        match validate::validate_operation(&safe_host, context, &operation) {
-            Ok(validation_info) => validation_info,
-            Err(validity_err) => {
-                log!(safe_host, Debug, "Operation is invalid: {:?}", validity_err);
-                safe_host.revert()?;
-                return Err(OperationError::Validation(validity_err));
-            }
-        };
-
-    log!(safe_host, Debug, "Operation is valid");
-
-    log!(safe_host, Debug, "Updates balance to pay fees");
-
-    if let Err(validity_err) =
-        burn_fees_and_increment_counter(&mut safe_host, &mut validation_info)
-    {
-        safe_host.revert()?;
-        return Err(OperationError::Validation(validity_err));
-    }
+    let validation_info = match execute_validation(&mut safe_host, context, &operation) {
+        Ok(validation_info) => validation_info,
+        Err(validity_err) => {
+            safe_host.revert()?;
+            return Err(OperationError::Validation(validity_err));
+        }
+    };
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
