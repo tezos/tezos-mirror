@@ -481,6 +481,10 @@ fn execute_validation<Host: Runtime>(
 
     balance_updates.extend(op_balance_updates);
 
+    let new_source_balance = account
+        .balance(host)
+        .map_err(|_| ValidityError::FailedToFetchBalance)?;
+
     Ok(ValidationInfo {
         new_source_balance,
         source_account: account,
