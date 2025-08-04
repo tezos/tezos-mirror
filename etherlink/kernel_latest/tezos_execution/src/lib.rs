@@ -21,16 +21,16 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
-use tezos_tezlink::operation_result::TransferTarget;
+use tezos_tezlink::operation_result::{produce_skipped_receipt, TransferTarget};
 use tezos_tezlink::{
     operation::{
         verify_signature, ManagerOperation, ManagerOperationContent, OperationContent,
         Parameter, RevealContent, TransferContent,
     },
     operation_result::{
-        is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
-        OperationError, OperationResultSum, RevealError, RevealSuccess, TransferError,
-        TransferSuccess, UpdateOrigin, ValidityError,
+        is_applied, produce_operation_result, transform_result_backtrack, Balance,
+        BalanceTooLow, BalanceUpdate, OperationError, OperationResultSum, RevealError,
+        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
 use validate::{validate_individual_operation, ValidationInfo};
@@ -539,39 +539,64 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let receipt = apply_batch(&mut safe_host, context, &content, validation_info);
+    let (receipts, applied) =
+        apply_batch(&mut safe_host, context, vec![content], validation_info);
 
-    if is_applied(&receipt) {
+    if applied {
         safe_host.promote()?;
         safe_host.promote_trace()?;
     } else {
         safe_host.revert()?;
     }
 
-    Ok(receipt)
+    Ok(receipts[0].clone())
 }
 
 fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    content: &ManagerOperation<OperationContent>,
+    operations: Vec<ManagerOperation<OperationContent>>,
     validation_info: ValidationInfo,
-) -> OperationResultSum {
+) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
         source,
         new_source_balance,
         mut source_account,
         balance_updates,
     } = validation_info;
-    apply_operation(
-        host,
-        context,
-        content,
-        &source,
-        &new_source_balance,
-        &mut source_account,
-        &balance_updates,
-    )
+    let mut first_failure: Option<usize> = None;
+    let mut receipts = Vec::with_capacity(operations.len());
+
+    for (index, content) in operations.into_iter().enumerate() {
+        let receipt = if first_failure.is_some() {
+            produce_skipped_receipt(&content)
+        } else {
+            apply_operation(
+                host,
+                context,
+                &content,
+                &source,
+                &new_source_balance,
+                &mut source_account,
+                &balance_updates,
+            )
+        };
+
+        if first_failure.is_none() && !is_applied(&receipt) {
+            first_failure = Some(index);
+        }
+
+        receipts.push(receipt);
+    }
+
+    if let Some(failure_idx) = first_failure {
+        receipts[..failure_idx]
+            .iter_mut()
+            .for_each(|r| *r = transform_result_backtrack(r.clone()));
+        return (receipts, false);
+    }
+
+    (receipts, true)
 }
 
 fn apply_operation<Host: Runtime>(
