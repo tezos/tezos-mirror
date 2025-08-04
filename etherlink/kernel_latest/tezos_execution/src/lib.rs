@@ -68,10 +68,6 @@ fn reveal<Host: Runtime>(
     account
         .set_manager_public_key(host, public_key)
         .map_err(|_| RevealError::FailedToWriteManager)?;
-    // TODO : Counter Increment should be done after successful validation (see issue  #8031)
-    account
-        .increment_counter(host)
-        .map_err(|_| RevealError::FailedToIncrementCounter)?;
 
     log!(host, Debug, "Reveal operation succeed");
 
@@ -306,7 +302,7 @@ pub fn transfer_external<Host: Runtime>(
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
 
-    let success = transfer(
+    transfer(
         host,
         context,
         &src_contract,
@@ -318,11 +314,7 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
-    );
-    src_account
-        .increment_counter(host)
-        .map_err(|_| TransferError::FailedToIncrementCounter)?;
-    success
+    )
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -452,6 +444,26 @@ fn execute_smart_contract<'a>(
     Ok((internal_operations, new_storage))
 }
 
+fn execute_validation<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    operation: &Operation,
+) -> Result<ValidationInfo, ValidityError> {
+    let mut validation_info = validate::validate_operation(host, context, operation)?;
+
+    validation_info
+        .source_account
+        .set_balance(host, &validation_info.new_source_balance)
+        .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+
+    validation_info
+        .source_account
+        .increment_counter(host)
+        .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+    Ok(validation_info)
+}
+
 pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
@@ -478,29 +490,12 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
-    let mut validation_info =
-        match validate::validate_operation(&safe_host, context, &operation) {
-            Ok(validation_info) => validation_info,
-            Err(validity_err) => {
-                log!(safe_host, Debug, "Operation is invalid: {:?}", validity_err);
-                safe_host.revert()?;
-                return Err(OperationError::Validation(validity_err));
-            }
-        };
-
-    log!(safe_host, Debug, "Operation is valid");
-
-    log!(safe_host, Debug, "Updates balance to pay fees");
-    if validation_info
-        .source_account
-        .set_balance(&mut safe_host, &validation_info.new_source_balance)
-        .is_err()
-    {
-        log!(safe_host, Debug, "Could not update balance!");
-        safe_host.revert()?;
-        return Err(OperationError::Validation(
-            ValidityError::FailedToUpdateBalance,
-        ));
+    let validation_info = match execute_validation(&mut safe_host, context, &operation) {
+        Ok(validation_info) => validation_info,
+        Err(validity_err) => {
+            safe_host.revert()?;
+            return Err(OperationError::Validation(validity_err));
+        }
     };
 
     safe_host.promote()?;
@@ -805,7 +800,7 @@ mod tests {
         // to avoid getting an error when initializing the safe_storage
         let other = bootstrap2();
 
-        init_account(&mut host, &other.pkh);
+        let src_account = init_account(&mut host, &other.pkh);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
@@ -818,6 +813,12 @@ mod tests {
         let expected_error =
             OperationError::Validation(ValidityError::EmptyImplicitContract);
 
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -828,7 +829,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let _ = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh);
 
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
@@ -842,6 +843,12 @@ mod tests {
         let expected_error =
             OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
 
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -852,7 +859,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let _ = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh);
 
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
@@ -868,6 +875,13 @@ mod tests {
                 expected: 1_u64.into(),
                 found: 15_u64.into(),
             }));
+
+        assert_eq!(
+            src_account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
+
         assert_eq!(result, Err(expected_error));
     }
 
@@ -922,6 +936,13 @@ mod tests {
             ),
             internal_operation_results: vec![],
         });
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
+
         assert_eq!(receipt, expected_receipt);
     }
 
@@ -977,8 +998,8 @@ mod tests {
         assert_eq!(receipt, expected_receipt);
         assert_eq!(
             account.counter(&host).unwrap(),
-            0.into(),
-            "Counter should not have been incremented"
+            1.into(),
+            "Counter should have been incremented"
         );
     }
 
@@ -996,7 +1017,7 @@ mod tests {
         let source = Bootstrap { pk, ..bootstrap1() };
 
         // Even if we don't use it we need to init the account
-        let _ = init_account(&mut host, &source.pkh);
+        let account = init_account(&mut host, &source.pkh);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
@@ -1007,6 +1028,12 @@ mod tests {
         );
 
         let expected_error = OperationError::Validation(ValidityError::InvalidSignature);
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            0.into(),
+            "Counter should not have been incremented"
+        );
 
         assert_eq!(result, Err(expected_error));
     }
@@ -1068,6 +1095,12 @@ mod tests {
             .expect("Read manager should have succeed");
 
         assert_eq!(manager, Manager::Revealed(pk));
+
+        assert_eq!(
+            account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Test an invalid transfer operation, source has not enough balance to fullfil the Transfer
@@ -1135,6 +1168,12 @@ mod tests {
         // Verify that source only paid the fees and the destination balance is unchanged
         assert_eq!(source_account.balance(&host).unwrap(), 35.into());
         assert_eq!(destination_account.balance(&host).unwrap(), 50_u64.into());
+
+        assert_eq!(
+            source_account.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     // Bootstrap 1 successfully transfer 30 mutez to Bootstrap 2
@@ -1298,6 +1337,13 @@ mod tests {
         assert_eq!(source.balance(&host).unwrap(), 35_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
+        // Verify that the source's counter has been incremented
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     #[test]
@@ -1361,6 +1407,12 @@ mod tests {
             requester.balance(&host).unwrap(),
             (requester_balance + requested_amount - fees).into()
         ); // The faucet should have transferred 100 mutez to the source
+
+        assert_eq!(
+            requester.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
     }
 
     #[test]
@@ -1404,7 +1456,7 @@ mod tests {
             "validate_and_apply_operation should not have failed with a kernel error",
         );
 
-        let storage = Some(storage_value);
+        let storage = Some(storage_value.clone());
 
         let expected_receipt = OperationResultSum::Transfer(OperationResult {
             balance_updates: vec![
@@ -1452,6 +1504,18 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 80_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
+        assert_eq!(
+            source.counter(&host).unwrap(),
+            1.into(),
+            "Counter should have been incremented"
+        );
+
+        assert_eq!(
+            destination.storage(&host).unwrap(),
+            storage_value,
+            "Storage has not been updated"
+        )
     }
 
     #[test]
@@ -1528,11 +1592,18 @@ mod tests {
         assert_eq!(destination.balance(&host).unwrap(), 50_u64.into());
 
         assert_eq!(receipt, expected_receipt);
+
         assert_eq!(
             source.counter(&host).unwrap(),
-            0.into(),
-            "Counter should not have been incremented"
+            1.into(),
+            "Counter should have been incremented"
         );
+
+        assert_eq!(
+            destination.storage(&host).unwrap(),
+            parser.parse(initial_storage).unwrap().encode(),
+            "Storage should not have been updated"
+        )
     }
 
     #[test]
