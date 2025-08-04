@@ -24,7 +24,8 @@ use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
     operation::{
-        ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
+        verify_signature, ManagerOperation, OperationContent, Parameter, RevealContent,
+        TransferContent,
     },
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
@@ -32,7 +33,7 @@ use tezos_tezlink::{
         TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
-use validate::ValidationInfo;
+use validate::{validate_individual_operation, ValidationInfo};
 
 extern crate alloc;
 pub mod account_storage;
@@ -457,25 +458,30 @@ fn execute_validation<Host: Runtime>(
     content: &ManagerOperation<OperationContent>,
     signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
-    let mut validation_info = validate::validate_operation(
-        host,
-        context,
-        branch,
-        vec![content.clone()],
-        signature,
-    )?;
+    let (source, pk, mut account) =
+        validate::validate_source(host, context, &[content.clone()])?;
 
-    validation_info
-        .source_account
-        .set_balance(host, &validation_info.new_source_balance)
+    let (new_source_balance, balance_updates) =
+        validate_individual_operation(host, &source, &account, content)?;
+
+    account
+        .set_balance(host, &new_source_balance)
         .map_err(|_| ValidityError::FailedToUpdateBalance)?;
 
-    validation_info
-        .source_account
+    match verify_signature(&pk, branch, vec![content.clone().into()], signature.clone()) {
+        Ok(true) => (),
+        _ => return Err(ValidityError::InvalidSignature),
+    }
+
+    account
         .increment_counter(host)
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
-    Ok(validation_info)
+    Ok(ValidationInfo {
+        new_source_balance,
+        source_account: account,
+        balance_updates,
+    })
 }
 
 pub fn validate_and_apply_operation<Host: Runtime>(

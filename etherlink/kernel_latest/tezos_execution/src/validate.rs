@@ -2,14 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::PublicKey;
-use tezos_tezlink::enc_wrappers::BlockHash;
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{verify_signature, ManagerOperation, OperationContent, RevealContent},
+    operation::{ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
 };
 
@@ -127,20 +125,18 @@ pub struct ValidationInfo {
     pub balance_updates: Vec<BalanceUpdate>,
 }
 
-pub fn validate_operation<Host: Runtime>(
+pub fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
-    branch: &BlockHash,
-    content: Vec<ManagerOperation<OperationContent>>,
-    signature: UnknownSignature,
-) -> Result<ValidationInfo, ValidityError> {
+    content: &[ManagerOperation<OperationContent>],
+) -> Result<(PublicKeyHash, PublicKey, TezlinkImplicitAccount), ValidityError> {
     if content.is_empty() {
         return Err(ValidityError::EmptyBatch);
     }
 
     let source = &content[0].source;
 
-    for c in &content {
+    for c in content {
         if c.source != *source {
             return Err(ValidityError::MultipleSources);
         }
@@ -159,8 +155,15 @@ pub fn validate_operation<Host: Runtime>(
 
     let pk = get_revealed_key(host, &account, &content[0].operation)?;
 
-    let content = &content[0];
+    Ok((source.clone(), pk, account))
+}
 
+pub fn validate_individual_operation<Host: Runtime>(
+    host: &Host,
+    source: &PublicKeyHash,
+    account: &TezlinkImplicitAccount,
+    content: &ManagerOperation<OperationContent>,
+) -> Result<(Narith, Vec<BalanceUpdate>), ValidityError> {
     account.check_counter_increment(host, &content.counter)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
@@ -178,18 +181,9 @@ pub fn validate_operation<Host: Runtime>(
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
 
-    match verify_signature(&pk, branch, vec![content.clone().into()], signature.clone()) {
-        Ok(true) => (),
-        _ => return Err(ValidityError::InvalidSignature),
-    }
-
     let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(&content.source, &content.fee)
+        crate::compute_fees_balance_updates(source, &content.fee)
             .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
-    Ok(ValidationInfo {
-        new_source_balance: new_balance,
-        source_account: account,
-        balance_updates: vec![src_delta, block_fees],
-    })
+    Ok((new_balance, vec![src_delta, block_fees]))
 }
