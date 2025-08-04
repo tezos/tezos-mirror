@@ -16,7 +16,7 @@ use tezos_tezlink::{
 use crate::{
     account_storage::{Manager, TezlinkImplicitAccount},
     context::Context,
-    ApplyKernelError, BalanceUpdate,
+    BalanceUpdate,
 };
 
 impl TezlinkImplicitAccount {
@@ -28,13 +28,15 @@ impl TezlinkImplicitAccount {
         &self,
         host: &impl Runtime,
         counter: &Narith,
-    ) -> Result<Result<(), ValidityError>, tezos_storage::error::Error> {
-        let contract_counter = self.counter(host)?;
+    ) -> Result<(), ValidityError> {
+        let contract_counter = self
+            .counter(host)
+            .map_err(|_| ValidityError::FailedToFetchCounter)?;
         // The provided counter value must be the successor of the manager's counter.
         let expected_counter = Narith(&contract_counter.0 + 1_u64);
 
         if &expected_counter == counter {
-            Ok(Ok(()))
+            Ok(())
         } else if expected_counter.0 > counter.0 {
             let error = CounterError {
                 expected: expected_counter,
@@ -45,7 +47,7 @@ impl TezlinkImplicitAccount {
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Source counter is in the past"
             );
-            Ok(Err(ValidityError::CounterInThePast(error)))
+            Err(ValidityError::CounterInThePast(error))
         } else {
             let error = CounterError {
                 expected: expected_counter,
@@ -56,7 +58,7 @@ impl TezlinkImplicitAccount {
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Source counter is in the future"
             );
-            Ok(Err(ValidityError::CounterInTheFuture(error)))
+            Err(ValidityError::CounterInTheFuture(error))
         }
     }
 
@@ -85,10 +87,12 @@ fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
     content: &OperationContent,
-) -> Result<Result<PublicKey, ValidityError>, ApplyKernelError> {
+) -> Result<PublicKey, ValidityError> {
     match content {
-        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(Ok(pk.clone())),
-        _ => Ok(account.get_manager_key(host)?),
+        OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
+        _ => account
+            .get_manager_key(host)
+            .map_err(|_| ValidityError::FailedToFetchManagerKey)?,
     }
 }
 
@@ -126,88 +130,57 @@ pub fn validate_operation<Host: Runtime>(
     host: &Host,
     context: &Context,
     operation: &Operation,
-) -> Result<Result<ValidationInfo, ValidityError>, ApplyKernelError> {
+) -> Result<ValidationInfo, ValidityError> {
     let branch = &operation.branch;
     let content: ManagerOperation<OperationContent> = operation.content.clone().into();
     let signature = &operation.signature;
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)?;
+    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)
+        .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
-    if !account.allocated(host)? {
-        log!(
-            host,
-            tezos_evm_logging::Level::Debug,
-            "Invalid operation: Source is not allocated"
-        );
-        return Ok(Err(ValidityError::EmptyImplicitContract));
+    if !account
+        .allocated(host)
+        .map_err(|_| ValidityError::FailedToFetchBalance)?
+    {
+        return Err(ValidityError::EmptyImplicitContract);
     }
 
-    if let Err(err) = account.check_counter_increment(host, &content.counter)? {
-        // Counter verification failed, return the error
-        return Ok(Err(err));
-    }
+    account.check_counter_increment(host, &content.counter)?;
 
-    let pk = match get_revealed_key(host, &account, &content.operation)? {
-        Err(err) => {
-            // Retrieve public key failed, return the error
-            return Ok(Err(err));
-        }
-        Ok(pk) => pk,
-    };
+    let pk = get_revealed_key(host, &account, &content.operation)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
-    if let Err(err) = check_gas_limit(&1040000_u64.into(), &content.gas_limit) {
-        // Gas limit verification failed, return the error
-        log!(
-            host,
-            tezos_evm_logging::Level::Debug,
-            "Invalid operation: Gas limit is too high"
-        );
-        return Ok(Err(err));
-    }
+    check_gas_limit(&1040000_u64.into(), &content.gas_limit)?;
 
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
-    if let Err(err) = check_storage_limit(&60000_u64.into(), &content.storage_limit) {
-        // Storage limit verification failed, return the error
-        log!(
-            host,
-            tezos_evm_logging::Level::Debug,
-            "Invalid operation: Storage limit is too high"
-        );
-        return Ok(Err(err));
-    }
+    check_storage_limit(&60000_u64.into(), &content.storage_limit)?;
 
     // The manager account must be solvent to pay the announced fees.
-    let new_balance = match account.simulate_spending(host, &content.fee)? {
-        Some(new_balance) => new_balance,
-        None => {
+    let new_balance = match account.simulate_spending(host, &content.fee) {
+        Ok(Some(new_balance)) => new_balance,
+        Ok(None) => {
             log!(
                 host,
                 tezos_evm_logging::Level::Debug,
                 "Invalid operation: Can't pay the fees"
             );
-            return Ok(Err(ValidityError::CantPayFees(content.fee)));
+            return Err(ValidityError::CantPayFees(content.fee));
         }
+        Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
 
-    let verify = verify_signature(&pk, branch, &operation.content, signature.clone())?;
-
-    if !verify {
-        log!(
-            host,
-            tezos_evm_logging::Level::Debug,
-            "Invalid operation: Signature is invalid"
-        );
-        return Ok(Err(ValidityError::InvalidSignature));
+    match verify_signature(&pk, branch, &operation.content, signature.clone()) {
+        Ok(true) => (),
+        _ => return Err(ValidityError::InvalidSignature),
     }
 
     let (src_delta, block_fees) =
         crate::compute_fees_balance_updates(&content.source, &content.fee)
-            .map_err(ApplyKernelError::BigIntError)?;
+            .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
-    Ok(Ok(ValidationInfo {
+    Ok(ValidationInfo {
         new_source_balance: new_balance,
         source_account: account,
         balance_updates: vec![src_delta, block_fees],
-    }))
+    })
 }

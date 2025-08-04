@@ -13,12 +13,12 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::{base58::FromBase58CheckError, PublicKeyWithHash};
-use tezos_data_encoding::enc::BinError;
+use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_smart_rollup_host::runtime::RuntimeError;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
@@ -28,52 +28,15 @@ use tezos_tezlink::{
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
         OperationError, OperationResultSum, Reveal, RevealError, RevealSuccess,
-        TransferError, TransferSuccess, UpdateOrigin,
+        TransferError, TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
-use thiserror::Error;
 use validate::ValidationInfo;
 
 extern crate alloc;
 pub mod account_storage;
 pub mod context;
 mod validate;
-
-#[derive(Error, Debug, PartialEq, Eq)]
-pub enum ApplyKernelError {
-    #[error("Host failed with a runtime error {0}")]
-    HostRuntimeError(#[from] tezos_smart_rollup_host::runtime::RuntimeError),
-    #[error("Apply operation failed on a storage manipulation {0}")]
-    StorageError(tezos_storage::error::Error),
-    #[error("Apply operation failed because of a b58 conversion {0}")]
-    Base58Error(String),
-    #[error("Apply operation failed because of a big integer conversion error {0}")]
-    BigIntError(num_bigint::TryFromBigIntError<num_bigint::BigInt>),
-    #[error("Serialization failed because of {0}")]
-    BinaryError(String),
-    #[error("Apply operation failed because of an unsupported address error")]
-    MirAddressUnsupportedError,
-}
-
-// 'FromBase58CheckError' doesn't implement PartialEq and Eq
-// Use the String representation instead
-impl From<FromBase58CheckError> for ApplyKernelError {
-    fn from(err: FromBase58CheckError) -> Self {
-        Self::Base58Error(err.to_string())
-    }
-}
-
-impl From<tezos_storage::error::Error> for ApplyKernelError {
-    fn from(value: tezos_storage::error::Error) -> Self {
-        Self::StorageError(value)
-    }
-}
-
-impl From<BinError> for ApplyKernelError {
-    fn from(value: BinError) -> Self {
-        Self::BinaryError(format!("{:?}", value))
-    }
-}
 
 fn reveal<Host: Runtime>(
     host: &mut Host,
@@ -118,11 +81,11 @@ fn reveal<Host: Runtime>(
     })
 }
 
-fn contract_from_address(address: AddressHash) -> Result<Contract, ApplyKernelError> {
+fn contract_from_address(address: AddressHash) -> Result<Contract, TransferError> {
     match address {
         AddressHash::Kt1(kt1) => Ok(Contract::Originated(kt1)),
         AddressHash::Implicit(pkh) => Ok(Contract::Implicit(pkh)),
-        AddressHash::Sr1(_) => Err(ApplyKernelError::MirAddressUnsupportedError),
+        AddressHash::Sr1(_) => Err(TransferError::MirAddressUnsupportedError),
     }
 }
 
@@ -195,8 +158,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 amount,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
-                let dest_contract = contract_from_address(destination_address.hash)
-                    .map_err(|_| TransferError::FailedToFetchDestinationAccount)?;
+                let dest_contract = contract_from_address(destination_address.hash)?;
                 transfer(
                     host,
                     context,
@@ -495,7 +457,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
     operation: Operation,
-) -> Result<OperationResultSum, ApplyKernelError> {
+) -> Result<OperationResultSum, RuntimeError> {
     let manager_operation: ManagerOperation<OperationContent> =
         operation.content.clone().into();
 
@@ -518,14 +480,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Verifying that the operation is valid");
 
     let mut validation_info =
-        match validate::validate_operation(&safe_host, context, &operation)? {
+        match validate::validate_operation(&safe_host, context, &operation) {
             Ok(validation_info) => validation_info,
             Err(validity_err) => {
-                log!(
-                    safe_host,
-                    Debug,
-                    "Operation is invalid, exiting apply_operation"
-                );
+                log!(safe_host, Debug, "Operation is invalid: {:?}", validity_err);
                 // TODO: Don't force the receipt to a reveal receipt
                 let receipt = produce_operation_result::<Reveal>(
                     vec![],
@@ -539,9 +497,20 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     log!(safe_host, Debug, "Operation is valid");
 
     log!(safe_host, Debug, "Updates balance to pay fees");
-    validation_info
+    if validation_info
         .source_account
-        .set_balance(&mut safe_host, &validation_info.new_source_balance)?;
+        .set_balance(&mut safe_host, &validation_info.new_source_balance)
+        .is_err()
+    {
+        log!(safe_host, Debug, "Could not update balance!");
+        // TODO: Don't force the receipt to a reveal receipt
+        let receipt = produce_operation_result::<Reveal>(
+            vec![],
+            Err(ValidityError::FailedToUpdateBalance.into()),
+        );
+        safe_host.revert()?;
+        return Ok(OperationResultSum::Reveal(receipt));
+    };
 
     safe_host.promote()?;
     safe_host.promote_trace()?;

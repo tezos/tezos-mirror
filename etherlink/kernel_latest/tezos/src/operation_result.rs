@@ -38,6 +38,12 @@ pub enum ValidityError {
     GasLimitTooHigh,
     StorageLimitTooHigh,
     InvalidSignature,
+    FailedToFetchAccount,
+    FailedToComputeFeeBalanceUpdate,
+    FailedToFetchCounter,
+    FailedToFetchManagerKey,
+    FailedToFetchBalance,
+    FailedToUpdateBalance,
 }
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
@@ -97,6 +103,8 @@ pub enum TransferError {
     FailedToApplyInternalOperation(String),
     #[error("Failed to increment counter")]
     FailedToIncrementCounter,
+    #[error("Apply operation failed because of an unsupported address error")]
+    MirAddressUnsupportedError,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
