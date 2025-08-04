@@ -82,13 +82,14 @@ impl TezlinkImplicitAccount {
 /// In all cases except Reveal, we obtain the public key from the context.
 /// However, the purpose of Reveal is to register the public key in the context,
 /// making it a special case. In this case, we obtain the public key
-/// from the operation's payload.
+/// from the operation's payload. When processing a batch, the reveal operation is the
+/// first operation on it.
 fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
-    content: &OperationContent,
+    first_content: &OperationContent,
 ) -> Result<PublicKey, ValidityError> {
-    match content {
+    match first_content {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
         _ => account
             .get_manager_key(host)
@@ -156,11 +157,11 @@ pub fn validate_operation<Host: Runtime>(
         return Err(ValidityError::EmptyImplicitContract);
     }
 
+    let pk = get_revealed_key(host, &account, &content[0].operation)?;
+
     let content = &content[0];
 
     account.check_counter_increment(host, &content.counter)?;
-
-    let pk = get_revealed_key(host, &account, &content.operation)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     check_gas_limit(&1040000_u64.into(), &content.gas_limit)?;
