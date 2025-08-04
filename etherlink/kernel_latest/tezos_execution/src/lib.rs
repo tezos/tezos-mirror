@@ -539,7 +539,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let receipt = apply_operation(&mut safe_host, context, &content, validation_info);
+    let receipt = apply_batch(&mut safe_host, context, &content, validation_info);
 
     if is_applied(&receipt) {
         safe_host.promote()?;
@@ -551,7 +551,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     Ok(receipt)
 }
 
-fn apply_operation<Host: Runtime>(
+fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     content: &ManagerOperation<OperationContent>,
@@ -561,37 +561,56 @@ fn apply_operation<Host: Runtime>(
         source,
         new_source_balance,
         mut source_account,
-        balance_updates: validation_balance_updates,
+        balance_updates,
     } = validation_info;
-    match content.operation {
-        OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
-            let reveal_result = reveal(host, &source, &mut source_account, pk);
+    apply_operation(
+        host,
+        context,
+        content,
+        &source,
+        &new_source_balance,
+        &mut source_account,
+        &balance_updates,
+    )
+}
+
+fn apply_operation<Host: Runtime>(
+    host: &mut Host,
+    context: &Context,
+    content: &ManagerOperation<OperationContent>,
+    source: &PublicKeyHash,
+    new_source_balance: &Narith,
+    source_account: &mut TezlinkImplicitAccount,
+    balance_updates: &[BalanceUpdate],
+) -> OperationResultSum {
+    match &content.operation {
+        OperationContent::Reveal(RevealContent { pk, .. }) => {
+            let reveal_result = reveal(host, source, source_account, pk);
             let manager_result = produce_operation_result(
-                validation_balance_updates,
-                reveal_result.map_err(|e| e.into()),
+                balance_updates.to_vec(),
+                reveal_result.map_err(Into::into),
             );
             OperationResultSum::Reveal(manager_result)
         }
         OperationContent::Transfer(TransferContent {
-            ref amount,
-            ref destination,
-            ref parameters,
+            amount,
+            destination,
+            parameters,
         }) => {
             let transfer_result = transfer_external(
                 host,
                 context,
-                &source,
-                &mut source_account,
-                &new_source_balance,
+                source,
+                source_account,
+                new_source_balance,
                 amount,
                 destination,
                 parameters.clone(),
-            );
+            )
+            .map(TransferTarget::ToContrat);
             let manager_result = produce_operation_result(
-                validation_balance_updates,
-                transfer_result
-                    .map(TransferTarget::ToContrat)
-                    .map_err(|e| e.into()),
+                balance_updates.to_vec(),
+                transfer_result.map_err(Into::into),
             );
             OperationResultSum::Transfer(manager_result)
         }
