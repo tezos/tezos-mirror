@@ -27,33 +27,48 @@ let detailed_encoding =
            enable;
            instance_id;
            config =
-             {debug; url_traces; headers; batch_traces; batch_timeout_ms; _};
+             {
+               debug;
+               url_traces;
+               url_logs;
+               headers;
+               batch_traces;
+               batch_logs;
+               batch_timeout_ms;
+               _;
+             };
          } ->
       ( enable,
         instance_id,
         Some debug,
         Some url_traces,
+        Some url_logs,
         Some headers,
         Some batch_traces,
+        Some batch_logs,
         Some batch_timeout_ms ))
     (fun ( enable,
            instance_id,
            debug,
            url_traces,
+           url_logs,
            headers,
            batch_traces,
+           batch_logs,
            batch_timeout_ms ) ->
       let config =
         Opentelemetry_client_cohttp_lwt.Config.make
           ?debug
           ?url_traces
+          ?url_logs
           ?headers
           ?batch_traces
+          ?batch_logs
           ?batch_timeout_ms
           ()
       in
       {enable; instance_id; config})
-  @@ obj7
+  @@ obj9
        (dft "enable" ~description:"Enable opentelemetry profiling" bool true)
        (opt
           "instance_id"
@@ -63,11 +78,13 @@ let detailed_encoding =
           string)
        (opt "debug" ~description:"Enable debug mode" bool)
        (opt "url_traces" ~description:"URL to send traces" string)
+       (opt "url_logs" ~description:"URL to send logs" string)
        (opt
           "headers"
           ~description:"API headers sent to the endpoint"
           (list (tup2 string string)))
        (opt "batch_traces" ~description:"Batch traces" (option int31))
+       (opt "batch_logs" ~description:"Batch logs" (option int31))
        (opt
           "batch_timeout_ms"
           ~description:
