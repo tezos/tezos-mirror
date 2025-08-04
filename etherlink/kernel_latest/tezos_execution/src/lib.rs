@@ -508,11 +508,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     operation: Operation,
 ) -> Result<OperationResultSum, OperationError> {
     let branch = operation.branch;
-    let manager_operation: ManagerOperation<OperationContent> =
-        operation.content.clone().into();
+    let content: ManagerOperation<OperationContent> = operation.content.clone().into();
     let signature = operation.signature;
 
-    let source = &manager_operation.source;
+    let source = &content.source;
 
     let mut safe_host = SafeStorage {
         host,
@@ -534,7 +533,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         &mut safe_host,
         context,
         &branch,
-        vec![manager_operation.clone()],
+        vec![content.clone()],
         signature,
     ) {
         Ok(validation_info) => validation_info,
@@ -548,8 +547,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let receipt =
-        apply_operation(&mut safe_host, context, &manager_operation, validation_info);
+    let receipt = apply_operation(&mut safe_host, context, &content, validation_info);
 
     if is_applied(&receipt) {
         safe_host.promote()?;
@@ -564,7 +562,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    operation: &ManagerOperation<OperationContent>,
+    content: &ManagerOperation<OperationContent>,
     validation_info: ValidationInfo,
 ) -> OperationResultSum {
     let ValidationInfo {
@@ -572,9 +570,9 @@ fn apply_operation<Host: Runtime>(
         mut source_account,
         balance_updates: validation_balance_updates,
     } = validation_info;
-    match operation.operation {
+    match content.operation {
         OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
-            let reveal_result = reveal(host, &operation.source, &mut source_account, pk);
+            let reveal_result = reveal(host, &content.source, &mut source_account, pk);
             let manager_result = produce_operation_result(
                 validation_balance_updates,
                 reveal_result.map_err(|e| e.into()),
@@ -589,7 +587,7 @@ fn apply_operation<Host: Runtime>(
             let transfer_result = transfer_external(
                 host,
                 context,
-                &operation.source,
+                &content.source,
                 &mut source_account,
                 &new_source_balance,
                 amount,
