@@ -73,8 +73,10 @@
     "enable": false,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
+    "batch_logs": 400,
     "batch_timeout_ms": 500
   }
 }
@@ -153,8 +155,10 @@
     "enable": false,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
+    "batch_logs": 400,
     "batch_timeout_ms": 500
   }
 }
@@ -238,8 +242,10 @@
     "enable": false,
     "debug": false,
     "url_traces": "http://localhost:4318/v1/traces",
+    "url_logs": "http://localhost:4318/v1/logs",
     "headers": [],
     "batch_traces": 400,
+    "batch_logs": 400,
     "batch_timeout_ms": 500
   }
 }

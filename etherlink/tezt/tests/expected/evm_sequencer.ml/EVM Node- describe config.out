@@ -349,11 +349,15 @@
            precedence over <data_dir>/telemetry_id. */,
       "debug"?: boolean /* Enable debug mode */,
       "url_traces"?: $unistring /* URL to send traces */,
+      "url_logs"?: $unistring /* URL to send logs */,
       "headers"?:
         [ [ $unistring, $unistring ] ... ]
         /* API headers sent to the endpoint */,
       "batch_traces"?:
         /* Batch traces */
+        integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+      "batch_logs"?:
+        /* Batch logs */
         integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "batch_timeout_ms"?:
         integer ∈ [-2^30, 2^30]
