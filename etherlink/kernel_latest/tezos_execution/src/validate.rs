@@ -168,7 +168,7 @@ pub fn validate_operation<Host: Runtime>(
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
 
-    match verify_signature(&pk, branch, &(content.clone().into()), signature.clone()) {
+    match verify_signature(&pk, branch, vec![content.clone().into()], signature.clone()) {
         Ok(true) => (),
         _ => return Err(ValidityError::InvalidSignature),
     }

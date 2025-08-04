@@ -225,10 +225,9 @@ pub enum SignatureErrors {
 pub fn sign_operation(
     sk: &SecretKeyEd25519,
     branch: &BlockHash,
-    content: &ManagerOperationContent,
+    content: Vec<ManagerOperationContent>,
 ) -> Result<UnknownSignature, SignatureErrors> {
-    let serialized_unsigned_operation =
-        serialize_unsigned_operation(branch, vec![content.clone()])?;
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
 
     let signature = sk.sign(serialized_unsigned_operation)?;
 
@@ -238,11 +237,10 @@ pub fn sign_operation(
 pub fn verify_signature(
     pk: &PublicKey,
     branch: &BlockHash,
-    content: &ManagerOperationContent,
+    content: Vec<ManagerOperationContent>,
     signature: UnknownSignature,
 ) -> Result<bool, BinError> {
-    let serialized_unsigned_operation =
-        serialize_unsigned_operation(branch, vec![content.clone()])?;
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
 
     let signature = &signature.into();
 

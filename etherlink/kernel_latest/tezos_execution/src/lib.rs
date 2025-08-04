@@ -586,8 +586,8 @@ mod tests {
     use tezos_tezlink::{
         block::TezBlock,
         operation::{
-            sign_operation, ManagerOperation, Operation, OperationContent, Parameter,
-            RevealContent, TransferContent,
+            sign_operation, ManagerOperation, ManagerOperationContent, Operation,
+            OperationContent, Parameter, RevealContent, TransferContent,
         },
         operation_result::{
             ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
@@ -668,7 +668,7 @@ mod tests {
         content: OperationContent,
     ) -> Operation {
         let branch = TezBlock::genesis_block_hash().into();
-        let manager_op = ManagerOperation {
+        let manager_op: ManagerOperationContent = ManagerOperation {
             source: source.pkh,
             fee: fee.into(),
             counter: counter.into(),
@@ -678,7 +678,8 @@ mod tests {
         }
         .into();
 
-        let signature = sign_operation(&source.sk, &branch, &manager_op).unwrap();
+        let signature =
+            sign_operation(&source.sk, &branch, vec![manager_op.clone()]).unwrap();
 
         Operation {
             branch,

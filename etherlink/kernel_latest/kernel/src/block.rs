@@ -634,6 +634,7 @@ mod tests {
     use tezos_smart_rollup_host::runtime::Runtime as SdkRuntime;
     use tezos_tezlink::block::TezBlock;
     use tezos_tezlink::operation::ManagerOperation;
+    use tezos_tezlink::operation::ManagerOperationContent;
     use tezos_tezlink::operation::Operation;
     use tezos_tezlink::operation::OperationContent;
     use tezos_tezlink::operation::RevealContent;
@@ -685,7 +686,7 @@ mod tests {
         content: OperationContent,
     ) -> Operation {
         let branch = TezBlock::genesis_block_hash().into();
-        let manager_op = ManagerOperation {
+        let manager_op: ManagerOperationContent = ManagerOperation {
             source: source.pkh,
             fee: fee.into(),
             counter: counter.into(),
@@ -695,7 +696,8 @@ mod tests {
         }
         .into();
 
-        let signature = sign_operation(&source.sk, &branch, &manager_op).unwrap();
+        let signature =
+            sign_operation(&source.sk, &branch, vec![manager_op.clone()]).unwrap();
 
         Operation {
             branch,
