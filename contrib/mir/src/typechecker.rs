@@ -17,7 +17,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
-use tezos_data_encoding::nom::NomReader;
+use tezos_data_encoding::nom::{NomReader, error::convert_error};
 
 pub mod type_props;
 
@@ -2432,15 +2432,15 @@ pub(crate) fn typecheck_value<'a>(
         }
         (T::KeyHash, V::Bytes(bs)) => {
             ctx.gas.consume(gas::tc_cost::KEY_HASH_OPTIMIZED)?;
-            match PublicKeyHash::nom_read(bs) {
-                Ok((remaining, hash)) if remaining.is_empty() => TV::KeyHash(hash),
-                _ => {
-                    return Err(TcError::ByteReprError(
-                        T::KeyHash,
-                        ByteReprError::WrongFormat("public key hash, optimized".into()),
-                    ))
-                }
-            }
+            TV::KeyHash(PublicKeyHash::nom_read_exact(bs).map_err(|err| {
+                TcError::ByteReprError(
+                    T::KeyHash,
+                    ByteReprError::WrongFormat(format!(
+                        "public key hash, optimized {}",
+                        convert_error(bs, err)
+                    )),
+                )
+            })?)
         }
         (T::Timestamp, V::Int(n)) => TV::Timestamp(n.clone()),
         (T::Timestamp, V::String(n)) => {
