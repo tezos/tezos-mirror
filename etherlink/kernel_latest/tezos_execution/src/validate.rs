@@ -137,9 +137,15 @@ pub fn validate_operation<Host: Runtime>(
         return Err(ValidityError::EmptyBatch);
     }
 
-    let content = &content[0];
+    let source = &content[0].source;
 
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)
+    for c in &content {
+        if c.source != *source {
+            return Err(ValidityError::MultipleSources);
+        }
+    }
+
+    let account = TezlinkImplicitAccount::from_public_key_hash(context, source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
@@ -149,6 +155,8 @@ pub fn validate_operation<Host: Runtime>(
     {
         return Err(ValidityError::EmptyImplicitContract);
     }
+
+    let content = &content[0];
 
     account.check_counter_increment(host, &content.counter)?;
 

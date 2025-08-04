@@ -64,6 +64,8 @@ pub enum ValidityError {
     FailedToIncrementCounter,
     #[error("Batch is empty.")]
     EmptyBatch,
+    #[error("Batch contains operations from multiple sources.")]
+    MultipleSources,
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
