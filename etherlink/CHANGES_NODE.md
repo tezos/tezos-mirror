@@ -1,35 +1,23 @@
 # Changelog
 
-## Unreleased
+## Version 0.37 (2025-08-04)
 
-### Breaking changes
+This is a bug fix release that improves system resilience and resource
+management. It makes the sequencer more robust against GCP KMS
+authentication issues and fixes a resource leak in the blueprint
+follower where network connections were not properly closed.
 
-### Configuration changes
-
-### RPCs changes
-
-### Metrics changes
-
-### Command-line interface changes
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
 
 ### Execution changes
 
-- Makes the sequencer resilient to GCP KMS authentication tokens invalidation.
-  (!18901)
-- Fixes a connection leak in the blueprint follower where the monitoring stream
-  was not closed if an internal callback failed. This prevents resource
-  exhaustion over time and improves the node's long-term stability.
-
-### Storage changes
-
-### Documentation changes
-
-### Experimental features changes
-
-*No guarantees are provided regarding backward compatibility of experimental
-features. They can be modified or removed without any deprecation notices. If
-you start using them, you probably want to use `octez-evm-node check config
---config-file PATH` to assert your configuration file is still valid.*
+- Makes the sequencer resilient to GCP KMS authentication tokens
+  invalidation. (!18901)
+- Fixes a connection leak in the blueprint follower where the
+  monitoring stream was not closed if an internal callback failed.
+  This prevents resource exhaustion over time and improves the node's
+  long-term stability. (!18908)
 
 ## Version 0.36 (2025-07-28)
 
@@ -38,7 +26,7 @@ stricter checks on JSON configuration files by returning an error for any
 extraneous content, fixes incorrect trace generation for HTTP requests to GCP
 KMS, and resolves issues with GCP KMS token refresh.
 
-This release will not apply any migration to the node’s store (version 20),
+This release will not apply any migration to the node’s store (version 22),
 meaning it is possible to downgrade to the previous version.
 
 ### Breaking changes
