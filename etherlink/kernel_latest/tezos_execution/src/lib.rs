@@ -461,7 +461,9 @@ fn execute_validation<Host: Runtime>(
     let (source, pk, mut account) =
         validate::validate_source(host, context, &[content.clone()])?;
 
-    let (new_source_balance, balance_updates) =
+    let mut balance_updates = vec![];
+
+    let (new_source_balance, op_balance_updates) =
         validate_individual_operation(host, &source, &account, content)?;
 
     account
@@ -476,6 +478,8 @@ fn execute_validation<Host: Runtime>(
     account
         .increment_counter(host)
         .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+    balance_updates.extend(op_balance_updates);
 
     Ok(ValidationInfo {
         new_source_balance,
