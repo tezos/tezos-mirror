@@ -1,7 +1,7 @@
-From 3f9052a5dc75bd64a628b7c99d9b8f8f1f8184f8 Mon Sep 17 00:00:00 2001
-From: mattiasdrp <mattias@kojin.tech>
-Date: Tue, 22 Jul 2025 10:42:38 +0200
-Subject: [PATCH] Apply proto alpha profiling
+From b162975217f4653cdd0d73d311d1bf4bcb9fc965 Mon Sep 17 00:00:00 2001
+From: Valentin Chaboche <valentin.chaboche@nomadic-labs.com>
+Date: Mon, 4 Aug 2025 15:13:17 +0200
+Subject: [PATCH 1/1] Patch alpha
 
 ---
  src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
@@ -488,10 +488,10 @@ index 1a34312188..4cb8b2b008 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 229b019310..b30eadacec 100644
+index a143951d08..6feaa4b54d 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -256,22 +256,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -246,22 +246,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -533,8 +533,8 @@ index 229b019310..b30eadacec 100644
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
          let* ctxt =
-           cleanup_values_for_protocol_t ctxt previous_proto_constants level
-@@ -280,10 +296,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+           match previous_proto_constants with
+@@ -275,10 +291,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let* ctxt =
@@ -556,10 +556,10 @@ index 229b019310..b30eadacec 100644
    in
    return ctxt
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index 17391ebd9d..a58a971293 100644
+index 7f5c3f767f..326dfc7fca 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
-@@ -1723,12 +1723,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
+@@ -1735,12 +1735,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let+ ctxt =
@@ -706,5 +706,5 @@ index 6f1d8b6bee..43f5715b4a 100644
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
 -- 
-2.50.1
+2.43.0
 
