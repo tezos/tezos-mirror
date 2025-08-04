@@ -194,7 +194,7 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
 
 pub fn serialize_unsigned_operation(
     branch: &BlockHash,
-    content: &ManagerOperationContent,
+    content: Vec<ManagerOperationContent>,
 ) -> Result<Vec<u8>, BinError> {
     // Watermark comes from `src/lib_crypto/signature_v2.ml`
     // The watermark for a ManagerOperation is always `Generic_operation`
@@ -205,7 +205,11 @@ pub fn serialize_unsigned_operation(
 
     let branch: [u8; 32] = branch.0.to_fixed_bytes();
     tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
-    content.bin_write(&mut serialized_unsigned_operation)?;
+    tezos_data_encoding::enc::list(ManagerOperationContent::bin_write)(
+        &content,
+        &mut serialized_unsigned_operation,
+    )
+    .expect("Failed to serialize the content");
 
     Ok(serialized_unsigned_operation)
 }
@@ -223,7 +227,8 @@ pub fn sign_operation(
     branch: &BlockHash,
     content: &ManagerOperationContent,
 ) -> Result<UnknownSignature, SignatureErrors> {
-    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
+    let serialized_unsigned_operation =
+        serialize_unsigned_operation(branch, vec![content.clone()])?;
 
     let signature = sk.sign(serialized_unsigned_operation)?;
 
@@ -233,10 +238,11 @@ pub fn sign_operation(
 pub fn verify_signature(
     pk: &PublicKey,
     branch: &BlockHash,
-    operation: &ManagerOperationContent,
+    content: &ManagerOperationContent,
     signature: UnknownSignature,
 ) -> Result<bool, BinError> {
-    let serialized_unsigned_operation = serialize_unsigned_operation(branch, operation)?;
+    let serialized_unsigned_operation =
+        serialize_unsigned_operation(branch, vec![content.clone()])?;
 
     let signature = &signature.into();
 
