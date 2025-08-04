@@ -2346,7 +2346,7 @@ let record_preattestation ctxt (mode : mode) (content : consensus_content) :
         ( ctxt,
           mk_preattestation_result
             consensus_key
-            Attestation_power_repr.zero (* Fake power. *) )
+            Attestation_power.zero (* Fake power. *) )
 
 let record_dal_content ctxt slot ~dal_power = function
   | None -> Result.return ctxt
@@ -2401,7 +2401,7 @@ let record_attestation ctxt (mode : mode) (consensus : consensus_content)
         ( ctxt,
           mk_attestation_result
             consensus_key
-            Attestation_power_repr.zero (* Fake power. *) )
+            Attestation_power.zero (* Fake power. *) )
 
 let record_attestations_aggregate ctxt (mode : mode) committee :
     (context * Kind.attestations_aggregate contents_result_list) tzresult Lwt.t
@@ -2432,8 +2432,8 @@ let record_attestations_aggregate ctxt (mode : mode) committee :
             return
               ( ctxt,
                 (key, attestation_power) :: consensus_keys,
-                Attestation_power_repr.add attestation_power consensus_power ))
-          (ctxt, [], Attestation_power_repr.zero)
+                Attestation_power.add attestation_power consensus_power ))
+          (ctxt, [], Attestation_power.zero)
           committee
       in
       let result =
@@ -2490,8 +2490,8 @@ let record_preattestations_aggregate ctxt (mode : mode)
             return
               ( ctxt,
                 (key, attestation_power) :: consensus_keys,
-                Attestation_power_repr.add attestation_power consensus_power ))
-          (ctxt, [], Attestation_power_repr.zero)
+                Attestation_power.add attestation_power consensus_power ))
+          (ctxt, [], Attestation_power.zero)
           committee
       in
       let result =
@@ -3012,7 +3012,7 @@ let record_attesting_participation ctxt dal_attestation =
               ctxt
               ~delegate:consensus_key.delegate
               ~participation
-              ~attesting_power:attestation_power.slots
+              ~attesting_slots:(Attestation_power.get_slots attestation_power)
           in
           Dal_apply.record_participation
             ctxt
@@ -3246,14 +3246,9 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt, reward_bonus =
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
-      let all_bakers_attest_enabled =
-        Stake_distribution.check_all_bakers_attest_at_level ctxt level
-      in
       let*? rewards_bonus =
-        if all_bakers_attest_enabled then
-          error Validate_errors.Consensus.All_bakers_attest_not_implemented
-          (* TODO ABAAB *)
-        else Baking.bonus_baking_reward ctxt ~attestation_power
+        (* TODO ABAAB : only works if flag is false *)
+        Baking.bonus_baking_reward ctxt level ~attestation_power
       in
       return (ctxt, Some rewards_bonus)
     else return (ctxt, None)

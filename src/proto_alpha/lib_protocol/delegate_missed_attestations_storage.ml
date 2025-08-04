@@ -62,7 +62,7 @@ type level_participation = Participated | Didn't_participate
 (* Note that the participation for the last block of a cycle is
    recorded in the next cycle. *)
 let record_attesting_participation ctxt ~delegate ~participation
-    ~attesting_power =
+    ~attesting_slots =
   let open Lwt_result_syntax in
   match participation with
   | Participated -> Stake_storage.set_active ctxt delegate
@@ -71,7 +71,7 @@ let record_attesting_participation ctxt ~delegate ~participation
       let* result = Storage.Contract.Missed_attestations.find ctxt contract in
       match result with
       | Some {remaining_slots; missed_levels} ->
-          let remaining_slots = remaining_slots - attesting_power in
+          let remaining_slots = remaining_slots - attesting_slots in
           Storage.Contract.Missed_attestations.update
             ctxt
             contract
@@ -108,7 +108,7 @@ let record_attesting_participation ctxt ~delegate ~participation
               in
               let minimal_activity = expected_slots * numerator / denominator in
               let maximal_inactivity = expected_slots - minimal_activity in
-              let remaining_slots = maximal_inactivity - attesting_power in
+              let remaining_slots = maximal_inactivity - attesting_slots in
               Storage.Contract.Missed_attestations.init
                 ctxt
                 contract

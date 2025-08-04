@@ -108,12 +108,15 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
             0
             attesters
         in
-        if voting_power = total_consensus_power.slots then return_unit
+        let total_consensus_power =
+          Alpha_context.Attestation_power.get_slots total_consensus_power
+        in
+        if voting_power = total_consensus_power then return_unit
         else
           Test.fail
             "Wrong voting power : expected %d, found %d"
             voting_power
-            total_consensus_power.slots
+            total_consensus_power
       in
       (* Check committee *)
       let expected_committee =
@@ -125,7 +128,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
       in
       let resulting_committee =
         List.map
-          (fun (a, b) -> (a, b.Attestation_power_repr.slots))
+          (fun (a, b) -> (a, Alpha_context.Attestation_power.get_slots b))
           resulting_committee
       in
       if

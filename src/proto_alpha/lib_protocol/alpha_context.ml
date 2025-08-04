@@ -626,9 +626,6 @@ module Delegate = struct
 end
 
 module Stake_distribution = struct
-  let check_all_bakers_attest_at_level =
-    Delegate_sampler.check_all_bakers_attest_at_level
-
   let baking_rights_owner = Delegate_sampler.baking_rights_owner
 
   let slot_owner = Delegate_sampler.slot_owner
@@ -673,6 +670,18 @@ module Commitment = struct
 end
 
 module Migration = Migration_repr
+
+module Attestation_power = struct
+  include Attestation_power_repr
+
+  let get ctxt level {slots; stake} =
+    let all_bakers_attest_enabled =
+      Delegate_sampler.check_all_bakers_attest_at_level ctxt level
+    in
+    if all_bakers_attest_enabled then stake else Int64.of_int slots
+
+  let get_slots {slots; _} = slots
+end
 
 module Consensus = struct
   include Raw_context.Consensus

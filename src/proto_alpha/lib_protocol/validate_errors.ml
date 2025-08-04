@@ -1968,7 +1968,7 @@ let () =
 module Block = struct
   (* All block errors are permanent. *)
   type error +=
-    | Not_enough_attestations of {required : int; provided : int}
+    | Not_enough_attestations of {required : int64; provided : int64}
     | Inconsistent_validation_passes_in_block of {
         expected : int;
         provided : int;
@@ -1982,8 +1982,8 @@ module Block = struct
         round : Round.t;
       }
     | Insufficient_locked_round_evidence of {
-        total_attesting_power : int;
-        consensus_threshold : int;
+        total_attesting_power : int64;
+        consensus_threshold : int64;
       }
 
   let () =
@@ -1997,10 +1997,10 @@ module Block = struct
       ~pp:(fun ppf (required, provided) ->
         Format.fprintf
           ppf
-          "Wrong number of attestations (%i), at least %i are expected"
+          "Wrong number of attestations (%Li), at least %Li are expected"
           provided
           required)
-      Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
+      Data_encoding.(obj2 (req "required" int64) (req "provided" int64))
       (function
         | Not_enough_attestations {required; provided} ->
             Some (required, provided)
@@ -2080,14 +2080,14 @@ module Block = struct
       ~pp:(fun ppf (total_attesting_power, consensus_threshold) ->
         Format.fprintf
           ppf
-          "The provided locked round evidence is not sufficient: provided %d \
-           total attesting power but was expecting at least %d."
+          "The provided locked round evidence is not sufficient: provided %Ld \
+           total attesting power but was expecting at least %Ld."
           total_attesting_power
           consensus_threshold)
       Data_encoding.(
         obj2
-          (req "total_attesting_power" int31)
-          (req "consensus_threshold" int31))
+          (req "total_attesting_power" int64)
+          (req "consensus_threshold" int64))
       (function
         | Insufficient_locked_round_evidence
             {total_attesting_power; consensus_threshold} ->

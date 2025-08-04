@@ -987,7 +987,7 @@ let pp_contents_and_result :
       "(%a, %a)"
       Consensus_key.pp
       delegate
-      Attestation_power_repr.pp
+      Attestation_power.pp
       voting_power
   in
   fun ppf -> function
@@ -1040,7 +1040,7 @@ let pp_contents_and_result :
           balance_updates
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
-          Attestation_power_repr.pp
+          Attestation_power.pp
           consensus_power
     | ( Attestation {consensus_content = {level; _}; dal_content = _},
         Attestation_result
@@ -1058,7 +1058,7 @@ let pp_contents_and_result :
           balance_updates
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
-          Attestation_power_repr.pp
+          Attestation_power.pp
           consensus_power
     | ( Preattestations_aggregate {consensus_content = {level; _}; _},
         Preattestations_aggregate_result
@@ -1076,7 +1076,7 @@ let pp_contents_and_result :
           balance_updates
           (Format.pp_print_list pp_committee)
           committee
-          Attestation_power_repr.pp
+          Attestation_power.pp
           total_consensus_power
     | ( Attestations_aggregate {consensus_content = {level; _}; _},
         Attestations_aggregate_result
@@ -1094,7 +1094,7 @@ let pp_contents_and_result :
           balance_updates
           (Format.pp_print_list pp_committee)
           committee
-          Attestation_power_repr.pp
+          Attestation_power.pp
           total_consensus_power
     | ( Double_consensus_operation_evidence {slot; op1; op2},
         Double_consensus_operation_evidence_result double_signing_result ) ->

@@ -2156,6 +2156,8 @@ module type CONSENSUS = sig
 
   type round
 
+  type attestation_power
+
   type consensus_power
 
   val allowed_attestations : t -> consensus_power slot_map option
@@ -2168,7 +2170,7 @@ module type CONSENSUS = sig
 
   type error += Slot_map_not_found of {loc : string}
 
-  val current_attestation_power : t -> Attestation_power_repr.t
+  val current_attestation_power : t -> attestation_power
 
   val initialize_consensus_operation :
     t ->
@@ -2178,14 +2180,10 @@ module type CONSENSUS = sig
     t
 
   val record_attestation :
-    t -> initial_slot:slot -> power:Attestation_power_repr.t -> t tzresult
+    t -> initial_slot:slot -> power:attestation_power -> t tzresult
 
   val record_preattestation :
-    t ->
-    initial_slot:slot ->
-    power:Attestation_power_repr.t ->
-    round ->
-    t tzresult
+    t -> initial_slot:slot -> power:attestation_power -> round -> t tzresult
 
   val forbid_delegate : t -> Signature.Public_key_hash.t -> t
 
@@ -2197,7 +2195,7 @@ module type CONSENSUS = sig
 
   val set_preattestations_quorum_round : t -> round -> t
 
-  val locked_round_evidence : t -> (round * Attestation_power_repr.t) option
+  val locked_round_evidence : t -> (round * attestation_power) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
@@ -2212,6 +2210,7 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
+     and type attestation_power := Attestation_power_repr.t
      and type consensus_power := consensus_power = struct
   let[@inline] update_consensus_with ctxt f =
     {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}

@@ -29,8 +29,8 @@ open Alpha_context
 type error +=
   | (* `Permanent *)
       Insufficient_attestation_power of {
-      attestation_power : int;
-      consensus_threshold : int;
+      attestation_power : int64;
+      consensus_threshold : int64;
     }
 
 let () =
@@ -44,12 +44,12 @@ let () =
     ~pp:(fun ppf (attestation_power, consensus_threshold) ->
       Format.fprintf
         ppf
-        "The attestation power (%d) is insufficient to satisfy the consensus \
-         threshold (%d)."
+        "The attestation power (%Ld) is insufficient to satisfy the consensus \
+         threshold (%Ld)."
         attestation_power
         consensus_threshold)
     Data_encoding.(
-      obj2 (req "attestation_power" int31) (req "consensus_threshold" int31))
+      obj2 (req "attestation_power" int64) (req "consensus_threshold" int64))
     (function
       | Insufficient_attestation_power {attestation_power; consensus_threshold}
         ->
@@ -58,22 +58,26 @@ let () =
     (fun (attestation_power, consensus_threshold) ->
       Insufficient_attestation_power {attestation_power; consensus_threshold})
 
-let bonus_baking_reward ctxt ~attestation_power =
+let bonus_baking_reward ctxt level ~attestation_power =
   let open Result_syntax in
-  (* TODO ABAAB *)
-  let attestation_power = attestation_power.Attestation_power_repr.slots in
-  let consensus_threshold_size = Constants.consensus_threshold_size ctxt in
+  (* TODO ABAAB : only works if flag is false *)
+  let attestation_power = Attestation_power.get ctxt level attestation_power in
+  let consensus_threshold_size =
+    Constants.consensus_threshold_size ctxt |> Int64.of_int
+  in
   let* baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
-  let extra_attestation_power = attestation_power - consensus_threshold_size in
+  let extra_attestation_power =
+    Int64.sub attestation_power consensus_threshold_size
+  in
   let* () =
     error_when
-      Compare.Int.(extra_attestation_power < 0)
+      Compare.Int64.(extra_attestation_power < 0L)
       (Insufficient_attestation_power
          {attestation_power; consensus_threshold = consensus_threshold_size})
   in
-  Tez.(baking_reward_bonus_per_slot *? Int64.of_int extra_attestation_power)
+  Tez.(baking_reward_bonus_per_slot *? extra_attestation_power)
 
 type ordered_slots = {
   delegate : Signature.public_key_hash;
@@ -109,6 +113,10 @@ let attesting_rights (ctxt : t) level =
       return (ctxt, map))
     (ctxt, Signature.Public_key_hash.Map.empty)
     slots
+
+let incr_slot att_rights =
+  let one = Attestation_power.make ~slots:1 ~stake:0L in
+  Attestation_power.add one att_rights
 
 let attesting_rights_by_first_slot ctxt level :
     (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
@@ -151,10 +159,8 @@ let attesting_rights_by_first_slot ctxt level :
                     {
                       consensus_key;
                       attestation_power =
-                        {
-                          Attestation_power_repr.slots = 1;
-                          (* built at a later step *) stake = 0L;
-                        };
+                        incr_slot Attestation_power.zero
+                        (* stake added in the next step *);
                       dal_power = in_dal_committee;
                     }
               | Some
@@ -163,11 +169,7 @@ let attesting_rights_by_first_slot ctxt level :
                   Some
                     {
                       consensus_key;
-                      attestation_power =
-                        {
-                          attestation_power with
-                          slots = attestation_power.slots + 1;
-                        };
+                      attestation_power = incr_slot attestation_power;
                       dal_power = dal_power + in_dal_committee;
                     })
             slots_map
@@ -193,7 +195,8 @@ let attesting_rights_by_first_slot ctxt level :
                   {
                     v with
                     attestation_power =
-                      {v.attestation_power with stake = weight};
+                      Attestation_power.(
+                        add (make ~slots:0 ~stake:weight) v.attestation_power);
                   }
                   acc))
       Slot.Map.empty
