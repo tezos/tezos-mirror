@@ -1,6 +1,6 @@
-From b162975217f4653cdd0d73d311d1bf4bcb9fc965 Mon Sep 17 00:00:00 2001
+From 5d383ff3c214ad92589c21f0f34609321479eb0c Mon Sep 17 00:00:00 2001
 From: Valentin Chaboche <valentin.chaboche@nomadic-labs.com>
-Date: Mon, 4 Aug 2025 15:13:17 +0200
+Date: Mon, 4 Aug 2025 16:29:25 +0200
 Subject: [PATCH 1/1] Patch alpha
 
 ---
@@ -475,7 +475,7 @@ index 38b0e96c9c..3de66a1efc 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index 1a34312188..4cb8b2b008 100644
+index a6427f2920..794e352b9f 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -488,10 +488,10 @@ index 1a34312188..4cb8b2b008 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index a143951d08..6feaa4b54d 100644
+index a94d4fc4fe..f65d245a51 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
-@@ -246,22 +246,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -252,11 +252,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of Alpha stitching. Comment used for automatic snapshot *)
      | Alpha ->
          let* ctxt =
@@ -511,8 +511,9 @@ index a143951d08..6feaa4b54d 100644
 +             {verbosity = Notice}
 +               "Sc_rollup_refutation_storage.migrate_clean_refutation_games"])
          in
-         return (ctxt, [])
-         (* End of Alpha stitching. Comment used for automatic snapshot *)
+         let* ctxt = Storage.Contract.Address_registry.Next.init ctxt in
+         let* ctxt, cpt = Storage.Contract.Address_registry.Next.incr ctxt in
+@@ -269,11 +277,19 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
          (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
      | S023 ->
          let* ctxt =
@@ -534,7 +535,7 @@ index a143951d08..6feaa4b54d 100644
          in
          let* ctxt =
            match previous_proto_constants with
-@@ -275,10 +291,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
+@@ -293,10 +309,18 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
      (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
    in
    let* ctxt =
@@ -610,10 +611,10 @@ index 70a79eb8f4..9724bc4246 100644
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index 90ac344bdd..2a29e2854e 100644
+index 87f2085bee..4d7a86da66 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
-@@ -1811,7 +1811,7 @@ type execution_result = {
+@@ -1841,7 +1841,7 @@ type execution_result = {
  let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      unparsed_script cached_script arg =
    let open Lwt_result_syntax in
@@ -622,7 +623,7 @@ index 90ac344bdd..2a29e2854e 100644
      Script_ir_translator_config.make
        ~legacy:true
        ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
-@@ -1864,9 +1864,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1894,9 +1894,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
    in
    let* (ops, new_storage), ctxt =
@@ -636,7 +637,7 @@ index 90ac344bdd..2a29e2854e 100644
    in
    let* storage, lazy_storage_diff, ctxt =
      Script_ir_translator.extract_lazy_storage_diff
-@@ -1932,7 +1933,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1962,7 +1963,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
          ticket_diffs;
          ticket_receipt;
        },
@@ -646,10 +647,10 @@ index 90ac344bdd..2a29e2854e 100644
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index 6f1d8b6bee..43f5715b4a 100644
+index 706dbb8bfe..d310cf88f6 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-@@ -5228,17 +5228,21 @@ let parse_script :
+@@ -5238,17 +5238,21 @@ let parse_script :
               (Code
                 {code; arg_type; storage_type; views; entrypoints; code_size}),
             ctxt ) =
@@ -680,7 +681,7 @@ index 6f1d8b6bee..43f5715b4a 100644
      in
      ( Ex_script
          (Script
-@@ -5938,15 +5942,15 @@ let list_of_big_map_ids ids =
+@@ -5948,15 +5952,15 @@ let list_of_big_map_ids ids =
  
  let parse_data ~elab_conf ctxt ~allow_forged_tickets
      ~allow_forged_lazy_storage_id ty t =
