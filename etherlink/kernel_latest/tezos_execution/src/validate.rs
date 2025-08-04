@@ -130,9 +130,15 @@ pub fn validate_operation<Host: Runtime>(
     host: &Host,
     context: &Context,
     branch: &BlockHash,
-    content: &ManagerOperation<OperationContent>,
+    content: Vec<ManagerOperation<OperationContent>>,
     signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
+    if content.is_empty() {
+        return Err(ValidityError::EmptyBatch);
+    }
+
+    let content = &content[0];
+
     let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 

@@ -62,6 +62,8 @@ pub enum ValidityError {
     FailedToUpdateBalance,
     #[error("Failed to increment counter.")]
     FailedToIncrementCounter,
+    #[error("Batch is empty.")]
+    EmptyBatch,
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]

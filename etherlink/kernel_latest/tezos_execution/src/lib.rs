@@ -457,8 +457,13 @@ fn execute_validation<Host: Runtime>(
     content: &ManagerOperation<OperationContent>,
     signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
-    let mut validation_info =
-        validate::validate_operation(host, context, branch, content, signature)?;
+    let mut validation_info = validate::validate_operation(
+        host,
+        context,
+        branch,
+        vec![content.clone()],
+        signature,
+    )?;
 
     validation_info
         .source_account
