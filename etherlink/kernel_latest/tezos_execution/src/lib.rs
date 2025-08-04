@@ -496,6 +496,7 @@ fn execute_validation<Host: Runtime>(
     }
 
     Ok(ValidationInfo {
+        source,
         new_source_balance,
         source_account: account,
         balance_updates,
@@ -511,19 +512,10 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     let content: ManagerOperation<OperationContent> = operation.content.clone().into();
     let signature = operation.signature;
 
-    let source = &content.source;
-
     let mut safe_host = SafeStorage {
         host,
         world_state: context::contracts::root(context).unwrap(),
     };
-
-    log!(
-        safe_host,
-        Debug,
-        "Going to run a Tezos Manager Operation from {}",
-        source
-    );
 
     safe_host.start()?;
 
@@ -566,13 +558,14 @@ fn apply_operation<Host: Runtime>(
     validation_info: ValidationInfo,
 ) -> OperationResultSum {
     let ValidationInfo {
+        source,
         new_source_balance,
         mut source_account,
         balance_updates: validation_balance_updates,
     } = validation_info;
     match content.operation {
         OperationContent::Reveal(RevealContent { ref pk, proof: _ }) => {
-            let reveal_result = reveal(host, &content.source, &mut source_account, pk);
+            let reveal_result = reveal(host, &source, &mut source_account, pk);
             let manager_result = produce_operation_result(
                 validation_balance_updates,
                 reveal_result.map_err(|e| e.into()),
@@ -587,7 +580,7 @@ fn apply_operation<Host: Runtime>(
             let transfer_result = transfer_external(
                 host,
                 context,
-                &content.source,
+                &source,
                 &mut source_account,
                 &new_source_balance,
                 amount,

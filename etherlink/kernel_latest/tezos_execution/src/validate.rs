@@ -120,6 +120,7 @@ fn check_storage_limit(
 }
 
 pub struct ValidationInfo {
+    pub source: PublicKeyHash,
     pub new_source_balance: Narith,
     pub source_account: TezlinkImplicitAccount,
     pub balance_updates: Vec<BalanceUpdate>,
