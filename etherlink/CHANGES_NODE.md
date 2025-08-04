@@ -16,6 +16,9 @@
 
 - Makes the sequencer resilient to GCP KMS authentication tokens invalidation.
   (!18901)
+- Fixes a connection leak in the blueprint follower where the monitoring stream
+  was not closed if an internal callback failed. This prevents resource
+  exhaustion over time and improves the node's long-term stability.
 
 ### Storage changes
 

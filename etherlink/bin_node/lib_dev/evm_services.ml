@@ -371,11 +371,17 @@ let monitor_blueprints ~evm_node_endpoint Ethereum_types.(Qty level) =
   in
   return stream
 
+type 'a monitor = {stream : 'a Lwt_stream.t; closefn : unit -> unit}
+
+let close_monitor {closefn; _} = closefn ()
+
+let get_from_monitor {stream; _} = Lwt_stream.get stream
+
 let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
   let open Lwt_result_syntax in
   let stream, push = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
-  let* _spill_all =
+  let* closefn =
     Tezos_rpc_http_client_unix.RPC_client_unix.call_streamed_service
       [Media_type.octet_stream]
       ~base:evm_node_endpoint
@@ -386,4 +392,4 @@ let monitor_messages ~evm_node_endpoint Ethereum_types.(Qty level) =
       (Z.to_int64 level)
       ()
   in
-  return stream
+  return {stream; closefn}
