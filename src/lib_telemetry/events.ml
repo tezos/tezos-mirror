@@ -134,10 +134,40 @@ module Sink : Internal_event.SINK = struct
         | Some (_, None) -> (* exclude list *) false
         | Some (_, Some lvl) -> Internal_event.Level.compare M.level lvl >= 0)
 
+  (** [json_to_value json] recursively converts an Ezjsonm.value to an
+      OpenTelemetry `any_value`. This is used to structure the event data in a
+      format that OpenTelemetry can understand. *)
+  let rec json_to_value (j : Ezjsonm.value) :
+      Opentelemetry.Proto.Common.any_value option =
+    match j with
+    | `Null -> None
+    | `Bool b -> Some (Bool_value b)
+    | `Float f ->
+        let i = Int64.of_float f in
+        Some (if Int64.to_float i = f then Int_value i else Double_value f)
+    | `String s -> Some (String_value s)
+    | `O kv ->
+        Some
+          (Kvlist_value
+             {
+               values =
+                 List.map
+                   (fun (key, j) ->
+                     Opentelemetry.Proto.Common.{key; value = json_to_value j})
+                   kv;
+             })
+    | `A l -> Some (Array_value {values = List.filter_map json_to_value l})
+
+  (** [handle sink event_definition ~section event] is the core function of the
+      sink. It processes an event by converting it into an OpenTelemetry log
+      record and emitting it. The log record includes metadata such as
+      timestamp, severity, trace and span IDs, and the event data as a structured
+      body and attributes. *)
   let handle (type a) _ m ?(section = Internal_event.Section.empty) (event : a)
       =
     let open Lwt_result_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
+    let time = Opentelemetry.Timestamp_ns.now_unix_ns () in
     let severity =
       match M.level with
       | Internal_event.Debug -> Opentelemetry.Logs.Severity_number_trace
@@ -154,20 +184,38 @@ module Sink : Internal_event.SINK = struct
       | Some {trace_id; span_id; _} -> (Some trace_id, Some span_id)
     in
     let log =
-      Opentelemetry.Logs.make_strf
-        ~severity
-        ~log_level
-        ?trace_id
-        ?span_id
-        "%a"
-        (M.pp ~all_fields:false ~block:false)
-        event
+      Format.asprintf "%a" (M.pp ~all_fields:false ~block:false) event
+    in
+    let body =
+      let (`O [(_, json)] | json) =
+        Data_encoding.Json.construct M.encoding event
+      in
+      json_to_value json
     in
     let section_str =
       Internal_event.Section.to_string_list section |> String.concat "."
     in
-    let attrs = [("section", `String section_str)] in
-    Opentelemetry.Logs.emit ~attrs [log] ;
+    let attributes : Opentelemetry_proto.Common.key_value list =
+      [
+        {key = "message"; value = Some (String_value log)};
+        {key = "section"; value = Some (String_value section_str)};
+        {key = "event"; value = Some (String_value M.name)};
+      ]
+    in
+
+    let log =
+      Opentelemetry.Proto.Logs.default_log_record
+        ~time_unix_nano:time
+        ~observed_time_unix_nano:time
+        ~severity_number:severity
+        ~severity_text:log_level
+        ?trace_id:(Option.map Opentelemetry.Trace_id.to_bytes trace_id)
+        ?span_id:(Option.map Opentelemetry.Span_id.to_bytes span_id)
+        ~body
+        ~attributes
+        ()
+    in
+    Opentelemetry.Logs.emit [log] ;
     return_unit
 
   let close (_ : t) : unit tzresult Lwt.t = Lwt_result_syntax.return_unit
