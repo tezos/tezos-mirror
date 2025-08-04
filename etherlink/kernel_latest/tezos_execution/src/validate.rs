@@ -164,11 +164,6 @@ pub fn validate_operation<Host: Runtime>(
     let new_balance = match account.simulate_spending(host, &content.fee) {
         Ok(Some(new_balance)) => new_balance,
         Ok(None) => {
-            log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "Invalid operation: Can't pay the fees"
-            );
             return Err(ValidityError::CantPayFees(content.fee.clone()));
         }
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
