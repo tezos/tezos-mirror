@@ -12911,7 +12911,8 @@ let test_fa_deposit_and_withdrawals_events =
   in
   (* Bake two blocks to let the sequencer see the FA deposit *)
   let* () =
-    repeat 2 (fun () ->
+    (* Keep the following number >= 4, otherwise the test becomes flaky. *)
+    repeat 4 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
   in
