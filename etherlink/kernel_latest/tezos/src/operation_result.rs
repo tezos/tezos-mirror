@@ -21,7 +21,11 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-use crate::operation::{ManagerOperation, ManagerOperationContent, OperationContent};
+use crate::operation::OriginationContent;
+use crate::operation::{
+    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
+    TransferContent,
+};
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub struct CounterError {
@@ -248,27 +252,14 @@ pub trait OperationKind {
     type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
 }
 
-/// Empty struct to implement [OperationKind] trait for Reveal
-#[derive(PartialEq, Debug)]
-pub struct Reveal;
-
-/// Empty struct to implement [OperationKind] trait for Transfer
-#[derive(PartialEq, Debug)]
-pub struct Transfer;
-
-/// Empty struct to implement [OperationKind] trait for Origination
-#[derive(PartialEq, Debug)]
-pub struct Origination;
-
-impl OperationKind for Transfer {
+impl OperationKind for TransferContent {
     type Success = TransferTarget;
 }
-
-impl OperationKind for Reveal {
+impl OperationKind for RevealContent {
     type Success = RevealSuccess;
 }
 
-impl OperationKind for Origination {
+impl OperationKind for OriginationContent {
     type Success = OriginationSuccess;
 }
 
@@ -446,9 +437,9 @@ pub struct OperationResult<M: OperationKind> {
 }
 #[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
-    Reveal(OperationResult<Reveal>),
-    Transfer(OperationResult<Transfer>),
-    Origination(OperationResult<Origination>),
+    Reveal(OperationResult<RevealContent>),
+    Transfer(OperationResult<TransferContent>),
+    Origination(OperationResult<OriginationContent>),
 }
 
 pub fn is_applied(res: &OperationResultSum) -> bool {
@@ -485,7 +476,7 @@ pub fn transform_result_backtrack(op: &mut OperationResultSum) {
             backtrack_if_applied(&mut op_result.result)
         }
         OperationResultSum::Origination(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
+            backtrack_if_applied(&mut op_result.result);
         }
     }
 }
@@ -555,15 +546,17 @@ impl NomReader<'_> for OperationWithMetadata {
         let (input, content) = ManagerOperationContent::nom_read(input)?;
         let (input, receipt) = match content {
             ManagerOperationContent::Transfer(_) => {
-                let (input, receipt) = OperationResult::<Transfer>::nom_read(input)?;
+                let (input, receipt) =
+                    OperationResult::<TransferContent>::nom_read(input)?;
                 (input, OperationResultSum::Transfer(receipt))
             }
             ManagerOperationContent::Reveal(_) => {
-                let (input, receipt) = OperationResult::<Reveal>::nom_read(input)?;
+                let (input, receipt) = OperationResult::<RevealContent>::nom_read(input)?;
                 (input, OperationResultSum::Reveal(receipt))
             }
             ManagerOperationContent::Origination(_) => {
-                let (input, receipt) = OperationResult::<Origination>::nom_read(input)?;
+                let (input, receipt) =
+                    OperationResult::<OriginationContent>::nom_read(input)?;
                 (input, OperationResultSum::Origination(receipt))
             }
         };
