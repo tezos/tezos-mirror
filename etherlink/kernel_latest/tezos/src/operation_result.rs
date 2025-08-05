@@ -269,6 +269,20 @@ pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
 
+impl From<TransferSuccess> for TransferTarget {
+    fn from(value: TransferSuccess) -> Self {
+        TransferTarget::ToContrat(value)
+    }
+}
+
+impl From<TransferTarget> for TransferSuccess {
+    fn from(value: TransferTarget) -> Self {
+        match value {
+            TransferTarget::ToContrat(success) => success,
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct RevealSuccess {
     pub consumed_gas: Narith,

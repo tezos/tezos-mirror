@@ -274,7 +274,7 @@ pub fn transfer_external<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<TransferTarget, TransferError> {
     log!(
         host,
         Debug,
@@ -309,6 +309,7 @@ pub fn transfer_external<Host: Runtime>(
         &parser,
         &mut ctx,
     )
+    .map(Into::into)
 }
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
@@ -638,7 +639,7 @@ fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            match transfer_external(
+            let transfer_result = transfer_external(
                 host,
                 context,
                 source,
@@ -646,19 +647,12 @@ fn apply_operation<Host: Runtime>(
                 amount,
                 destination,
                 parameters,
-            ) {
-                Ok(res) => {
-                    let transfer_result = TransferTarget::ToContrat(res);
-                    let manager_result =
-                        produce_operation_result(balance_updates, Ok(transfer_result));
-                    OperationResultSum::Transfer(manager_result)
-                }
-                Err(e) => {
-                    let manager_result =
-                        produce_operation_result(balance_updates, Err(e.into()));
-                    OperationResultSum::Transfer(manager_result)
-                }
-            }
+            );
+            let manager_result = produce_operation_result(
+                balance_updates,
+                transfer_result.map_err(Into::into),
+            );
+            OperationResultSum::Transfer(manager_result)
         }
         OperationContent::Origination(_) => {
             let origination_result = originate_contract(host, source);
