@@ -152,6 +152,8 @@ module Traps : sig
   val find : t -> level:Types.level -> Types.trap list
 end
 
+module Chain_id : Single_value_store.S with type value = Chain_id.t
+
 module Last_processed_level : Single_value_store.S with type value = int32
 
 module First_seen_level : Single_value_store.S with type value = int32
@@ -177,6 +179,9 @@ val first_seen_level : t -> First_seen_level.t
     maximum number of levels is given by {!Constants.slot_id_cache_size}.
     No more than [number_of_slots] commitments can be stored per level. *)
 val finalized_commitments : t -> Slot_id_cache.t
+
+(** [chain_id t] returns the chain_id store associated with the store [t]. *)
+val chain_id : t -> Chain_id.t
 
 (** [last_processed_level t] returns the last processed level store
     associated with the store [t]. *)

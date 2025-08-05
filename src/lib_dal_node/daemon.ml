@@ -466,6 +466,21 @@ let run ?(disable_shard_validation = false) ~ignore_pkhs ~data_dir ~config_file
   in
   (* Initialize store *)
   let* store = Store.init config profile_ctxt proto_parameters in
+  let* current_chain_id = L1_helpers.fetch_l1_chain_id cctxt in
+  let chain_id_store = Store.chain_id store in
+  let* stored_chain_id = Store.Chain_id.load chain_id_store in
+  let* () =
+    match stored_chain_id with
+    | None ->
+        (* If no chain was stored, then either:
+           - the DAL node never ran, hence there are no level stored,
+           - the previously running DAL node did not feature the chain id storing.
+           Hence, for retrocompatibility, we accept to load stored level if any in this case. *)
+        Store.Chain_id.save chain_id_store current_chain_id
+    | Some chain when chain = current_chain_id -> return_unit
+    | Some stored_chain_id ->
+        tzfail @@ Errors.Wrong_chain_id {current_chain_id; stored_chain_id}
+  in
   let* last_processed_level =
     let last_processed_level_store = Store.last_processed_level store in
     Store.Last_processed_level.load last_processed_level_store
