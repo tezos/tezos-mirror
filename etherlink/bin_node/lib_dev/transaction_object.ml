@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -17,6 +18,30 @@ let access_encoding =
     (obj2
        (req "address" address_encoding)
        (req "storageKeys" (list hex_encoding)))
+
+type authorization_item = {
+  chain_id : quantity;
+  address : address;
+  nonce : quantity;
+  y_parity : quantity;
+  r : quantity;
+  s : quantity;
+}
+
+let authorization_item_encoding =
+  let open Data_encoding in
+  conv
+    (fun {chain_id; address; nonce; y_parity; r; s} ->
+      (chain_id, address, nonce, y_parity, r, s))
+    (fun (chain_id, address, nonce, y_parity, r, s) ->
+      {chain_id; address; nonce; y_parity; r; s})
+    (obj6
+       (req "chainId" quantity_encoding)
+       (req "address" address_encoding)
+       (req "nonce" quantity_encoding)
+       (req "yParity" quantity_encoding)
+       (req "r" quantity_encoding)
+       (req "s" quantity_encoding))
 
 module EIP_2930 = struct
   type t = {
@@ -250,12 +275,148 @@ module EIP_1559 = struct
             (req "s" quantity_encoding)))
 end
 
+module EIP_7702 = struct
+  type t = {
+    chain_id : quantity;
+    hash : hash;
+    nonce : quantity;
+    block_hash : block_hash option;
+    block_number : quantity option;
+    transaction_index : quantity option;
+    from : address;
+    to_ : address option;
+    value : quantity;
+    gas : quantity;
+    max_fee_per_gas : quantity;
+    max_priority_fee_per_gas : quantity;
+    access_list : access list;
+    authorization_list : authorization_item list;
+    input : hex;
+    v : quantity;
+    r : quantity;
+    s : quantity;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             chain_id;
+             hash;
+             nonce;
+             block_hash;
+             block_number;
+             transaction_index;
+             from;
+             to_;
+             value;
+             gas;
+             max_fee_per_gas;
+             max_priority_fee_per_gas;
+             access_list;
+             authorization_list;
+             input;
+             v;
+             r;
+             s;
+           } ->
+        ( ( chain_id,
+            hash,
+            nonce,
+            block_hash,
+            block_number,
+            transaction_index,
+            from,
+            to_,
+            value,
+            gas ),
+          ( max_fee_per_gas,
+            max_priority_fee_per_gas,
+            Some max_fee_per_gas
+            (* Other providers set gasPrice as the effectiveGasPrice, but this
+               information is only available in the receipt. *),
+            access_list,
+            authorization_list,
+            input,
+            v,
+            r,
+            s ) ))
+      (fun ( ( chain_id,
+               hash,
+               nonce,
+               block_hash,
+               block_number,
+               transaction_index,
+               from,
+               to_,
+               value,
+               gas ),
+             ( max_fee_per_gas,
+               max_priority_fee_per_gas,
+               _gas_price,
+               access_list,
+               authorization_list,
+               input,
+               v,
+               r,
+               s ) ) ->
+        {
+          chain_id;
+          hash;
+          nonce;
+          block_hash;
+          block_number;
+          transaction_index;
+          from;
+          to_;
+          value;
+          gas;
+          max_fee_per_gas;
+          max_priority_fee_per_gas;
+          access_list;
+          authorization_list;
+          input;
+          v;
+          r;
+          s;
+        })
+      (merge_objs
+         (obj10
+            (req "chainId" quantity_encoding)
+            (req "hash" hash_encoding)
+            (req "nonce" quantity_encoding)
+            (req "blockHash" (option block_hash_encoding))
+            (req "blockNumber" (option quantity_encoding))
+            (req "transactionIndex" (option quantity_encoding))
+            (req "from" address_encoding)
+            (req "to" (option address_encoding))
+            (req "value" quantity_encoding)
+            (req "gas" quantity_encoding))
+         (obj9
+            (req "maxFeePerGas" quantity_encoding)
+            (req "maxPriorityFeePerGas" quantity_encoding)
+            (opt
+               "gasPrice"
+               quantity_encoding
+               ~description:
+                 "Identical to maxFeePerGas. Purely for compatibility with \
+                  hardhat although the spec specifies this should be null for \
+                  EIP 1559.")
+            (req "accessList" (list access_encoding))
+            (req "authorizationList" (list authorization_item_encoding))
+            (req "input" hex_encoding)
+            (req "v" quantity_encoding)
+            (req "r" quantity_encoding)
+            (req "s" quantity_encoding)))
+end
+
 type t =
   | Kernel of legacy_transaction_object
       (** Transaction object read from the durable storage. *)
   | Legacy of legacy_transaction_object
   | EIP_2930 of EIP_2930.t
   | EIP_1559 of EIP_1559.t
+  | EIP_7702 of EIP_7702.t
 
 let from_store_transaction_object (obj : legacy_transaction_object) = Kernel obj
 
@@ -282,6 +443,78 @@ let decode_access_list =
           in
           Ok {address; storage_keys}
       | _ -> error_with "failed to decode access list from raw transaction")
+
+let decode_authorization_list =
+  Rlp.decode_list (function
+      | List
+          [
+            Value chain_id;
+            Value address;
+            Value nonce;
+            Value y_parity;
+            Value r;
+            Value s;
+          ] ->
+          let chain_id = decode_number_be chain_id in
+          let address = decode_address address in
+          let nonce = decode_number_be nonce in
+          let y_parity = decode_number_be y_parity in
+          let r = decode_number_be r in
+          let s = decode_number_be s in
+          Ok {chain_id; address; nonce; y_parity; r; s}
+      | _ -> error_with "Expected list of 6 elements in authorization list")
+
+let reconstruct_from_eip_7702_transaction (obj : legacy_transaction_object)
+    raw_txn =
+  let open Result_syntax in
+  match Rlp.decode (Bytes.unsafe_of_string raw_txn) with
+  | Ok
+      (List
+        [
+          Value chain_id;
+          Value _nonce;
+          Value max_priority_fee_per_gas;
+          Value max_fee_per_gas;
+          Value _gas_limit;
+          Value _to_;
+          Value _value;
+          Value _input;
+          access_list;
+          authorization_list;
+          Value _v;
+          Value _r;
+          Value _s;
+        ]) ->
+      let chain_id = decode_number_be chain_id in
+      let max_fee_per_gas = decode_number_be max_fee_per_gas in
+      let max_priority_fee_per_gas =
+        decode_number_be max_priority_fee_per_gas
+      in
+      let* access_list = decode_access_list access_list in
+      let* authorization_list = decode_authorization_list authorization_list in
+      return
+      @@ EIP_7702
+           {
+             chain_id;
+             hash = obj.hash;
+             nonce = obj.nonce;
+             block_hash = obj.blockHash;
+             block_number = obj.blockNumber;
+             transaction_index = obj.transactionIndex;
+             from = obj.from;
+             to_ = obj.to_;
+             value = obj.value;
+             gas = obj.gas;
+             max_fee_per_gas;
+             max_priority_fee_per_gas;
+             access_list;
+             authorization_list;
+             input = obj.input;
+             v = obj.v;
+             r = obj.r;
+             s = obj.s;
+           }
+  | _ -> error_with "failed to decode EIP-7702 transaction"
 
 let reconstruct_from_eip_2930_transaction (obj : legacy_transaction_object)
     raw_txn =
@@ -378,6 +611,11 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
 
 let reconstruct_from_raw_transaction (obj : legacy_transaction_object) raw_txn =
   match String.get raw_txn 0 with
+  | '\x04' ->
+      (* EIP 7702 *)
+      reconstruct_from_eip_7702_transaction
+        obj
+        (String.sub raw_txn 1 (String.length raw_txn - 1))
   | '\x02' ->
       (* EIP 1559 *)
       reconstruct_from_eip_1559_transaction
@@ -449,24 +687,28 @@ let hash = function
   | Legacy obj -> obj.hash
   | EIP_2930 obj -> obj.hash
   | EIP_1559 obj -> obj.hash
+  | EIP_7702 obj -> obj.hash
 
 let block_number = function
   | Kernel obj -> obj.blockNumber
   | Legacy obj -> obj.blockNumber
   | EIP_2930 obj -> obj.block_number
   | EIP_1559 obj -> obj.block_number
+  | EIP_7702 obj -> obj.block_number
 
 let input = function
   | Kernel obj -> obj.input
   | Legacy obj -> obj.input
   | EIP_2930 obj -> obj.input
   | EIP_1559 obj -> obj.input
+  | EIP_7702 obj -> obj.input
 
 let to_ = function
   | Kernel obj -> obj.to_
   | Legacy obj -> obj.to_
   | EIP_2930 obj -> obj.to_
   | EIP_1559 obj -> obj.to_
+  | EIP_7702 obj -> obj.to_
 
 let encoding =
   let open Data_encoding in
@@ -490,6 +732,12 @@ let encoding =
         (merge_objs (obj1 (req "type" (constant "0x2"))) EIP_1559.encoding)
         (function EIP_1559 o -> Some ((), o) | _ -> None)
         (fun ((), o) -> EIP_1559 o);
+      case
+        ~title:"eip-7702"
+        (Tag 5)
+        (merge_objs (obj1 (req "type" (constant "0x4"))) EIP_7702.encoding)
+        (function EIP_7702 o -> Some ((), o) | _ -> None)
+        (fun ((), o) -> EIP_7702 o);
       case
         ~title:"kernel"
         (Tag 255)
