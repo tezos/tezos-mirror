@@ -1324,6 +1324,136 @@ let test_tezlink_internal_operation =
     ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
+let test_tezlink_internal_receipts =
+  let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
+  register_tezlink_test
+    ~title:"Internal receipts"
+    ~tags:["internal"; "operation"; "receipts"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_contracts:[faucet]
+  @@ fun {sequencer; client; _} _protocol ->
+  let tezlink_path = "/tezlink" in
+  let amount = 1000000 in
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = tezlink_path})
+  in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~fee:Tez.zero
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:faucet.address
+      ~burn_cap:Tez.one
+      ~entrypoint:"fund"
+      ~arg:(string_of_int amount)
+      client
+  in
+  let*@ _ = produce_block sequencer in
+
+  let* operation =
+    let path = tezlink_path ^ "/chains/main/blocks/head/operations/3/0" in
+    let* res =
+      Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
+      |> Runnable.run
+    in
+    let json = JSON.parse ~origin:"curl_operation_hashes" res in
+    return json
+  in
+
+  let operation_metadata =
+    JSON.(operation |-> "contents" |> as_list |> List.hd |-> "metadata")
+  in
+  Check.(
+    JSON.(
+      operation_metadata |-> "operation_result" |-> "status" |> as_string
+      = "applied")
+      string
+      ~error_msg:"Expected status to be %R but got %L") ;
+
+  let internal_ops_list =
+    JSON.(operation_metadata |-> "internal_operation_results" |> as_list)
+  in
+  Check.(
+    (List.length internal_ops_list = 1)
+      int
+      ~error_msg:"Expected 1 internal operation but got %L") ;
+
+  (* Check the internal operation *)
+  let internal_op_content = List.hd internal_ops_list in
+  Check.(
+    JSON.(internal_op_content |-> "kind" |> as_string = "transaction")
+      string
+      ~error_msg:"Expected internal operation kind to be %R but got %L") ;
+  Check.(
+    JSON.(
+      internal_op_content |-> "destination" |> as_string
+      = Constant.bootstrap1.public_key_hash)
+      string
+      ~error_msg:"Expected internal operation destination to be %R but got %L") ;
+  Check.(
+    JSON.(internal_op_content |-> "amount" |> as_int = amount)
+      int
+      ~error_msg:"Expected internal operation amount to be %R but got %L") ;
+  Check.(
+    JSON.(internal_op_content |-> "source" |> as_string = faucet.address)
+      string
+      ~error_msg:"Expected internal operation source to be %R but got %L") ;
+  let internal_op_result = JSON.(internal_op_content |-> "result") in
+  Check.(
+    JSON.(internal_op_result |-> "status" |> as_string = "applied")
+      string
+      ~error_msg:"Expected internal operation status to be %R but got %L") ;
+
+  (* Check the internal operation result's balance updates *)
+  let balance_updates =
+    JSON.(internal_op_result |-> "balance_updates" |> as_list)
+  in
+  Check.(
+    (List.length balance_updates = 2)
+      int
+      ~error_msg:"Expected 2 INTERNAL balance updates but got %L") ;
+
+  let check_balance_update json_data ~kind ~contract ~change ~origin =
+    Check.(
+      JSON.(json_data |-> "kind" |> as_string = kind)
+        string
+        ~error_msg:"Expected kind to be %R but got %L") ;
+    Check.(
+      JSON.(json_data |-> "contract" |> as_string = contract)
+        string
+        ~error_msg:"Expected contract to be %R but got %L") ;
+    Check.(
+      JSON.(json_data |-> "change" |> as_int = change)
+        int
+        ~error_msg:"Expected change to be %R but got %L") ;
+    Check.(
+      JSON.(json_data |-> "origin" |> as_string = origin)
+        string
+        ~error_msg:"Expected origin to be %R but got %L")
+  in
+
+  let first_update = List.hd balance_updates in
+  check_balance_update
+    first_update
+    ~kind:"contract"
+    ~contract:faucet.address
+    ~change:(-amount)
+    ~origin:"block" ;
+
+  let second_update = List.nth balance_updates 1 in
+  check_balance_update
+    second_update
+    ~kind:"contract"
+    ~contract:Constant.bootstrap1.public_key_hash
+    ~change:amount
+    ~origin:"block" ;
+
+  unit
+
 let () =
   test_observer_starts [Alpha] ;
   test_describe_endpoint [Alpha] ;
@@ -1357,4 +1487,5 @@ let () =
   test_tezlink_batch [Alpha] ;
   test_tezlink_bootstrap_block_info [Alpha] ;
   test_tezlink_sandbox () ;
-  test_tezlink_internal_operation [Alpha]
+  test_tezlink_internal_operation [Alpha] ;
+  test_tezlink_internal_receipts [Alpha]
