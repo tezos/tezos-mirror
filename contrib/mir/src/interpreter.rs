@@ -659,7 +659,7 @@ fn interpret_one<'a>(
                 let o1 = pop!(V::Bytes);
                 let o2 = pop!(V::Nat);
 
-                let o2_usize = o2.to_usize().unwrap();
+                let o2_usize = o2.to_usize().ok_or(InterpretError::Overflow)?;
                 ctx.gas
                     .consume(interpret_cost::lsr_bytes(&o1, &o2_usize)?)?;
 

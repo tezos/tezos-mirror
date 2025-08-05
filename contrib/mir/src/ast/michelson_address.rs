@@ -138,7 +138,10 @@ mod tests {
             dbg!(Address::from_bytes(
                 &hex::decode("00ff7b09f782e0bcd67739510afa819d85976119d5ef").unwrap()
             )),
-            Err(ByteReprError::WrongFormat("public key hash".into())),
+            Err(ByteReprError::WrongFormat(
+                "public key hash : Error decoding bytes [1..21] caused by invalid tag `0xFF`"
+                    .into()
+            )),
         );
 
         // unknown tag
