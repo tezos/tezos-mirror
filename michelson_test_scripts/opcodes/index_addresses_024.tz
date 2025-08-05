@@ -3,4 +3,5 @@
   code { CAR ;
          MAP { INDEX_ADDRESS } ;
          NIL operation ;
-         PAIR } }
+         PAIR } ;
+  view "v" address (option nat) { CAR; GET_ADDRESS_INDEX } }
