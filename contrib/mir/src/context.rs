@@ -90,6 +90,11 @@ impl<'a> Ctx<'a> {
         self.operation_counter
     }
 
+    /// Get the current operation counter.
+    pub fn get_operation_counter(&self) -> u128 {
+        self.operation_counter
+    }
+
     /// Forcibly set the operation counter. This is mostly useful for testing purposes.
     pub fn set_operation_counter(&mut self, v: u128) {
         self.operation_counter = v;
