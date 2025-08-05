@@ -21,8 +21,8 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, Originated, OriginationError, OriginationSuccess,
-    TransferTarget,
+    produce_skipped_receipt, ApplyOperationError, Originated, OriginationError,
+    OriginationSuccess, TransferTarget,
 };
 use tezos_tezlink::{
     operation::{
@@ -132,7 +132,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_account: &mut TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> Result<(), TransferError> {
+) -> Result<(), ApplyOperationError> {
     for internal_op in internal_operations {
         log!(
             host,
@@ -162,7 +162,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 )
             }
             _ => {
-                return Err(TransferError::FailedToApplyInternalOperation(
+                return Err(ApplyOperationError::UnSupportedOperation(
                     "Unsupported internal operation".to_string(),
                 ));
             }

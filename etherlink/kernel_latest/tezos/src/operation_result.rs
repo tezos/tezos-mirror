@@ -132,8 +132,6 @@ pub enum TransferError {
     FailedToUpdateContractStorage,
     #[error("Failed to update destination balance")]
     FailedToUpdateDestinationBalance,
-    #[error("An internal operation failed: {0}")]
-    FailedToApplyInternalOperation(String),
     #[error("Apply operation failed because of an unsupported address error")]
     MirAddressUnsupportedError,
 }
