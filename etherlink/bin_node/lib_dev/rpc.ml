@@ -261,7 +261,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     (* We leave one domain for the RPC server *)
     Lwt_domain.setup_pool (max 1 (Domain.recommended_domain_count () - 1))
   in
-  let*! () =
+  let* () =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
       ~service_namespace:"evm_node"

@@ -178,7 +178,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
-  let*! () =
+  let* () =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
       ~service_namespace:"evm_node"

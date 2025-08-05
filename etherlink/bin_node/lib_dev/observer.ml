@@ -189,7 +189,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let open Configuration in
-  let*! () =
+  let* () =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
       ~service_namespace:"evm_node"
