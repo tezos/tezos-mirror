@@ -32,7 +32,6 @@ type multichain_sequencer_setup = {
   evm_version : Evm_version.t;
   enable_multichain : bool;
   l2_chains : Evm_node.l2_setup list;
-  enable_revm : bool;
 }
 
 type sequencer_setup = {
@@ -50,7 +49,6 @@ type sequencer_setup = {
   evm_version : Evm_version.t;
   enable_multichain : bool;
   l2_chains : Evm_node.l2_setup list;
-  enable_revm : bool;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
@@ -107,7 +105,6 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -160,7 +157,6 @@ val register_multichain_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
@@ -215,7 +211,6 @@ val register_test_for_kernels :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   ?commitment_period:int ->
   ?challenge_window:int ->
@@ -269,7 +264,6 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
-  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?drop_duplicate_when_injection:bool ->
@@ -306,8 +300,6 @@ type feature_test_registration =
    MR CI. *)
 
 val ci_enabled_dal_registration : feature_test_registration
-
-val activate_revm_registration : feature_test_registration
 
 val register_all :
   __FILE__:string ->
@@ -346,7 +338,6 @@ val register_all :
   ?history_mode:Evm_node.history_mode ->
   ?use_dal:feature_test_registration ->
   ?use_multichain:feature_test_registration ->
-  ?use_revm:feature_test_registration ->
   ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->

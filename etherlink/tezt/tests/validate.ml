@@ -551,52 +551,60 @@ let test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction =
       "Validate custom gas limit greater than the maximum gas per transaction"
     ~tags:["gas_limit"; "maximum_gas_per_transaction"]
   @@ fun kernel sequencer tx_type ->
-  assert (tx_type = Legacy) ;
-  let source = Eth_account.bootstrap_accounts.(0) in
-  let inclusion_fees = 600_000 in
-  let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
-  let over_approximated_gas = succ gas in
-  let* tx =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~legacy:true
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ~gas:over_approximated_gas
-      ()
-  in
-  match kernel with
-  | Mainnet ->
-      let*@? err = Rpc.send_raw_transaction ~raw_tx:tx sequencer in
-      Check.(err.message =~ rex "Gas limit for execution is too high")
-        ~error_msg:"Gas limit too high for execution, it should fail" ;
-      unit
-  | Latest -> (
-      let* tx_hash =
-        send_transaction_and_wait_confirmation ~raw_tx:tx sequencer
-      in
-      let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-      match receipt_opt with
-      | None ->
-          Test.fail
-            ~__LOC__
-            "Expected a receipt for transaction hash %s but got none"
-            tx_hash
-      | Some receipt ->
-          Check.is_false
-            receipt.status
-            ~__LOC__
-            ~error_msg:
-              "Expected status in transaction receipt to be 0x0 (failure) but \
-               got 0x1 (success)" ;
-          Check.((receipt.cumulativeGasUsed = Int64.of_int gas) ~__LOC__ int64)
-            ~error_msg:
-              "Expected cumulative gas used in transaction receipt to be the \
-               maximum gas per transaction (%R) but got %L" ;
-          unit)
+  if kernel = Kernel.Latest then
+    (* This test isn't relevant on a kernel where REVM is activated. A transaction with a gas limit inferior to 21 000
+       can not be processed. The test rely on a semantic mistake from our Sputnik implementation.
+       TODO: As a follow-up [validate_gas_limit] should refuse transaction with a transaction gas limit < 21 000 to be
+       aligned with other EVM-compatible chains. *)
+    unit
+  else (
+    assert (tx_type = Legacy) ;
+    let source = Eth_account.bootstrap_accounts.(0) in
+    let inclusion_fees = 600_000 in
+    let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
+    let over_approximated_gas = succ gas in
+    let* tx =
+      Cast.craft_tx
+        ~source_private_key:source.private_key
+        ~chain_id:1337
+        ~nonce:0
+        ~gas_price:1_000_000_000
+        ~legacy:true
+        ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+        ~value:Wei.zero
+        ~gas:over_approximated_gas
+        ()
+    in
+    match kernel with
+    | Mainnet ->
+        let*@? err = Rpc.send_raw_transaction ~raw_tx:tx sequencer in
+        Check.(err.message =~ rex "Gas limit for execution is too high")
+          ~error_msg:"Gas limit too high for execution, it should fail" ;
+        unit
+    | Latest -> (
+        let* tx_hash =
+          send_transaction_and_wait_confirmation ~raw_tx:tx sequencer
+        in
+        let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+        match receipt_opt with
+        | None ->
+            Test.fail
+              ~__LOC__
+              "Expected a receipt for transaction hash %s but got none"
+              tx_hash
+        | Some receipt ->
+            Check.is_false
+              receipt.status
+              ~__LOC__
+              ~error_msg:
+                "Expected status in transaction receipt to be 0x0 (failure) \
+                 but got 0x1 (success)" ;
+            Check.(
+              (receipt.cumulativeGasUsed = Int64.of_int gas) ~__LOC__ int64)
+              ~error_msg:
+                "Expected cumulative gas used in transaction receipt to be the \
+                 maximum gas per transaction (%R) but got %L" ;
+            unit))
 
 (** This test verifies that transactions with gas consumption over the
     maximum allowed gas per transaction are properly rejected by
@@ -610,47 +618,56 @@ let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
     ~title:
       "Validate custom gas limit lower than the maximum gas per transaction"
     ~tags:["gas_limit"; "maximum_gas_per_transaction"]
-  @@ fun _kernel sequencer tx_type ->
-  assert (tx_type = Legacy) ;
-  let source = Eth_account.bootstrap_accounts.(0) in
-  let inclusion_fees = 600_000 in
-  let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
-  let under_approximated_gas = pred gas in
-  let* tx =
-    Cast.craft_tx
-      ~source_private_key:source.private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:1_000_000_000
-      ~legacy:true
-      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
-      ~value:Wei.zero
-      ~gas:under_approximated_gas
-      ()
-  in
-  let* tx_hash = send_transaction_and_wait_confirmation ~raw_tx:tx sequencer in
-  let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
-  match receipt_opt with
-  | None ->
-      Test.fail
-        ~__LOC__
-        "Expected a receipt for transaction hash %s but got none"
-        tx_hash
-  | Some receipt ->
-      Check.is_false
-        receipt.status
-        ~__LOC__
-        ~error_msg:
-          "Expected status in transaction receipt to be 0x0 (failure) but got \
-           0x1 (success)" ;
-      Check.(
-        (receipt.cumulativeGasUsed = Int64.of_int under_approximated_gas)
+  @@ fun kernel sequencer tx_type ->
+  if kernel = Kernel.Latest then
+    (* This test isn't relevant on a kernel where REVM is activated. A transaction with a gas limit inferior to 21 000
+       can not be processed. The test rely on a semantic mistake from our Sputnik implementation.
+       TODO: As a follow-up [validate_gas_limit] should refuse transaction with a transaction gas limit < 21 000 to be
+       aligned with other EVM-compatible chains. *)
+    unit
+  else (
+    assert (tx_type = Legacy) ;
+    let source = Eth_account.bootstrap_accounts.(0) in
+    let inclusion_fees = 600_000 in
+    let gas = inclusion_fees + Int64.to_int maximum_gas_per_transaction in
+    let under_approximated_gas = pred gas in
+    let* tx =
+      Cast.craft_tx
+        ~source_private_key:source.private_key
+        ~chain_id:1337
+        ~nonce:0
+        ~gas_price:1_000_000_000
+        ~legacy:true
+        ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+        ~value:Wei.zero
+        ~gas:under_approximated_gas
+        ()
+    in
+    let* tx_hash =
+      send_transaction_and_wait_confirmation ~raw_tx:tx sequencer
+    in
+    let*@ receipt_opt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+    match receipt_opt with
+    | None ->
+        Test.fail
           ~__LOC__
-          int64)
-        ~error_msg:
-          "Expected cumulative gas used in transaction receipt to be the gas \
-           limit provided (%R) but got %L" ;
-      unit
+          "Expected a receipt for transaction hash %s but got none"
+          tx_hash
+    | Some receipt ->
+        Check.is_false
+          receipt.status
+          ~__LOC__
+          ~error_msg:
+            "Expected status in transaction receipt to be 0x0 (failure) but \
+             got 0x1 (success)" ;
+        Check.(
+          (receipt.cumulativeGasUsed = Int64.of_int under_approximated_gas)
+            ~__LOC__
+            int64)
+          ~error_msg:
+            "Expected cumulative gas used in transaction receipt to be the gas \
+             limit provided (%R) but got %L" ;
+        unit)
 
 let test_validate_gas_limit =
   register

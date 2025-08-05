@@ -309,7 +309,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
     ?dal_slots ?(enable_multichain = false) ?websockets
-    ?(enable_fast_withdrawal = false) ?enable_tx_queue ?enable_revm protocol =
+    ?(enable_fast_withdrawal = false) ?enable_tx_queue protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -385,7 +385,6 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         ~enable_dal
         ~enable_multichain
         ~enable_fast_withdrawal
-        ?enable_revm
         ?dal_slots
         ?evm_version
         ()
@@ -529,8 +528,8 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
-    ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue
-    ?(enable_revm = false) f protocols =
+    ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue f
+    protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -549,64 +548,58 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
         @ (if enable_dal then [Constant.octez_dal_node] else [])
         @ additional_uses
       in
-      if (not enable_revm) || Kernel.supports_revm kernel then
-        Protocol.register_test
-          ~__FILE__
-          ~tags:
-            ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
-            @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
-               else [])
-            @ (if enable_revm then ["revm"] (* Activate CI for REVM tests *)
-               else [])
-            @ (kernel_tag :: extra_tag :: tags))
-          ~uses
-          ~title:
-            (sf
-               "%s (%s, %s, %s, %s, %s)"
-               title
-               extra_tag
-               kernel_tag
-               (if enable_dal then "with dal" else "without dal")
-               (if enable_multichain then "multichain" else "single chain")
-               (if enable_revm then "with revm" else "without revm"))
-          (fun protocol ->
-            let* evm_setup =
-              setup_evm_kernel
-                ~kernel
-                ?additional_config
-                ?whitelist
-                ?commitment_period
-                ?challenge_window
-                ?eth_bootstrap_accounts
-                ?da_fee_per_byte
-                ?minimum_base_fee_per_gas
-                ?rollup_operator_key
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?restricted_rpcs
-                ~admin
-                ~setup_mode
-                ~enable_dal
-                ?dal_slots
-                ~enable_multichain
-                ?websockets
-                ?enable_fast_withdrawal
-                ?evm_version
-                ?enable_tx_queue
-                ~enable_revm
-                protocol
-            in
-            f ~protocol ~evm_setup)
-          protocols)
+      Protocol.register_test
+        ~__FILE__
+        ~tags:
+          ((if enable_dal then ["dal"; Tag.ci_disabled] else [])
+          @ (if enable_multichain then ["multichain_enabled"; Tag.ci_disabled]
+             else [])
+          @ (kernel_tag :: extra_tag :: tags))
+        ~uses
+        ~title:
+          (sf
+             "%s (%s, %s, %s, %s)"
+             title
+             extra_tag
+             kernel_tag
+             (if enable_dal then "with dal" else "without dal")
+             (if enable_multichain then "multichain" else "single chain"))
+        (fun protocol ->
+          let* evm_setup =
+            setup_evm_kernel
+              ~kernel
+              ?additional_config
+              ?whitelist
+              ?commitment_period
+              ?challenge_window
+              ?eth_bootstrap_accounts
+              ?da_fee_per_byte
+              ?minimum_base_fee_per_gas
+              ?rollup_operator_key
+              ?maximum_allowed_ticks
+              ?maximum_gas_per_transaction
+              ?restricted_rpcs
+              ~admin
+              ~setup_mode
+              ~enable_dal
+              ?dal_slots
+              ~enable_multichain
+              ?websockets
+              ?enable_fast_withdrawal
+              ?evm_version
+              ?enable_tx_queue
+              protocol
+          in
+          f ~protocol ~evm_setup)
+        protocols)
     kernels
 
 let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?whitelist ?rollup_operator_key
     ?maximum_allowed_ticks ?maximum_gas_per_transaction ?restricted_rpcs
-    ?websockets ?enable_fast_withdrawal ?evm_version ?(enable_revm = false) f
-    protocols =
-  let register ~enable_dal ~enable_multichain ~enable_revm : unit =
+    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
+  let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
       ~tags
@@ -631,15 +624,12 @@ let register_proxy ~title ~tags ?kernels ?additional_uses ?additional_config
       protocols
       ~enable_dal
       ~enable_multichain
-      ~enable_revm
       ~setup_mode:Setup_proxy
   in
-  if enable_revm then
-    register ~enable_dal:false ~enable_multichain:false ~enable_revm ;
-  register ~enable_dal:false ~enable_multichain:false ~enable_revm:false ;
-  register ~enable_dal:true ~enable_multichain:false ~enable_revm:false ;
-  register ~enable_dal:false ~enable_multichain:true ~enable_revm:false ;
-  register ~enable_dal:true ~enable_multichain:true ~enable_revm:false
+  register ~enable_dal:false ~enable_multichain:false ;
+  register ~enable_dal:true ~enable_multichain:false ;
+  register ~enable_dal:false ~enable_multichain:true ;
+  register ~enable_dal:true ~enable_multichain:true
 
 let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?additional_uses ?additional_config ?admin ?commitment_period
@@ -647,8 +637,8 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
-    ?genesis_timestamp ?enable_tx_queue ?(enable_revm = false) f protocols =
-  let register ~enable_dal ~enable_multichain ~enable_revm : unit =
+    ?genesis_timestamp ?enable_tx_queue f protocols =
+  let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
       ~tags
@@ -673,7 +663,6 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       protocols
       ~enable_dal
       ~enable_multichain
-      ~enable_revm
       ~setup_mode:
         (Setup_sequencer
            {
@@ -684,19 +673,17 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
              genesis_timestamp;
            })
   in
-  if enable_revm then
-    register ~enable_dal:false ~enable_multichain:false ~enable_revm ;
-  register ~enable_dal:false ~enable_multichain:false ~enable_revm:false ;
-  register ~enable_dal:true ~enable_multichain:false ~enable_revm:false ;
-  register ~enable_dal:false ~enable_multichain:true ~enable_revm:false ;
-  register ~enable_dal:true ~enable_multichain:true ~enable_revm:false
+  register ~enable_dal:false ~enable_multichain:false ;
+  register ~enable_dal:true ~enable_multichain:false ;
+  register ~enable_dal:false ~enable_multichain:true ;
+  register ~enable_dal:true ~enable_multichain:true
 
 let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?admin ?commitment_period ?challenge_window ?eth_bootstrap_accounts
     ?da_fee_per_byte ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
-    ?(enable_revm = false) f protocols : unit =
+    ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version f protocols
+    : unit =
   register_proxy
     ~title
     ~tags
@@ -716,7 +703,6 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?restricted_rpcs
     ?websockets
     ?evm_version
-    ~enable_revm
     f
     protocols ;
   register_sequencer
@@ -740,7 +726,6 @@ let register_both ~title ~tags ?kernels ?additional_uses ?additional_config
     ?max_blueprints_ahead
     ?websockets
     ?evm_version
-    ~enable_revm
     f
     protocols
 
@@ -998,7 +983,6 @@ let test_rpc_getBlockReceipts =
     ~tags:["evm"; "rpc"; "get_block_receipts"]
     ~title:"RPC method eth_getBlockReceipts"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup -> test_rpc_getBlockReceipts_aux evm_setup
 
 let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
@@ -1009,7 +993,6 @@ let test_rpc_getBlockBy_return_base_fee_per_gas_and_mix_hash =
     ~tags:["evm"; "rpc"; "get_block_by_hash"]
     ~title:"getBlockBy returns base fee per gas and previous random number"
     ~minimum_base_fee_per_gas:(Wei.to_wei_z @@ Z.of_int 100)
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let evm_node_endpoint = Evm_node.endpoint evm_setup.evm_node in
 
@@ -1230,7 +1213,6 @@ let test_l2_deploy_simple_storage =
   register_proxy
     ~tags:["evm"; "l2_deploy"; "simple_storage"]
     ~title:"Check L2 contract deployment"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let* simple_storage_resolved = simple_storage evm_setup.evm_version in
   deploy_with_base_checks
@@ -1288,7 +1270,6 @@ let test_l2_call_simple_storage =
   register_proxy
     ~tags:["evm"; "l2_deploy"; "l2_call"; "simple_storage"]
     ~title:"Check L2 contract call"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; sc_rollup_node; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -1358,7 +1339,6 @@ let test_l2_deploy_erc20 =
   register_proxy
     ~tags:["evm"; "l2_deploy"; "erc20"; "l2_call"]
     ~title:"Check L2 erc20 contract deployment"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
   let {evm_node; sc_rollup_node; evm_version; _} = evm_setup in
@@ -1484,7 +1464,6 @@ let test_deploy_contract_with_push0 =
     ~tags:["evm"; "deploy"; "push0"]
     ~title:
       "Check that a contract containing PUSH0 can successfully be deployed."
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let* shanghai_storage_resolved = shanghai_storage evm_setup.evm_version in
   deploy_with_base_checks
@@ -1520,7 +1499,6 @@ let test_log_index =
   register_both
     ~tags:["evm"; "log_index"; "events"]
     ~title:"Check that log index is correctly computed"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   (* setup *)
   let {evm_node; _} = evm_setup in
@@ -1862,7 +1840,6 @@ let test_rpc_txpool_content =
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~enable_tx_queue:(Enable false)
-    ~enable_revm:true
   (*This test does not work for the tx_queue yet. It needs to be adapted *)
   @@
   fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
@@ -2092,7 +2069,6 @@ let test_simulate =
   register_proxy
     ~tags:["evm"; "simulate"]
     ~title:"A block can be simulated in the rollup node"
-    ~enable_revm:true
     (fun ~protocol:_ ~evm_setup:{evm_node; sc_rollup_node; _} ->
       let*@ block_number = Rpc.block_number evm_node in
       let* simulation_result =
@@ -2124,7 +2100,6 @@ let test_full_blocks =
       "Check `eth_getBlockByNumber` with full blocks returns the correct \
        informations"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   let txs =
     read_tx_from_file ()
@@ -2195,7 +2170,6 @@ let test_eth_call_nullable_recipient =
   register_both
     ~tags:["evm"; "eth_call"; "null"]
     ~title:"Check `eth_call.to` input can be null"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* call_result =
     Evm_node.(
@@ -2216,7 +2190,6 @@ let test_eth_call_contract_create =
     ~tags:["evm"; "eth_call"; "contract_create"]
     ~title:"Check eth_call with contract creation"
     ~kernels:[Latest]
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* call_result =
     Evm_node.(
@@ -2253,7 +2226,6 @@ let test_inject_100_transactions =
     ~title:"Check blocks can contain more than 64 transactions"
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   (* Retrieves all the messages and prepare them for the current rollup. *)
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
@@ -2347,7 +2319,7 @@ let test_eth_call_input =
   in
   let title = "eth_call with input instead of data" in
   let tags = ["evm"; "eth_call"; "simulate"; "input"] in
-  register_both ~title ~tags ~enable_revm:true test_f
+  register_both ~title ~tags test_f
 
 let test_estimate_gas =
   let test_f ~protocol:_ ~evm_setup =
@@ -2462,7 +2434,7 @@ let test_eth_call_storage_contract =
   in
   let title = "Call a view" in
   let tags = ["evm"; "eth_call"; "simulate"; "simple_storage"] in
-  register_both ~title ~tags ~enable_revm:true test_f
+  register_both ~title ~tags test_f
 
 let test_eth_call_storage_contract_eth_cli =
   let test_f ~protocol:_
@@ -2516,7 +2488,7 @@ let test_eth_call_storage_contract_eth_cli =
   let title = "Call a view through an ethereum client" in
   let tags = ["evm"; "eth_call"; "simulate"; "simple_storage"] in
 
-  register_both ~title ~tags ~enable_revm:true test_f
+  register_both ~title ~tags test_f
 
 let test_preinitialized_evm_kernel =
   let admin = Constant.bootstrap1 in
@@ -2627,7 +2599,6 @@ let test_deposit_and_withdraw =
     ~admin
     ~commitment_period
     ~challenge_window
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                {
@@ -2711,7 +2682,6 @@ let test_withdraw_amount =
     ~tags:["evm"; "withdraw"; "wei"; "mutez"]
     ~title:"Minimum amount to withdraw"
     ~admin
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{endpoint; produce_block; _} ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Minimal amount of Wei fails with revert. *)
@@ -2766,7 +2736,6 @@ let test_withdraw_via_calls =
     ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
     ~title:"Withdrawal via different kind of calls"
     ~admin
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
@@ -3140,7 +3109,6 @@ let test_rpc_sendRawTransaction =
     ~title:
       "Ensure EVM node returns appropriate hash for any given transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let* tx1 =
     Cast.craft_tx
@@ -3239,7 +3207,6 @@ let test_rpc_getCode =
   register_both
     ~tags:["evm"; "rpc"; "get_code"; "simple_storage"]
     ~title:"RPC method eth_getCode"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* simple_storage_resolved = simple_storage evm_setup.evm_version in
@@ -3257,7 +3224,6 @@ let test_rpc_getTransactionByHash =
     ~tags:["evm"; "rpc"; "get_transaction_by"; "transaction_by_hash"]
     ~title:"RPC method eth_getTransactionByHash"
     ~da_fee_per_byte:(Wei.of_eth_string "0.000004")
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -3307,7 +3273,6 @@ let test_rpc_getTransactionByBlockHashAndIndex =
     ~title:"RPC method eth_getTransactionByBlockHashAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
-    ~enable_revm:true
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Hash
 
 let test_rpc_getTransactionByBlockNumberAndIndex =
@@ -3316,7 +3281,6 @@ let test_rpc_getTransactionByBlockNumberAndIndex =
     ~title:"RPC method eth_getTransactionByBlockNumberAndIndex"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
-    ~enable_revm:true
   @@ fun ~protocol:_ -> test_rpc_getTransactionByBlockArgAndIndex ~by:`Number
 
 type storage_migration_results = {
@@ -3572,7 +3536,6 @@ let test_cannot_prepayed_leads_to_no_inclusion =
       "Not being able to prepay a transaction leads to it not being included."
     ~eth_bootstrap_accounts:[]
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   (* No bootstrap accounts, so no one has funds. *)
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
@@ -3604,7 +3567,6 @@ let test_cannot_prepayed_with_delay_leads_to_no_injection =
       "Not being able to prepay a transaction that was included leads to it \
        not being injected."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; endpoint; produce_block; _} ->
   let sender, to_public_key =
     ( Eth_account.bootstrap_accounts.(0),
@@ -3969,7 +3931,6 @@ let test_rpc_getBlockTransactionCountBy =
        eth_getBlockTransactionCountByNumber"
     ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {produce_block; evm_node; _} = evm_setup in
   let txs = read_tx_from_file () |> List.filteri (fun i _ -> i < 5) in
@@ -4084,7 +4045,6 @@ let test_simulation_eip2200 =
   register_both
     ~tags:["evm"; "loop"; "simulation"; "eip2200"]
     ~title:"Simulation is EIP2200 resilient"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {produce_block; endpoint; evm_version; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -4109,7 +4069,6 @@ let test_rpc_sendRawTransaction_with_consecutive_nonce =
     ~tags:["evm"; "rpc"; "tx_nonce"]
     ~title:"Can submit many transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   (* Nonce: 0*)
   let* tx_1 =
@@ -4155,7 +4114,6 @@ let test_rpc_sendRawTransaction_not_included =
     ~title:
       "Tx with nonce too high are not included without previous transactions."
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; endpoint; produce_block; _} ->
   (* Nonce: 1 *)
   let* tx =
@@ -4185,7 +4143,6 @@ let test_rpc_gasPrice =
   register_both
     ~tags:["evm"; "rpc"; "gas_price"]
     ~title:"RPC methods eth_gasPrice"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:{evm_node; _} ->
   let expected_gas_price = Wei.of_gwei_string "1" in
   let* gas_price =
@@ -4216,7 +4173,6 @@ let test_rpc_getStorageAt =
   register_both
     ~tags:["evm"; "rpc"; "get_storage_at"; "mapping_storage"]
     ~title:"RPC methods eth_getStorageAt"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {endpoint; evm_node; _} = evm_setup in
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -4364,7 +4320,6 @@ let test_rpc_getLogs =
   register_both
     ~tags:["evm"; "rpc"; "get_logs"; "erc20"]
     ~title:"Check getLogs RPC"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4516,7 +4471,6 @@ let test_l2_nested_create =
   register_both
     ~tags:["evm"; "l2_deploy"; "l2_create"; "inter_contract"]
     ~title:"Check L2 nested create"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4602,7 +4556,6 @@ let test_l2_revert_returns_unused_gas =
     ~tags:["evm"; "revert"]
     ~title:"Check L2 revert returns unused gas"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4646,7 +4599,6 @@ let test_l2_create_collision =
   register_both
     ~tags:["evm"; "l2_create"; "collision"]
     ~title:"Check L2 create collision"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4687,7 +4639,6 @@ let test_l2_intermediate_OOG_call =
     ~title:
       "Check that an L2 call to a smart contract with an intermediate call \
        that runs out of gas still succeeds."
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; evm_version; _} = evm_setup in
   let* oog_call_resolved = oog_call evm_version in
@@ -4719,7 +4670,6 @@ let test_l2_ether_wallet =
   register_both
     ~tags:["evm"; "l2_call"; "wallet"]
     ~title:"Check ether wallet functions correctly"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let {evm_node; produce_block; evm_version; _} = evm_setup in
   let endpoint = Evm_node.endpoint evm_node in
@@ -4806,7 +4756,6 @@ let test_reboot_gas_limit =
        for a single run"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~maximum_gas_per_transaction:250_000L
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                ({evm_node; produce_block; sc_rollup_node; node; evm_version; _}
@@ -4960,7 +4909,6 @@ let test_l2_timestamp_opcode =
     ~tags:["evm"; "timestamp"; "opcode"]
     ~title:"Check L2 opcode timestamp"
     ~kernels:[Kernel.Latest]
-    ~enable_revm:true
     test
 
 let test_migrate_proxy_to_sequencer_future =
@@ -5318,7 +5266,6 @@ let test_estimate_gas_out_of_gas =
     ~kernels:[Kernel.Mainnet]
     ~tags:["evm"; "estimate_gas"; "simulate"; "loop"]
     ~title:"estimateGas fails with out of gas for overly costly transaction"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* loop_resolved = loop evm_version in
@@ -5370,7 +5317,6 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
   register_both
     ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
     ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
@@ -5443,7 +5389,6 @@ let test_mcopy_opcode =
   register_both
     ~tags:["evm"; "mcopy"; "cancun"]
     ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
@@ -5503,7 +5448,6 @@ let test_transient_storage =
   register_both
     ~tags:["evm"; "transient_storage"; "cancun"]
     ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
@@ -5589,57 +5533,11 @@ let test_call_recursive_contract_estimate_gas =
   let* () = check_tx_succeeded ~endpoint ~tx in
   unit
 
-let test_limited_stack_depth =
-  register_both
-    ~kernels:[Kernel.Latest]
-    ~tags:["evm"; "recursive"; "stack_depth"]
-    ~title:"Check recursive contract gasLimit is high enough"
-    ~maximum_allowed_ticks:1_000_000_000_000L
-  @@ fun ~protocol:_
-             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
-    ->
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* recursive_resolved = recursive evm_version in
-  let* recursive_address, _tx =
-    deploy ~contract:recursive_resolved ~sender evm_setup
-  in
-  (* 256 is ok. *)
-  let call () =
-    Eth_cli.contract_send
-      ~source_private_key:sender.private_key
-      ~endpoint
-      ~abi_label:recursive_resolved.label
-      ~address:recursive_address
-      ~method_call:"call(256)"
-      ~gas:30_000_000
-      ()
-  in
-  let* tx = wait_for_application ~produce_block call in
-  let* () = check_tx_succeeded ~endpoint ~tx in
-  (* 257 is not. *)
-  let call () =
-    Eth_cli.contract_send
-      ~expect_failure:true
-      ~source_private_key:sender.private_key
-      ~endpoint
-      ~abi_label:recursive_resolved.label
-      ~address:recursive_address
-      ~method_call:"call(257)"
-      ~gas:30_000_000
-        (* The fee model kicks in because we spend too much ticks in the previous call. *)
-      ~gas_price:2000000000
-      ()
-  in
-  let* tx = wait_for_application ~produce_block call in
-  let* () = check_tx_failed ~endpoint ~tx in
-  unit
-
 let test_check_estimateGas_enforces_limits =
   register_both
     ~kernels:[Latest]
     ~tags:["evm"; "estimate_gas"; "gas_limit"]
     ~title:"Check that the eth_estimateGas enforces the kernel gas limit."
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* gas_left_contract = Solidity_contracts.gas_left evm_version in
@@ -5786,7 +5684,6 @@ let test_blockhash_opcode =
     ~max_blueprints_ahead:300
     ~tags:["evm"; "blockhash"; "opcode"]
     ~title:"Check if blockhash opcode returns the actual hash of the block"
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                ({produce_block; endpoint; evm_node; evm_version; _} as evm_setup)
@@ -5843,7 +5740,6 @@ let test_block_constants_opcode =
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "block"; "opcode"; "constants"]
     ~title:"Check block constants in opcode"
-    ~enable_revm:true
   @@ fun ~protocol:_
              ~evm_setup:
                ({evm_node; produce_block; endpoint; evm_version; _} as evm_setup)
@@ -5931,7 +5827,6 @@ let test_revert_is_correctly_propagated =
   register_both
     ~tags:["evm"; "revert"]
     ~title:"Check that the node propagates reverts reason correctly."
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup:({evm_node; evm_version; _} as evm_setup) ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* error_resolved = error evm_version in
@@ -6345,7 +6240,6 @@ let test_rpc_feeHistory =
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "fee_history"]
     ~title:"RPC methods eth_feeHistory"
-    ~enable_revm:true
   @@ fun ~protocol:_ ~evm_setup ->
   let* _ =
     repeat 2 (fun _ ->
@@ -6540,7 +6434,9 @@ let test_rpc_state_value_and_subkeys =
     ~tags:["evm"; "rpc"; "state_value"; "state_subkeys"]
     ~title:"RPC methods stateValue and stateSubkeys"
   @@ fun ~protocol:_ ~evm_setup ->
-  let {evm_node; sc_rollup_node; client; produce_block; _} = evm_setup in
+  let {evm_node; sc_rollup_node; client; produce_block; kernel; _} =
+    evm_setup
+  in
   let* _ = produce_block () in
   let* () =
     repeat 3 (fun () ->
@@ -6553,11 +6449,17 @@ let test_rpc_state_value_and_subkeys =
       string
       ~error_msg:"Kernel version is %L, but should be %R") ;
   let*@! world_state_subkeys = Rpc.state_subkeys evm_node "/evm/world_state" in
+  let expected_subkeys =
+    (* Hack-ish way to know if revm is enabled or not: *)
+    if Kernel.of_tag kernel = Latest then
+      ["indexes"; "blocks"; "fees"; "eth_accounts"; "eth_codes"]
+    else ["indexes"; "blocks"; "fees"; "eth_accounts"]
+  in
   Check.(
     (List.sort String.compare world_state_subkeys
-    = List.sort String.compare ["indexes"; "blocks"; "fees"; "eth_accounts"])
+    = List.sort String.compare expected_subkeys)
       (list string)
-      ~error_msg:"Kernel version is %L, but should be %R") ;
+      ~error_msg:"World state subkeys are %L, but should be %R") ;
   unit
 
 let test_cast_work () =
@@ -6738,7 +6640,6 @@ let register_evm_node ~protocols =
   test_transient_storage protocols ;
   test_reveal_storage protocols ;
   test_call_recursive_contract_estimate_gas protocols ;
-  test_limited_stack_depth protocols ;
   test_check_estimateGas_enforces_limits protocols ;
   test_blockhash_opcode protocols ;
   test_block_constants_opcode protocols ;

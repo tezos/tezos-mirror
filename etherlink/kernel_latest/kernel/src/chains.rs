@@ -19,11 +19,7 @@ use crate::{
     CHAIN_ID,
 };
 use anyhow::Context;
-use evm_execution::{
-    configuration::EVMVersion,
-    precompiles::{precompile_set, PrecompileBTreeMap},
-    trace::TracerInput,
-};
+use evm_execution::{configuration::EVMVersion, trace::TracerInput};
 use primitive_types::{H160, H256, U256};
 use rlp::{Decodable, Encodable};
 use std::{
@@ -251,7 +247,6 @@ pub trait ChainConfigTrait: Debug {
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        precompiles: &PrecompileBTreeMap<Host>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         maximum_allowed_ticks: u64,
@@ -260,16 +255,7 @@ pub trait ChainConfigTrait: Debug {
         coinbase: H160,
     ) -> anyhow::Result<BlockComputationResult>;
 
-    fn start_simulation_mode(
-        &self,
-        host: &mut impl Runtime,
-        enable_fa_bridge: bool,
-    ) -> anyhow::Result<()>;
-
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host>;
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()>;
 }
 
 impl ChainConfigTrait for EvmChainConfig {
@@ -339,7 +325,6 @@ impl ChainConfigTrait for EvmChainConfig {
         host: &mut Host,
         outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        precompiles: &PrecompileBTreeMap<Host>,
         tick_counter: &mut TickCounter,
         sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -353,7 +338,6 @@ impl ChainConfigTrait for EvmChainConfig {
             host,
             outbox_queue,
             block_in_progress,
-            precompiles,
             tick_counter,
             sequencer_pool_address,
             &self.limits,
@@ -365,19 +349,8 @@ impl ChainConfigTrait for EvmChainConfig {
         )
     }
 
-    fn start_simulation_mode(
-        &self,
-        host: &mut impl Runtime,
-        enable_fa_bridge: bool,
-    ) -> anyhow::Result<()> {
-        start_simulation_mode(host, enable_fa_bridge, &self.evm_config)
-    }
-
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host> {
-        precompile_set::<Host>(enable_fa_bridge)
+    fn start_simulation_mode(&self, host: &mut impl Runtime) -> anyhow::Result<()> {
+        start_simulation_mode(host, &self.evm_config)
     }
 
     fn storage_root_path(&self) -> RefPath {
@@ -481,7 +454,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
         host: &mut Host,
         _outbox_queue: &OutboxQueue<'_, impl Path>,
         block_in_progress: Self::BlockInProgress,
-        _precompiles: &PrecompileBTreeMap<Host>,
         _tick_counter: &mut TickCounter,
         _sequencer_pool_address: Option<H160>,
         _maximum_allowed_ticks: u64,
@@ -564,19 +536,8 @@ impl ChainConfigTrait for MichelsonChainConfig {
         })
     }
 
-    fn start_simulation_mode(
-        &self,
-        _host: &mut impl Runtime,
-        _enable_fa_bridge: bool,
-    ) -> anyhow::Result<()> {
+    fn start_simulation_mode(&self, _host: &mut impl Runtime) -> anyhow::Result<()> {
         Ok(())
-    }
-
-    fn precompiles_set<Host: Runtime>(
-        &self,
-        _enable_fa_bridge: bool,
-    ) -> PrecompileBTreeMap<Host> {
-        PrecompileBTreeMap::new()
     }
 
     fn storage_root_path(&self) -> RefPath {

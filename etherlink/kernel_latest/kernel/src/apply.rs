@@ -14,10 +14,7 @@ use evm_execution::fa_bridge::queue_fa_deposit;
 use evm_execution::handler::{
     ExecutionOutcome, FastWithdrawalInterface, RouterInterface,
 };
-use evm_execution::precompiles::{
-    self, PrecompileBTreeMap, FA_BRIDGE_PRECOMPILE_ADDRESS,
-};
-use evm_execution::run_transaction;
+use evm_execution::precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS};
 use evm_execution::storage::tracer;
 use evm_execution::trace::TracerInput::CallTracer;
 use evm_execution::trace::{
@@ -39,7 +36,6 @@ use crate::bridge::{execute_deposit, Deposit};
 use crate::chains::EvmLimits;
 use crate::error::Error;
 use crate::fees::{tx_execution_gas_limit, FeeUpdates};
-use crate::storage::is_revm_enabled;
 use crate::transaction::{Transaction, TransactionContent};
 
 // This implementation of `Transaction` is used to share the logic of
@@ -534,7 +530,6 @@ pub fn revm_run_transaction<Host: Runtime>(
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
-    precompiles: &PrecompileBTreeMap<Host>,
     evm_account_storage: &mut EthereumAccountStorage,
     transaction: &EthereumTransactionCommon,
     is_delayed: bool,
@@ -563,51 +558,25 @@ fn apply_ethereum_transaction_common<Host: Runtime>(
     let call_data = transaction.data.clone();
     log_transaction_type(host, to, &call_data);
     let value = transaction.value;
-    let execution_outcome = if is_revm_enabled(host)? {
-        match revm_run_transaction(
-            host,
-            block_constants,
-            caller,
-            to,
-            value,
-            gas_limit,
-            call_data,
-            effective_gas_price,
-            transaction.access_list.clone(),
-            evm_configuration,
-            tracer_input,
-        ) {
-            Ok(outcome) => outcome,
-            Err(err) => {
-                return Err(Error::InvalidRunTransaction(
-                    evm_execution::EthereumError::WrappedError(Cow::Owned(
-                        err.to_string(),
-                    )),
-                )
-                .into());
-            }
-        }
-    } else {
-        match run_transaction(
-            host,
-            block_constants,
-            evm_account_storage,
-            precompiles,
-            evm_configuration,
-            to,
-            caller,
-            call_data,
-            Some(gas_limit),
-            effective_gas_price,
-            value,
-            true,
-            tracer_input,
-            transaction.access_list.clone(),
-        ) {
-            Ok(outcome) => outcome,
-            Err(err) => {
-                return Err(Error::InvalidRunTransaction(err).into());
-            }
+    let execution_outcome = match revm_run_transaction(
+        host,
+        block_constants,
+        caller,
+        to,
+        value,
+        gas_limit,
+        call_data,
+        effective_gas_price,
+        transaction.access_list.clone(),
+        evm_configuration,
+        tracer_input,
+    ) {
+        Ok(outcome) => outcome,
+        Err(err) => {
+            return Err(Error::InvalidRunTransaction(
+                evm_execution::EthereumError::WrappedError(Cow::Owned(err.to_string())),
+            )
+            .into());
         }
     };
 
@@ -849,7 +818,6 @@ pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
     block_constants: &BlockConstants,
-    precompiles: &PrecompileBTreeMap<Host>,
     transaction: &Transaction,
     index: u32,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -863,7 +831,6 @@ pub fn apply_transaction<Host: Runtime>(
         TransactionContent::Ethereum(tx) => apply_ethereum_transaction_common(
             host,
             block_constants,
-            precompiles,
             evm_account_storage,
             tx,
             false,
@@ -874,7 +841,6 @@ pub fn apply_transaction<Host: Runtime>(
         TransactionContent::EthereumDelayed(tx) => apply_ethereum_transaction_common(
             host,
             block_constants,
-            precompiles,
             evm_account_storage,
             tx,
             true,

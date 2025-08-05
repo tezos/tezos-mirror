@@ -460,7 +460,7 @@ fn read_and_dispatch_input<
             // kernel enters in simulation mode, reading will be done by the
             // simulation and all the previous and next transactions are
             // discarded.
-            chain_configuration.start_simulation_mode(host, enable_fa_bridge)?;
+            chain_configuration.start_simulation_mode(host)?;
             Ok(ReadStatus::FinishedIgnore)
         }
         InputResult::Input(input) => {

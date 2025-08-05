@@ -24,11 +24,7 @@ open Setup
 open Rpc.Syntax
 
 let register_test =
-  register_test_for_kernels
-    ~__FILE__
-    ~enable_dal:true
-    ~enable_multichain:false
-    ~enable_revm:false
+  register_test_for_kernels ~__FILE__ ~enable_dal:true ~enable_multichain:false
 
 let count_event ?(get_count_from_event = fun _event -> 1) sequencer event
     counter =
