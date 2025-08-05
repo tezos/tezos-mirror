@@ -129,10 +129,22 @@ module Operation_metadata = struct
                   paid_storage_size_diff = Z.zero;
                   allocated_destination_contract = false;
                 }))
+    | Origination _ ->
+        return
+          (Origination_result
+             {
+               lazy_storage_diff = None;
+               balance_updates = [];
+               originated_contracts = [];
+               consumed_gas;
+               storage_size = Z.zero;
+               paid_storage_size_diff = Z.zero;
+             })
     | _ ->
         tzfail
           (Unsupported_operation_kind
-             "only supported kinds are 'reveal' and 'transaction'")
+             "only supported kinds are 'reveal' and 'transaction' and \
+              'origination'")
 
   let contents_result (type kind) (contents : kind contents) :
       kind contents_result tzresult =
