@@ -131,6 +131,12 @@ pub enum TransferError {
     MirAddressUnsupportedError,
 }
 
+#[derive(Error, Debug, PartialEq, Eq, NomReader, Clone)]
+pub enum OriginationError {
+    #[error("Fail")]
+    Fail,
+}
+
 impl From<mir::serializer::DecodeError> for TransferError {
     fn from(err: mir::serializer::DecodeError) -> Self {
         Self::MichelineDecodeError(err.to_string())
@@ -155,6 +161,8 @@ pub enum ApplyOperationError {
     Reveal(#[from] RevealError),
     #[error("Transfer error: {0}")]
     Transfer(#[from] TransferError),
+    #[error("Origination error: {0}")]
+    Origination(#[from] OriginationError),
     #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
 }
@@ -245,12 +253,22 @@ pub struct Reveal;
 #[derive(PartialEq, Debug, Clone)]
 pub struct Transfer;
 
+/// Empty struct to implement [OperationKind] trait for Origination
+#[derive(PartialEq, Debug, Clone)]
+pub struct Origination;
+
 impl OperationKind for Transfer {
     type Success = TransferTarget;
 }
 
 impl OperationKind for Reveal {
     type Success = RevealSuccess;
+}
+
+impl OperationKind for Origination {
+    // TODO: Implement the real origination result inspired of
+    // src/proto_alpha/lib_protocol/apply_internal_result.mli
+    type Success = Empty;
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
@@ -368,6 +386,7 @@ pub struct OperationResult<M: OperationKind> {
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
     Transfer(OperationResult<Transfer>),
+    Origination(OperationResult<Origination>),
 }
 
 pub fn is_applied(res: &OperationResultSum) -> bool {
@@ -376,6 +395,9 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
             matches!(op_res.result, ContentResult::Applied(_))
         }
         OperationResultSum::Transfer(op_res) => {
+            matches!(op_res.result, ContentResult::Applied(_))
+        }
+        OperationResultSum::Origination(op_res) => {
             matches!(op_res.result, ContentResult::Applied(_))
         }
     }
@@ -396,6 +418,13 @@ pub fn transform_result_backtrack(op: OperationResultSum) -> OperationResultSum 
                 other => other,
             };
             OperationResultSum::Transfer(op_result)
+        }
+        OperationResultSum::Origination(mut op_result) => {
+            op_result.result = match op_result.result {
+                ContentResult::Applied(success) => ContentResult::BackTracked(success),
+                other => other,
+            };
+            OperationResultSum::Origination(op_result)
         }
     }
 }
@@ -427,6 +456,9 @@ pub fn produce_skipped_receipt(
         }
         OperationContent::Transfer(_) => {
             OperationResultSum::Transfer(produce_skipped_result())
+        }
+        OperationContent::Origination(_) => {
+            OperationResultSum::Origination(produce_skipped_result())
         }
     }
 }
@@ -469,6 +501,10 @@ impl NomReader<'_> for OperationWithMetadata {
                 let (input, receipt) = OperationResult::<Reveal>::nom_read(input)?;
                 (input, OperationResultSum::Reveal(receipt))
             }
+            ManagerOperationContent::Origination(_) => {
+                let (input, receipt) = OperationResult::<Origination>::nom_read(input)?;
+                (input, OperationResultSum::Origination(receipt))
+            }
         };
         Ok((input, Self { content, receipt }))
     }
@@ -480,6 +516,7 @@ impl BinWriter for OperationWithMetadata {
         match &self.receipt {
             OperationResultSum::Transfer(receipt) => receipt.bin_write(output),
             OperationResultSum::Reveal(receipt) => receipt.bin_write(output),
+            OperationResultSum::Origination(receipt) => receipt.bin_write(output),
         }
     }
 }

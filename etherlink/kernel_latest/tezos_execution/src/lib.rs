@@ -21,7 +21,9 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
-use tezos_tezlink::operation_result::{produce_skipped_receipt, TransferTarget};
+use tezos_tezlink::operation_result::{
+    produce_skipped_receipt, Empty, OriginationError, TransferTarget,
+};
 use tezos_tezlink::{
     operation::{
         verify_signature, ManagerOperation, ManagerOperationContent, OperationContent,
@@ -331,6 +333,14 @@ pub fn transfer_external<Host: Runtime>(
         &parser,
         &mut ctx,
     )
+}
+
+/// Originate a contract deployed by the public key hash given in parameter. For now
+/// the origination is not correctly implemented.
+fn originate_contract<Host: Runtime>(
+    _host: &mut Host,
+) -> Result<Empty, OriginationError> {
+    Ok(Empty)
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -707,6 +717,17 @@ fn apply_operation<Host: Runtime>(
                     )
                 }
             }
+        }
+        OperationContent::Origination(_) => {
+            let origination_result = originate_contract(host);
+            let manager_result = produce_operation_result(
+                balance_updates.to_vec(),
+                origination_result.map_err(|e| e.into()),
+            );
+            (
+                OperationResultSum::Origination(manager_result),
+                source_balance.clone(),
+            )
         }
     }
 }

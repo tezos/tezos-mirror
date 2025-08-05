@@ -44,10 +44,27 @@ pub struct TransferContent {
     pub parameters: Option<Parameter>,
 }
 
+// Original code is from sdk/rust/protocol/src/operation.rs
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct OriginationContent {
+    pub balance: Narith,
+    pub delegate: Option<PublicKeyHash>,
+    pub script: Script,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct Script {
+    #[encoding(dynamic, bytes)]
+    pub code: Vec<u8>,
+    #[encoding(dynamic, bytes)]
+    pub storage: Vec<u8>,
+}
+
 #[derive(Clone)]
 pub enum OperationContent {
     Reveal(RevealContent),
     Transfer(TransferContent),
+    Origination(OriginationContent),
 }
 
 // In Tezlink, we'll only support ManagerOperation so we don't
@@ -119,6 +136,8 @@ pub enum ManagerOperationContent {
     Reveal(ManagerOperation<RevealContent>),
     #[encoding(tag = 108)]
     Transfer(ManagerOperation<TransferContent>),
+    #[encoding(tag = 109)]
+    Origination(ManagerOperation<OriginationContent>),
 }
 
 impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
@@ -144,6 +163,16 @@ impl From<ManagerOperation<OperationContent>> for ManagerOperationContent {
             }
             OperationContent::Transfer(c) => {
                 ManagerOperationContent::Transfer(ManagerOperation {
+                    source,
+                    fee,
+                    counter,
+                    gas_limit,
+                    storage_limit,
+                    operation: c,
+                })
+            }
+            OperationContent::Origination(c) => {
+                ManagerOperationContent::Origination(ManagerOperation {
                     source,
                     fee,
                     counter,
@@ -188,6 +217,21 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
                 gas_limit,
                 storage_limit,
                 operation: OperationContent::Transfer(c),
+            },
+            ManagerOperationContent::Origination(ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: c,
+            }) => ManagerOperation {
+                source,
+                fee,
+                counter,
+                gas_limit,
+                storage_limit,
+                operation: OperationContent::Origination(c),
             },
         }
     }
@@ -610,6 +654,75 @@ mod tests {
             .to_bytes()
             .expect("Operation encoding should have succeed");
 
-        assert_eq!(operation_bytes, kernel_bytes)
+        assert_eq!(operation_bytes, kernel_bytes);
+    }
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents" from '{
+      "kind": "origination",
+      "source": "tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U",
+      "fee": "52",
+      "counter": "703",
+      "gas_limit": "5",
+      "storage_limit": "36",
+      "balance": "1924",
+      "script": {
+        "code": [
+          { "prim": "parameter", "args": [ { "prim": "nat" } ] },
+          { "prim": "storage", "args": [ { "prim": "nat" } ] },
+          {
+            "prim": "code",
+            "args": [
+              [
+                { "prim": "UNPAIR" },
+                { "prim": "ADD" },
+                { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                { "prim": "PAIR" }
+              ]
+            ]
+          }
+        ],
+        "storage": { "int": "0" }
+      }
+    }'
+    */
+    #[test]
+    fn origination_encoding() {
+        let operation = ManagerOperationContent::Origination(ManagerOperation {
+            source: PublicKeyHash::from_b58check("tz1WQGXKa2h5edfELL1XMBrDmcb4qLHQye4U")
+                .unwrap(),
+            fee: 52.into(),
+            counter: 703.into(),
+            operation: OriginationContent {
+                balance: 1924.into(),
+                delegate: None,
+                script: Script {
+                    /*
+                    octez-client convert script "
+                              parameter nat;
+                              storage nat;
+                              code { UNPAIR; ADD; NIL operation; PAIR }
+                            " from Michelson to binary
+                     */
+                    code: hex::decode(
+                        "020000001905000362050103620502020000000a037a0312053d036d0342",
+                    )
+                    .unwrap(),
+                    // octez-client convert data "0" from Michelson to binary
+                    storage: hex::decode("0000").unwrap(),
+                },
+            },
+            gas_limit: 5.into(),
+            storage_limit: 36.into(),
+        });
+
+        let encoded_operation = operation.to_bytes().unwrap();
+
+        let bytes = hex::decode("6d00760f1b125362fdf15f0e1093b1c6555b2dfdb8e434bf050524840f000000001e020000001905000362050103620502020000000a037a0312053d036d0342000000020000").unwrap();
+        assert_eq!(bytes, encoded_operation);
+
+        let (bytes, decoded_operation) =
+            ManagerOperationContent::nom_read(&encoded_operation).unwrap();
+        assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
     }
 }
