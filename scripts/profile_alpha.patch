@@ -1,22 +1,22 @@
-From 5d383ff3c214ad92589c21f0f34609321479eb0c Mon Sep 17 00:00:00 2001
+From cc526b7117b506fad015330e53e6ba27885c2243 Mon Sep 17 00:00:00 2001
 From: Valentin Chaboche <valentin.chaboche@nomadic-labs.com>
-Date: Mon, 4 Aug 2025 16:29:25 +0200
+Date: Tue, 5 Aug 2025 14:44:04 +0200
 Subject: [PATCH 1/1] Patch alpha
 
 ---
- src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
- src/lib_protocol_environment/sigs/v15.ml      | 82 ++++++++++++++-----
- .../sigs/v15/profiler.mli                     | 36 ++++++++
- src/proto_alpha/lib_protocol/apply.ml         | 17 ++--
- src/proto_alpha/lib_protocol/baking.ml        |  4 +-
- .../lib_protocol/delegate_cycles.ml           | 78 ++++++++++++++----
- src/proto_alpha/lib_protocol/dune             |  2 +
- src/proto_alpha/lib_protocol/init_storage.ml  | 36 ++++++--
- src/proto_alpha/lib_protocol/raw_context.ml   | 13 +--
- src/proto_alpha/lib_protocol/script_cache.ml  | 19 +++--
- .../lib_protocol/script_interpreter.ml        | 11 +--
- .../lib_protocol/script_ir_translator.ml      | 40 +++++----
- 12 files changed, 254 insertions(+), 86 deletions(-)
+ src/lib_protocol_environment/sigs/v15.in.ml   |   2 +
+ src/lib_protocol_environment/sigs/v15.ml      |  82 ++++--
+ .../sigs/v15/profiler.mli                     |  36 +++
+ src/proto_alpha/lib_protocol/apply.ml         |  17 +-
+ src/proto_alpha/lib_protocol/baking.ml        |   4 +-
+ .../lib_protocol/delegate_cycles.ml           |  78 +++++-
+ src/proto_alpha/lib_protocol/dune             |   2 +
+ src/proto_alpha/lib_protocol/init_storage.ml  |  36 ++-
+ src/proto_alpha/lib_protocol/raw_context.ml   |  13 +-
+ src/proto_alpha/lib_protocol/script_cache.ml  |  19 +-
+ .../lib_protocol/script_interpreter.ml        | 250 +++++++++---------
+ .../lib_protocol/script_ir_translator.ml      |  40 +--
+ 12 files changed, 375 insertions(+), 204 deletions(-)
  create mode 100644 src/lib_protocol_environment/sigs/v15/profiler.mli
 
 diff --git a/src/lib_protocol_environment/sigs/v15.in.ml b/src/lib_protocol_environment/sigs/v15.in.ml
@@ -307,10 +307,10 @@ index 0000000000..3dc7a1c702
 +
 +val mark : verbosity -> ids -> unit
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index b8e5d86d62..a77f59c744 100644
+index 692797ec9c..2c91f79a8a 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
-@@ -2504,7 +2504,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
+@@ -2513,7 +2513,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
      ~source ~operation contents_list =
    let open Lwt_result_syntax in
    let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
@@ -323,7 +323,7 @@ index b8e5d86d62..a77f59c744 100644
    let gas_cost_for_sig_check =
      let algo =
        Michelson_v1_gas.Cost_of.Interpreter.algo_of_public_key_hash source
-@@ -2780,11 +2784,12 @@ let may_start_new_cycle ctxt =
+@@ -2789,11 +2793,12 @@ let may_start_new_cycle ctxt =
    match Level.dawn_of_a_new_cycle ctxt with
    | None -> return (ctxt, [], [])
    | Some last_cycle ->
@@ -611,38 +611,263 @@ index 70a79eb8f4..9724bc4246 100644
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index 87f2085bee..4d7a86da66 100644
+index 253d534ef8..0ef25f1033 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
-@@ -1841,7 +1841,7 @@ type execution_result = {
+@@ -1987,129 +1987,133 @@ type execution_result = {
  let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      unparsed_script cached_script arg =
    let open Lwt_result_syntax in
 -  let elab_conf =
-+  (let elab_conf =
-     Script_ir_translator_config.make
-       ~legacy:true
-       ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
-@@ -1894,9 +1894,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
-     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
-   in
-   let* (ops, new_storage), ctxt =
+-    Script_ir_translator_config.make
+-      ~legacy:true
+-      ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
+-      ()
+-  in
+-  let* ( Ex_script
+-           (Script
+-             {
+-               code_size;
+-               code;
+-               arg_type;
+-               storage = old_storage;
+-               storage_type;
+-               entrypoints;
+-               views;
+-             }),
+-         ctxt ) =
+-    match cached_script with
+-    | None ->
+-        parse_script
+-          ctxt
+-          unparsed_script
+-          ~elab_conf
+-          ~allow_forged_tickets_in_storage:true
+-          ~allow_forged_lazy_storage_id_in_storage:true
+-    | Some ex_script -> return (ex_script, ctxt)
+-  in
+-  let*? r, ctxt =
+-    Gas_monad.run
+-      ctxt
+-      (find_entrypoint
+-         ~error_details:(Informative ())
+-         arg_type
+-         entrypoints
+-         entrypoint)
+-  in
+-  let self_contract = Contract.Originated step_constants.self in
+-  let*? (Ex_ty_cstr {ty = entrypoint_ty; construct; original_type_expr = _}) =
+-    record_trace (Bad_contract_parameter self_contract) r
+-  in
+-  let* arg, ctxt =
+-    trace
+-      (Bad_contract_parameter self_contract)
+-      (lift_execution_arg ctxt ~internal entrypoint_ty construct arg)
+-  in
+-  let*? to_duplicate, ctxt =
+-    Script_ir_translator.collect_lazy_storage ctxt arg_type arg
+-  in
+-  let*? to_update, ctxt =
+-    Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
+-  in
+-  let* (ops, new_storage), ctxt, address_registry_diffs =
 -    trace
 -      (Runtime_contract_error step_constants.self)
--      (interp logger (ctxt, step_constants) code (arg, old_storage))
-+    (trace
-+       (Runtime_contract_error step_constants.self)
-+       (interp logger (ctxt, step_constants) code (arg, old_storage))
-+     [@profiler.record_s {verbosity = Notice} "interprete"])
-   in
-   let* storage, lazy_storage_diff, ctxt =
-     Script_ir_translator.extract_lazy_storage_diff
-@@ -1962,7 +1963,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
-         ticket_diffs;
-         ticket_receipt;
-       },
+-      (interp logger (ctxt, step_constants, []) code (arg, old_storage))
+-  in
+-  let* storage, lazy_storage_diff, ctxt =
+-    Script_ir_translator.extract_lazy_storage_diff
+-      ctxt
+-      mode
+-      ~temporary:false
+-      ~to_duplicate
+-      ~to_update
+-      storage_type
+-      new_storage
+-  in
+-  let* unparsed_storage, ctxt =
+-    trace Cannot_serialize_storage (unparse_data ctxt mode storage_type storage)
+-  in
+-  let op_to_couple op = (op.piop, op.lazy_storage_diff) in
+-  let operations, op_diffs =
+-    ops.elements |> List.map op_to_couple |> List.split
+-  in
+-  let lazy_storage_diff_all =
+-    match
+-      List.flatten
+-        (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
+-    with
+-    | [] -> None
+-    | diff -> Some diff
+-  in
+-  let script =
+-    Ex_script
+-      (Script
+-         {code_size; code; arg_type; storage; storage_type; entrypoints; views})
+-  in
+-  let*? arg_type_has_tickets, ctxt =
+-    Ticket_scanner.type_has_tickets ctxt arg_type
+-  in
+-  let*? storage_type_has_tickets, ctxt =
+-    Ticket_scanner.type_has_tickets ctxt storage_type
+-  in
+-  (* Collect the ticket diffs *)
+-  let* ticket_diffs, ticket_receipt, ctxt =
+-    Ticket_accounting.ticket_diffs
+-      ctxt
+-      ~self_contract
+-      ~arg_type_has_tickets
+-      ~storage_type_has_tickets
+-      ~arg
+-      ~old_storage
+-      ~new_storage
+-      ~lazy_storage_diff:(Option.value ~default:[] lazy_storage_diff)
+-  in
+-  (* We consume gas after the fact in order to not have to instrument
+-     [script_size] (for efficiency).
+-     This is safe, as we already pay gas proportional to storage size
+-     in [unparse_data]. *)
+-  let size, cost = Script_ir_translator.script_size script in
+-  let*? ctxt = Gas.consume ctxt cost in
+-  return
+-    ( {
+-        script;
+-        code_size = size;
+-        storage = unparsed_storage;
+-        lazy_storage_diff = lazy_storage_diff_all;
+-        operations;
+-        ticket_diffs;
+-        ticket_receipt;
+-        address_registry_diff = address_registry_diffs;
+-      },
 -      ctxt )
-+      ctxt )) [@profiler.record_s {verbosity = Notice} "execute"]
++  (let elab_conf =
++     Script_ir_translator_config.make
++       ~legacy:true
++       ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
++       ()
++   in
++   let* ( Ex_script
++            (Script
++              {
++                code_size;
++                code;
++                arg_type;
++                storage = old_storage;
++                storage_type;
++                entrypoints;
++                views;
++              }),
++          ctxt ) =
++     match cached_script with
++     | None ->
++         parse_script
++           ctxt
++           unparsed_script
++           ~elab_conf
++           ~allow_forged_tickets_in_storage:true
++           ~allow_forged_lazy_storage_id_in_storage:true
++     | Some ex_script -> return (ex_script, ctxt)
++   in
++   let*? r, ctxt =
++     Gas_monad.run
++       ctxt
++       (find_entrypoint
++          ~error_details:(Informative ())
++          arg_type
++          entrypoints
++          entrypoint)
++   in
++   let self_contract = Contract.Originated step_constants.self in
++   let*? (Ex_ty_cstr {ty = entrypoint_ty; construct; original_type_expr = _}) =
++     record_trace (Bad_contract_parameter self_contract) r
++   in
++   let* arg, ctxt =
++     trace
++       (Bad_contract_parameter self_contract)
++       (lift_execution_arg ctxt ~internal entrypoint_ty construct arg)
++   in
++   let*? to_duplicate, ctxt =
++     Script_ir_translator.collect_lazy_storage ctxt arg_type arg
++   in
++   let*? to_update, ctxt =
++     Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
++   in
++   let* (ops, new_storage), ctxt, address_registry_diffs =
++     (trace
++        (Runtime_contract_error step_constants.self)
++        (interp logger (ctxt, step_constants, []) code (arg, old_storage))
++      [@profiler.record_s {verbosity = Notice} "interprete"])
++   in
++   let* storage, lazy_storage_diff, ctxt =
++     Script_ir_translator.extract_lazy_storage_diff
++       ctxt
++       mode
++       ~temporary:false
++       ~to_duplicate
++       ~to_update
++       storage_type
++       new_storage
++   in
++   let* unparsed_storage, ctxt =
++     trace
++       Cannot_serialize_storage
++       (unparse_data ctxt mode storage_type storage)
++   in
++   let op_to_couple op = (op.piop, op.lazy_storage_diff) in
++   let operations, op_diffs =
++     ops.elements |> List.map op_to_couple |> List.split
++   in
++   let lazy_storage_diff_all =
++     match
++       List.flatten
++         (List.map (Option.value ~default:[]) (op_diffs @ [lazy_storage_diff]))
++     with
++     | [] -> None
++     | diff -> Some diff
++   in
++   let script =
++     Ex_script
++       (Script
++          {code_size; code; arg_type; storage; storage_type; entrypoints; views})
++   in
++   let*? arg_type_has_tickets, ctxt =
++     Ticket_scanner.type_has_tickets ctxt arg_type
++   in
++   let*? storage_type_has_tickets, ctxt =
++     Ticket_scanner.type_has_tickets ctxt storage_type
++   in
++   (* Collect the ticket diffs *)
++   let* ticket_diffs, ticket_receipt, ctxt =
++     Ticket_accounting.ticket_diffs
++       ctxt
++       ~self_contract
++       ~arg_type_has_tickets
++       ~storage_type_has_tickets
++       ~arg
++       ~old_storage
++       ~new_storage
++       ~lazy_storage_diff:(Option.value ~default:[] lazy_storage_diff)
++   in
++   (* We consume gas after the fact in order to not have to instrument
++      [script_size] (for efficiency).
++      This is safe, as we already pay gas proportional to storage size
++      in [unparse_data]. *)
++   let size, cost = Script_ir_translator.script_size script in
++   let*? ctxt = Gas.consume ctxt cost in
++   return
++     ( {
++         script;
++         code_size = size;
++         storage = unparsed_storage;
++         lazy_storage_diff = lazy_storage_diff_all;
++         operations;
++         ticket_diffs;
++         ticket_receipt;
++         address_registry_diff = address_registry_diffs;
++       },
++       ctxt ))
++  [@profiler.record_s {verbosity = Notice} "execute"]
  
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
