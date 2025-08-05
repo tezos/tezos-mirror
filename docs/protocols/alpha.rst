@@ -59,6 +59,10 @@ RPC Changes
 Operation receipts
 ------------------
 
+- Added ``address_registry_diff`` field in ``metadata`` for newly indexed
+  addresses from the opcode ``INDEX_ADDRESS`` in the operation. (MR
+  :gl:`!18870`)
+
 Errors
 ------
 
