@@ -1403,6 +1403,9 @@ enums:
     159:
       id: index_address
       doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   alpha__operation__alpha__internal_operation_result__delegation_tag:
     0: applied
     1: failed
