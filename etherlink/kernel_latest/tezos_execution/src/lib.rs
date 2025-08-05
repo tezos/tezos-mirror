@@ -4,6 +4,7 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use address::generate_kt1;
 use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
@@ -13,7 +14,7 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::hash::{ContractKt1Hash, UnknownSignature};
+use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
@@ -40,6 +41,7 @@ use validate::{validate_individual_operation, ValidationInfo};
 
 extern crate alloc;
 pub mod account_storage;
+mod address;
 pub mod context;
 mod validate;
 
@@ -340,10 +342,10 @@ pub fn transfer_external<Host: Runtime>(
 /// the origination is not correctly implemented.
 fn originate_contract<Host: Runtime>(
     _host: &mut Host,
+    src: &PublicKeyHash,
 ) -> Result<OriginationSuccess, OriginationError> {
-    let contract =
-        ContractKt1Hash::from_base58_check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe")
-            .map_err(|e| OriginationError::FailToGenerateKT1(e.to_string()))?;
+    // Generate a simple KT1 address depending on the source of the operation
+    let contract = generate_kt1(src)?;
     let dummy_origination_sucess = OriginationSuccess {
         balance_updates: vec![],
         originated_contracts: vec![Originated { contract }],
@@ -731,7 +733,7 @@ fn apply_operation<Host: Runtime>(
             }
         }
         OperationContent::Origination(_) => {
-            let origination_result = originate_contract(host);
+            let origination_result = originate_contract(host, source);
             let manager_result = produce_operation_result(
                 balance_updates.to_vec(),
                 origination_result.map_err(|e| e.into()),
