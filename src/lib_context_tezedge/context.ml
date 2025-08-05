@@ -20,9 +20,12 @@ module Tezedge = Octez_rust_tezos_context.Rust_tezedge_gen
 
 type patch_context = t -> t tzresult Lwt.t
 
-and index = {index : Tezedge.index; patch_context : patch_context option}
+(* TODO: get rid of this and use tezedge type directly *)
+and extra_payload = {patch_context : patch_context option; base_path : string}
 
-and t = {context : Tezedge.context; patch_context : patch_context option}
+and index = {index : Tezedge.index; extra : extra_payload}
+
+and t = {context : Tezedge.context; extra : extra_payload}
 
 [@@@warning "+duplicate-definitions"]
 
@@ -39,33 +42,36 @@ let equal_config _ _ = assert false
 let mem_tree ctxt key =
   Lwt.return (Tezedge.mem_tree ctxt.context (data_key key))
 
-let find_raw ctxt key = Lwt.return (Tezedge.find ctxt.context key)
+let find_raw ctxt key = Tezedge.find ctxt.context key
 
-let find ctxt key = find_raw ctxt (data_key key)
+let find ctxt key = Lwt.return (find_raw ctxt (data_key key))
 
 let find_tree ctxt key =
   Lwt.return (Tezedge.find_tree ctxt.context (data_key key))
 
 let list ctxt ?offset ?length key =
-  Lwt.return @@ Array.to_list @@ Tezedge.list ctxt.context offset length key
+  Lwt.return @@ Array.to_list
+  @@ Tezedge.list ctxt.context offset length (data_key key)
 
-let length ctxt key = Lwt.return (Tezedge.length ctxt.context key)
+let length ctxt key = Lwt.return (Tezedge.length ctxt.context (data_key key))
 
-let add_raw {context; patch_context} (key : key) (v : value) =
+let add_raw {context; extra} (key : key) (v : value) =
   let context = Tezedge.add context key v in
-  Lwt.return {context; patch_context}
+  Lwt.return {context; extra}
 
 let add (ctxt : t) (key : key) (v : value) = add_raw ctxt (data_key key) v
 
 [@@@warning "+duplicate-definitions"]
 
-let add_tree {context; patch_context} key tree =
+let add_tree {context; extra} key tree =
   let context = Tezedge.add_tree context (data_key key) tree in
-  Lwt.return {context; patch_context}
+  Lwt.return {context; extra}
 
-let remove {context; patch_context} key =
-  let context = Tezedge.remove context (data_key key) in
-  Lwt.return {context; patch_context}
+let remove_raw {context; extra} key =
+  let context = Tezedge.remove context key in
+  Lwt.return {context; extra}
+
+let remove ctxt key = remove_raw ctxt (data_key key)
 
 let config _ = assert false
 
@@ -74,18 +80,16 @@ module Tree = struct
 
   let mem_tree tree key = Lwt.return (Tezedge.tree_mem_tree tree key)
 
-  let find tree key = Lwt.return (Tezedge.tree_find tree ("data" :: key))
+  let find tree key = Lwt.return (Tezedge.tree_find tree key)
 
-  let find_tree tree key =
-    Lwt.return (Tezedge.tree_find_tree tree ("data" :: key))
+  let find_tree tree key = Lwt.return (Tezedge.tree_find_tree tree key)
 
   let list tree ?offset ?length key =
     Lwt.return @@ Array.to_list @@ Tezedge.tree_list tree offset length key
 
   let length tree key = Lwt.return (Tezedge.tree_length tree key)
 
-  let add tree key value =
-    Lwt.return (Tezedge.tree_add tree ("data" :: key) value)
+  let add tree key value = Lwt.return (Tezedge.tree_add tree key value)
 
   let add_tree tree key value =
     Lwt.return (Tezedge.tree_add_tree tree key value)
@@ -144,12 +148,18 @@ module Tree = struct
   let pp _ _ = assert false
 end
 
-let get_protocol ctxt =
-  let open Lwt_syntax in
-  let+ v = find_raw ctxt ["protocol"] in
-  match v with None -> assert false | Some v -> Protocol_hash.of_bytes_exn v
+let protocol_key = ["protocol"]
 
-let fork_test_chain _ ~protocol:_ ~expiration:_ = assert false
+let test_chain_key = ["test_chain"]
+
+let predecessor_block_metadata_hash_key = ["predecessor_block_metadata_hash"]
+
+let predecessor_ops_metadata_hash_key = ["predecessor_ops_metadata_hash"]
+
+let get_protocol ctxt =
+  match find_raw ctxt protocol_key with
+  | None -> assert false
+  | Some v -> Lwt.return (Protocol_hash.of_bytes_exn v)
 
 let set_hash_version _ _ = assert false
 
@@ -163,33 +173,34 @@ let verify_stream_proof _ _ = assert false
 
 let fold ?depth t k ~order ~init ~f =
   let tree = Tezedge.get_tree t.context in
-  Tree.fold ?depth tree k ~order ~init ~f
+  Tree.fold ?depth tree (data_key k) ~order ~init ~f
 
 let mem ctxt key = Lwt.return (Tezedge.mem ctxt.context (data_key key))
 
-let index {context; patch_context} =
+let index {context; extra} =
   let index = Tezedge.index context in
-  {index; patch_context}
+  {index; extra}
 
 let init ?patch_context dir =
   let index = Tezedge.index_init dir in
-  {index; patch_context}
+  {index; extra = {patch_context; base_path = dir}}
 
-let commit ~time ?(message = "") context =
-  Lwt.return @@ Context_hash.of_bytes_exn
-  @@ Tezedge.commit
-       context.context
-       (Time.Protocol.to_seconds time)
-       "Tezos"
-       message
+let raw_commit ~time ?(message = "") context =
+  Tezedge.commit context.context (Time.Protocol.to_seconds time) "Tezos" message
+
+let commit ~time ?message context =
+  Lwt.return @@ Context_hash.of_bytes_exn @@ raw_commit ~time ?message context
 
 let add_protocol ctxt protocol =
   let bytes = Protocol_hash.to_bytes protocol in
-  add_raw ctxt ["protocol"] bytes
+  add_raw ctxt protocol_key bytes
 
 let add_test_chain ctxt v =
   let bytes = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding v in
-  add_raw ctxt ["test_chain"] bytes
+  add_raw ctxt test_chain_key bytes
+
+let fork_test_chain t ~protocol ~expiration =
+  add_test_chain t (Test_chain_status.Forking {protocol; expiration})
 
 let hash ~time ?(message = "") {context; _} =
   let hash =
@@ -197,12 +208,12 @@ let hash ~time ?(message = "") {context; _} =
   in
   Context_hash.of_bytes_exn hash
 
-let commit_genesis {index; patch_context} ~chain_id:_ ~time ~protocol =
+let commit_genesis {index; extra} ~chain_id:_ ~time ~protocol =
   let open Lwt_result_syntax in
   let context = Tezedge.context_init index in
-  let context = {context; patch_context} in
+  let context = {context; extra} in
   let* context =
-    match patch_context with
+    match extra.patch_context with
     | None -> return context
     | Some patch_context -> patch_context context
   in
@@ -214,9 +225,9 @@ let commit_genesis {index; patch_context} ~chain_id:_ ~time ~protocol =
 let exists (index : index) context_hash =
   Tezedge.exists index.index context_hash
 
-let checkout {index; patch_context} context_hash =
+let checkout {index; extra} context_hash =
   Option.map
-    (fun context -> {context; patch_context})
+    (fun context -> {context; extra})
     (Tezedge.checkout index context_hash)
 
 let checkout_exn index context_hash =
@@ -229,16 +240,42 @@ let checkout_exn index context_hash =
 
 let set_protocol = add_protocol
 
-let get_test_chain _ctxt = Lwt.return Test_chain_status.Not_running
+let get_test_chain t =
+  match find_raw t test_chain_key with
+  | None -> assert false
+  | Some data -> (
+      match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+      | Error re ->
+          Format.kasprintf
+            (fun s -> Lwt.fail (Failure s))
+            "Error in Context.get_test_chain: %a"
+            Data_encoding.Binary.pp_read_error
+            re
+      | Ok r -> Lwt.return r)
 
-let add_predecessor_block_metadata_hash _ _ = assert false
+let add_predecessor_block_metadata_hash t hash =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+  in
+  add_raw t predecessor_block_metadata_hash_key bytes
 
-let add_predecessor_ops_metadata_hash _ _ = assert false
+let add_predecessor_ops_metadata_hash t hash =
+  let bytes =
+    Data_encoding.Binary.to_bytes_exn
+      Operation_metadata_list_list_hash.encoding
+      hash
+  in
+  add_raw t predecessor_ops_metadata_hash_key bytes
+
+let compute_testchain_genesis forked_block =
+  Block_hash.hash_bytes [Block_hash.to_bytes forked_block]
+
+let compute_testchain_chain_id genesis =
+  Chain_id.of_block_hash (Block_hash.hash_bytes [Block_hash.to_bytes genesis])
 
 let commit_test_chain_genesis _ _ = assert false
 
-let compute_testchain_genesis _ = assert false
-
 let merkle_tree_v2 _ctx _leaf_kind _key = assert false
 
-let compute_testchain_chain_id _ = assert false
+let export_snapshot {index = _; extra = {base_path; _}} context_hash ~path =
+  Tezedge.export_snapshot base_path context_hash path

@@ -7,7 +7,6 @@ open! Bigarray
 type index
 type context
 type tree
-type o_context_hash
 type o_caml_tree_walker
 type o_caml_depth = Eq of int | Le of int | Lt of int | Ge of int | Gt of int
 type o_caml_order = Sorted | Undefined
@@ -47,3 +46,4 @@ external tree_to_value: tree -> bytes option = "tree_to_value"
 external tree_of_value: context -> bytes -> tree = "tree_of_value"
 external tree_hash: tree -> bytes = "tree_hash"
 external tree_equal: tree -> tree -> bool = "tree_equal"
+external export_snapshot: string -> 'a -> string -> unit = "export_snapshot"
