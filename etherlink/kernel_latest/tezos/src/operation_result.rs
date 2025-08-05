@@ -8,6 +8,7 @@
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
 use std::fmt::Debug;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
@@ -133,8 +134,8 @@ pub enum TransferError {
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader, Clone)]
 pub enum OriginationError {
-    #[error("Fail")]
-    Fail,
+    #[error("Fail to generate KT1 hash: {0}")]
+    FailToGenerateKT1(String),
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
@@ -266,9 +267,7 @@ impl OperationKind for Reveal {
 }
 
 impl OperationKind for Origination {
-    // TODO: Implement the real origination result inspired of
-    // src/proto_alpha/lib_protocol/apply_internal_result.mli
-    type Success = Empty;
+    type Success = OriginationSuccess;
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
@@ -296,6 +295,65 @@ impl NomReader<'_> for Empty {
     fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
         Ok((input, Self))
     }
+}
+
+// alpha.contract_id.originated (22 bytes, 8-bit tag)
+// **************************************************
+//
+// Originated (tag 1)
+// ==================
+//
+// +---------------+----------+------------------------+
+// | Name          | Size     | Contents               |
+// +===============+==========+========================+
+// | Tag           | 1 byte   | unsigned 8-bit integer |
+// +---------------+----------+------------------------+
+// | Contract_hash | 20 bytes | bytes                  |
+// +---------------+----------+------------------------+
+// | padding       | 1 byte   | padding                |
+// +---------------+----------+------------------------+
+//
+// The encoding of the alpha.contract_id.originated type is the same as
+// the one implemented in the kernel_sdk Contract. However, this type
+// cannot be an implicit account. Therefore, we created a new type that
+// only holds a KT1. The new type reuses the existing functions.
+#[derive(PartialEq, Debug, Clone)]
+pub struct Originated {
+    pub contract: ContractKt1Hash,
+}
+
+impl BinWriter for Originated {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        let contract = Contract::Originated(self.contract.clone());
+        contract.bin_write(output)
+    }
+}
+
+impl NomReader<'_> for Originated {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        let (input, contract) = Contract::nom_read(input)?;
+        match contract {
+            Contract::Originated(kt1h) => Ok((input, Originated { contract: kt1h })),
+            Contract::Implicit(_) => Err(nom::Err::Error(DecodeError::from_error_kind(
+                input,
+                nom::error::ErrorKind::Fail,
+            ))),
+        }
+    }
+}
+
+// Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+pub struct OriginationSuccess {
+    #[encoding(dynamic, list)]
+    pub balance_updates: Vec<BalanceUpdate>,
+    #[encoding(dynamic, list)]
+    pub originated_contracts: Vec<Originated>,
+    pub consumed_gas: Narith,
+    pub storage_size: Narith,
+    pub paid_storage_size_diff: Narith,
+    // TODO: Placeholder for lazy storage diff issue : #8018
+    pub lazy_storage_diff: Option<()>,
 }
 
 #[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
@@ -353,6 +411,8 @@ pub enum Balance {
     // the tag 1 doesn't exist
     #[encoding(tag = 2)]
     BlockFees,
+    #[encoding(tag = 11)]
+    StorageFees,
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml

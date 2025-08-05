@@ -13,7 +13,7 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::hash::UnknownSignature;
+use tezos_crypto_rs::hash::{ContractKt1Hash, UnknownSignature};
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
@@ -22,7 +22,8 @@ use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, Empty, OriginationError, TransferTarget,
+    produce_skipped_receipt, Originated, OriginationError, OriginationSuccess,
+    TransferTarget,
 };
 use tezos_tezlink::{
     operation::{
@@ -339,8 +340,19 @@ pub fn transfer_external<Host: Runtime>(
 /// the origination is not correctly implemented.
 fn originate_contract<Host: Runtime>(
     _host: &mut Host,
-) -> Result<Empty, OriginationError> {
-    Ok(Empty)
+) -> Result<OriginationSuccess, OriginationError> {
+    let contract =
+        ContractKt1Hash::from_base58_check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe")
+            .map_err(|e| OriginationError::FailToGenerateKT1(e.to_string()))?;
+    let dummy_origination_sucess = OriginationSuccess {
+        balance_updates: vec![],
+        originated_contracts: vec![Originated { contract }],
+        consumed_gas: 0u64.into(),
+        storage_size: 0u64.into(),
+        paid_storage_size_diff: 0u64.into(),
+        lazy_storage_diff: None,
+    };
+    Ok(dummy_origination_sucess)
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
