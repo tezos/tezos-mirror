@@ -517,3 +517,18 @@ let clear_block_storage chain_family block evm_state =
       Durable_storage_path.Transaction_object.objects
   in
   return evm_state
+
+let delayed_inbox_hashes evm_state =
+  let open Lwt_syntax in
+  let* keys =
+    subkeys evm_state Durable_storage_path.Delayed_transaction.hashes
+  in
+  let hashes =
+    (* Remove the empty, meta keys *)
+    List.filter_map
+      (fun key ->
+        if key = "" || key = "meta" then None
+        else Some (Ethereum_types.hash_of_string key))
+      keys
+  in
+  return hashes

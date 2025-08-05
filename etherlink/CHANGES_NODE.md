@@ -14,6 +14,9 @@
 
 ### Execution changes
 
+- Fixes a race condition in the block production component which could trigger
+  a crash of the sequencer. (!18924)
+
 ### Storage changes
 
 ### Documentation changes

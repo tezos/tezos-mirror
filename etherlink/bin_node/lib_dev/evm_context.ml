@@ -1809,23 +1809,6 @@ module State = struct
     Evm_store.with_transaction conn @@ fun store ->
     Evm_store.reset_after store ~l2_level
 
-  let delayed_inbox_hashes evm_state =
-    let open Lwt_syntax in
-    let* keys =
-      Evm_state.subkeys
-        evm_state
-        Durable_storage_path.Delayed_transaction.hashes
-    in
-    let hashes =
-      (* Remove the empty, meta keys *)
-      List.filter_map
-        (fun key ->
-          if key = "" || key = "meta" then None
-          else Some (Ethereum_types.hash_of_string key))
-        keys
-    in
-    return hashes
-
   let wasm_pvm_version (ctxt : t) =
     let open Lwt_result_syntax in
     let*! version = Evm_state.wasm_pvm_version ctxt.session.evm_state in
@@ -2149,11 +2132,6 @@ module Handlers = struct
         Evm_store.use ctxt.store @@ fun conn ->
         let+ level = Evm_store.L1_l2_levels_relationships.find conn in
         match level with Some {l1_level; _} -> Some l1_level | None -> None)
-    | Delayed_inbox_hashes ->
-        protect @@ fun () ->
-        let ctxt = Worker.state self in
-        let*! hashes = State.delayed_inbox_hashes ctxt.session.evm_state in
-        return hashes
     | Patch_state {commit; key; patch; block_number} ->
         protect @@ fun () ->
         let ctxt = Worker.state self in
@@ -2199,7 +2177,6 @@ module Handlers = struct
       | Apply_evm_events _ -> Eq
       | Apply_blueprint _ -> Eq
       | Last_known_L1_level -> Eq
-      | Delayed_inbox_hashes -> Eq
       | Patch_state _ -> Eq
       | Wasm_pvm_version -> Eq
       | Potential_observer_reorg _ -> Eq
@@ -2450,7 +2427,7 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
   let* new_delayed_transactions =
     if omit_delayed_tx_events then return []
     else
-      let*! hashes = State.delayed_inbox_hashes evm_state in
+      let*! hashes = Evm_state.delayed_inbox_hashes evm_state in
       let* events =
         List.map_es
           (fun hash ->
@@ -2596,8 +2573,6 @@ let next_blueprint_number () =
   head_info.next_blueprint_number
 
 let last_known_l1_level () = worker_wait_for_request Last_known_L1_level
-
-let delayed_inbox_hashes () = worker_wait_for_request Delayed_inbox_hashes
 
 let patch_kernel ?block_number kernel =
   let open Lwt_result_syntax in

@@ -684,8 +684,6 @@ evm_context_request_failed:
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
-            || { /* Delayed_inbox_hashes */
-                 "request": "Delayed_inbox_hashes" }
             || { /* Patch_state */
                  "request": "patch_state",
                  "commit": boolean,
@@ -2506,8 +2504,6 @@ evm_context_request_failed:
                        /^([a-zA-Z0-9][a-zA-Z0-9])*$/ ] ... ] }
             || { /* Last_known_L1_level */
                  "request": "last_known_l1_level" }
-            || { /* Delayed_inbox_hashes */
-                 "request": "Delayed_inbox_hashes" }
             || { /* Patch_state */
                  "request": "patch_state",
                  "commit": boolean,

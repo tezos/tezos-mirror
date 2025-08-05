@@ -121,7 +121,7 @@ module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let take_delayed_transactions maximum_number_of_chunks =
+let take_delayed_transactions evm_state maximum_number_of_chunks =
   let open Lwt_result_syntax in
   let maximum_cumulative_size =
     Sequencer_blueprint.maximum_usable_space_in_blueprint
@@ -130,7 +130,7 @@ let take_delayed_transactions maximum_number_of_chunks =
   let maximum_delayed_transactions =
     maximum_cumulative_size / maximum_delayed_transaction_size
   in
-  let* delayed_transactions = Evm_context.delayed_inbox_hashes () in
+  let*! delayed_transactions = Evm_state.delayed_inbox_hashes evm_state in
   let delayed_transactions =
     List.take_n maximum_delayed_transactions delayed_transactions
   in
@@ -346,7 +346,7 @@ let produce_block_if_needed (type f) ~signer ~force ~timestamp ~delayed_hashes
     return (`Block_produced n)
   else return `No_block
 
-let head_info_and_delayed_transactions ~with_delayed_transactions
+let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
     maximum_number_of_chunks =
   let open Lwt_result_syntax in
   (* We need to first fetch the delayed transactions then requests the head info.
@@ -354,7 +354,7 @@ let head_info_and_delayed_transactions ~with_delayed_transactions
      transactions are fetched from state more recent than head info. *)
   let* delayed_hashes, remaining_cumulative_size =
     if with_delayed_transactions then
-      take_delayed_transactions maximum_number_of_chunks
+      take_delayed_transactions evm_state maximum_number_of_chunks
     else
       return
         ( [],
@@ -393,6 +393,7 @@ let produce_block (type f) (state : Types.state) ~force ~timestamp
         let* delayed_hashes, remaining_cumulative_size =
           head_info_and_delayed_transactions
             ~with_delayed_transactions
+            head_info.evm_state
             state.maximum_number_of_chunks
         in
         let is_going_to_upgrade_kernel =
