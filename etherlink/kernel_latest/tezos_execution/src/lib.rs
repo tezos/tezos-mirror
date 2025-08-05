@@ -206,8 +206,8 @@ pub fn transfer<'a, Host: Runtime>(
             if param != Micheline::from(()) || !entrypoint.is_default() {
                 return Err(TransferError::NonSmartContractExecutionCall);
             }
-            // Allocate the implicit account if it doesn't exist
-            let allocated =
+            // Allocated is not being used on purpose (see below the comment on the allocated_destination_contract field)
+            let _allocated =
                 TezlinkImplicitAccount::allocate(host, context, dest_contract)
                     .map_err(|_| TransferError::FailedToAllocateDestination)?;
             let mut dest_account =
@@ -223,7 +223,11 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut dest_account,
             )
             .map(|(success, _applied_balance_changes)| TransferSuccess {
-                allocated_destination_contract: allocated,
+                // This boolean is kept at false on purpose to maintain compatibility with TZKT.
+                // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
+                // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
+                // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
+                allocated_destination_contract: false,
                 ..success
             })
         }
@@ -1258,7 +1262,7 @@ mod tests {
                 consumed_gas: 0_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: true,
+                allocated_destination_contract: false,
             })),
             internal_operation_results: vec![],
         });
@@ -1342,7 +1346,7 @@ mod tests {
                 consumed_gas: 0_u64.into(),
                 storage_size: 0_u64.into(),
                 paid_storage_size_diff: 0_u64.into(),
-                allocated_destination_contract: true,
+                allocated_destination_contract: false,
             })),
             internal_operation_results: vec![],
         });
