@@ -584,7 +584,7 @@ impl BinWriter for OperationWithMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operation::{ManagerOperation, TransferContent};
+    use crate::operation::{ManagerOperation, OriginationContent, TransferContent};
     use pretty_assertions::assert_eq;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
@@ -664,6 +664,58 @@ mod tests {
                 })
     }
 
+    fn simple_origination_operation() -> OperationDataAndMetadata {
+        OperationDataAndMetadata::OperationWithMetadata(
+            OperationBatchWithMetadata {
+               operations: vec![OperationWithMetadata {
+                   content: ManagerOperationContent::Origination(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 343.into(), counter: 1.into(), gas_limit: 679.into(), storage_limit: 323.into(),
+                   operation: OriginationContent {
+                    balance: 1000000_u64.into(),
+                    delegate: None,
+                    /*
+                    octez-client convert script "
+                              parameter string;
+                              storage string;
+                              code { CAR; NIL operation; PAIR }
+                            " from Michelson to binary
+                     */
+                    script: crate::operation::Script { code: hex::decode(
+                        "02000000170500036805010368050202000000080316053d036d0342",
+                    )
+                    .unwrap(), storage: hex::decode(
+                        "010000000568656c6c6f",
+                    )
+                    .unwrap() } } }),
+                   receipt:
+                    OperationResultSum::Origination(
+                        OperationResult {
+                            balance_updates:vec![BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -343, update_origin: UpdateOrigin::BlockApplication }, BalanceUpdate { balance: Balance::BlockFees , changes: 343, update_origin: UpdateOrigin::BlockApplication }],
+                            result: ContentResult::Applied(
+                                OriginationSuccess{
+                                    balance_updates:vec![
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -11500, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::StorageFees, changes: 11500, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -64250, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::StorageFees, changes: 64250, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -1000000, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()) , changes: 1000000, update_origin: UpdateOrigin::BlockApplication },
+                                    ],
+                                    originated_contracts:vec![Originated {contract: ContractKt1Hash::from_base58_check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()}],
+                                    consumed_gas:578755_u64.into(),
+                                    storage_size:46_u64.into(),
+                                    paid_storage_size_diff:46_u64.into(),
+                                    lazy_storage_diff: None,
+                                }),
+                            internal_operation_results: vec![]
+                        })
+                    }
+               ],
+               signature:  UnknownSignature::from_base58_check(
+                   "sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"
+               ).unwrap(),
+           })
+    }
+
     #[test]
     fn test_operation_with_metadata_rlp_roundtrip() {
         let operation_and_receipt = dummy_test_result_operation();
@@ -687,16 +739,15 @@ mod tests {
     }
 
     // The operation with metadata below is produced by using the following command:
-    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from
-    '{"contents":
-        [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-          "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
-          "amount":"42000000","destination":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-          "metadata":{"balance_updates":[],
-          "operation_result":{"status":"applied",
-          "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-42000000","origin":"block"},{"kind":"contract","contract":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN","change":"42000000","origin":"block"}],
-          "consumed_milligas":"2169000"}}}],
-          "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
+    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from '{"contents":
+    [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
+      "amount":"42000000","destination":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "metadata":{"balance_updates":[],
+      "operation_result":{"status":"applied",
+      "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-42000000","origin":"block"},{"kind":"contract","contract":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN","change":"42000000","origin":"block"}],
+      "consumed_milligas":"2169000"}}}],
+      "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
     #[test]
     fn tezos_compatibility_for_successful_operation_with_metadata() {
         let mut output = vec![];
@@ -704,6 +755,39 @@ mod tests {
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
         let operation_and_receipt_bytes = "00000000966c0002298c03ed7d454a101eb7022bc95f7e5f41ac78d40301f9100080bd83140000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000000000000004000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffd7f218000000000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000280de80000000000000000000a8b1840100000000000000000c5e6f3021d6effcc1b99d918a3db6dd4820893f076386fb9c85bf62f497870936898e970901e5f8b3e41a8eb0aa1a578811c110415c01719e6ed2dc6e96bb0a";
+
+        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+    }
+
+    // The operation with metadata below is produced by using the following command:
+    /* octez-codec encode 023-PtSeouLo.operation.data_and_metadata from '{"contents":
+    [{"kind":"origination","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee":"343","counter":"1","gas_limit":"679","storage_limit":"323",
+      "balance":"1000000",
+      "script":{"code":[
+        {"prim":"parameter","args":[{"prim":"string"}]},
+        {"prim":"storage","args":[{"prim":"string"}]},
+        {"prim":"code","args":[[{"prim":"CAR"},{"prim":"NIL","args":[{"prim":"operation"}]},{"prim":"PAIR"}]]}],
+      "storage":{"string":"hello"}},
+      "metadata":
+        {"balance_updates":[
+        {"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-343","origin":"block"},
+        {"kind":"accumulator","category":"block fees","change":"343","origin":"block"}],
+         "operation_result":{
+            "status":"applied",
+            "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-11500","origin":"block"},{"kind":"burned","category":"storage fees","change":"11500","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-64250","origin":"block"},{"kind":"burned","category":"storage fees","change":"64250","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-1000000","origin":"block"},{"kind":"contract","contract":"KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe","change":"1000000","origin":"block"}],
+            "originated_contracts":["KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe"],
+            "consumed_milligas":"578755",
+            "storage_size":"46",
+            "paid_storage_size_diff":"46"}}}],
+            "signature":"sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"}' */
+    #[test]
+    fn tezos_compatibility_for_successful_origination_with_metadata() {
+        let mut output = vec![];
+        simple_origination_operation()
+            .bin_write(output.as_mut())
+            .expect("Operation with metadata should be encodable");
+        let operation_and_receipt_bytes = "000000013a6d0002298c03ed7d454a101eb7022bc95f7e5f41ac78d70201a705c302c0843d000000001c02000000170500036805010368050202000000080316053d036d03420000000a010000000568656c6c6f0000002a00000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffffffea90002000000000000015700000000009400000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffffd314000b0000000000002cec0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffff0506000b000000000000fafa0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffff0bdc0000001f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b0000000000000f4240000000001601f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b00c3a9232e2e0000000000a443d5393c979c3685198d8fb754bfd9bd59c4c96423fc3928cfcf9742921c7b0490057599fa9367cc74d6bcb5c0004adcf69037e655779642e1b94586544a00";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
