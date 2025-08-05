@@ -81,12 +81,12 @@ impl<'a> ContractScript<'a> {
         ctx: &mut Ctx<'a>,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
-        entrypoint: Option<Entrypoint>,
-        storage: Micheline<'a>,
+        entrypoint: &Entrypoint,
+        storage: &Micheline<'a>,
     ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
         let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
-        let storage = typecheck_value(&storage, ctx, &self.storage)?;
+        let storage = typecheck_value(storage, ctx, &self.storage)?;
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, arena, &mut stack)?;
@@ -109,10 +109,9 @@ impl<'a> ContractScript<'a> {
         &self,
         arena: &'a Arena<Micheline<'a>>,
         parameter: Micheline<'a>,
-        entrypoint: Option<Entrypoint>,
+        entrypoint: &Entrypoint,
         ctx: &mut Ctx<'a>,
     ) -> Result<TypedValue<'a>, TcError> {
-        let entrypoint = entrypoint.unwrap_or_default();
         let parsed_annotation = FieldAnnotation::from_string(entrypoint.to_string());
         if let Some((annotation_path, annotation_type)) = self.annotations.get(&parsed_annotation) {
             typecheck_value(&parameter, ctx, annotation_type)?;
@@ -129,7 +128,7 @@ impl<'a> ContractScript<'a> {
             }
             Ok(typecheck_value(&result, ctx, &self.parameter)?)
         } else {
-            Err(TcError::NoSuchEntrypoint(entrypoint))
+            Err(TcError::NoSuchEntrypoint(entrypoint.clone()))
         }
     }
 }

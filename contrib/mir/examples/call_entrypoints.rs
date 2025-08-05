@@ -48,7 +48,7 @@ fn run_contract<'a>(
     let entrypoint =
         Entrypoint::try_from(entrypoint).expect("Entrypoint should be valid, check the string");
     let (_, new_storage) = contract_typechecked
-        .interpret(ctx, &parser.arena, parameter, Some(entrypoint), storage)
+        .interpret(ctx, &parser.arena, parameter, &entrypoint, &storage)
         .unwrap();
     let TypedValue::Int(storage_int) = &new_storage else {
         unreachable!()
