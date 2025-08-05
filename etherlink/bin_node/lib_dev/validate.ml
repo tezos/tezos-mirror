@@ -2,11 +2,29 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Ethereum_types
+
+type error += Gas_limit_too_low of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node_gas_limit_too_low"
+    ~title:"Gas limit too low"
+    ~description:
+      "Transaction with a gas limit below the set threshold is not allowed"
+    ~pp:(fun ppf gas_limit ->
+      Format.fprintf
+        ppf
+        "Transaction with a gas limit below %s is not allowed"
+        gas_limit)
+    Data_encoding.(obj1 (req "gas_limit" string))
+    (function Gas_limit_too_low gas_limit -> Some gas_limit | _ -> None)
+    (fun gas_limit -> Gas_limit_too_low gas_limit)
 
 let ( let** ) v f =
   let open Lwt_result_syntax in
@@ -36,8 +54,7 @@ let validate_nonce ~next_nonce:(Qty next_nonce)
 
 let validate_gas_limit ~storage_version
     ~maximum_gas_limit:(Qty maximum_gas_limit) ~da_fee_per_byte
-    ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
-    (transaction : Transaction.transaction) :
+    ~minimum_base_fee_per_gas (transaction : Transaction.transaction) :
     (unit, string) result tzresult Lwt.t =
   let open Lwt_result_syntax in
   (* Computing the execution gas limit validates that the gas limit is
@@ -116,22 +133,38 @@ let validate_tx_data_size ~max_number_of_chunks
 let minimal_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
     ~caller =
   let open Lwt_result_syntax in
-  let** () = validate_chain_id backend_rpc transaction in
-  let** () = validate_nonce ~next_nonce transaction in
-  let** () = validate_sender_not_a_contract backend_rpc caller in
-  let** () = validate_tx_data_size ~max_number_of_chunks transaction in
   let (module Backend_rpc : Services_backend_sig.S) = backend_rpc in
   let* state = Backend_rpc.Reader.get_state () in
+  let* da_fee_per_byte =
+    Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
+  in
   let* minimum_base_fee_per_gas =
     Etherlink_durable_storage.minimum_base_fee_per_gas
       (Backend_rpc.Reader.read state)
   in
+  let minimum_gas_limit =
+    let base_intrisic_gas_cost = Z.of_int 21_000 in
+    let da_inclusion_fees =
+      Fees.da_fees_gas_limit_overhead
+        ~da_fee_per_byte
+        ~minimum_base_fee_per_gas
+        transaction.Transaction.data
+    in
+    Z.add da_inclusion_fees base_intrisic_gas_cost
+  in
+  let* () =
+    (* Early exit: transaction with a gas limit below `minimum_gas_limit` is not allowed. *)
+    when_ (transaction.Transaction.gas_limit < minimum_gas_limit) @@ fun () ->
+    fail [Gas_limit_too_low (Z.to_string minimum_gas_limit)]
+  in
+  let** () = validate_chain_id backend_rpc transaction in
+  let** () = validate_nonce ~next_nonce transaction in
+  let** () = validate_sender_not_a_contract backend_rpc caller in
+  let** () = validate_tx_data_size ~max_number_of_chunks transaction in
+
   let* maximum_gas_limit =
     Etherlink_durable_storage.maximum_gas_per_transaction
       (Backend_rpc.Reader.read state)
-  in
-  let* da_fee_per_byte =
-    Etherlink_durable_storage.da_fee_per_byte (Backend_rpc.Reader.read state)
   in
   let* storage_version =
     Durable_storage.storage_version (Backend_rpc.Reader.read state)
@@ -141,7 +174,7 @@ let minimal_validation ~next_nonce ~max_number_of_chunks backend_rpc transaction
       ~storage_version
       ~maximum_gas_limit
       ~da_fee_per_byte
-      ~minimum_base_fee_per_gas:(Qty minimum_base_fee_per_gas)
+      ~minimum_base_fee_per_gas
       transaction
   in
   return (Ok ())
