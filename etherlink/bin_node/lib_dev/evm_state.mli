@@ -151,3 +151,10 @@ val clear_block_storage :
     kernel. This storage version is used by the EVM node to determine whether a
     given feature is implemented by the kernel or not. *)
 val storage_version : t -> int tzresult Lwt.t
+
+(** [delayed_inbox_hashes tree] returns a list of hashes—each hash identifying
+    an item of the delayed inbox.
+
+    This function will raise an exception if the delayed inbox is nowhere to be
+    found. *)
+val delayed_inbox_hashes : t -> Ethereum_types.hash list Lwt.t

@@ -137,9 +137,6 @@ val last_known_l1_level : unit -> int32 option tzresult Lwt.t
 
 val shutdown : unit -> unit tzresult Lwt.t
 
-(** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
-val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
-
 (** [patch_kernel ?block_number kernel] modifies the state of the
     [block_number] (defaults to current head) of the EVM node to replace its
     kernel with the provided [kernel]. *)

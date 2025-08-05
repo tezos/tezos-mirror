@@ -23,7 +23,6 @@ module Request = struct
       }
         -> (Ethereum_types.hash Seq.t, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
-    | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Patch_state : {
         commit : bool;
         key : string;
@@ -49,7 +48,6 @@ module Request = struct
     | Apply_evm_events _ -> "Apply_evm_events"
     | Apply_blueprint _ -> "Apply_blueprint"
     | Last_known_L1_level -> "Last_known_l1_level"
-    | Delayed_inbox_hashes -> "Delayed_inbox_hashes"
     | Patch_state _ -> "Patch_state"
     | Wasm_pvm_version -> "Wasm_pvm_version"
     | Potential_observer_reorg _ -> "Potential_observer_reorg"
@@ -101,12 +99,6 @@ module Request = struct
           (obj1 (req "request" (constant "last_known_l1_level")))
           (function View Last_known_L1_level -> Some () | _ -> None)
           (fun () -> View Last_known_L1_level);
-        case
-          (Tag 3)
-          ~title:"Delayed_inbox_hashes"
-          (obj1 (req "request" (constant "Delayed_inbox_hashes")))
-          (function View Delayed_inbox_hashes -> Some () | _ -> None)
-          (fun () -> View Delayed_inbox_hashes);
         case
           (Tag 4)
           ~title:"Patch_state"
