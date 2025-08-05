@@ -21,6 +21,31 @@ types:
       size: 20
     - id: secret
       size: 20
+  address_registry_diff:
+    seq:
+    - id: address_registry_diff_entries
+      type: address_registry_diff_entries
+      repeat: eos
+  address_registry_diff_0:
+    seq:
+    - id: len_address_registry_diff
+      type: u4be
+      valid:
+        max: 1073741823
+    - id: address_registry_diff
+      type: address_registry_diff
+      size: len_address_registry_diff
+  address_registry_diff_entries:
+    seq:
+    - id: address
+      type: alpha__transaction_destination
+      doc: ! >-
+        A destination of a transaction: A destination notation compatible with the
+        contract notation as given to an RPC or inside scripts. Can be a base58 implicit
+        contract hash, a base58 originated contract hash, a base58 originated transaction
+        rollup, or a base58 originated smart rollup.
+    - id: index
+      type: z
   alpha__apply_internal_results__alpha__operation_result:
     seq:
     - id: alpha__apply_internal_results__alpha__operation_result_tag
@@ -3582,6 +3607,8 @@ types:
     - id: lazy_storage_diff
       type: alpha__lazy_storage_diff
       if: (lazy_storage_diff_tag == bool::true)
+    - id: address_registry_diff
+      type: address_registry_diff_0
   to_contract_0:
     seq:
     - id: storage_tag
@@ -3611,6 +3638,8 @@ types:
     - id: lazy_storage_diff
       type: alpha__lazy_storage_diff
       if: (lazy_storage_diff_tag == bool::true)
+    - id: address_registry_diff
+      type: address_registry_diff_0
   to_smart_rollup:
     seq:
     - id: consumed_milligas
