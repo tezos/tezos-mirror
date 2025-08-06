@@ -7587,7 +7587,7 @@ let test_trace_transaction =
   in
   register_all
     ~__FILE__
-    ~kernels:Kernel.[Mainnet]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
     ~time_between_blocks:Nothing
@@ -7665,7 +7665,7 @@ let test_trace_transaction =
 let test_trace_transaction_on_invalid_transaction =
   register_all
     ~__FILE__
-    ~kernels:[Kernel.Mainnet]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
     ~time_between_blocks:Nothing
@@ -7753,7 +7753,7 @@ let check_trace expect_null expected_returned_value receipt trace =
 let test_trace_transaction_call =
   register_all
     ~__FILE__
-    ~kernels:Kernel.[Mainnet]
+    ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
@@ -11621,7 +11621,7 @@ let test_trace_block_struct_logger =
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
-    ~kernels:[Kernel.Mainnet]
+    ~kernels:Kernel.all
   @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
   let* trace_result =
