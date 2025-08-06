@@ -80,11 +80,13 @@ if [ "$skip_registry_cache_check" = "true" ]; then
 fi
 echo "Build ${image_name}"
 
+# APT_PROXY_DEB is a variable that is set in the tezos group CI configuration
 ./images/create_image.sh \
   "rust-toolchain" \
   "${image_base}" \
   "${image_tag}" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
+  --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --cache-from="${image_base}:${docker_image_ref_tag}" \
   --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
   --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \

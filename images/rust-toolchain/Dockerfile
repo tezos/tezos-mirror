@@ -6,6 +6,11 @@ ENV LANG='C.UTF-8' LC_ALL='C.UTF-8' TZ='Etc/UTC'
 
 WORKDIR /root
 
+# Setup proxy
+ARG APT_PROXY
+ENV APT_PROXY=${APT_PROXY:-false}
+RUN echo "Acquire::http::Proxy::deb.debian.org \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy
+
 # install datadog static binary
 COPY scripts/install_datadog_static.sh /tmp
 #hadolint ignore=DL3008,DL3015
