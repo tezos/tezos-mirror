@@ -19,7 +19,7 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
-use tezos_tezlink::operation::Operation;
+use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
     InternalContentWithMetadata, InternalOperationSum, Originated, OriginationSuccess,
@@ -383,13 +383,53 @@ pub fn transfer_external<Host: Runtime>(
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
 fn originate_contract<Host: Runtime>(
-    _host: &mut Host,
+    host: &mut Host,
+    context: &Context,
     src: &PublicKeyHash,
+    src_account: &mut TezlinkImplicitAccount,
+    balance: &Narith,
+    script: &Script,
 ) -> Result<OriginationSuccess, OriginationError> {
     // Generate a simple KT1 address depending on the source of the operation
     let contract = generate_kt1(src)?;
+    let dest_contract = Contract::Originated(contract.clone());
+
+    // TODO: Handle lazy_storage diff, a lot of the origination is concerned
+
+    // Set the storage of the contract
+    let mut smart_contract =
+        TezlinkOriginatedAccount::from_contract(context, &dest_contract)
+            .map_err(|_| OriginationError::FailedToFetchOriginated)?;
+
+    let total_size = smart_contract
+        .init(host, &script.code, &script.storage)
+        .map_err(|_| OriginationError::CantInitContract)?;
+
+    // There's this line in the origination `assert (Compare.Z.(total_size >= Z.zero)) ;`
+    // This error is unreachable because of the simulation, but as we don't have simulation
+    // yet it's possible.
+    if total_size.eq(&0u64.into()) {
+        return Err(OriginationError::CantOriginateEmptyContract);
+    }
+
+    // Compute the balance setup of the smart contract as a balance update for the origination.
+    let src_contract = Contract::Implicit(src.clone());
+    let (src_update, kt1_update) =
+        compute_balance_updates(&src_contract, &dest_contract, balance)
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+
+    // Apply the balance change, accordingly to the balance updates computed
+    apply_balance_changes(
+        host,
+        &src_contract,
+        src_account,
+        &mut smart_contract,
+        &balance.0,
+    )
+    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+
     let dummy_origination_sucess = OriginationSuccess {
-        balance_updates: vec![],
+        balance_updates: vec![src_update, kt1_update],
         originated_contracts: vec![Originated { contract }],
         consumed_gas: 0u64.into(),
         storage_size: 0u64.into(),
@@ -726,8 +766,19 @@ fn apply_operation<Host: Runtime>(
             );
             OperationResultSum::Transfer(manager_result)
         }
-        OperationContent::Origination(_) => {
-            let origination_result = originate_contract(host, source);
+        OperationContent::Origination(OriginationContent {
+            ref balance,
+            delegate: _,
+            ref script,
+        }) => {
+            let origination_result = originate_contract(
+                host,
+                context,
+                source,
+                source_account,
+                balance,
+                script,
+            );
             let manager_result = produce_operation_result(
                 balance_updates,
                 origination_result.map_err(|e| e.into()),
