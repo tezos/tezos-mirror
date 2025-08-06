@@ -1051,9 +1051,9 @@ module Constants : sig
   (** See {!Raw_context.round_durations}. *)
   val round_durations : context -> Round.round_durations
 
+  (** To be used for rounds and DAL. For attestations,
+      see {!Attestation_power.consensus_committee}. *)
   val consensus_committee_size : context -> int
-
-  val consensus_threshold_size : context -> int
 
   val minimal_participation_ratio : context -> Ratio.t
 
@@ -2242,7 +2242,8 @@ module Receipt : sig
   val balance_updates_encoding : balance_updates Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Attestation_power_repr}. *)
+(** This module re-exports definitions from {!Attestation_power_repr} and
+    {!Consensus_parameters_storage}. *)
 module Attestation_power : sig
   type t
 
@@ -2259,6 +2260,10 @@ module Attestation_power : sig
   val get : context -> Level.t -> t -> int64
 
   val get_slots : t -> int
+
+  val consensus_threshold : context -> Level.t -> int
+
+  val consensus_committee : context -> Level.t -> int
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)

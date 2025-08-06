@@ -144,6 +144,7 @@
         "Global_constants_costs",
         "Ticket_hash_builder",
         "Constants_storage",
+	"Consensus_parameters_storage",
         "Level_storage",
         "Cycle_storage",
         "Nonce_storage",

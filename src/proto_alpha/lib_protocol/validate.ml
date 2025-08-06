@@ -4024,7 +4024,10 @@ let check_attestation_power vi bs =
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
   if are_attestations_required then
-    let required = Constants.consensus_threshold_size vi.ctxt |> Int64.of_int in
+    let required =
+      Attestation_power.consensus_threshold vi.ctxt vi.current_level
+      |> Int64.of_int
+    in
     (* TODO ABAAB : required should depend on the flag *)
     let provided =
       Attestation_power.get vi.ctxt vi.current_level bs.attestation_power
@@ -4076,7 +4079,8 @@ let check_preattestation_round_and_power vi vs round =
       in
       (* TODO ABAAB : threshold should depend on abaab flag *)
       let consensus_threshold =
-        Constants.consensus_threshold_size vi.ctxt |> Int64.of_int
+        Attestation_power.consensus_threshold vi.ctxt vi.current_level
+        |> Int64.of_int
       in
       let total_attesting_power =
         Attestation_power.get vi.ctxt vi.current_level total_attesting_power

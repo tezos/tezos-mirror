@@ -210,7 +210,7 @@ let check_and_reset_delegate_participation ctxt delegate =
         Level_repr.first_level_in_cycle_from_eras ~cycle_eras current_cycle
       in
       let all_bakers_attest_enabled =
-        Delegate_sampler.check_all_bakers_attest_at_level
+        Consensus_parameters_storage.check_all_bakers_attest_at_level
           ctxt
           first_level_of_cycle
       in

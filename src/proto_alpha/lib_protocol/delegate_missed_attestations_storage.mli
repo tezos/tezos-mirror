@@ -32,7 +32,7 @@
 
 (** Computes the number of validator slots that a delegate is expected to be
     allocated during a cycle. This number is proportional to its active stake
-    wrt to total active stake. *)
+    wrt total active stake. *)
 val expected_slots_for_given_active_stake :
   Raw_context.t ->
   total_active_stake_weight:int64 ->

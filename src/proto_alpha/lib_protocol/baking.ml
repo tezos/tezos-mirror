@@ -63,7 +63,7 @@ let bonus_baking_reward ctxt level ~attestation_power =
   (* TODO ABAAB : only works if flag is false *)
   let attestation_power = Attestation_power.get ctxt level attestation_power in
   let consensus_threshold_size =
-    Constants.consensus_threshold_size ctxt |> Int64.of_int
+    Attestation_power.consensus_threshold ctxt level |> Int64.of_int
   in
   let* baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
