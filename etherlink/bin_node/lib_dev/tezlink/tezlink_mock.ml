@@ -426,3 +426,68 @@ let storage_cycle () =
   let selected_stake_distribution = Storage_repr.Cycle.stake ~consensus_pk in
   Lwt_result.return
     Storage_repr.Cycle.{delegate_sampler_state; selected_stake_distribution}
+
+(* This is a way to obtain a context built on genesis with the minimum of
+   block. This is not to be used if the context is actually relevant, but just
+   as a dummy value for specific cases, for Quick and Dirty wins. *)
+let init_dummy_context () =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_syntax in
+  let* b, _cs = Context.init1 () in
+  let* v = Incremental.begin_construction b in
+  let ctxt = Incremental.alpha_ctxt v in
+  let ctxt = Alpha_context.Gas.set_unlimited ctxt in
+  return ctxt
+
+(* This an implementation taken straight from the plugin, which assumes the
+   context is actually irrelevant. A better solution would be to go through
+   rust bindings to the mir implementation, but this a quick win. *)
+let list_entrypoints code normalize_types =
+  let open Imported_protocol_test_helpers in
+  let open Lwt_result_wrap_syntax in
+  let open Alpha_context in
+  let open Imported_protocol in
+  let* ctxt = init_dummy_context () in
+  let expr = Script.lazy_expr code in
+  (* The following is taken verbatim from the implementation of the contract
+     services in the plugin:
+         src/proto_023_PtSeouLo/lib_plugin/contract_services.ml
+  *)
+  let legacy = true in
+  let open Script_ir_translator in
+  let*?@ expr, _ =
+    Script.force_decode_in_context
+      ~consume_deserialization_gas:When_needed
+      ctxt
+      expr
+  in
+  let*@ {arg_type; _}, ctxt = parse_toplevel ctxt expr in
+  Lwt.return
+  @@ Imported_env.wrap_tzresult (* we wrap the Error_monad result*)
+       (let open Result_syntax in
+        let* Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _ =
+          Script_ir_translator.parse_parameter_ty_and_entrypoints
+            ctxt
+            ~legacy
+            arg_type
+        in
+        let unreachable_entrypoint, map =
+          list_entrypoints_uncarbonated arg_type entrypoints
+        in
+        let* entrypoint_types, _ctxt =
+          Entrypoint.Map.fold_e
+            (fun entry (Script_typed_ir.Ex_ty ty, original_type_expr) (acc, ctxt) ->
+              let* ty_expr, ctxt =
+                let open Tezos_micheline in
+                if normalize_types then
+                  let* ty_node, ctxt =
+                    Script_ir_unparser.unparse_ty ~loc:() ctxt ty
+                  in
+                  return (Micheline.strip_locations ty_node, ctxt)
+                else return (Micheline.strip_locations original_type_expr, ctxt)
+              in
+              return ((Entrypoint.to_string entry, ty_expr) :: acc, ctxt))
+            map
+            ([], ctxt)
+        in
+        return_some (unreachable_entrypoint, entrypoint_types))
