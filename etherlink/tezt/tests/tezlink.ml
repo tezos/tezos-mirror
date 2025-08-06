@@ -322,19 +322,18 @@ let test_tezlink_storage =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
-let account_rpc sequencer account key =
+let account_str_rpc sequencer account key =
   let path =
-    sf
-      "/tezlink/chains/main/blocks/head/context/contracts/%s/%s"
-      account.Account.public_key_hash
-      key
+    sf "/tezlink/chains/main/blocks/head/context/contracts/%s/%s" account key
   in
-
   let* res =
     Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
     |> Runnable.run
   in
   return @@ JSON.parse ~origin:"curl_protocols" res
+
+let account_rpc sequencer account key =
+  account_str_rpc sequencer account.Account.public_key_hash key
 
 let test_tezlink_contract_info =
   register_tezlink_test
@@ -349,6 +348,34 @@ let test_tezlink_contract_info =
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
   Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
+  unit
+
+let test_tezlink_contract_info_script =
+  let contract = Michelson_contracts.concat_hello () in
+  register_tezlink_test
+    ~title:"Test of the contract info rpc on smart contracts"
+    ~tags:["rpc"; "contract"; "info"; "script"]
+    ~bootstrap_contracts:[contract]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the contract info rpc and check the result *)
+  let* valid_info = account_str_rpc sequencer contract.address "" in
+  let balance = JSON.(valid_info |-> "balance" |> as_int) in
+  let counter = JSON.(valid_info |-> "counter" |> as_int) in
+  let script = JSON.(valid_info |-> "script") in
+  let storage = JSON.(script |-> "storage" |> as_list) in
+  let code = JSON.(script |-> "code" |> as_list) in
+
+  Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
+  Check.((counter = 1) int ~error_msg:"Expected %R but got %L") ;
+  Check.(
+    (List.length storage = 1)
+      int
+      ~error_msg:"Expected storage with %R element but got %L") ;
+  Check.(
+    (List.length code = 3)
+      int
+      ~error_msg:"Expected code with %R elements but got %L") ;
   unit
 
 let test_tezlink_manager_key =
@@ -1114,6 +1141,7 @@ let () =
   test_describe_endpoint [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_contract_info [Alpha] ;
+  test_tezlink_contract_info_script [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_manager_key [Alpha] ;
   test_tezlink_contract_info_on_liquidity_baking [Alpha] ;
