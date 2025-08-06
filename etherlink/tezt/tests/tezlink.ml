@@ -326,6 +326,7 @@ let account_str_rpc sequencer account key =
   let path =
     sf "/tezlink/chains/main/blocks/head/context/contracts/%s/%s" account key
   in
+
   let* res =
     Curl.get_raw ~args:["-v"] (Evm_node.endpoint sequencer ^ path)
     |> Runnable.run
@@ -348,6 +349,24 @@ let test_tezlink_contract_info =
 
   Check.((balance = 3800000000000) int ~error_msg:"Expected %R but got %L") ;
   Check.((counter = 0) int ~error_msg:"Expected %R but got %L") ;
+  unit
+
+let test_tezlink_list_entrypoints =
+  let contract = Michelson_contracts.faucet_contract () in
+  register_tezlink_test
+    ~title:"Test of the contract entrypoint list"
+    ~tags:["rpc"; "contract"; "info"; "list_entrypoints"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+    ~bootstrap_contracts:[contract]
+  @@ fun {sequencer; _} _protocol ->
+  (* call the list_entrypoint rpc and check the result *)
+  let* entrypoints = account_str_rpc sequencer contract.address "entrypoints" in
+  let expected =
+    JSON.parse
+      ~origin:"expected_entrypoints"
+      "{\"entrypoints\":{\"fund\":{\"prim\":\"mutez\"}}}"
+  in
+  Check.((entrypoints = expected) json ~error_msg:"Expected %R but got %L") ;
   unit
 
 let test_tezlink_contract_info_script =
@@ -1141,6 +1160,7 @@ let () =
   test_describe_endpoint [Alpha] ;
   test_tezlink_current_level [Alpha] ;
   test_tezlink_contract_info [Alpha] ;
+  test_tezlink_list_entrypoints [Alpha] ;
   test_tezlink_contract_info_script [Alpha] ;
   test_tezlink_balance [Alpha] ;
   test_tezlink_manager_key [Alpha] ;
