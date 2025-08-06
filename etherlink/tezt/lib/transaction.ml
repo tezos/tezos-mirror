@@ -25,6 +25,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type authorization_item = {
+  chain_id : string;
+  address : string;
+  nonce : string;
+  y_parity : int32;
+  r : string;
+  s : string;
+}
+
 type transaction_object = {
   blockHash : string option;
   blockNumber : int32 option;
@@ -36,11 +45,23 @@ type transaction_object = {
   nonce : int32;
   to_ : string option;
   transactionIndex : int32 option;
+  authorizationList : authorization_item list option;
   value : Wei.t;
   v : int32;
   r : string;
   s : string;
 }
+
+let as_authorization json =
+  let open JSON in
+  {
+    chain_id = json |-> "chainId" |> as_string;
+    address = json |-> "address" |> as_string;
+    nonce = json |-> "nonce" |> as_string;
+    y_parity = json |-> "yParity" |> as_int32;
+    r = json |-> "r" |> as_string;
+    s = json |-> "s" |> as_string;
+  }
 
 let transaction_object_of_json json =
   let open JSON in
@@ -55,6 +76,9 @@ let transaction_object_of_json json =
     nonce = json |-> "nonce" |> as_int32;
     to_ = json |-> "to" |> as_string_opt;
     transactionIndex = json |-> "transactionIndex" |> as_int32_opt;
+    authorizationList =
+      json |-> "authorizationList" |> as_list_opt
+      |> Option.map (List.map as_authorization);
     value = json |-> "value" |> as_string |> Wei.of_string;
     v = json |-> "v" |> as_int32;
     r = json |-> "r" |> as_string;
