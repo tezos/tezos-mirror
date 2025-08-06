@@ -325,7 +325,10 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
       ()
   in
   let* time_between_blocks =
-    Evm_services.get_time_between_blocks ~evm_node_endpoint:rpc_endpoint ()
+    Evm_services.get_time_between_blocks
+      ~fallback:(Time_between_blocks 10.)
+      ~evm_node_endpoint:rpc_endpoint
+      ()
   in
   Blueprints_follower.start
     ~multichain:false
