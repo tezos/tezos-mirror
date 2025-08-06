@@ -125,23 +125,23 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
-
-    Durable_storage.inspect_durable_and_decode
-      (read ~block)
-      (Tezlink_durable_storage.Path.storage c)
-      (Data_encoding.Binary.of_bytes_opt
-         Tezlink_imports.Alpha_context.Script.expr_encoding)
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.storage c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
 
   let get_code chain block c =
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
-
-    Durable_storage.inspect_durable_and_decode
-      (read ~block)
-      (Tezlink_durable_storage.Path.code c)
-      (Data_encoding.Binary.of_bytes_opt
-         Tezlink_imports.Alpha_context.Script.expr_encoding)
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.code c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
 
   let get_script chain block c =
     let open Lwt_result_syntax in
