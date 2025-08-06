@@ -549,6 +549,18 @@ let contract_info :
     Tezos_rpc.Service.t =
   import_service_with_arg Imported_protocol_plugin.Contract_services.S.info
 
+let list_entrypoints :
+    ( [`GET],
+      tezlink_rpc_context,
+      tezlink_rpc_context * Tezos_types.Contract.t,
+      Imported_protocol_plugin.Contract_services.S.normalize_types_query,
+      unit,
+      Imported_protocol.Michelson_v1_primitives.prim list list
+      * (string * Alpha_context.Script.expr) list )
+    Tezos_rpc.Service.t =
+  import_service_with_arg
+    Imported_protocol_plugin.Contract_services.S.list_entrypoints
+
 let balance :
     ( [`GET],
       tezlink_rpc_context,

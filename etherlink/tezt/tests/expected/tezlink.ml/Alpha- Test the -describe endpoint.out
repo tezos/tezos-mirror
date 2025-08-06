@@ -161,6 +161,8 @@ Available services:
             Identical to the 'spendable' RPC. 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/counter
             Access the counter of a contract, if any. 
+        - GET /chains/main/blocks/head/context/contracts/<contract_id>/entrypoints
+            Return the list of entrypoints of the contract 
         - GET /chains/main/blocks/head/context/contracts/<contract_id>/manager_key
             Access the manager of an implicit contract. 
         - POST /chains/main/blocks/head/context/contracts/<contract_id>/storage/normalized
