@@ -92,8 +92,7 @@ echo "Build ${image_name}"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
+  --push \
   -t "${image_base}:${docker_image_ref_tag}" \
+  -t "${image_base}" \
   $docker_no_cache_option_placeholder
-
-# Push image
-docker push --all-tags "${image_base}"
