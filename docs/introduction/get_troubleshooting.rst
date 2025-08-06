@@ -66,3 +66,8 @@ Currently, the ``CONFIG_SITE`` environment variable must not be
 set during the installation process, or the ``stdcompat`` package
 may be installed incorrectly. See `thierry-martinez/stdcompat#13
 <https://github.com/thierry-martinez/stdcompat/issues/13>`__.
+
+If you have trouble **compiling on MacOS**, update ``brew`` packages and development tools such as Xcode.
+If you have recently updated to a new version of MacOS, you may need to reinstall these tools.
+Also, if you have built Octez before, ``brew`` may be linked to an older version of PostgreSQL.
+In this case, you can force ``brew`` to update its link to the newer version by running ``brew link --overwrite postgresql@15``, for example.
