@@ -67,6 +67,9 @@ module Delegate_slots : sig
   (** Returns the slot with the smallest index, along with its associated
       delegate. Returns [None] if the map is empty. *)
   val min_slot : t -> (Slot.t * delegate_slot) option
+
+  (** Returns the consensus threshold at the level the slots were computed *)
+  val consensus_threshold : t -> int
 end
 
 type delegate_slots = Delegate_slots.t

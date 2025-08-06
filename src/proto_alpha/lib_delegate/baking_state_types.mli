@@ -122,5 +122,6 @@ module Delegate : sig
       in [known_keys], emits an error event but nevertheless returns a
       {!t} where [companion_key = None]. (This function is in Lwt to
       be able to emit this event.) *)
-  val of_validator : known_keys:Key.Set.t -> RPC.Validators.t -> t option Lwt.t
+  val of_validator :
+    known_keys:Key.Set.t -> RPC.Validators.delegate -> t option Lwt.t
 end

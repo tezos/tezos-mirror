@@ -149,6 +149,7 @@ module Delegate_slots = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
+    consensus_threshold : int;
   }
 
   let own_delegates slots = slots.own_delegates
@@ -169,6 +170,8 @@ module Delegate_slots = struct
 
   let voting_power slots ~slot =
     SlotMap.find slot slots.all_delegate_voting_power
+
+  let consensus_threshold {consensus_threshold; _} = consensus_threshold
 end
 
 type delegate_slots = Delegate_slots.t
@@ -935,38 +938,51 @@ let may_load_attestable_data state =
 let delegate_slots attesting_rights delegates =
   let open Lwt_syntax in
   let known_keys = Key.Set.of_list delegates in
-  let* own_delegate_first_slots, own_delegate_slots, all_delegate_voting_power =
-    Lwt_list.fold_left_s
-      (fun (own_list, own_map, all_map) validator ->
-        let {Plugin.RPC.Validators.slots; _} = validator in
-        let first_slot = Stdlib.List.hd slots in
-        let attesting_power = List.length slots in
-        let all_map = SlotMap.add first_slot attesting_power all_map in
-        let* own_list, own_map =
-          let* delegate_opt = Delegate.of_validator ~known_keys validator in
-          match delegate_opt with
-          | None -> return (own_list, own_map)
-          | Some delegate ->
-              let attesting_slot = {delegate; first_slot; attesting_power} in
-              return
-                ( attesting_slot :: own_list,
-                  List.fold_left
-                    (fun own_map slot ->
-                      SlotMap.add slot attesting_slot own_map)
-                    own_map
-                    slots )
-        in
-        return (own_list, own_map, all_map))
-      ([], SlotMap.empty, SlotMap.empty)
-      attesting_rights
-  in
-  return
-    Delegate_slots.
-      {
-        own_delegates = own_delegate_first_slots;
-        own_delegate_slots;
-        all_delegate_voting_power;
-      }
+  match attesting_rights with
+  | [] | _ :: _ :: _ -> assert false
+  | [
+   {
+     Plugin.RPC.Validators.level = _;
+     consensus_threshold;
+     delegates = attesting_rights;
+   };
+  ] ->
+      let* ( own_delegate_first_slots,
+             own_delegate_slots,
+             all_delegate_voting_power ) =
+        Lwt_list.fold_left_s
+          (fun (own_list, own_map, all_map) validator ->
+            let {Plugin.RPC.Validators.slots; _} = validator in
+            let first_slot = Stdlib.List.hd slots in
+            let attesting_power = List.length slots in
+            let all_map = SlotMap.add first_slot attesting_power all_map in
+            let* own_list, own_map =
+              let* delegate_opt = Delegate.of_validator ~known_keys validator in
+              match delegate_opt with
+              | None -> return (own_list, own_map)
+              | Some delegate ->
+                  let attesting_slot =
+                    {delegate; first_slot; attesting_power}
+                  in
+                  return
+                    ( attesting_slot :: own_list,
+                      List.fold_left
+                        (fun own_map slot ->
+                          SlotMap.add slot attesting_slot own_map)
+                        own_map
+                        slots )
+            in
+            return (own_list, own_map, all_map))
+          ([], SlotMap.empty, SlotMap.empty)
+          attesting_rights
+      in
+      return
+        {
+          Delegate_slots.own_delegates = own_delegate_first_slots;
+          own_delegate_slots;
+          all_delegate_voting_power;
+          consensus_threshold;
+        }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =

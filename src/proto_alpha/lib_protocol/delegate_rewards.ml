@@ -115,6 +115,9 @@ module M = struct
     in
     let base_rewards =
       match reward_kind with
+      (* Since these the "_per_slot" rewards are given per slot, they do not depend on whether
+         all bakers attest or not. We can use the constants directly. *)
+      (* TODO ABAAB: baking bonus and attesting rewards without slots *)
       | Baking_reward_bonus_per_slot ->
           let bonus_committee_size =
             csts.consensus_committee_size - csts.consensus_threshold_size

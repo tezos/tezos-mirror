@@ -348,10 +348,11 @@ let propose_at_next_level ~minimal_timestamp state =
 
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
-  if
-    Compare.Int.(
-      power >= state.global_state.constants.parametric.consensus_threshold_size)
-  then Some (power, attestations)
+  (* TODO ABAAB *)
+  let consensus_threshold =
+    Delegate_slots.consensus_threshold state.level_state.delegate_slots
+  in
+  if Compare.Int.(power >= consensus_threshold) then Some (power, attestations)
   else None
 
 (* Here's the sketch of the algorithm:
@@ -708,8 +709,9 @@ let rec baking_minimal_timestamp ~count state
       own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
   in
+  (* TODO ABAAB *)
   let consensus_threshold =
-    state.global_state.constants.parametric.consensus_threshold_size
+    Delegate_slots.consensus_threshold state.level_state.delegate_slots
   in
   let* () =
     if Compare.Int.(total_voting_power < consensus_threshold) then

@@ -263,7 +263,7 @@ let test_different_slots () =
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
-         (fun (attester : RPC.Validators.t) ->
+         (fun (attester : RPC.Validators.delegate) ->
            match attester.slots with
            | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
            | _ -> None)
@@ -987,7 +987,7 @@ let different_slots_under_feature_flag () =
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
-         (fun (attester : RPC.Validators.t) ->
+         (fun (attester : RPC.Validators.delegate) ->
            match attester.slots with
            | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
            | _ -> None)

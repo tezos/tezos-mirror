@@ -3974,27 +3974,43 @@ module Attestation_rights = struct
 end
 
 module Validators = struct
-  type t = {
-    level : Raw_level.t;
+  type delegate = {
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
     slots : Slot.t list;
   }
 
-  let encoding =
+  type t = {
+    level : Raw_level.t;
+    consensus_threshold : int;
+    delegates : delegate list;
+  }
+
+  let delegate_encoding =
     let open Data_encoding in
     conv
-      (fun {level; delegate; consensus_key; companion_key; slots} ->
-        (level, delegate, slots, consensus_key, companion_key))
-      (fun (level, delegate, slots, consensus_key, companion_key) ->
-        {level; delegate; consensus_key; companion_key; slots})
-      (obj5
-         (req "level" Raw_level.encoding)
+      (fun {delegate; consensus_key; companion_key; slots} ->
+        (delegate, slots, consensus_key, companion_key))
+      (fun (delegate, slots, consensus_key, companion_key) ->
+        {delegate; consensus_key; companion_key; slots})
+      (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "slots" (list Slot.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
          (opt "companion_key" Bls.Public_key_hash.encoding))
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {level; consensus_threshold; delegates} ->
+        (level, consensus_threshold, delegates))
+      (fun (level, consensus_threshold, delegates) ->
+        {level; consensus_threshold; delegates})
+      (obj3
+         (req "level" Raw_level.encoding)
+         (req "consensus_threshold" int31)
+         (req "delegates" (list delegate_encoding)))
 
   module S = struct
     open Data_encoding
@@ -4036,7 +4052,7 @@ module Validators = struct
         path
   end
 
-  let add_attestation_slots_at_level (ctxt, acc) level =
+  let attestation_slots_at_level ctxt level =
     let open Lwt_result_syntax in
     let+ ctxt, rights = Baking.attesting_rights ctxt level in
     let aggregate_attestation = Constants.aggregate_attestation ctxt in
@@ -4048,10 +4064,9 @@ module Validators = struct
             | Bls _ when aggregate_attestation -> companion_key
             | _ -> None
           in
-          {level = level.level; delegate; consensus_key; companion_key; slots}
-          :: acc)
+          {delegate; consensus_key; companion_key; slots} :: acc)
         rights
-        acc )
+        [] )
 
   let register () =
     let open Lwt_result_syntax in
@@ -4061,9 +4076,24 @@ module Validators = struct
         in
         let+ _ctxt, rights =
           List.fold_left_es
-            add_attestation_slots_at_level
+            (fun (ctxt, acc) level ->
+              let consensus_threshold =
+                Attestation_power.consensus_threshold ctxt level
+              in
+              let* ctxt, delegates = attestation_slots_at_level ctxt level in
+              return
+                ( ctxt,
+                  ( {level = level.level; consensus_threshold; delegates = []},
+                    delegates )
+                  :: acc ))
             (ctxt, [])
             (List.rev levels)
+        in
+        let filter_with f list =
+          List.map
+            (fun (level_info, delegates) ->
+              (level_info, List.filter f delegates))
+            list
         in
         let rights =
           match q.delegates with
@@ -4074,7 +4104,7 @@ module Validators = struct
                   (Signature.Public_key_hash.equal p.delegate)
                   delegates
               in
-              List.filter is_requested rights
+              filter_with is_requested rights
         in
         let rights =
           match q.consensus_keys with
@@ -4085,7 +4115,12 @@ module Validators = struct
                   (Signature.Public_key_hash.equal p.consensus_key)
                   delegates
               in
-              List.filter is_requested rights
+              filter_with is_requested rights
+        in
+        let rights =
+          List.map
+            (fun (level_info, delegates) -> {level_info with delegates})
+            rights
         in
         rights)
 
