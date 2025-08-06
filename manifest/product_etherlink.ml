@@ -281,6 +281,8 @@ let evm_node_lib_dev_tezlink =
         octez_base |> open_ ~m:"TzPervasives";
         octez_shell_services;
         octez_version;
+        octez_micheline;
+        Protocol.test_helpers_exn tezlink_target_proto;
         lwt_watcher;
       ]
 
