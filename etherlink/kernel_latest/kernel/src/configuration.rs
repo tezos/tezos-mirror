@@ -58,8 +58,7 @@ impl std::fmt::Display for ConfigurationMode {
                 max_blueprint_lookahead_in_seconds,
             } => write!(
                 f,
-                "Sequencer {{ delayed_bridge: {:?}, sequencer: {:?}, dal: {:?}, evm_node_flag: {}, max_blueprints_lookahead_in_seconds: {} }}",
-                delayed_bridge, sequencer, dal, evm_node_flag, max_blueprint_lookahead_in_seconds
+                "Sequencer {{ delayed_bridge: {delayed_bridge:?}, sequencer: {sequencer:?}, dal: {dal:?}, evm_node_flag: {evm_node_flag}, max_blueprints_lookahead_in_seconds: {max_blueprint_lookahead_in_seconds} }}"
             ),
         }
     }
@@ -115,8 +114,7 @@ impl std::fmt::Display for TezosContracts {
         } = self;
         write!(
             f,
-            "Ticketer is {:?}. Administrator is {:?}. Sequencer governance is {:?}. Kernel governance is {:?}. Kernel security governance is {:?}.",
-            ticketer, admin, sequencer_governance, kernel_governance, kernel_security_governance
+            "Ticketer is {ticketer:?}. Administrator is {admin:?}. Sequencer governance is {sequencer_governance:?}. Kernel governance is {kernel_governance:?}. Kernel security governance is {kernel_security_governance:?}."
         )
     }
 }

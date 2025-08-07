@@ -483,10 +483,9 @@ mod test {
         let manager = account.manager(&host).expect("Can't read manager");
 
         let pkh = match manager {
-            Manager::NotRevealed(pkh) => panic!(
-                "Manager should be revealed (manager key is a pkh: {:?})",
-                pkh
-            ),
+            Manager::NotRevealed(pkh) => {
+                panic!("Manager should be revealed (manager key is a pkh: {pkh:?})")
+            }
             Manager::Revealed(pk) => pk.pk_hash(),
         };
 

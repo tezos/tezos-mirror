@@ -177,12 +177,12 @@ impl BinWriter for ApplyOperationError {
     fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
         tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
             // Convert the error to a String
-            let error = format!("{:?}", error);
+            let error = format!("{error:?}");
             let encoded_error = error.as_bytes();
             let size_of_string: u32 = encoded_error
                 .len()
                 .try_into()
-                .map_err(|err| tezos_enc::BinError::custom(format!("{}", err)))?;
+                .map_err(|err| tezos_enc::BinError::custom(format!("{err}")))?;
             // Tag for a BSON string is 0x82 (1 byte)
             let bson_tag_size = 1;
             // Size of a BSON object is encoded on 4 bytes

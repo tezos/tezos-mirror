@@ -347,7 +347,7 @@ mod test {
         let bytes = v.rlp_bytes();
         let v2 = TransactionReceipt::from_rlp_bytes(&bytes)
             .expect("Transaction receipt should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
+        assert_eq!(v, v2, "Roundtrip failed on {v:?}")
     }
 
     fn tx_receipt(logs: Vec<IndexedLog>) -> TransactionReceipt {
@@ -409,7 +409,7 @@ mod test {
         let bytes = v.rlp_bytes();
         let v2 = TransactionObject::from_rlp_bytes(&bytes)
             .expect("Transaction object should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
+        assert_eq!(v, v2, "Roundtrip failed on {v:?}")
     }
 
     #[test]

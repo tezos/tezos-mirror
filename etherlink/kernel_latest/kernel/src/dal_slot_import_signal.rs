@@ -154,8 +154,7 @@ mod tests {
             FromRlpBytes::from_rlp_bytes(&encoded).expect("should decode as tree");
         assert_eq!(
             encoded_as_tree, tree,
-            "Encoding gave unexpected result, source: {:?}, expected: {:?}, actual: {:?}",
-            v, tree, encoded_as_tree
+            "Encoding gave unexpected result, source: {v:?}, expected: {tree:?}, actual: {encoded_as_tree:?}"
         );
 
         let v2: u8 =
@@ -170,8 +169,7 @@ mod tests {
             FromRlpBytes::from_rlp_bytes(&encoded).expect("should decode as tree");
         assert_eq!(
             encoded_as_tree, tree,
-            "Encoding gave unexpected result, source: {:?}, expected: {:?}, actual: {:?}",
-            v, tree, encoded_as_tree
+            "Encoding gave unexpected result, source: {v:?}, expected: {tree:?}, actual: {encoded_as_tree:?}"
         );
 
         let v2: DalSlotIndicesList =
@@ -184,7 +182,7 @@ mod tests {
         let bytes = v.rlp_bytes();
         let v2: DalSlotIndicesList =
             FromRlpBytes::from_rlp_bytes(&bytes).expect("Indices should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed for indices: {:?}", v);
+        assert_eq!(v, v2, "Roundtrip failed for indices: {v:?}");
     }
 
     fn indices_of_level_roundtrip(published_level: u32, slot_indices: Vec<u8>) {
@@ -196,14 +194,14 @@ mod tests {
         let bytes = v.rlp_bytes();
         let v2: DalSlotIndicesOfLevel = FromRlpBytes::from_rlp_bytes(&bytes)
             .expect("Slot indices of level should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed for slot indices of level: {:?}", v);
+        assert_eq!(v, v2, "Roundtrip failed for slot indices of level: {v:?}");
     }
 
     fn unsigned_signals_roundtrip(v: UnsignedDalSlotSignals) {
         let bytes = v.rlp_bytes();
         let v2: UnsignedDalSlotSignals = FromRlpBytes::from_rlp_bytes(&bytes)
             .expect("Unsigned signals should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed for unsigned signals: {:?}", v);
+        assert_eq!(v, v2, "Roundtrip failed for unsigned signals: {v:?}");
 
         let signature = UnknownSignature::from_base58_check(
             "sigdGBG68q2vskMuac4AzyNb1xCJTfuU8MiMbQtmZLUCYydYrtTd5Lessn1EFLTDJzjXoYxRasZxXbx6tHnirbEJtikcMHt3"
@@ -216,7 +214,7 @@ mod tests {
         let bytes = v3.rlp_bytes();
         let v4: DalSlotImportSignals = FromRlpBytes::from_rlp_bytes(&bytes)
             .expect("Signed signals should be decodable");
-        assert_eq!(v3, v4, "Roundtrip failed for signed signals: {:?}", v3)
+        assert_eq!(v3, v4, "Roundtrip failed for signed signals: {v3:?}")
     }
 
     #[test]

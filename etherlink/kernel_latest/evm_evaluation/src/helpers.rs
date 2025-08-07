@@ -19,7 +19,7 @@ pub struct LabelIndexes<'a> {
 pub fn string_of_hexa(bytes: &bytes::Bytes) -> String {
     let mut hexa = String::from("0x");
     for byte in bytes.into_iter() {
-        hexa.push_str(format!("{:02x?}", byte).as_str());
+        hexa.push_str(format!("{byte:02x?}").as_str());
     }
     hexa
 }

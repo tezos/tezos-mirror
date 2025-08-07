@@ -170,7 +170,7 @@ impl From<L2Block> for BlockHeader<ChainHeader> {
 }
 
 pub fn blueprint_path(number: U256) -> Result<OwnedPath, StorageError> {
-    let number_as_path: Vec<u8> = format!("/{}", number).into();
+    let number_as_path: Vec<u8> = format!("/{number}").into();
     // The key being an integer value, it will always be valid as a path,
     // `assert_from` cannot fail.
     let number_subkey = RefPath::assert_from(&number_as_path);
@@ -181,7 +181,7 @@ fn blueprint_chunk_path(
     blueprint_path: &OwnedPath,
     chunk_index: u16,
 ) -> Result<OwnedPath, StorageError> {
-    let chunk_index_as_path: Vec<u8> = format!("/{}", chunk_index).into();
+    let chunk_index_as_path: Vec<u8> = format!("/{chunk_index}").into();
     let chunk_index_subkey = RefPath::assert_from(&chunk_index_as_path);
     concat(blueprint_path, &chunk_index_subkey).map_err(StorageError::from)
 }

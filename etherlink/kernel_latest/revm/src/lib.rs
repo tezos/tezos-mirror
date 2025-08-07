@@ -133,8 +133,7 @@ fn tx_env<'a, Host: Runtime>(
         .build()
         .map_err(|err| {
             Error::Custom(format!(
-                "Building the transaction environment failed with: {:?}",
-                err
+                "Building the transaction environment failed with: {err:?}"
             ))
         })?;
 
@@ -695,7 +694,7 @@ mod test {
             .unwrap();
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
-        assert_eq!(format!("{:?}", withdrawals), raw_expected_withdrawals);
+        assert_eq!(format!("{withdrawals:?}"), raw_expected_withdrawals);
     }
 
     #[test]

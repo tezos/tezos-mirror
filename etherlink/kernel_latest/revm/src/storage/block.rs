@@ -15,8 +15,7 @@ pub const BLOCKS_STORED: u64 = 256;
 const MALFORMED_HASH_ERR: &str = "Malformed block hash";
 
 fn to_block_hash_path(block_number: u64) -> Result<OwnedPath, Error> {
-    let path: Vec<u8> =
-        format!("/evm/world_state/indexes/blocks/{}", block_number).into();
+    let path: Vec<u8> = format!("/evm/world_state/indexes/blocks/{block_number}").into();
     OwnedPath::try_from(path).map_err(|err| Error::Custom(err.to_string()))
 }
 

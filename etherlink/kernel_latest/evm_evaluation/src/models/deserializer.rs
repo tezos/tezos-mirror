@@ -155,7 +155,7 @@ where
         // Some are not so we have to convert the decimal values
         // into hexadecimal ones.
         let dec_to_hex = u64::from_str(&value).unwrap();
-        value = format!("{:x}", dec_to_hex);
+        value = format!("{dec_to_hex:x}");
     }
 
     let filling_zeroes = (0..(H256_RAW_SIZE - value.len()))
@@ -247,7 +247,7 @@ pub fn deserialize_indices<'de, D>(deserializer: D) -> Result<Vec<IndexKind>, D:
 where
     D: de::Deserializer<'de>,
 {
-    let err = |v| D::Error::custom(format!("Unexpected index {:?}", v));
+    let err = |v| D::Error::custom(format!("Unexpected index {v:?}"));
     match Value::deserialize(deserializer)? {
         Value::Sequence(values) => {
             let mut out = Vec::new();

@@ -250,7 +250,7 @@ pub fn rlp_roundtrip_f<S: Encodable + PartialEq + std::fmt::Debug, T: Decodable>
     let bytes = v.rlp_bytes();
     let v2: T =
         rlp_helpers::FromRlpBytes::from_rlp_bytes(&bytes).expect("Should be decodable");
-    assert_eq!(v, f(v2), "Roundtrip failed on {:?}", v)
+    assert_eq!(v, f(v2), "Roundtrip failed on {v:?}")
 }
 
 #[cfg(test)]

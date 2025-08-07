@@ -282,7 +282,7 @@ pub fn emit_log_and_return<Host: Runtime>(
 
     handler
         .add_log(withdrawal_event)
-        .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{:?}", e))))?;
+        .map_err(|e| EthereumError::WrappedError(Cow::from(format!("{e:?}"))))?;
 
     Ok(PrecompileOutcome {
         exit_status: ExitReason::Succeed(ExitSucceed::Returned),

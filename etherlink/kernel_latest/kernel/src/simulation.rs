@@ -201,7 +201,7 @@ pub struct Evaluation {
 
 impl<T> From<EthereumError> for SimulationResult<T, String> {
     fn from(err: EthereumError) -> Self {
-        let msg = format!("The transaction failed: {:?}.", err);
+        let msg = format!("The transaction failed: {err:?}.");
         Self::Err(msg)
     }
 }
@@ -232,7 +232,7 @@ impl From<Result<Option<ExecutionOutcome>, EthereumError>>
                 ..
             })) => Self::Err(String::from(OUT_OF_TICKS_MSG)),
             Ok(Some(ExecutionOutcome { result, .. })) => {
-                let msg = format!("The transaction failed: {:?}.", result);
+                let msg = format!("The transaction failed: {result:?}.");
                 Self::Err(msg)
             }
             Ok(None) => Self::Err(String::from(
@@ -1037,9 +1037,9 @@ mod tests {
     ) {
         let bytes = v.rlp_bytes();
         let decoder = Rlp::new(&bytes);
-        println!("{:?}", bytes);
+        println!("{bytes:?}");
         let decoded = R::decode(&decoder).expect("Value should be decodable");
-        assert_eq!(v, decoded, "Roundtrip failed on {:?}", v)
+        assert_eq!(v, decoded, "Roundtrip failed on {v:?}")
     }
 
     #[test]

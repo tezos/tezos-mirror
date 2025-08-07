@@ -43,8 +43,8 @@ impl SdkRuntime for EvalHost {
     #[inline(always)]
     fn write_debug(&self, data: &str) {
         let mut unboxed_buffer = self.buffer.borrow_mut();
-        if let Err(e) = write!(*unboxed_buffer, "{}", data) {
-            eprint!("Error due to: {}", e)
+        if let Err(e) = write!(*unboxed_buffer, "{data}") {
+            eprint!("Error due to: {e}")
         }
     }
 

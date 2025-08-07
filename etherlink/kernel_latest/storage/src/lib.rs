@@ -282,8 +282,7 @@ pub fn read_nom_value<T: for<'a> NomReader<'a>>(
     // Verify that all data were consumed
     if !remaining.is_empty() {
         return Err(Error::NomReadError(format!(
-            "decoding didn't consume all data, remaining data: {:?}",
-            remaining
+            "decoding didn't consume all data, remaining data: {remaining:?}"
         )));
     }
     Ok(value)

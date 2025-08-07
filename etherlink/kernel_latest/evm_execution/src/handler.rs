@@ -206,7 +206,7 @@ fn ethereum_error_to_exit_reason(exit_reason: &EthereumError) -> ExitReason {
         EthereumError::EthereumAccountError(AccountStorageError::NonceOverflow) => {
             ExitReason::Error(ExitError::MaxNonce)
         }
-        _ => ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{:?}", exit_reason)))),
+        _ => ExitReason::Fatal(ExitFatal::Other(Cow::from(format!("{exit_reason:?}")))),
     }
 }
 
@@ -215,10 +215,9 @@ fn ethereum_error_to_execution_result(error: &EthereumError) -> ExecutionResult 
         EthereumError::EthereumAccountError(AccountStorageError::NonceOverflow) => {
             ExecutionResult::Error(ExitError::MaxNonce)
         }
-        _ => ExecutionResult::FatalError(ExitFatal::Other(Cow::from(format!(
-            "{:?}",
-            error
-        )))),
+        _ => {
+            ExecutionResult::FatalError(ExitFatal::Other(Cow::from(format!("{error:?}"))))
+        }
     }
 }
 
@@ -509,8 +508,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             self.get_contract(address);
             if self.mark_address_as_hot(address).is_err() {
                 return Err(EthereumError::InconsistentState(Cow::from(format!(
-                    "Failed to mark access list address {} as hot",
-                    address
+                    "Failed to mark access list address {address} as hot"
                 ))));
             }
 
@@ -519,8 +517,7 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
                 self.storage(address, index);
                 if self.mark_storage_as_hot(address, index).is_err() {
                     return Err(EthereumError::InconsistentState(Cow::from(format!(
-                        "Failed to mark access list storage slot at address {} and index {} as hot",
-                        address, index
+                        "Failed to mark access list storage slot at address {address} and index {index} as hot"
                     ))));
                 }
             }
@@ -1037,10 +1034,10 @@ impl<'a, Host: Runtime> EvmHandler<'a, Host> {
             let error = if let Err(Capture::Exit(reason)) = &step_result {
                 match &reason {
                     ExitReason::Error(exit) => {
-                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                        Some(format!("{exit:?}").as_bytes().to_vec())
                     }
                     ExitReason::Fatal(exit) => {
-                        Some(format!("{:?}", exit).as_bytes().to_vec())
+                        Some(format!("{exit:?}").as_bytes().to_vec())
                     }
                     _ => None,
                 }
@@ -2527,11 +2524,9 @@ pub fn trace_call<Host: Runtime>(
         // to return for tracing. The following values are kind of placeholders.
         match reason {
             ExitReason::Succeed(_) => (),
-            ExitReason::Error(e) => call_trace.add_error(Some(format!("{:?}", e).into())),
-            ExitReason::Revert(r) => {
-                call_trace.add_error(Some(format!("{:?}", r).into()))
-            }
-            ExitReason::Fatal(f) => call_trace.add_error(Some(format!("{:?}", f).into())),
+            ExitReason::Error(e) => call_trace.add_error(Some(format!("{e:?}").into())),
+            ExitReason::Revert(r) => call_trace.add_error(Some(format!("{r:?}").into())),
+            ExitReason::Fatal(f) => call_trace.add_error(Some(format!("{f:?}").into())),
         };
 
         if with_logs {
@@ -3017,11 +3012,11 @@ impl<Host: Runtime> Handler for EvmHandler<'_, Host> {
                                     // to return for tracing. The following values are kind of placeholders.
                                     match &reason {
                                         ExitReason::Error(e) => call_trace
-                                            .add_error(Some(format!("{:?}", e).into())),
+                                            .add_error(Some(format!("{e:?}").into())),
                                         ExitReason::Revert(r) => call_trace
-                                            .add_error(Some(format!("{:?}", r).into())),
+                                            .add_error(Some(format!("{r:?}").into())),
                                         ExitReason::Fatal(f) => call_trace
-                                            .add_error(Some(format!("{:?}", f).into())),
+                                            .add_error(Some(format!("{f:?}").into())),
                                         ExitReason::Succeed(_) => (),
                                     };
 
@@ -3481,7 +3476,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3583,7 +3578,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3684,7 +3679,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3764,7 +3759,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3829,7 +3824,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3903,7 +3898,7 @@ mod test {
                 assert_eq!(result, expected_result);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -3974,7 +3969,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Expected Ok, but got {:?}", err);
+                panic!("Expected Ok, but got {err:?}");
             }
         }
     }
@@ -4044,7 +4039,7 @@ mod test {
                 assert_eq!(handler.gas_used(), 0);
             }
             Err(err) => {
-                panic!("Unexpected error: {:?}", err);
+                panic!("Unexpected error: {err:?}");
             }
         }
     }
@@ -4123,7 +4118,7 @@ mod test {
                 assert_eq!(expected_result, result);
             }
             Err(err) => {
-                panic!("Unexpected error: {:?}", err);
+                panic!("Unexpected error: {err:?}");
             }
         }
     }
@@ -4977,7 +4972,7 @@ mod test {
         match inter_result {
             Capture::Exit((exit_reason, _, _)) => match exit_reason {
                 ExitReason::Error(_) => (),
-                e => panic!("The exit reason should be an error but got {:?}.", e),
+                e => panic!("The exit reason should be an error but got {e:?}."),
             },
             Capture::Trap(_) => panic!("The internal result shouldn't be a trap case."),
         }
@@ -5117,8 +5112,7 @@ mod test {
                 ..,
             )) => (),
             e => panic!(
-                "Create doesn't fail with error CreateContractLimit but with {:?}",
-                e
+                "Create doesn't fail with error CreateContractLimit but with {e:?}"
             ),
         }
     }

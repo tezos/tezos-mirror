@@ -50,14 +50,14 @@ impl From<DecoderError> for Error {
 
 impl From<DecodeError<&[u8]>> for Error {
     fn from(value: DecodeError<&[u8]>) -> Self {
-        let msg = format!("{:?}", value);
+        let msg = format!("{value:?}");
         Self::NomReadError(msg)
     }
 }
 
 impl From<BinError> for Error {
     fn from(value: BinError) -> Self {
-        let msg = format!("{}", value);
+        let msg = format!("{value}");
         Self::BinWriteError(msg)
     }
 }

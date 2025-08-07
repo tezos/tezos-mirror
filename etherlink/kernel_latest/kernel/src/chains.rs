@@ -214,7 +214,7 @@ pub trait ChainConfigTrait: Debug {
 
     fn fmt_with_family(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let chain_family = self.get_chain_family();
-        write!(f, "{{Chain family: {}, {:?}}}", chain_family, self)
+        write!(f, "{{Chain family: {chain_family}, {self:?}}}")
     }
 
     fn fetch_hashes_from_delayed_inbox(
@@ -435,7 +435,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             .iter()
             .map(|bytes| {
                 Operation::nom_read_exact(bytes).map_err(|decode_error| {
-                    error::Error::NomReadError(format!("{:?}", decode_error))
+                    error::Error::NomReadError(format!("{decode_error:?}"))
                 })
             })
             .collect::<Result<Vec<Operation>, error::Error>>()?;

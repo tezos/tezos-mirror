@@ -182,7 +182,7 @@ pub mod blocks {
 
     fn to_block_hash_path(block_number: U256) -> Result<OwnedPath, EvmBlockStorageError> {
         let path: Vec<u8> =
-            format!("/evm/world_state/indexes/blocks/{}", block_number).into();
+            format!("/evm/world_state/indexes/blocks/{block_number}").into();
         let owned_path = OwnedPath::try_from(path)?;
         Ok(owned_path)
     }
