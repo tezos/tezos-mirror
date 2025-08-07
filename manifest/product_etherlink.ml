@@ -16,6 +16,7 @@ open Product_octez
 open Product_prometheus
 open Product_websocket
 open Product_efunc_core
+open Product_lwt_domain
 
 include Product (struct
   let name = "etherlink"
@@ -348,6 +349,7 @@ let evm_node_lib_dev =
         performance_metrics;
         opentelemetry_lwt;
         octez_telemetry;
+        lwt_domain;
       ]
 
 let _octez_evm_node_tests =

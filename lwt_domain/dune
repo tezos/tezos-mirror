@@ -1,0 +1,11 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name lwt_domain)
+ (public_name octez-lwt-domain)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  lwt
+  lwt.unix
+  domainslib))

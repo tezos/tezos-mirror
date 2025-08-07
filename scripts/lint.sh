@@ -54,6 +54,8 @@ src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
 src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.mli
 src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.ml
 src/rust_deps/rust_tezos_context/ocaml-api/rust_tezedge_gen.mli
+etherlink/lwt_domain/lwt_domain.ml
+etherlink/lwt_domain/lwt_domain.mli
 EOF
 )
 

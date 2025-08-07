@@ -47,6 +47,7 @@
 (package (name octez-lib-upnp))
 (package (name octez-lib-upnp-args))
 (package (name octez-libs))
+(package (name octez-lwt-domain))
 (package (name octez-node))
 (package (name octez-node-config))
 (package (name octez-performance-metrics))
