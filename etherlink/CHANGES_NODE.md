@@ -8,6 +8,9 @@
 
 ### RPCs changes
 
+- To stay aligned with Ethereum standards, the sequencer will now refuse transactions
+  with a gas limit below the intrinsic gas cost (21,000) plus the inclusion fees. (!18923) 
+
 ### Metrics changes
 
 ### Command-line interface changes
