@@ -29,6 +29,8 @@ module Path = struct
   let counter contract = account contract ^ "/counter"
 
   let storage contract = account contract ^ "/data/storage"
+
+  let code contract = account contract ^ "/data/code"
 end
 
 let contract_of_path = Contract.of_hex

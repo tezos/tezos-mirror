@@ -28,6 +28,18 @@ module type S = sig
     Tezos_types.Contract.t ->
     Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
 
+  val get_code :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Tezlink_imports.Alpha_context.Script.expr option tzresult Lwt.t
+
+  val get_script :
+    [`Main] ->
+    block_param ->
+    Tezos_types.Contract.t ->
+    Tezlink_imports.Alpha_context.Script.t option tzresult Lwt.t
+
   val manager_key :
     [`Main] ->
     block_param ->

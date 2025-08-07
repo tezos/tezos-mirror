@@ -125,12 +125,38 @@ module Make (Backend : Backend) (Block_storage : Tezlink_block_storage_sig.S) :
     (* TODO: #7986
        Support unparsing_mode argument. *)
     let `Main = chain in
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.storage c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
 
-    Durable_storage.inspect_durable_and_decode
-      (read ~block)
-      (Tezlink_durable_storage.Path.storage c)
-      (Data_encoding.Binary.of_bytes_opt
-         Tezlink_imports.Alpha_context.Script.expr_encoding)
+  let get_code chain block c =
+    (* TODO: #7986
+       Support unparsing_mode argument. *)
+    let `Main = chain in
+    Lwt_result.map (Option.value ~default:None)
+    @@ Durable_storage.inspect_durable_and_decode_opt
+         (read ~block)
+         (Tezlink_durable_storage.Path.code c)
+         (Data_encoding.Binary.of_bytes_opt
+            Tezlink_imports.Alpha_context.Script.expr_encoding)
+
+  let get_script chain block c =
+    let open Lwt_result_syntax in
+    match Tezlink_mock.mocked_script c with
+    | Some c -> return_some c
+    | None -> (
+        let* code = get_code chain block c in
+        let* storage = get_storage chain block c in
+        match (code, storage) with
+        | Some code, Some storage ->
+            return
+            @@ Some
+                 Tezlink_imports.Imported_protocol.Alpha_context.Script.
+                   {code = lazy_expr code; storage = lazy_expr storage}
+        | _ -> return_none)
 
   let manager_key chain block c =
     let open Lwt_result_syntax in
