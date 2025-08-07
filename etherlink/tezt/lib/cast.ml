@@ -143,3 +143,6 @@ let wallet_sign_auth ~authorization ~private_key ~endpoint =
       "--rpc-url";
       endpoint;
     ]
+
+let raw_call ~endpoint ~address ~arg =
+  spawn_command_and_read_string ["call"; address; arg; "--rpc-url"; endpoint]

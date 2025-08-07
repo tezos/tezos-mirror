@@ -104,3 +104,7 @@ val call :
     to retrieve the chain id and the nonce of the signer. *)
 val wallet_sign_auth :
   authorization:string -> private_key:string -> endpoint:string -> string Lwt.t
+
+(** [call ~endpoint ~address ~arg] calls [address] only with the raw calldata as argument.
+    Useful when calling precompiles as they don't expect a prepended signature. *)
+val raw_call : endpoint:string -> address:string -> arg:string -> string Lwt.t
