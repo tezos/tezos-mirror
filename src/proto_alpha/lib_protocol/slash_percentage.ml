@@ -8,7 +8,7 @@
 let for_double_baking ctxt =
   Constants_storage.percentage_of_frozen_deposits_slashed_per_double_baking ctxt
 
-let for_double_attestation ctxt rights denounced =
+let for_double_attestation ctxt rights level denounced =
   let total_rights_denounced =
     List.fold_left
       (fun total delegate ->
@@ -19,7 +19,10 @@ let for_double_attestation ctxt rights denounced =
       0
       denounced
   in
-  let committee_size = Constants_storage.consensus_committee_size ctxt in
+  (* TODO ABAAB. Note that the [rights] amount would also depend on the flag status. *)
+  let committee_size =
+    Consensus_parameters_storage.consensus_committee ctxt level
+  in
   let Ratio_repr.{numerator; denominator} =
     Constants_storage.max_slashing_threshold ctxt
   in
@@ -39,7 +42,7 @@ let get ctxt ~(kind : Misbehaviour_repr.kind) ~(level : Level_repr.t)
   | Double_baking -> return (ctxt, for_double_baking ctxt)
   | Double_attesting | Double_preattesting ->
       let* ctxt, rights = Delegate_sampler.attesting_rights_count ctxt level in
-      return (ctxt, for_double_attestation ctxt rights denounced)
+      return (ctxt, for_double_attestation ctxt rights level denounced)
 
 module Internal_for_tests = struct
   let for_double_attestation = for_double_attestation

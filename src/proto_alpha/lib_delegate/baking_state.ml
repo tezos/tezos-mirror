@@ -150,6 +150,7 @@ module Delegate_slots = struct
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
     consensus_threshold : int;
+    consensus_committee : int;
   }
 
   let own_delegates slots = slots.own_delegates
@@ -172,6 +173,8 @@ module Delegate_slots = struct
     SlotMap.find slot slots.all_delegate_voting_power
 
   let consensus_threshold {consensus_threshold; _} = consensus_threshold
+
+  let consensus_committee {consensus_committee; _} = consensus_committee
 end
 
 type delegate_slots = Delegate_slots.t
@@ -944,6 +947,7 @@ let delegate_slots attesting_rights delegates =
    {
      Plugin.RPC.Validators.level = _;
      consensus_threshold;
+     consensus_committee;
      delegates = attesting_rights;
    };
   ] ->
@@ -982,6 +986,7 @@ let delegate_slots attesting_rights delegates =
           own_delegate_slots;
           all_delegate_voting_power;
           consensus_threshold;
+          consensus_committee;
         }
 
 let compute_delegate_slots (cctxt : Protocol_client_context.full)

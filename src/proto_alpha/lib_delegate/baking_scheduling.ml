@@ -1015,7 +1015,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.run ~constants cctxt in
+  let*! operation_worker = Operation_worker.run cctxt in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->

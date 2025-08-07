@@ -70,6 +70,9 @@ module Delegate_slots : sig
 
   (** Returns the consensus threshold at the level the slots were computed *)
   val consensus_threshold : t -> int
+
+  (** Returns the consensus committee at the level the slots were computed *)
+  val consensus_committee : t -> int
 end
 
 type delegate_slots = Delegate_slots.t

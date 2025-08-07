@@ -3984,6 +3984,7 @@ module Validators = struct
   type t = {
     level : Raw_level.t;
     consensus_threshold : int;
+    consensus_committee : int;
     delegates : delegate list;
   }
 
@@ -4003,13 +4004,14 @@ module Validators = struct
   let encoding =
     let open Data_encoding in
     conv
-      (fun {level; consensus_threshold; delegates} ->
-        (level, consensus_threshold, delegates))
-      (fun (level, consensus_threshold, delegates) ->
-        {level; consensus_threshold; delegates})
-      (obj3
+      (fun {level; consensus_threshold; consensus_committee; delegates} ->
+        (level, consensus_threshold, consensus_committee, delegates))
+      (fun (level, consensus_threshold, consensus_committee, delegates) ->
+        {level; consensus_threshold; consensus_committee; delegates})
+      (obj4
          (req "level" Raw_level.encoding)
          (req "consensus_threshold" int31)
+         (req "consensus_committee" int31)
          (req "delegates" (list delegate_encoding)))
 
   module S = struct
@@ -4080,10 +4082,18 @@ module Validators = struct
               let consensus_threshold =
                 Attestation_power.consensus_threshold ctxt level
               in
+              let consensus_committee =
+                Attestation_power.consensus_committee ctxt level
+              in
               let* ctxt, delegates = attestation_slots_at_level ctxt level in
               return
                 ( ctxt,
-                  ( {level = level.level; consensus_threshold; delegates = []},
+                  ( {
+                      level = level.level;
+                      consensus_threshold;
+                      consensus_committee;
+                      delegates = [];
+                    },
                     delegates )
                   :: acc ))
             (ctxt, [])

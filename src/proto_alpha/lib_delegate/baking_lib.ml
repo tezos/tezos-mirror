@@ -58,7 +58,7 @@ let create_state cctxt ?dal_node_rpc_ctxt ?synchronize ?monitor_node_mempool
     Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
   let*! operation_worker =
-    Operation_worker.run ?monitor_node_operations ~constants cctxt
+    Operation_worker.run ?monitor_node_operations cctxt
   in
   Baking_scheduling.create_initial_state
     cctxt
