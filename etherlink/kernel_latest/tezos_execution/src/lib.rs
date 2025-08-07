@@ -482,7 +482,7 @@ fn execute_validation<Host: Runtime>(
             .increment_counter(host)
             .map_err(|_| ValidityError::FailedToIncrementCounter)?;
 
-        balance_updates.extend(op_balance_updates);
+        balance_updates.push(op_balance_updates);
     }
 
     let new_source_balance = account
@@ -623,7 +623,7 @@ fn apply_batch<Host: Runtime>(
                 &source,
                 &new_source_balance,
                 &mut source_account,
-                &balance_updates,
+                &balance_updates[index],
             )
         };
 
