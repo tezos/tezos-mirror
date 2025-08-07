@@ -5,23 +5,16 @@ set -eu
 if [ "$APT_PROXY" != false ]; then
   # shellcheck disable=SC1091
   . /etc/os-release
-  ARCH=$(uname -m)
   OS_ID=$ID
-  OS_VERSION=$VERSION_ID
 
   case "$OS_ID" in
   "fedora")
 
-    echo "zchunk=false" >> /etc/dnf/dnf.conf
-    for file in /etc/yum.repos.d/fedora*.repo; do
-      sed -i \
-        -e 's|^metalink=|#metalink=|' \
-        -e "s|^#baseurl=http://download.example.*|baseurl=http://dl.fedoraproject.org/pub/fedora/linux/updates/$OS_VERSION/Everything/$ARCH/|" \
-        -e "s|^baseurl=.*|baseurl=http://dl.fedoraproject.org/pub/fedora/linux/updates/$OS_VERSION/Everything/$ARCH/|" \
-        -e "/^baseurl=/a proxy=$APT_PROXY" \
-        -e '/^\[.*\]/a metadata_types=rpm-md' \
-        "$file"
-    done
+    : noop
+    # since fedora uses already a systeme based on mirrors
+    # we do nor configure the local proxy
+    # Also because of the use of the keyword mirrorlist
+    # the use of a local proxy is not easy
     ;;
 
   "rockylinux" | "rocky")
