@@ -83,7 +83,7 @@ module Rpc : sig
 end
 
 module type PERFORMANCE = sig
-  val set_stats : data_dir:string -> unit Lwt.t
+  val set_stats : data_dir:string -> unit
 end
 
 val performance_metrics : (module PERFORMANCE) Lazy.t
