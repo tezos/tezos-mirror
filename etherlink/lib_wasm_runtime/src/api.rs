@@ -10,7 +10,10 @@ use crate::{
 };
 use log::trace;
 use ocaml::{Error, List, Pointer, Value};
-use std::collections::BTreeMap;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, RwLock, RwLockReadGuard},
+};
 use wasmer::{Engine, Features, Module, NativeEngineExt, Store, Target};
 use wasmer_compiler_cranelift::Cranelift;
 
@@ -28,25 +31,33 @@ impl Kernel {
     }
 }
 
-pub struct KernelsCache(BTreeMap<[u8; 32], Kernel>);
+pub struct KernelsCache(Arc<RwLock<BTreeMap<[u8; 32], Arc<Kernel>>>>);
 
 impl KernelsCache {
     pub fn new() -> Self {
-        KernelsCache(BTreeMap::new())
+        KernelsCache(Arc::new(RwLock::new(BTreeMap::new())))
     }
 
     pub fn miss(&self, hash: &ContextHash) -> bool {
-        !self.0.contains_key(hash.as_bytes())
+        !self.0.read().unwrap().contains_key(hash.as_bytes())
     }
 
-    pub fn get(&self, hash: &ContextHash) -> &Kernel {
-        self.0.get(hash.as_bytes()).unwrap()
+    pub fn get<'a>(&'a self, hash: &ContextHash) -> Arc<Kernel> {
+        self.0.read().unwrap().get(hash.as_bytes()).unwrap().clone()
     }
+
     pub fn insert(&mut self, hash: &ContextHash, kernel: Kernel) {
-        self.0.insert(hash.as_bytes().to_owned(), kernel);
+        self.0
+            .write()
+            .unwrap()
+            .insert(hash.as_bytes().to_owned(), Arc::new(kernel));
     }
 
-    pub fn load(&mut self, engine: &Engine, evm_tree: &EvmTree) -> Result<(&Kernel, bool), Error> {
+    pub fn load(
+        &mut self,
+        engine: &Engine,
+        evm_tree: &EvmTree,
+    ) -> Result<(Arc<Kernel>, bool), Error> {
         const KERNEL_PATH: &'static str = "/kernel/boot.wasm";
         let hash = bindings::store_get_hash(evm_tree, &KERNEL_PATH)?;
 

@@ -67,7 +67,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
     let open Lwt_syntax in
     let enable_fallback =
       match
-        Lwt_preemptive.run_in_main @@ fun () -> Evm_state.storage_version tree
+        Lwt_domain.run_in_main @@ fun () -> Evm_state.storage_version tree
       with
       | Ok storage_version ->
           (* See case [StorageVersion::V17] in [migration::migrate_to] *)
@@ -81,7 +81,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
     in
     if enable_fallback && key = tmp_world_state_path ^ "/transactions_receipts"
     then
-      Lwt_preemptive.run_in_main @@ fun () ->
+      Lwt_domain.run_in_main @@ fun () ->
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root
@@ -94,7 +94,7 @@ let enable ~keep_alive ?evm_node_endpoint store =
     else if
       enable_fallback && key = tmp_world_state_path ^ "/transactions_objects"
     then
-      Lwt_preemptive.run_in_main @@ fun () ->
+      Lwt_domain.run_in_main @@ fun () ->
       let* pred =
         Evm_state.current_block_height
           ~root:Durable_storage_path.etherlink_root

@@ -44,9 +44,10 @@ end = struct
   let wrap ?l1_timestamp inbox = (sol :: ipl ?l1_timestamp () :: inbox) @ [eol]
 end
 
-let run ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
+let run ~pool ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
     ~entrypoint tree rollup_address inbox : Irmin_context.tree Lwt.t =
-  Lwt_preemptive.detach
+  Lwt_domain.detach
+    pool
     (fun () ->
       wasm_runtime_run
         ~preimages_dir
@@ -60,8 +61,9 @@ let run ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
         Shared_inbox.(wrap ?l1_timestamp inbox))
     ()
 
-let preload_kernel tree =
-  Lwt_preemptive.detach
+let preload_kernel ~pool tree =
+  Lwt_domain.detach
+    pool
     (fun () ->
       Evm_node_wasm_runtime.wasm_runtime_preload_kernel static_context tree)
     ()

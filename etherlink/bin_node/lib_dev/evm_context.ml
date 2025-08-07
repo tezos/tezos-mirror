@@ -53,6 +53,7 @@ type t = {
   signer : Signer.t option;
   legacy_block_storage : bool;
   tx_container : Services_backend_sig.ex_tx_container;
+  execution_pool : Lwt_domain.pool;
 }
 
 let is_sequencer t = Option.is_some t.signer
@@ -415,7 +416,7 @@ module State = struct
     let*! res = Evm_state.inspect evm_state path in
     return res
 
-  let on_new_delayed_transaction ~native_execution ~delayed_transaction
+  let on_new_delayed_transaction ~pool ~native_execution ~delayed_transaction
       evm_state =
     let open Lwt_result_syntax in
     let*! data_dir, config = execution_config in
@@ -424,6 +425,7 @@ module State = struct
     in
     if storage_version < 15 then
       Evm_state.execute
+        ~pool
         ~data_dir
         ~config
         ~native_execution
@@ -444,6 +446,7 @@ module State = struct
           evm_state
       in
       Evm_state.execute
+        ~pool
         ~native_execution
         ~wasm_entrypoint:"populate_delayed_inbox"
         ~data_dir
@@ -845,6 +848,7 @@ module State = struct
                Because of all that it's necessary to do a run with no
                specified blueprint. *)
             Evm_state.execute
+              ~pool:ctxt.execution_pool
               ~execution_timestamp:timestamp
               ~native_execution:
                 (ctxt.configuration.kernel_execution.native_execution_policy
@@ -872,6 +876,7 @@ module State = struct
         (fun time -> Lwt.return (time_processed := time))
         (fun () ->
           Evm_state.apply_unsigned_chunks
+            ~pool:ctxt.execution_pool
             ~native_execution_policy:
               ctxt.configuration.kernel_execution.native_execution_policy
             ~wasm_pvm_fallback:(not @@ List.is_empty delayed_transactions)
@@ -1249,6 +1254,7 @@ module State = struct
     | New_delayed_transaction delayed_transaction ->
         let* evm_state =
           on_new_delayed_transaction
+            ~pool:ctxt.execution_pool
             ~native_execution:
               (ctxt.configuration.kernel_execution.native_execution_policy
              = Always)
@@ -1453,35 +1459,6 @@ module State = struct
         Invalid_rollup_node
           {smart_rollup_address; rollup_node_smart_rollup_address})
 
-  let preload_kernel_from_level ctxt level =
-    let open Lwt_result_syntax in
-    let* hash_candidate =
-      Evm_store.use ctxt.store @@ fun conn ->
-      Evm_store.Context_hashes.find conn level
-    in
-    match hash_candidate with
-    | None -> return_unit
-    | Some hash ->
-        let*! context = Irmin_context.checkout_exn ctxt.index hash in
-        let*! evm_state = Irmin_context.PVMState.get context in
-        let*! () = Evm_state.preload_kernel evm_state in
-        return_unit
-
-  let preload_known_kernels ctxt =
-    let open Lwt_result_syntax in
-    let* activation_levels =
-      Evm_store.use ctxt.store Evm_store.Kernel_upgrades.activation_levels
-    in
-    let* earliest_info =
-      Evm_store.use ctxt.store Evm_store.Context_hashes.find_earliest
-    in
-    let earliest_level =
-      Option.fold ~none:[] ~some:(fun (l, _) -> [l]) earliest_info
-    in
-    List.iter_ep
-      (preload_kernel_from_level ctxt)
-      (earliest_level @ activation_levels)
-
   let check_smart_rollup_address ~store_smart_rollup_address
       ~smart_rollup_address =
     let open Lwt_result_syntax in
@@ -1618,6 +1595,11 @@ module State = struct
       ?smart_rollup_address ~store_perm ?signer ?snapshot_url
       ~(tx_container : _ Services_backend_sig.tx_container) () =
     let open Lwt_result_syntax in
+    let pool =
+      (* All interactions of the Evm_context worker with the kernel are purely
+         sequential. As a consequence, a pool of 1 domain is enough. *)
+      Lwt_domain.setup_pool 1
+    in
     let*! () =
       Lwt_utils_unix.create_dir (Evm_state.kernel_logs_directory ~data_dir)
     in
@@ -1724,6 +1706,7 @@ module State = struct
             in
             let* evm_state =
               Evm_state.execute
+                ~pool
                 ~data_dir
                 ~config
                 ~native_execution:false
@@ -1772,6 +1755,7 @@ module State = struct
         signer;
         legacy_block_storage;
         tx_container = Ex_tx_container tx_container;
+        execution_pool = pool;
       }
     in
 
@@ -2079,7 +2063,6 @@ module Handlers = struct
     Lwt.wakeup execution_config_waker @@ (ctxt.data_dir, pvm_config ctxt) ;
     Lwt.wakeup init_status_waker status ;
     State.Transaction.initialize_head_info ctxt ;
-    let* () = State.preload_known_kernels ctxt in
     return ctxt
 
   let on_request :

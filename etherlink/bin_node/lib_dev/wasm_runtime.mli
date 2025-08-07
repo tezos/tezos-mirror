@@ -14,6 +14,7 @@
     is `epoch`.
 *)
 val run :
+  pool:Lwt_domain.pool ->
   ?l1_timestamp:Time.Protocol.t ->
   preimages_dir:string ->
   ?preimages_endpoint:Uri.t ->
@@ -24,4 +25,4 @@ val run :
   string list ->
   Irmin_context.tree Lwt.t
 
-val preload_kernel : Irmin_context.tree -> bool Lwt.t
+val preload_kernel : pool:Lwt_domain.pool -> Irmin_context.tree -> bool Lwt.t

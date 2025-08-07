@@ -263,9 +263,15 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~tx_container
       ()
   in
-  let* ro_ctxt =
-    Evm_ro_context.load ?network ~smart_rollup_address ~data_dir config
+  (* One domain for the Lwt scheduler, one domain for Evm_context and the rest
+     of the RPCs. *)
+  let pool =
+    Lwt_domain.setup_pool (max 1 (Domain.recommended_domain_count () - 2))
   in
+  let* ro_ctxt =
+    Evm_ro_context.load ~pool ?network ~smart_rollup_address ~data_dir config
+  in
+  let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
 
   let observer_backend =
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint

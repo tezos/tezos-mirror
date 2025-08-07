@@ -253,6 +253,10 @@ let container_forward_request (type f) ~(chain_family : f L2_types.chain_family)
 let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     ~(config : Configuration.t) () =
   let open Lwt_result_syntax in
+  let pool =
+    (* We leave one domain for the RPC server *)
+    Lwt_domain.setup_pool (max 1 (Domain.recommended_domain_count () - 1))
+  in
   let*! () =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
@@ -266,7 +270,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~evm_node_endpoint
       ()
   in
-  let* ctxt = Evm_ro_context.load ~data_dir config in
+  let* ctxt = Evm_ro_context.load ~pool ~data_dir config in
   let* () = Evm_ro_context.preload_known_kernels ctxt in
 
   let* legacy_block_storage =

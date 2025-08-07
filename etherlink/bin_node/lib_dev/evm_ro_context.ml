@@ -15,6 +15,7 @@ type t = {
   index : Irmin_context.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
+  execution_pool : Lwt_domain.pool;
 }
 
 let get_evm_state ctxt hash =
@@ -88,7 +89,7 @@ let network_sanity_check ~network ctxt =
 
   return_unit
 
-let load ?network ?smart_rollup_address ~data_dir
+let load ~pool ?network ?smart_rollup_address ~data_dir
     (configuration : Configuration.t) =
   let open Lwt_result_syntax in
   let* store =
@@ -125,6 +126,7 @@ let load ?network ?smart_rollup_address ~data_dir
       smart_rollup_address;
       block_storage_sqlite3 = not legacy_mode;
       finalized_view = configuration.finalized_view;
+      execution_pool = pool;
     }
   in
 
@@ -219,6 +221,8 @@ module MakeBackend (Ctxt : sig
   val evm_node_endpoint : Uri.t option
 
   val keep_alive : bool
+
+  val execution_pool : Lwt_domain.pool
 end) =
 struct
   module Reader = struct
@@ -332,6 +336,7 @@ struct
       in
       let* raw_insights =
         Evm_state.execute_and_inspect
+          ~pool:Ctxt.execution_pool
           ~native_execution_policy:Ctxt.ctxt.native_execution_policy
           ~config
           ~data_dir:Ctxt.ctxt.data_dir
@@ -420,6 +425,8 @@ module Make (Base : sig
   val evm_node_endpoint : Uri.t option
 
   val keep_alive : bool
+
+  val execution_pool : Lwt_domain.pool
 end) =
   Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
@@ -502,7 +509,7 @@ let replay ctxt ?(log_file = "replay") ?profile
     else failwith "Todo: support legacy mode"
   in
   let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
-  let*! () = Evm_state.preload_kernel evm_state in
+  let*! () = Evm_state.preload_kernel ~pool:ctxt.execution_pool evm_state in
   let process_time = ref (Ptime.Span.of_int_s 0) in
   let* apply_result =
     Misc.with_timing (fun dt ->
@@ -519,6 +526,7 @@ let replay ctxt ?(log_file = "replay") ?profile
         blueprint.blueprint.payload
     in
     Evm_state.apply_unsigned_chunks
+      ~pool:ctxt.execution_pool
       ~log_file
       ?profile
       ~data_dir:ctxt.data_dir
@@ -581,6 +589,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
       let* evm_state = get_evm_state ctxt hash in
       let* evm_state = alter_evm_state evm_state in
       Evm_state.execute
+        ~pool:ctxt.execution_pool
         ?log_file:input.log_kernel_debug_file
         ~data_dir:ctxt.data_dir
         ~config:pvm_config
@@ -596,6 +605,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     let evm_node_endpoint = evm_node_endpoint
 
     let keep_alive = config.Configuration.keep_alive
+
+    let execution_pool = ctxt.execution_pool
   end) in
   if ctxt.block_storage_sqlite3 then
     (module struct
@@ -801,7 +812,7 @@ let preload_kernel_from_level ctxt level =
   match hash with
   | Some hash ->
       let* evm_state = get_evm_state ctxt hash in
-      let*! () = Evm_state.preload_kernel evm_state in
+      let*! () = Evm_state.preload_kernel ~pool:ctxt.execution_pool evm_state in
       return_unit
   | None -> return_unit
 
