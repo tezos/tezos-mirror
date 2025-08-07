@@ -791,8 +791,11 @@ fn apply_operation<Host: Runtime>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{account_storage::TezlinkOriginatedAccount, TezlinkImplicitAccount};
+    use crate::{
+        account_storage::TezlinkOriginatedAccount, address, TezlinkImplicitAccount,
+    };
     use mir::ast::{Entrypoint, Micheline};
+    use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::enc::BinWriter;
@@ -803,13 +806,15 @@ mod tests {
         block::TezBlock,
         operation::{
             sign_operation, ManagerOperation, ManagerOperationContent, Operation,
-            OperationContent, Parameter, RevealContent, TransferContent,
+            OperationContent, OriginationContent, Parameter, RevealContent, Script,
+            TransferContent,
         },
         operation_result::{
             ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
             CounterError, InternalContentWithMetadata, InternalOperationSum,
-            OperationResult, OperationResultSum, RevealError, RevealSuccess,
-            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            OperationResult, OperationResultSum, Originated, OriginationSuccess,
+            RevealError, RevealSuccess, TransferError, TransferSuccess, TransferTarget,
+            UpdateOrigin, ValidityError,
         },
     };
 
@@ -978,6 +983,30 @@ mod tests {
                 amount,
                 destination,
                 parameters,
+            })],
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn make_origination_operation(
+        fee: u64,
+        counter: u64,
+        gas_limit: u64,
+        storage_limit: u64,
+        source: Bootstrap,
+        balance: u64,
+        script: Script,
+    ) -> Operation {
+        make_operation(
+            fee,
+            counter,
+            gas_limit,
+            storage_limit,
+            source,
+            vec![OperationContent::Origination(OriginationContent {
+                balance: balance.into(),
+                script,
+                delegate: None,
             })],
         )
     }
@@ -2421,7 +2450,158 @@ mod tests {
             src_acc.balance(&host).unwrap(),
             20.into(),
             "Fees should have been paid for failed operation"
+        );
+    }
+
+    #[test]
+    fn origination_of_a_smart_contract() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let context = context::Context::init_context();
+
+        let src_account =
+            TezlinkImplicitAccount::from_public_key_hash(&context, &src.pkh)
+                .expect("Should have succeeded to create an account");
+
+        // Retrieve initial balance for the end of the test
+        let initial_balance = src_account
+            .balance(&host)
+            .expect("Should have found a balance");
+
+        let fee = 15u64;
+        let smart_contract_balance = 30u64;
+        /*
+        octez-client convert script "
+                  parameter string;
+                  storage string;
+                  code { CAR; NIL operation; PAIR }
+                " from Michelson to binary
+         */
+        let code =
+            hex::decode("02000000170500036805010368050202000000080316053d036d0342")
+                .unwrap();
+
+        // octez-client -E https://rpc.tzkt.io/mainnet convert data  '"hello"' from Michelson to binary
+        let storage = hex::decode("010000000568656c6c6f").unwrap();
+        let operation = make_origination_operation(
+            fee,
+            1,
+            4,
+            5,
+            src.clone(),
+            smart_contract_balance,
+            Script {
+                code: code.clone(),
+                storage: storage.clone(),
+            },
+        );
+
+        let receipt = validate_and_apply_operation(&mut host, &context, operation)
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            );
+
+        let expected_kt1 = address::generate_kt1(&src.pkh)
+            .expect("Should have succeeded to generate a KT1");
+
+        let expected_receipt = OperationResultSum::Origination(OperationResult {
+            balance_updates: vec![
+                BalanceUpdate {
+                    balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                    changes: -15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+                BalanceUpdate {
+                    balance: Balance::BlockFees,
+                    changes: 15,
+                    update_origin: UpdateOrigin::BlockApplication,
+                },
+            ],
+            result: ContentResult::Applied(OriginationSuccess {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Originated(
+                            expected_kt1.clone(),
+                        )),
+                        changes: 30,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                originated_contracts: vec![Originated {
+                    contract: expected_kt1.clone(),
+                }],
+                consumed_gas: 0u64.into(),
+                storage_size: 0u64.into(),
+                paid_storage_size_diff: 0u64.into(),
+                lazy_storage_diff: None,
+            }),
+            internal_operation_results: vec![],
+        });
+
+        assert_eq!(receipt, vec![expected_receipt]);
+
+        // Now check that everything in the durable storage is updated
+
+        // Balance of the source
+        let current_balance = src_account
+            .balance(&host)
+            .expect("Should have found a balance for the source");
+
+        let expected_balance = initial_balance
+            .0
+            .checked_sub(&fee.into())
+            .expect("Should have been able to debit the fees")
+            .checked_sub(&smart_contract_balance.into())
+            .expect("Should have been able to debit the smart contract balance");
+
+        assert_eq!(
+            current_balance.0, expected_balance,
+            "Source current balance doesn't match the expected one"
+        );
+
+        let smart_contract_account = TezlinkOriginatedAccount::from_contract(
+            &context,
+            &Contract::Originated(expected_kt1),
         )
+        .expect("Should have been able to create an account from the KT1");
+
+        // Balance of the smart contract
+        let current_kt1_balance = smart_contract_account
+            .balance(&host)
+            .expect("Should have found a balance for the smart contract");
+
+        assert_eq!(
+            current_kt1_balance,
+            smart_contract_balance.into(),
+            "Smart cont
+            ract current balance doesn't match the expected one"
+        );
+
+        // Verify code and storage
+        let smart_contract_code = smart_contract_account
+            .code(&host)
+            .expect("Should have found a code for the KT1");
+        assert_eq!(
+            smart_contract_code, code,
+            "Current code for smart contract is not the same as the one originated"
+        );
+        let smart_contract_storage = smart_contract_account
+            .storage(&host)
+            .expect("Should have found a code for the KT1");
+        assert_eq!(
+            smart_contract_storage, storage,
+            "Current storage for smart contract is not the same as the one originated"
+        );
     }
 
     #[test]
