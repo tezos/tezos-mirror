@@ -201,7 +201,7 @@ pub fn transfer<'a, Host: Runtime>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<(TransferSuccess, Narith), TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
             if param != Micheline::from(()) || !entrypoint.is_default() {
@@ -223,13 +223,18 @@ pub fn transfer<'a, Host: Runtime>(
                 dest_contract,
                 &mut dest_account,
             )
-            .map(|(success, _applied_balance_changes)| TransferSuccess {
-                // This boolean is kept at false on purpose to maintain compatibility with TZKT.
-                // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
-                // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
-                // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
-                allocated_destination_contract: false,
-                ..success
+            .map(|(success, applied_balance_changes)| {
+                (
+                    TransferSuccess {
+                        // This boolean is kept at false on purpose to maintain compatibility with TZKT.
+                        // When transferring to a non-existent account, we need to allocate it (I/O to durable storage).
+                        // This incurs a cost, and TZKT expects balance updates in the operation receipt representing this cost.
+                        // So, as long as we don't have balance updates to represent this cost, we keep this boolean false.
+                        allocated_destination_contract: false,
+                        ..success
+                    },
+                    applied_balance_changes.new_src_balance,
+                )
             })
         }
         Contract::Originated(_) => {
@@ -268,10 +273,13 @@ pub fn transfer<'a, Host: Runtime>(
                 ctx,
             );
             log!(host, Debug, "Transfer operation succeeded");
-            Ok(TransferSuccess {
-                storage: Some(new_storage),
-                ..receipt
-            })
+            Ok((
+                TransferSuccess {
+                    storage: Some(new_storage),
+                    ..receipt
+                },
+                applied_balance_changes.new_src_balance,
+            ))
         }
     }
 }
@@ -287,7 +295,7 @@ pub fn transfer_external<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: Option<Parameter>,
-) -> Result<TransferSuccess, TransferError> {
+) -> Result<(TransferSuccess, Narith), TransferError> {
     log!(
         host,
         Debug,
@@ -505,7 +513,7 @@ fn execute_validation<Host: Runtime>(
 
     Ok(ValidationInfo {
         source,
-        new_source_balance,
+        source_balance: new_source_balance,
         source_account: account,
         balance_updates,
     })
@@ -592,7 +600,7 @@ fn apply_batch<Host: Runtime>(
 ) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
         source,
-        new_source_balance,
+        mut source_balance,
         mut source_account,
         balance_updates,
     } = validation_info;
@@ -616,15 +624,17 @@ fn apply_batch<Host: Runtime>(
             );
             produce_skipped_receipt(&content)
         } else {
-            apply_operation(
+            let (r, b) = apply_operation(
                 host,
                 context,
                 &content,
                 &source,
-                &new_source_balance,
+                &source_balance,
                 &mut source_account,
                 &balance_updates[index],
-            )
+            );
+            source_balance = b;
+            r
         };
 
         if first_failure.is_none() && !is_applied(&receipt) {
@@ -649,10 +659,10 @@ fn apply_operation<Host: Runtime>(
     context: &Context,
     content: &ManagerOperation<OperationContent>,
     source: &PublicKeyHash,
-    new_source_balance: &Narith,
+    source_balance: &Narith,
     source_account: &mut TezlinkImplicitAccount,
     balance_updates: &[BalanceUpdate],
-) -> OperationResultSum {
+) -> (OperationResultSum, Narith) {
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source, source_account, pk);
@@ -660,29 +670,43 @@ fn apply_operation<Host: Runtime>(
                 balance_updates.to_vec(),
                 reveal_result.map_err(Into::into),
             );
-            OperationResultSum::Reveal(manager_result)
+            (
+                OperationResultSum::Reveal(manager_result),
+                source_balance.clone(),
+            )
         }
         OperationContent::Transfer(TransferContent {
             amount,
             destination,
             parameters,
         }) => {
-            let transfer_result = transfer_external(
+            match transfer_external(
                 host,
                 context,
                 source,
                 source_account,
-                new_source_balance,
+                source_balance,
                 amount,
                 destination,
                 parameters.clone(),
-            )
-            .map(TransferTarget::ToContrat);
-            let manager_result = produce_operation_result(
-                balance_updates.to_vec(),
-                transfer_result.map_err(Into::into),
-            );
-            OperationResultSum::Transfer(manager_result)
+            ) {
+                Ok((res, bal)) => {
+                    let transfer_result = TransferTarget::ToContrat(res);
+                    let manager_result = produce_operation_result(
+                        balance_updates.to_vec(),
+                        Ok(transfer_result),
+                    );
+                    (OperationResultSum::Transfer(manager_result), bal)
+                }
+                Err(e) => {
+                    let manager_result =
+                        produce_operation_result(balance_updates.to_vec(), Err(e.into()));
+                    (
+                        OperationResultSum::Transfer(manager_result),
+                        source_balance.clone(),
+                    )
+                }
+            }
         }
     }
 }
