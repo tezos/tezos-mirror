@@ -31,7 +31,12 @@ TMP_FILE="$(mktemp)"
 URL="https://github.com/DataDog/datadog-ci/releases/download/$DATAGOG_RELEASE/datadog-ci_linux-$PLATFORM"
 echo "Downloading datadog-ci for $PLATFORM $URL..."
 
-curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+if command -v kiss-fetch.sh > /dev/null 2>&1; then
+  kiss-fetch.sh "$URL" -o "$TMP_FILE"
+else
+  echo "Warning: Kiss-fetch.sh missing"
+  curl -L -Ss --fail "$URL" -o "$TMP_FILE"
+fi
 
 DOWNLOADED_SHA256=$(sha256sum "$TMP_FILE" | cut -d ' ' -f1)
 if [[ "$DOWNLOADED_SHA256" != "$EXPECTED_SHA256" ]]; then
