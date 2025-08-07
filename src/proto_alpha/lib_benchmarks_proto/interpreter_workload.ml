@@ -176,6 +176,7 @@ type instruction_name =
   | N_IIs_implicit_account
   | N_ICreate_contract
   | N_ISet_delegate
+  | N_IIndex_address
   (* time *)
   | N_INow
   | N_IMin_block_time
@@ -383,6 +384,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_IContract -> "N_IContract"
   | N_ITransfer_tokens -> "N_ITransfer_tokens"
   | N_IImplicit_account -> "N_IImplicit_account"
+  | N_IIndex_address -> "N_IIndex_address"
   | N_IIs_implicit_account -> "N_IIs_implicit_account"
   | N_ICreate_contract -> "N_ICreate_contract"
   | N_ISet_delegate -> "N_ISet_delegate"
@@ -617,6 +619,7 @@ let all_instructions =
     N_ITransfer_tokens;
     N_IImplicit_account;
     N_IIs_implicit_account;
+    N_IIndex_address;
     N_ICreate_contract;
     N_ISet_delegate;
     N_INow;
@@ -1038,6 +1041,8 @@ module Instructions = struct
 
   let is_implicit_account = ir_sized_step N_IIs_implicit_account nullary
 
+  let index_address = ir_sized_step N_IIndex_address nullary
+
   let create_contract = ir_sized_step N_ICreate_contract nullary
 
   let set_delegate = ir_sized_step N_ISet_delegate nullary
@@ -1443,6 +1448,7 @@ let extract_ir_sized_step :
   | IView (_, _, _, _), _ -> Instructions.view
   | IImplicit_account (_, _), _ -> Instructions.implicit_account
   | IIs_implicit_account (_, _), _ -> Instructions.is_implicit_account
+  | IIndex_address (_, _), _ -> Instructions.index_address
   | ICreate_contract _, _ -> Instructions.create_contract
   | ISet_delegate (_, _), _ -> Instructions.set_delegate
   | INow (_, _), _ -> Instructions.now
@@ -1574,7 +1580,6 @@ let extract_ir_sized_step :
   | IXor_bytes (_, _), (x, (y, _)) ->
       Instructions.xor_bytes (Size.bytes x) (Size.bytes y)
   | INot_bytes (_, _), (x, _) -> Instructions.not_bytes (Size.bytes x)
-  | IIndex_address (_, _), _ -> assert false
   | IGet_address_index _, _ -> assert false
 
 let extract_control_trace (type bef_top bef aft_top aft)
