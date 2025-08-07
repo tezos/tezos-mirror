@@ -2,7 +2,7 @@
 
 ## Version NEXT
 
-Its storage version is 36.
+Its storage version is 37.
 
 ### Features
 
@@ -26,6 +26,9 @@ Its storage version is 36.
   - Improved smart contract execution performances.
   - Reduced overall tick consumption.
   - Better maintainability and alignment with upcoming Ethereum forks and EVM feature updates.
+- Etherlink's VM version was bumped from Cancun to Prague, it now supports (!18851):
+    - [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702): Set Code for EOAs.
+    - [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537): Precompile for BLS12-381 curve operations.
 
 ### Bug fixes
 
