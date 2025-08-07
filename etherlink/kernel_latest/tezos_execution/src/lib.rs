@@ -24,7 +24,8 @@ use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::TransferTarget;
 use tezos_tezlink::{
     operation::{
-        ManagerOperation, OperationContent, Parameter, RevealContent, TransferContent,
+        verify_signature, ManagerOperation, ManagerOperationContent, OperationContent,
+        Parameter, RevealContent, TransferContent,
     },
     operation_result::{
         is_applied, produce_operation_result, Balance, BalanceTooLow, BalanceUpdate,
@@ -32,7 +33,7 @@ use tezos_tezlink::{
         TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
-use validate::ValidationInfo;
+use validate::{validate_individual_operation, ValidationInfo};
 
 extern crate alloc;
 pub mod account_storage;
@@ -454,23 +455,51 @@ fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     branch: &BlockHash,
-    content: &ManagerOperation<OperationContent>,
+    content: Vec<ManagerOperation<OperationContent>>,
     signature: UnknownSignature,
 ) -> Result<ValidationInfo, ValidityError> {
-    let mut validation_info =
-        validate::validate_operation(host, context, branch, content, signature)?;
+    let (source, pk, mut account) = validate::validate_source(host, context, &content)?;
 
-    validation_info
-        .source_account
-        .set_balance(host, &validation_info.new_source_balance)
-        .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+    let mut balance_updates = vec![];
 
-    validation_info
-        .source_account
-        .increment_counter(host)
-        .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+    for c in &content {
+        let (new_source_balance, op_balance_updates) =
+            validate_individual_operation(host, &source, &account, c)?;
 
-    Ok(validation_info)
+        account
+            .set_balance(host, &new_source_balance)
+            .map_err(|_| ValidityError::FailedToUpdateBalance)?;
+
+        account
+            .increment_counter(host)
+            .map_err(|_| ValidityError::FailedToIncrementCounter)?;
+
+        balance_updates.extend(op_balance_updates);
+    }
+
+    let new_source_balance = account
+        .balance(host)
+        .map_err(|_| ValidityError::FailedToFetchBalance)?;
+
+    match verify_signature(
+        &pk,
+        branch,
+        content
+            .clone()
+            .into_iter()
+            .map(|op| op.into())
+            .collect::<Vec<ManagerOperationContent>>(),
+        signature.clone(),
+    ) {
+        Ok(true) => (),
+        _ => return Err(ValidityError::InvalidSignature),
+    }
+
+    Ok(ValidationInfo {
+        new_source_balance,
+        source_account: account,
+        balance_updates,
+    })
 }
 
 pub fn validate_and_apply_operation<Host: Runtime>(
@@ -505,7 +534,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
         &mut safe_host,
         context,
         &branch,
-        &manager_operation,
+        vec![manager_operation.clone()],
         signature,
     ) {
         Ok(validation_info) => validation_info,

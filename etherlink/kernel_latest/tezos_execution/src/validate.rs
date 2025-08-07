@@ -2,14 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::log;
 use tezos_evm_runtime::runtime::Runtime;
-use tezos_smart_rollup::types::PublicKey;
-use tezos_tezlink::enc_wrappers::BlockHash;
+use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
-    operation::{verify_signature, ManagerOperation, OperationContent, RevealContent},
+    operation::{ManagerOperation, OperationContent, RevealContent},
     operation_result::{CounterError, ValidityError},
 };
 
@@ -82,13 +80,14 @@ impl TezlinkImplicitAccount {
 /// In all cases except Reveal, we obtain the public key from the context.
 /// However, the purpose of Reveal is to register the public key in the context,
 /// making it a special case. In this case, we obtain the public key
-/// from the operation's payload.
+/// from the operation's payload. When processing a batch, the reveal operation is the
+/// first operation on it.
 fn get_revealed_key<Host: Runtime>(
     host: &Host,
     account: &TezlinkImplicitAccount,
-    content: &OperationContent,
+    first_content: &OperationContent,
 ) -> Result<PublicKey, ValidityError> {
-    match content {
+    match first_content {
         OperationContent::Reveal(RevealContent { pk, proof: _ }) => Ok(pk.clone()),
         _ => account
             .get_manager_key(host)
@@ -126,14 +125,24 @@ pub struct ValidationInfo {
     pub balance_updates: Vec<BalanceUpdate>,
 }
 
-pub fn validate_operation<Host: Runtime>(
+pub fn validate_source<Host: Runtime>(
     host: &Host,
     context: &Context,
-    branch: &BlockHash,
-    content: &ManagerOperation<OperationContent>,
-    signature: UnknownSignature,
-) -> Result<ValidationInfo, ValidityError> {
-    let account = TezlinkImplicitAccount::from_public_key_hash(context, &content.source)
+    content: &[ManagerOperation<OperationContent>],
+) -> Result<(PublicKeyHash, PublicKey, TezlinkImplicitAccount), ValidityError> {
+    if content.is_empty() {
+        return Err(ValidityError::EmptyBatch);
+    }
+
+    let source = &content[0].source;
+
+    for c in content {
+        if c.source != *source {
+            return Err(ValidityError::MultipleSources);
+        }
+    }
+
+    let account = TezlinkImplicitAccount::from_public_key_hash(context, source)
         .map_err(|_| ValidityError::FailedToFetchAccount)?;
 
     // Account must exist in the durable storage
@@ -144,9 +153,18 @@ pub fn validate_operation<Host: Runtime>(
         return Err(ValidityError::EmptyImplicitContract);
     }
 
-    account.check_counter_increment(host, &content.counter)?;
+    let pk = get_revealed_key(host, &account, &content[0].operation)?;
 
-    let pk = get_revealed_key(host, &account, &content.operation)?;
+    Ok((source.clone(), pk, account))
+}
+
+pub fn validate_individual_operation<Host: Runtime>(
+    host: &Host,
+    source: &PublicKeyHash,
+    account: &TezlinkImplicitAccount,
+    content: &ManagerOperation<OperationContent>,
+) -> Result<(Narith, Vec<BalanceUpdate>), ValidityError> {
+    account.check_counter_increment(host, &content.counter)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
     check_gas_limit(&1040000_u64.into(), &content.gas_limit)?;
@@ -158,28 +176,14 @@ pub fn validate_operation<Host: Runtime>(
     let new_balance = match account.simulate_spending(host, &content.fee) {
         Ok(Some(new_balance)) => new_balance,
         Ok(None) => {
-            log!(
-                host,
-                tezos_evm_logging::Level::Debug,
-                "Invalid operation: Can't pay the fees"
-            );
             return Err(ValidityError::CantPayFees(content.fee.clone()));
         }
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
 
-    match verify_signature(&pk, branch, vec![content.clone().into()], signature.clone()) {
-        Ok(true) => (),
-        _ => return Err(ValidityError::InvalidSignature),
-    }
-
     let (src_delta, block_fees) =
-        crate::compute_fees_balance_updates(&content.source, &content.fee)
+        crate::compute_fees_balance_updates(source, &content.fee)
             .map_err(|_| ValidityError::FailedToComputeFeeBalanceUpdate)?;
 
-    Ok(ValidationInfo {
-        new_source_balance: new_balance,
-        source_account: account,
-        balance_updates: vec![src_delta, block_fees],
-    })
+    Ok((new_balance, vec![src_delta, block_fees]))
 }
