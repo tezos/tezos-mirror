@@ -1680,6 +1680,18 @@ let cost_N_IImplicit_account_alloc = S.safe_int 10
 (* let time = 10. in let alloc = 8. in max 10 (max time alloc) *)
 let cost_N_IImplicit_account_synthesized = S.safe_int 10
 
+(* model interpreter/N_IIndex_address *)
+(* max 10 3480.323814 *)
+let cost_N_IIndex_address = S.safe_int 3480
+
+(* model interpreter/N_IIndex_address_alloc *)
+(* max 10 0. *)
+let cost_N_IIndex_address_alloc = S.safe_int 10
+
+(* model interpreter/N_IIndex_address_synthesized *)
+(* let time = 3480.323814 in let alloc = 0. in max 10 (max time alloc) *)
+let cost_N_IIndex_address_synthesized = S.safe_int 3480
+
 (* model interpreter/N_IInt_bls12_381_z_fr *)
 (* max 10 115. *)
 let cost_N_IInt_bls12_381_z_fr = S.safe_int 115

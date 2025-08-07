@@ -435,11 +435,7 @@ module Cost_of = struct
 
     let is_implicit_account = atomic_step_cost cost_N_IIs_implicit_account
 
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/8039
-       This gas cost is temporary and uses Big map's get_and_update, as their
-       semantics and implementation is highly similar. *)
-    let index_address =
-      atomic_step_cost (cost_N_IMap_get_and_update big_map_elt_size 4)
+    let index_address = atomic_step_cost cost_N_IIndex_address
 
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/8039
        This gas cost is temporary and uses Big map's get, as their

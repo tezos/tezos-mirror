@@ -11,7 +11,7 @@ trace
     [ (Pair "tz1burnburnburnburnburnburnburjAYjjX" None) ]
   - location: 8 (just consumed gas: 0.010)
     [ "tz1burnburnburnburnburnburnburjAYjjX" ]
-  - location: 9 (just consumed gas: 455.097)
+  - location: 9 (just consumed gas: 458.484)
     [ 1 ]
   - location: 10 (just consumed gas: 0.010)
     [ (Some 1) ]
