@@ -26,6 +26,12 @@ Data Availability Layer
 Adaptive Issuance
 -----------------
 
+Michelson
+---------
+
+- A new instruction named ``INDEX_ADDRESS`` has been added, it
+  provides a unique identifier of type ``nat`` for values 
+  of type ``address``, stored in the context. (MR :gl:`!18866`)
 
 Gas improvements
 ----------------
