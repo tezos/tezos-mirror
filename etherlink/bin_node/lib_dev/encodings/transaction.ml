@@ -2,16 +2,25 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Ethereum_types
 open L2_types
 
-type transaction_type = Legacy | Eip2930 | Eip1559
+type transaction_type = Legacy | Eip2930 | Eip1559 | Eip7702
 
 type access_list_item = bytes * bytes list
+
+type authorization_list_item = {
+  chain_id : Z.t;
+  address : bytes;
+  nonce : Z.t;
+  y_parity : Z.t;
+  r : Z.t;
+  s : Z.t;
+}
 
 type transaction = {
   transaction_type : transaction_type;
@@ -24,6 +33,7 @@ type transaction = {
   value : Z.t;
   data : bytes;
   access_list : access_list_item list;
+  authorization_list : authorization_list_item list;
   v : Z.t;
   r : Z.t;
   s : Z.t;
@@ -47,6 +57,41 @@ let decode_access_list_item (item : Rlp.item) :
       in
       return (address, List.rev storage_slots)
   | _ -> fail "An access list item should be a list of two items"
+
+let decode_authorization_list_item (item : Rlp.item) :
+    (authorization_list_item, string) result =
+  let open Rlp in
+  let open Result_syntax in
+  match item with
+  | List
+      [
+        Value chain_id;
+        Value address;
+        Value nonce;
+        Value y_parity;
+        Value r;
+        Value s;
+      ] ->
+      let (Qty chain_id) = decode_number_be chain_id in
+      let (Qty nonce) = decode_number_be nonce in
+      let (Qty y_parity) = decode_number_be y_parity in
+      let (Qty r) = decode_number_be r in
+      let (Qty s) = decode_number_be s in
+      return {chain_id; address; nonce; y_parity; r; s}
+  | _ -> fail "An authorization list item should be a list of 5 items"
+
+let decode_authorization_list_rlp authorization_list =
+  let open Result_syntax in
+  let* rev_list =
+    List.fold_left
+      (fun acc item ->
+        let* acc in
+        let* item = decode_authorization_list_item item in
+        return (item :: acc))
+      return_nil
+      authorization_list
+  in
+  return (List.rev rev_list)
 
 let decode_access_list_rlp access_list =
   let open Result_syntax in
@@ -72,9 +117,31 @@ let encode_access_list access_list =
   let items = List.map encode_access_list_item access_list in
   List items
 
+let encode_authorization_list_item {chain_id; address; nonce; y_parity; r; s} =
+  let open Rlp in
+  let chain_id = encode_z chain_id in
+  let nonce = encode_z nonce in
+  let y_parity = encode_z y_parity in
+  let r = encode_z r in
+  let s = encode_z s in
+  List
+    [
+      Value chain_id;
+      Value address;
+      Value nonce;
+      Value y_parity;
+      Value r;
+      Value s;
+    ]
+
+let encode_authorization_list authorization_list =
+  let open Rlp in
+  let items = List.map encode_authorization_list_item authorization_list in
+  List items
+
 let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
-    ~max_fee_per_gas ~gas_limit ~to_ ~value ~data ?(access_list = []) (v, r, s)
-    =
+    ~max_fee_per_gas ~gas_limit ~to_ ~value ~data ?(access_list = [])
+    ?(authorization_list = []) (v, r, s) =
   let open Result_syntax in
   let (Qty nonce) = decode_number_be nonce in
   let (Qty gas_limit) = decode_number_be gas_limit in
@@ -88,6 +155,7 @@ let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
   let (Qty r) = decode_number_be r in
   let (Qty s) = decode_number_be s in
   let* access_list = decode_access_list_rlp access_list in
+  let* authorization_list = decode_authorization_list_rlp authorization_list in
   let* chain_id =
     match chain_id with
     | None ->
@@ -111,6 +179,7 @@ let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
       value;
       data;
       access_list;
+      authorization_list;
       v;
       r;
       s;
@@ -158,6 +227,7 @@ let encode_legacy_transaction : transaction -> bytes = function
       value;
       data;
       access_list = [];
+      authorization_list = [];
       v = _;
       r = _;
       s = _;
@@ -242,6 +312,7 @@ let encode_eip1559_transaction : transaction -> bytes = function
       value;
       data;
       access_list;
+      authorization_list = [];
       v = _;
       r = _;
       s = _;
@@ -319,6 +390,7 @@ let encode_eip2930_transaction : transaction -> bytes = function
       value;
       data;
       access_list;
+      authorization_list = [];
       v = _;
       r = _;
       s = _;
@@ -348,6 +420,89 @@ let encode_eip2930_transaction : transaction -> bytes = function
       Bytes.cat prefix (encode rlp)
   | _ -> invalid_arg "Transaction is not eip 2930"
 
+let decode_eip7702 : bytes -> (transaction, string) result =
+ fun bytes ->
+  let open Result_syntax in
+  let open Rlp in
+  match decode bytes with
+  | Ok
+      (List
+        [
+          Value chain_id;
+          Value nonce;
+          Value max_priority_fee_per_gas;
+          Value max_fee_per_gas;
+          Value gas_limit;
+          Value to_;
+          Value value;
+          Value data;
+          List access_list;
+          List authorization_list;
+          Value v;
+          Value r;
+          Value s;
+        ]) ->
+      decode_transaction
+        ~tx_type:Eip7702
+        ~chain_id
+        ~nonce
+        ~max_priority_fee_per_gas
+        ~max_fee_per_gas
+        ~gas_limit
+        ~to_
+        ~value
+        ~data
+        ~access_list
+        ~authorization_list
+        (v, r, s)
+  | _ -> fail "Eip7702 transaction is not 13 rlp items"
+
+let encode_eip7702_transaction : transaction -> bytes = function
+  | {
+      transaction_type = Eip7702;
+      chain_id = Some chain_id;
+      nonce;
+      max_priority_fee_per_gas;
+      max_fee_per_gas;
+      gas_limit;
+      to_;
+      value;
+      data;
+      access_list;
+      authorization_list;
+      v = _;
+      r = _;
+      s = _;
+    } ->
+      let open Rlp in
+      let rlp =
+        let chain_id = encode_z chain_id in
+        let nonce = encode_z nonce in
+        let max_priority_fee_per_gas = encode_z max_priority_fee_per_gas in
+        let max_fee_per_gas = encode_z max_fee_per_gas in
+        let gas_limit = encode_z gas_limit in
+        let to_ = Option.value ~default:Bytes.empty to_ in
+        let value = encode_z value in
+        let access_list = encode_access_list access_list in
+        let authorization_list = encode_authorization_list authorization_list in
+        List
+          [
+            Value chain_id;
+            Value nonce;
+            Value max_priority_fee_per_gas;
+            Value max_fee_per_gas;
+            Value gas_limit;
+            Value to_;
+            Value value;
+            Value data;
+            access_list;
+            authorization_list;
+          ]
+      in
+      let prefix = Bytes.make 1 (Char.chr 4) in
+      Bytes.cat prefix (encode rlp)
+  | _ -> invalid_arg "Transaction is not eip 7702"
+
 let decode tx_raw =
   let decode, tx_raw =
     match String.get_uint8 tx_raw 0 with
@@ -357,6 +512,9 @@ let decode tx_raw =
     | 2 ->
         let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
         (decode_eip1559, tx_raw)
+    | 4 ->
+        let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+        (decode_eip7702, tx_raw)
     | _ -> (decode_legacy, tx_raw)
   in
   let tx_raw = Bytes.unsafe_of_string tx_raw in
@@ -371,6 +529,7 @@ let message : transaction -> bytes =
     | Legacy -> encode_legacy_transaction transaction
     | Eip2930 -> encode_eip2930_transaction transaction
     | Eip1559 -> encode_eip1559_transaction transaction
+    | Eip7702 -> encode_eip7702_transaction transaction
   in
   Tezos_crypto.Hacl.Hash.Keccak_256.digest encoded_transaction
 
@@ -388,7 +547,7 @@ let recovery_id : transaction -> (bytes, string) result =
     match transaction.transaction_type with
     | Legacy ->
         legacy_recovery_id ~chain_id:transaction.chain_id ~v:transaction.v
-    | Eip2930 | Eip1559 -> Z.to_int transaction.v
+    | Eip2930 | Eip1559 | Eip7702 -> Z.to_int transaction.v
   in
   if ri == 0 || ri == 1 then (
     let buffer = Bytes.create 1 in
@@ -443,6 +602,7 @@ let to_transaction_object :
         value;
         data;
         access_list = _;
+        authorization_list = _;
         v;
         r;
         s;

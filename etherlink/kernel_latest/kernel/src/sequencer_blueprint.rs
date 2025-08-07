@@ -268,7 +268,8 @@ mod tests {
     use primitive_types::{H160, U256};
     use tezos_crypto_rs::hash::UnknownSignature;
     use tezos_ethereum::{
-        transaction::TRANSACTION_HASH_SIZE, tx_common::EthereumTransactionCommon,
+        transaction::TRANSACTION_HASH_SIZE,
+        tx_common::{AuthorizationList, EthereumTransactionCommon},
     };
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
 
@@ -289,6 +290,7 @@ mod tests {
             U256::from(500000000u64),
             vec![],
             vec![],
+            AuthorizationList::default(),
             None,
         )
     }

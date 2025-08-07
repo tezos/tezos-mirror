@@ -212,7 +212,7 @@ pub mod tests {
 
     use primitive_types::{H160, U256};
     use rlp::Encodable;
-    use tezos_ethereum::tx_common::EthereumTransactionCommon;
+    use tezos_ethereum::tx_common::{AuthorizationList, EthereumTransactionCommon};
     use tezos_evm_runtime::runtime::MockKernelHost;
     use tezos_smart_rollup_encoding::timestamp::Timestamp;
     use tezos_smart_rollup_host::runtime::Runtime;
@@ -239,6 +239,7 @@ pub mod tests {
             U256::from(500000000u64),
             vec![],
             vec![],
+            AuthorizationList::default(),
             None,
         );
 

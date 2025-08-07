@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
 // SPDX-FileCopyrightText: 2023-2024 TriliTech <contact@trili.tech>
-// SPDX-FileCopyrightText: 2023 Functori <contact@functori.com>
+// SPDX-FileCopyrightText: 2023-2025 Functori <contact@functori.com>
 // SPDX-FileCopyrightText: 2023 Marigold <contact@marigold.dev>
 //
 // SPDX-License-Identifier: MIT
@@ -448,6 +448,7 @@ mod tests {
     use tezos_data_encoding::nom::NomReader;
     use tezos_ethereum::block::BlockFees;
     use tezos_ethereum::transaction::TransactionStatus;
+    use tezos_ethereum::tx_common::AuthorizationList;
     use tezos_ethereum::{
         transaction::TransactionType, tx_common::EthereumTransactionCommon,
     };
@@ -579,6 +580,7 @@ mod tests {
             U256::from(1000000000000000000u64),
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         );
 
@@ -808,6 +810,7 @@ mod tests {
             U256::zero(),
             data,
             vec![],
+            AuthorizationList::default(),
             None,
         );
 

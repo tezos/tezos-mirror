@@ -19,6 +19,7 @@ pub enum TransactionType {
     Legacy,
     Eip2930,
     Eip1559,
+    Eip7702,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy)]
@@ -65,6 +66,8 @@ impl TryFrom<&u8> for TransactionType {
             Ok(Self::Eip2930)
         } else if *v == 2 {
             Ok(Self::Eip1559)
+        } else if *v == 4 {
+            Ok(Self::Eip7702)
         } else {
             Err(TransactionDecodingError::InvalidEncoding)
         }
@@ -77,6 +80,7 @@ impl From<TransactionType> for u8 {
             TransactionType::Legacy => 0u8,
             TransactionType::Eip2930 => 1u8,
             TransactionType::Eip1559 => 2u8,
+            TransactionType::Eip7702 => 4u8,
         }
     }
 }
