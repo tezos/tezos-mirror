@@ -267,6 +267,7 @@ pub fn transfer<'a, Host: Runtime>(
                 parser,
                 ctx,
             );
+            log!(host, Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: Some(new_storage),
                 ..receipt
@@ -414,6 +415,13 @@ fn apply_balance_changes(
     dest_account
         .set_balance(host, &new_dest_balance)
         .map_err(|_| TransferError::FailedToUpdateDestinationBalance)?;
+
+    log!(
+        host,
+        Debug,
+        "Transfer: OK - the new balance of the source is {:?} and the new balance of the destination is {:?}",
+    new_src_balance, new_dest_balance);
+
     Ok(AppliedBalanceChanges {
         new_src_balance,
         new_dest_balance,
@@ -519,7 +527,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     safe_host.start()?;
 
-    log!(safe_host, Debug, "Verifying that the operation is valid");
+    log!(safe_host, Debug, "Verifying that the batch is valid");
 
     let validation_info = match execute_validation(
         &mut safe_host,
@@ -530,10 +538,17 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     ) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
+            log!(
+                safe_host,
+                Debug,
+                "Reverting the changes because the batch is invalid."
+            );
             safe_host.revert()?;
             return Err(OperationError::Validation(validity_err));
         }
     };
+
+    log!(safe_host, Debug, "Batch is valid!");
 
     safe_host.promote()?;
     safe_host.promote_trace()?;
@@ -542,10 +557,22 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     let (receipts, applied) =
         apply_batch(&mut safe_host, context, vec![content], validation_info);
 
+    log!(safe_host, Debug, "Receipts: {:#?}", receipts);
+
     if applied {
+        log!(
+            safe_host,
+            Debug,
+            "Committing the changes because the batch was successfully applied."
+        );
         safe_host.promote()?;
         safe_host.promote_trace()?;
     } else {
+        log!(
+            safe_host,
+            Debug,
+            "Reverting the changes because some operation failed."
+        );
         safe_host.revert()?;
     }
 
@@ -568,7 +595,20 @@ fn apply_batch<Host: Runtime>(
     let mut receipts = Vec::with_capacity(operations.len());
 
     for (index, content) in operations.into_iter().enumerate() {
+        log!(
+            host,
+            Debug,
+            "Applying operation #{} in the batch with counter {:?}.",
+            index,
+            content.counter
+        );
         let receipt = if first_failure.is_some() {
+            log!(
+                host,
+                Debug,
+                "Skipping this operation because we already failed on {:?}.",
+                first_failure
+            );
             produce_skipped_receipt(&content)
         } else {
             apply_operation(
@@ -1185,7 +1225,7 @@ mod tests {
         );
     }
 
-    // Test an invalid transfer operation, source has not enough balance to fullfil the Transfer
+    // Test an invalid transfer operation, source has not enough balance to fulfill the Transfer
     #[test]
     fn apply_transfer_with_not_enough_balance() {
         let mut host = MockKernelHost::default();
