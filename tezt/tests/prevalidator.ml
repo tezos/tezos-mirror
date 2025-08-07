@@ -1908,7 +1908,7 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let inject_attestation (delegate : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
@@ -2159,7 +2159,7 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let inject_attestation (delegate : Account.key) =
       let* op =
         Operation.Consensus.operation
@@ -2421,7 +2421,7 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
@@ -2534,7 +2534,7 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
@@ -2666,7 +2666,7 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
@@ -3808,7 +3808,9 @@ module Revamped = struct
     let* validated, refused =
       Lwt_list.fold_left_s
         (fun (validated, refused) level ->
-          let* attesting_rights = Operation.Consensus.get_slots ~level client in
+          let* attesting_rights =
+            Operation.Consensus.get_slots ~level ~protocol client
+          in
           (* Look for a delegate that has more than one slot *)
           let delegate, slots =
             let delegate_opt =

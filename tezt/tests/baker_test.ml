@@ -801,7 +801,7 @@ let prequorum_check_levels =
     return @@ JSON.(json |-> "payload_hash" |> as_string)
   in
   let preattest_for ~delegate level =
-    let* slots = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
     let slot = Operation.Consensus.first_slot ~slots delegate in
     let* _ =
       Operation.Consensus.preattest_for
@@ -961,7 +961,10 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at [base_level + 1]. *)
   let* slots =
-    Operation.Consensus.get_slots_by_consensus_key ~level:base_level client
+    Operation.Consensus.get_slots_by_consensus_key
+      ~level:base_level
+      ~protocol
+      client
   in
   let* round = fetch_round client in
   let* branch =
@@ -1060,6 +1063,7 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
     let* slots =
       Operation.Consensus.get_slots_by_consensus_key
         ~level:(base_level + 1)
+        ~protocol
         client
     in
     let* round = fetch_round client in

@@ -104,7 +104,11 @@ let double_consensus_init
   let slots =
     List.map
       JSON.as_int
-      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+      (if Protocol.number protocol >= 024 then
+         JSON.(
+           slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+           |-> "slots" |> as_list)
+       else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info "Inject valid %s." consensus_name ;
   let waiter = Node.wait_for_request ~request:`Inject node in
@@ -388,7 +392,11 @@ let operation_too_far_in_future =
   let slots =
     List.map
       JSON.as_int
-      JSON.(List.hd JSON.(slots |> as_list) |-> "slots" |> as_list)
+      (if Protocol.number protocol >= 024 then
+         JSON.(
+           slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+           |-> "slots" |> as_list)
+       else JSON.(slots |> as_list |> List.hd |-> "slots" |> as_list))
   in
   Log.info
     "Craft and inject an attestation 3 levels in the future and wait for \
@@ -563,7 +571,7 @@ let attestation_and_aggregation_wrong_payload_hash =
   (* Attest for bootstrap1 with a dummy block_payload_hash *)
   let* _ =
     let open Operation.Consensus in
-    let* slots = get_slots_by_consensus_key ~level client in
+    let* slots = get_slots_by_consensus_key ~level ~protocol client in
     let slot = first_slot ~slots ck1 in
     let* branch = get_branch ~attested_level:level client in
     let* bph_level_4 = get_block_payload_hash ~block:"4" client in
@@ -591,7 +599,7 @@ let attestation_and_aggregation_wrong_payload_hash =
       [(bootstrap1, (Attestation, Attestations_aggregate))]
   in
   let open Operation.Consensus in
-  let* slots = get_slots_by_consensus_key ~level client in
+  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
   (* Attest for bootstrap1 and check that he is forbidden *)
@@ -729,7 +737,7 @@ let double_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level client1 in
+  let* slots = get_slots_by_consensus_key ~level ~protocol client1 in
   (* Attest with the double attesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s
@@ -904,7 +912,7 @@ let preattestation_and_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash ~block:"2" client in
-  let* slots = get_slots_by_consensus_key ~level client in
+  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   Log.info
     "preattesting level %d round 1 for bootstrap1, bootstrap2 and bootstrap4"
     level ;
@@ -957,7 +965,7 @@ let preattestation_and_aggregation_wrong_payload_hash =
   (* Attest with the misbehaving keys and check that they are forbidden *)
   let* branch = get_branch ~attested_level:level client in
   let* block_payload_hash = get_block_payload_hash client in
-  let* slots = get_slots_by_consensus_key ~level client in
+  let* slots = get_slots_by_consensus_key ~level ~protocol client in
   let* () =
     Lwt_list.iter_s
       (fun ck ->
@@ -1120,7 +1128,7 @@ let double_preattestation_aggregation_wrong_payload_hash =
   let open Operation.Consensus in
   let* branch = get_branch ~attested_level:level client1 in
   let* block_payload_hash = get_block_payload_hash client1 in
-  let* slots = get_slots_by_consensus_key ~level client1 in
+  let* slots = get_slots_by_consensus_key ~level ~protocol client1 in
   (* Attest with the double preattesting keys and check that they are forbidden *)
   let* () =
     Lwt_list.iter_s

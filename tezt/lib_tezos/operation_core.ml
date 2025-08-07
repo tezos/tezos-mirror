@@ -507,31 +507,45 @@ module Consensus = struct
     in
     inject ?request ?force ?error ~protocol op client
 
-  let get_slots ~level client =
+  let get_slots ~level ~protocol client =
     let* rpc_json =
       Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
     in
     let open JSON in
+    let list =
+      if Protocol.number protocol >= 024 then
+        match as_list rpc_json with
+        | [] | _ :: _ :: _ -> assert false
+        | [rpc_json] -> as_list (rpc_json |-> "delegates")
+      else as_list rpc_json
+    in
     return
     @@ List.map
          (fun json ->
            let delegate = json |-> "delegate" |> as_string in
            let slots = json |-> "slots" |> as_list |> List.map as_int in
            (delegate, slots))
-         (as_list rpc_json)
+         list
 
-  let get_slots_by_consensus_key ~level client =
+  let get_slots_by_consensus_key ~level ~protocol client =
     let* rpc_json =
       Client.RPC.call client @@ RPC.get_chain_block_helper_validators ~level ()
     in
     let open JSON in
+    let list =
+      if Protocol.number protocol >= 024 then
+        match as_list rpc_json with
+        | [] | _ :: _ :: _ -> assert false
+        | [rpc_json] -> as_list (rpc_json |-> "delegates")
+      else as_list rpc_json
+    in
     return
     @@ List.map
          (fun json ->
            let consensus_key = json |-> "consensus_key" |> as_string in
            let slots = json |-> "slots" |> as_list |> List.map as_int in
            (consensus_key, slots))
-         (as_list rpc_json)
+         list
 
   let first_slot ~slots (delegate : Account.key) =
     match List.assoc_opt delegate.public_key_hash slots with
@@ -720,7 +734,7 @@ module Anonymous = struct
     "vh3cjL2UL3p73CHhSLpAcLvB9obU9jSrRsu1Y9tg85os3i3akAig"
 
   let make_double_consensus_evidence_with_distinct_bph ~kind ~misbehaviour_level
-      ~misbehaviour_round ~culprit client =
+      ~misbehaviour_round ~culprit ~protocol client =
     let* slots =
       Client.RPC.call_via_endpoint client
       @@ RPC.get_chain_block_helper_validators
@@ -729,8 +743,14 @@ module Anonymous = struct
            ()
     in
     let slot =
-      JSON.(
-        slots |> as_list |> List.hd |-> "slots" |> as_list |> List.hd |> as_int)
+      if Protocol.number protocol >= 024 then
+        JSON.(
+          slots |> as_list |> List.hd |-> "delegates" |> as_list |> List.hd
+          |-> "slots" |> as_list |> List.hd |> as_int)
+      else
+        JSON.(
+          slots |> as_list |> List.hd |-> "slots" |> as_list |> List.hd
+          |> as_int)
     in
     let mk_consensus_op block_payload_hash =
       let consensus =

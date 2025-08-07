@@ -313,11 +313,18 @@ module Consensus : sig
       [GET /chains/<chain>/blocks/<block>/helpers/validators] RPC.
       Returns an association list that maps a public key hash to
       the owned slot list *)
-  val get_slots : level:int -> Client.t -> (string * int list) list Lwt.t
+  val get_slots :
+    level:int ->
+    protocol:Protocol.t ->
+    Client.t ->
+    (string * int list) list Lwt.t
 
   (** Same as [get_slots] but maps a consensus key to the owned slot list. *)
   val get_slots_by_consensus_key :
-    level:int -> Client.t -> (string * int list) list Lwt.t
+    level:int ->
+    protocol:Protocol.t ->
+    Client.t ->
+    (string * int list) list Lwt.t
 
   (** Returns the first slot of the provided delegate in the [slots]
       association list that describes all attestation rights at some level.
@@ -438,6 +445,7 @@ module Anonymous : sig
     misbehaviour_level:int ->
     misbehaviour_round:int ->
     culprit:Account.key ->
+    protocol:Protocol.t ->
     Client.t ->
     t Lwt.t
 end
