@@ -6,7 +6,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let data_dir_element = Sigs.data_dir_element
-
-module Lwt = Lwt_metrics
-include Lwt
+include Sigs.S with type 'a monad := 'a Lwt.t
