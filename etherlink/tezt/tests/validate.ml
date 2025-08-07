@@ -543,7 +543,7 @@ let test_validate_gas_limit_above_the_maximum =
     confirming gas used equals the maximum gas limit even in case of
     over-approximated gas limit. *)
 let test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction =
-  let maximum_gas_per_transaction = 10L in
+  let maximum_gas_per_transaction = 21001L in
   register
     ~maximum_gas_per_transaction
     ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
@@ -611,7 +611,7 @@ let test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction =
     confirming gas used equals the gas limit in case of
     under-approximated gas limit. *)
 let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
-  let maximum_gas_per_transaction = 10L in
+  let maximum_gas_per_transaction = 21001L in
   register
     ~maximum_gas_per_transaction
     ~da_fee_per_byte:(Wei.of_string "4_000_000_000_000")
@@ -654,12 +654,12 @@ let test_validate_custom_gas_limit_less_than_maximum_gas_per_transaction =
           "Expected a receipt for transaction hash %s but got none"
           tx_hash
     | Some receipt ->
-        Check.is_false
+        Check.is_true
           receipt.status
           ~__LOC__
           ~error_msg:
-            "Expected status in transaction receipt to be 0x0 (failure) but \
-             got 0x1 (success)" ;
+            "Expected status in transaction receipt to be 0x1 (success) but \
+             got 0x0 (failure)" ;
         Check.(
           (receipt.cumulativeGasUsed = Int64.of_int under_approximated_gas)
             ~__LOC__
@@ -700,7 +700,7 @@ let test_validate_gas_limit =
   let*@? err =
     Rpc.send_raw_transaction ~raw_tx:not_enough_gas_limit sequencer
   in
-  Check.(err.message =~ rex "Not enough gas for inclusion fees")
+  Check.(err.message =~ rex "Transaction with a gas limit below")
     ~error_msg:
       "The transaction has not enough gas to pay da_fees, it should fail" ;
   (* This tx is the same as the valid_transaction in eip2930 but with some random entry for access_list *)
