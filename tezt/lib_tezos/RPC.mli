@@ -1469,3 +1469,10 @@ val get_stake_distribution :
   ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t
 
 val get_stake_info : ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/destination/<destination>/index]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_destination_index :
+  ?chain:string -> ?block:string -> string -> int option t

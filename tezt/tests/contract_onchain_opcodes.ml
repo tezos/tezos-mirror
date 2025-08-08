@@ -987,8 +987,14 @@ let test_get_address_index ~protocols =
         let* index =
           Client.run_view ~view:"v" ~contract ~input:(sf {|"%s"|} addr) client
         in
+        let* rpc_index =
+          Client.RPC.call client
+          @@ RPC.get_chain_block_context_destination_index addr
+        in
         let index = parse_int_option index in
         Check.((index = expected) (option int))
+          ~error_msg:(sf "Expected index %%R for %s got %%L" addr1) ;
+        Check.((rpc_index = expected) (option int))
           ~error_msg:(sf "Expected index %%R for %s got %%L" addr1) ;
         unit
       in
