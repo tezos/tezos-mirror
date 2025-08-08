@@ -1031,6 +1031,175 @@ let test_tezlink_execution =
       ~error_msg:"Expected \"%R\" but got \"%L\"") ;
   unit
 
+let test_tezlink_reveal_transfer_batch =
+  let bootstrap_balance = Tez.of_mutez_int 3_800_000_000_000 in
+  register_tezlink_test
+    ~title:"Test Tezlink reveal+transfer batch"
+    ~tags:["kernel"; "reveal"; "transfer"; "batch"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+
+  (* Unfortunately, the client does not allow us to stipulate fees when revealing
+     an account with a batch, so we need to capture this information from the log *)
+  let collected_fees : int list ref = ref [] in
+
+  (* Regex: look for "fee" and then find the number after the ꜩ symbol *)
+  let fee_regex = Str.regexp_case_fold "fee[^ꜩ]*ꜩ\\([0-9]+\\.?[0-9]*\\)" in
+
+  let on_log line =
+    match
+      try Some (Str.search_forward fee_regex line 0) with Not_found -> None
+    with
+    | Some _ -> (
+        let fee_str = Str.matched_group 1 line in
+        (* Remove the dot and calculate the new integer string *)
+        let fee_mutez_str =
+          match String.split_on_char '.' fee_str with
+          | [int_part; frac_part] ->
+              let frac_part_padded =
+                frac_part
+                ^ String.make (max 0 (6 - String.length frac_part)) '0'
+              in
+              int_part ^ String.sub frac_part_padded 0 6
+          | [int_part] -> int_part ^ "000000"
+          | _ -> "" (* fallback for malformed input *)
+        in
+        match int_of_string_opt fee_mutez_str with
+        | Some fee_mutez ->
+            collected_fees := fee_mutez :: !collected_fees ;
+            Log.info "Captured fee: %s (mutez: %d)" fee_str fee_mutez
+        | None -> Log.warn "Could not parse fee: %s" fee_str)
+    | None -> ()
+  in
+
+  let on_spawn _ _ = () in
+
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:(Tez.of_int 2)
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:Constant.bootstrap2.alias
+      ~burn_cap:Tez.one
+      ~hooks:{on_log; on_spawn}
+      client
+  in
+  let fee_bootstrap1 = List.fold_left ( + ) 0 !collected_fees in
+  collected_fees := [] ;
+  let*@ _ = produce_block sequencer in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~amount:Tez.one
+      ~giver:Constant.bootstrap2.alias
+      ~receiver:Constant.bootstrap1.alias
+      ~burn_cap:Tez.one
+      ~hooks:{on_log; on_spawn}
+      client
+  in
+  let fee_bootstrap2 = List.fold_left ( + ) 0 !collected_fees in
+  let*@ _ = produce_block sequencer in
+  let* balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  Log.info "bootstrap_1 fees: %d" fee_bootstrap1 ;
+  Log.info "bootstrap_2 fees: %d" fee_bootstrap2 ;
+  Check.(
+    (Tez.to_mutez balance1
+    = Tez.to_mutez bootstrap_balance - Tez.(to_mutez one) - fee_bootstrap1)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
+  Check.((Tez.to_mutez balance2 = Tez.(to_mutez one) - fee_bootstrap2) int)
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
+  unit
+
+let test_tezlink_batch =
+  register_tezlink_test
+    ~title:"Test of tezlink batches"
+    ~tags:["batch"; "multiple_transfers"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let fee_2 = Tez.of_mutez_int 100_000 in
+  let fee_3 = Tez.of_mutez_int 200_000 in
+  let amount2 = Tez.of_mutez_int 1_000_000 in
+  let amount3 = Tez.of_mutez_int 2_000_000 in
+  let json_batch =
+    `A
+      [
+        `O
+          [
+            ("destination", `String Constant.bootstrap2.alias);
+            ("amount", `String (Tez.to_string amount2));
+            ("fee", `String (Tez.to_string fee_2));
+          ];
+        `O
+          [
+            ("destination", `String Constant.bootstrap3.alias);
+            ("amount", `String (Tez.to_string amount3));
+            ("fee", `String (Tez.to_string fee_3));
+          ];
+      ]
+    |> JSON.encode_u
+  in
+  let* init_balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* init_balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  let* init_balance3 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap3.alias client
+  in
+  let*! () =
+    Client.multiple_transfers
+      ~endpoint
+      ~giver:Constant.bootstrap1.alias
+      ~json_batch
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* end_balance1 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* end_balance2 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap2.alias client
+  in
+  let* end_balance3 =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap3.alias client
+  in
+  Check.(
+    (Tez.to_mutez end_balance1
+    = Tez.to_mutez init_balance1 - Tez.to_mutez amount2 - Tez.to_mutez amount3
+      - Tez.to_mutez fee_2 - Tez.to_mutez fee_3)
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
+  Check.(
+    (Tez.to_mutez end_balance2
+    = Tez.to_mutez init_balance2 + Tez.to_mutez amount2)
+      int)
+    ~error_msg:"Wrong balance for bootstrap2: expected %R, actual %L" ;
+  Check.(
+    (Tez.to_mutez end_balance3
+    = Tez.to_mutez init_balance3 + Tez.to_mutez amount3)
+      int)
+    ~error_msg:"Wrong balance for bootstrap3: expected %R, actual %L" ;
+  unit
+
 let test_tezlink_sandbox () =
   Test.register
     ~__FILE__
@@ -1152,7 +1321,7 @@ let test_tezlink_internal_operation =
   Check.(
     (Tez.to_mutez balance = Tez.to_mutez bootstrap_balance + Tez.(to_mutez one))
       int)
-    ~error_msg:"Wrong balance for bootstrap1: exptected %R, actual %L" ;
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
 let () =
@@ -1184,6 +1353,8 @@ let () =
   test_tezlink_block_info [Alpha] ;
   test_tezlink_storage [Alpha] ;
   test_tezlink_execution [Alpha] ;
+  test_tezlink_reveal_transfer_batch [Alpha] ;
+  test_tezlink_batch [Alpha] ;
   test_tezlink_bootstrap_block_info [Alpha] ;
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha]

@@ -69,7 +69,10 @@ let validate_and_add_tezlink_operation
   in
   let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
   let* _ =
-    Tx_container.add ~next_nonce:(Ethereum_types.Qty op.counter) op ~raw_tx
+    Tx_container.add
+      ~next_nonce:(Ethereum_types.Qty op.first_counter)
+      op
+      ~raw_tx
   in
   return_unit
 

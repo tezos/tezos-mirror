@@ -1227,7 +1227,7 @@ let dispatch_private_request (type f) ~websocket
               | Michelson_tx_container m -> return m
             in
             Tx_container.add
-              ~next_nonce:(Ethereum_types.Qty op.counter)
+              ~next_nonce:(Ethereum_types.Qty op.first_counter)
               op
               ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
           in
