@@ -1608,6 +1608,7 @@ module State = struct
     in
     Irmin_context.load
       ~cache_size:100_000
+      ~async_domain:true
       Read_write
       (Evm_state.irmin_store_path ~data_dir)
 
@@ -2350,7 +2351,11 @@ let init_context_from_rollup_node ~data_dir ~rollup_node_data_dir =
     return_unit
   in
   let* evm_node_index =
-    Irmin_context.load ~cache_size:100_000 Read_write evm_context_dir
+    Irmin_context.load
+      ~cache_size:100_000
+      ~async_domain:true
+      Read_write
+      evm_context_dir
   in
   let*! evm_node_context =
     Irmin_context.checkout_exn evm_node_index checkpoint
