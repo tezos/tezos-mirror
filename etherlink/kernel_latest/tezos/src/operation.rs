@@ -5,6 +5,7 @@
 //! Tezos operations: this module defines the fragment of Tezos operations supported by Tezlink and how to serialize them.
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::enc_wrappers::{BlockHash, OperationHash};
+use crate::operation_result::{OperationResultSum, OperationWithMetadata};
 use mir::ast::michelson_address::entrypoint;
 use primitive_types::H256;
 use rlp::Decodable;
@@ -64,7 +65,7 @@ pub struct ManagerOperation<C> {
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct Operation {
     pub branch: BlockHash,
-    pub content: ManagerOperationContent,
+    pub content: Vec<ManagerOperationContent>,
     pub signature: UnknownSignature,
 }
 
@@ -254,6 +255,21 @@ pub fn verify_signature(
     Ok(check)
 }
 
+pub fn zip_operations(
+    operation: Operation,
+    receipt: Vec<OperationResultSum>,
+) -> Vec<OperationWithMetadata> {
+    operation
+        .content
+        .into_iter()
+        .zip(receipt)
+        .map(|(c, r)| OperationWithMetadata {
+            content: c,
+            receipt: r,
+        })
+        .collect::<Vec<OperationWithMetadata>>()
+}
+
 #[cfg(test)]
 fn make_dummy_operation(
     operation: OperationContent,
@@ -269,7 +285,7 @@ fn make_dummy_operation(
 
     Operation {
         branch,
-        content: ManagerOperation {
+        content: vec![ManagerOperation {
             source,
             fee: 1_u64.into(),
             counter: 10_u64.into(),
@@ -277,7 +293,7 @@ fn make_dummy_operation(
             storage_limit: 45_u64.into(),
             operation,
         }
-        .into(),
+        .into()],
         signature,
     }
 }
@@ -355,7 +371,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigbuPiC4jLnc17xWVXMRgKiWsTsckZ2jBeHYVamUWi2m8MBXGsL6SPf9SadUEzXM7D5NfpJiYnr5BhcVfm2zwrLGuvNSGVM").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Reveal(ManagerOperation {
+            content: vec![ManagerOperationContent::Reveal(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
                 )
@@ -371,7 +387,7 @@ mod tests {
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 
@@ -401,7 +417,7 @@ mod tests {
         let signature = UnknownSignature::from_base58_check("sigT4yGRRhiMZCjGigdhopaXkshKrwDbYrPw3jGFZGkjpvpT57a6KmLa4mFVKBTNHR8NrmyMEt9Pgusac5HLqUoJie2MB5Pd").unwrap();
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
                 )
@@ -418,7 +434,7 @@ mod tests {
                 },
                 gas_limit: 169_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 
@@ -479,7 +495,7 @@ mod tests {
 
         let expected_operation = Operation {
             branch,
-            content: ManagerOperationContent::Transfer(ManagerOperation {
+            content: vec![ManagerOperationContent::Transfer(ManagerOperation {
                 source: PublicKeyHash::from_b58check(
                     "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
                 )
@@ -501,12 +517,88 @@ mod tests {
                 },
                 gas_limit: 1380_u64.into(),
                 storage_limit: 0_u64.into(),
-            }),
+            })],
             signature,
         };
 
         // This bytes sequence comes from the command just above the test
         let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86c0002298c03ed7d454a101eb7022bc95f7e5f41ac78950302e40a00c0843d014151d57ddff98da8cd49f0f2cbf89465bcf267a400ffff01420000000a010000000548656c6c6f3f391b739b8583427a69f0879cc5c5fd30bced4fcfc680fc37a39960e82dec2efbba8feae60b24f7fb4fdb4e553d9d9a34ac9c93b9e966da21b37ece0d63b00c").unwrap();
+
+        let operation = Operation::nom_read_exact(&operation_bytes)
+            .expect("Decoding operation should have succeeded");
+
+        assert_eq!(operation, expected_operation);
+
+        // Also test the encoding
+        let kernel_bytes = expected_operation
+            .to_bytes()
+            .expect("Operation encoding should have succeed");
+
+        assert_eq!(operation_bytes, kernel_bytes)
+    }
+
+    // The operation below is the batch of a reveal and a transfer using the mockup mode of octez-client as follows:
+    //  $ alias mockup-client='octez-client --mode mockup --base-dir /tmp/mockup --protocol
+    //  PtSeouLo'
+    //  $ mockup-client create mockup
+    //  $ mockup-client import secret key alice unencrypted:edsk44ifgGvYJW7zEUasv156yPgVSUbNocwzXy4eMXjV2BSPBvQv3A
+    //  $ mockup-client transfer 2 from bootstrap1 to alice --burn-cap 1
+    //  $ BATCH_HEX=$(mockup-client transfer 1 from alice to bootstrap1 --burn-cap 1 --dry-run | grep Operation: | cut -d x -f 2)
+    //  $ octez-codec decode 023-PtSeouLo.operation from "$BATCH_HEX"
+    #[test]
+    fn tezos_compatibility_for_reveal_transfer_batch() {
+        // The goal of this test is to try to decode an encoding generated by 'octez-codec encode' command
+        let branch_vec = HashType::b58check_to_hash(
+            &HashType::BlockHash,
+            "BLockGenesisGenesisGenesisGenesisGenesisCCCCCeZiLHU",
+        )
+        .unwrap();
+        let branch = BlockHash::from(H256::from_slice(&branch_vec));
+        let signature = UnknownSignature::from_base58_check("sigcBAU3AtdyxrMsZ4ScgFRWfTh66dD7mMNXQ2KmGP9y125hiJFgKtgcjmi3jVmUB5ytLjrU3xY6EVTveyfb4XcBvxNvCUDi").unwrap();
+        let expected_operation = Operation {
+            branch,
+            content: vec![
+                ManagerOperationContent::Reveal(ManagerOperation {
+                    source: PublicKeyHash::from_b58check(
+                        "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
+                    )
+                    .unwrap(),
+                    fee: 276_u64.into(),
+                    counter: 2_u64.into(),
+                    operation: RevealContent {
+                        pk: PublicKey::from_b58check(
+                            "edpkuqNrmPPcy2S3G1uKYnxmg7Gov3c8q7AABKRs9EtTVtfDg5Fu7R",
+                        )
+                        .unwrap(),
+                        proof: None,
+                    },
+                    gas_limit: 171_u64.into(),
+                    storage_limit: 0_u64.into(),
+                }),
+                ManagerOperationContent::Transfer(ManagerOperation {
+                    source: PublicKeyHash::from_b58check(
+                        "tz1cckAZtxYwxAfwQuHnabTWfbp2ScWobxHH",
+                    )
+                    .unwrap(),
+                    fee: 365_u64.into(),
+                    counter: 3_u64.into(),
+                    operation: TransferContent {
+                        amount: 1000000_u64.into(),
+                        destination: Contract::from_b58check(
+                            "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+                        )
+                        .unwrap(),
+                        parameters: None,
+                    },
+                    gas_limit: 2101_u64.into(),
+                    storage_limit: 0_u64.into(),
+                }),
+            ],
+            signature,
+        };
+
+        // This bytes sequence comes from the command just above the test
+        let operation_bytes = hex::decode("8fcf233671b6a04fcf679d2a381c2544ea6c1ea29ba6157776ed842426e5cab86b00ba3bed311a5d7b06dc4daf3c94c5c406927e4bcf940202ab0100009d05b06ea36a6ad464d94dc07a38b77b80b577c1ae51bbd8d20105cd5aed496c006c00ba3bed311a5d7b06dc4daf3c94c5c406927e4bcfed0203b51000c0843d000002298c03ed7d454a101eb7022bc95f7e5f41ac78006c7157e12e95a182e2d6caa7c7d275faf1dbaf97ec974b89c1ca1e27b43d063b975a4425b0c88d4cc00d88df6c6ca0328bfbd329a53eef6b59506e5cbc7dc90b").unwrap();
 
         let operation = Operation::nom_read_exact(&operation_bytes)
             .expect("Decoding operation should have succeeded");

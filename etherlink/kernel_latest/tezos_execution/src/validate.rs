@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use tezos_data_encoding::types::Narith;
-use tezos_evm_logging::log;
+use tezos_evm_logging::{log, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_tezlink::{
@@ -34,6 +34,12 @@ impl TezlinkImplicitAccount {
         let expected_counter = Narith(&contract_counter.0 + 1_u64);
 
         if &expected_counter == counter {
+            log!(
+                host,
+                Debug,
+                "Validation: OK - Operation has the expected counter {:?}.",
+                expected_counter
+            );
             Ok(())
         } else if expected_counter.0 > counter.0 {
             let error = CounterError {
@@ -120,9 +126,10 @@ fn check_storage_limit(
 }
 
 pub struct ValidationInfo {
-    pub new_source_balance: Narith,
+    pub source: PublicKeyHash,
+    pub source_balance: Narith,
     pub source_account: TezlinkImplicitAccount,
-    pub balance_updates: Vec<BalanceUpdate>,
+    pub balance_updates: Vec<Vec<BalanceUpdate>>,
 }
 
 pub fn validate_source<Host: Runtime>(
@@ -167,10 +174,26 @@ pub fn validate_individual_operation<Host: Runtime>(
     account.check_counter_increment(host, &content.counter)?;
 
     // TODO: hard gas limit per operation is a Tezos constant, for now we took the one from ghostnet
-    check_gas_limit(&1040000_u64.into(), &content.gas_limit)?;
+    let hard_gas_limit = 1040000_u64;
+    check_gas_limit(&hard_gas_limit.into(), &content.gas_limit)?;
+    log!(
+        host,
+        Debug,
+        "Validation: OK - the gas_limit {:?} does not exceed the {:?} threshold.",
+        &content.gas_limit,
+        hard_gas_limit
+    );
 
     // TODO: hard storage limit per operation is a Tezos constant, for now we took the one from ghostnet
-    check_storage_limit(&60000_u64.into(), &content.storage_limit)?;
+    let hard_storage_limit = 60000_u64;
+    check_storage_limit(&hard_storage_limit.into(), &content.storage_limit)?;
+    log!(
+        host,
+        Debug,
+        "Validation: OK - the storage_limit {:?} does not exceed the {:?} threshold.",
+        &content.storage_limit,
+        hard_storage_limit
+    );
 
     // The manager account must be solvent to pay the announced fees.
     let new_balance = match account.simulate_spending(host, &content.fee) {
@@ -180,6 +203,13 @@ pub fn validate_individual_operation<Host: Runtime>(
         }
         Err(_) => return Err(ValidityError::FailedToFetchBalance),
     };
+    log!(
+        host,
+        Debug,
+        "Validation: OK - the source can pay {:?} in fees, being left with a new balance of {:?}.",
+        &content.fee,
+        new_balance
+    );
 
     let (src_delta, block_fees) =
         crate::compute_fees_balance_updates(source, &content.fee)

@@ -35,10 +35,9 @@ use tezos_smart_rollup_host::path::{Path, RefPath};
 use tezos_tezlink::{
     block::{AppliedOperation, TezBlock},
     enc_wrappers::BlockNumber,
-    operation::Operation,
+    operation::{zip_operations, Operation},
     operation_result::{
         OperationBatchWithMetadata, OperationDataAndMetadata, OperationError,
-        OperationWithMetadata,
     },
 };
 
@@ -507,16 +506,15 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Compute the hash of the operation
             let hash = operation.hash()?;
 
+            let operations = zip_operations(operation.clone(), receipt);
+
             // Add the applied operation in the block in progress
             let applied_operation = AppliedOperation {
                 hash,
                 branch: operation.branch,
                 op_and_receipt: OperationDataAndMetadata::OperationWithMetadata(
                     OperationBatchWithMetadata {
-                        operations: vec![OperationWithMetadata {
-                            content: operation.content,
-                            receipt,
-                        }],
+                        operations,
                         signature: operation.signature,
                     },
                 ),
@@ -524,7 +522,7 @@ impl ChainConfigTrait for MichelsonChainConfig {
             applied.push(applied_operation);
         }
 
-        // Create a Tezos block from the block in progess
+        // Create a Tezos block from the block in progress
         let tezblock = TezBlock::new(number, timestamp, previous_hash, applied)?;
         let new_block = L2Block::Tezlink(tezblock);
         let root = self.storage_root_path();
