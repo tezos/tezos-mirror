@@ -24,7 +24,6 @@ COPY ./scripts/version.sh ./scripts/version.sh
 COPY scripts/ci/bin_packages_rpm_dependencies.sh \
   ./scripts/ci/bin_packages_rpm_dependencies.sh
 COPY images/scripts/install_sccache_static.sh \
-     images/scripts/install_datadog_static.sh \
      images/scripts/install_opam_static.sh \
      scripts/kiss-fetch.sh \
      scripts/kiss-logs.sh \
@@ -35,7 +34,6 @@ RUN scripts/ci/bin_packages_rpm_dependencies.sh
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 RUN /tmp/install_sccache_static.sh && \
-    /tmp/install_datadog_static.sh && \
     /tmp/install_opam_static.sh
 
 #hadolint ignore=SC2154

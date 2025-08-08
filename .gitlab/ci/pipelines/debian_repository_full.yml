@@ -54,6 +54,7 @@ oc.docker-systemd_tests_debian:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$DISTRIBUTION:$RELEASE
   parallel:
     matrix:
     - RELEASE:
@@ -86,6 +87,7 @@ oc.docker-systemd_tests_ubuntu:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$DISTRIBUTION:$RELEASE
   parallel:
     matrix:
     - RELEASE:
@@ -118,6 +120,7 @@ oc.docker-build-debian-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: debian
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -200,7 +203,7 @@ oc.build-data_packages:
     - packages/$DISTRIBUTION/$RELEASE
 
 apt_repo_debian:
-  image: debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -253,6 +256,7 @@ oc.docker-build-ubuntu-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: ubuntu
+    BASE_IMAGE: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -307,7 +311,7 @@ oc.build-ubuntu:
       - gcp_arm64
 
 apt_repo_ubuntu:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -338,7 +342,7 @@ apt_repo_ubuntu:
   retry: 0
 
 oc.lintian_debian:
-  image: debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publishing_tests
   tags:
   - gcp
@@ -361,7 +365,7 @@ oc.lintian_debian:
   variables: {}
 
 oc.install_bin_debian_bookworm:
-  image: debian:bookworm
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publishing_tests
   tags:
   - gcp
@@ -506,7 +510,7 @@ oc.upgrade_bin_debian_bookworm-systemd:
     RELEASE: bookworm
 
 oc.lintian_ubuntu:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publishing_tests
   tags:
   - gcp
@@ -529,7 +533,7 @@ oc.lintian_ubuntu:
   variables: {}
 
 oc.install_bin_ubunty_jammy:
-  image: public.ecr.aws/lts/ubuntu:22.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:jammy
   stage: publishing_tests
   tags:
   - gcp
@@ -548,7 +552,7 @@ oc.install_bin_ubunty_jammy:
     PREFIX: ""
 
 oc.install_bin_ubunty_noble:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publishing_tests
   tags:
   - gcp
