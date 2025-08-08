@@ -45,6 +45,7 @@ depends: [
   "ctypes-foreign" { >= "0.18.0" }
   "digestif" { >= "0.9.0" }
   "dmap"
+  "domainslib" { >= "0.5.2" }
   "dream" { >= "1.0.0~alpha7" }
   "dune-configurator"
   "eio"
@@ -138,6 +139,7 @@ conflicts: [
   "json_data_encoding"
   "json_data_encoding_browser"
   "json_data_encoding_bson"
+  "lwt_domain"
   "opentelemetry-client-cohttp-lwt"
   "prometheus"
   "prometheus-app"

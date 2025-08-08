@@ -41,7 +41,8 @@
   octez-evm-node-libs.evm_node_wasm_runtime
   octez-performance-metrics
   opentelemetry-lwt
-  octez-libs.octez-telemetry)
+  octez-libs.octez-telemetry
+  octez-lwt-domain)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
