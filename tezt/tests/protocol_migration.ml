@@ -2086,6 +2086,135 @@ let test_consensus_rights_delay_shortening () =
     unit
   done
 
+let test_tolerated_inactivity_period () =
+  (* Given that [grace_period] for the current scenario is equal to 4
+     cycles, we check a protocol migration near that cycle *)
+  let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
+  let migrate_to = Protocol.Alpha in
+
+  for migration_cycle = 4 to 6 do
+    Test.register
+      ~__FILE__
+      ~title:
+        (Printf.sprintf
+           "protocol migration for tolerated_inactivity_period at the end of \
+            cycle %d"
+           (migration_cycle - 1))
+      ~tags:[team; "protocol"; "migration"; "tolerated_inactivity_period"]
+    @@ fun () ->
+    let parameter_file = Protocol.parameter_file migrate_from in
+    let parameters = JSON.parse_file parameter_file in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let migration_level = migration_cycle * blocks_per_cycle in
+    let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+
+    let* client, _node =
+      Local_helpers.activate_protocol
+        ~parameter_file
+        ~migrate_from
+        ~migrate_to
+        ~migration_level
+    in
+    let bake_until_cycle_with_and_check =
+      Local_helpers.bake_until_cycle_with_and_check
+        ~migration_level
+        ~migrate_from
+        ~migrate_to
+        ~blocks_per_cycle
+    in
+    (* [default_baker] never gets deactivated *)
+    let default_baker = Constant.bootstrap1.alias in
+    (* [funder] is used to fund all new accounts *)
+    let funder = Constant.bootstrap2.alias in
+
+    (* [delegate_i] stops participating in cycle (i + 1) *)
+    let* delegates =
+      Local_helpers.create_delegates_and_stake
+        ~baker:default_baker
+        ~giver:funder
+        ~delegates:
+          (List.init 8 (fun i ->
+               ("delegate_" ^ Int.to_string i, Tez.of_int 300_000)))
+        client
+    in
+    let delegates_array = Array.of_list delegates in
+    let all_activated = List.init 8 (fun _i -> false) in
+    let all_deactivated = List.init 8 (fun _i -> true) in
+
+    let check_deactivated_list expected_status_for_delegates =
+      Lwt_list.iteri_s
+        (fun i expected ->
+          let* () =
+            Local_helpers.check_deactivated delegates_array.(i) ~expected client
+          in
+          unit)
+        expected_status_for_delegates
+    in
+
+    let* () =
+      Local_helpers.check_current_level_and_cycle ~level:4 ~cycle:0 client
+    in
+    (* grace_period = tolerated_inactivity_period + consensus_rights_delay = 2 + 2 = 4 *)
+    (* all delegates are marked as active with [grace_period] = 4 *)
+    let* () = check_deactivated_list all_activated in
+
+    let* () =
+      Lwt_list.iter_s
+        (fun target_cycle ->
+          let delegates_i_and_higher i =
+            List.init (8 - i) (fun x -> delegates_array.(x + i).alias)
+          in
+          (* [delegate_i] cannot bake during cycle_{0,1,2} as they
+             have no baking rights, so we wait for cycle 3 to start
+             baking with new delegates; delegate_{0,1,2} never bake in
+             this testing scenario *)
+          let bakers, delegate =
+            if 3 <= target_cycle && target_cycle <= 7 then
+              ( delegates_i_and_higher target_cycle,
+                delegates_array.(target_cycle).alias )
+            else ([], default_baker)
+          in
+          let expected_list =
+            match target_cycle with
+            | 3 | 4 -> all_activated
+            | 5 ->
+                (* D0, D1, D2 are deactivated at the end of C4 *)
+                List.init 8 (fun i -> if i <= 2 then true else false)
+            | 6 ->
+                (* D3 is deactivated at the end of C5 *)
+                List.init 8 (fun i -> if i <= 3 then true else false)
+            | 7 ->
+                (* D4 is deactivated at the end of C6 *)
+                List.init 8 (fun i -> if i <= 4 then true else false)
+            | 8 ->
+                (* D5 is deactivated at the end of C7 *)
+                List.init 8 (fun i -> if i <= 5 then true else false)
+            | 9 ->
+                (* D6 is deactivated at the end of C8 *)
+                List.init 8 (fun i -> if i <= 6 then true else false)
+            | 10 ->
+                (* D7 is deactivated at the end of C9 *)
+                all_deactivated
+            | _ -> failwith "unexpected input"
+          in
+          (* [default_baker] must be always active *)
+          let bakers = default_baker :: bakers in
+          let* () =
+            bake_until_cycle_with_and_check
+              ~bakers
+              ~target_cycle
+              ~delegate
+              ~check_last_block:(fun () -> check_deactivated_list expected_list)
+              ~check_next_block:(fun _ -> unit)
+              client
+          in
+          unit)
+        (* From cycle 3 to 10 *)
+        (List.init 8 (fun i -> i + 3))
+    in
+    unit
+  done
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -2097,4 +2226,5 @@ let register ~migrate_from ~migrate_to =
   test_reveal_migration () ;
   test_tz4_manager_operation ~with_empty_mempool:true ;
   test_tz4_manager_operation ~with_empty_mempool:false ;
-  test_consensus_rights_delay_shortening ()
+  test_consensus_rights_delay_shortening () ;
+  test_tolerated_inactivity_period ()
