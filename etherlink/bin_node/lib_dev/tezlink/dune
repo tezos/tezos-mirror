@@ -13,6 +13,8 @@
   octez-libs.base
   octez-shell-libs.shell-services
   octez-libs.version
+  octez-libs.micheline
+  octez-protocol-023-PtSeouLo-libs.test-helpers
   lwt-watcher)
  (flags
   (:standard)

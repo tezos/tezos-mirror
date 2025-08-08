@@ -87,6 +87,8 @@ val octez_stdlib_unix : Manifest.target
 
 val octez_test_helpers : Manifest.target
 
+val octez_micheline : Manifest.target
+
 val octez_version : Manifest.target
 
 val octez_version_value : Manifest.target
@@ -164,4 +166,6 @@ module Protocol : sig
     (t -> Manifest.target option) list -> Manifest.target list
 
   val client : t -> Manifest.target option
+
+  val test_helpers_exn : t -> Manifest.target
 end
