@@ -13,12 +13,7 @@ open Scenario_base
 open Protocol
 
 let update_activity name block state : State.t =
-  State.update_account_f
-    name
-    (Account_helpers.update_activity
-       state.constants
-       (Block.cycle_of_next_block block))
-    state
+  Scenario_activity.update_activity name state (Block.cycle_of_next_block block)
 
 type kind = Preattestation | Attestation
 

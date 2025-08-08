@@ -331,12 +331,10 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let baker_name, _ = State.find_account_from_pkh baker.pkh state in
   (* Update baker activity *)
   let state =
-    State.update_account_f
+    Scenario_activity.update_activity
       baker_name
-      (Account_helpers.update_activity
-         state.constants
-         (Block.current_cycle block))
       state
+      (Block.current_cycle block)
   in
   let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
