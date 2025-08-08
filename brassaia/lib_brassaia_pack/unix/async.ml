@@ -119,3 +119,47 @@ module Unix = struct
         s
     | #outcome as s -> Lwt.return s
 end
+
+module Domain = struct
+  type t = { domain : unit Domain.t; promise : unit Lwt.t }
+  type outcome = Unix.outcome [@@deriving brassaia]
+  type status = Unix.status [@@deriving brassaia]
+
+  let fail = Error (Failure "Brassaia_pack_unix.Async.Domain.async")
+
+  let async f =
+    let promise, resolver = Lwt.task () in
+    let result = ref fail in
+    let id =
+      (* Lwt.wakeup* is not thread safe so we wrap it in a notification to
+         execute it the main domain. *)
+      Lwt_unix.make_notification ~once:true (fun () ->
+          Lwt.wakeup_result resolver !result)
+    in
+    let domain =
+      Domain.spawn @@ fun () ->
+      (result :=
+         try
+           f ();
+           Ok ()
+         with e -> Error e);
+      Lwt_unix.send_notification id
+    in
+    { domain; promise }
+
+  let status { promise; _ } =
+    match Lwt.state promise with
+    | Lwt.Return _ -> `Success
+    | Lwt.Fail Lwt.Canceled -> `Cancelled
+    | Lwt.Fail e -> `Failure (Printexc.to_string e)
+    | Lwt.Sleep -> `Running
+
+  let await t =
+    let+ () = t.promise in
+    (* Exceptions in the GC promise will be raised *)
+    `Success
+
+  let cancel _ =
+    (* Not cancellable *)
+    false
+end

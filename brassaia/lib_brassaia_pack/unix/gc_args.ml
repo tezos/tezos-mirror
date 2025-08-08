@@ -18,7 +18,7 @@ open! Import
 
 module type S = sig
   module File_manager : File_manager.S
-  module Async : Async.S
+  module Async : Async_intf.Sigs
   module Dict : Dict.S with module File_manager = File_manager
   module Dispatcher : Dispatcher.S with module File_manager = File_manager
 

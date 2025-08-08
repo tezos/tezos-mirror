@@ -40,6 +40,7 @@ module Default = struct
   let suffix_auto_flush_threshold = 1_000_000
   let no_migrate = false
   let lower_root = None
+  let async_domain = false
 end
 
 open Brassaia.Backend.Conf
@@ -114,6 +115,10 @@ module Key = struct
   let no_migrate =
     key ~spec ~doc:"Prevent migration of V1 and V2 stores" "no-migrate"
       Brassaia.Type.bool Default.no_migrate
+
+  let async_domain =
+    key ~spec ~doc:"Run the asynchronous GC in a domain instead of a process"
+      "async-domain" Brassaia.Type.bool Default.async_domain
 end
 
 let fresh config = get config Key.fresh
@@ -143,6 +148,7 @@ let suffix_auto_flush_threshold config =
   get config Key.suffix_auto_flush_threshold
 
 let no_migrate config = get config Key.no_migrate
+let async_domain config = get config Key.async_domain
 
 let init ?(fresh = Default.fresh) ?(readonly = Default.readonly)
     ?(lru_size = Default.lru_size) ?(lru_max_memory = Default.lru_max_memory)
@@ -152,7 +158,8 @@ let init ?(fresh = Default.fresh) ?(readonly = Default.readonly)
     ?(use_fsync = Default.use_fsync)
     ?(dict_auto_flush_threshold = Default.dict_auto_flush_threshold)
     ?(suffix_auto_flush_threshold = Default.suffix_auto_flush_threshold)
-    ?(no_migrate = Default.no_migrate) ?(lower_root = Default.lower_root) root =
+    ?(no_migrate = Default.no_migrate) ?(lower_root = Default.lower_root)
+    ?(async_domain = Default.async_domain) root =
   let config = empty spec in
   let config = add config Key.root root in
   let config = add config Key.lower_root lower_root in
@@ -171,4 +178,5 @@ let init ?(fresh = Default.fresh) ?(readonly = Default.readonly)
     add config Key.suffix_auto_flush_threshold suffix_auto_flush_threshold
   in
   let config = add config Key.no_migrate no_migrate in
+  let config = add config Key.async_domain async_domain in
   verify config

@@ -82,6 +82,7 @@ module type Sigs = sig
     ?suffix_auto_flush_threshold:int ->
     ?no_migrate:bool ->
     ?lower_root:string option ->
+    ?async_domain:bool ->
     string ->
     Irmin.config
   (** Configuration options for stores. See {!Irmin_pack.Conf} for more details. *)
