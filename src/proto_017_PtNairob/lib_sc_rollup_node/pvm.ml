@@ -32,4 +32,9 @@ let of_kind : Kind.t -> (module S) = function
   | Riscv -> invalid_arg "Riscv rollup is inactive in this protocol"
 
 let context : Kind.t -> (module Context_sigs.S) = function
-  | _ -> (module Irmin_context)
+  | _ ->
+      (module struct
+        include Irmin_context
+
+        let load ~cache_size path = load ~cache_size path
+      end)

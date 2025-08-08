@@ -73,7 +73,11 @@ let to_node_pvmstate :
     ~impl_name:C.impl_name
 
 module Irmin = struct
-  module I = Irmin_context
+  module I = struct
+    include Irmin_context
+
+    let load ~cache_size path = load ~cache_size path
+  end
 
   type repo = I.repo
 

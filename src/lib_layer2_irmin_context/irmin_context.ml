@@ -106,8 +106,13 @@ let hash_of_context_hash h =
   Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
 let load :
-    type a. cache_size:int -> a Access_mode.t -> string -> a raw_index Lwt.t =
- fun ~cache_size mode path ->
+    type a.
+    cache_size:int ->
+    ?async_domain:bool ->
+    a Access_mode.t ->
+    string ->
+    a raw_index Lwt.t =
+ fun ~cache_size ?(async_domain = false) mode path ->
   let open Lwt_syntax in
   let readonly = match mode with Read_only -> true | Read_write -> false in
   let+ repo =
@@ -118,6 +123,7 @@ let load :
             * the [always] indexing strategy not be used. *)
          ~indexing_strategy:Irmin_pack.Indexing_strategy.minimal
          ~lru_size:cache_size
+         ~async_domain
          path)
   in
   {path; repo}
@@ -321,9 +327,9 @@ module PVMState = struct
     {ctxt with tree}
 end
 
-let load ~cache_size mode path =
+let load ~cache_size ?async_domain mode path =
   let open Lwt_result_syntax in
-  let*! index = load ~cache_size mode path in
+  let*! index = load ~cache_size ?async_domain mode path in
   return index
 
 let reload (index : ro_index) = IStore.reload index.repo
