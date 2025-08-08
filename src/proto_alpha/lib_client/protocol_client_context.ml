@@ -206,6 +206,11 @@ let () =
   register
   @@ def
        "operation"
+       ["internal_and_metadata"]
+       Protocol.Apply_internal_results.internal_operation_result_encoding ;
+  register
+  @@ def
+       "operation"
        ["unsigned"]
        Protocol.Alpha_context.Operation.unsigned_encoding ;
   register
