@@ -32,7 +32,7 @@ module Events = struct
   let initializing_context =
     declare_2
       ~section
-      ~level:Warning
+      ~level:Notice
       ~name:"initializing_context"
       ~msg:"initializing {context} context at {path}"
       ("context", Data_encoding.string)
