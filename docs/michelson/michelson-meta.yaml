@@ -448,6 +448,30 @@ instructions:
         input: '(Pair -1  (Pair 1 (Pair "foobar" (Pair 0x00AABBCC (Pair 1000 (Pair False (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" (Pair "2019-09-09T08:35:33Z" "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"))))))))'
         initial_storage: 'Unit'
         final_storage: 'Unit'
+  INDEX_ADDRESS:
+    category: blockchain
+    proposed-in: ['ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK']
+    since: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+    documentation_short: Returns a unique identifier for a given address
+    documentation: |
+      Returns a unique identifier for a given address, that can be used to store
+      an address more efficiently in a contract storage. The identifier is
+      global to the chain. The first time an address is indexed, the chain
+      generates a fresh identifier. Afterwards, any call to ``INDEX_ADDRESS``
+      will return the same identifier.
+
+      ``INDEX_ADDRESS`` cannot be used in views.
+    examples:
+      - name: Store addresses
+        description: |
+          This example demonstrates how the ``INDEX_ADDRESS`` instruction can be
+          used to store an address in the storage, using only the bytes to
+          represent the identifier.
+        path: opcodes/index_address_024.tz
+        input: '"tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"'
+        initial_storage: "None"
+        final_storage: "(Some 1)"
+
   BLAKE2B:
     category: crypto
     proposed-in: ['PtCJ7pwoxe8JasnHY8YonnLYjcVHmhiARPJvqcC6VfHT5s8k8sY']

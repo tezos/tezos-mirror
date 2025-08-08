@@ -692,6 +692,7 @@ module Script : sig
     | I_EMIT
     | I_BYTES
     | I_NAT
+    | I_INDEX_ADDRESS
     | T_bool
     | T_contract
     | T_int
@@ -4416,6 +4417,22 @@ module Destination : sig
   val must_exist : context -> t -> context tzresult Lwt.t
 
   type error += Invalid_destination_b58check of string
+end
+
+module Address_registry_storage : sig
+  type add_result = {ctxt : context; index : Z.t; existed : bool}
+
+  val init : context -> context tzresult Lwt.t
+
+  val find : context -> Destination.t -> (context * Z.t option) tzresult Lwt.t
+
+  val add_if_missing : context -> Destination.t -> add_result tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    val set_counter : context -> Z.t -> context tzresult Lwt.t
+
+    val get_counter : context -> Z.t tzresult Lwt.t
+  end
 end
 
 (** See {!Block_payload_repr}. *)

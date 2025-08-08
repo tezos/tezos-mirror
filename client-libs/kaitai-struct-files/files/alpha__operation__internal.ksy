@@ -755,6 +755,9 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
   alpha__transaction_destination_tag:
     0: implicit
     1: originated

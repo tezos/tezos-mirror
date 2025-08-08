@@ -889,6 +889,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIs_implicit_account :
       Script.location * (public_key_hash option, 'S, 'r, 'F) kinstr
       -> (address, 'S, 'r, 'F) kinstr
+  | IIndex_address :
+      Script.location * (n num, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;

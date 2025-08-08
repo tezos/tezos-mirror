@@ -2016,6 +2016,9 @@ enums:
     158:
       id: is_implicit_account
       doc: IS_IMPLICIT_ACCOUNT
+    159:
+      id: index_address
+      doc: INDEX_ADDRESS
   alpha__operation__alpha__contents_or_signature_prefix_tag:
     1: seed_nonce_revelation
     2: double_consensus_operation_evidence
