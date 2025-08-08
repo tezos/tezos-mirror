@@ -82,6 +82,7 @@ module Key : sig
   val dict_auto_flush_threshold : int Irmin.Backend.Conf.key
   val suffix_auto_flush_threshold : int Irmin.Backend.Conf.key
   val no_migrate : bool Irmin.Backend.Conf.key
+  val async_domain : bool Irmin.Backend.Conf.key
 end
 
 val fresh : Irmin.Backend.Conf.t -> bool
@@ -138,6 +139,10 @@ val suffix_auto_flush_threshold : Irmin.Backend.Conf.t -> int
 val no_migrate : Irmin.Backend.Conf.t -> bool
 (** Flag to prevent migration of data. Default [false]. *)
 
+val async_domain : Irmin.Backend.Conf.t -> bool
+(** Flag to run the asynchronous GC in a background domain instead of using
+    fork. Default [false]. *)
+
 val init :
   ?fresh:bool ->
   ?readonly:bool ->
@@ -151,6 +156,7 @@ val init :
   ?suffix_auto_flush_threshold:int ->
   ?no_migrate:bool ->
   ?lower_root:string option ->
+  ?async_domain:bool ->
   string ->
   Irmin.config
 (** [init root] creates a backend configuration for storing data with default
