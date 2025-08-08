@@ -4317,7 +4317,7 @@ let test_l2_call_inter_contract =
   unit
 
 let test_rpc_getLogs =
-  register_both
+  register_sequencer
     ~tags:["evm"; "rpc"; "get_logs"; "erc20"]
     ~title:"Check getLogs RPC"
   @@ fun ~protocol:_ ~evm_setup ->

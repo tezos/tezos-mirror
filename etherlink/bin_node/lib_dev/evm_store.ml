@@ -816,6 +816,21 @@ DO UPDATE SET value = excluded.value
         ~table
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
 
+    let select_receipts_from_block_range =
+      (t2 level level
+      ->* t6
+            block_hash
+            quantity
+            root_hash
+            address
+            (option address)
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
+              WHERE ? <= block_number AND block_number < ?
+              ORDER BY block_number ASC, index_ ASC|eos}
+
     let select_object =
       (root_hash
       ->? t7
@@ -1520,6 +1535,51 @@ module Transactions = struct
             transactionIndex = index;
             blockHash = block_hash;
             blockNumber = level;
+            from;
+            to_;
+            cumulativeGasUsed = cumulative_gas_used;
+            effectiveGasPrice = effective_gas_price;
+            gasUsed = gas_used;
+            logs;
+            logsBloom = logs_bloom;
+            type_;
+            status;
+            contractAddress = contract_address;
+          })
+      rows
+
+  let receipts_of_block_range store (Ethereum_types.Qty level) len =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let+ rows =
+      Db.collect_list
+        conn
+        Q.Transactions.select_receipts_from_block_range
+        (Qty level, Qty Z.(level + of_int len))
+    in
+    List.map
+      (fun ( block_hash,
+             index,
+             hash,
+             from,
+             to_,
+             Transaction_info.
+               {
+                 cumulative_gas_used;
+                 effective_gas_price;
+                 gas_used;
+                 logs;
+                 logs_bloom;
+                 type_;
+                 status;
+                 contract_address;
+               } ) ->
+        Transaction_receipt.
+          {
+            transactionHash = hash;
+            transactionIndex = index;
+            blockHash = block_hash;
+            blockNumber = Qty level;
             from;
             to_;
             cumulativeGasUsed = cumulative_gas_used;

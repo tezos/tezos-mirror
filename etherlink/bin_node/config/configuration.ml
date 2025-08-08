@@ -286,7 +286,7 @@ let default_filter_config ?max_nb_blocks ?max_nb_logs ?chunk_size () =
   {
     max_nb_blocks = Option.value ~default:100 max_nb_blocks;
     max_nb_logs = Option.value ~default:1000 max_nb_logs;
-    chunk_size = Option.value ~default:10 chunk_size;
+    chunk_size = Option.value ~default:1000 chunk_size;
   }
 
 let default_enable_send_raw_transaction = true

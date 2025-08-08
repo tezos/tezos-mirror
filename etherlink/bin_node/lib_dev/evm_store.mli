@@ -244,6 +244,15 @@ module Transactions : sig
       from level [block_number]. The function does not check if the block exists. *)
   val receipts_of_block_number :
     conn -> Ethereum_types.quantity -> Transaction_receipt.t list tzresult Lwt.t
+
+  (** [receipts_of_block_range conn block_number len] returns all the receipts
+      found in [len] blocks, starting from level [block_number]. The function does
+      not check if these blocks exist. *)
+  val receipts_of_block_range :
+    conn ->
+    Ethereum_types.quantity ->
+    int ->
+    Transaction_receipt.t list tzresult Lwt.t
 end
 
 module Irmin_chunks : sig
