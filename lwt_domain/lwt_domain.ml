@@ -33,8 +33,6 @@ let detach pool f args =
 
 (* Jobs to be run in the main domain *)
 let jobs = C.make_unbounded ()
-let job_done = C.make_bounded 0
-
 let job_notification =
   Lwt_unix.make_notification (fun () ->
       let thunk = C.recv jobs in
@@ -42,6 +40,7 @@ let job_notification =
 
 let run_in_main f =
   let res = ref init_result in
+  let job_done = C.make_bounded 0 in
   let job () =
     Lwt.try_bind f
       (fun ret -> Lwt.return (Result.Ok ret))
