@@ -7,6 +7,7 @@
 
 let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
     =
+  let open Lwt_syntax in
   let p_name = Sys.executable_name in
   let base_cmd =
     [|
@@ -28,8 +29,9 @@ let spawn_main ~exposed_port ~protected_endpoint ?private_endpoint ~data_dir ()
       ~some:(fun uri -> [|"--evm-node-private-endpoint"; Uri.to_string uri|])
       private_endpoint
   in
-  let process =
-    Lwt_process.open_process_none (p_name, Array.concat [base_cmd; private_cmd])
+  let+ process =
+    Process_manager.open_process_out
+      (p_name, Array.concat [base_cmd; private_cmd])
   in
   let finalizer () = Lwt.return process#terminate in
   finalizer

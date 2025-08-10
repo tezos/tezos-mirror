@@ -58,7 +58,7 @@ exception Timeout
 let run_without_error cmd args =
   let open Lwt_syntax in
   let+ status =
-    Lwt_process.with_process_full
+    Process_manager.with_process_full
       (cmd, Array.of_list (cmd :: args))
       (fun pc -> pc#status)
   in
@@ -86,7 +86,7 @@ let rec retry ~timeout ~backoff ~on_error remaining_count k =
   else Lwt_exit.exit_and_raise Node_error.exit_code_when_gcp_kms_auth_error
 
 let get_token_using_gcloud gcloud_path () =
-  Lwt_process.with_process_full
+  Process_manager.with_process_full
     (gcloud_path, [|"gcloud"; "auth"; "print-access-token"; "--quiet"|])
   @@ fun pc ->
   let open Lwt_result_syntax in

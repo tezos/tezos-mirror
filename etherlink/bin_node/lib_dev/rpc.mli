@@ -26,4 +26,4 @@ val spawn_main :
   ?private_endpoint:Uri.t ->
   data_dir:string ->
   unit ->
-  Rpc_server.finalizer
+  Rpc_server.finalizer Lwt.t
