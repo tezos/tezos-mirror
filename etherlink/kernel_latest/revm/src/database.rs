@@ -195,8 +195,6 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 
 impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error> {
-        // TODO: get_account function should be implemented whenever errors are
-        // reintroduced
         self.world_state_handler
             .get_or_create(self.host, &account_path(&address)?)
             .map_err(|err| Error::Custom(err.to_string()))
@@ -294,7 +292,7 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 
     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
         // return 0 when block number not in valid range
-        // Ref. https://www.evm.codes/?fork=cancun#40 (opcode 0x40)
+        // Ref. https://www.evm.codes/?fork=prague#40 (opcode 0x40)
 
         match self.block.number.checked_sub(number.into()) {
             Some(block_diff)
