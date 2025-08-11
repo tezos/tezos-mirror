@@ -69,8 +69,8 @@ let get_pct ~max_slashing_threshold ~max_slashing_per_block int_list =
   return
   @@ Protocol.Slash_percentage.Internal_for_tests.for_double_attestation
        ctxt
+       Default_parameters.constants_mainnet.consensus_committee_size
        map
-       Protocol.Level_repr.level_zero_use_with_care
        pkh_list
 
 (** Tests that the slashing amount for several delegates is the same as long
