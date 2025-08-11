@@ -378,6 +378,8 @@ module Make_block_storage (Reader : READER) = struct
     let* read = read_with_state () in
     block_receipts read n
 
+  let block_range_receipts _n _len = failwith "Not supported"
+
   let transaction_object tx_hash =
     let open Lwt_result_syntax in
     let* read = read_with_state () in

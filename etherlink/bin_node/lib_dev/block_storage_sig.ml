@@ -37,6 +37,11 @@ module type S = sig
     *)
   val block_receipts : Z.t -> Transaction_receipt.t list tzresult Lwt.t
 
+  (** [block_range_receipts n len] returns the receipts of [len] blocks,
+      starting from level [n]. *)
+  val block_range_receipts :
+    Z.t -> int -> Transaction_receipt.t list tzresult Lwt.t
+
   (** [transaction_receipt tx_hash] returns the receipt of [tx_hash]. *)
   val transaction_receipt :
     Ethereum_types.hash -> Transaction_receipt.t option tzresult Lwt.t

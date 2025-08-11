@@ -645,6 +645,23 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | Some _hash ->
               Evm_store.Transactions.receipts_of_block_number conn (Qty level)
 
+        let block_range_receipts level len =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let start = Ethereum_types.Qty level in
+          let finish = Ethereum_types.Qty Z.(pred (level + of_int len)) in
+          let* found1 = Evm_store.Blocks.find_hash_of_number conn start in
+          let* found2 = Evm_store.Blocks.find_hash_of_number conn finish in
+          match (found1, found2) with
+          | None, _ | _, None ->
+              failwith
+                "Block range [%a, %a] unavailable"
+                Ethereum_types.pp_quantity
+                start
+                Ethereum_types.pp_quantity
+                finish
+          | _ -> Evm_store.Transactions.receipts_of_block_range conn start len
+
         let transaction_receipt hash =
           Evm_store.use ctxt.store @@ fun conn ->
           Evm_store.Transactions.find_receipt conn hash
@@ -743,6 +760,8 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             return block
 
         let block_receipts = Etherlink_block_storage.block_receipts
+
+        let block_range_receipts = Etherlink_block_storage.block_range_receipts
 
         let transaction_receipt = Etherlink_block_storage.transaction_receipt
 

@@ -206,50 +206,18 @@ let filter_one_log : bloom_filter -> transaction_log -> Filter.changes option =
 
 let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
   if Ethbloom.contains_bloom (hex_to_bytes receipt.logsBloom) filter.bloom then
-    Some (List.filter_map (filter_one_log filter) receipt.logs)
-  else None
+    List.filter_map (filter_one_log filter) receipt.logs
+  else []
 
 (* Apply a filter on one transaction *)
-let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
-    bloom_filter -> hash -> Filter.changes list option tzresult Lwt.t =
- fun filter tx_hash ->
-  let open Lwt_result_syntax in
-  let* receipt =
-    Rollup_node_rpc.Etherlink_block_storage.transaction_receipt tx_hash
-  in
-  match receipt with
-  | Some receipt -> return @@ filter_receipt filter receipt
-  | None -> tzfail (Receipt_not_found tx_hash)
 
-(* Apply a filter on one block *)
-let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
-    valid_filter -> Z.t -> Filter.changes list option tzresult Lwt.t =
- fun filter block_number ->
-  let open Lwt_result_syntax in
-  let* block =
-    Rollup_node_rpc.Etherlink_block_storage.nth_block
-      ~full_transaction_object:false
-      block_number
-  in
-  let indexed_transaction_hashes =
-    match block.transactions with
-    | TxHash l -> l
-    | TxFull _ ->
-        (* Impossible:
-           The block is requested without tx objects *)
-        assert false
-  in
+let filter_one_tx : valid_filter -> Transaction_receipt.t -> Filter.changes list
+    =
+ fun filter receipt ->
   let filter =
     {bloom = filter.bloom; topics = filter.topics; address = filter.address}
   in
-  if Ethbloom.contains_bloom (hex_to_bytes block.logsBloom) filter.bloom then
-    let+ changes =
-      List.filter_map_ep
-        (filter_one_tx (module Rollup_node_rpc) filter)
-        indexed_transaction_hashes
-    in
-    Some (List.concat changes)
-  else return_none
+  filter_receipt filter receipt
 
 (** [split_in_chunks ~chunk_size ~base ~length] returns a list of
     lists (chunks) containing the consecutive numbers from [base]
@@ -271,8 +239,7 @@ let split_in_chunks ~chunk_size ~base ~length =
         else chunk_size
       in
       let chunk_offset = chunk * chunk_size in
-      Stdlib.List.init chunk_length (fun i ->
-          Z.(base + of_int chunk_offset + of_int i)))
+      (Z.(base + of_int chunk_offset), chunk_length))
 
 (* [get_logs (module Rollup_node_rpc) filter] applies the [filter].
 
@@ -296,7 +263,7 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
       let (Qty from) = filter.from_block in
       let (Qty to_) = filter.to_block in
       let length = Z.(to_int (to_ - from)) + 1 in
-      let block_numbers =
+      let chunks =
         split_in_chunks
           ~chunk_size:log_filter_config.chunk_size
           ~length
@@ -306,13 +273,15 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
         List.fold_left_es
           (function
             | acc_logs, n_logs ->
-                fun chunk ->
+                fun (offset, len) ->
                   (* Apply the filter to the entire chunk concurrently *)
                   let* new_logs =
-                    Lwt_result.map List.concat
-                    @@ List.filter_map_ep
-                         (filter_one_block (module Rollup_node_rpc) filter)
-                         chunk
+                    Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
+                      offset
+                      len
+                  in
+                  let new_logs =
+                    List.concat_map (filter_one_tx filter) new_logs
                   in
                   let n_new_logs = List.length new_logs in
                   if n_logs + n_new_logs > log_filter_config.max_nb_logs then
@@ -320,7 +289,7 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
                       (Too_many_logs {limit = log_filter_config.max_nb_logs})
                   else return (acc_logs @ new_logs, n_logs + n_new_logs))
           ([], 0)
-          block_numbers
+          chunks
       in
       return logs
 

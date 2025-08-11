@@ -277,7 +277,6 @@ let filter_from ~address ~topics =
 
 let filter_logs ~bloom_filter ~receipt =
   let logs = Filter_helpers.filter_receipt bloom_filter receipt in
-  let logs = Option.value ~default:[] logs in
   List.filter_map logs_of_filter logs
 
 let produce_logs_stream ~bloom_filter stream =

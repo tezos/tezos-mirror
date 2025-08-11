@@ -2,7 +2,7 @@
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
@@ -82,7 +82,7 @@
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
@@ -162,7 +162,7 @@
   "log_filter": {
     "max_nb_blocks": 100,
     "max_nb_logs": 1000,
-    "chunk_size": 10
+    "chunk_size": 1000
   },
   "sequencer": {
     "time_between_blocks": 5,
