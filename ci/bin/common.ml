@@ -740,43 +740,70 @@ type bin_package_group = A | B
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
-let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
-    ?(release = false) ?dependencies ?(sccache_size = "5G") () =
+let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
+    ?dependencies ?(sccache_size = "5G") () =
   let arch_string = Runner.Arch.show_easy_to_distinguish arch in
-  let name =
-    sf
-      "oc.build_%s-%s"
-      arch_string
-      (if release then "released" else "exp-dev-extra")
+  let name = sf "oc.build_%s-released" arch_string in
+  let executable_files = "script-inputs/released-executables" in
+  let variables =
+    [("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
   in
-  let executable_files =
-    if release then "script-inputs/released-executables"
-    else "script-inputs/experimental-executables script-inputs/dev-executables"
+  let artifacts =
+    artifacts
+      ~name:"build-$ARCH-$CI_COMMIT_REF_SLUG"
+      ~when_:On_success
+      ~expire_in:(Duration (Days 1))
+      ["octez-*"; "src/proto_*/parameters/*.json"]
   in
+  let job =
+    job
+      ?rules
+      ?dependencies
+      ~__POS__
+      ~stage:Stages.build
+      ~arch
+      ?retry
+      ?cpu
+      ?storage
+      ~name
+      ~image:Images.CI.build
+      ~before_script:
+        (before_script
+           ~take_ownership:true
+           ~source_version:true
+           ~eval_opam:true
+           [])
+      ~variables
+      ~artifacts
+      ["./scripts/ci/build_full_unreleased.sh"]
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:sccache_size
+    |> enable_cargo_target_caches
+  in
+  (* Disable coverage for arm64 *)
+  if arch = Amd64 then enable_coverage_instrumentation job else job
+
+let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
+    ?dependencies ?(sccache_size = "5G") ~name executable_files =
+  let arch_string = Runner.Arch.show_easy_to_distinguish arch in
   let build_extra =
-    match (release, arch) with
-    | true, _ -> None
-    | false, Amd64 ->
-        Some
-          [
-            "src/bin_tps_evaluation/main_tps_evaluation.exe";
-            "src/bin_octogram/octogram_main.exe";
-            "tezt/tests/main.exe";
-            "contrib/octez_injector_server/octez_injector_server.exe";
-          ]
-    | false, Arm64 ->
-        Some
-          [
-            "src/bin_tps_evaluation/main_tps_evaluation.exe";
-            "src/bin_octogram/octogram_main.exe tezt/tests/main.exe";
-          ]
+    match arch with
+    | Amd64 ->
+        [
+          "src/bin_tps_evaluation/main_tps_evaluation.exe";
+          "src/bin_octogram/octogram_main.exe";
+          "tezt/tests/main.exe";
+          "contrib/octez_injector_server/octez_injector_server.exe";
+        ]
+    | Arm64 ->
+        [
+          "src/bin_tps_evaluation/main_tps_evaluation.exe";
+          "src/bin_octogram/octogram_main.exe tezt/tests/main.exe";
+        ]
   in
   let variables =
     [("ARCH", arch_string); ("EXECUTABLE_FILES", executable_files)]
-    @
-    match build_extra with
-    | Some build_extra -> [("BUILD_EXTRA", String.concat " " build_extra)]
-    | None -> []
+    @ [("BUILD_EXTRA", String.concat " " build_extra)]
   in
   let artifacts =
     artifacts
@@ -785,7 +812,6 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
       ~expire_in:(Duration (Days 1))
       (* TODO: [paths] can be refined based on [release] *)
       [
-        "octez-*";
         "octez-teztale-*";
         "src/proto_*/parameters/*.json";
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
@@ -825,23 +851,27 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
 (** {2 Shared jobs} *)
 
 let job_build_arm64_release ?rules () : tezos_job =
-  job_build_dynamic_binaries
-    ?rules
-    ~__POS__
-    ~arch:Arm64
-    ~storage:Ramfs
-    ~release:true
-    ()
+  job_build_released_binaries ?rules ~__POS__ ~arch:Arm64 ~storage:Ramfs ()
 
-let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
+let job_build_arm64_extra_dev ?rules () : tezos_job =
   job_build_dynamic_binaries
+    ~name:"oc.build_arm64-extra-dev"
     ?rules
     ~__POS__
     ~arch:Arm64
     ~storage:Ramfs
-    ~release:false
     ~sccache_size:"2G"
-    ()
+    "script-inputs/dev-executables"
+
+let job_build_arm64_extra_exp ?rules () : tezos_job =
+  job_build_dynamic_binaries
+    ~name:"oc.build_arm64-extra-exp"
+    ?rules
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~sccache_size:"2G"
+    "script-inputs/experimental-executables"
 
 let job_build_kernels ?rules () : tezos_job =
   job

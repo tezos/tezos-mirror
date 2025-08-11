@@ -384,15 +384,10 @@ oc.build_arm64-released:
     expire_in: 1 day
     paths:
     - octez-*
-    - octez-teztale-*
     - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
     when: on_success
 
-oc.build_arm64-exp-dev-extra:
+oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -430,7 +425,7 @@ oc.build_arm64-exp-dev-extra:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: arm64
-    EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
+    EXECUTABLE_FILES: script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
@@ -443,7 +438,65 @@ oc.build_arm64-exp-dev-extra:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
+    when: on_success
+
+oc.build_arm64-extra-exp:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
+      tezt/tests/main.exe
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -599,15 +652,10 @@ oc.build_x86_64-released:
     expire_in: 1 day
     paths:
     - octez-*
-    - octez-teztale-*
     - src/proto_*/parameters/*.json
-    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
-    - _build/default/tezt/tests/main.exe
-    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
-    - etherlink-governance-observer
     when: on_success
 
-oc.build_x86_64-exp-dev-extra:
+oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -651,7 +699,7 @@ oc.build_x86_64-exp-dev-extra:
   - dune cache trim --size=5GB
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/experimental-executables script-inputs/dev-executables
+    EXECUTABLE_FILES: script-inputs/dev-executables
     BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
       tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
     CARGO_NET_OFFLINE: "false"
@@ -668,7 +716,75 @@ oc.build_x86_64-exp-dev-extra:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
-    - octez-*
+    - octez-teztale-*
+    - src/proto_*/parameters/*.json
+    - _build/default/src/lib_protocol_compiler/bin/main_native.exe
+    - _build/default/tezt/tests/main.exe
+    - _build/default/contrib/octez_injector_server/octez_injector_server.exe
+    - etherlink-governance-observer
+    when: on_success
+
+oc.build_amd64-extra-exp:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  - key: dune-build-cache-$CI_PIPELINE_ID
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_full_unreleased.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    ARCH: x86_64
+    EXECUTABLE_FILES: script-inputs/experimental-executables
+    BUILD_EXTRA: src/bin_tps_evaluation/main_tps_evaluation.exe src/bin_octogram/octogram_main.exe
+      tezt/tests/main.exe contrib/octez_injector_server/octez_injector_server.exe
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  artifacts:
+    name: build-$ARCH-$CI_COMMIT_REF_SLUG
+    expire_in: 1 day
+    paths:
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -1915,7 +2031,8 @@ oc.integration:compiler-rejections:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2021,7 +2138,8 @@ oc.script:test_octez_release_versions:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2070,11 +2188,13 @@ oc.test-liquidity-baking-scripts:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2507,7 +2627,8 @@ oc.unit:non-proto-x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2571,7 +2692,8 @@ oc.unit:etherlink-x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2635,7 +2757,8 @@ oc.unit:other-x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2699,7 +2822,8 @@ oc.unit:proto-x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2763,7 +2887,8 @@ oc.unit:non-proto-arm64:
   needs:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
-  - oc.build_arm64-exp-dev-extra
+  - oc.build_arm64-extra-dev
+  - oc.build_arm64-extra-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -2816,7 +2941,8 @@ oc.unit:webassembly-x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 20 minutes
@@ -2841,7 +2967,8 @@ oc.unit:protocol_compiles:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2881,7 +3008,8 @@ de.unit:x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -2905,7 +3033,8 @@ de.unit:arm64:
   needs:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
-  - oc.build_arm64-exp-dev-extra
+  - oc.build_arm64-extra-dev
+  - oc.build_arm64-extra-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 60 minutes
@@ -2929,7 +3058,8 @@ resto.unit:x86_64:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   dependencies:
   - oc.docker:ci:amd64
   timeout: 10 minutes
@@ -2953,7 +3083,8 @@ resto.unit:arm64:
   needs:
   - oc.docker:ci:arm64
   - oc.build_arm64-released
-  - oc.build_arm64-exp-dev-extra
+  - oc.build_arm64-extra-dev
+  - oc.build_arm64-extra-exp
   dependencies:
   - oc.docker:ci:arm64
   timeout: 10 minutes
@@ -3040,14 +3171,16 @@ tezt:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3110,14 +3243,16 @@ tezt-time-sensitive:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3179,14 +3314,16 @@ tezt-slow:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3246,14 +3383,16 @@ tezt-extra:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3312,14 +3451,16 @@ tezt-flaky:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3381,12 +3522,14 @@ tezt:static-binaries:
   - when: on_success
   needs:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build:static-x86_64-linux-binaries
   - oc.tezt:fetch-records
   timeout: 60 minutes
@@ -3443,14 +3586,16 @@ tezt-riscv-slow-sequential:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-exp
+  - oc.build_amd64-extra-dev
   - oc.build_kernels
   - oc.build_dsn_node
   - oc.tezt:fetch-records
@@ -3608,13 +3753,15 @@ documentation:manuals:
   needs:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   - oc.build_kernels
   - oc.build_dsn_node
   dependencies:
   - oc.docker:ci:amd64
   - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
   - oc.build_kernels
   - oc.build_dsn_node
   timeout: 60 minutes
