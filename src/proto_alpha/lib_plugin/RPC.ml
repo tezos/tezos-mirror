@@ -3898,17 +3898,27 @@ module Attestation_rights = struct
     let rights =
       Slot.Map.fold
         (fun first_slot
-             ( {
-                 Consensus_key.delegate;
-                 consensus_pk = _;
-                 consensus_pkh = consensus_key;
-                 companion_pk = _;
-                 companion_pkh = _;
-               },
-               attestation_power,
-               _dal_power )
+             ({
+                consensus_key =
+                  {
+                    Consensus_key.delegate;
+                    consensus_pk = _;
+                    consensus_pkh = consensus_key;
+                    companion_pk = _;
+                    companion_pkh = _;
+                  };
+                attestation_power;
+                dal_power = _;
+              } :
+               Consensus_key.power)
              acc ->
-          {delegate; consensus_key; first_slot; attestation_power} :: acc)
+          {
+            delegate;
+            consensus_key;
+            first_slot;
+            attestation_power = attestation_power.slots;
+          }
+          :: acc)
         rights
         []
     in
@@ -4150,6 +4160,14 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Data_encoding.int64
       RPC_path.(path / "total_baking_power")
+
+  let stake_info =
+    RPC_service.get_service
+      ~description:"Returns the stake info."
+      ~query:RPC_query.empty
+      ~output:
+        Data_encoding.(tup2 int64 (list (tup2 Consensus_key.encoding int64)))
+      RPC_path.(path / "stake_info")
 end
 
 type Environment.Error_monad.error += Negative_level_offset
@@ -4211,7 +4229,15 @@ let register () =
   Registration.register0 ~chunked:false S.total_baking_power (fun ctxt () () ->
       Stake_distribution.For_RPC.total_baking_power
         ctxt
-        (Level.current ctxt).cycle)
+        (Level.current ctxt).cycle) ;
+  Registration.register0 ~chunked:false S.stake_info (fun ctxt () () ->
+      let* _, total_stake, stake_info_list =
+        Stake_distribution.stake_info ctxt (Level.current ctxt)
+      in
+      let stake_info_list =
+        List.map (fun (x, y) -> (Consensus_key.pkh x, y)) stake_info_list
+      in
+      return (total_stake, stake_info_list))
 
 let current_level ctxt ?(offset = 0l) block =
   RPC_context.make_call0 S.current_level ctxt block {offset} ()

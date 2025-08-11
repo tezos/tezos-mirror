@@ -26,6 +26,7 @@
         "Cycle_repr",
         "Tez_repr",
         "Deposits_repr",
+	"Attestation_power_repr",
         "Unstaked_frozen_deposits_repr",
         "Staking_pseudotoken_repr",
         "Period_repr",

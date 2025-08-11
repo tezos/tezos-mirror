@@ -126,6 +126,12 @@ type pk = Raw_context.consensus_pk = {
   companion_pkh : Bls.Public_key_hash.t option;
 }
 
+type power = Raw_context.consensus_power = {
+  consensus_key : pk;
+  attestation_power : Attestation_power_repr.t;
+  dal_power : int;
+}
+
 type t = {
   delegate : Signature.Public_key_hash.t;
   consensus_pkh : Signature.Public_key_hash.t;

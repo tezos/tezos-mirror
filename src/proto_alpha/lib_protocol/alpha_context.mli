@@ -2257,6 +2257,12 @@ module Consensus_key : sig
     consensus_pkh : Signature.Public_key_hash.t;
   }
 
+  type power = {
+    consensus_key : pk;
+    attestation_power : Attestation_power_repr.t;
+    dal_power : int;
+  }
+
   val encoding : t Data_encoding.t
 
   val zero : t
@@ -5228,6 +5234,8 @@ end
 (** This module re-exports definitions from {!Stake_storage},
     {!Delegate_storage} and {!Delegate}. *)
 module Stake_distribution : sig
+  val check_all_bakers_attest_at_level : context -> Level.t -> bool
+
   val baking_rights_owner :
     context ->
     Level.t ->
@@ -5524,7 +5532,7 @@ module Consensus : sig
        and type 'a level_map := 'a Level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
-       and type consensus_pk := Consensus_key.pk
+       and type consensus_power := Consensus_key.power
 
   (** [store_attestation_branch context branch] sets the "attestation branch"
       (see {!Storage.Tenderbake.Attestation_branch} to [branch] in both the disk

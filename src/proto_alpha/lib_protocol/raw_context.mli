@@ -355,6 +355,12 @@ module Internal_for_tests : sig
   val add_cycles : t -> int -> t
 end
 
+type consensus_power = {
+  consensus_key : consensus_pk;
+  attestation_power : Attestation_power_repr.t;
+  dal_power : int;
+}
+
 module type CONSENSUS = sig
   type t
 
@@ -368,21 +374,22 @@ module type CONSENSUS = sig
 
   type round
 
-  type consensus_pk
+  (** Info on the power of a given member of the consensus committee.
+      Contains a consensus_pk, its attesting power and its DAL power. *)
+  type consensus_power
 
   (** Returns a map where from the initial slot of each attester in the TB
       committee for a given level, to the attester's public key and its
       consensus power and DAL power. *)
-  val allowed_attestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_attestations : t -> consensus_power slot_map option
 
   (** See {!allowed_attestations}. *)
-  val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+  val allowed_preattestations : t -> consensus_power slot_map option
 
   (** Returns a map that associates a level with a slot map.
       The slot map links a delegate's public key to a tuple containing
       (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
-  val allowed_consensus :
-    t -> (consensus_pk * int * int) slot_map level_map option
+  val allowed_consensus : t -> consensus_power slot_map level_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -392,18 +399,18 @@ module type CONSENSUS = sig
   (** Missing pre-computed map by first slot. This error should not happen. *)
   type error += Slot_map_not_found of {loc : string}
 
-  (** [attestation power ctx] returns the attestation power of the
+  (** [attestation power ctx] returns the attestation power and stake of the
      current block. *)
-  val current_attestation_power : t -> int
+  val current_attestation_power : t -> Attestation_power_repr.t
 
   (** Initializes the map of allowed attestations and preattestations, this
       function must be called only once and before applying any consensus
       operation. *)
   val initialize_consensus_operation :
     t ->
-    allowed_attestations:(consensus_pk * int * int) slot_map option ->
-    allowed_preattestations:(consensus_pk * int * int) slot_map option ->
-    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
+    allowed_attestations:consensus_power slot_map option ->
+    allowed_preattestations:consensus_power slot_map option ->
+    allowed_consensus:consensus_power slot_map level_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -412,7 +419,8 @@ module type CONSENSUS = sig
       The attestation should be valid in the sense that
       [Int_map.find_opt initial_slot allowed_attestation ctx = Some
       (pkh, power)].  *)
-  val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
+  val record_attestation :
+    t -> initial_slot:slot -> power:Attestation_power_repr.t -> t tzresult
 
   (** [record_preattestation ctx ~initial_slot ~power round
      payload_hash power] records a preattestation for a proposal at
@@ -422,7 +430,11 @@ module type CONSENSUS = sig
      [Int_map.find_opt initial_slot allowed_preattestation ctx = Some
      (pkh, power)].  *)
   val record_preattestation :
-    t -> initial_slot:slot -> power:int -> round -> t tzresult
+    t ->
+    initial_slot:slot ->
+    power:Attestation_power_repr.t ->
+    round ->
+    t tzresult
 
   (** [forbid_delegate ctx delegate] adds [delegate] to the set of
       forbidden delegates, which prevents this delegate from baking or
@@ -450,7 +462,7 @@ module type CONSENSUS = sig
 
   (** [locked_round_evidence ctx] returns the round of the recorded
      preattestations as well as their power. *)
-  val locked_round_evidence : t -> (round * int) option
+  val locked_round_evidence : t -> (round * Attestation_power_repr.t) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
@@ -465,7 +477,7 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type consensus_pk := consensus_pk
+     and type consensus_power := consensus_power
 
 module Sc_rollup_in_memory_inbox : sig
   val current_messages : t -> Sc_rollup_inbox_merkelized_payload_hashes_repr.t

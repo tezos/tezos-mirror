@@ -1632,7 +1632,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: consensus_power
-      type: int31
+      type: consensus_power
   committee_entries_1:
     seq:
     - id: committee_elt
@@ -1645,6 +1645,12 @@ types:
       type: s4be
     - id: block_payload_hash
       size: 32
+  consensus_power:
+    seq:
+    - id: slots
+      type: int31
+    - id: stake
+      type: s8be
   contents:
     seq:
     - id: contents_entries
@@ -2138,7 +2144,7 @@ types:
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
     - id: consensus_power
-      type: int31
+      type: consensus_power
     - id: consensus_key
       type: public_key_hash
       doc: A Ed25519, Secp256k1, P256, or BLS public key hash
@@ -2149,7 +2155,7 @@ types:
     - id: committee
       type: committee_2
     - id: total_consensus_power
-      type: int31
+      type: total_consensus_power
   metadata_1:
     seq:
     - id: punished_delegate
@@ -3617,6 +3623,12 @@ types:
       type: n
     - id: ticket_updates
       type: ticket_updates_0
+  total_consensus_power:
+    seq:
+    - id: slots
+      type: int31
+    - id: stake
+      type: s8be
   transaction:
     seq:
     - id: source

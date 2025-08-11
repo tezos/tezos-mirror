@@ -982,7 +982,13 @@ let pp_contents_and_result :
       rewarded_delegate
   in
   let pp_committee ppf (delegate, voting_power) =
-    Format.fprintf ppf "(%a, %d)" Consensus_key.pp delegate voting_power
+    Format.fprintf
+      ppf
+      "(%a, %a)"
+      Consensus_key.pp
+      delegate
+      Attestation_power_repr.pp
+      voting_power
   in
   fun ppf -> function
     | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
@@ -1027,13 +1033,14 @@ let pp_contents_and_result :
            Level: %a@,\
            Balance updates:%a@,\
            Delegate: %a@,\
-           Consensus Power: %d@]"
+           Consensus Power: %a@]"
           Raw_level.pp
           level
           pp_balance_updates
           balance_updates
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
+          Attestation_power_repr.pp
           consensus_power
     | ( Attestation {consensus_content = {level; _}; dal_content = _},
         Attestation_result
@@ -1044,13 +1051,14 @@ let pp_contents_and_result :
            Level: %a@,\
            Balance updates:%a@,\
            Delegate: %a@,\
-           Consensus Power: %d@]"
+           Consensus Power: %a@]"
           Raw_level.pp
           level
           pp_balance_updates
           balance_updates
           Consensus_key.pp
           {delegate; consensus_pkh = consensus_key}
+          Attestation_power_repr.pp
           consensus_power
     | ( Preattestations_aggregate {consensus_content = {level; _}; _},
         Preattestations_aggregate_result
@@ -1061,13 +1069,14 @@ let pp_contents_and_result :
            Level: %a@,\
            Balance updates:%a@,\
            Delegates: %a@,\
-           Consensus Power: %d@]"
+           Consensus Power: %a@]"
           Raw_level.pp
           level
           pp_balance_updates
           balance_updates
           (Format.pp_print_list pp_committee)
           committee
+          Attestation_power_repr.pp
           total_consensus_power
     | ( Attestations_aggregate {consensus_content = {level; _}; _},
         Attestations_aggregate_result
@@ -1078,13 +1087,14 @@ let pp_contents_and_result :
            Level: %a@,\
            Balance updates:%a@,\
            Delegates: %a@,\
-           Consensus Power: %d@]"
+           Consensus Power: %a@]"
           Raw_level.pp
           level
           pp_balance_updates
           balance_updates
           (Format.pp_print_list pp_committee)
           committee
+          Attestation_power_repr.pp
           total_consensus_power
     | ( Double_consensus_operation_evidence {slot; op1; op2},
         Double_consensus_operation_evidence_result double_signing_result ) ->

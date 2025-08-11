@@ -1467,3 +1467,5 @@ type baker_with_power = {delegate : string; baking_power : int}
 
 val get_stake_distribution :
   ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t
+
+val get_stake_info : ?chain:string -> ?block:string -> unit -> JSON.t t

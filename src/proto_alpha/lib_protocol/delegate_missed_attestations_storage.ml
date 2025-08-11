@@ -78,12 +78,16 @@ let record_attesting_participation ctxt ~delegate ~participation
             {remaining_slots; missed_levels = missed_levels + 1}
       | None -> (
           let level = Level_storage.current ctxt in
-          let*? stake_distribution =
-            Raw_context.stake_distribution_for_current_cycle ctxt
+          let* ctxt, total_active_stake_weight, stake_list =
+            Delegate_sampler.stake_info ctxt level
           in
-          match
-            Signature.Public_key_hash.Map.find delegate stake_distribution
-          with
+          let stake_weight_info =
+            List.find
+              (fun (pk, _) ->
+                Signature.Public_key_hash.equal delegate pk.Raw_context.delegate)
+              stake_list
+          in
+          match stake_weight_info with
           | None ->
               (* This happens when the block is the first one in a
                  cycle, and therefore the attestations are for the last
@@ -92,17 +96,8 @@ let record_attesting_participation ctxt ~delegate ~participation
                  case its participation is simply ignored. *)
               assert (Compare.Int32.(level.cycle_position = 0l)) ;
               return ctxt
-          | Some active_stake ->
-              let* total_active_stake =
-                Stake_storage.get_total_active_stake ctxt level.cycle
-              in
+          | Some (_, active_stake_weight) ->
               let expected_slots =
-                let active_stake_weight =
-                  Stake_repr.staking_weight active_stake
-                in
-                let total_active_stake_weight =
-                  Stake_repr.staking_weight total_active_stake
-                in
                 expected_slots_for_given_active_stake
                   ctxt
                   ~total_active_stake_weight

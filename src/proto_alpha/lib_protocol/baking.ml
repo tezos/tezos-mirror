@@ -60,6 +60,8 @@ let () =
 
 let bonus_baking_reward ctxt ~attestation_power =
   let open Result_syntax in
+  (* TODO ABAAB *)
+  let attestation_power = attestation_power.Attestation_power_repr.slots in
   let consensus_threshold_size = Constants.consensus_threshold_size ctxt in
   let* baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
@@ -108,28 +110,29 @@ let attesting_rights (ctxt : t) level =
     (ctxt, Signature.Public_key_hash.Map.empty)
     slots
 
-let attesting_rights_by_first_slot ctxt level =
+let attesting_rights_by_first_slot ctxt level :
+    (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
   let open Lwt_result_syntax in
   let*? slots =
     Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   in
   let number_of_shards = Constants.dal_number_of_shards ctxt in
-  let* ctxt, (_, slots_map) =
+  let* ctxt, (delegates_map, slots_map) =
     Slot.Range.fold_es
       (fun (ctxt, (delegates_map, slots_map)) slot ->
-        let+ ctxt, consensus_pk =
+        let+ ctxt, consensus_key =
           Stake_distribution.slot_owner ctxt level slot
         in
         let initial_slot, delegates_map =
           match
             Signature.Public_key_hash.Map.find
-              consensus_pk.delegate
+              consensus_key.delegate
               delegates_map
           with
           | None ->
               ( slot,
                 Signature.Public_key_hash.Map.add
-                  consensus_pk.delegate
+                  consensus_key.delegate
                   slot
                   delegates_map )
           | Some initial_slot -> (initial_slot, delegates_map)
@@ -143,13 +146,57 @@ let attesting_rights_by_first_slot ctxt level =
           Slot.Map.update
             initial_slot
             (function
-              | None -> Some (consensus_pk, 1, in_dal_committee)
-              | Some (consensus_pk, count, dal_count) ->
-                  Some (consensus_pk, count + 1, dal_count + in_dal_committee))
+              | None ->
+                  Some
+                    {
+                      consensus_key;
+                      attestation_power =
+                        {
+                          Attestation_power_repr.slots = 1;
+                          (* built at a later step *) stake = 0L;
+                        };
+                      dal_power = in_dal_committee;
+                    }
+              | Some
+                  ({consensus_key; attestation_power; dal_power} :
+                    Consensus_key.power) ->
+                  Some
+                    {
+                      consensus_key;
+                      attestation_power =
+                        {
+                          attestation_power with
+                          slots = attestation_power.slots + 1;
+                        };
+                      dal_power = dal_power + in_dal_committee;
+                    })
             slots_map
         in
         (ctxt, (delegates_map, slots_map)))
       (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
       slots
+  in
+  let* ctxt, _, stake_info_list = Stake_distribution.stake_info ctxt level in
+  let slots_map =
+    List.fold_left
+      (fun acc ((consensus_pk, weight) : Consensus_key.pk * Int64.t) ->
+        match
+          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
+        with
+        | None -> acc
+        | Some slot -> (
+            match Slot.Map.find slot slots_map with
+            | None -> acc (* Impossible by construction *)
+            | Some v ->
+                Slot.Map.add
+                  slot
+                  {
+                    v with
+                    attestation_power =
+                      {v.attestation_power with stake = weight};
+                  }
+                  acc))
+      Slot.Map.empty
+      stake_info_list
   in
   return (ctxt, slots_map)
