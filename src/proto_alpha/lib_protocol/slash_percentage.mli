@@ -24,7 +24,7 @@ val get :
 module Internal_for_tests : sig
   val for_double_attestation :
     Raw_context.t ->
-    int ->
+    int64 ->
     int Signature.Public_key_hash.Map.t ->
     Signature.Public_key_hash.t list ->
     Percentage.t

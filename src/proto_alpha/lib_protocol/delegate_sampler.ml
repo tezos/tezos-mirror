@@ -289,9 +289,6 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
 
 (* This function is relevant only when all bakers don't attest *)
 let attesting_rights_count ctxt level =
-  assert (
-    not
-      (Consensus_parameters_storage.check_all_bakers_attest_at_level ctxt level)) ;
   let consensus_committee_size =
     Constants_storage.consensus_committee_size ctxt
   in

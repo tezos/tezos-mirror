@@ -2262,9 +2262,11 @@ module Attestation_power : sig
 
   val get_slots : t -> int
 
-  val consensus_threshold : context -> Level.t -> int
+  val consensus_threshold :
+    context -> Level.t -> (context * int64) tzresult Lwt.t
 
-  val consensus_committee : context -> Level.t -> int
+  val consensus_committee :
+    context -> Level.t -> (context * int64) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)

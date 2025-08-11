@@ -59,25 +59,28 @@ let () =
       Insufficient_attestation_power {attestation_power; consensus_threshold})
 
 let bonus_baking_reward ctxt level ~attestation_power =
-  let open Result_syntax in
-  (* TODO ABAAB : only works if flag is false *)
+  let open Lwt_result_syntax in
+  (* TODO ABAAB : only works if flag is false, slots are not distributed correctly *)
   let attestation_power = Attestation_power.get ctxt level attestation_power in
-  let consensus_threshold_size =
-    Attestation_power.consensus_threshold ctxt level |> Int64.of_int
+  let* ctxt, consensus_threshold_size =
+    Attestation_power.consensus_threshold ctxt level
   in
-  let* baking_reward_bonus_per_slot =
+  let*? baking_reward_bonus_per_slot =
     Delegate.Rewards.baking_reward_bonus_per_slot ctxt
   in
   let extra_attestation_power =
     Int64.sub attestation_power consensus_threshold_size
   in
-  let* () =
+  let*? () =
     error_when
       Compare.Int64.(extra_attestation_power < 0L)
       (Insufficient_attestation_power
          {attestation_power; consensus_threshold = consensus_threshold_size})
   in
-  Tez.(baking_reward_bonus_per_slot *? extra_attestation_power)
+  let*? reward =
+    Tez.(baking_reward_bonus_per_slot *? extra_attestation_power)
+  in
+  return (ctxt, reward)
 
 type ordered_slots = {
   delegate : Signature.public_key_hash;

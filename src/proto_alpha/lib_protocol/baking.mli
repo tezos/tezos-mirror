@@ -63,4 +63,7 @@ val attesting_rights_by_first_slot :
 
 (** Computes the bonus baking reward depending on the attestation power. *)
 val bonus_baking_reward :
-  context -> Level.t -> attestation_power:Attestation_power.t -> Tez.t tzresult
+  context ->
+  Level.t ->
+  attestation_power:Attestation_power.t ->
+  (context * Tez.t) tzresult Lwt.t

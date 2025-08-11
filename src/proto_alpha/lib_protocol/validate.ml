@@ -4024,11 +4024,12 @@ let check_attestation_power vi bs =
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
   if are_attestations_required then
-    let required =
+    (* We can safely drop the context: it is only updated for the cache of
+       the stake info for a given level, which should already be cached
+       at this time anyways. *)
+    let* _ctxt, required =
       Attestation_power.consensus_threshold vi.ctxt vi.current_level
-      |> Int64.of_int
     in
-    (* TODO ABAAB : required should depend on the flag *)
     let provided =
       Attestation_power.get vi.ctxt vi.current_level bs.attestation_power
     in
@@ -4063,11 +4064,11 @@ let check_fitness_locked_round bs fitness_locked_round =
     contains preattestations when they are mandatory. This is checked by
     {!check_fitness_locked_round} instead. *)
 let check_preattestation_round_and_power vi vs round =
-  let open Result_syntax in
+  let open Lwt_result_syntax in
   match vs.locked_round_evidence with
-  | None -> ok_unit
+  | None -> return_unit
   | Some (preattestation_round, total_attesting_power) ->
-      let* () =
+      let*? () =
         (* Actually, this check should never fail, because we have
            already called {!Consensus.check_round_before_block} for
            all preattestations in a block. Nevertheless, it does not
@@ -4077,18 +4078,22 @@ let check_preattestation_round_and_power vi vs round =
           (Locked_round_after_block_round
              {locked_round = preattestation_round; round})
       in
-      (* TODO ABAAB : threshold should depend on abaab flag *)
-      let consensus_threshold =
+      (* We can safely drop the context: it is only updated for the cache of
+         the stake info for a given level, which should already be cached
+         at this time anyways. *)
+      let* _ctxt, consensus_threshold =
         Attestation_power.consensus_threshold vi.ctxt vi.current_level
-        |> Int64.of_int
       in
       let total_attesting_power =
         Attestation_power.get vi.ctxt vi.current_level total_attesting_power
       in
-      error_when
-        Compare.Int64.(total_attesting_power < consensus_threshold)
-        (Insufficient_locked_round_evidence
-           {total_attesting_power; consensus_threshold})
+      let*? () =
+        error_when
+          Compare.Int64.(total_attesting_power < consensus_threshold)
+          (Insufficient_locked_round_evidence
+             {total_attesting_power; consensus_threshold})
+      in
+      return_unit
 
 let check_payload_hash block_state ~predecessor_hash
     (block_header_contents : Block_header.contents) =
@@ -4109,7 +4114,7 @@ let finalize_block {info; block_state; _} =
   | Application {round; locked_round; predecessor_hash; header_contents} ->
       let* () = check_attestation_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
-      let*? () = check_preattestation_round_and_power info block_state round in
+      let* () = check_preattestation_round_and_power info block_state round in
       let*? () =
         check_payload_hash block_state ~predecessor_hash header_contents
       in
@@ -4117,11 +4122,11 @@ let finalize_block {info; block_state; _} =
   | Partial_validation {round; locked_round; _} ->
       let* () = check_attestation_power info block_state in
       let*? () = check_fitness_locked_round block_state locked_round in
-      let*? () = check_preattestation_round_and_power info block_state round in
+      let* () = check_preattestation_round_and_power info block_state round in
       return_unit
   | Construction {round; predecessor_hash; header_contents} ->
       let* () = check_attestation_power info block_state in
-      let*? () = check_preattestation_round_and_power info block_state round in
+      let* () = check_preattestation_round_and_power info block_state round in
       let*? () =
         match block_state.locked_round_evidence with
         | Some _ ->

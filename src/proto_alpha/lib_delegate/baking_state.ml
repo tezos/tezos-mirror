@@ -149,8 +149,8 @@ module Delegate_slots = struct
            non-first-slot operations from the mempool because this check is
            skipped in the mempool to increase its speed; the baker can and
            should ignore such operations. *)
-    consensus_threshold : int;
-    consensus_committee : int;
+    consensus_threshold : int64;
+    consensus_committee : int64;
   }
 
   let own_delegates slots = slots.own_delegates
@@ -169,8 +169,9 @@ module Delegate_slots = struct
     in
     return @@ SlotMap.find slot slots.own_delegate_slots
 
+  (* TODO ABAAB: get the correct voting power *)
   let voting_power slots ~slot =
-    SlotMap.find slot slots.all_delegate_voting_power
+    Option.map Int64.of_int @@ SlotMap.find slot slots.all_delegate_voting_power
 
   let consensus_threshold {consensus_threshold; _} = consensus_threshold
 

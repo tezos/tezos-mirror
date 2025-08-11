@@ -3257,7 +3257,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
   let* ctxt, reward_bonus =
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
-      let*? rewards_bonus =
+      let* ctxt, rewards_bonus =
         (* TODO ABAAB : only works if flag is false *)
         Baking.bonus_baking_reward ctxt level ~attestation_power
       in

@@ -3988,8 +3988,8 @@ module Validators = struct
 
   type t = {
     level : Raw_level.t;
-    consensus_threshold : int;
-    consensus_committee : int;
+    consensus_threshold : int64;
+    consensus_committee : int64;
     delegates : delegate list;
   }
 
@@ -4015,8 +4015,8 @@ module Validators = struct
         {level; consensus_threshold; consensus_committee; delegates})
       (obj4
          (req "level" Raw_level.encoding)
-         (req "consensus_threshold" int31)
-         (req "consensus_committee" int31)
+         (req "consensus_threshold" int64)
+         (req "consensus_committee" int64)
          (req "delegates" (list delegate_encoding)))
 
   module S = struct
@@ -4084,10 +4084,10 @@ module Validators = struct
         let+ _ctxt, rights =
           List.fold_left_es
             (fun (ctxt, acc) level ->
-              let consensus_threshold =
+              let* ctxt, consensus_threshold =
                 Attestation_power.consensus_threshold ctxt level
               in
-              let consensus_committee =
+              let* ctxt, consensus_committee =
                 Attestation_power.consensus_committee ctxt level
               in
               let* ctxt, delegates = attestation_slots_at_level ctxt level in

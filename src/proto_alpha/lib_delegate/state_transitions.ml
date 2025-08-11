@@ -204,29 +204,30 @@ let extract_pqc state (new_proposal : proposal) =
             Delegate_slots.voting_power state.level_state.delegate_slots ~slot
           with
           | Some attesting_power -> attesting_power
-          | None -> 0
+          | None -> 0L
         in
         List.fold_left
           (fun voting_power op ->
             let (Operation_data operation_data) = op.protocol_data in
             match operation_data.contents with
             | Single (Preattestation {slot; _}) ->
-                voting_power_of_slot slot + voting_power
+                Int64.add (voting_power_of_slot slot) voting_power
             | Single (Preattestations_aggregate {committee; _}) ->
                 List.fold_left
                   (fun aggregated_voting_power slot ->
-                    voting_power_of_slot slot + aggregated_voting_power)
-                  0
+                    Int64.add
+                      (voting_power_of_slot slot)
+                      aggregated_voting_power)
+                  0L
                   committee
             | _ -> voting_power)
-          0
+          0L
           prequorum.preattestations
       in
-      (* TODO ABAAB *)
       let consensus_threshold =
         Delegate_slots.consensus_threshold state.level_state.delegate_slots
       in
-      if Compare.Int.(voting_power >= consensus_threshold) then
+      if Compare.Int64.(voting_power >= consensus_threshold) then
         Some (prequorum.preattestations, prequorum.round)
       else None
 

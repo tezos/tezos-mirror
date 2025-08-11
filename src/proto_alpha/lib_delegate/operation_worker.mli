@@ -83,9 +83,9 @@ val get_quorum_event_stream : t -> event Lwt_stream.t
 *)
 val monitor_preattestation_quorum :
   t ->
-  consensus_threshold:int ->
-  consensus_committee:int ->
-  get_slot_voting_power:(slot:Slot.t -> int option) ->
+  consensus_threshold:int64 ->
+  consensus_committee:int64 ->
+  get_slot_voting_power:(slot:Slot.t -> int64 option) ->
   candidate ->
   unit Lwt.t
 
@@ -96,9 +96,9 @@ val monitor_preattestation_quorum :
 *)
 val monitor_attestation_quorum :
   t ->
-  consensus_threshold:int ->
-  consensus_committee:int ->
-  get_slot_voting_power:(slot:Slot.t -> int option) ->
+  consensus_threshold:int64 ->
+  consensus_committee:int64 ->
+  get_slot_voting_power:(slot:Slot.t -> int64 option) ->
   candidate ->
   unit Lwt.t
 
