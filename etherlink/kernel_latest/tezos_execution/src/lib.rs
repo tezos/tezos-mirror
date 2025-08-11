@@ -165,7 +165,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     sender_balance,
                     &amount,
                     &dest_contract,
-                    destination_address.entrypoint,
+                    &destination_address.entrypoint,
                     param.into_micheline_optimized_legacy(&parser.arena),
                     parser,
                     ctx,
@@ -197,7 +197,7 @@ pub fn transfer<'a, Host: Runtime>(
     src_balance: &Narith,
     amount: &Narith,
     dest_contract: &Contract,
-    entrypoint: Entrypoint,
+    entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
@@ -326,7 +326,7 @@ pub fn transfer_external<Host: Runtime>(
         src_balance,
         amount,
         dest,
-        entrypoint,
+        &entrypoint,
         value,
         &parser,
         &mut ctx,
@@ -440,7 +440,7 @@ fn apply_balance_changes(
 fn execute_smart_contract<'a>(
     code: Vec<u8>,
     storage: Vec<u8>,
-    entrypoint: Entrypoint,
+    entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
@@ -455,8 +455,8 @@ fn execute_smart_contract<'a>(
         ctx,
         &parser.arena,
         value,
-        Some(entrypoint),
-        storage_micheline,
+        entrypoint,
+        &storage_micheline,
     )?;
 
     // Encode the new storage

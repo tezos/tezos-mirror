@@ -111,7 +111,7 @@
 //! // from `parser` for simplicity, you may also opt to create a new one to
 //! // potentially save a bit of memory (depends on the workload).
 //! let (operations_iter, new_storage) = contract_typechecked
-//!     .interpret(&mut ctx, &parser.arena, parameter, None, storage)
+//!     .interpret(&mut ctx, &parser.arena, parameter, &Entrypoint::default(), &storage)
 //!     .unwrap();
 //! let TypedValue::Int(new_storage_int) = &new_storage else { unreachable!() };
 //! assert_eq!(new_storage_int, &22698374052006863956975682u128.into());
@@ -159,7 +159,7 @@ mod tests {
 
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
-    use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
+    use crate::stack::{FailingTypeStack, Stack, TypeStack, stk, tc_stk};
     use crate::typechecker;
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
@@ -181,9 +181,10 @@ mod tests {
             .unwrap();
         let mut istack = stk![TypedValue::nat(10)];
         let temp = Arena::new();
-        assert!(ast
-            .interpret(&mut Ctx::default(), &temp, &mut istack)
-            .is_ok());
+        assert!(
+            ast.interpret(&mut Ctx::default(), &temp, &mut istack)
+                .is_ok()
+        );
         assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
     }
 
@@ -237,9 +238,10 @@ mod tests {
             .unwrap();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         let temp = Arena::new();
-        assert!(ast
-            .interpret(&mut Ctx::default(), &temp, &mut istack)
-            .is_ok());
+        assert!(
+            ast.interpret(&mut Ctx::default(), &temp, &mut istack)
+                .is_ok()
+        );
         assert_eq!(istack, stk![TypedValue::nat(6)]);
     }
 
@@ -372,8 +374,8 @@ mod tests {
                 ctx,
                 &arena,
                 "foo".into(),
-                None,
-                M::seq(
+                &Entrypoint::default(),
+                &M::seq(
                     &arena,
                     [
                         M::prim2(&arena, Prim::Elt, "bar".into(), 0.into()),
@@ -1154,10 +1156,10 @@ mod multisig_tests {
     use crate::interpreter::{ContractInterpretError, InterpretError};
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
-    use num_bigint::BigUint;
-    use typed_arena::Arena;
     use Type as T;
     use TypedValue as TV;
+    use num_bigint::BigUint;
+    use typed_arena::Arena;
 
     // The comments below detail the steps used to
     // prepare the signature for calling the multisig contract.
@@ -1263,9 +1265,9 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
-                None,
+                &Entrypoint::default(),
                 // make_initial_storage(),
-                pair(
+                &pair(
                     anti_replay_counter(),
                     pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
@@ -1336,8 +1338,8 @@ mod multisig_tests {
                     // %sigs
                     seq([some(signature)]),
                 ),
-                None,
-                pair(
+                &Entrypoint::default(),
+                &pair(
                     anti_replay_counter(),
                     pair(threshold.clone(), seq([PUBLIC_KEY.into()])),
                 ),
@@ -1392,8 +1394,8 @@ mod multisig_tests {
                     // %sigs
                     seq([some(invalid_signature)]),
                 ),
-                None,
-                pair(
+                &Entrypoint::default(),
+                &pair(
                     anti_replay_counter(),
                     pair(threshold, seq([PUBLIC_KEY.into()])),
                 ),
