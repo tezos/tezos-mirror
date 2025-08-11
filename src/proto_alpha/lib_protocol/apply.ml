@@ -3246,7 +3246,7 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     if Round.(round = zero) then Consecutive_round_zero.incr ctxt
     else Consecutive_round_zero.reset ctxt
   in
-  (* end of level  *)
+  (* end of level *)
   let* ctxt =
     match block_data_contents.Block_header.seed_nonce_hash with
     | None -> return ctxt
@@ -3258,7 +3258,6 @@ let finalize_application ctxt block_data_contents ~round ~predecessor_hash
     if required_attestations then
       let* ctxt = record_attesting_participation ctxt dal_attestation in
       let* ctxt, rewards_bonus =
-        (* TODO ABAAB : only works if flag is false *)
         Baking.bonus_baking_reward ctxt level ~attestation_power
       in
       return (ctxt, Some rewards_bonus)

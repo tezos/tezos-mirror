@@ -27,7 +27,7 @@
 
 val baking_reward_fixed_portion : Raw_context.t -> Tez_repr.t tzresult
 
-val baking_reward_bonus_per_slot : Raw_context.t -> Tez_repr.t tzresult
+val baking_reward_bonus_per_block : Raw_context.t -> Tez_repr.t tzresult
 
 val attesting_reward_per_slot : Raw_context.t -> Tez_repr.t tzresult
 
@@ -42,7 +42,7 @@ val vdf_revelation_tip : Raw_context.t -> Tez_repr.t tzresult
 module For_RPC : sig
   type reward_kind =
     | Baking_reward_fixed_portion
-    | Baking_reward_bonus_per_slot
+    | Baking_reward_bonus_per_block
     | Attesting_reward_per_slot
     | Dal_attesting_reward_per_shard
     | Seed_nonce_revelation_tip

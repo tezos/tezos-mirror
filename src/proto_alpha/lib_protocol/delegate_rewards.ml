@@ -74,7 +74,7 @@ let tez_from_weights
 module M = struct
   type reward_kind =
     | Baking_reward_fixed_portion
-    | Baking_reward_bonus_per_slot
+    | Baking_reward_bonus_per_block
     | Attesting_reward_per_slot
     | Dal_attesting_reward_per_shard
     | Seed_nonce_revelation_tip
@@ -89,7 +89,7 @@ module M = struct
       match reward_kind with
       | Baking_reward_fixed_portion ->
           issuance_weights.baking_reward_fixed_portion_weight
-      | Baking_reward_bonus_per_slot ->
+      | Baking_reward_bonus_per_block ->
           issuance_weights.baking_reward_bonus_weight
       | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
       | Dal_attesting_reward_per_shard ->
@@ -118,12 +118,6 @@ module M = struct
       (* Since these the "_per_slot" rewards are given per slot, they do not depend on whether
          all bakers attest or not. We can use the constants directly. *)
       (* TODO ABAAB: baking bonus and attesting rewards without slots *)
-      | Baking_reward_bonus_per_slot ->
-          let bonus_committee_size =
-            csts.consensus_committee_size - csts.consensus_threshold_size
-          in
-          if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
-          else Tez_repr.div_exn rewards bonus_committee_size
       | Attesting_reward_per_slot ->
           Tez_repr.div_exn rewards csts.consensus_committee_size
       | Dal_attesting_reward_per_shard ->
@@ -156,8 +150,8 @@ let reward_from_context ~ctxt ~reward_kind =
 let baking_reward_fixed_portion ctxt =
   reward_from_context ~ctxt ~reward_kind:Baking_reward_fixed_portion
 
-let baking_reward_bonus_per_slot ctxt =
-  reward_from_context ~ctxt ~reward_kind:Baking_reward_bonus_per_slot
+let baking_reward_bonus_per_block ctxt =
+  reward_from_context ~ctxt ~reward_kind:Baking_reward_bonus_per_block
 
 let attesting_reward_per_slot ctxt =
   reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_slot

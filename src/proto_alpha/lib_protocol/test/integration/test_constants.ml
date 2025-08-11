@@ -428,12 +428,8 @@ let () =
     Protocol.Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       constants
   in
-  let*?@ baking_reward_bonus_per_slot =
-    get_reward ~reward_kind:Baking_reward_bonus_per_slot
-  in
-  let*? baking_reward_bonus =
-    baking_reward_bonus_per_slot
-    *? Int64.of_int (constants.consensus_committee_size / 3)
+  let*?@ baking_reward_bonus =
+    get_reward ~reward_kind:Baking_reward_bonus_per_block
   in
   let*?@ baking_reward_fixed_portion =
     get_reward ~reward_kind:Baking_reward_fixed_portion

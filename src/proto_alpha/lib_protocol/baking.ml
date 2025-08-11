@@ -60,26 +60,47 @@ let () =
 
 let bonus_baking_reward ctxt level ~attestation_power =
   let open Lwt_result_syntax in
-  (* TODO ABAAB : only works if flag is false, slots are not distributed correctly *)
   let attestation_power = Attestation_power.get ctxt level attestation_power in
-  let* ctxt, consensus_threshold_size =
+  let* ctxt, consensus_threshold =
     Attestation_power.consensus_threshold ctxt level
   in
-  let*? baking_reward_bonus_per_slot =
-    Delegate.Rewards.baking_reward_bonus_per_slot ctxt
+  let* ctxt, consensus_committee =
+    Attestation_power.consensus_committee ctxt level
+  in
+  let*? baking_reward_bonus_per_block =
+    Delegate.Rewards.baking_reward_bonus_per_block ctxt
   in
   let extra_attestation_power =
-    Int64.sub attestation_power consensus_threshold_size
+    Int64.sub attestation_power consensus_threshold
   in
   let*? () =
     error_when
       Compare.Int64.(extra_attestation_power < 0L)
-      (Insufficient_attestation_power
-         {attestation_power; consensus_threshold = consensus_threshold_size})
+      (Insufficient_attestation_power {attestation_power; consensus_threshold})
   in
-  let*? reward =
-    Tez.(baking_reward_bonus_per_slot *? extra_attestation_power)
+  let max_extra_attestation_power =
+    Int64.sub consensus_committee consensus_threshold
   in
+  (* Reward computation depends on the flag. If not activated, we keep the same
+     rewards as before: division then multiplication. It activated, we have to change
+     the order of operations (because the division will always result in 0 otherwise). *)
+  let* reward =
+    if Compare.Int64.(max_extra_attestation_power <= 0L) then
+      return (Ok Tez.zero)
+    else if Attestation_power.check_all_bakers_attest_at_level ctxt level then
+      return
+      @@ Tez.mul_ratio
+           ~rounding:`Up
+           ~num:extra_attestation_power
+           ~den:max_extra_attestation_power
+           baking_reward_bonus_per_block
+    else
+      let*? part =
+        Tez.(baking_reward_bonus_per_block /? max_extra_attestation_power)
+      in
+      return Tez.(part *? extra_attestation_power)
+  in
+  let*? reward in
   return (ctxt, reward)
 
 type ordered_slots = {

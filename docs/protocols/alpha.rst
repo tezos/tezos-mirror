@@ -54,6 +54,10 @@ Breaking Changes
   ``consensus_key``, and ``companion_key`` (optional).
   (MR :gl:`!18931`)
 
+- Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
+  changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``. (MR :gl:`!18959`)
+
+
 RPC Changes
 -----------
 

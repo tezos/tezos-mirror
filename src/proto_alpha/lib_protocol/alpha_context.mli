@@ -153,6 +153,10 @@ module Tez : sig
 
   val div_exn : t -> int -> t
 
+  (** See {!Tez_repr.mul_ratio}. *)
+  val mul_ratio :
+    rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
+
   (** See {!Tez_repr.mul_percentage}. *)
   val mul_percentage : rounding:[`Down | `Up] -> t -> Percentage.t -> t
 end
@@ -2262,6 +2266,8 @@ module Attestation_power : sig
 
   val get_slots : t -> int
 
+  val check_all_bakers_attest_at_level : context -> Level.t -> bool
+
   val consensus_threshold :
     context -> Level.t -> (context * int64) tzresult Lwt.t
 
@@ -2451,7 +2457,7 @@ module Delegate : sig
   module Rewards : sig
     val baking_reward_fixed_portion : t -> Tez.t tzresult
 
-    val baking_reward_bonus_per_slot : t -> Tez.t tzresult
+    val baking_reward_bonus_per_block : t -> Tez.t tzresult
 
     val attesting_reward_per_slot : t -> Tez.t tzresult
 
@@ -2466,7 +2472,7 @@ module Delegate : sig
     module For_RPC : sig
       type reward_kind =
         | Baking_reward_fixed_portion
-        | Baking_reward_bonus_per_slot
+        | Baking_reward_bonus_per_block
         | Attesting_reward_per_slot
         | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip

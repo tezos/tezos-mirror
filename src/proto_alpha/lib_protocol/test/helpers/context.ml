@@ -288,17 +288,26 @@ let get_baking_reward_fixed_portion ctxt =
 
 let get_bonus_reward ctxt ~attesting_power =
   let open Lwt_result_wrap_syntax in
-  let* {Constants.parametric = {consensus_threshold_size; _} as csts; _} =
+  let* {
+         Constants.parametric =
+           {consensus_threshold_size; consensus_committee_size; _} as csts;
+         _;
+       } =
     get_constants ctxt
   in
   (* TODO ABAAB: will depend on level/feature flag *)
-  let*?@ baking_reward_bonus_per_slot =
+  let*?@ baking_reward_bonus_per_block =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
-      ~reward_kind:Baking_reward_bonus_per_slot
+      ~reward_kind:Baking_reward_bonus_per_block
   in
-  let multiplier = max 0 (attesting_power - consensus_threshold_size) in
-  return Tez_helpers.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
+  let multiplier =
+    max 0 (attesting_power - consensus_threshold_size) |> Int64.of_int
+  in
+  let den =
+    consensus_committee_size - consensus_threshold_size |> Int64.of_int
+  in
+  return Tez_helpers.(baking_reward_bonus_per_block /! den *! multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
   let open Lwt_result_wrap_syntax in
