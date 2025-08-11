@@ -122,6 +122,8 @@ pub enum TransferError {
     FailedToFetchContractStorage,
     #[error("Failed to fetch destination balance")]
     FailedToFetchDestinationBalance,
+    #[error("Failed to fetch sender balance")]
+    FailedToFetchSenderBalance,
     #[error("Failed to update contract storage")]
     FailedToUpdateContractStorage,
     #[error("Failed to update destination balance")]
