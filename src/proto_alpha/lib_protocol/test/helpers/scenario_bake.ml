@@ -153,12 +153,7 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
             else Cycle.succ current_cycle
           in
           let deactivated =
-            match account.last_seen_activity with
-            | None -> assert false (* delegates have a minimum activity cycle *)
-            | Some activity_cycle ->
-                Cycle.(
-                  add activity_cycle state.constants.tolerated_inactivity_period)
-                < ctxt_cycle
+            Scenario_activity.is_inactive state.constants ctxt_cycle account
           in
           let*! r3 =
             Assert.equal_bool ~loc:__LOC__ deactivated deactivated_rpc

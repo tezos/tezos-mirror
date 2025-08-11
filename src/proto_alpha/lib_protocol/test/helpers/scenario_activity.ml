@@ -8,11 +8,22 @@
 open State_account
 open State
 
+let is_inactive constants current_activity_cycle account =
+  let tolerated_inactivity_period =
+    constants
+      .Protocol.Alpha_context.Constants.Parametric.tolerated_inactivity_period
+  in
+  match account.last_seen_activity with
+  | None -> assert false (* delegates have a minimum activity cycle *)
+  | Some last_seen_activity_cycle ->
+      Cycle.(
+        add last_seen_activity_cycle tolerated_inactivity_period
+        < current_activity_cycle)
+
 let update_activity_account constants current_activity_cycle account =
   let consensus_rights_delay =
     constants.Protocol.Alpha_context.Constants.Parametric.consensus_rights_delay
   in
-  let tolerated_inactivity_period = constants.tolerated_inactivity_period in
   let last_seen_activity =
     (* When a delegate is initialized or reactivated (either from
        [set_delegate] or participating in the consensus again), we put
@@ -22,11 +33,8 @@ let update_activity_account constants current_activity_cycle account =
     | None -> Cycle.add current_activity_cycle consensus_rights_delay
     | Some last_seen_activity_cycle ->
         let updated =
-          if
-            Cycle.(
-              add last_seen_activity_cycle tolerated_inactivity_period
-              < current_activity_cycle)
-          then Cycle.add current_activity_cycle consensus_rights_delay
+          if is_inactive constants current_activity_cycle account then
+            Cycle.add current_activity_cycle consensus_rights_delay
           else current_activity_cycle
         in
         Cycle.max last_seen_activity_cycle updated
