@@ -96,9 +96,7 @@ depends: [
   "duration" {= "0.2.1"}
   "dyn" {= "3.19.1"}
   "eio" {= "1.2"}
-  "eio_linux" {= "1.2"}
   "eio_main" {= "1.2"}
-  "eio_posix" {= "1.2"}
   "either" {= "1.0.0"}
   "eqaf" {= "0.10"}
   "ezgzip" {= "0.2.3"}
@@ -266,7 +264,6 @@ depends: [
   "unstrctrd" {= "0.4"}
   "uri" {= "4.4.0"}
   "uri-sexp" {= "4.4.0"}
-  "uring" {= "0.9"}
   "uucp" {= "16.0.0"}
   "uuidm" {= "0.9.10"}
   "uuseg" {= "16.0.0"}

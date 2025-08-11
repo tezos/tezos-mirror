@@ -116,12 +116,23 @@ opam lock opam/virtual/octez-deps.opam
 
 # Starting with `ocaml/opam-repository` commit hash
 # 0b240d2960133fd3d8aa8f008d7aa79534caa3b9, ocaml-base-compiler now explicitly
-# depends on system libraries. We need to remove them from our lockfile,
-# otherwise they won’t be portable.
+# depends on system libraries.
 # See https://github.com/ocaml/opam-repository/commit/0b240d2960133fd3d8aa8f008d7aa79534caa3b9
+# Similarly, since we rely on eio_main, our dependencies tree contain system
+# dependent libraries (e.g, on Linux, we use uring).
+#
+# Having these system-dependent libraries listed in our lock file make this
+# lock file system-dependent as well. Fortunately, lock files are not close
+# sets of dependencies we are allowed to use, but rather subsets of
+# dependencies we are obligated to install. By dropping system-dependent
+# dependencies from the lock file, we basically defer to Opam the choice to
+# pick the most suited one, ensuring our lock file is portable.
 ed -s octez-deps.opam.locked << EOF
 g/host-arch-/d
 g/host-system-/d
+g/eio_linux/d
+g/eio_posix/d
+g/uring/d
 w
 EOF
 
