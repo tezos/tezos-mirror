@@ -6,10 +6,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let data_dir_element = Sigs.data_dir_element
-
-module Lwt = Lwt_metrics
-module Unix = Unix_metrics
-
-(** Default to Lwt implementation (not compatible with OCaml5 domains). *)
-include Lwt
+include Sigs.S with type 'a monad := 'a Lwt.t
