@@ -96,6 +96,16 @@ pub(crate) trait PrecompileDatabase: Database {
     fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
 }
 
+macro_rules! abort_on_error {
+    ($obj:expr, $expr:expr, $msg:expr) => {
+        if let Err(err) = $expr {
+            $obj.abort();
+            log!($obj.host, LogError, "{} error: {err:?}", $msg);
+            return;
+        }
+    };
+}
+
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     pub fn commit_status(&self) -> bool {
         *self.commit_status
@@ -127,14 +137,11 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         match self.get_or_create_account(address) {
             Ok(mut storage_account) => match account_state {
                 AccountState::Touched((info, storage)) => {
-                    if let Err(err) = storage_account.set_info(self.host, info) {
-                        self.abort();
-                        log!(
-                            self.host,
-                            LogError,
-                            "DatabaseCommit `set_info` error: {err:?}"
-                        );
-                    }
+                    abort_on_error!(
+                        self,
+                        storage_account.set_info(self.host, info),
+                        "DatabaseCommit `set_info`"
+                    );
 
                     for (
                         key,
@@ -146,48 +153,33 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
                     ) in storage
                     {
                         if original_value != present_value {
-                            if let Err(err) = storage_account.set_storage(
-                                self.host,
-                                &key,
-                                &present_value,
-                            ) {
-                                self.abort();
-                                log!(
+                            abort_on_error!(
+                                self,
+                                storage_account.set_storage(
                                     self.host,
-                                    LogError,
-                                    "DatabaseCommit `set_storage` error: {err:?}"
-                                );
-                            }
+                                    &key,
+                                    &present_value,
+                                ),
+                                "DatabaseCommit `set_storage`"
+                            );
                         }
                     }
                 }
                 AccountState::SelfDestructed(code_hash) => {
-                    if let Err(err) = storage_account.clear_info(self.host, &code_hash) {
-                        self.abort();
-                        log!(
-                            self.host,
-                            LogError,
-                            "DatabaseCommit `clear_info` error: {err:?}"
-                        );
-                    }
-
-                    if let Err(err) = storage_account.clear_storage(self.host) {
-                        self.abort();
-                        log!(
-                            self.host,
-                            LogError,
-                            "DatabaseCommit `clear_storage` error: {err:?}"
-                        );
-                    }
+                    abort_on_error!(
+                        self,
+                        storage_account.clear_info(self.host, &code_hash),
+                        "DatabaseCommit `clear_info`"
+                    );
+                    abort_on_error!(
+                        self,
+                        storage_account.clear_storage(self.host),
+                        "DatabaseCommit `clear_storage`"
+                    );
                 }
             },
-            Err(err) => {
-                self.abort();
-                log!(
-                    self.host,
-                    LogError,
-                    "DatabaseCommit `get_or_create_account` error: {err:?}"
-                )
+            error => {
+                abort_on_error!(self, error, "DatabaseCommit `get_or_create_account`")
             }
         }
     }
@@ -195,8 +187,6 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 
 impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
     fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error> {
-        // TODO: get_account function should be implemented whenever errors are
-        // reintroduced
         self.world_state_handler
             .get_or_create(self.host, &account_path(&address)?)
             .map_err(|err| Error::Custom(err.to_string()))
@@ -294,7 +284,7 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 
     fn block_hash(&mut self, number: u64) -> Result<B256, Self::Error> {
         // return 0 when block number not in valid range
-        // Ref. https://www.evm.codes/?fork=cancun#40 (opcode 0x40)
+        // Ref. https://www.evm.codes/?fork=prague#40 (opcode 0x40)
 
         match self.block.number.checked_sub(number.into()) {
             Some(block_diff)
