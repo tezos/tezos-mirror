@@ -108,35 +108,69 @@ type ordered_slots = {
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
+  attestation_power : int64;
 }
 
 (* Slots returned by this function are assumed by consumers to be in increasing
    order, hence the use of [Slot.Range.rev_fold_es]. *)
 let attesting_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
+  let all_bakers_attest_enabled =
+    Attestation_power.check_all_bakers_attest_at_level ctxt level
+  in
   let open Lwt_result_syntax in
+  let* ctxt, _, delegates = Stake_distribution.stake_info ctxt level in
+  let* attesting_power_map =
+    List.fold_left_es
+      (fun acc_map ((consensus_pk : Consensus_key.pk), power) ->
+        let acc_map =
+          Signature.Public_key_hash.Map.add consensus_pk.delegate power acc_map
+        in
+        return acc_map)
+      Signature.Public_key_hash.Map.empty
+      delegates
+  in
   let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
-  Slot.Range.rev_fold_es
-    (fun (ctxt, map) slot ->
-      let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
-      let map =
-        Signature.Public_key_hash.Map.update
-          consensus_pk.delegate
-          (function
-            | None ->
-                Some
-                  {
-                    delegate = consensus_pk.delegate;
-                    consensus_key = consensus_pk.consensus_pkh;
-                    companion_key = consensus_pk.companion_pkh;
-                    slots = [slot];
-                  }
-            | Some slots -> Some {slots with slots = slot :: slots.slots})
-          map
-      in
-      return (ctxt, map))
-    (ctxt, Signature.Public_key_hash.Map.empty)
-    slots
+  let* ctxt, map =
+    Slot.Range.rev_fold_es
+      (fun (ctxt, map) slot ->
+        let* ctxt, consensus_pk =
+          Stake_distribution.slot_owner ctxt level slot
+        in
+        let map =
+          Signature.Public_key_hash.Map.update
+            consensus_pk.delegate
+            (function
+              | None ->
+                  Some
+                    {
+                      delegate = consensus_pk.delegate;
+                      consensus_key = consensus_pk.consensus_pkh;
+                      companion_key = consensus_pk.companion_pkh;
+                      slots = [slot];
+                      attestation_power = 0L;
+                      (* Updated after, once all the slots are attributed *)
+                    }
+              | Some slots -> Some {slots with slots = slot :: slots.slots})
+            map
+        in
+        return (ctxt, map))
+      (ctxt, Signature.Public_key_hash.Map.empty)
+      slots
+  in
+  let map =
+    Signature.Public_key_hash.Map.map
+      (fun ({slots; delegate; _} as t) ->
+        if all_bakers_attest_enabled then
+          let attestation_power =
+            Option.value ~default:0L
+            @@ Signature.Public_key_hash.Map.find delegate attesting_power_map
+          in
+          {t with attestation_power}
+        else {t with attestation_power = List.length slots |> Int64.of_int})
+      map
+  in
+  return (ctxt, map)
 
 let incr_slot att_rights =
   let one = Attestation_power.make ~slots:1 ~stake:0L in

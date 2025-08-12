@@ -1016,7 +1016,6 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
   return new_state
 
 let prepare_waiting_for_quorum state =
-  (* TODO ABAAB *)
   let consensus_threshold =
     Delegate_slots.consensus_threshold state.level_state.delegate_slots
   in

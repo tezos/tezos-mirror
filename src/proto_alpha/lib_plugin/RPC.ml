@@ -3984,6 +3984,7 @@ module Validators = struct
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
     slots : Slot.t list;
+    attestation_power : int64;
   }
 
   type t = {
@@ -3996,15 +3997,16 @@ module Validators = struct
   let delegate_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; companion_key; slots} ->
-        (delegate, slots, consensus_key, companion_key))
-      (fun (delegate, slots, consensus_key, companion_key) ->
-        {delegate; consensus_key; companion_key; slots})
-      (obj4
+      (fun {delegate; consensus_key; companion_key; slots; attestation_power} ->
+        (delegate, slots, consensus_key, companion_key, attestation_power))
+      (fun (delegate, slots, consensus_key, companion_key, attestation_power) ->
+        {delegate; consensus_key; companion_key; slots; attestation_power})
+      (obj5
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "slots" (list Slot.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
-         (opt "companion_key" Bls.Public_key_hash.encoding))
+         (opt "companion_key" Bls.Public_key_hash.encoding)
+         (req "attestation_power" int64))
 
   let encoding =
     let open Data_encoding in
@@ -4061,19 +4063,29 @@ module Validators = struct
 
   let attestation_slots_at_level ctxt level =
     let open Lwt_result_syntax in
-    let+ ctxt, rights = Baking.attesting_rights ctxt level in
+    let* ctxt, rights = Baking.attesting_rights ctxt level in
     let aggregate_attestation = Constants.aggregate_attestation ctxt in
-    ( ctxt,
-      Signature.Public_key_hash.Map.fold
-        (fun _pkh {Baking.delegate; consensus_key; companion_key; slots} acc ->
-          let companion_key =
-            match consensus_key with
-            | Bls _ when aggregate_attestation -> companion_key
-            | _ -> None
-          in
-          {delegate; consensus_key; companion_key; slots} :: acc)
-        rights
-        [] )
+    return
+      ( ctxt,
+        Signature.Public_key_hash.Map.fold
+          (fun _pkh
+               {
+                 Baking.delegate;
+                 consensus_key;
+                 companion_key;
+                 slots;
+                 attestation_power;
+               }
+               acc ->
+            let companion_key =
+              match consensus_key with
+              | Bls _ when aggregate_attestation -> companion_key
+              | _ -> None
+            in
+            {delegate; consensus_key; companion_key; slots; attestation_power}
+            :: acc)
+          rights
+          [] )
 
   let register () =
     let open Lwt_result_syntax in

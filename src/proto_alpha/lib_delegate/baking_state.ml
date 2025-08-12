@@ -127,7 +127,7 @@ module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 type delegate_slot = {
   delegate : Delegate.t;
   first_slot : Slot.t;
-  attesting_power : int;
+  attesting_power : int64;
 }
 
 module Delegate_slots = struct
@@ -138,7 +138,7 @@ module Delegate_slots = struct
         (* This map cannot have as keys just the first slot of delegates,
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
-    all_delegate_voting_power : int SlotMap.t;
+    all_delegate_voting_power : int64 SlotMap.t;
         (* This is a map having as keys the first slot of all delegates, and as
            values their attesting power.
            This map contains just the first slot for a delegate, because it is
@@ -169,9 +169,8 @@ module Delegate_slots = struct
     in
     return @@ SlotMap.find slot slots.own_delegate_slots
 
-  (* TODO ABAAB: get the correct voting power *)
   let voting_power slots ~slot =
-    Option.map Int64.of_int @@ SlotMap.find slot slots.all_delegate_voting_power
+    SlotMap.find slot slots.all_delegate_voting_power
 
   let consensus_threshold {consensus_threshold; _} = consensus_threshold
 
@@ -957,9 +956,11 @@ let delegate_slots attesting_rights delegates =
              all_delegate_voting_power ) =
         Lwt_list.fold_left_s
           (fun (own_list, own_map, all_map) validator ->
-            let {Plugin.RPC.Validators.slots; _} = validator in
+            let {Plugin.RPC.Validators.slots; attestation_power; _} =
+              validator
+            in
             let first_slot = Stdlib.List.hd slots in
-            let attesting_power = List.length slots in
+            let attesting_power = attestation_power in
             let all_map = SlotMap.add first_slot attesting_power all_map in
             let* own_list, own_map =
               let* delegate_opt = Delegate.of_validator ~known_keys validator in
@@ -1173,7 +1174,7 @@ let pp_elected_block fmt {proposal; attestation_qc} =
 let pp_delegate_slot fmt {delegate; first_slot; attesting_power} =
   Format.fprintf
     fmt
-    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %d"
+    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %Ld"
     Slot.pp
     first_slot
     Delegate.pp
@@ -1196,20 +1197,21 @@ let delegate_slots_for_pp delegate_slot_map =
   |> SlotMap.map (fun {attester; all_slots} ->
          {attester; all_slots = List.rev all_slots})
 
-let pp_delegate_slots fmt Delegate_slots.{own_delegate_slots; _} =
+let pp_delegate_slots fmt (Delegate_slots.{own_delegate_slots; _} as t) =
   Format.fprintf
     fmt
     "@[<v>%a@]"
     Format.(
       pp_print_list
         ~pp_sep:pp_print_cut
-        (fun fmt (_first_slot, {attester; all_slots}) ->
+        (fun fmt (first_slot, {attester; all_slots}) ->
           Format.fprintf
             fmt
-            "attester: %a, power: %d, first 10 slots: %a"
+            "attester: %a, power: %Ld, first 10 slots: %a"
             Delegate.pp
             attester
-            (List.length all_slots)
+            (Option.value ~default:0L
+            @@ Delegate_slots.voting_power t ~slot:first_slot)
             (Format.pp_print_list
                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
                Slot.pp)

@@ -52,7 +52,9 @@ Breaking Changes
   of validators for that level. Each element of this last
   list contains the fields present in the previous version of this RPC: ``delegate``, ``slots``,
   ``consensus_key``, and ``companion_key`` (optional).
-  (MR :gl:`!18931`)
+  Also include a new field for delegates, ``attestation_power``, with their attestation power
+  for the level.
+  (MR :gl:`!18931`, :gl:`!18959`)
 
 - Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
   changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``, and

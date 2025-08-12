@@ -38,6 +38,7 @@ type ordered_slots = private {
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
+  attestation_power : int64;
 }
 
 (** For a given level computes who has the right to include an attestation in

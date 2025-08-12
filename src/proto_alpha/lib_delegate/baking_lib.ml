@@ -348,7 +348,6 @@ let propose_at_next_level ~minimal_timestamp state =
 
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
-  (* TODO ABAAB *)
   let consensus_threshold =
     Delegate_slots.consensus_threshold state.level_state.delegate_slots
   in

@@ -32,7 +32,7 @@ open Baking_state_types
 type delegate_slot = {
   delegate : Delegate.t;
   first_slot : Slot.t;
-  attesting_power : int;
+  attesting_power : int64;
 }
 
 val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
