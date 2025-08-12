@@ -275,7 +275,7 @@ pub fn transfer_external<Host: Runtime>(
     src_account: &mut TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
-    parameter: Option<Parameter>,
+    parameter: &Option<Parameter>,
 ) -> Result<TransferSuccess, TransferError> {
     log!(
         host,
@@ -291,10 +291,10 @@ pub fn transfer_external<Host: Runtime>(
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
-            param.entrypoint,
+            &param.entrypoint,
             Micheline::decode_raw(&parser.arena, &param.value)?,
         ),
-        None => (Entrypoint::default(), Micheline::from(())),
+        None => (&Entrypoint::default(), Micheline::from(())),
     };
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
@@ -306,7 +306,7 @@ pub fn transfer_external<Host: Runtime>(
         src_account,
         amount,
         dest,
-        &entrypoint,
+        entrypoint,
         value,
         &parser,
         &mut ctx,
@@ -669,7 +669,7 @@ fn apply_operation<Host: Runtime>(
                 source_account,
                 amount,
                 destination,
-                parameters.clone(),
+                parameters,
             ) {
                 Ok(res) => {
                     let transfer_result = TransferTarget::ToContrat(res);
