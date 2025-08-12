@@ -101,7 +101,7 @@ odoc:
 
 .PHONY: odoc-lite
 odoc-lite:
-	$(MAKE) odoc-raw slim_mode=on odoc_errors=true
+	$(MAKE) odoc-raw slim_mode=on odoc_errors=false
 
 .PHONY: odoc-raw
 odoc-raw:
