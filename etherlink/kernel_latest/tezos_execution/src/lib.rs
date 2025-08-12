@@ -4,6 +4,7 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
+use address::generate_kt1;
 use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
@@ -21,7 +22,10 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
-use tezos_tezlink::operation_result::{produce_skipped_receipt, TransferTarget};
+use tezos_tezlink::operation_result::{
+    produce_skipped_receipt, Originated, OriginationError, OriginationSuccess,
+    TransferTarget,
+};
 use tezos_tezlink::{
     operation::{
         verify_signature, ManagerOperation, ManagerOperationContent, OperationContent,
@@ -37,6 +41,7 @@ use validate::{validate_individual_operation, ValidationInfo};
 
 extern crate alloc;
 pub mod account_storage;
+mod address;
 pub mod context;
 mod validate;
 
@@ -331,6 +336,25 @@ pub fn transfer_external<Host: Runtime>(
         &parser,
         &mut ctx,
     )
+}
+
+/// Originate a contract deployed by the public key hash given in parameter. For now
+/// the origination is not correctly implemented.
+fn originate_contract<Host: Runtime>(
+    _host: &mut Host,
+    src: &PublicKeyHash,
+) -> Result<OriginationSuccess, OriginationError> {
+    // Generate a simple KT1 address depending on the source of the operation
+    let contract = generate_kt1(src)?;
+    let dummy_origination_sucess = OriginationSuccess {
+        balance_updates: vec![],
+        originated_contracts: vec![Originated { contract }],
+        consumed_gas: 0u64.into(),
+        storage_size: 0u64.into(),
+        paid_storage_size_diff: 0u64.into(),
+        lazy_storage_diff: None,
+    };
+    Ok(dummy_origination_sucess)
 }
 
 /// Prepares balance updates when accounting fees in the format expected by the Tezos operation.
@@ -707,6 +731,17 @@ fn apply_operation<Host: Runtime>(
                     )
                 }
             }
+        }
+        OperationContent::Origination(_) => {
+            let origination_result = originate_contract(host, source);
+            let manager_result = produce_operation_result(
+                balance_updates.to_vec(),
+                origination_result.map_err(|e| e.into()),
+            );
+            (
+                OperationResultSum::Origination(manager_result),
+                source_balance.clone(),
+            )
         }
     }
 }

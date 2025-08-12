@@ -8,6 +8,7 @@
 /// In Tezlink, operation is equivalent to manager operation because there is no other type of operation that interests us.
 use nom::error::ParseError;
 use std::fmt::Debug;
+use tezos_crypto_rs::hash::ContractKt1Hash;
 use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
@@ -131,6 +132,12 @@ pub enum TransferError {
     MirAddressUnsupportedError,
 }
 
+#[derive(Error, Debug, PartialEq, Eq, NomReader, Clone)]
+pub enum OriginationError {
+    #[error("Fail to generate KT1 hash: {0}")]
+    FailToGenerateKT1(String),
+}
+
 impl From<mir::serializer::DecodeError> for TransferError {
     fn from(err: mir::serializer::DecodeError) -> Self {
         Self::MichelineDecodeError(err.to_string())
@@ -155,6 +162,8 @@ pub enum ApplyOperationError {
     Reveal(#[from] RevealError),
     #[error("Transfer error: {0}")]
     Transfer(#[from] TransferError),
+    #[error("Origination error: {0}")]
+    Origination(#[from] OriginationError),
     #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
 }
@@ -245,12 +254,20 @@ pub struct Reveal;
 #[derive(PartialEq, Debug, Clone)]
 pub struct Transfer;
 
+/// Empty struct to implement [OperationKind] trait for Origination
+#[derive(PartialEq, Debug, Clone)]
+pub struct Origination;
+
 impl OperationKind for Transfer {
     type Success = TransferTarget;
 }
 
 impl OperationKind for Reveal {
     type Success = RevealSuccess;
+}
+
+impl OperationKind for Origination {
+    type Success = OriginationSuccess;
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
@@ -278,6 +295,65 @@ impl NomReader<'_> for Empty {
     fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
         Ok((input, Self))
     }
+}
+
+// alpha.contract_id.originated (22 bytes, 8-bit tag)
+// **************************************************
+//
+// Originated (tag 1)
+// ==================
+//
+// +---------------+----------+------------------------+
+// | Name          | Size     | Contents               |
+// +===============+==========+========================+
+// | Tag           | 1 byte   | unsigned 8-bit integer |
+// +---------------+----------+------------------------+
+// | Contract_hash | 20 bytes | bytes                  |
+// +---------------+----------+------------------------+
+// | padding       | 1 byte   | padding                |
+// +---------------+----------+------------------------+
+//
+// The encoding of the alpha.contract_id.originated type is the same as
+// the one implemented in the kernel_sdk Contract. However, this type
+// cannot be an implicit account. Therefore, we created a new type that
+// only holds a KT1. The new type reuses the existing functions.
+#[derive(PartialEq, Debug, Clone)]
+pub struct Originated {
+    pub contract: ContractKt1Hash,
+}
+
+impl BinWriter for Originated {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
+        let contract = Contract::Originated(self.contract.clone());
+        contract.bin_write(output)
+    }
+}
+
+impl NomReader<'_> for Originated {
+    fn nom_read(input: &'_ [u8]) -> tezos_nom::NomResult<'_, Self> {
+        let (input, contract) = Contract::nom_read(input)?;
+        match contract {
+            Contract::Originated(kt1h) => Ok((input, Originated { contract: kt1h })),
+            Contract::Implicit(_) => Err(nom::Err::Error(DecodeError::from_error_kind(
+                input,
+                nom::error::ErrorKind::Fail,
+            ))),
+        }
+    }
+}
+
+// Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
+#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+pub struct OriginationSuccess {
+    #[encoding(dynamic, list)]
+    pub balance_updates: Vec<BalanceUpdate>,
+    #[encoding(dynamic, list)]
+    pub originated_contracts: Vec<Originated>,
+    pub consumed_gas: Narith,
+    pub storage_size: Narith,
+    pub paid_storage_size_diff: Narith,
+    // TODO: Placeholder for lazy storage diff issue : #8018
+    pub lazy_storage_diff: Option<()>,
 }
 
 #[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
@@ -335,6 +411,8 @@ pub enum Balance {
     // the tag 1 doesn't exist
     #[encoding(tag = 2)]
     BlockFees,
+    #[encoding(tag = 11)]
+    StorageFees,
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
@@ -368,6 +446,7 @@ pub struct OperationResult<M: OperationKind> {
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
     Transfer(OperationResult<Transfer>),
+    Origination(OperationResult<Origination>),
 }
 
 pub fn is_applied(res: &OperationResultSum) -> bool {
@@ -376,6 +455,9 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
             matches!(op_res.result, ContentResult::Applied(_))
         }
         OperationResultSum::Transfer(op_res) => {
+            matches!(op_res.result, ContentResult::Applied(_))
+        }
+        OperationResultSum::Origination(op_res) => {
             matches!(op_res.result, ContentResult::Applied(_))
         }
     }
@@ -396,6 +478,13 @@ pub fn transform_result_backtrack(op: OperationResultSum) -> OperationResultSum 
                 other => other,
             };
             OperationResultSum::Transfer(op_result)
+        }
+        OperationResultSum::Origination(mut op_result) => {
+            op_result.result = match op_result.result {
+                ContentResult::Applied(success) => ContentResult::BackTracked(success),
+                other => other,
+            };
+            OperationResultSum::Origination(op_result)
         }
     }
 }
@@ -427,6 +516,9 @@ pub fn produce_skipped_receipt(
         }
         OperationContent::Transfer(_) => {
             OperationResultSum::Transfer(produce_skipped_result())
+        }
+        OperationContent::Origination(_) => {
+            OperationResultSum::Origination(produce_skipped_result())
         }
     }
 }
@@ -469,6 +561,10 @@ impl NomReader<'_> for OperationWithMetadata {
                 let (input, receipt) = OperationResult::<Reveal>::nom_read(input)?;
                 (input, OperationResultSum::Reveal(receipt))
             }
+            ManagerOperationContent::Origination(_) => {
+                let (input, receipt) = OperationResult::<Origination>::nom_read(input)?;
+                (input, OperationResultSum::Origination(receipt))
+            }
         };
         Ok((input, Self { content, receipt }))
     }
@@ -480,6 +576,7 @@ impl BinWriter for OperationWithMetadata {
         match &self.receipt {
             OperationResultSum::Transfer(receipt) => receipt.bin_write(output),
             OperationResultSum::Reveal(receipt) => receipt.bin_write(output),
+            OperationResultSum::Origination(receipt) => receipt.bin_write(output),
         }
     }
 }
@@ -487,7 +584,7 @@ impl BinWriter for OperationWithMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operation::{ManagerOperation, TransferContent};
+    use crate::operation::{ManagerOperation, OriginationContent, TransferContent};
     use pretty_assertions::assert_eq;
 
     fn dummy_failed_operation() -> OperationDataAndMetadata {
@@ -567,6 +664,58 @@ mod tests {
                 })
     }
 
+    fn simple_origination_operation() -> OperationDataAndMetadata {
+        OperationDataAndMetadata::OperationWithMetadata(
+            OperationBatchWithMetadata {
+               operations: vec![OperationWithMetadata {
+                   content: ManagerOperationContent::Origination(ManagerOperation { source: PublicKeyHash::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap(), fee: 343.into(), counter: 1.into(), gas_limit: 679.into(), storage_limit: 323.into(),
+                   operation: OriginationContent {
+                    balance: 1000000_u64.into(),
+                    delegate: None,
+                    /*
+                    octez-client convert script "
+                              parameter string;
+                              storage string;
+                              code { CAR; NIL operation; PAIR }
+                            " from Michelson to binary
+                     */
+                    script: crate::operation::Script { code: hex::decode(
+                        "02000000170500036805010368050202000000080316053d036d0342",
+                    )
+                    .unwrap(), storage: hex::decode(
+                        "010000000568656c6c6f",
+                    )
+                    .unwrap() } } }),
+                   receipt:
+                    OperationResultSum::Origination(
+                        OperationResult {
+                            balance_updates:vec![BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -343, update_origin: UpdateOrigin::BlockApplication }, BalanceUpdate { balance: Balance::BlockFees , changes: 343, update_origin: UpdateOrigin::BlockApplication }],
+                            result: ContentResult::Applied(
+                                OriginationSuccess{
+                                    balance_updates:vec![
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -11500, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::StorageFees, changes: 11500, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -64250, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::StorageFees, changes: 64250, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx").unwrap()) , changes: -1000000, update_origin: UpdateOrigin::BlockApplication },
+                                        BalanceUpdate { balance: Balance::Account(Contract::from_b58check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()) , changes: 1000000, update_origin: UpdateOrigin::BlockApplication },
+                                    ],
+                                    originated_contracts:vec![Originated {contract: ContractKt1Hash::from_base58_check("KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe").unwrap()}],
+                                    consumed_gas:578755_u64.into(),
+                                    storage_size:46_u64.into(),
+                                    paid_storage_size_diff:46_u64.into(),
+                                    lazy_storage_diff: None,
+                                }),
+                            internal_operation_results: vec![]
+                        })
+                    }
+               ],
+               signature:  UnknownSignature::from_base58_check(
+                   "sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"
+               ).unwrap(),
+           })
+    }
+
     #[test]
     fn test_operation_with_metadata_rlp_roundtrip() {
         let operation_and_receipt = dummy_test_result_operation();
@@ -590,16 +739,15 @@ mod tests {
     }
 
     // The operation with metadata below is produced by using the following command:
-    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from
-    '{"contents":
-        [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-          "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
-          "amount":"42000000","destination":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-          "metadata":{"balance_updates":[],
-          "operation_result":{"status":"applied",
-          "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-42000000","origin":"block"},{"kind":"contract","contract":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN","change":"42000000","origin":"block"}],
-          "consumed_milligas":"2169000"}}}],
-          "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
+    /* octez-codec encode 022-PsRiotum.operation.data_and_metadata from '{"contents":
+    [{"kind":"transaction","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee":"468","counter":"1","gas_limit":"2169","storage_limit":"0",
+      "amount":"42000000","destination":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
+      "metadata":{"balance_updates":[],
+      "operation_result":{"status":"applied",
+      "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-42000000","origin":"block"},{"kind":"contract","contract":"tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN","change":"42000000","origin":"block"}],
+      "consumed_milligas":"2169000"}}}],
+      "signature":"sigPc9gwEse2o5nsicnNeWLjLgoMbEGumXw7PErAkMMa1asXVKRq43RPd7TnUKYwuHmejxEu15XTyV1iKGiaa8akFHK7CCEF"}' */
     #[test]
     fn tezos_compatibility_for_successful_operation_with_metadata() {
         let mut output = vec![];
@@ -607,6 +755,39 @@ mod tests {
             .bin_write(output.as_mut())
             .expect("Operation with metadata should be encodable");
         let operation_and_receipt_bytes = "00000000966c0002298c03ed7d454a101eb7022bc95f7e5f41ac78d40301f9100080bd83140000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000000000000004000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffd7f218000000000e7670f32038107a59a2b9cfefae36ea21f5aa63c000000000280de80000000000000000000a8b1840100000000000000000c5e6f3021d6effcc1b99d918a3db6dd4820893f076386fb9c85bf62f497870936898e970901e5f8b3e41a8eb0aa1a578811c110415c01719e6ed2dc6e96bb0a";
+
+        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+    }
+
+    // The operation with metadata below is produced by using the following command:
+    /* octez-codec encode 023-PtSeouLo.operation.data_and_metadata from '{"contents":
+    [{"kind":"origination","source":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
+      "fee":"343","counter":"1","gas_limit":"679","storage_limit":"323",
+      "balance":"1000000",
+      "script":{"code":[
+        {"prim":"parameter","args":[{"prim":"string"}]},
+        {"prim":"storage","args":[{"prim":"string"}]},
+        {"prim":"code","args":[[{"prim":"CAR"},{"prim":"NIL","args":[{"prim":"operation"}]},{"prim":"PAIR"}]]}],
+      "storage":{"string":"hello"}},
+      "metadata":
+        {"balance_updates":[
+        {"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-343","origin":"block"},
+        {"kind":"accumulator","category":"block fees","change":"343","origin":"block"}],
+         "operation_result":{
+            "status":"applied",
+            "balance_updates":[{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-11500","origin":"block"},{"kind":"burned","category":"storage fees","change":"11500","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-64250","origin":"block"},{"kind":"burned","category":"storage fees","change":"64250","origin":"block"},{"kind":"contract","contract":"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx","change":"-1000000","origin":"block"},{"kind":"contract","contract":"KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe","change":"1000000","origin":"block"}],
+            "originated_contracts":["KT1WcSvmiwJqDUm6cKEFjGVizXVSMujq5Kfe"],
+            "consumed_milligas":"578755",
+            "storage_size":"46",
+            "paid_storage_size_diff":"46"}}}],
+            "signature":"sigjUkDaz4jjfp7EvsPGryCBoGKZ1B3FiAn4kX9adpwmcKUEpobhkNJjbYqjxB1mgBe7wGGGQp4T8MPzithFpbBMCN2L5RUa"}' */
+    #[test]
+    fn tezos_compatibility_for_successful_origination_with_metadata() {
+        let mut output = vec![];
+        simple_origination_operation()
+            .bin_write(output.as_mut())
+            .expect("Operation with metadata should be encodable");
+        let operation_and_receipt_bytes = "000000013a6d0002298c03ed7d454a101eb7022bc95f7e5f41ac78d70201a705c302c0843d000000001c02000000170500036805010368050202000000080316053d036d03420000000a010000000568656c6c6f0000002a00000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffffffea90002000000000000015700000000009400000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffffd314000b0000000000002cec0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78ffffffffffff0506000b000000000000fafa0000000002298c03ed7d454a101eb7022bc95f7e5f41ac78fffffffffff0bdc0000001f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b0000000000000f4240000000001601f1a40a8574cf5dd73ddaa5c3a4eabad41e64ae0b00c3a9232e2e0000000000a443d5393c979c3685198d8fb754bfd9bd59c4c96423fc3928cfcf9742921c7b0490057599fa9367cc74d6bcb5c0004adcf69037e655779642e1b94586544a00";
 
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
