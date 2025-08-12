@@ -95,7 +95,12 @@ let jobs pipeline_type =
       ~name
       ~stage:Stages.images
       ~variables:
-        (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
+        (variables
+           ~kind:"systemd-tests"
+           [
+             ("DISTRIBUTION", distribution);
+             ("BASE_IMAGE", "${DISTRIBUTION}:${RELEASE}");
+           ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [
@@ -123,7 +128,12 @@ let jobs pipeline_type =
       ~__POS__
       ~name
       ~stage:Stages.images
-      ~variables:(variables [("DISTRIBUTION", distribution)])
+      ~variables:
+        (variables
+           [
+             ("DISTRIBUTION", distribution);
+             ("BASE_IMAGE", "${DISTRIBUTION}:${RELEASE}");
+           ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [

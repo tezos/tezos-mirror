@@ -54,6 +54,7 @@ oc.docker-build-rockylinux-dependencies:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
+    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:
@@ -84,6 +85,7 @@ oc.docker-systemd-tests-rpm-rockylinux:
     DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
+    BASE_IMAGE: ${DISTRIBUTION}:${RELEASE}
   parallel:
     matrix:
     - RELEASE:

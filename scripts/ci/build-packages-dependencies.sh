@@ -26,6 +26,8 @@ gcp | gcp_dev | gcp_high_cpu | gcp_very_high_cpu | gcp_very_high_cpu_ramfs | gcp
 esac
 
 LOCAL_IMAGE_NAME="$DEP_IMAGE:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}"
+# Set as a variable in the job definition
+BASE_IMAGE="${BASE_IMAGE:?Must set base image to run this script}"
 
 docker build \
   --network host \
@@ -38,8 +40,7 @@ docker build \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
   -f "$DOCKERFILE" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
-  --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
-  --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
+  --build-arg IMAGE="${BASE_IMAGE}" \
   --build-arg OPAM_VERSION="${opam_version}" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
   --cache-from="${DEP_IMAGE_PROTECTED}:master" \

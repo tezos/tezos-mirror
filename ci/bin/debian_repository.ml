@@ -90,6 +90,23 @@ let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ~variables
     script
 
+module Deb_base_images = struct
+  let debian_bookworm =
+    Image.mk_external
+      ~image_path:
+        "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm"
+
+  let ubuntu_noble =
+    Image.mk_external
+      ~image_path:
+        "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble"
+
+  let ubuntu_jammy =
+    Image.mk_external
+      ~image_path:
+        "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:jammy"
+end
+
 (* The entire Debian packages pipeline. When [pipeline_type] is [Before_merging]
    we test only on Debian stable. Returns a triplet, the first element is
    the list of all jobs, the second is the job building ubuntu packages artifats
@@ -113,7 +130,14 @@ let jobs pipeline_type =
       ~name
       ~stage:Stages.images
       ~variables:
-        (variables ~kind:"systemd-tests" [("DISTRIBUTION", distribution)])
+        (variables
+           ~kind:"systemd-tests"
+           [
+             ("DISTRIBUTION", distribution);
+             ( "BASE_IMAGE",
+               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$DISTRIBUTION:$RELEASE"
+             );
+           ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [
@@ -142,7 +166,14 @@ let jobs pipeline_type =
       ~__POS__
       ~name
       ~stage:Stages.images
-      ~variables:(variables [("DISTRIBUTION", distribution)])
+      ~variables:
+        (variables
+           [
+             ("DISTRIBUTION", distribution);
+             ( "BASE_IMAGE",
+               "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/${DISTRIBUTION}:${RELEASE}"
+             );
+           ])
       ~parallel:(Matrix matrix)
       ~tag:Dynamic
       [
@@ -256,7 +287,7 @@ let jobs pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.debian_bookworm
+      ~image:Deb_base_images.debian_bookworm
       ["./scripts/ci/create_debian_repo.sh debian bookworm"]
   in
   let job_apt_repo_ubuntu =
@@ -272,7 +303,7 @@ let jobs pipeline_type =
            ])
       ~variables:(archs_variables pipeline_type)
       ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
-      ~image:Images.ubuntu_noble
+      ~image:Deb_base_images.ubuntu_noble
       ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
   in
   (* These test the installability of the old packages *)
@@ -329,21 +360,21 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.lintian_ubuntu"
         ~dependencies:(Dependent [Artifacts job_build_ubuntu_package])
-        ~image:Images.ubuntu_noble
+        ~image:Deb_base_images.ubuntu_noble
         ["./scripts/ci/lintian_debian_packages.sh ubuntu jammy noble"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubunty_jammy"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.ubuntu_jammy
+        ~image:Deb_base_images.ubuntu_jammy
         ["./docs/introduction/install-bin-deb.sh ubuntu jammy"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_ubunty_noble"
         ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~variables:[("PREFIX", "")]
-        ~image:Images.ubuntu_noble
+        ~image:Deb_base_images.ubuntu_noble
         ["./docs/introduction/install-bin-deb.sh ubuntu noble"];
       job_install_systemd_bin
         ~__POS__
@@ -410,14 +441,14 @@ let jobs pipeline_type =
         ~__POS__
         ~name:"oc.lintian_debian"
         ~dependencies:(Dependent [Artifacts job_build_debian_package])
-        ~image:Images.debian_bookworm
+        ~image:Deb_base_images.debian_bookworm
         ["./scripts/ci/lintian_debian_packages.sh debian bookworm"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm"
         ~dependencies:(Dependent [Job job_apt_repo_debian])
         ~variables:[("PREFIX", "")]
-        ~image:Images.debian_bookworm
+        ~image:Deb_base_images.debian_bookworm
         ["./docs/introduction/install-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
