@@ -407,6 +407,19 @@ pub enum ContentResult<M: OperationKind> {
     BackTracked(M::Success),
 }
 
+impl<M: OperationKind> ContentResult<M> {
+    pub fn backtrack_if_applied(&mut self) {
+        if let ContentResult::Applied(_) = self {
+            // Lowkey optimisation: takes the ownership of the content result by replacing
+            // the result with Skipped as a place holder
+            let current_content_result = std::mem::replace(self, ContentResult::Skipped);
+            if let ContentResult::Applied(success) = current_content_result {
+                *self = ContentResult::BackTracked(success);
+            }
+        }
+    }
+}
+
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
@@ -449,6 +462,7 @@ pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, bytes)]
     pub internal_operation_results: Vec<u8>,
 }
+
 #[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
     Reveal(OperationResult<RevealContent>),
@@ -456,41 +470,32 @@ pub enum OperationResultSum {
     Origination(OperationResult<OriginationContent>),
 }
 
-pub fn is_applied(res: &OperationResultSum) -> bool {
-    match res {
-        OperationResultSum::Reveal(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
-        }
-        OperationResultSum::Transfer(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
-        }
-        OperationResultSum::Origination(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
-        }
-    }
-}
-
-fn backtrack_if_applied<T: OperationKind>(result: &mut ContentResult<T>) {
-    if let ContentResult::Applied(_) = result {
-        // Lowkey optimisation: takes the ownership of the content result by replacing
-        // the result with Skipped as a place holder
-        let current_content_result = std::mem::replace(result, ContentResult::Skipped);
-        if let ContentResult::Applied(success) = current_content_result {
-            *result = ContentResult::BackTracked(success);
+impl OperationResultSum {
+    pub fn is_applied(&self) -> bool {
+        match self {
+            OperationResultSum::Reveal(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            OperationResultSum::Transfer(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            OperationResultSum::Origination(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
         }
     }
-}
 
-pub fn transform_result_backtrack(op: &mut OperationResultSum) {
-    match op {
-        OperationResultSum::Transfer(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
-        }
-        OperationResultSum::Reveal(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
-        }
-        OperationResultSum::Origination(op_result) => {
-            backtrack_if_applied(&mut op_result.result);
+    pub fn transform_result_backtrack(&mut self) {
+        match self {
+            OperationResultSum::Transfer(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
+            OperationResultSum::Reveal(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
+            OperationResultSum::Origination(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
         }
     }
 }

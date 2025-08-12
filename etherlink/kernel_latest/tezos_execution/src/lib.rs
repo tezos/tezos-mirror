@@ -30,9 +30,9 @@ use tezos_tezlink::{
         TransferContent,
     },
     operation_result::{
-        is_applied, produce_operation_result, transform_result_backtrack, Balance,
-        BalanceTooLow, BalanceUpdate, OperationError, OperationResultSum, RevealError,
-        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin, ValidityError,
+        produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
+        OperationResultSum, RevealError, RevealSuccess, TransferError, TransferSuccess,
+        UpdateOrigin, ValidityError,
     },
 };
 use validate::{validate_individual_operation, ValidationInfo};
@@ -600,7 +600,7 @@ fn apply_batch<Host: Runtime>(
             )
         };
 
-        if first_failure.is_none() && !is_applied(&receipt) {
+        if first_failure.is_none() && !receipt.is_applied() {
             first_failure = Some(index);
         }
 
@@ -610,7 +610,7 @@ fn apply_batch<Host: Runtime>(
     if let Some(failure_idx) = first_failure {
         receipts[..failure_idx]
             .iter_mut()
-            .for_each(transform_result_backtrack);
+            .for_each(OperationResultSum::transform_result_backtrack);
         return (receipts, false);
     }
 
