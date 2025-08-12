@@ -15,6 +15,7 @@ type t = {
   index : Irmin_context.ro_index;
   finalized_view : bool;
   block_storage_sqlite3 : bool;
+  execution_pool : Lwt_domain.pool;
 }
 
 (** [load ~data_dir configuration] creates a new read-only handler on the
@@ -27,6 +28,7 @@ type t = {
     If [network] is set, the function performs additional sanity checks to
     ensure its local context is consistent with the expected network. *)
 val load :
+  pool:Lwt_domain.pool ->
   ?network:Configuration.supported_network ->
   ?smart_rollup_address:Address.t ->
   data_dir:string ->

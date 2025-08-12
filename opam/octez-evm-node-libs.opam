@@ -19,6 +19,7 @@ depends: [
   "octez-libs"
   "lwt_log"
   "octez-l2-libs"
+  "octez-lwt-domain"
   "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }
@@ -37,7 +38,6 @@ depends: [
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"
   "octez-performance-metrics"
-  "octez-lwt-domain"
 ]
 conflicts: [
   "websocket"

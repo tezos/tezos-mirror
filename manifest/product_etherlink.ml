@@ -124,6 +124,7 @@ let wasm_runtime_callbacks =
         octez_base_unix;
         octez_layer2_irmin_context |> open_;
         Product_cohttp.cohttp_lwt_unix;
+        lwt_domain;
         opentelemetry_lwt;
       ]
 

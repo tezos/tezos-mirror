@@ -43,14 +43,14 @@ module Impl = struct
   let read_durable_value tree key =
     let open Lwt_result_syntax in
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main @@ fun () ->
+    Lwt_domain.run_in_main @@ fun () ->
     let* vec = Vector.get tree key in
     let*! bytes = Vector.load_all vec in
     return (Bytes.unsafe_of_string bytes)
 
   let store_delete tree key is_value =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let key = if is_value then key @ ["@"] else key in
         let+ tree = Irmin_context.Tree.remove tree key in
@@ -59,7 +59,7 @@ module Impl = struct
   let store_copy tree key1 key2 =
     Key_parser.with_key key1 @@ fun key1 ->
     Key_parser.with_key key2 @@ fun key2 ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let* subtree = Irmin_context.Tree.find_tree tree key1 in
         match subtree with
@@ -71,7 +71,7 @@ module Impl = struct
   let store_move tree key1 key2 =
     Key_parser.with_key key1 @@ fun key1 ->
     Key_parser.with_key key2 @@ fun key2 ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let* subtree = Irmin_context.Tree.find_tree tree key1 in
         match subtree with
@@ -83,7 +83,7 @@ module Impl = struct
 
   let mem_tree tree key =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let+ exists = Irmin_context.Tree.mem_tree tree key in
         Ok exists)
@@ -98,7 +98,7 @@ module Impl = struct
 
   let store_has tree key =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let* value_exists = Irmin_context.Tree.mem_tree tree (key @ ["@"]) in
         let* num_subtrees = Irmin_context.Tree.length tree key in
@@ -112,8 +112,7 @@ module Impl = struct
   let store_get_hash tree key =
     Key_parser.with_key key @@ fun key ->
     let findee =
-      Lwt_preemptive.run_in_main (fun () ->
-          Irmin_context.Tree.find_tree tree key)
+      Lwt_domain.run_in_main (fun () -> Irmin_context.Tree.find_tree tree key)
     in
     match findee with
     | Some tree -> Ok (Irmin_context.Tree.hash tree |> Context_hash.to_bytes)
@@ -121,28 +120,28 @@ module Impl = struct
 
   let store_list_size tree key =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let+ len = Irmin_context.Tree.length tree key in
         Ok len)
 
   let store_value_size tree key =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main @@ fun () ->
+    Lwt_domain.run_in_main @@ fun () ->
     let open Lwt_result_syntax in
     let* vec = Vector.get tree key in
     Vector.length vec
 
   let store_read tree key offset num_bytes =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main @@ fun () ->
+    Lwt_domain.run_in_main @@ fun () ->
     let open Lwt_result_syntax in
     let* vector = Vector.get tree key in
     Vector.load_bytes vector ~offset ~num_bytes
 
   let store_write (tree : Irmin_context.tree) key offset bytes =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main @@ fun () ->
+    Lwt_domain.run_in_main @@ fun () ->
     let open Lwt_result_syntax in
     let* vector = Vector.get ~create_if_absent:true tree key in
     let* vector = Vector.write_bytes vector offset bytes in
@@ -151,7 +150,7 @@ module Impl = struct
 
   let store_write_all (tree : Irmin_context.tree) key bytes =
     Key_parser.with_key key @@ fun key ->
-    Lwt_preemptive.run_in_main @@ fun () ->
+    Lwt_domain.run_in_main @@ fun () ->
     let open Lwt_result_syntax in
     let*! vector = Vector.empty () in
     let* vector = Vector.write_bytes vector 0 bytes in
@@ -161,14 +160,14 @@ module Impl = struct
   let reboot_flag = Key_parser.key_of_string_exn "/durable/kernel/env/reboot"
 
   let check_reboot_flag tree =
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let* exists = Irmin_context.Tree.mem_tree tree reboot_flag in
         let+ tree = Irmin_context.Tree.remove tree reboot_flag in
         (exists, tree))
 
   let fetch_preimage_from_remote preimages_endpoint hash_hex =
-    Lwt_preemptive.run_in_main (fun () ->
+    Lwt_domain.run_in_main (fun () ->
         let open Lwt_syntax in
         let preimages_endpoint = Uri.of_string preimages_endpoint in
         let url =

@@ -25,6 +25,8 @@ let z_typ = Check.(convert Z.to_int64 int64)
 
 let expect_ok msg = function Ok x -> x | Error _err -> Test.fail msg
 
+let pool = Lwt_domain.setup_pool 1
+
 let test_wasm_runtime_id () =
   register ~title:"test wasm_runtime_run" @@ fun () ->
   Log.info "Initialize the tree" ;
@@ -38,6 +40,7 @@ let test_wasm_runtime_id () =
   Log.info "Run kernel_run" ;
   let* tree =
     Wasm_runtime.run
+      ~pool
       ~preimages_dir:Temp.(dir "wasm_2_0_0")
       ~entrypoint:"kernel_run"
       ~native_execution:true

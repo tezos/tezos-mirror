@@ -32,7 +32,7 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
+let execute ~pool ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
     ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
@@ -111,6 +111,7 @@ let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
                 match Seq.uncons inbox with Some (x, _) -> x | _ -> []
               in
               Wasm_runtime.run
+                ~pool
                 ?l1_timestamp:execution_timestamp
                 ~preimages_dir:config.preimage_directory
                 ?preimages_endpoint:config.preimage_endpoint
@@ -250,38 +251,8 @@ let current_block_hash ~chain_family evm_state =
   | Some h -> return (decode_block_hash h)
   | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
-(* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
-   dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
-   event loop the resolutions of host functions (notably interacting with
-   Irmin) (`Lwt_preemptive.run_in_main`).
-
-   This means that parallel executions of the Etherlink kernel using the Fast
-   Execution engine competes for the access of the event loop. In practice, it
-   means it is possible for an attacker to slow down block production through
-   RPC calls leading to execute the Etherlink kernel (typically,
-   `eth_estimateGas`).
-
-   Under the hood, `Lwt_preemptive` relies on a pool of 4 workers (implemented
-   using native threads). With this patch, we ensure 1 of these workers is
-   always available to the block production, by limiting the concurrent call to
-   `execute_and_inspect` to 3. *)
-let pool = Lwt_pool.create 3 (fun () -> Lwt.return_unit)
-
-(** Instruments the pool with a few metrics: when adding a callback to the
-    waiting queue we instrument the callback to track how long it stays in the
-    queue before being executed. *)
-let add_callback_to_queue pool callback =
-  Metrics.set_simulation_queue_size (Lwt_pool.wait_queue_length pool) ;
-  let arrival_time = Tezos_base.Time.System.now () in
-  (* instrumenting callback and adding to queue *)
-  Lwt_pool.use pool @@ fun () ->
-  let exec_time = Tezos_base.Time.System.now () in
-  let time_waiting = Ptime.diff exec_time arrival_time in
-  Metrics.inc_time_waiting time_waiting ;
-  callback ()
-
-let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
-    ~native_execution_policy
+let execute_and_inspect ~pool ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint
+    ~config ~native_execution_policy
     ~input:
       Simulation.Encodings.
         {messages; insight_requests; log_kernel_debug_file; _} ctxt =
@@ -303,8 +274,8 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
   (* Messages from simulation requests are already valid inputs. *)
   let messages = List.map (fun s -> `Input s) messages in
   let* evm_state =
-    add_callback_to_queue pool @@ fun () ->
     execute
+      ~pool
       ~native_execution
       ?wasm_pvm_fallback
       ~kind:Simulation
@@ -358,7 +329,7 @@ type apply_result =
     }
   | Apply_failure
 
-let apply_unsigned_chunks ?wasm_pvm_fallback ?log_file ?profile ~data_dir
+let apply_unsigned_chunks ~pool ?wasm_pvm_fallback ?log_file ?profile ~data_dir
     ~chain_family ~config ~native_execution_policy evm_state
     (chunks : Sequencer_blueprint.unsigned_chunk list) =
   let open Lwt_result_syntax in
@@ -372,6 +343,7 @@ let apply_unsigned_chunks ?wasm_pvm_fallback ?log_file ?profile ~data_dir
   in
   let* evm_state =
     execute
+      ~pool
       ~native_execution:(native_execution_policy = Configuration.Always)
       ?wasm_pvm_fallback
       ?profile
@@ -431,9 +403,9 @@ let storage_version state = Durable_storage.storage_version (read state)
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
-let preload_kernel evm_state =
+let preload_kernel ~pool evm_state =
   let open Lwt_syntax in
-  let* loaded = Wasm_runtime.preload_kernel evm_state in
+  let* loaded = Wasm_runtime.preload_kernel ~pool evm_state in
   if loaded then
     let* version = kernel_version evm_state in
     Events.preload_kernel version
