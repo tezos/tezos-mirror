@@ -2459,7 +2459,7 @@ module Delegate : sig
 
     val baking_reward_bonus_per_block : t -> Tez.t tzresult
 
-    val attesting_reward_per_slot : t -> Tez.t tzresult
+    val attesting_reward_per_block : t -> Tez.t tzresult
 
     val dal_attesting_reward_per_shard : t -> Tez.t tzresult
 
@@ -2473,7 +2473,7 @@ module Delegate : sig
       type reward_kind =
         | Baking_reward_fixed_portion
         | Baking_reward_bonus_per_block
-        | Attesting_reward_per_slot
+        | Attesting_reward_per_block
         | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
@@ -5285,6 +5285,11 @@ module Stake_distribution : sig
 
   val slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
+
+  val stake_info_for_cycle :
+    context ->
+    Cycle.t ->
+    (context * Int64.t * (Consensus_key.pk * Int64.t) list) tzresult Lwt.t
 
   val stake_info :
     context ->

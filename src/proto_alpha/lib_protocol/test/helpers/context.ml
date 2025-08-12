@@ -310,16 +310,19 @@ let get_bonus_reward ctxt ~attesting_power =
   return Tez_helpers.(baking_reward_bonus_per_block /! den *! multiplier)
 
 let get_attesting_reward ctxt ~expected_attesting_power =
+  (* TODO ABAAB: will depend on level/feature flag *)
   let open Lwt_result_wrap_syntax in
   let* {Constants.parametric = csts; _} = get_constants ctxt in
-  let*?@ attesting_reward_per_slot =
+  let*?@ attesting_reward_per_block =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts
-      ~reward_kind:Attesting_reward_per_slot
+      ~reward_kind:Attesting_reward_per_block
   in
   let*?@ t =
-    Tez.(attesting_reward_per_slot *? Int64.of_int expected_attesting_power)
+    Tez.(
+      attesting_reward_per_block /? Int64.of_int csts.consensus_committee_size)
   in
+  let*?@ t = Tez.(t *? Int64.of_int expected_attesting_power) in
   return t
 
 let get_liquidity_baking_subsidy ctxt =

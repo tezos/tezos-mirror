@@ -203,10 +203,15 @@ let test_participation_rpc () =
     expected_cycle_activity * numerator / denominator
   in
   let allowed_missed_slots = expected_cycle_activity - minimal_cycle_activity in
-  let*?@ attesting_reward_per_slot =
+  let*?@ attesting_reward_per_block =
     Alpha_context.Delegate.Rewards.For_RPC.reward_from_constants
       csts.parametric
-      ~reward_kind:Attesting_reward_per_slot
+      ~reward_kind:Attesting_reward_per_block
+  in
+  let attesting_reward_per_slot =
+    Tez_helpers.(
+      attesting_reward_per_block
+      /! Int64.of_int csts.parametric.consensus_committee_size)
   in
   let expected_attesting_rewards =
     Tez_helpers.(

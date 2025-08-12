@@ -30,14 +30,14 @@
     This module is responsible for maintaining the
     {!Storage.Contract.Missed_attestations} table.  *)
 
-(** Computes the number of validator slots that a delegate is expected to be
-    allocated during a cycle. This number is proportional to its active stake
-    wrt total active stake. *)
-val expected_slots_for_given_active_stake :
+(** Computes the total rewards over a cycle for a given portion of the stake *)
+val attestation_rewards_per_cycle :
   Raw_context.t ->
+  all_bakers_attest_enabled:bool ->
   total_active_stake_weight:int64 ->
   active_stake_weight:int64 ->
-  int
+  rewards_per_block:Tez_repr.t ->
+  Tez_repr.t tzresult
 
 (** Computes the number of DAL shards that a delegate is expected to be
     allocated during a cycle per DAL slot. This number is proportional to its

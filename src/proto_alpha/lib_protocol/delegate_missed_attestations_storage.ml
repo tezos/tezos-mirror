@@ -43,6 +43,38 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake_weight
           (Z.of_int number_of_attestations_per_cycle))
        (Z.of_int64 total_active_stake_weight))
 
+(* The rewards depend on the flag status. In essence, the rewards should be about
+   the same, but a bit more accurate since we don't quantize with slots.
+   We also round up to ensure all attesters get rewarded, even if their stake
+   is incredibly low. *)
+let attestation_rewards_per_cycle ctxt ~all_bakers_attest_enabled
+    ~total_active_stake_weight ~active_stake_weight ~rewards_per_block =
+  let open Result_syntax in
+  let* rewards =
+    if all_bakers_attest_enabled then
+      let blocks_per_cycle =
+        Z.of_int32 (Constants_storage.blocks_per_cycle ctxt)
+      in
+      let num = Z.(mul (of_int64 active_stake_weight) blocks_per_cycle) in
+      let den = Z.of_int64 total_active_stake_weight in
+      Tez_repr.mul_ratio_z ~rounding:`Up ~num ~den rewards_per_block
+    else
+      let consensus_committee_size =
+        Constants_storage.consensus_committee_size ctxt
+      in
+      let rewards_per_slot =
+        Tez_repr.div_exn rewards_per_block consensus_committee_size
+      in
+      let expected_slots =
+        expected_slots_for_given_active_stake
+          ctxt
+          ~total_active_stake_weight
+          ~active_stake_weight
+      in
+      return Tez_repr.(mul_exn rewards_per_slot expected_slots)
+  in
+  return rewards
+
 let expected_dal_shards_per_slot_for_given_active_stake ctxt
     ~total_active_stake_weight ~active_stake_weight =
   let blocks_per_cycle =
@@ -289,14 +321,11 @@ module For_RPC = struct
             expected_attesting_rewards = Tez_repr.zero;
           }
     | Some active_stake ->
-        let* total_active_stake =
-          Stake_storage.get_total_active_stake ctxt level.cycle
+        let* ctxt, total_active_stake_weight, _ =
+          Delegate_sampler.stake_info ctxt level
         in
+        let active_stake_weight = Stake_repr.staking_weight active_stake in
         let expected_cycle_activity =
-          let active_stake_weight = Stake_repr.staking_weight active_stake in
-          let total_active_stake_weight =
-            Stake_repr.staking_weight total_active_stake
-          in
           expected_slots_for_given_active_stake
             ctxt
             ~total_active_stake_weight
@@ -305,8 +334,13 @@ module For_RPC = struct
         let Ratio_repr.{numerator; denominator} =
           Constants_storage.minimal_participation_ratio ctxt
         in
-        let*? attesting_reward_per_slot =
-          Delegate_rewards.attesting_reward_per_slot ctxt
+        let*? rewards_per_block =
+          Delegate_rewards.attesting_reward_per_block ctxt
+        in
+        let all_bakers_attest_enabled =
+          Consensus_parameters_storage.check_all_bakers_attest_at_level
+            ctxt
+            level
         in
         let minimal_cycle_activity =
           expected_cycle_activity * numerator / denominator
@@ -314,8 +348,13 @@ module For_RPC = struct
         let maximal_cycle_inactivity =
           expected_cycle_activity - minimal_cycle_activity
         in
-        let expected_attesting_rewards =
-          Tez_repr.mul_exn attesting_reward_per_slot expected_cycle_activity
+        let*? expected_attesting_rewards =
+          attestation_rewards_per_cycle
+            ctxt
+            ~all_bakers_attest_enabled
+            ~total_active_stake_weight
+            ~active_stake_weight
+            ~rewards_per_block
         in
         let contract = Contract_repr.Implicit delegate in
         let* missed_attestations =

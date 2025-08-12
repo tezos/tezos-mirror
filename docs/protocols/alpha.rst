@@ -55,7 +55,8 @@ Breaking Changes
   (MR :gl:`!18931`)
 
 - Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
-  changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``. (MR :gl:`!18959`)
+  changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``, and
+  ``attesting_reward_per_slot`` with ``ættesting_reward_per_block``. (MR :gl:`!18959`)
 
 
 RPC Changes

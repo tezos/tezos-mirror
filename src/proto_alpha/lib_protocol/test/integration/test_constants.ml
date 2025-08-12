@@ -435,11 +435,8 @@ let () =
     get_reward ~reward_kind:Baking_reward_fixed_portion
   in
   let*? baking_rewards = baking_reward_fixed_portion +? baking_reward_bonus in
-  let*?@ attesting_reward_per_slot =
-    get_reward ~reward_kind:Attesting_reward_per_slot
-  in
-  let*? validators_rewards =
-    attesting_reward_per_slot *? Int64.of_int constants.consensus_committee_size
+  let*?@ validators_rewards =
+    get_reward ~reward_kind:Attesting_reward_per_block
   in
   let*?@ dal_attesting_reward_per_shard =
     get_reward ~reward_kind:Dal_attesting_reward_per_shard

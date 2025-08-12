@@ -75,7 +75,7 @@ module M = struct
   type reward_kind =
     | Baking_reward_fixed_portion
     | Baking_reward_bonus_per_block
-    | Attesting_reward_per_slot
+    | Attesting_reward_per_block
     | Dal_attesting_reward_per_shard
     | Seed_nonce_revelation_tip
     | Vdf_revelation_tip
@@ -91,7 +91,7 @@ module M = struct
           issuance_weights.baking_reward_fixed_portion_weight
       | Baking_reward_bonus_per_block ->
           issuance_weights.baking_reward_bonus_weight
-      | Attesting_reward_per_slot -> issuance_weights.attesting_reward_weight
+      | Attesting_reward_per_block -> issuance_weights.attesting_reward_weight
       | Dal_attesting_reward_per_shard ->
           if dal_incentives_enabled then issuance_weights.dal_rewards_weight
           else 0
@@ -115,16 +115,14 @@ module M = struct
     in
     let base_rewards =
       match reward_kind with
-      (* Since these the "_per_slot" rewards are given per slot, they do not depend on whether
-         all bakers attest or not. We can use the constants directly. *)
-      (* TODO ABAAB: baking bonus and attesting rewards without slots *)
-      | Attesting_reward_per_slot ->
-          Tez_repr.div_exn rewards csts.consensus_committee_size
       | Dal_attesting_reward_per_shard ->
           Tez_repr.div_exn
             rewards
             csts.dal.cryptobox_parameters.number_of_shards
-      | _ -> rewards
+      | Baking_reward_fixed_portion | Baking_reward_bonus_per_block
+      | Attesting_reward_per_block | Seed_nonce_revelation_tip
+      | Vdf_revelation_tip ->
+          rewards
     in
     Tez_repr.mul_q ~rounding:`Down base_rewards coeff
 
@@ -153,8 +151,8 @@ let baking_reward_fixed_portion ctxt =
 let baking_reward_bonus_per_block ctxt =
   reward_from_context ~ctxt ~reward_kind:Baking_reward_bonus_per_block
 
-let attesting_reward_per_slot ctxt =
-  reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_slot
+let attesting_reward_per_block ctxt =
+  reward_from_context ~ctxt ~reward_kind:Attesting_reward_per_block
 
 let dal_attesting_reward_per_shard ctxt =
   reward_from_context ~ctxt ~reward_kind:Dal_attesting_reward_per_shard
