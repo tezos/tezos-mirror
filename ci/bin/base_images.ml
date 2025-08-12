@@ -34,7 +34,11 @@ let jobs =
       ~name
       ~stage:Stages.images
       ~variables
-      ~rules:[job_rule ~changes:(Changeset.encode changes) ~when_:On_success ()]
+      ~rules:
+        [
+          job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
+          job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
+        ]
       ~parallel:(Matrix matrix)
       ~tag:Gcp_very_high_cpu
       [script]
