@@ -134,6 +134,8 @@ pub enum TransferError {
     FailedToUpdateDestinationBalance,
     #[error("Apply operation failed because of an unsupported address error")]
     MirAddressUnsupportedError,
+    #[error("Failed to execute internal operation: {0}")]
+    FailedToExecuteInternalOperation(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
@@ -170,6 +172,8 @@ pub enum ApplyOperationError {
     Origination(#[from] OriginationError),
     #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
+    #[error("Internal operation nonce overflow due to {0}")]
+    InternalOperationNonceOverflow(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -395,6 +399,14 @@ impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
     }
 }
 
+impl From<ApplyOperationError> for ApplyOperationErrors {
+    fn from(value: ApplyOperationError) -> Self {
+        ApplyOperationErrors {
+            errors: vec![value],
+        }
+    }
+}
+
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
@@ -532,17 +544,29 @@ impl OperationResultSum {
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, ApplyOperationError>,
+    internal_operation_results: Vec<InternalOperationSum>,
 ) -> OperationResult<M> {
     match result {
-        Ok(success) => OperationResult {
-            balance_updates,
-            result: ContentResult::Applied(success),
-            internal_operation_results: vec![],
-        },
+        Ok(success) => {
+            let all_internal_succeded = internal_operation_results
+                .last()
+                .is_none_or(InternalOperationSum::is_applied);
+            OperationResult {
+                balance_updates,
+                result: if all_internal_succeded {
+                    ContentResult::Applied(success)
+                } else {
+                    ContentResult::BackTracked(
+                        success, // If internal operations failed, we backtrack the main operation result
+                    )
+                },
+                internal_operation_results,
+            }
+        }
         Err(operation_error) => OperationResult {
             balance_updates,
             result: ContentResult::Failed(vec![operation_error].into()),
-            internal_operation_results: vec![],
+            internal_operation_results,
         },
     }
 }

@@ -21,8 +21,9 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, ApplyOperationError, Originated, OriginationError,
-    OriginationSuccess, TransferTarget,
+    produce_skipped_receipt, ApplyOperationError, ContentResult,
+    InternalContentWithMetadata, InternalOperationSum, Originated, OriginationSuccess,
+    TransferTarget,
 };
 use tezos_tezlink::{
     operation::{
@@ -31,8 +32,8 @@ use tezos_tezlink::{
     },
     operation_result::{
         produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
-        OperationResultSum, RevealError, RevealSuccess, TransferError, TransferSuccess,
-        UpdateOrigin, ValidityError,
+        OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
+        TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
 use validate::{validate_individual_operation, ValidationInfo};
@@ -132,8 +133,10 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_account: &mut TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<(), ApplyOperationError> {
-    for internal_op in internal_operations {
+    let mut failed = None;
+    for (index, internal_op) in internal_operations.into_iter().enumerate() {
         log!(
             host,
             Debug,
@@ -148,31 +151,89 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                transfer(
-                    host,
-                    context,
-                    sender_contract,
-                    sender_account,
-                    &amount,
-                    &dest_contract,
-                    &destination_address.entrypoint,
-                    param.into_micheline_optimized_legacy(&parser.arena),
-                    parser,
-                    ctx,
-                )
+                let value = param.into_micheline_optimized_legacy(&parser.arena);
+                let encoded_value = value.encode();
+                let content = TransferContent {
+                    amount,
+                    destination: dest_contract,
+                    parameters: Some(Parameter {
+                        entrypoint: destination_address.entrypoint,
+                        value: encoded_value,
+                    }),
+                };
+                let nonce = ctx.get_operation_counter().try_into().map_err(
+                    |err: std::num::TryFromIntError| {
+                        ApplyOperationError::InternalOperationNonceOverflow(
+                            err.to_string(),
+                        )
+                    },
+                )?;
+                if failed.is_some() {
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        content,
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: ContentResult::Skipped,
+                    })
+                } else {
+                    let receipt = transfer(
+                        host,
+                        context,
+                        sender_contract,
+                        sender_account,
+                        &content.amount,
+                        &content.destination,
+                        content
+                            .parameters
+                            .as_ref()
+                            .map_or(&Entrypoint::default(), |param| &param.entrypoint),
+                        value,
+                        parser,
+                        ctx,
+                        all_internal_receipts,
+                    );
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        content,
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: match receipt {
+                            Ok(success) => ContentResult::Applied(success.into()),
+                            Err(err) => {
+                                failed = Some(index);
+                                ContentResult::Failed(
+                                    ApplyOperationError::from(err).into(),
+                                )
+                            }
+                        },
+                    })
+                }
             }
             _ => {
-                return Err(ApplyOperationError::UnSupportedOperation(
-                    "Unsupported internal operation".to_string(),
-                ));
+                return Err(ApplyOperationError::UnSupportedOperation(format!(
+                    "Internal operation {:?} is not supported",
+                    internal_op.operation
+                )));
             }
-        }?;
+        };
         log!(
             host,
             Debug,
             "Internal operation executed successfully: {:?}",
             internal_receipt
         );
+        all_internal_receipts.push(internal_receipt);
+    }
+    if let Some(index) = failed {
+        log!(
+            host,
+            Debug,
+            "Internal operation execution failed at index {}",
+            index
+        );
+        all_internal_receipts
+            .iter_mut()
+            .take(index)
+            .for_each(InternalOperationSum::transform_result_backtrack);
     }
     Ok(())
 }
@@ -190,6 +251,7 @@ pub fn transfer<'a, Host: Runtime>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -246,7 +308,7 @@ pub fn transfer<'a, Host: Runtime>(
             dest_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
-            let _internal_receipt = execute_internal_operations(
+            execute_internal_operations(
                 host,
                 context,
                 internal_operations,
@@ -254,7 +316,11 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut dest_account,
                 parser,
                 ctx,
-            );
+                all_internal_receipts,
+            )
+            .map_err(|err| {
+                TransferError::FailedToExecuteInternalOperation(err.to_string())
+            })?;
             log!(host, Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: Some(new_storage),
@@ -274,6 +340,7 @@ pub fn transfer_external<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         host,
@@ -308,6 +375,7 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
+        all_internal_receipts,
     )
     .map(Into::into)
 }
@@ -625,12 +693,14 @@ fn apply_operation<Host: Runtime>(
     source_account: &mut TezlinkImplicitAccount,
     balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
+    let mut internal_operations_receipts = Vec::new();
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source, source_account, pk);
             let manager_result = produce_operation_result(
                 balance_updates,
                 reveal_result.map_err(Into::into),
+                internal_operations_receipts,
             );
             OperationResultSum::Reveal(manager_result)
         }
@@ -647,10 +717,12 @@ fn apply_operation<Host: Runtime>(
                 amount,
                 destination,
                 parameters,
+                &mut internal_operations_receipts,
             );
             let manager_result = produce_operation_result(
                 balance_updates,
                 transfer_result.map_err(Into::into),
+                internal_operations_receipts,
             );
             OperationResultSum::Transfer(manager_result)
         }
@@ -659,6 +731,7 @@ fn apply_operation<Host: Runtime>(
             let manager_result = produce_operation_result(
                 balance_updates,
                 origination_result.map_err(|e| e.into()),
+                internal_operations_receipts,
             );
             OperationResultSum::Origination(manager_result)
         }
