@@ -32,7 +32,6 @@ use tezos_evm_runtime::runtime::Runtime;
 
 pub mod call_tracer;
 pub mod noop;
-pub mod plain;
 
 mod storage;
 
