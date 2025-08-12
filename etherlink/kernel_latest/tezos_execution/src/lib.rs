@@ -594,7 +594,9 @@ fn apply_batch<Host: Runtime>(
     let mut first_failure: Option<usize> = None;
     let mut receipts = Vec::with_capacity(operations.len());
 
-    for (index, content) in operations.into_iter().enumerate() {
+    for (index, (content, balance_uppdate)) in
+        operations.into_iter().zip(balance_updates).enumerate()
+    {
         log!(
             host,
             Debug,
@@ -617,7 +619,7 @@ fn apply_batch<Host: Runtime>(
                 &content,
                 &source,
                 &mut source_account,
-                &balance_updates[index],
+                balance_uppdate,
             )
         };
 
@@ -644,13 +646,13 @@ fn apply_operation<Host: Runtime>(
     content: &ManagerOperation<OperationContent>,
     source: &PublicKeyHash,
     source_account: &mut TezlinkImplicitAccount,
-    balance_updates: &[BalanceUpdate],
+    balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source, source_account, pk);
             let manager_result = produce_operation_result(
-                balance_updates.to_vec(),
+                balance_updates,
                 reveal_result.map_err(Into::into),
             );
             OperationResultSum::Reveal(manager_result)
@@ -672,14 +674,14 @@ fn apply_operation<Host: Runtime>(
                 Ok(res) => {
                     let transfer_result = TransferTarget::ToContrat(res);
                     let manager_result = produce_operation_result(
-                        balance_updates.to_vec(),
+                        balance_updates,
                         Ok(transfer_result),
                     );
                     OperationResultSum::Transfer(manager_result)
                 }
                 Err(e) => {
                     let manager_result =
-                        produce_operation_result(balance_updates.to_vec(), Err(e.into()));
+                        produce_operation_result(balance_updates, Err(e.into()));
                     OperationResultSum::Transfer(manager_result)
                 }
             }
@@ -687,7 +689,7 @@ fn apply_operation<Host: Runtime>(
         OperationContent::Origination(_) => {
             let origination_result = originate_contract(host, source);
             let manager_result = produce_operation_result(
-                balance_updates.to_vec(),
+                balance_updates,
                 origination_result.map_err(|e| e.into()),
             );
             OperationResultSum::Origination(manager_result)
