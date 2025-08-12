@@ -76,7 +76,7 @@ const BALANCE_DEFAULT_VALUE: U256 = U256::ZERO;
 const NONCE_DEFAULT_VALUE: u64 = 0;
 
 pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
-    let path_string = format!("/{:x}", address);
+    let path_string = format!("/{address:x}");
     OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
 }
 
@@ -345,7 +345,7 @@ impl StorageAccount {
     fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, Error> {
         concat(
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
-            &RefPath::assert_from(format!("/{}", withdrawal_id).as_bytes()),
+            &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
         )
     }
 

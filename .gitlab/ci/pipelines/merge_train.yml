@@ -3214,7 +3214,7 @@ oc.compile_sources_doc_bookworm:
   image: ocaml/opam:debian-12
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_tezt
   rules:
   - changes:
     - docs/introduction/compile-sources.sh

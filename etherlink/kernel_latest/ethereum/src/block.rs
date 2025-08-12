@@ -399,7 +399,7 @@ mod tests {
     fn block_encoding_roundtrip(v: EthBlock) {
         let bytes = v.to_bytes();
         let v2 = EthBlock::from_bytes(&bytes).expect("EthBlock should be decodable");
-        assert_eq!(v, v2, "Roundtrip failed on {:?}", v)
+        assert_eq!(v, v2, "Roundtrip failed on {v:?}")
     }
 
     const DUMMY_HASH: &str = "00000000000000000000000000000000";

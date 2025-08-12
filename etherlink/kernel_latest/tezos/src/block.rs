@@ -93,7 +93,7 @@ mod tests {
             .expect("Block encoding should have succeeded");
         let decoded_block =
             TezBlock::nom_read_exact(&bytes).expect("Block should be decodable");
-        assert_eq!(block, decoded_block, "Roundtrip failed on {:?}", block)
+        assert_eq!(block, decoded_block, "Roundtrip failed on {block:?}")
     }
 
     fn dummy_applied_operation() -> AppliedOperation {

@@ -205,10 +205,10 @@ fn call_trace_outcome<Host: Runtime>(
             call_trace.add_error(Some(error.clone()))
         }
         ExecutionResult::Error(ref exit_error) => {
-            call_trace.add_error(Some(format!("{:?}", exit_error).into()))
+            call_trace.add_error(Some(format!("{exit_error:?}").into()))
         }
         ExecutionResult::FatalError(ref fatal_error) => {
-            call_trace.add_error(Some(format!("{:?}", fatal_error).into()))
+            call_trace.add_error(Some(format!("{fatal_error:?}").into()))
         }
         ExecutionResult::OutOfTicks => call_trace.add_error(Some("OutOfTicks".into())),
         ExecutionResult::TransferSucceeded
@@ -243,7 +243,7 @@ fn call_trace_error<Host: Runtime>(
 
     call_trace.add_to(address);
     call_trace.add_gas(gas_limit);
-    call_trace.add_error(Some(format!("{:?}", e).into()));
+    call_trace.add_error(Some(format!("{e:?}").into()));
 
     tracer::store_call_trace(handler.host, call_trace, &transaction_hash)?;
     Ok(())
@@ -2929,8 +2929,7 @@ mod test {
         match &result.result {
             ExecutionResult::Error(ExitError::CreateCollision) => (),
             result => panic!(
-                "ExecutionResult: {:?}. Expect ExecutionResult::Error(ExitError::CreateCollision)",
-                result
+                "ExecutionResult: {result:?}. Expect ExecutionResult::Error(ExitError::CreateCollision)"
             ),
         }
     }
@@ -3026,8 +3025,7 @@ mod test {
                 assert_eq!(sub_contract_nonce, 1);
             }
             result => panic!(
-                "ExecutionResult: {:?}. Expect ExecutionResult::ContractDeployed(_)",
-                result
+                "ExecutionResult: {result:?}. Expect ExecutionResult::ContractDeployed(_)"
             ),
         }
     }
@@ -3133,8 +3131,7 @@ mod test {
                 assert_eq!(sub_contract_nonce, original_sub_nonce);
             }
             result => panic!(
-                "ExecutionResult: {:?}. Expect ExecutionResult::ContractDeployed(_)",
-                result
+                "ExecutionResult: {result:?}. Expect ExecutionResult::ContractDeployed(_)"
             ),
         }
     }
@@ -3197,8 +3194,7 @@ mod test {
         match &result.result {
             ExecutionResult::Error(ExitError::CreateCollision) => (),
             result => panic!(
-                "ExecutionResult: {:?}. Expect ExecutionResult::Error(ExitError::CreateCollision)",
-                result
+                "ExecutionResult: {result:?}. Expect ExecutionResult::Error(ExitError::CreateCollision)"
             ),
         }
     }

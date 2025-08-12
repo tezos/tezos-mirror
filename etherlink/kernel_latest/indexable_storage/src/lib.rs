@@ -87,7 +87,7 @@ impl IndexableStorage {
     }
 
     fn value_path(&self, index: u64) -> Result<OwnedPath, PathError> {
-        let index_as_path: Vec<u8> = format!("/{}", index).into();
+        let index_as_path: Vec<u8> = format!("/{index}").into();
         // The key being an integer value, it will always be valid as a path,
         // `assert_from` cannot fail.
         let index_subkey = RefPath::assert_from(&index_as_path);

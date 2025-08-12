@@ -152,7 +152,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
 {
     fn pointer_path(id: &Id, prefix: &impl Path) -> Result<OwnedPath> {
         let path = hex::encode(id);
-        let path: Vec<u8> = format!("/{}/pointer", path).into();
+        let path: Vec<u8> = format!("/{path}/pointer").into();
         let path = OwnedPath::try_from(path)?;
         let path = concat(prefix, &path)?;
         Ok(path)
@@ -168,7 +168,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
     /// Path to the data held by the pointer.
     fn data_path(&self, prefix: &impl Path) -> Result<OwnedPath> {
         let path = hex::encode(&self.id);
-        let path: Vec<u8> = format!("/{}/data", path).into();
+        let path: Vec<u8> = format!("/{path}/data").into();
         let path = OwnedPath::try_from(path)?;
         let path = concat(prefix, &path)?;
         Ok(path)
@@ -207,7 +207,7 @@ impl<Id: Decodable + Encodable + AsRef<[u8]>, Elt: Encodable + Decodable>
         prefix: &impl Path,
     ) -> Result<()> {
         let path = hex::encode(&self.id);
-        let path: Vec<u8> = format!("/{}", path).into();
+        let path: Vec<u8> = format!("/{path}").into();
         let path = OwnedPath::try_from(path)?;
         let path = concat(prefix, &path)?;
         host.store_delete(&path)

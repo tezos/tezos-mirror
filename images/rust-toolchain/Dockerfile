@@ -44,7 +44,7 @@ RUN curl https://sh.rustup.rs --silent --show-error --fail | \
 ENV PATH=/root/.cargo/bin:$PATH
 
 # install rust toolchains and compilation targets
-RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 nightly-2025-01-30 nightly-2023-12-15 && \
+RUN rustup update 1.66.0 1.73.0 1.76.0 1.78.0 1.80.1 1.84.1 1.86.0 1.88.0 nightly-2025-01-30 nightly-2023-12-15 && \
     for tc in $(rustup toolchain list | awk '{print $1}'); do \
         rustup target add --toolchain="$tc" wasm32-unknown-unknown; \
         rustup target add --toolchain="$tc" riscv64gc-unknown-none-elf; \
@@ -67,12 +67,12 @@ FROM rust-base AS rust-toolchain
 # - building the EVM kernel distributed in the tezos/tezos Docker images.
 
 # Install Taplo
-RUN cargo +1.86.0 install taplo-cli --version 0.9.3 --locked && \
+RUN cargo +1.88.0 install taplo-cli --version 0.9.3 --locked && \
     taplo --version
 
 # Install cargo-audit
-RUN cargo +1.86.0 install --locked cargo-audit --version 0.21.2 && \
+RUN cargo +1.88.0 install --locked cargo-audit --version 0.21.2 && \
     cargo audit --version
 
 # Install cargo-expand, used to test derive macros in sdk/rust/encoding-derive/
-RUN cargo +1.86.0 install cargo-expand
+RUN cargo +1.88.0 install cargo-expand

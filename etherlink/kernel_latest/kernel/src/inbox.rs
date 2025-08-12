@@ -1203,7 +1203,7 @@ mod tests {
 
     fn bytes_to_hex(bytes: &[u8]) -> String {
         bytes.iter().fold(String::new(), |mut acc, &b| {
-            write!(acc, "{:02x}", b).expect("Failed to write to string");
+            write!(acc, "{b:02x}").expect("Failed to write to string");
             acc
         })
     }
@@ -1231,19 +1231,19 @@ mod tests {
 
         let dal_slot_signal_list = DalSlotImportSignals { signals, signature };
 
-        println!("Initial dal_slot_signal_list: {:?}", dal_slot_signal_list);
+        println!("Initial dal_slot_signal_list: {dal_slot_signal_list:?}");
 
         // Encode the structure
         let encoded = rlp::encode(&dal_slot_signal_list);
         let encoded_hex = bytes_to_hex(&encoded);
 
-        println!("Encoded DAL slot signal (hex): {}", encoded_hex);
+        println!("Encoded DAL slot signal (hex): {encoded_hex}");
 
         // Decode the structure
         let decoded: DalSlotImportSignals =
             rlp::decode(&encoded).expect("RLP decoding should succeed.");
 
-        println!("Decoded dal_slot_signal_list: {:?}", decoded);
+        println!("Decoded dal_slot_signal_list: {decoded:?}");
 
         // Ensure that the encoded and decoded structures match
         assert_eq!(dal_slot_signal_list, decoded);

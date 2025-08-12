@@ -131,7 +131,7 @@ fn deposit_path(
 ) -> Result<OwnedPath, EthereumError> {
     path::concat(
         &system.custom_path(&DEPOSIT_QUEUE_TABLE)?,
-        &RefPath::assert_from(format!("/{}", withdrawal_id).as_bytes()),
+        &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
     )
     .map_err(EthereumError::from)
 }

@@ -262,7 +262,7 @@ fn generate_final_report(
             let skipped_msg = if skipped == 0 {
                 String::new()
             } else {
-                format!(" with {} test(s) skipped", skipped)
+                format!(" with {skipped} test(s) skipped")
             };
             write_out!(
                 output_file,

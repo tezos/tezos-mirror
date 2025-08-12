@@ -22,7 +22,7 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 
 fn code_hash_path(code_hash: &H256) -> Result<OwnedPath, GenStorageError> {
     let code_hash_hex = hex::encode(code_hash);
-    let code_hash_path_string = format!("/{}", code_hash_hex);
+    let code_hash_path_string = format!("/{code_hash_hex}");
     OwnedPath::try_from(code_hash_path_string).map_err(Into::into)
 }
 

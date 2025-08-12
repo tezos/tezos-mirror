@@ -1019,7 +1019,7 @@ mod tests {
         ) {
             Ok(_) => (),
             Err(e) => {
-                panic!("Block reading failed: {:?}\n", e)
+                panic!("Block reading failed: {e:?}\n")
             }
         }
     }

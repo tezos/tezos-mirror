@@ -897,7 +897,7 @@ mod test {
     }
 
     fn h256_to_string(e: H256) -> String {
-        format!("{:x}", e)
+        format!("{e:x}")
     }
 
     /// used in test to decode a string and get the size of the decoded input,

@@ -205,7 +205,7 @@ pub fn object_path(object_hash: &TransactionHash) -> Result<OwnedPath, Error> {
 }
 
 pub fn chain_config_path(chain_id: &U256) -> Result<OwnedPath, Error> {
-    let raw_chain_id_path: Vec<u8> = format!("/{}", chain_id).into();
+    let raw_chain_id_path: Vec<u8> = format!("/{chain_id}").into();
     let chain_id_path = OwnedPath::try_from(raw_chain_id_path)?;
     concat(&CHAIN_CONFIGURATIONS, &chain_id_path).map_err(Error::from)
 }
@@ -260,7 +260,7 @@ const CHUNKED_HASHES: RefPath = RefPath::assert_from(b"/chunk_hashes");
 
 pub fn chunked_transaction_path(tx_hash: &TransactionHash) -> Result<OwnedPath, Error> {
     let hash = hex::encode(tx_hash);
-    let raw_chunked_transaction_path: Vec<u8> = format!("/{}", hash).into();
+    let raw_chunked_transaction_path: Vec<u8> = format!("/{hash}").into();
     let chunked_transaction_path = OwnedPath::try_from(raw_chunked_transaction_path)?;
     concat(&CHUNKED_TRANSACTIONS, &chunked_transaction_path).map_err(Error::from)
 }
@@ -276,7 +276,7 @@ pub fn chunked_hash_transaction_path(
     chunked_transaction_path: &OwnedPath,
 ) -> Result<OwnedPath, Error> {
     let hash = hex::encode(chunked_hash);
-    let raw_chunked_hash_key: Vec<u8> = format!("/{}", hash).into();
+    let raw_chunked_hash_key: Vec<u8> = format!("/{hash}").into();
     let chunked_hash_key = OwnedPath::try_from(raw_chunked_hash_key)?;
     let chunked_hash_path = concat(&CHUNKED_HASHES, &chunked_hash_key)?;
     concat(chunked_transaction_path, &chunked_hash_path).map_err(Error::from)
@@ -286,7 +286,7 @@ pub fn transaction_chunk_path(
     chunked_transaction_path: &OwnedPath,
     i: u16,
 ) -> Result<OwnedPath, Error> {
-    let raw_i_path: Vec<u8> = format!("/{}", i).into();
+    let raw_i_path: Vec<u8> = format!("/{i}").into();
     let i_path = OwnedPath::try_from(raw_i_path)?;
     concat(chunked_transaction_path, &i_path).map_err(Error::from)
 }
@@ -918,7 +918,7 @@ pub fn read_chain_family(
     let path = concat(&chain_configurations_path, &chain_family_path)?;
     let bytes = host
         .store_read_all(&path)
-        .context(format!("Cannot read chain family for chain {}", chain_id))?;
+        .context(format!("Cannot read chain family for chain {chain_id}"))?;
     let chain_family = String::from_utf8(bytes)?;
     Ok(chain_family.into())
 }

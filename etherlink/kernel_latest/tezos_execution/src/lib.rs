@@ -1556,7 +1556,7 @@ mod tests {
         let res = validate_and_apply_operation(&mut host, &context, operation).expect(
             "validate_and_apply_operation should not have failed with a kernel error",
         );
-        println!("Result: {:?}", res);
+        println!("Result: {res:?}");
         assert_eq!(
             faucet.balance(&host).unwrap(),
             (faucet_balance - requested_amount).into()
@@ -2165,7 +2165,7 @@ mod tests {
         )
         .unwrap();
 
-        println!("{:?}", receipts);
+        println!("{receipts:?}");
 
         assert!(
             matches!(

@@ -525,7 +525,7 @@ mod tests {
             Some(260_000),
             false,
         );
-        println!("result {:?}", result);
+        println!("result {result:?}");
         assert!(result.is_ok());
         let outcome = result.unwrap();
         assert!(outcome.is_success());

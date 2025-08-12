@@ -170,7 +170,7 @@ fn migrate_to<Host: Runtime>(
             for i in 0..to_clean.as_usize() {
                 let number = current_number - i;
                 let path: Vec<u8> =
-                    format!("/evm/world_state/blocks/{}/hash", number).into();
+                    format!("/evm/world_state/blocks/{number}/hash").into();
                 let owned_path = OwnedPath::try_from(path)?;
                 host.store_delete(&owned_path)?;
             }

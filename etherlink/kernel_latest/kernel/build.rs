@@ -14,5 +14,5 @@ fn main() {
         (_, Ok(output)) => String::from_utf8(output.stdout).unwrap(),
         (None, Err(_)) => "unknown version".to_string(),
     };
-    println!("cargo:rustc-env=GIT_HASH={}", git_hash)
+    println!("cargo:rustc-env=GIT_HASH={git_hash}")
 }

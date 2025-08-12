@@ -27,7 +27,7 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 const REFERENCE_PATH: RefPath = RefPath::assert_from(b"/ref_count");
 
 fn code_hash_path(code_hash: &B256) -> Result<OwnedPath, Error> {
-    let code_hash_path_string = format!("/{:x}", code_hash);
+    let code_hash_path_string = format!("/{code_hash:x}");
     OwnedPath::try_from(code_hash_path_string)
         .map_err(|err| Error::Custom(err.to_string()))
 }
