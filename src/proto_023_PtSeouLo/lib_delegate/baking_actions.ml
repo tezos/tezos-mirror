@@ -544,16 +544,14 @@ let process_dal_rpc_result state delegate level round =
               Dal.Attestation.empty
               slots
           in
+          let dal_content = {attestation = dal_attestation} in
           let*! () =
-            let bitset_int =
-              Environment.Bitset.to_z (dal_attestation :> Environment.Bitset.t)
-            in
             Events.(
               emit
                 attach_dal_attestation
-                (delegate, bitset_int, published_level, level, round))
+                (delegate, dal_content, published_level, level, round))
           in
-          return_some {attestation = dal_attestation})
+          return_some dal_content)
 
 let may_get_dal_content state consensus_vote =
   let open Lwt_result_syntax in
@@ -666,18 +664,15 @@ let authorized_consensus_votes global_state
   in
   let*! () =
     List.iter_s
-      (fun {vote_kind; delegate; _} ->
+      (fun unsigned_consensus_vote ->
         let error =
-          match vote_kind with
+          match unsigned_consensus_vote.vote_kind with
           | Preattestation ->
               Baking_highwatermarks.Block_previously_preattested {round; level}
           | Attestation ->
               Baking_highwatermarks.Block_previously_attested {round; level}
         in
-        Events.(
-          emit
-            skipping_consensus_vote
-            (vote_kind, delegate, level, round, [error])))
+        Events.(emit skipping_consensus_vote (unsigned_consensus_vote, [error])))
       unauthorized_votes
   in
   return authorized_votes
@@ -850,9 +845,8 @@ let sign_consensus_votes (global_state : global_state)
   in
   let* signed_consensus_votes =
     List.filter_map_es
-      (fun ({delegate; vote_kind; vote_consensus_content; _} as
-            unsigned_consensus_vote) ->
-        let*! () = Events.emit_signing_consensus_op unsigned_consensus_vote in
+      (fun unsigned_consensus_vote ->
+        let*! () = Events.(emit signing_consensus_op) unsigned_consensus_vote in
         let*! signed_consensus_vote_r =
           (forge_and_sign_consensus_vote
              global_state
@@ -863,15 +857,9 @@ let sign_consensus_votes (global_state : global_state)
         in
         match signed_consensus_vote_r with
         | Error err ->
-            let level, round =
-              ( Raw_level.to_int32 vote_consensus_content.level,
-                vote_consensus_content.round )
-            in
             let*! () =
               Events.(
-                emit
-                  skipping_consensus_vote
-                  (vote_kind, delegate, level, round, err))
+                emit skipping_consensus_vote (unsigned_consensus_vote, err))
             in
             return_none
         | Ok signed_consensus_vote -> return_some signed_consensus_vote)
@@ -891,15 +879,11 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
   let open Lwt_result_syntax in
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
-  let unsigned_consensus_vote = signed_consensus_vote.unsigned_consensus_vote in
-  let delegate = unsigned_consensus_vote.delegate in
   protect
     ~on_error:(fun err ->
       let*! () =
         Events.(
-          emit
-            failed_to_inject_consensus_vote
-            (unsigned_consensus_vote.vote_kind, delegate, err))
+          emit failed_to_inject_consensus_vote (signed_consensus_vote, err))
       in
       return_unit)
     (fun () ->
@@ -917,7 +901,7 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
                 | Attestation -> "attestation"))])
       in
       let*! () =
-        Events.emit_consensus_op_injected unsigned_consensus_vote oph
+        Events.(emit consensus_op_injected) (signed_consensus_vote, oph)
       in
       return_unit)
 
