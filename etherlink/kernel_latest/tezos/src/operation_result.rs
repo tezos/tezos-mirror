@@ -465,28 +465,27 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
     }
 }
 
-pub fn transform_result_backtrack(op: OperationResultSum) -> OperationResultSum {
+fn backtrack_if_applied<T: OperationKind>(result: &mut ContentResult<T>) {
+    if let ContentResult::Applied(_) = result {
+        // Lowkey optimisation: takes the ownership of the content result by replacing
+        // the result with Skipped as a place holder
+        let current_content_result = std::mem::replace(result, ContentResult::Skipped);
+        if let ContentResult::Applied(success) = current_content_result {
+            *result = ContentResult::BackTracked(success);
+        }
+    }
+}
+
+pub fn transform_result_backtrack(op: &mut OperationResultSum) {
     match op {
-        OperationResultSum::Reveal(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Reveal(op_result)
+        OperationResultSum::Transfer(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
-        OperationResultSum::Transfer(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Transfer(op_result)
+        OperationResultSum::Reveal(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
-        OperationResultSum::Origination(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Origination(op_result)
+        OperationResultSum::Origination(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
     }
 }

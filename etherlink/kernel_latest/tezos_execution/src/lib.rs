@@ -631,7 +631,7 @@ fn apply_batch<Host: Runtime>(
     if let Some(failure_idx) = first_failure {
         receipts[..failure_idx]
             .iter_mut()
-            .for_each(|r| *r = transform_result_backtrack(r.clone()));
+            .for_each(transform_result_backtrack);
         return (receipts, false);
     }
 
