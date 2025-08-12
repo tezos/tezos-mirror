@@ -137,12 +137,13 @@ let start_server config rpc = function
 let monitor_performances ~data_dir =
   let (module Performance) = Lazy.force Metrics.performance_metrics in
   let rec aux () =
-    let open Lwt_syntax in
-    let* () = Performance.set_stats ~data_dir in
-    let* () = Lwt_unix.sleep 10.0 in
+    Performance.set_stats ~data_dir ;
+    Unix.sleep 10 ;
     aux ()
   in
-  Lwt.dont_wait aux (Fun.const ())
+  let domain = Domain.spawn aux in
+  (* Run in background *)
+  ignore domain
 
 let start_public_server (type f) ~is_sequencer
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
@@ -150,8 +151,8 @@ let start_public_server (type f) ~is_sequencer
     (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
-  let*! can_start_performance_metrics =
-    Octez_performance_metrics.supports_performance_metrics ()
+  let can_start_performance_metrics =
+    Octez_performance_metrics.Unix.supports_performance_metrics ()
   in
   if can_start_performance_metrics && Option.is_some data_dir then
     monitor_performances

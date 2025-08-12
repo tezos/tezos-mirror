@@ -74,7 +74,11 @@ let to_node_pvmstate :
     ~impl_name:"Irmin"
 
 module Irmin = struct
-  module I = Irmin_context
+  module I = struct
+    include Irmin_context
+
+    let load ~cache_size path = load ~cache_size path
+  end
 
   let of_node_context : 'a Context.t -> ('a, I.repo, I.tree) Context_sigs.t =
    fun ctxt -> of_node_context I.equality_witness ctxt

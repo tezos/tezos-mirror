@@ -512,8 +512,8 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       tx_container
       (backend, smart_rollup_address_typed)
   in
-  let finalizer_rpc_process =
-    Option.map
+  let*! finalizer_rpc_process =
+    Option.map_s
       (fun port ->
         let protected_endpoint =
           Uri.make ~scheme:"http" ~host:configuration.public_rpc.addr ~port ()

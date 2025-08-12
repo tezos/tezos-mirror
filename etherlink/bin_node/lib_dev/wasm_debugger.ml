@@ -22,7 +22,9 @@ module Bare_context = struct
 
   let init ?patch_context:_ ?readonly:_ ?index_log_size:_ path =
     let open Lwt_syntax in
-    let* res = Irmin_context.load ~cache_size:100_000 Read_write path in
+    let* res =
+      Irmin_context.load ~cache_size:100_000 ~async_domain:true Read_write path
+    in
     match res with
     | Ok res -> return res
     | Error _ -> Lwt.fail_with "could not initialize the context"

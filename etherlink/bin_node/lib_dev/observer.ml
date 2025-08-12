@@ -350,8 +350,8 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       return_unit
   in
 
-  let finalizer_rpc_process =
-    Option.map
+  let*! finalizer_rpc_process =
+    Option.map_s
       (fun port ->
         let protected_endpoint =
           Uri.make ~scheme:"http" ~host:config.public_rpc.addr ~port ()

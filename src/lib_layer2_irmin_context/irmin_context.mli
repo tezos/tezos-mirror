@@ -79,7 +79,11 @@ val to_imm : mut_state -> tree
     [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
 val load :
-  cache_size:int -> 'a Access_mode.t -> string -> 'a index tzresult Lwt.t
+  cache_size:int ->
+  ?async_domain:bool ->
+  'a Access_mode.t ->
+  string ->
+  'a index tzresult Lwt.t
 
 val reload : ro_index -> unit
 

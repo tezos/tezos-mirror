@@ -447,12 +447,13 @@ module Performance_metrics_config = struct
 end
 
 module type PERFORMANCE = sig
-  val set_stats : data_dir:string -> unit Lwt.t
+  val set_stats : data_dir:string -> unit
 end
 
 let performance_metrics : (module PERFORMANCE) Lazy.t =
   lazy
-    (let module M = Octez_performance_metrics.Make (Performance_metrics_config) in
+    (let module M =
+       Octez_performance_metrics.Unix.Make (Performance_metrics_config) in
     (module M : PERFORMANCE))
 
 let listing () =

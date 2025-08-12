@@ -12,6 +12,12 @@
     Subject:      Test garbage collection for the smart rollup node context
 *)
 
+module Irmin_context = struct
+  include Irmin_context
+
+  let load ~cache_size path = load ~cache_size path
+end
+
 let commit_new_state context key =
   let open Lwt_syntax in
   let* state =
