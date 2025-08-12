@@ -287,25 +287,41 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
       let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
-(* This function is relevant only when all bakers don't attest *)
-let attesting_rights_count ctxt level =
-  let consensus_committee_size =
-    Constants_storage.consensus_committee_size ctxt
-  in
+let attesting_power ~all_bakers_attest_enabled ctxt level =
   let open Lwt_result_syntax in
-  let*? slots = Slot_repr.Range.create ~min:0 ~count:consensus_committee_size in
-  Slot_repr.Range.fold_es
-    (fun (ctxt, map) slot ->
-      let* ctxt, consensus_pk = slot_owner ctxt level slot in
-      let map =
-        Signature.Public_key_hash.Map.update
-          consensus_pk.delegate
-          (function None -> Some 1 | Some slots_n -> Some (slots_n + 1))
-          map
-      in
-      return (ctxt, map))
-    (ctxt, Signature.Public_key_hash.Map.empty)
-    slots
+  if all_bakers_attest_enabled then
+    let* ctxt, _, delegates = stake_info ctxt level in
+    let map =
+      List.fold_left
+        (fun map_acc ((consensus_pk : Raw_context.consensus_pk), staking_power) ->
+          Signature.Public_key_hash.Map.add
+            consensus_pk.delegate
+            staking_power
+            map_acc)
+        Signature.Public_key_hash.Map.empty
+        delegates
+    in
+    return (ctxt, map)
+  else
+    let consensus_committee_size =
+      Constants_storage.consensus_committee_size ctxt
+    in
+    let*? slots =
+      Slot_repr.Range.create ~min:0 ~count:consensus_committee_size
+    in
+    Slot_repr.Range.fold_es
+      (fun (ctxt, map) slot ->
+        let* ctxt, consensus_pk = slot_owner ctxt level slot in
+        let map =
+          Signature.Public_key_hash.Map.update
+            consensus_pk.delegate
+            (function
+              | None -> Some 1L | Some slots_n -> Some (Int64.succ slots_n))
+            map
+        in
+        return (ctxt, map))
+      (ctxt, Signature.Public_key_hash.Map.empty)
+      slots
 
 let cleanup_values_for_protocol_t ctxt ~previous_consensus_rights_delay
     ~consensus_rights_delay ~new_cycle =

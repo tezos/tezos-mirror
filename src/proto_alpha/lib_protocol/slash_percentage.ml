@@ -8,14 +8,14 @@
 let for_double_baking ctxt =
   Constants_storage.percentage_of_frozen_deposits_slashed_per_double_baking ctxt
 
-let for_double_attestation ctxt committee_size rights denounced =
+let for_double_attestation ctxt ~committee_size rights denounced =
   let total_rights_denounced =
     List.fold_left
       (fun total delegate ->
         Option.value
           (Signature.Public_key_hash.Map.find delegate rights)
-          ~default:0
-        |> Int64.of_int |> Int64.add total)
+          ~default:0L
+        |> Int64.add total)
       0L
       denounced
   in
@@ -45,12 +45,16 @@ let get ctxt ~(kind : Misbehaviour_repr.kind) ~(level : Level_repr.t)
   match kind with
   | Double_baking -> return (ctxt, for_double_baking ctxt)
   | Double_attesting | Double_preattesting ->
-      (* TODO ABAAB. Note that the [rights] amount should also depend on the flag status. *)
-      let* ctxt, rights = Delegate_sampler.attesting_rights_count ctxt level in
+      let all_bakers_attest_enabled =
+        Consensus_parameters_storage.check_all_bakers_attest_at_level ctxt level
+      in
+      let* ctxt, rights =
+        Delegate_sampler.attesting_power ~all_bakers_attest_enabled ctxt level
+      in
       let* ctxt, committee_size =
         Consensus_parameters_storage.consensus_committee ctxt level
       in
-      return (ctxt, for_double_attestation ctxt committee_size rights denounced)
+      return (ctxt, for_double_attestation ctxt ~committee_size rights denounced)
 
 module Internal_for_tests = struct
   let for_double_attestation = for_double_attestation
