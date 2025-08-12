@@ -1406,13 +1406,12 @@ let jobs pipeline_type =
           ~timeout:(Hours 2)
           ["./docs/introduction/install-opam.sh"]
       in
-      let job_compile_sources ~__POS__ ~name ~image ~project ~branch ?cpu ?retry
-          () =
+      let job_compile_sources ~__POS__ ~name ~image ~project ~branch ?retry () =
         job
           ~__POS__
           ~name
           ~image
-          ?cpu
+          ~cpu:Tezt
           ?retry
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
@@ -1437,7 +1436,6 @@ let jobs pipeline_type =
               ~image:Images.opam_debian_bookworm
               ~project:"tezos/tezos"
               ~branch:"latest-release"
-              ~cpu:Very_high
               ();
             job_compile_sources
               ~__POS__
@@ -1459,7 +1457,6 @@ let jobs pipeline_type =
               ~image:Images.opam_debian_bookworm
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
-              ~cpu:Very_high
               ();
           ]
     in

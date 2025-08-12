@@ -2992,7 +2992,7 @@ oc.compile_sources_doc_bookworm:
   image: ocaml/opam:debian-12
   stage: test
   tags:
-  - gcp_very_high_cpu
+  - gcp_tezt
   rules:
   - when: always
   dependencies: []
@@ -3013,7 +3013,7 @@ oc.compile_sources_doc_oracular:
   image: ocaml/opam:ubuntu-24.10
   stage: test
   tags:
-  - gcp
+  - gcp_tezt
   rules:
   - when: always
   dependencies: []
