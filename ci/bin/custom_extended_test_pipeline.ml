@@ -29,10 +29,21 @@ open Common
    under the 1GB hard limit set by GitLab. *)
 (* [job_build_x86_64_release] builds the released executables. *)
 let job_build_x86_64_release =
-  job_build_dynamic_binaries ~__POS__ ~arch:Amd64 ~release:true ()
+  job_build_released_binaries ~__POS__ ~arch:Amd64 ()
 
-let job_build_x86_64_exp_dev_extra =
-  job_build_dynamic_binaries ~__POS__ ~arch:Amd64 ~release:false ()
+let job_build_x86_64_extra_exp =
+  job_build_dynamic_binaries
+    ~name:"oc.build_amd64-extra-exp"
+    ~__POS__
+    ~arch:Amd64
+    "script-inputs/experimental-executables"
+
+let job_build_x86_64_extra_dev =
+  job_build_dynamic_binaries
+    ~name:"oc.build_amd64-extra-dev"
+    ~__POS__
+    ~arch:Amd64
+    "script-inputs/dev-executables"
 
 let jobs =
   (* Tezt jobs.
@@ -51,7 +62,8 @@ let jobs =
     Dependent
       [
         Artifacts job_build_x86_64_release;
-        Artifacts job_build_x86_64_exp_dev_extra;
+        Artifacts job_build_x86_64_extra_exp;
+        Artifacts job_build_x86_64_extra_dev;
         Artifacts job_build_kernels;
         Artifacts job_tezt_fetch_records;
       ]
@@ -151,7 +163,8 @@ let jobs =
     tezt_extra;
     tezt_flaky;
     job_build_x86_64_release;
-    job_build_x86_64_exp_dev_extra;
+    job_build_x86_64_extra_dev;
+    job_build_x86_64_extra_exp;
     job_build_kernels;
     job_tezt_fetch_records;
     job_datadog_pipeline_trace;

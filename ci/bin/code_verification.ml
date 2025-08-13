@@ -615,13 +615,12 @@ let jobs pipeline_type =
      under the 1GB hard limit set by GitLab. *)
   (* [job_build_x86_64_release] builds the released executables. *)
   let job_build_x86_64_release =
-    job_build_dynamic_binaries
+    job_build_released_binaries
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
       ~storage:Ramfs
       ~dependencies:dependencies_needs_start
-      ~release:true
       ~rules:(make_rules ~changes:changeset_octez_or_doc ())
       ~sccache_size:"2G"
       ()
@@ -632,15 +631,26 @@ let jobs pipeline_type =
   let build_cache_key =
     "dune-build-cache-" ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id)
   in
-  let job_build_x86_64_exp_dev_extra =
+  let job_build_x86_64_extra_dev =
     job_build_dynamic_binaries
+      ~name:"oc.build_amd64-extra-dev"
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
       ~dependencies:dependencies_needs_start
-      ~release:false
       ~rules:(make_rules ~changes:changeset_octez_or_doc ())
-      ()
+      "script-inputs/dev-executables"
+    |> enable_dune_cache ~key:build_cache_key ~policy:Push
+  in
+  let job_build_x86_64_extra_exp =
+    job_build_dynamic_binaries
+      ~name:"oc.build_amd64-extra-exp"
+      ~__POS__
+      ~arch:Amd64
+      ~cpu:Very_high
+      ~dependencies:dependencies_needs_start
+      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
+      "script-inputs/experimental-executables"
     |> enable_dune_cache ~key:build_cache_key ~policy:Push
   in
 
@@ -648,9 +658,13 @@ let jobs pipeline_type =
   let job_build_arm64_release : Tezos_ci.tezos_job =
     job_build_arm64_release ~rules:build_arm_rules ()
   in
-  let job_build_arm64_exp_dev_extra : Tezos_ci.tezos_job =
-    job_build_arm64_exp_dev_extra ~rules:build_arm_rules ()
+  let job_build_arm64_extra_dev : Tezos_ci.tezos_job =
+    job_build_arm64_extra_dev ~rules:build_arm_rules ()
   in
+  let job_build_arm64_extra_exp : Tezos_ci.tezos_job =
+    job_build_arm64_extra_exp ~rules:build_arm_rules ()
+  in
+
   let job_build_kernels =
     job_build_kernels
       ~rules:
@@ -827,11 +841,13 @@ let jobs pipeline_type =
     in
     [
       job_build_arm64_release;
-      job_build_arm64_exp_dev_extra;
+      job_build_arm64_extra_dev;
+      job_build_arm64_extra_exp;
       job_static_x86_64_experimental;
       job_static_arm64_experimental;
       job_build_x86_64_release;
-      job_build_x86_64_exp_dev_extra;
+      job_build_x86_64_extra_dev;
+      job_build_x86_64_extra_exp;
       wasm_runtime_check;
       job_build_kernels;
       job_build_dsn_node;
@@ -868,7 +884,8 @@ let jobs pipeline_type =
           (Job job_start
           :: [
                Optional job_build_x86_64_release;
-               Optional job_build_x86_64_exp_dev_extra;
+               Optional job_build_x86_64_extra_dev;
+               Optional job_build_x86_64_extra_exp;
              ]))
       ~schedule_extended_test:(fun () -> Staged [])
   in
@@ -1055,10 +1072,18 @@ let jobs pipeline_type =
       let build_dependencies : Runner.Arch.t -> _ = function
         | Amd64 ->
             Dependent
-              [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra]
+              [
+                Job job_build_x86_64_release;
+                Job job_build_x86_64_extra_dev;
+                Job job_build_x86_64_extra_exp;
+              ]
         | Arm64 ->
             Dependent
-              [Job job_build_arm64_release; Job job_build_arm64_exp_dev_extra]
+              [
+                Job job_build_arm64_release;
+                Job job_build_arm64_extra_dev;
+                Job job_build_arm64_extra_exp;
+              ]
       in
       let rules =
         (* TODO: Note that all jobs defined here are
@@ -1277,7 +1302,11 @@ let jobs pipeline_type =
         ~rules:(make_rules ~changes:changeset_octez ())
         ~dependencies:
           (Dependent
-             [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
+             [
+               Job job_build_x86_64_release;
+               Job job_build_x86_64_extra_dev;
+               Job job_build_x86_64_extra_exp;
+             ])
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         ["dune build @runtest_rejections"]
       |> enable_cargo_cache |> enable_sccache
@@ -1321,7 +1350,11 @@ let jobs pipeline_type =
         ~image:Images.CI.build
         ~dependencies:
           (Dependent
-             [Job job_build_x86_64_release; Job job_build_x86_64_exp_dev_extra])
+             [
+               Job job_build_x86_64_release;
+               Job job_build_x86_64_extra_dev;
+               Job job_build_x86_64_extra_exp;
+             ])
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_octez ())
         ~before_script:
@@ -1361,7 +1394,8 @@ let jobs pipeline_type =
           (Dependent
              [
                Artifacts job_build_x86_64_release;
-               Artifacts job_build_x86_64_exp_dev_extra;
+               Artifacts job_build_x86_64_extra_exp;
+               Artifacts job_build_x86_64_extra_dev;
              ])
         ~rules:
           (make_rules
@@ -1494,7 +1528,8 @@ let jobs pipeline_type =
         Dependent
           [
             Artifacts job_build_x86_64_release;
-            Artifacts job_build_x86_64_exp_dev_extra;
+            Artifacts job_build_x86_64_extra_exp;
+            Artifacts job_build_x86_64_extra_dev;
             Artifacts job_build_kernels;
             Artifacts job_build_dsn_node;
             Artifacts job_tezt_fetch_records;
@@ -1647,7 +1682,8 @@ let jobs pipeline_type =
           ~dependencies:
             (Dependent
                [
-                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_build_x86_64_extra_exp;
+                 Artifacts job_build_x86_64_extra_dev;
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;
                ])
@@ -1984,7 +2020,8 @@ let jobs pipeline_type =
             (Dependent
                [
                  Artifacts job_build_x86_64_release;
-                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_build_x86_64_extra_dev;
+                 Artifacts job_build_x86_64_extra_exp;
                  Artifacts job_build_kernels;
                  Artifacts job_build_dsn_node;
                ])
