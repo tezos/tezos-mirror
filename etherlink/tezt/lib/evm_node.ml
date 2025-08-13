@@ -449,6 +449,15 @@ let wait_for_successful_upgrade ?timeout evm_node =
          let level = json |-> "level" |> as_int in
          Some (root_hash, level))
 
+let wait_for_pending_sequencer_upgrade ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"pending_sequencer_upgrade.v0"
+  @@ JSON.(
+       fun json ->
+         let sequencer = json |-> "sequencer" |> as_string in
+         let pool_address = json |-> "pool_address" |> as_string in
+         let timestamp = json |-> "timestamp" |> as_string in
+         Some (sequencer, pool_address, timestamp))
+
 let wait_for_spawn_rpc_ready ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"spawn_rpc_is_ready.v0"
   @@ Fun.const (Some ())

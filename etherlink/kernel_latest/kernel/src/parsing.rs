@@ -769,8 +769,12 @@ impl<Mode: Parsable> InputResult<Mode> {
                 }
             },
             MichelsonOr::Right(MichelsonBytes(bytes)) => {
-                if tezos_contracts.is_admin(&source)
-                    || tezos_contracts.is_kernel_governance(&source)
+                if tezos_contracts.is_admin(&source) {
+                    match Self::parse_kernel_upgrade(&bytes) {
+                        InputResult::Unparsable => Self::parse_sequencer_update(&bytes),
+                        input => input,
+                    }
+                } else if tezos_contracts.is_kernel_governance(&source)
                     || tezos_contracts.is_kernel_security_governance(&source)
                 {
                     Self::parse_kernel_upgrade(&bytes)

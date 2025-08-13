@@ -3103,6 +3103,90 @@ let test_kernel_upgrade_via_kernel_security_governance =
   in
   unit
 
+let test_sequencer_and_kernel_upgrade_via_kernel_admin =
+  Protocol.register_test
+    ~__FILE__
+    ~tags:["upgrade"; "administrator"; "sequencer"]
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.WASM.debug_kernel;
+      ])
+    ~title:"Sequencer and kernel upgrades using admin contract"
+  @@ fun protocol ->
+  let admin = Constant.bootstrap1 in
+  (* Setup an activation_timestamp in the future to avoid the upgrade to be triggered
+     which can cause the sequencer to diverge from smart-rollup-node *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  (* Setup environment including a sequencer *)
+  let setup_mode =
+    Setup_sequencer
+      {
+        return_sequencer = true;
+        time_between_blocks = Some Nothing;
+        sequencer = admin;
+        max_blueprints_ahead = None;
+        genesis_timestamp = Some genesis_timestamp;
+      }
+  in
+  let* {client; sc_rollup_address; l1_contracts; evm_node; sc_rollup_node; _} =
+    setup_evm_kernel
+      ~timestamp:genesis_timestamp
+      ~setup_mode
+      ~with_administrator:true
+      ~admin:(Some admin)
+      protocol
+  in
+  (* Send a sequencer upgrade from admin contract on L1 *)
+  let l1_contracts = Option.get l1_contracts in
+  let admin_contract = l1_contracts.admin in
+  let* () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:admin.alias
+      ~sequencer_governance_contract:admin_contract
+      ~client
+      ~upgrade_to:admin.alias
+      ~activation_timestamp
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+  in
+  (* Wait for the sequencer to receive the upgrade *)
+  let waiting_sequencer_upgrade =
+    Evm_node.wait_for_pending_sequencer_upgrade evm_node
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _res = waiting_sequencer_upgrade in
+  (* Send a kernel upgrade from admin contract on L1 *)
+  let* _root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:admin.alias
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.debug_kernel
+      ~activation_timestamp
+  in
+  (* Wait for the sequencer to receive the upgrade *)
+  let waiting_kernel_upgrade = Evm_node.wait_for_pending_upgrade evm_node in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _res = waiting_kernel_upgrade in
+  unit
+
 let test_rpc_sendRawTransaction =
   register_both
     ~tags:["evm"; "rpc"; "tx_hash"; "raw_tx"]
@@ -6602,6 +6686,7 @@ let register_evm_node ~protocols =
   test_kernel_upgrade_version_change protocols ;
   test_kernel_upgrade_via_governance protocols ;
   test_kernel_upgrade_via_kernel_security_governance protocols ;
+  test_sequencer_and_kernel_upgrade_via_kernel_admin protocols ;
   test_rpc_sendRawTransaction protocols ;
   test_cannot_prepayed_leads_to_no_inclusion protocols ;
   test_cannot_prepayed_with_delay_leads_to_no_injection protocols ;
