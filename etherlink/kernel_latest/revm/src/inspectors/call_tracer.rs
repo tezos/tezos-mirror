@@ -175,7 +175,7 @@ pub struct CallTracer {
     config: CallTracerConfig,
     precompiles: EtherlinkPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
-    transaction_hash: Option<B256>,
+    pub transaction_hash: Option<B256>,
     initial_gas: u64,
     spec_id: SpecId,
 }
