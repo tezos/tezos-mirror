@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use super::call_tracer::CallTrace;
+use super::{call_tracer::CallTrace, struct_logger::StructLog};
 use crate::{helpers::storage::concat, Error};
 
 use revm::primitives::B256;
@@ -13,6 +13,10 @@ use tezos_smart_rollup_host::path::{OwnedPath, RefPath};
 
 const EVM_TRACE: RefPath = RefPath::assert_from(b"/evm/trace");
 const CALL_TRACE: RefPath = RefPath::assert_from(b"/call_trace");
+const STRUCT_LOGS: RefPath = RefPath::assert_from(b"/struct_logs");
+const GAS: RefPath = RefPath::assert_from(b"/gas");
+const FAILED: RefPath = RefPath::assert_from(b"/failed");
+const RETURN_VALUE: RefPath = RefPath::assert_from(b"/return_value");
 
 pub fn trace_tx_path(hash: &Option<B256>, field: &RefPath) -> Result<OwnedPath, Error> {
     let trace_tx_path = match hash {
@@ -43,5 +47,55 @@ pub fn store_call_trace<Host: Runtime>(
         .map_err(|err| Error::Custom(err.to_string()))?;
 
     log!(host, Debug, "Store call trace: {:?}", call_trace);
+    Ok(())
+}
+
+pub fn store_trace_gas<Host: Runtime>(
+    host: &mut Host,
+    gas: u64,
+    hash: &Option<B256>,
+) -> Result<(), Error> {
+    let path = trace_tx_path(hash, &GAS)?;
+    host.store_write_all(&path, gas.to_le_bytes().as_slice())?;
+    Ok(())
+}
+
+pub fn store_trace_failed<Host: Runtime>(
+    host: &mut Host,
+    is_success: bool,
+    hash: &Option<B256>,
+) -> Result<(), Error> {
+    let path = trace_tx_path(hash, &FAILED)?;
+    host.store_write_all(&path, &[u8::from(!is_success)])?;
+    log!(host, Debug, "Store trace info: is_success {is_success}");
+    Ok(())
+}
+
+pub fn store_return_value<Host: Runtime>(
+    host: &mut Host,
+    value: &[u8],
+    hash: &Option<B256>,
+) -> Result<(), Error> {
+    let path = trace_tx_path(hash, &RETURN_VALUE)?;
+    host.store_write_all(&path, value)?;
+    log!(host, Debug, "Store trace info: value {value:?}");
+    Ok(())
+}
+
+pub fn store_struct_log<Host: Runtime>(
+    host: &mut Host,
+    struct_log: &StructLog,
+    hash: &Option<B256>,
+) -> Result<(), Error> {
+    let encoded_strug_log = rlp::encode(struct_log);
+
+    let path = trace_tx_path(hash, &STRUCT_LOGS)?;
+    let struct_logs_storage = IndexableStorage::new_owned_path(path);
+
+    struct_logs_storage
+        .push_value(host, &encoded_strug_log)
+        .map_err(|err| Error::Custom(err.to_string()))?;
+
+    log!(host, Debug, "Store struct log: {encoded_strug_log:?}");
     Ok(())
 }
