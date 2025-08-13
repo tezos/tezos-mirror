@@ -352,11 +352,21 @@ let eth_unsubscribe ~id =
 
 let decode :
     type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
- fun (module M) v -> Data_encoding.Json.destruct M.input_encoding v
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.decode"
+  @@ fun _ -> Data_encoding.Json.destruct M.input_encoding v
 
 let encode :
     type a. (module METHOD with type output = a) -> a -> Data_encoding.json =
- fun (module M) v -> Data_encoding.Json.construct M.output_encoding v
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.encode"
+  @@ fun _ -> Data_encoding.Json.construct M.output_encoding v
 
 let build :
     type input output.
