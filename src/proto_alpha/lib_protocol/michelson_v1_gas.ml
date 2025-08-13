@@ -440,8 +440,7 @@ module Cost_of = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/8039
        This gas cost is temporary and uses Big map's get, as their
        semantics and implementation is highly similar. *)
-    let get_address_index =
-      atomic_step_cost (cost_N_IMap_get big_map_elt_size 4)
+    let get_address_index = atomic_step_cost cost_N_IGet_address_index
 
     let create_contract = atomic_step_cost cost_N_ICreate_contract
 
