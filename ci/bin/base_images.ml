@@ -9,13 +9,21 @@ open Gitlab_ci.Types
 open Gitlab_ci.Util
 open Tezos_ci
 
-let debian_matrix = [[("RELEASE", ["unstable"; "bookworm"])]]
+let debian_releases = ["unstable"; "bookworm"]
 
-let ubuntu_matrix = [[("RELEASE", ["noble"; "jammy"])]]
+let debian_matrix = [[("RELEASE", debian_releases)]]
 
-let rockylinux_matrix = [[("RELEASE", ["9.6"])]]
+let ubuntu_releases = ["noble"; "jammy"]
 
-let fedora_matrix = [[("RELEASE", ["39"; "42"])]]
+let ubuntu_matrix = [[("RELEASE", ubuntu_releases)]]
+
+let rockylinux_releases = ["9.6"]
+
+let rockylinux_matrix = [[("RELEASE", rockylinux_releases)]]
+
+let fedora_releases = ["39"; "42"]
+
+let fedora_matrix = [[("RELEASE", fedora_releases)]]
 
 let jobs =
   let make_job_base_images ~__POS__ ~name ~matrix ~distribution ?image_path

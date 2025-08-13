@@ -415,6 +415,7 @@ let () =
             name = "tezos/tezos";
             tag = "master";
             dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-master";
           })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
@@ -429,6 +430,7 @@ let () =
             name = "tezos/tezos";
             tag = "latest";
             dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-latest";
           })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
@@ -443,6 +445,7 @@ let () =
             name = "tezos/tezos";
             tag = "octez-evm-node-latest";
             dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-octez-evm-node-latest";
           })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
@@ -457,6 +460,7 @@ let () =
             name = "tezos/tezos";
             tag = "octez-v22.0-rc3";
             dockerfile = "build.Dockerfile";
+            job_name = "tezos-tezos-octez--v22.0-rc3";
           })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in the Docker image for \

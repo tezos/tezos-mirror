@@ -13,7 +13,14 @@
 open Gitlab_ci.Util
 open Tezos_ci
 
-type docker_image = {name : string; tag : string; dockerfile : string}
+type docker_image = {
+  name : string; (* the name of the image like tezos/tezos *)
+  tag : string; (* the tag like master *)
+  dockerfile : string;
+      (* the docker file associated to this image like build.dockerfile *)
+  job_name : string;
+      (* the unique friendly job name associate to the scanning job *)
+}
 
 let image_ref image = image.name ^ ":" ^ image.tag
 
