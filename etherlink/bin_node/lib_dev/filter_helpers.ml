@@ -196,12 +196,12 @@ let match_filter_address (filter : bloom_filter) (address : address) : bool =
   List.is_empty filter.address || List.mem ~equal:( = ) address filter.address
 
 (* Apply a filter on one log *)
-let filter_one_log : bloom_filter -> transaction_log -> Filter.changes option =
+let filter_one_log : bloom_filter -> transaction_log -> transaction_log option =
  fun filter log ->
   if
     match_filter_address filter log.address
     && match_filter_topics filter log.topics
-  then Some (Log log)
+  then Some log
   else None
 
 let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
@@ -211,8 +211,8 @@ let filter_receipt (filter : bloom_filter) (receipt : Transaction_receipt.t) =
 
 (* Apply a filter on one transaction *)
 
-let filter_one_tx : valid_filter -> Transaction_receipt.t -> Filter.changes list
-    =
+let filter_one_tx :
+    valid_filter -> Transaction_receipt.t -> transaction_log list =
  fun filter receipt ->
   let filter =
     {bloom = filter.bloom; topics = filter.topics; address = filter.address}

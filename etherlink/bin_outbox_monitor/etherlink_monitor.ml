@@ -608,12 +608,7 @@ let rec get_logs db ws_client ~from_block ~to_block =
     match logs with
     | Ok logs ->
         (* Process each log in the range *)
-        List.iter_es
-          (function
-            | Filter.Block_filter _ | Pending_transaction_filter _ ->
-                return_unit
-            | Log log -> handle_one_log ws_client db (Ok log))
-          logs
+        List.iter_es (fun log -> handle_one_log ws_client db (Ok log)) logs
     | Error (Filter_helpers.Too_many_logs {limit} :: _ as e)
       when Z.equal from_z to_z ->
         (* If we're querying a single block and it has too many logs, this is a

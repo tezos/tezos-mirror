@@ -771,12 +771,12 @@ end
 module Get_logs = struct
   type input = Ethereum_types.Filter.t
 
-  type output = Ethereum_types.Filter.changes list
+  type output = Ethereum_types.transaction_log list
 
   let input_encoding = Data_encoding.tup1 Ethereum_types.Filter.encoding
 
   let output_encoding =
-    Data_encoding.list Ethereum_types.Filter.changes_encoding
+    Data_encoding.list Ethereum_types.transaction_log_encoding
 
   let method_ = "eth_getLogs"
 

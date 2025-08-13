@@ -287,7 +287,7 @@ module Web3_sha3 :
 module Get_logs :
   METHOD
     with type input = Ethereum_types.Filter.t
-     and type output = Ethereum_types.Filter.changes list
+     and type output = Ethereum_types.transaction_log list
 
 type produce_block_input = {
   timestamp : Time.Protocol.t option;
