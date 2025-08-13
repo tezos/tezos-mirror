@@ -82,7 +82,7 @@ impl<'a, Host: Runtime> ExecuteEvm for EtherlinkEvmInspector<'a, Host> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EtherlinkHandler<CTX, ERROR, FRAME> {
     _phantom: core::marker::PhantomData<(CTX, ERROR, FRAME)>,
 }
