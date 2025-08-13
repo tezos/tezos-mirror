@@ -627,9 +627,7 @@ let rec get_logs ?(n = 1) ctx ~block =
   | Ok logs ->
       (* Process each log in the range *)
       List.iter_es
-        (function
-          | Filter.Block_filter _ | Pending_transaction_filter _ -> return_unit
-          | Log log -> handle_one_log ctx log)
+        (fun log -> handle_one_log ctx (Ethereum_types.decode_pre log))
         logs
   | Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
       (* If we're querying a single block and it has too many logs, this is a

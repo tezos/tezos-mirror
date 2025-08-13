@@ -263,24 +263,19 @@ let generate_id () =
   Bytes.iteri (fun i _ -> Bytes.set_uint8 id i (Random.int 256)) id ;
   encode_id id
 
-let logs_of_filter logs =
-  match logs with
-  | Ethereum_types.Filter.Log logs ->
-      Some (Ethereum_types.Subscription.Logs logs)
-  | Ethereum_types.Filter.Block_filter _
-  | Ethereum_types.Filter.Pending_transaction_filter _ ->
-      None
-
 let filter_from ~address ~topics =
   Ethereum_types.Filter.
     {from_block = None; to_block = None; address; topics; block_hash = None}
 
 let filter_logs ~bloom_filter ~receipt =
-  let logs = Filter_helpers.filter_receipt bloom_filter receipt in
-  List.filter_map logs_of_filter logs
+  Filter_helpers.filter_receipt bloom_filter receipt
 
 let produce_logs_stream ~bloom_filter stream =
-  Lwt_stream.map_list (fun receipt -> filter_logs ~bloom_filter ~receipt) stream
+  Lwt_stream.map_list
+    (fun receipt ->
+      filter_logs ~bloom_filter ~receipt
+      |> List.map (fun l -> Ethereum_types.Subscription.Logs l))
+    stream
 
 let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
     (module Backend_rpc : Services_backend_sig.S) =
@@ -352,11 +347,21 @@ let eth_unsubscribe ~id =
 
 let decode :
     type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
- fun (module M) v -> Data_encoding.Json.destruct M.input_encoding v
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.decode"
+  @@ fun _ -> Data_encoding.Json.destruct M.input_encoding v
 
 let encode :
     type a. (module METHOD with type output = a) -> a -> Data_encoding.json =
- fun (module M) v -> Data_encoding.Json.construct M.output_encoding v
+ fun (module M) v ->
+  Opentelemetry.Trace.with_
+    ~kind:Span_kind_server
+    ~service_name:"HTTP_server"
+    "Service.encode"
+  @@ fun _ -> Data_encoding.Json.construct M.output_encoding v
 
 let build :
     type input output.

@@ -814,7 +814,7 @@ DO UPDATE SET value = excluded.value
             receipt_fields)
         ~name:__FUNCTION__
         ~table
-      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
+      @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ? ORDER BY index_ DESC|eos}
 
     let select_receipts_from_block_range =
       (t2 level level
@@ -829,7 +829,7 @@ DO UPDATE SET value = excluded.value
         ~table
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions
               WHERE ? <= block_number AND block_number < ?
-              ORDER BY block_number ASC, index_ ASC|eos}
+              ORDER BY block_number DESC, index_ DESC|eos}
 
     let select_object =
       (root_hash
@@ -1504,15 +1504,10 @@ module Transactions = struct
       receipt
 
   let receipts_of_block_number store level =
-    let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let+ rows =
-      Db.collect_list
-        conn
-        Q.Transactions.select_receipts_from_block_number
-        level
-    in
-    List.map
+    Db.fold
+      conn
+      Q.Transactions.select_receipts_from_block_number
       (fun ( block_hash,
              index,
              hash,
@@ -1528,7 +1523,8 @@ module Transactions = struct
                  type_;
                  status;
                  contract_address;
-               } ) ->
+               } )
+           acc ->
         Transaction_receipt.
           {
             transactionHash = hash;
@@ -1545,53 +1541,57 @@ module Transactions = struct
             type_;
             status;
             contractAddress = contract_address;
-          })
-      rows
+          }
+        :: acc)
+      level
+      []
 
   let receipts_of_block_range store (Ethereum_types.Qty level) len =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let+ rows =
-      Db.collect_list
+    let+ res =
+      Db.fold
         conn
         Q.Transactions.select_receipts_from_block_range
+        (fun ( block_hash,
+               index,
+               hash,
+               from,
+               to_,
+               Transaction_info.
+                 {
+                   cumulative_gas_used;
+                   effective_gas_price;
+                   gas_used;
+                   logs;
+                   logs_bloom;
+                   type_;
+                   status;
+                   contract_address;
+                 } )
+             acc ->
+          Transaction_receipt.
+            {
+              transactionHash = hash;
+              transactionIndex = index;
+              blockHash = block_hash;
+              blockNumber = Qty level;
+              from;
+              to_;
+              cumulativeGasUsed = cumulative_gas_used;
+              effectiveGasPrice = effective_gas_price;
+              gasUsed = gas_used;
+              logs;
+              logsBloom = logs_bloom;
+              type_;
+              status;
+              contractAddress = contract_address;
+            }
+          :: acc)
         (Qty level, Qty Z.(level + of_int len))
+        []
     in
-    List.map
-      (fun ( block_hash,
-             index,
-             hash,
-             from,
-             to_,
-             Transaction_info.
-               {
-                 cumulative_gas_used;
-                 effective_gas_price;
-                 gas_used;
-                 logs;
-                 logs_bloom;
-                 type_;
-                 status;
-                 contract_address;
-               } ) ->
-        Transaction_receipt.
-          {
-            transactionHash = hash;
-            transactionIndex = index;
-            blockHash = block_hash;
-            blockNumber = Qty level;
-            from;
-            to_;
-            cumulativeGasUsed = cumulative_gas_used;
-            effectiveGasPrice = effective_gas_price;
-            gasUsed = gas_used;
-            logs;
-            logsBloom = logs_bloom;
-            type_;
-            status;
-            contractAddress = contract_address;
-          })
-      rows
+    res
 
   let find_object store hash =
     let open Lwt_result_syntax in

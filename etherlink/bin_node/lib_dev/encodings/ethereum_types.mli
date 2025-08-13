@@ -75,6 +75,18 @@ val block_hash_of_bytes : bytes -> block_hash
 
 val block_hash_of_string : string -> block_hash
 
+(** Type for values than are already encoded, for performance purposes. *)
+type 'a pre_encoded = private {
+  encoding : 'a Data_encoding.t;
+  json : Data_encoding.json;
+}
+
+val pre_encode : 'a Data_encoding.t -> 'a -> 'a pre_encoded
+
+val decode_pre : 'a pre_encoded -> 'a
+
+val pre_encoded_encoding : 'a Data_encoding.t -> 'a pre_encoded Data_encoding.t
+
 (** Ethereum generic quantity, always encoded in hexadecimal. *)
 type quantity = Qty of Z.t [@@unboxed]
 

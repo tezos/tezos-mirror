@@ -129,6 +129,20 @@ let block_hash_of_bytes s = Block_hash (hex_of_bytes s)
 
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
+type 'a pre_encoded = {
+  encoding : 'a Data_encoding.t;
+  json : Data_encoding.Json.t;
+}
+
+let pre_encode encoding v =
+  {encoding; json = Data_encoding.Json.construct encoding v}
+
+let decode_pre {encoding; json} = Data_encoding.Json.destruct encoding json
+
+let pre_encoded_encoding encoding =
+  let open Data_encoding in
+  conv (fun {json; _} -> json) (fun json -> {encoding; json}) Data_encoding.json
+
 module Block_parameter = struct
   type t = Number of quantity | Earliest | Latest | Pending | Finalized
 
