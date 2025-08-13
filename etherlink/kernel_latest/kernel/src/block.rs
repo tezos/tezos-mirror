@@ -701,7 +701,7 @@ mod tests {
             })
             .collect::<Vec<ManagerOperationContent>>();
 
-        let signature = sign_operation(&source.sk, &branch, content.clone()).unwrap();
+        let signature = sign_operation(&source.sk, &branch, &content).unwrap();
 
         Operation {
             branch,
