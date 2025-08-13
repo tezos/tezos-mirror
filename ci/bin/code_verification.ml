@@ -371,13 +371,14 @@ let jobs pipeline_type =
   (* Used in trigger job definitions. For code verification pipelines,
      add type of parent pipeline. This definition shadows
      [Tezos_ci.trigger_job]. *)
-  let trigger_job ~__POS__ ?rules ?dependencies ?description child_pipeline_path
-      =
+  let trigger_job ~__POS__ ?rules ?dependencies ?description ?variables
+      child_pipeline_path =
     trigger_job
       ~__POS__
       ?rules
       ?dependencies
       ?description
+      ?variables
       ~parent_pipeline_name:(code_verification_pipeline_name pipeline_type)
       child_pipeline_path
   in
@@ -2100,6 +2101,7 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:Yes ())
         ~stage:Stages.manual
+        ~variables:[("DOCKER_FORCE_BUILD", "true")]
         ~dependencies:(Dependent [])
         Base_images.child_pipeline
     in

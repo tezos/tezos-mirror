@@ -995,6 +995,15 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     template;
   }
 
+(* helper function to merge two list of variables, giving the precedence
+   to the values in [variables] over the [default_variables] *)
+let merge_variables ~default_variables variables =
+  let module StringMap = Map.Make (String) in
+  let m1 = List.to_seq default_variables |> StringMap.of_seq in
+  let m2 = List.to_seq variables |> StringMap.of_seq in
+  StringMap.union (fun _ _ v2 -> Some v2) m1 m2
+  |> StringMap.to_seq |> List.of_seq |> List.rev
+
 let trigger_job ?(dependencies = Staged []) ?rules ?description
     ?(variables = []) ~__POS__ ~stage ?parent_pipeline_name
     Pipeline.
@@ -1024,7 +1033,14 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
-      ~variables:(("PIPELINE_TYPE", pipeline_type) :: variables)
+      ~variables:
+        (merge_variables
+           ~default_variables:
+             [
+               ("PIPELINE_TYPE", pipeline_type);
+               ("DOCKER_FORCE_BUILD", "$DOCKER_FORCE_BUILD");
+             ]
+           variables)
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
