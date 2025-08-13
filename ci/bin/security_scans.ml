@@ -12,19 +12,24 @@ open Gitlab_ci.Util
 open Tezos_ci
 
 let jobs : tezos_job list =
-  let image_tags = ["latest"; "octez-evm-node-latest"; "master"] in
+  let build_images =
+    let name = "tezos/tezos" in
+    List.map
+      (fun tag ->
+        {Container_scanning.name; tag; dockerfile = "build.Dockerfile"})
+      ["latest"; "octez-evm-node-latest"; "master"]
+  in
 
   (* Scans [docker_image:docker_tag] image. A scanning report artifact
      is produced.
      We adapt the template provided by Trivy:
      https://trivy.dev/v0.63/tutorials/integrations/gitlab-ci/#gitlab-ci-using-trivy-container *)
-  let job_container_scanning ?(docker_image = "tezos/tezos") docker_tag :
-      tezos_job =
-    let full_image_name = docker_image ^ ":" ^ docker_tag in
-    let report = "gl-container-scanning-report-" ^ docker_tag ^ ".json" in
+  let job_container_scanning image : tezos_job =
+    let full_image_name = Container_scanning.(image_ref image) in
+    let report = "gl-container-scanning-report-" ^ image.tag ^ ".json" in
     job
       ~__POS__
-      ~name:("container_scanning_" ^ docker_tag)
+      ~name:("container_scanning_" ^ image.tag)
       ~description:("Container scanning of [" ^ full_image_name ^ "]")
       ~stage:Stages.test
       ~image:Images.trivy
@@ -42,7 +47,7 @@ let jobs : tezos_job list =
   in
 
   let job_list_container_scanning =
-    List.map job_container_scanning image_tags
+    List.map job_container_scanning build_images
   in
 
   (* Merges reports from individual image scans into a single report
@@ -76,11 +81,11 @@ let jobs : tezos_job list =
        in
        (* String of all individual image scan reports *)
        let input_scan_reports =
-         let concat_reports tag report_name : string =
+         let concat_reports image report_name : string =
            Format.sprintf " gl-container-scanning-report-"
-           ^ tag ^ ".json" ^ report_name
+           ^ image.Container_scanning.tag ^ ".json" ^ report_name
          in
-         List.fold_right concat_reports image_tags " "
+         List.fold_right concat_reports build_images " "
        in
        [
          "jq --slurp " ^ jq_slurp_filter ^ input_scan_reports

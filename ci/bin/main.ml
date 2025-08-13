@@ -408,28 +408,56 @@ let () =
   register
     "schedule_container_scanning_master"
     schedule_container_scanning_master
-    ~jobs:(Container_scanning.jobs "tezos/tezos:master")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "master";
+            dockerfile = "build.Dockerfile";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:master \
        Docker image" ;
   register
     "schedule_container_scanning_octez_releases"
     schedule_container_scanning_octez_releases
-    ~jobs:(Container_scanning.jobs "tezos/tezos:latest")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "latest";
+            dockerfile = "build.Dockerfile";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in tezos/tezos:latest \
        Docker image" ;
   register
     "schedule_container_scanning_evm_node_releases"
     schedule_container_scanning_evm_node_releases
-    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-evm-node-latest")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "octez-evm-node-latest";
+            dockerfile = "build.Dockerfile";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in latest \
        tezos/tezos:octez-evm-node-latest Docker image" ;
   register
     "schedule_container_scanning_octez_rc"
     schedule_container_scanning_octez_rc
-    ~jobs:(Container_scanning.jobs "tezos/tezos:octez-v22.0-rc3")
+    ~jobs:
+      Container_scanning.(
+        jobs
+          {
+            name = "tezos/tezos";
+            tag = "octez-v22.0-rc3";
+            dockerfile = "build.Dockerfile";
+          })
     ~description:
       "Scheduled pipeline for scanning vulnerabilities in the Docker image for \
        the latest release candidate of Octez" ;
