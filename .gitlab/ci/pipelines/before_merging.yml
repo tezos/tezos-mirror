@@ -558,6 +558,7 @@ oc.build_arm64-extra-dev:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
+    - octez-*
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -619,6 +620,7 @@ oc.build_arm64-extra-exp:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
+    - octez-*
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -977,6 +979,7 @@ oc.build_amd64-extra-dev:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
+    - octez-*
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
@@ -1087,6 +1090,7 @@ oc.build_amd64-extra-exp:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
     paths:
+    - octez-*
     - octez-teztale-*
     - src/proto_*/parameters/*.json
     - _build/default/src/lib_protocol_compiler/bin/main_native.exe
