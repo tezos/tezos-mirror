@@ -64,6 +64,8 @@ pub enum DurableStorageError {
     PathError(#[from] host::path::PathError),
 }
 
+// TO TRIGGER TEZT TESTS
+
 /// Errors when processing Ethereum transactions
 ///
 /// What could possibly go wrong? Some of these are place holders for now.

@@ -812,6 +812,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
       ~expire_in:(Duration (Days 1))
       (* TODO: [paths] can be refined based on [release] *)
       [
+        "octez-*";
         "octez-teztale-*";
         "src/proto_*/parameters/*.json";
         "_build/default/src/lib_protocol_compiler/bin/main_native.exe";
