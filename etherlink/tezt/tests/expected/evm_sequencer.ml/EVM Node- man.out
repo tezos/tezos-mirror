@@ -47,7 +47,7 @@ Run commands:
       [--kernel <evm_kernel.wasm>] [-d --wallet-dir <path>]
       [-f --password-filename <filename>] [--disable-da-fees]
       [--kernel-verbosity <info>] [--network <network>]
-      [--init-from-snapshot [snapshot url]] [--fund <0x...>]
+      [--init-from-snapshot [snapshot url or file path]] [--fund <0x...>]
       [--replicate [url]]
     Start the EVM node in sandbox mode. The sandbox mode is a sequencer-like
     mode that produces blocks with a fake key and no rollup node connection.
@@ -125,17 +125,17 @@ Run commands:
     --network <network>: The network the EVM node will be connecting to. Can
       be `mainnet` or `testnet`.
       If set, defaults to the value of EVM_NODE_NETWORK.
-    --init-from-snapshot [snapshot url]: Automatically download and import a
-      recent snapshot for supported networks on fresh data directories. If no
-      snapshot provider is given e.g. `--init-from-snapshot` with no
-      argument, then it uses the default built-in provider
-      `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the
-      short form of the Smart Rollup address, %R by the complete Smart Rollup
-      address, %n by the network (given by the argument --network), %h by the
-      history mode used by the node, and %% by %. Also accepts a path to an
-      existing snapshot.
+    --init-from-snapshot [snapshot url or file path]: Automatically download
+      and import a recent snapshot for supported networks on fresh data
+      directories. If no snapshot provider is given e.g.
+      `--init-from-snapshot` with no argument, then it uses the default
+      built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is
+      replaced by the short form of the Smart Rollup address, %R by the
+      complete Smart Rollup address, %n by the network (given by the argument
+      --network), %h by the history mode used by the node, and %% by %. Also
+      accepts a path to an existing snapshot.
       Defaults to
-      `https://snapshotter-sandbox.nomadic-labs.eu/local/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
+      `https://storage.googleapis.com/nl-sandboxes-etherlink--snapshots/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
     --fund <0x...>: The address of an account to provide with funds in the
       sandbox (can be repeated to fund multiple accounts).
     --replicate [url]: Replicate a chain in real time from the EVM node whose
@@ -414,7 +414,7 @@ Run commands:
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--initial-kernel <evm_installer.wasm>] [--dont-track-rollup-node]
-      [--no-sync] [--init-from-snapshot [snapshot url]]
+      [--no-sync] [--init-from-snapshot [snapshot url or file path]]
       [--history <archive | rolling:n | full:n>] [--network <network>]
     Start the EVM node in observer mode.
     --data-dir <data-dir>: The path to the EVM node data directory.
@@ -478,17 +478,17 @@ Run commands:
       Tracking the state of a rollup node allows to confirm the blocks
       received from the upstream EVM node.
     --no-sync: Disable tracking the head of the EVM node endpoint.
-    --init-from-snapshot [snapshot url]: Automatically download and import a
-      recent snapshot for supported networks on fresh data directories. If no
-      snapshot provider is given e.g. `--init-from-snapshot` with no
-      argument, then it uses the default built-in provider
-      `https://snapshotter-sandbox.nomadic-labs.eu`. %r is replaced by the
-      short form of the Smart Rollup address, %R by the complete Smart Rollup
-      address, %n by the network (given by the argument --network), %h by the
-      history mode used by the node, and %% by %. Also accepts a path to an
-      existing snapshot.
+    --init-from-snapshot [snapshot url or file path]: Automatically download
+      and import a recent snapshot for supported networks on fresh data
+      directories. If no snapshot provider is given e.g.
+      `--init-from-snapshot` with no argument, then it uses the default
+      built-in provider `https://snapshotter-sandbox.nomadic-labs.eu`. %r is
+      replaced by the short form of the Smart Rollup address, %R by the
+      complete Smart Rollup address, %n by the network (given by the argument
+      --network), %h by the history mode used by the node, and %% by %. Also
+      accepts a path to an existing snapshot.
       Defaults to
-      `https://snapshotter-sandbox.nomadic-labs.eu/local/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
+      `https://storage.googleapis.com/nl-sandboxes-etherlink--snapshots/etherlink-%n/%h/etherlink-%n-%h-latest.gz`.
     --history <archive | rolling:n | full:n>: History mode for the EVM node.
       ':n' means n days of history.
     --network <network>: The network the EVM node will be connecting to. Can
