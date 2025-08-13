@@ -626,7 +626,9 @@ let rec get_logs ?(n = 1) ctx ~block =
   match logs with
   | Ok logs ->
       (* Process each log in the range *)
-      List.iter_es (fun log -> handle_one_log ctx log) logs
+      List.iter_es
+        (fun log -> handle_one_log ctx (Ethereum_types.decode_pre log))
+        logs
   | Error (Filter_helpers.Too_many_logs {limit} :: _ as e) ->
       (* If we're querying a single block and it has too many logs, this is a
          fatal error - the node's max_nb_logs config needs to be increased *)

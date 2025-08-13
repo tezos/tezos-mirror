@@ -275,13 +275,32 @@ let get_logs (log_filter_config : Configuration.log_filter_config)
             | acc_logs, n_logs ->
                 fun (offset, len) ->
                   (* Apply the filter to the entire chunk concurrently *)
-                  let* new_logs =
+                  let* receipts =
                     Rollup_node_rpc.Etherlink_block_storage.block_range_receipts
                       offset
                       len
                   in
-                  let new_logs =
-                    List.concat_map (filter_one_tx filter) new_logs
+                  Octez_telemetry.Trace.with_tzresult
+                    ~service_name:"get_logs"
+                    "filter_and_encode_logs"
+                  @@ fun _ ->
+                  let*! new_logs =
+                    List.concat_map_s
+                      (fun receipt ->
+                        let open Lwt_syntax in
+                        let* () = Lwt.pause () in
+                        let logs = filter_one_tx filter receipt in
+                        (* Already encode logs individually, with yields to the
+                           Lwt scheduler, to allow the full encoding to not be
+                           blocking. *)
+                        List.map_s
+                          (fun log ->
+                            let+ () = Lwt.pause () in
+                            Ethereum_types.pre_encode
+                              Ethereum_types.transaction_log_encoding
+                              log)
+                          logs)
+                      receipts
                   in
                   let n_new_logs = List.length new_logs in
                   if n_logs + n_new_logs > log_filter_config.max_nb_logs then
