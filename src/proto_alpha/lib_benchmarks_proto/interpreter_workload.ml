@@ -177,6 +177,7 @@ type instruction_name =
   | N_ICreate_contract
   | N_ISet_delegate
   | N_IIndex_address
+  | N_IGet_address_index
   (* time *)
   | N_INow
   | N_IMin_block_time
@@ -385,6 +386,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ITransfer_tokens -> "N_ITransfer_tokens"
   | N_IImplicit_account -> "N_IImplicit_account"
   | N_IIndex_address -> "N_IIndex_address"
+  | N_IGet_address_index -> "N_IGet_address_index"
   | N_IIs_implicit_account -> "N_IIs_implicit_account"
   | N_ICreate_contract -> "N_ICreate_contract"
   | N_ISet_delegate -> "N_ISet_delegate"
@@ -620,6 +622,7 @@ let all_instructions =
     N_IImplicit_account;
     N_IIs_implicit_account;
     N_IIndex_address;
+    N_IGet_address_index;
     N_ICreate_contract;
     N_ISet_delegate;
     N_INow;
@@ -1043,6 +1046,8 @@ module Instructions = struct
 
   let index_address = ir_sized_step N_IIndex_address nullary
 
+  let get_address_index = ir_sized_step N_IGet_address_index nullary
+
   let create_contract = ir_sized_step N_ICreate_contract nullary
 
   let set_delegate = ir_sized_step N_ISet_delegate nullary
@@ -1448,6 +1453,7 @@ let extract_ir_sized_step : type bef_top bef res_top res.
   | IImplicit_account (_, _), _ -> Instructions.implicit_account
   | IIs_implicit_account (_, _), _ -> Instructions.is_implicit_account
   | IIndex_address (_, _), _ -> Instructions.index_address
+  | IGet_address_index (_, _), _ -> Instructions.get_address_index
   | ICreate_contract _, _ -> Instructions.create_contract
   | ISet_delegate (_, _), _ -> Instructions.set_delegate
   | INow (_, _), _ -> Instructions.now
@@ -1579,7 +1585,6 @@ let extract_ir_sized_step : type bef_top bef res_top res.
   | IXor_bytes (_, _), (x, (y, _)) ->
       Instructions.xor_bytes (Size.bytes x) (Size.bytes y)
   | INot_bytes (_, _), (x, _) -> Instructions.not_bytes (Size.bytes x)
-  | IGet_address_index _, _ -> assert false
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =
