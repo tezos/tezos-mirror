@@ -381,9 +381,10 @@ let build_block_static_directory ~l2_chain_id
          ->
          let*? _chain = check_chain chain in
          let*? _block = check_block block in
+         let hash = Alpha_context.Operation.hash_packed operation in
          let op = operation.protocol_data in
          let*? mock_result =
-           Tezlink_mock.Operation_metadata.operation_metadata op
+           Tezlink_mock.Operation_metadata.operation_metadata hash op
          in
          return (op, mock_result))
   |> register
@@ -395,9 +396,10 @@ let build_block_static_directory ~l2_chain_id
            List.map_e
              (fun (op : Alpha_context.packed_operation) ->
                let open Result_syntax in
+               let hash = Alpha_context.Operation.hash_packed op in
                let op = op.protocol_data in
                let* mock_result =
-                 Tezlink_mock.Operation_metadata.operation_metadata op
+                 Tezlink_mock.Operation_metadata.operation_metadata hash op
                in
                return (op, mock_result))
              ops

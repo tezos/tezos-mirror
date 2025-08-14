@@ -109,7 +109,7 @@ module Operation_metadata = struct
 
   let consumed_gas = Gas.Arith.zero
 
-  let manager_op_result (type kind) (source : public_key_hash)
+  let manager_op_result (type kind) (hash : Operation_hash.t)
       (contents : kind manager_operation) :
       kind successful_manager_operation_result tzresult =
     let open Result_syntax in
@@ -131,16 +131,8 @@ module Operation_metadata = struct
                   allocated_destination_contract = false;
                 }))
     | Origination _ ->
-        let bytes =
-          Data_encoding.Binary.to_bytes_exn
-            Signature.Public_key_hash.encoding
-            source
-        in
-        let kt1 =
-          Data_encoding.Binary.of_bytes_exn
-            Imported_protocol.Contract_hash.encoding
-            (Bytes.sub bytes 0 20)
-        in
+        let nonce = Imported_protocol.Origination_nonce.(incr (initial hash)) in
+        let kt1 = Imported_protocol.Contract_hash.of_nonce nonce in
         return
           (Origination_result
              {
@@ -157,12 +149,12 @@ module Operation_metadata = struct
              "only supported kinds are 'reveal' and 'transaction' and \
               'origination'")
 
-  let contents_result (type kind) (contents : kind contents) :
-      kind contents_result tzresult =
+  let contents_result (type kind) (hash : Operation_hash.t)
+      (contents : kind contents) : kind contents_result tzresult =
     let open Result_syntax in
     match contents with
-    | Manager_operation {operation; source; _} ->
-        let* result = manager_op_result source operation in
+    | Manager_operation {operation; _} ->
+        let* result = manager_op_result hash operation in
         return
           (Manager_operation_result
              {
@@ -175,21 +167,23 @@ module Operation_metadata = struct
           (Unsupported_operation_kind "only manager operations are supported")
 
   let rec contents_list_result : type kind.
-      kind contents_list -> kind contents_result_list tzresult =
-   fun contents ->
+      Operation_hash.t ->
+      kind contents_list ->
+      kind contents_result_list tzresult =
+   fun hash contents ->
     let open Result_syntax in
     match contents with
     | Single contents ->
-        let* result = contents_result contents in
+        let* result = contents_result hash contents in
         return (Single_result result)
     | Cons (contents, contents_list) ->
-        let* result = contents_result contents in
-        let* result_list = contents_list_result contents_list in
+        let* result = contents_result hash contents in
+        let* result_list = contents_list_result hash contents_list in
         return (Cons_result (result, result_list))
 
-  let operation_metadata (Operation_data op) =
+  let operation_metadata (hash : Operation_hash.t) (Operation_data op) =
     let open Result_syntax in
-    let* contents = contents_list_result op.contents in
+    let* contents = contents_list_result hash op.contents in
     return (Operation_metadata {contents})
 end
 
