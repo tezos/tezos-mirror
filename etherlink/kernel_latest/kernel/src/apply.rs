@@ -18,7 +18,8 @@ use evm_execution::precompiles::{self, FA_BRIDGE_PRECOMPILE_ADDRESS};
 use evm_execution::storage::tracer;
 use evm_execution::trace::TracerInput::CallTracer;
 use evm_execution::trace::{
-    get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput, TracerInput,
+    get_tracer_configuration, CallTrace, CallTracerConfig, CallTracerInput,
+    StructLoggerInput, TracerInput,
 };
 use primitive_types::{H160, H256, U256};
 use std::borrow::Cow;
@@ -404,7 +405,7 @@ pub fn revm_run_transaction<Host: Runtime>(
                 transaction_hash,
                 config,
             }) => revm_etherlink::inspectors::TracerInput::CallTracer(
-                revm_etherlink::inspectors::CallTracerInput {
+                revm_etherlink::inspectors::call_tracer::CallTracerInput {
                     config: revm_etherlink::inspectors::call_tracer::CallTracerConfig {
                         only_top_call: config.only_top_call,
                         with_logs: config.with_logs,
@@ -413,9 +414,22 @@ pub fn revm_run_transaction<Host: Runtime>(
                         .map(|hash| revm::primitives::B256::from(hash.0)),
                 },
             ),
-            // TODO: StructLogger is a no-op on purpose for now. Check if this is something
-            // we want to maintain when switching to REVM.
-            TracerInput::StructLogger(_) => revm_etherlink::inspectors::TracerInput::NoOp,
+            TracerInput::StructLogger(StructLoggerInput {
+                transaction_hash,
+                config,
+            }) => revm_etherlink::inspectors::TracerInput::StructLogger(
+                revm_etherlink::inspectors::struct_logger::StructLoggerInput {
+                    config:
+                        revm_etherlink::inspectors::struct_logger::StructLoggerConfig {
+                            enable_memory: config.enable_memory,
+                            enable_return_data: config.enable_return_data,
+                            disable_stack: config.disable_stack,
+                            disable_storage: config.disable_storage,
+                        },
+                    transaction_hash: transaction_hash
+                        .map(|hash| revm::primitives::B256::from(hash.0)),
+                },
+            ),
         }),
     ) {
         Ok(outcome) => {

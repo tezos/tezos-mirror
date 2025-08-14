@@ -29,13 +29,13 @@ use tezos_ethereum::Log as RlpLog;
 use tezos_evm_logging::{log, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct CallTracerConfig {
     pub only_top_call: bool,
     pub with_logs: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug)]
 pub struct CallTracerInput {
     pub config: CallTracerConfig,
     pub transaction_hash: Option<B256>,
@@ -175,7 +175,7 @@ pub struct CallTracer {
     config: CallTracerConfig,
     precompiles: EtherlinkPrecompiles,
     call_trace: HashMap<u16, CallTrace>,
-    transaction_hash: Option<B256>,
+    pub transaction_hash: Option<B256>,
     initial_gas: u64,
     spec_id: SpecId,
 }

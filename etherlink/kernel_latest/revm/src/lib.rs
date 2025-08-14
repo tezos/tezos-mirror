@@ -7,8 +7,10 @@ use crate::{database::PrecompileDatabase, precompiles::send_outbox_message::With
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
-    call_tracer::CallTracer, noop::NoInspector, CallTracerInput, EtherlinkInspector,
-    EvmInspection, TracerInput,
+    call_tracer::{CallTracer, CallTracerInput},
+    noop::NoInspector,
+    struct_logger::{StructLogger, StructLoggerInput},
+    EtherlinkInspector, EvmInspection, TracerInput,
 };
 use precompiles::provider::EtherlinkPrecompiles;
 use revm::{
@@ -153,6 +155,13 @@ fn get_inspector_from(
             spec_id,
             transaction_hash,
         ))),
+        TracerInput::StructLogger(StructLoggerInput {
+            config,
+            transaction_hash,
+        }) => EtherlinkInspector::StructLogger(Box::new(StructLogger::new(
+            config,
+            transaction_hash,
+        ))),
         TracerInput::NoOp => EtherlinkInspector::NoOp(NoInspector),
     }
 }
@@ -272,6 +281,16 @@ pub fn run_transaction<'a, Host: Runtime>(
         );
 
         let ExecResultAndState { result, .. } = evm.inspect_tx(&tx)?;
+
+        if evm.inspector.is_struct_logger() {
+            StructLogger::store_outcome(
+                evm.ctx.db_mut().host,
+                result.is_success(),
+                result.output(),
+                result.gas_used(),
+                evm.inspector.get_transaction_hash(),
+            )?
+        }
 
         let withdrawals = evm.db_mut().take_withdrawals();
 
