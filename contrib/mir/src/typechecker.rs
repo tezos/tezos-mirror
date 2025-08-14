@@ -2204,7 +2204,7 @@ pub(crate) fn typecheck_instruction<'a>(
 }
 
 pub(crate) fn typecheck_contract_address(
-    ctx: &mut Ctx,
+    _ctx: &mut Ctx,
     address: Address,
     ep: Entrypoint,
     typ: &Type,
@@ -2235,11 +2235,12 @@ pub(crate) fn typecheck_contract_address(
                 Err(TcError::UnexpectedImplicitAccountType(typ.clone()))
             }
         }
+        #[cfg(feature = "runtime_entrypoint_verification")]
         AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
             let contract_entrypoints =
-                (ctx.lookup_contract)(&address.hash).ok_or(TcError::NoSuchContract)?;
+                (_ctx.lookup_contract)(&address.hash).ok_or(TcError::NoSuchContract)?;
 
             // Do we have the entrypoint for the call in the entrypoints parsed
             // from the destination contract parameter?
@@ -2249,13 +2250,18 @@ pub(crate) fn typecheck_contract_address(
 
             // if the entrypoint is present, check that it is of the required
             // type.
-            ensure_ty_eq(&mut ctx.gas, typ, contract_entrypoint_type)?;
+            ensure_ty_eq(&mut _ctx.gas, typ, contract_entrypoint_type)?;
 
             Ok(Address {
                 entrypoint,
                 hash: address.hash,
             })
         }
+        #[cfg(not(feature = "runtime_entrypoint_verification"))]
+        AddressHash::Kt1(_) | AddressHash::Sr1(_) => Ok(Address {
+            entrypoint,
+            hash: address.hash,
+        }),
     }
 }
 

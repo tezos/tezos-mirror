@@ -9,8 +9,9 @@
 
 #![allow(clippy::type_complexity)]
 use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage};
-use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::ast::michelson_address::AddressHash;
+#[cfg(feature = "runtime_entrypoint_verification")]
+use crate::ast::michelson_address::entrypoint::Entrypoints;
 use crate::gas::Gas;
 use num_bigint::{BigInt, BigUint};
 use std::collections::HashMap;
@@ -52,6 +53,7 @@ pub struct Ctx<'a> {
     /// exist, or [`Some(entrypoints)`] with the map of its entrypoints. See
     /// also [Self::set_known_contracts]. Defaults to returning [None] for any
     /// address.
+    #[cfg(feature = "runtime_entrypoint_verification")]
     pub lookup_contract: Box<dyn FnMut(&AddressHash) -> Option<Entrypoints>>,
     /// A function that maps public key hashes (i.e. effectively implicit
     /// account addresses) to their corresponding voting powers. Note that if
@@ -102,6 +104,7 @@ impl<'a> Ctx<'a> {
 
     /// Set a reasonable implementation for [Self::lookup_contract] by providing
     /// something that can convert to [`HashMap<AddressHash, Entrypoints>`].
+    #[cfg(feature = "runtime_entrypoint_verification")]
     pub fn set_known_contracts(&mut self, v: impl Into<HashMap<AddressHash, Entrypoints>>) {
         let map = v.into();
         self.lookup_contract = Box::new(move |ah| map.get(ah).cloned());
@@ -154,6 +157,7 @@ impl Default for Ctx<'_> {
             self_address: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             sender: "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi".try_into().unwrap(),
             source: "tz1TSbthBCECxmnABv73icw7yyyvUWFLAoSP".try_into().unwrap(),
+            #[cfg(feature = "runtime_entrypoint_verification")]
             lookup_contract: Box::new(|_| None),
             voting_powers: Box::new(|_| 0u32.into()),
             total_voting_power: 0u32.into(),

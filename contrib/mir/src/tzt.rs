@@ -134,6 +134,7 @@ fn populate_ctx_with_known_contracts(
     }
 
     // Set known contracts in context.
+    #[cfg(feature = "runtime_entrypoint_verification")]
     ctx.set_known_contracts(known_contracts);
 }
 
