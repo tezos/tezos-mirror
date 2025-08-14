@@ -21,7 +21,8 @@ use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{
-    produce_skipped_receipt, Originated, OriginationError, OriginationSuccess,
+    produce_skipped_receipt, ApplyOperationError, ContentResult,
+    InternalContentWithMetadata, InternalOperationSum, Originated, OriginationSuccess,
     TransferTarget,
 };
 use tezos_tezlink::{
@@ -30,9 +31,9 @@ use tezos_tezlink::{
         TransferContent,
     },
     operation_result::{
-        is_applied, produce_operation_result, transform_result_backtrack, Balance,
-        BalanceTooLow, BalanceUpdate, OperationError, OperationResultSum, RevealError,
-        RevealSuccess, TransferError, TransferSuccess, UpdateOrigin, ValidityError,
+        produce_operation_result, Balance, BalanceTooLow, BalanceUpdate, OperationError,
+        OperationResultSum, OriginationError, RevealError, RevealSuccess, TransferError,
+        TransferSuccess, UpdateOrigin, ValidityError,
     },
 };
 use validate::{validate_individual_operation, ValidationInfo};
@@ -132,8 +133,10 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_account: &mut TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
-) -> Result<(), TransferError> {
-    for internal_op in internal_operations {
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
+) -> Result<(), ApplyOperationError> {
+    let mut failed = None;
+    for (index, internal_op) in internal_operations.into_iter().enumerate() {
         log!(
             host,
             Debug,
@@ -148,31 +151,89 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let dest_contract = contract_from_address(destination_address.hash)?;
-                transfer(
-                    host,
-                    context,
-                    sender_contract,
-                    sender_account,
-                    &amount,
-                    &dest_contract,
-                    &destination_address.entrypoint,
-                    param.into_micheline_optimized_legacy(&parser.arena),
-                    parser,
-                    ctx,
-                )
+                let value = param.into_micheline_optimized_legacy(&parser.arena);
+                let encoded_value = value.encode();
+                let content = TransferContent {
+                    amount,
+                    destination: dest_contract,
+                    parameters: Some(Parameter {
+                        entrypoint: destination_address.entrypoint,
+                        value: encoded_value,
+                    }),
+                };
+                let nonce = ctx.get_operation_counter().try_into().map_err(
+                    |err: std::num::TryFromIntError| {
+                        ApplyOperationError::InternalOperationNonceOverflow(
+                            err.to_string(),
+                        )
+                    },
+                )?;
+                if failed.is_some() {
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        content,
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: ContentResult::Skipped,
+                    })
+                } else {
+                    let receipt = transfer(
+                        host,
+                        context,
+                        sender_contract,
+                        sender_account,
+                        &content.amount,
+                        &content.destination,
+                        content
+                            .parameters
+                            .as_ref()
+                            .map_or(&Entrypoint::default(), |param| &param.entrypoint),
+                        value,
+                        parser,
+                        ctx,
+                        all_internal_receipts,
+                    );
+                    InternalOperationSum::Transfer(InternalContentWithMetadata {
+                        content,
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: match receipt {
+                            Ok(success) => ContentResult::Applied(success.into()),
+                            Err(err) => {
+                                failed = Some(index);
+                                ContentResult::Failed(
+                                    ApplyOperationError::from(err).into(),
+                                )
+                            }
+                        },
+                    })
+                }
             }
             _ => {
-                return Err(TransferError::FailedToApplyInternalOperation(
-                    "Unsupported internal operation".to_string(),
-                ));
+                return Err(ApplyOperationError::UnSupportedOperation(format!(
+                    "Internal operation {:?} is not supported",
+                    internal_op.operation
+                )));
             }
-        }?;
+        };
         log!(
             host,
             Debug,
             "Internal operation executed successfully: {:?}",
             internal_receipt
         );
+        all_internal_receipts.push(internal_receipt);
+    }
+    if let Some(index) = failed {
+        log!(
+            host,
+            Debug,
+            "Internal operation execution failed at index {}",
+            index
+        );
+        all_internal_receipts
+            .iter_mut()
+            .take(index)
+            .for_each(InternalOperationSum::transform_result_backtrack);
     }
     Ok(())
 }
@@ -190,6 +251,7 @@ pub fn transfer<'a, Host: Runtime>(
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -246,7 +308,7 @@ pub fn transfer<'a, Host: Runtime>(
             dest_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
-            let _internal_receipt = execute_internal_operations(
+            execute_internal_operations(
                 host,
                 context,
                 internal_operations,
@@ -254,7 +316,11 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut dest_account,
                 parser,
                 ctx,
-            );
+                all_internal_receipts,
+            )
+            .map_err(|err| {
+                TransferError::FailedToExecuteInternalOperation(err.to_string())
+            })?;
             log!(host, Debug, "Transfer operation succeeded");
             Ok(TransferSuccess {
                 storage: Some(new_storage),
@@ -274,7 +340,8 @@ pub fn transfer_external<Host: Runtime>(
     amount: &Narith,
     dest: &Contract,
     parameter: &Option<Parameter>,
-) -> Result<TransferSuccess, TransferError> {
+    all_internal_receipts: &mut Vec<InternalOperationSum>,
+) -> Result<TransferTarget, TransferError> {
     log!(
         host,
         Debug,
@@ -308,7 +375,9 @@ pub fn transfer_external<Host: Runtime>(
         value,
         &parser,
         &mut ctx,
+        all_internal_receipts,
     )
+    .map(Into::into)
 }
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
@@ -599,7 +668,7 @@ fn apply_batch<Host: Runtime>(
             )
         };
 
-        if first_failure.is_none() && !is_applied(&receipt) {
+        if first_failure.is_none() && !receipt.is_applied() {
             first_failure = Some(index);
         }
 
@@ -609,7 +678,7 @@ fn apply_batch<Host: Runtime>(
     if let Some(failure_idx) = first_failure {
         receipts[..failure_idx]
             .iter_mut()
-            .for_each(transform_result_backtrack);
+            .for_each(OperationResultSum::transform_result_backtrack);
         return (receipts, false);
     }
 
@@ -624,12 +693,14 @@ fn apply_operation<Host: Runtime>(
     source_account: &mut TezlinkImplicitAccount,
     balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
+    let mut internal_operations_receipts = Vec::new();
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source, source_account, pk);
             let manager_result = produce_operation_result(
                 balance_updates,
                 reveal_result.map_err(Into::into),
+                internal_operations_receipts,
             );
             OperationResultSum::Reveal(manager_result)
         }
@@ -638,7 +709,7 @@ fn apply_operation<Host: Runtime>(
             destination,
             parameters,
         }) => {
-            match transfer_external(
+            let transfer_result = transfer_external(
                 host,
                 context,
                 source,
@@ -646,25 +717,21 @@ fn apply_operation<Host: Runtime>(
                 amount,
                 destination,
                 parameters,
-            ) {
-                Ok(res) => {
-                    let transfer_result = TransferTarget::ToContrat(res);
-                    let manager_result =
-                        produce_operation_result(balance_updates, Ok(transfer_result));
-                    OperationResultSum::Transfer(manager_result)
-                }
-                Err(e) => {
-                    let manager_result =
-                        produce_operation_result(balance_updates, Err(e.into()));
-                    OperationResultSum::Transfer(manager_result)
-                }
-            }
+                &mut internal_operations_receipts,
+            );
+            let manager_result = produce_operation_result(
+                balance_updates,
+                transfer_result.map_err(Into::into),
+                internal_operations_receipts,
+            );
+            OperationResultSum::Transfer(manager_result)
         }
         OperationContent::Origination(_) => {
             let origination_result = originate_contract(host, source);
             let manager_result = produce_operation_result(
                 balance_updates,
                 origination_result.map_err(|e| e.into()),
+                internal_operations_receipts,
             );
             OperationResultSum::Origination(manager_result)
         }
@@ -677,6 +744,7 @@ mod tests {
     use mir::ast::{Entrypoint, Micheline};
     use pretty_assertions::assert_eq;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
+    use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
     use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
@@ -688,9 +756,9 @@ mod tests {
         },
         operation_result::{
             ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
-            CounterError, OperationResult, OperationResultSum, RevealError,
-            RevealSuccess, TransferError, TransferSuccess, TransferTarget, UpdateOrigin,
-            ValidityError,
+            CounterError, InternalContentWithMetadata, InternalOperationSum,
+            OperationResult, OperationResultSum, RevealError, RevealSuccess,
+            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -737,12 +805,21 @@ mod tests {
     }
 
     const CONTRACT_1: &str = "KT1EFxv88KpjxzGNu1ozh9Vta4BaV3psNknp";
-
     const CONTRACT_2: &str = "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton";
+    const CONTRACT_3: &str = "KT1AEfeckNbdEYwaMKkytBwPJPycz7jdSGea";
 
     static SCRIPT: &str = r#"
         parameter string;
         storage string;
+        code {
+            CAR ;
+            NIL operation ;
+            PAIR
+        }"#;
+
+    static UNIT_SCRIPT: &str = r#"
+        parameter unit;
+        storage unit;
         code {
             CAR ;
             NIL operation ;
@@ -756,6 +833,23 @@ mod tests {
             DROP;
             PUSH string "This contract always fails";
             FAILWITH
+        }"#;
+
+    static SCRIPT_EMITING_INTERNAL_OP: &str = r#"
+        parameter (list address);
+        storage unit;
+        code {
+            CAR;
+            MAP {
+                CONTRACT unit;
+                IF_NONE { PUSH string "Invalid contract address"; FAILWITH } {};
+                PUSH mutez 10;
+                PUSH unit Unit;
+                TRANSFER_TOKENS
+            };
+            PUSH unit Unit;
+            SWAP;
+            PAIR
         }"#;
 
     fn make_operation(
@@ -1465,7 +1559,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_transfer_to_originated_faucet() {
+    fn apply_transfer_to_originated_faucet_with_success_receipt() {
         let mut host = MockKernelHost::default();
         let context = context::Context::init_context();
         let (requester_balance, faucet_balance, fees) = (50, 1000, 15);
@@ -1497,6 +1591,7 @@ mod tests {
             "#,
             "Unit",
         );
+        let encoded_storage = mir::parser::Parser::new().parse(storage).unwrap().encode();
         let faucet = init_contract(&mut host, &desthash, code, storage, &1000.into());
         let requested_amount = 100;
         let operation = make_transfer_operation(
@@ -1506,15 +1601,105 @@ mod tests {
             5,
             src.clone(),
             0.into(),
-            Contract::Originated(desthash).clone(),
+            Contract::Originated(desthash.clone()),
             Some(Parameter {
                 entrypoint: Entrypoint::try_from("fund")
                     .expect("Entrypoint should be valid"),
                 value: Micheline::from(requested_amount as i128).encode(),
             }),
         );
-        let res = validate_and_apply_operation(&mut host, &context, operation).expect(
-            "validate_and_apply_operation should not have failed with a kernel error",
+        let res = validate_and_apply_operation(&mut host, &context, operation)
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            )
+            .remove(0);
+        assert_eq!(
+            res,
+            OperationResultSum::Transfer(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: 0 - fees as i64,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: fees as i64,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Applied(TransferTarget::ToContrat(
+                    TransferSuccess {
+                        storage: Some(encoded_storage),
+                        lazy_storage_diff: None,
+                        balance_updates: vec![
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Implicit(
+                                    src.pkh.clone()
+                                )),
+                                changes: 0,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                            BalanceUpdate {
+                                balance: Balance::Account(Contract::Originated(
+                                    desthash.clone()
+                                ),),
+                                changes: 0,
+                                update_origin: UpdateOrigin::BlockApplication,
+                            },
+                        ],
+                        ticket_receipt: vec![],
+                        originated_contracts: vec![],
+                        consumed_gas: 0_u64.into(),
+                        storage_size: 0_u64.into(),
+                        paid_storage_size_diff: 0_u64.into(),
+                        allocated_destination_contract: false,
+                    }
+                )),
+                internal_operation_results: vec![InternalOperationSum::Transfer(
+                    InternalContentWithMetadata {
+                        content: TransferContent {
+                            amount: requested_amount.into(),
+                            destination: Contract::Implicit(src.pkh.clone()),
+                            parameters: Some(Parameter {
+                                entrypoint: Entrypoint::default(),
+                                value: Micheline::from(()).encode(),
+                            }),
+                        },
+
+                        sender: Contract::Originated(desthash.clone()),
+                        nonce: 1,
+                        result: ContentResult::Applied(TransferTarget::ToContrat(
+                            TransferSuccess {
+                                storage: None,
+                                lazy_storage_diff: None,
+                                balance_updates: vec![
+                                    BalanceUpdate {
+                                        balance: Balance::Account(Contract::Originated(
+                                            desthash.clone()
+                                        )),
+                                        changes: 0 - (requested_amount as i64),
+                                        update_origin: UpdateOrigin::BlockApplication,
+                                    },
+                                    BalanceUpdate {
+                                        balance: Balance::Account(Contract::Implicit(
+                                            src.pkh.clone()
+                                        )),
+                                        changes: requested_amount as i64,
+                                        update_origin: UpdateOrigin::BlockApplication,
+                                    },
+                                ],
+                                ticket_receipt: vec![],
+                                originated_contracts: vec![],
+                                consumed_gas: 0_u64.into(),
+                                storage_size: 0_u64.into(),
+                                paid_storage_size_diff: 0_u64.into(),
+                                allocated_destination_contract: false,
+                            }
+                        )),
+                    }
+                )],
+            })
         );
         println!("Result: {res:?}");
         assert_eq!(
@@ -2186,5 +2371,194 @@ mod tests {
             20.into(),
             "Fees should have been paid for failed operation"
         )
+    }
+
+    #[test]
+    fn test_internal_receipts_failure_backtrack_all() {
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+
+        // Initialize accounts with higher balances for the test
+        let mut src_acc = init_account(&mut host, &src.pkh);
+        src_acc.set_balance(&mut host, &100_u64.into()).unwrap();
+
+        // Create a script that emits internal operations to multiple targets
+        let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &contract_chapo_hash,
+            SCRIPT_EMITING_INTERNAL_OP,
+            "Unit",
+            &100_u64.into(),
+        );
+
+        // Create a failing contract
+        let internal_fail_contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_2)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &internal_fail_contract_hash,
+            FAILING_SCRIPT,
+            "Unit",
+            &100_u64.into(),
+        );
+
+        // Create a successful contract
+        let internal_success_contract_hash =
+            ContractKt1Hash::from_base58_check(CONTRACT_3)
+                .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &internal_success_contract_hash,
+            UNIT_SCRIPT,
+            "Unit",
+            &100_u64.into(),
+        );
+
+        let success_micheline_address = Micheline::Bytes(
+            Contract::Originated(internal_success_contract_hash.clone())
+                .to_bytes()
+                .unwrap(),
+        );
+        let fail_micheline_address = Micheline::Bytes(
+            Contract::Originated(internal_fail_contract_hash.clone())
+                .to_bytes()
+                .unwrap(),
+        );
+        let addrs: Vec<Micheline> = vec![
+            success_micheline_address.clone(),
+            fail_micheline_address,
+            success_micheline_address,
+        ];
+        let param_value = Micheline::Seq(&addrs);
+        let operation = make_operation(
+            10,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![
+                OperationContent::Reveal(RevealContent {
+                    pk: src.pk.clone(),
+                    proof: None,
+                }),
+                OperationContent::Transfer(TransferContent {
+                    amount: 0.into(),
+                    destination: Contract::Originated(contract_chapo_hash),
+                    parameters: Some(Parameter {
+                        entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                        value: param_value.encode(),
+                    }),
+                }),
+            ],
+        );
+        let context = context::Context::init_context();
+        let receipts = validate_and_apply_operation(&mut host, &context, operation)
+            .expect(
+                "validate_and_apply_operation should not have failed with a kernel error",
+            );
+        assert_eq!(
+            receipts.len(),
+            2,
+            "There should be two receipts: one for reveal and one for transfer"
+        );
+        assert!(
+            matches!(
+                &receipts[0],
+                OperationResultSum::Reveal(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "First receipt should be a BackTracked Reveal but is {:?}",
+            receipts[0]
+        );
+        assert!(
+            matches!(
+                &receipts[1],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::BackTracked(_),
+                    ..
+                })
+            ),
+            "Second receipt should be a BackTracked Transfer but is {:?}",
+            receipts[1]
+        );
+
+        // Check Internal Operations
+        if let OperationResultSum::Transfer(OperationResult {
+            internal_operation_results,
+            ..
+        }) = &receipts[1]
+        {
+            assert_eq!(
+                internal_operation_results.len(),
+                3,
+                "There should be three internal operations"
+            );
+
+            // Check the first internal operation
+            if let InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result:
+                    ContentResult::BackTracked(TransferTarget::ToContrat(TransferSuccess {
+                        balance_updates,
+                        ..
+                    })),
+                ..
+            }) = &internal_operation_results[0]
+            {
+                assert_eq!(
+                    destination,
+                    &Contract::Originated(internal_success_contract_hash.clone()),
+                    "First internal operation should target the successful contract"
+                );
+                assert_eq!(
+                    balance_updates.len(),
+                    2,
+                    "Balance updates should have two entries"
+                );
+            } else {
+                panic!(
+                    "First internal operation is not a transfer its {:?}",
+                    internal_operation_results[0]
+                );
+            }
+
+            // Check the second internal operation
+            if let InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result: ContentResult::Failed(_),
+                ..
+            }) = &internal_operation_results[1]
+            {
+                assert_eq!(
+                    destination,
+                    &Contract::Originated(internal_fail_contract_hash),
+                    "Second internal operation should target the failing contract"
+                );
+            } else {
+                panic!("Second internal operation is not a transfer or does not match expected structure");
+            }
+
+            // Check the third internal operation
+            if let InternalOperationSum::Transfer(InternalContentWithMetadata {
+                content: TransferContent { destination, .. },
+                result: ContentResult::Skipped,
+                ..
+            }) = &internal_operation_results[2]
+            {
+                assert_eq!(
+                    destination,
+                    &Contract::Originated(internal_success_contract_hash),
+                    "Third internal operation should target the successful contract"
+                );
+            } else {
+                panic!("Third internal operation is not a transfer or does not match expected structure");
+            }
+        } else {
+            panic!("Second receipt is not a Transfer with Internal Operations");
+        }
     }
 }

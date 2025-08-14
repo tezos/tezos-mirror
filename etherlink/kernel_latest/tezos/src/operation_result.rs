@@ -21,7 +21,11 @@ use tezos_smart_rollup::types::{PublicKey, PublicKeyHash};
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
-use crate::operation::{ManagerOperation, ManagerOperationContent, OperationContent};
+use crate::operation::OriginationContent;
+use crate::operation::{
+    ManagerOperation, ManagerOperationContent, OperationContent, RevealContent,
+    TransferContent,
+};
 
 #[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub struct CounterError {
@@ -128,10 +132,10 @@ pub enum TransferError {
     FailedToUpdateContractStorage,
     #[error("Failed to update destination balance")]
     FailedToUpdateDestinationBalance,
-    #[error("An internal operation failed: {0}")]
-    FailedToApplyInternalOperation(String),
     #[error("Apply operation failed because of an unsupported address error")]
     MirAddressUnsupportedError,
+    #[error("Failed to execute internal operation: {0}")]
+    FailedToExecuteInternalOperation(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
@@ -168,6 +172,8 @@ pub enum ApplyOperationError {
     Origination(#[from] OriginationError),
     #[error("Unsupported operation: {0}")]
     UnSupportedOperation(String),
+    #[error("Internal operation nonce overflow due to {0}")]
+    InternalOperationNonceOverflow(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -248,27 +254,14 @@ pub trait OperationKind {
     type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
 }
 
-/// Empty struct to implement [OperationKind] trait for Reveal
-#[derive(PartialEq, Debug)]
-pub struct Reveal;
-
-/// Empty struct to implement [OperationKind] trait for Transfer
-#[derive(PartialEq, Debug)]
-pub struct Transfer;
-
-/// Empty struct to implement [OperationKind] trait for Origination
-#[derive(PartialEq, Debug)]
-pub struct Origination;
-
-impl OperationKind for Transfer {
+impl OperationKind for TransferContent {
     type Success = TransferTarget;
 }
-
-impl OperationKind for Reveal {
+impl OperationKind for RevealContent {
     type Success = RevealSuccess;
 }
 
-impl OperationKind for Origination {
+impl OperationKind for OriginationContent {
     type Success = OriginationSuccess;
 }
 
@@ -276,6 +269,20 @@ impl OperationKind for Origination {
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
+}
+
+impl From<TransferSuccess> for TransferTarget {
+    fn from(value: TransferSuccess) -> Self {
+        TransferTarget::ToContrat(value)
+    }
+}
+
+impl From<TransferTarget> for TransferSuccess {
+    fn from(value: TransferTarget) -> Self {
+        match value {
+            TransferTarget::ToContrat(success) => success,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, NomReader, BinWriter)]
@@ -392,6 +399,14 @@ impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
     }
 }
 
+impl From<ApplyOperationError> for ApplyOperationErrors {
+    fn from(value: ApplyOperationError) -> Self {
+        ApplyOperationErrors {
+            errors: vec![value],
+        }
+    }
+}
+
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
 #[derive(PartialEq, Debug, BinWriter, NomReader)]
@@ -400,6 +415,19 @@ pub enum ContentResult<M: OperationKind> {
     Failed(ApplyOperationErrors),
     Skipped,
     BackTracked(M::Success),
+}
+
+impl<M: OperationKind> ContentResult<M> {
+    pub fn backtrack_if_applied(&mut self) {
+        if let ContentResult::Applied(_) = self {
+            // Lowkey optimisation: takes the ownership of the content result by replacing
+            // the result with Skipped as a place holder
+            let current_content_result = std::mem::replace(self, ContentResult::Skipped);
+            if let ContentResult::Applied(success) = current_content_result {
+                *self = ContentResult::BackTracked(success);
+            }
+        }
+    }
 }
 
 /// A [Balance] updates can be triggered on different target
@@ -441,51 +469,74 @@ pub struct OperationResult<M: OperationKind> {
     pub balance_updates: Vec<BalanceUpdate>,
     pub result: ContentResult<M>,
     //TODO Placeholder for internal operations : #8018
-    #[encoding(dynamic, bytes)]
-    pub internal_operation_results: Vec<u8>,
+    #[encoding(dynamic, list)]
+    pub internal_operation_results: Vec<InternalOperationSum>,
 }
+
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
+pub struct InternalContentWithMetadata<M: OperationKind> {
+    pub sender: Contract,
+    pub nonce: u16,
+    pub content: M,
+    pub result: ContentResult<M>,
+}
+
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
+pub enum InternalOperationSum {
+    #[encoding(tag = 1)]
+    Transfer(InternalContentWithMetadata<TransferContent>),
+}
+
+impl InternalOperationSum {
+    pub fn transform_result_backtrack(&mut self) {
+        match self {
+            InternalOperationSum::Transfer(op_res) => {
+                op_res.result.backtrack_if_applied();
+            }
+        }
+    }
+    pub fn is_applied(&self) -> bool {
+        match self {
+            InternalOperationSum::Transfer(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+        }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
-    Reveal(OperationResult<Reveal>),
-    Transfer(OperationResult<Transfer>),
-    Origination(OperationResult<Origination>),
+    Reveal(OperationResult<RevealContent>),
+    Transfer(OperationResult<TransferContent>),
+    Origination(OperationResult<OriginationContent>),
 }
 
-pub fn is_applied(res: &OperationResultSum) -> bool {
-    match res {
-        OperationResultSum::Reveal(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
-        }
-        OperationResultSum::Transfer(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
-        }
-        OperationResultSum::Origination(op_res) => {
-            matches!(op_res.result, ContentResult::Applied(_))
+impl OperationResultSum {
+    pub fn is_applied(&self) -> bool {
+        match self {
+            OperationResultSum::Reveal(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            OperationResultSum::Transfer(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            OperationResultSum::Origination(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
         }
     }
-}
 
-fn backtrack_if_applied<T: OperationKind>(result: &mut ContentResult<T>) {
-    if let ContentResult::Applied(_) = result {
-        // Lowkey optimisation: takes the ownership of the content result by replacing
-        // the result with Skipped as a place holder
-        let current_content_result = std::mem::replace(result, ContentResult::Skipped);
-        if let ContentResult::Applied(success) = current_content_result {
-            *result = ContentResult::BackTracked(success);
-        }
-    }
-}
-
-pub fn transform_result_backtrack(op: &mut OperationResultSum) {
-    match op {
-        OperationResultSum::Transfer(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
-        }
-        OperationResultSum::Reveal(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
-        }
-        OperationResultSum::Origination(op_result) => {
-            backtrack_if_applied(&mut op_result.result)
+    pub fn transform_result_backtrack(&mut self) {
+        match self {
+            OperationResultSum::Transfer(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
+            OperationResultSum::Reveal(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
+            OperationResultSum::Origination(op_result) => {
+                op_result.result.backtrack_if_applied();
+            }
         }
     }
 }
@@ -493,17 +544,29 @@ pub fn transform_result_backtrack(op: &mut OperationResultSum) {
 pub fn produce_operation_result<M: OperationKind>(
     balance_updates: Vec<BalanceUpdate>,
     result: Result<M::Success, ApplyOperationError>,
+    internal_operation_results: Vec<InternalOperationSum>,
 ) -> OperationResult<M> {
     match result {
-        Ok(success) => OperationResult {
-            balance_updates,
-            result: ContentResult::Applied(success),
-            internal_operation_results: vec![],
-        },
+        Ok(success) => {
+            let all_internal_succeded = internal_operation_results
+                .last()
+                .is_none_or(InternalOperationSum::is_applied);
+            OperationResult {
+                balance_updates,
+                result: if all_internal_succeded {
+                    ContentResult::Applied(success)
+                } else {
+                    ContentResult::BackTracked(
+                        success, // If internal operations failed, we backtrack the main operation result
+                    )
+                },
+                internal_operation_results,
+            }
+        }
         Err(operation_error) => OperationResult {
             balance_updates,
             result: ContentResult::Failed(vec![operation_error].into()),
-            internal_operation_results: vec![],
+            internal_operation_results,
         },
     }
 }
@@ -555,15 +618,17 @@ impl NomReader<'_> for OperationWithMetadata {
         let (input, content) = ManagerOperationContent::nom_read(input)?;
         let (input, receipt) = match content {
             ManagerOperationContent::Transfer(_) => {
-                let (input, receipt) = OperationResult::<Transfer>::nom_read(input)?;
+                let (input, receipt) =
+                    OperationResult::<TransferContent>::nom_read(input)?;
                 (input, OperationResultSum::Transfer(receipt))
             }
             ManagerOperationContent::Reveal(_) => {
-                let (input, receipt) = OperationResult::<Reveal>::nom_read(input)?;
+                let (input, receipt) = OperationResult::<RevealContent>::nom_read(input)?;
                 (input, OperationResultSum::Reveal(receipt))
             }
             ManagerOperationContent::Origination(_) => {
-                let (input, receipt) = OperationResult::<Origination>::nom_read(input)?;
+                let (input, receipt) =
+                    OperationResult::<OriginationContent>::nom_read(input)?;
                 (input, OperationResultSum::Origination(receipt))
             }
         };
@@ -817,6 +882,89 @@ mod tests {
             .expect("Operation with metadata should be encodable");
         let operation_and_receipt_bytes = "00000001b76c0002298c03ed7d454a101eb7022bc95f7e5f41ac78ff010100008080a8ec85afd1310000e7670f32038107a59a2b9cfefae36ea21f5aa63c00000000000100000170000000b3b300000082a90000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a314b715470455a37596f62375162504534487934576f38664847384c684b785a5378222929292c2062616c616e63653a204e6172697468283130292c20616d6f756e743a204e617269746828323129207d29290000000000b5b500000082ab0000005472616e736665722842616c616e6365546f6f4c6f772842616c616e6365546f6f4c6f77207b20636f6e74726163743a20496d706c69636974284564323535313928436f6e7472616374547a31486173682822747a31676a614638315a525276647a6a6f627966564e7341655343365053636a6651774e222929292c2062616c616e63653a204e6172697468283535292c20616d6f756e743a204e6172697468283131313129207d2929000000000000f868f45f51a0c7a5733ab2c7f29781303904d9ef5b8fbf7b96429f00fe487c1d0f174c205b49c7393e5436b9522b88d3951113c32115e518465e029439874306";
 
+        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+    }
+
+    /*
+    octez-codec encode alpha.operation.internal_and_metadata from '{
+      "kind": "transaction",
+      "source": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+      "nonce": 0,
+      "amount": "1000000",
+      "destination": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+      "result": {
+        "status": "applied",
+        "consumed_milligas": "100000",
+        "storage_size": "0",
+        "paid_storage_size_diff": "0",
+        "balance_updates": [
+          {
+            "kind": "contract",
+            "contract": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+            "change": "-1000000",
+            "origin": "block"
+          },
+          {
+            "kind": "contract",
+            "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+            "change": "1000000",
+            "origin": "block"
+          }
+        ]
+      }
+    }'
+    */
+    #[test]
+    fn tezos_compatibility_for_internal_operation_with_metadata() {
+        let operation = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            content: TransferContent {
+                amount: 1000000.into(),
+                destination: Contract::from_b58check(
+                    "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+                )
+                .unwrap(),
+                parameters: None,
+            },
+            sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
+                .unwrap(),
+            nonce: 0,
+            result: ContentResult::Applied(TransferTarget::ToContrat(TransferSuccess {
+                storage: None,
+                lazy_storage_diff: None,
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(
+                                "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+                            )
+                            .unwrap(),
+                        ),
+                        changes: -1000000,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(
+                            Contract::from_b58check(
+                                "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+                            )
+                            .unwrap(),
+                        ),
+                        changes: 1000000,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                ticket_receipt: vec![],
+                originated_contracts: vec![],
+                consumed_gas: 100000.into(),
+                storage_size: 0.into(),
+                paid_storage_size_diff: 0.into(),
+                allocated_destination_contract: false,
+            })),
+        });
+        let output = operation
+            .to_bytes()
+            .expect("Internal operation with metadata should be encodable");
+        let operation_and_receipt_bytes = "0100006b82198cb179e8306c1bedd08f12dc863f3288860000c0843d01b752c7f3de31759bce246416a6823e86b9756c6c0000000000000000400000006b82198cb179e8306c1bedd08f12dc863f328886fffffffffff0bdc0000001b752c7f3de31759bce246416a6823e86b9756c6c0000000000000f4240000000000000000000a08d0600000000";
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
 }
