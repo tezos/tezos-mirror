@@ -48,7 +48,7 @@ pub enum TztTestError<'a> {
     /// Execution completed successfully, when the test expected an error.
     UnexpectedSuccess(ErrorExpectation<'a>, IStack<'a>),
     /// Expected one error, but got another.
-    ExpectedDifferentError(ErrorExpectation<'a>, TestError<'a>),
+    ExpectedDifferentError(Box<(ErrorExpectation<'a>, TestError<'a>)>),
 }
 
 impl fmt::Display for TztTestError<'_> {
@@ -67,7 +67,8 @@ impl fmt::Display for TztTestError<'_> {
                     "Expected an error but none occurred. Expected {e} but ended with stack {stk:?}."
                 )
             }
-            ExpectedDifferentError(e, r) => {
+            ExpectedDifferentError(box_tuple) => {
+                let (e, r) = &**box_tuple;
                 write!(
                     f,
                     "Expected an error but got a different one.\n expected: {e}\n got: {r}."
@@ -264,7 +265,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 )
                 .hash,
             ),
-            None => None,
+            None => None
         };
 
         let other_contracts = match m_other_contracts {

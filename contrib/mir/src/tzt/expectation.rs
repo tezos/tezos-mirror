@@ -31,7 +31,7 @@ fn check_error_expectation<'a>(
         {
             Ok(())
         }
-        (err_exp, err) => Err(ExpectedDifferentError(err_exp, err)),
+        (err_exp, err) => Err(ExpectedDifferentError(Box::new((err_exp, err)))),
     }
 }
 

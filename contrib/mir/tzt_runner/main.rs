@@ -212,7 +212,7 @@ mod tztrunner_tests {
         let tzt_test = parse_tzt_test(TZT_SAMPLE_FAIL_WITH_UNEXPECTED).unwrap();
         assert!(matches!(
             run_tzt_test(tzt_test),
-            Err(ExpectedDifferentError(_, _))
+            Err(ExpectedDifferentError(_))
         ));
     }
 
