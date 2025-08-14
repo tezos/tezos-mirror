@@ -19,7 +19,7 @@ use tezos_crypto_rs::{
 };
 use tezos_data_encoding::{
     enc::BinWriter,
-    nom::{NomReader, error::convert_error},
+    nom::{error::convert_error, NomReader},
 };
 
 macro_rules! address_hash_type_and_impls {

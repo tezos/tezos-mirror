@@ -17,7 +17,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
-use tezos_data_encoding::nom::{NomReader, error::convert_error};
+use tezos_data_encoding::nom::{error::convert_error, NomReader};
 
 pub mod type_props;
 
@@ -339,7 +339,7 @@ impl<'a> Micheline<'a> {
                 | micheline_types!()
                 | micheline_fields!()
                 | micheline_values!() => {
-                    return Err(TcError::UnexpectedMicheline(format!("{elt:?}")))
+                    return Err(TcError::UnexpectedMicheline(format!("{elt:?}")));
                 }
             }
         }
@@ -556,7 +556,7 @@ fn parse_ty_with_entrypoints<'a>(
                 let entry = eps.entry(entrypoint);
                 match entry {
                     Entry::Occupied(e) => {
-                        return Err(TcError::DuplicateEntrypoint(e.key().clone()))
+                        return Err(TcError::DuplicateEntrypoint(e.key().clone()));
                     }
                     Entry::Vacant(e) => {
                         e.insert(parsed_ty.clone());
@@ -1957,7 +1957,7 @@ pub(crate) fn typecheck_instruction<'a>(
                         instr: APPLY,
                         stack: stack.clone(),
                         reason: Option::Some(NMOR::ExpectedPair(t.clone())),
-                    })
+                    });
                 }
             };
             ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
