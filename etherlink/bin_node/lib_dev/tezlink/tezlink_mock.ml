@@ -109,7 +109,8 @@ module Operation_metadata = struct
 
   let consumed_gas = Gas.Arith.zero
 
-  let manager_op_result (type kind) (contents : kind manager_operation) :
+  let manager_op_result (type kind) (source : public_key_hash)
+      (contents : kind manager_operation) :
       kind successful_manager_operation_result tzresult =
     let open Result_syntax in
     match contents with
@@ -130,12 +131,22 @@ module Operation_metadata = struct
                   allocated_destination_contract = false;
                 }))
     | Origination _ ->
+        let bytes =
+          Data_encoding.Binary.to_bytes_exn
+            Signature.Public_key_hash.encoding
+            source
+        in
+        let kt1 =
+          Data_encoding.Binary.of_bytes_exn
+            Imported_protocol.Contract_hash.encoding
+            (Bytes.sub bytes 0 20)
+        in
         return
           (Origination_result
              {
                lazy_storage_diff = None;
                balance_updates = [];
-               originated_contracts = [];
+               originated_contracts = [kt1];
                consumed_gas;
                storage_size = Z.zero;
                paid_storage_size_diff = Z.zero;
@@ -150,8 +161,8 @@ module Operation_metadata = struct
       kind contents_result tzresult =
     let open Result_syntax in
     match contents with
-    | Manager_operation {operation; _} ->
-        let* result = manager_op_result operation in
+    | Manager_operation {operation; source; _} ->
+        let* result = manager_op_result source operation in
         return
           (Manager_operation_result
              {
