@@ -140,8 +140,18 @@ pub enum TransferError {
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
 pub enum OriginationError {
+    #[error("Failed to fetch originated smart contract")]
+    FailedToFetchOriginated,
+    #[error("Failed to compute balance update")]
+    FailedToComputeBalanceUpdate,
+    #[error("Failed to applied balance update")]
+    FailedToApplyBalanceUpdate,
     #[error("Fail to generate KT1 hash: {0}")]
     FailToGenerateKT1(String),
+    #[error("Can't initialize smart contract")]
+    CantInitContract,
+    #[error("Can't originate an empty smart contract")]
+    CantOriginateEmptyContract,
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {

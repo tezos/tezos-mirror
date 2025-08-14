@@ -38,10 +38,6 @@ const COUNTER_PATH: RefPath = RefPath::assert_from(b"/counter");
 
 const MANAGER_PATH: RefPath = RefPath::assert_from(b"/manager");
 
-const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
-
-const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
-
 fn account_path(contract: &Contract) -> Result<OwnedPath, tezos_storage::error::Error> {
     // uses the same encoding as in the octez node's representation of the context
     // see `octez-codec describe alpha.contract binary schema`
@@ -240,6 +236,18 @@ impl TezlinkImplicitAccount {
     }
 }
 
+const CODE_PATH: RefPath = RefPath::assert_from(b"/data/code");
+
+const STORAGE_PATH: RefPath = RefPath::assert_from(b"/data/storage");
+
+const CODE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/code");
+
+const STORAGE_SIZE_PATH: RefPath = RefPath::assert_from(b"/len/storage");
+
+const PAID_BYTES: RefPath = RefPath::assert_from(b"/paid_bytes");
+
+const USED_BYTES: RefPath = RefPath::assert_from(b"/used_bytes");
+
 #[derive(Debug, PartialEq)]
 pub struct TezlinkOriginatedAccount {
     path: OwnedPath,
@@ -281,15 +289,25 @@ impl TezlinkOriginatedAccount {
         Ok(host.store_read_all(&path)?)
     }
 
-    #[cfg(test)]
+    fn set_code_size(
+        &mut self,
+        host: &mut impl Runtime,
+        len: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &CODE_SIZE_PATH)?;
+        store_bin(len, host, &path)
+    }
+
     pub fn set_code(
-        &self,
+        &mut self,
         host: &mut impl Runtime,
         data: &[u8],
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<u64, tezos_storage::error::Error> {
         let path = concat(self.path(), &CODE_PATH)?;
         host.store_write_all(&path, data)?;
-        Ok(())
+        let code_size = data.len() as u64;
+        self.set_code_size(host, &code_size.into())?;
+        Ok(code_size)
     }
 
     pub fn storage(
@@ -300,14 +318,67 @@ impl TezlinkOriginatedAccount {
         Ok(host.store_read_all(&path)?)
     }
 
+    fn set_storage_size(
+        &mut self,
+        host: &mut impl Runtime,
+        len: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &STORAGE_SIZE_PATH)?;
+        store_bin(len, host, &path)
+    }
+
     pub fn set_storage(
-        &self,
+        &mut self,
         host: &mut impl Runtime,
         data: &[u8],
-    ) -> Result<(), tezos_storage::error::Error> {
+    ) -> Result<u64, tezos_storage::error::Error> {
         let path = concat(self.path(), &STORAGE_PATH)?;
         host.store_write_all(&path, data)?;
-        Ok(())
+        let storage_size = data.len() as u64;
+        self.set_storage_size(host, &storage_size.into())?;
+        Ok(storage_size)
+    }
+
+    fn set_paid_bytes(
+        &mut self,
+        host: &mut impl Runtime,
+        paid: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &PAID_BYTES)?;
+        store_bin(paid, host, &path)
+    }
+
+    fn set_used_bytes(
+        &mut self,
+        host: &mut impl Runtime,
+        used: &Narith,
+    ) -> Result<(), tezos_storage::error::Error> {
+        let path = concat(self.path(), &USED_BYTES)?;
+        store_bin(used, host, &path)
+    }
+
+    pub fn init(
+        &mut self,
+        host: &mut impl Runtime,
+        code: &[u8],
+        storage: &[u8],
+    ) -> Result<Narith, tezos_storage::error::Error> {
+        // Set the smart contract code and its size
+        let code_size = self.set_code(host, code)?;
+
+        // Set the smart contract storage and its size
+        let storage_size = self.set_storage(host, storage)?;
+
+        // TODO: Set the lazy_storage
+        let lazy_storage_size = 0u64;
+
+        // TODO: Set real value for those two fields
+        self.set_paid_bytes(host, &0u64.into())?;
+        self.set_used_bytes(host, &0u64.into())?;
+
+        let total_size = code_size + storage_size + lazy_storage_size;
+
+        Ok(total_size.into())
     }
 }
 
