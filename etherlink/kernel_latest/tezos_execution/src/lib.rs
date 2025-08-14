@@ -162,6 +162,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    origination_nonce: &mut OriginationNonce,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
@@ -224,6 +225,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         parser,
                         ctx,
                         all_internal_receipts,
+                        origination_nonce,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -231,6 +233,61 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         nonce,
                         result: match receipt {
                             Ok(success) => ContentResult::Applied(success.into()),
+                            Err(err) => {
+                                failed = Some(index);
+                                ContentResult::Failed(
+                                    ApplyOperationError::from(err).into(),
+                                )
+                            }
+                        },
+                    })
+                }
+            }
+            mir::ast::Operation::CreateContract(mir::ast::CreateContract {
+                delegate,
+                amount,
+                storage,
+                code: _,
+                micheline_code,
+            }) => {
+                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let script = Script {
+                    code: micheline_code.encode(),
+                    storage: storage
+                        .into_micheline_optimized_legacy(&parser.arena)
+                        .encode(),
+                };
+                if failed.is_some() {
+                    InternalOperationSum::Origination(InternalContentWithMetadata {
+                        content: OriginationContent {
+                            balance: amount,
+                            delegate,
+                            script,
+                        },
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: ContentResult::Skipped,
+                    })
+                } else {
+                    let receipt = originate_contract(
+                        host,
+                        context,
+                        origination_nonce,
+                        sender_contract,
+                        sender_account,
+                        &amount,
+                        &script,
+                    );
+                    InternalOperationSum::Origination(InternalContentWithMetadata {
+                        content: OriginationContent {
+                            balance: amount,
+                            delegate,
+                            script,
+                        },
+                        sender: sender_contract.clone(),
+                        nonce,
+                        result: match receipt {
+                            Ok(success) => ContentResult::Applied(success),
                             Err(err) => {
                                 failed = Some(index);
                                 ContentResult::Failed(
@@ -285,6 +342,7 @@ pub fn transfer<'a, Host: Runtime>(
     parser: &'a Parser<'a>,
     ctx: &mut Ctx<'a>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    origination_nonce: &mut OriginationNonce,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -364,6 +422,7 @@ pub fn transfer<'a, Host: Runtime>(
                 parser,
                 ctx,
                 all_internal_receipts,
+                origination_nonce,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
@@ -388,6 +447,7 @@ pub fn transfer_external<Host: Runtime>(
     dest: &Contract,
     parameter: &Option<Parameter>,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
+    origination_nonce: &mut OriginationNonce,
 ) -> Result<TransferTarget, TransferError> {
     log!(
         host,
@@ -410,6 +470,8 @@ pub fn transfer_external<Host: Runtime>(
     };
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
+    ctx.operation_group_hash = origination_nonce.operation.0 .0;
+    ctx.set_origination_counter(origination_nonce.index);
 
     transfer(
         host,
@@ -423,6 +485,7 @@ pub fn transfer_external<Host: Runtime>(
         &parser,
         &mut ctx,
         all_internal_receipts,
+        origination_nonce,
     )
     .map(Into::into)
 }
@@ -438,8 +501,8 @@ fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
     origination_nonce: &mut OriginationNonce,
-    src: &PublicKeyHash,
-    src_account: &mut TezlinkImplicitAccount,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
     balance: &Narith,
     script: &Script,
 ) -> Result<OriginationSuccess, OriginationError> {
@@ -466,9 +529,8 @@ fn originate_contract<Host: Runtime>(
     }
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
-    let src_contract = Contract::Implicit(src.clone());
     let mut balance_updates =
-        compute_balance_updates(&src_contract, &dest_contract, balance)
+        compute_balance_updates(src_contract, &dest_contract, balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
@@ -477,20 +539,20 @@ fn originate_contract<Host: Runtime>(
         .checked_mul(&BigUint::from(COST_PER_BYTES))
         .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
     let storage_fees_balance_updates =
-        compute_storage_balance_updates(src, storage_fees.clone())
+        compute_storage_balance_updates(src_contract, storage_fees.clone())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(storage_fees_balance_updates);
 
     // Balance updates for the base origination cost.
     let origination_fees_balance_updates =
-        compute_storage_balance_updates(src, ORIGINATION_COST.into())
+        compute_storage_balance_updates(src_contract, ORIGINATION_COST.into())
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
     balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
     apply_balance_changes(
         host,
-        &src_contract,
+        src_contract,
         src_account,
         &mut smart_contract,
         &balance.0,
@@ -499,7 +561,7 @@ fn originate_contract<Host: Runtime>(
 
     let _ = burn_tez(
         host,
-        &src_contract,
+        src_contract,
         src_account,
         &(ORIGINATION_COST + storage_fees),
     )
@@ -576,14 +638,14 @@ fn compute_balance_updates(
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
 pub fn compute_storage_balance_updates(
-    source: &PublicKeyHash,
+    source: &Contract,
     fee: BigUint,
 ) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
     let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
 
     let src_update = BalanceUpdate {
-        balance: Balance::Account(Contract::Implicit(source.clone())),
+        balance: Balance::Account(source.clone()),
         changes: source_delta.try_into()?,
         update_origin: UpdateOrigin::BlockApplication,
     };
@@ -873,6 +935,7 @@ fn apply_operation<Host: Runtime>(
                 destination,
                 parameters,
                 &mut internal_operations_receipts,
+                origination_nonce,
             );
             let manager_result = produce_operation_result(
                 balance_updates,
@@ -890,7 +953,7 @@ fn apply_operation<Host: Runtime>(
                 host,
                 context,
                 origination_nonce,
-                source,
+                &Contract::Implicit(source.clone()),
                 source_account,
                 balance,
                 script,
