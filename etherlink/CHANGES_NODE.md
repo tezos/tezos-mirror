@@ -6,28 +6,13 @@
 
 ### Configuration changes
 
-- Changes the default snapshot provider URL. It still the same
-  provider but the snapshot is downloaded from another source.
-  (!18969)
-
 ### RPCs changes
-
-- To stay aligned with Ethereum standards, the sequencer will now refuse transactions
-  with a gas limit below the intrinsic gas cost (21,000) plus the inclusion fees. (!18923)
-- Etherlink now supports [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702). A user can now set code for
-  their EOAs by submitting transaction of type 4 to the sequencer and request the transaction details
-  associated to it. (!18851)
-- Encoding of responses for `eth_getLogs` are not blocking anymore, allowing the
-  node to continue to process blueprints and handle concurrent RPCs. (!18975)
 
 ### Metrics changes
 
 ### Command-line interface changes
 
 ### Execution changes
-
-- Fixes a race condition in the block production component which could trigger
-  a crash of the sequencer. (!18924)
 
 ### Storage changes
 
@@ -39,6 +24,45 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.38 (2025-08-13)
+
+This is a quality of life release, most notably improving the performances of
+the `eth_getLogs` and `eth_call` RPC requests. It also contains a bug fix for
+the sequencer, which will improve its reliability.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+## Breaking changes
+
+- Improves performances of `eth_getLogs`. The semantics of the
+  `log_filter.chunk_size` has changed in the process, and its default value has
+  been bumped from 10 to 1,000 and node operators are encouraged to configure
+  their nodes using a value of this order of magnitude. (!18950)
+
+- Changes the default snapshot provider URL. It still the same
+  provider but the snapshot is downloaded from another source.
+  (!18969)
+
+### RPCs changes
+
+- To stay aligned with Ethereum standards, the sequencer will now refuse
+  transactions with a gas limit below the intrinsic gas cost (21,000) plus the
+  inclusion fees. (!18923)
+- Adds support for type-4 transactions (see
+  [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702)) for the Etherlink
+  networks with support for Prague. This is not the case for Mainnet and
+  Testnet yet. (!18851)
+- Encoding of responses for `eth_getLogs` are not blocking anymore, allowing the
+  node to continue to process blueprints and handle concurrent RPCs. (!18975)
+
+### Execution changes
+
+- Fixes a race condition in the block production component which could trigger
+  a crash of the sequencer. (!18924)
+- Parallelize executions of EVM kernel, improving performance of `eth_call`
+  RPC. (!18937)
 
 ## Version 0.37 (2025-08-04)
 
