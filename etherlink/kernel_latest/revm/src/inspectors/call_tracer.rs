@@ -41,7 +41,7 @@ pub struct CallTracerInput {
     pub transaction_hash: Option<B256>,
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Debug)]
 pub struct CallTrace {
     type_: Vec<u8>,
     from: Address,

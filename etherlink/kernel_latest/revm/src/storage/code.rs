@@ -32,7 +32,7 @@ fn code_hash_path(code_hash: &B256) -> Result<OwnedPath, Error> {
         .map_err(|err| Error::Custom(err.to_string()))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub struct CodeStorage {
     path: OwnedPath,
 }

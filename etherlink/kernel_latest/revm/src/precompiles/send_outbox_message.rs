@@ -108,7 +108,7 @@ pub type FastWithdrawalInterface = MichelsonPair<
 
 /// Outbox messages that implements the different withdrawal interfaces,
 /// ready to be encoded and posted.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum Withdrawal {
     Standard(OutboxMessage<RouterInterface>),
     Fast(OutboxMessage<FastWithdrawalInterface>),
