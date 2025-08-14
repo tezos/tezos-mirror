@@ -499,6 +499,8 @@ pub struct InternalContentWithMetadata<M: OperationKind> {
 pub enum InternalOperationSum {
     #[encoding(tag = 1)]
     Transfer(InternalContentWithMetadata<TransferContent>),
+    #[encoding(tag = 2)]
+    Origination(InternalContentWithMetadata<OriginationContent>),
 }
 
 impl InternalOperationSum {
@@ -507,11 +509,17 @@ impl InternalOperationSum {
             InternalOperationSum::Transfer(op_res) => {
                 op_res.result.backtrack_if_applied();
             }
+            InternalOperationSum::Origination(op_res) => {
+                op_res.result.backtrack_if_applied();
+            }
         }
     }
     pub fn is_applied(&self) -> bool {
         match self {
             InternalOperationSum::Transfer(op_res) => {
+                matches!(op_res.result, ContentResult::Applied(_))
+            }
+            InternalOperationSum::Origination(op_res) => {
                 matches!(op_res.result, ContentResult::Applied(_))
             }
         }
