@@ -193,13 +193,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         value: encoded_value,
                     }),
                 };
-                let nonce = ctx.get_operation_counter().try_into().map_err(
-                    |err: std::num::TryFromIntError| {
-                        ApplyOperationError::InternalOperationNonceOverflow(
-                            err.to_string(),
-                        )
-                    },
-                )?;
+                let nonce = 0; // Invalid Nonce for now
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
