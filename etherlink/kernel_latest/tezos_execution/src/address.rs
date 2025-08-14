@@ -6,7 +6,39 @@
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashType};
 use tezos_data_encoding::enc::BinWriter;
 use tezos_smart_rollup::types::PublicKeyHash;
-use tezos_tezlink::operation_result::OriginationError;
+use tezos_tezlink::{enc_wrappers::OperationHash, operation_result::OriginationError};
+
+// Inspired by src/proto_alpha/lib_protocol/origination_nonce.ml
+#[allow(dead_code)]
+#[derive(BinWriter, Clone)]
+pub struct OriginationNonce {
+    pub operation: OperationHash,
+    pub index: u32,
+}
+
+impl OriginationNonce {
+    pub fn _initial(operation: OperationHash) -> OriginationNonce {
+        OriginationNonce {
+            operation,
+            index: 0,
+        }
+    }
+
+    /// Generate the KT1 address for a contract originated by the public key hash given in
+    /// parameter
+    pub fn _generate_kt1(&mut self) -> Result<ContractKt1Hash, OriginationError> {
+        // First we increment the nonce
+        self.index += 1;
+        let address =
+            mir::interpreter::compute_contract_address(&self.operation.0 .0, self.index);
+        match address.hash {
+            mir::ast::AddressHash::Kt1(contract_kt1_hash) => Ok(contract_kt1_hash),
+            _ => Err(OriginationError::FailToGenerateKT1(
+                "Expected KT1 address hash".to_string(),
+            )),
+        }
+    }
+}
 
 /// Generate the KT1 address for a contract originated by the public key hash given in
 /// parameter. For now the implementation is incorrect.
