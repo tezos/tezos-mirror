@@ -14,13 +14,11 @@ use mir::{
 };
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::hash::UnknownSignature;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
-use tezos_tezlink::enc_wrappers::BlockHash;
 use tezos_tezlink::operation::Operation;
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, Originated, OriginationError, OriginationSuccess,
@@ -28,8 +26,8 @@ use tezos_tezlink::operation_result::{
 };
 use tezos_tezlink::{
     operation::{
-        verify_signature, ManagerOperation, ManagerOperationContent, OperationContent,
-        Parameter, RevealContent, TransferContent,
+        verify_signature, ManagerOperation, OperationContent, Parameter, RevealContent,
+        TransferContent,
     },
     operation_result::{
         is_applied, produce_operation_result, transform_result_backtrack, Balance,
@@ -275,7 +273,7 @@ pub fn transfer_external<Host: Runtime>(
     src_account: &mut TezlinkImplicitAccount,
     amount: &Narith,
     dest: &Contract,
-    parameter: Option<Parameter>,
+    parameter: &Option<Parameter>,
 ) -> Result<TransferSuccess, TransferError> {
     log!(
         host,
@@ -291,10 +289,10 @@ pub fn transfer_external<Host: Runtime>(
     let parser = Parser::new();
     let (entrypoint, value) = match parameter {
         Some(param) => (
-            param.entrypoint,
+            &param.entrypoint,
             Micheline::decode_raw(&parser.arena, &param.value)?,
         ),
-        None => (Entrypoint::default(), Micheline::from(())),
+        None => (&Entrypoint::default(), Micheline::from(())),
     };
     let mut ctx = Ctx::default();
     ctx.source = address_from_contract(src_contract.clone());
@@ -306,7 +304,7 @@ pub fn transfer_external<Host: Runtime>(
         src_account,
         amount,
         dest,
-        &entrypoint,
+        entrypoint,
         value,
         &parser,
         &mut ctx,
@@ -462,16 +460,18 @@ fn execute_smart_contract<'a>(
 fn execute_validation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    branch: &BlockHash,
-    content: &Vec<ManagerOperation<OperationContent>>,
-    signature: &UnknownSignature,
+    operation: Operation,
 ) -> Result<ValidationInfo, ValidityError> {
+    let content = operation
+        .content
+        .into_iter()
+        .map(|op| op.into())
+        .collect::<Vec<ManagerOperation<OperationContent>>>();
     let (source, pk, mut source_account) =
-        validate::validate_source(host, context, content)?;
-
+        validate::validate_source(host, context, &content)?;
     let mut balance_updates = vec![];
 
-    for c in content {
+    for c in &content {
         let (new_source_balance, op_balance_updates) =
             validate_individual_operation(host, &source, &source_account, c)?;
 
@@ -486,25 +486,15 @@ fn execute_validation<Host: Runtime>(
         balance_updates.push(op_balance_updates);
     }
 
-    match verify_signature(
-        &pk,
-        branch,
-        content
-            .clone()
-            .into_iter()
-            .map(|op| op.into())
-            .collect::<Vec<ManagerOperationContent>>(),
-        signature.clone(),
-    ) {
-        Ok(true) => (),
-        _ => return Err(ValidityError::InvalidSignature),
+    match verify_signature(&pk, &operation.branch, content, operation.signature) {
+        Ok((true, validated_operations)) => Ok(ValidationInfo {
+            source,
+            source_account,
+            balance_updates,
+            validated_operations,
+        }),
+        _ => Err(ValidityError::InvalidSignature),
     }
-
-    Ok(ValidationInfo {
-        source,
-        source_account,
-        balance_updates,
-    })
 }
 
 pub fn validate_and_apply_operation<Host: Runtime>(
@@ -512,15 +502,6 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     context: &context::Context,
     operation: Operation,
 ) -> Result<Vec<OperationResultSum>, OperationError> {
-    let branch = operation.branch;
-    let content: Vec<ManagerOperation<OperationContent>> = operation
-        .content
-        .into_iter()
-        .map(|op| op.into())
-        .collect::<Vec<ManagerOperation<OperationContent>>>();
-
-    let signature = operation.signature;
-
     let mut safe_host = SafeStorage {
         host,
         world_state: context::contracts::root(context).unwrap(),
@@ -530,13 +511,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 
     log!(safe_host, Debug, "Verifying that the batch is valid");
 
-    let validation_info = match execute_validation(
-        &mut safe_host,
-        context,
-        &branch,
-        &content,
-        &signature,
-    ) {
+    let validation_info = match execute_validation(&mut safe_host, context, operation) {
         Ok(validation_info) => validation_info,
         Err(validity_err) => {
             log!(
@@ -555,8 +530,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let (receipts, applied) =
-        apply_batch(&mut safe_host, context, content, validation_info);
+    let (receipts, applied) = apply_batch(&mut safe_host, context, validation_info);
 
     log!(safe_host, Debug, "Receipts: {:#?}", receipts);
 
@@ -583,18 +557,22 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    operations: Vec<ManagerOperation<OperationContent>>,
     validation_info: ValidationInfo,
 ) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
         source,
         mut source_account,
         balance_updates,
+        validated_operations,
     } = validation_info;
     let mut first_failure: Option<usize> = None;
-    let mut receipts = Vec::with_capacity(operations.len());
+    let mut receipts = Vec::with_capacity(validated_operations.len());
 
-    for (index, content) in operations.into_iter().enumerate() {
+    for (index, (content, balance_uppdate)) in validated_operations
+        .into_iter()
+        .zip(balance_updates)
+        .enumerate()
+    {
         log!(
             host,
             Debug,
@@ -617,7 +595,7 @@ fn apply_batch<Host: Runtime>(
                 &content,
                 &source,
                 &mut source_account,
-                &balance_updates[index],
+                balance_uppdate,
             )
         };
 
@@ -631,7 +609,7 @@ fn apply_batch<Host: Runtime>(
     if let Some(failure_idx) = first_failure {
         receipts[..failure_idx]
             .iter_mut()
-            .for_each(|r| *r = transform_result_backtrack(r.clone()));
+            .for_each(transform_result_backtrack);
         return (receipts, false);
     }
 
@@ -644,13 +622,13 @@ fn apply_operation<Host: Runtime>(
     content: &ManagerOperation<OperationContent>,
     source: &PublicKeyHash,
     source_account: &mut TezlinkImplicitAccount,
-    balance_updates: &[BalanceUpdate],
+    balance_updates: Vec<BalanceUpdate>,
 ) -> OperationResultSum {
     match &content.operation {
         OperationContent::Reveal(RevealContent { pk, .. }) => {
             let reveal_result = reveal(host, source, source_account, pk);
             let manager_result = produce_operation_result(
-                balance_updates.to_vec(),
+                balance_updates,
                 reveal_result.map_err(Into::into),
             );
             OperationResultSum::Reveal(manager_result)
@@ -667,19 +645,17 @@ fn apply_operation<Host: Runtime>(
                 source_account,
                 amount,
                 destination,
-                parameters.clone(),
+                parameters,
             ) {
                 Ok(res) => {
                     let transfer_result = TransferTarget::ToContrat(res);
-                    let manager_result = produce_operation_result(
-                        balance_updates.to_vec(),
-                        Ok(transfer_result),
-                    );
+                    let manager_result =
+                        produce_operation_result(balance_updates, Ok(transfer_result));
                     OperationResultSum::Transfer(manager_result)
                 }
                 Err(e) => {
                     let manager_result =
-                        produce_operation_result(balance_updates.to_vec(), Err(e.into()));
+                        produce_operation_result(balance_updates, Err(e.into()));
                     OperationResultSum::Transfer(manager_result)
                 }
             }
@@ -687,7 +663,7 @@ fn apply_operation<Host: Runtime>(
         OperationContent::Origination(_) => {
             let origination_result = originate_contract(host, source);
             let manager_result = produce_operation_result(
-                balance_updates.to_vec(),
+                balance_updates,
                 origination_result.map_err(|e| e.into()),
             );
             OperationResultSum::Origination(manager_result)
@@ -807,7 +783,7 @@ mod tests {
             })
             .collect::<Vec<ManagerOperationContent>>();
 
-        let signature = sign_operation(&source.sk, &branch, content.clone()).unwrap();
+        let signature = sign_operation(&source.sk, &branch, &content).unwrap();
 
         Operation {
             branch,

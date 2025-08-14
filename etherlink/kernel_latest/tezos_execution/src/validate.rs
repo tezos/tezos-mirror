@@ -129,6 +129,7 @@ pub struct ValidationInfo {
     pub source: PublicKeyHash,
     pub source_account: TezlinkImplicitAccount,
     pub balance_updates: Vec<Vec<BalanceUpdate>>,
+    pub validated_operations: Vec<ManagerOperation<OperationContent>>,
 }
 
 pub fn validate_source<Host: Runtime>(

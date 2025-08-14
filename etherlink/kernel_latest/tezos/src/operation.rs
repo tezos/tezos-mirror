@@ -239,7 +239,7 @@ impl From<ManagerOperationContent> for ManagerOperation<OperationContent> {
 
 pub fn serialize_unsigned_operation(
     branch: &BlockHash,
-    content: Vec<ManagerOperationContent>,
+    content: &Vec<ManagerOperationContent>,
 ) -> Result<Vec<u8>, BinError> {
     // Watermark comes from `src/lib_crypto/signature_v2.ml`
     // The watermark for a ManagerOperation is always `Generic_operation`
@@ -251,7 +251,7 @@ pub fn serialize_unsigned_operation(
     let branch: [u8; 32] = branch.0.to_fixed_bytes();
     tezos_data_encoding::enc::put_bytes(&branch, &mut serialized_unsigned_operation);
     tezos_data_encoding::enc::list(ManagerOperationContent::bin_write)(
-        &content,
+        content,
         &mut serialized_unsigned_operation,
     )
     .expect("Failed to serialize the content");
@@ -270,7 +270,7 @@ pub enum SignatureErrors {
 pub fn sign_operation(
     sk: &SecretKeyEd25519,
     branch: &BlockHash,
-    content: Vec<ManagerOperationContent>,
+    content: &Vec<ManagerOperationContent>,
 ) -> Result<UnknownSignature, SignatureErrors> {
     let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
 
@@ -282,10 +282,14 @@ pub fn sign_operation(
 pub fn verify_signature(
     pk: &PublicKey,
     branch: &BlockHash,
-    content: Vec<ManagerOperationContent>,
+    content: Vec<ManagerOperation<OperationContent>>,
     signature: UnknownSignature,
-) -> Result<bool, BinError> {
-    let serialized_unsigned_operation = serialize_unsigned_operation(branch, content)?;
+) -> Result<(bool, Vec<ManagerOperation<OperationContent>>), BinError> {
+    let content = content
+        .into_iter()
+        .map(|op| op.into())
+        .collect::<Vec<ManagerOperationContent>>();
+    let serialized_unsigned_operation = serialize_unsigned_operation(branch, &content)?;
 
     let signature = &signature.into();
 
@@ -295,8 +299,8 @@ pub fn verify_signature(
     let check = pk
         .verify_signature(signature, &serialized_unsigned_operation)
         .unwrap_or(false);
-
-    Ok(check)
+    let content = content.into_iter().map(|op| op.into()).collect();
+    Ok((check, content))
 }
 
 pub fn zip_operations(

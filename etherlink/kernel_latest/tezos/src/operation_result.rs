@@ -23,13 +23,13 @@ use thiserror::Error;
 
 use crate::operation::{ManagerOperation, ManagerOperationContent, OperationContent};
 
-#[derive(Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
+#[derive(Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub struct CounterError {
     pub expected: Narith,
     pub found: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum ValidityError {
     #[error("Counter in the past: {0:?}.")]
     CounterInThePast(CounterError),
@@ -69,7 +69,7 @@ pub enum ValidityError {
     MultipleSources,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader, BinWriter)]
 pub enum RevealError {
     #[error("Revelation failed because the public key {0} was already revealed.")]
     PreviouslyRevealedKey(PublicKey),
@@ -83,7 +83,7 @@ pub enum RevealError {
     FailedToWriteManager,
 }
 
-#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader, Clone)]
+#[derive(thiserror::Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
 #[error("{contract:?} cannot spend {amount:?} as its balance is {balance:?}")]
 pub struct BalanceTooLow {
     pub contract: Contract,
@@ -91,7 +91,7 @@ pub struct BalanceTooLow {
     pub amount: Narith,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, BinWriter, NomReader)]
 pub enum TransferError {
     #[error(transparent)]
     BalanceTooLow(BalanceTooLow),
@@ -134,7 +134,7 @@ pub enum TransferError {
     MirAddressUnsupportedError,
 }
 
-#[derive(Error, Debug, PartialEq, Eq, NomReader, Clone)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader)]
 pub enum OriginationError {
     #[error("Fail to generate KT1 hash: {0}")]
     FailToGenerateKT1(String),
@@ -158,7 +158,7 @@ impl From<mir::typechecker::TcError> for TransferError {
     }
 }
 
-#[derive(Clone, Error, Debug, PartialEq, Eq, NomReader)]
+#[derive(Error, Debug, PartialEq, Eq, NomReader)]
 pub enum ApplyOperationError {
     #[error("Reveal error: {0}")]
     Reveal(#[from] RevealError),
@@ -170,7 +170,7 @@ pub enum ApplyOperationError {
     UnSupportedOperation(String),
 }
 
-#[derive(Error, Debug, PartialEq, Eq, Clone)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum OperationError {
     #[error("Validation error: {0}")]
     Validation(#[from] ValidityError),
@@ -245,19 +245,19 @@ impl NomReader<'_> for OperationError {
 }
 
 pub trait OperationKind {
-    type Success: PartialEq + Debug + BinWriter + Clone + for<'a> NomReader<'a>;
+    type Success: PartialEq + Debug + BinWriter + for<'a> NomReader<'a>;
 }
 
 /// Empty struct to implement [OperationKind] trait for Reveal
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Reveal;
 
 /// Empty struct to implement [OperationKind] trait for Transfer
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Transfer;
 
 /// Empty struct to implement [OperationKind] trait for Origination
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Origination;
 
 impl OperationKind for Transfer {
@@ -273,18 +273,18 @@ impl OperationKind for Origination {
 }
 
 // Inspired from `src/proto_alpha/lib_protocol/apply_results.ml` : transaction_contract_variant_cases
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum TransferTarget {
     ToContrat(TransferSuccess),
 }
 
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct RevealSuccess {
     pub consumed_gas: Narith,
 }
 
 // PlaceHolder Type for temporary unused fields
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Empty;
 
 impl BinWriter for Empty {
@@ -319,7 +319,7 @@ impl NomReader<'_> for Empty {
 // the one implemented in the kernel_sdk Contract. However, this type
 // cannot be an implicit account. Therefore, we created a new type that
 // only holds a KT1. The new type reuses the existing functions.
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub struct Originated {
     pub contract: ContractKt1Hash,
 }
@@ -345,7 +345,7 @@ impl NomReader<'_> for Originated {
 }
 
 // Inspired of src/proto_023_PtSeouLo/lib_protocol/apply_internal_result.mli
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct OriginationSuccess {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -358,7 +358,7 @@ pub struct OriginationSuccess {
     pub lazy_storage_diff: Option<()>,
 }
 
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct TransferSuccess {
     pub storage: Option<Vec<u8>>,
     #[encoding(dynamic, list)]
@@ -380,7 +380,7 @@ pub struct TransferSuccess {
 // An operation error in a Tezos receipt has no specific format
 // It should just be encoded as a JSON, so we can't derive
 // NomReader and BinWriter if we want to be Tezos compatible
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub struct ApplyOperationErrors {
     #[encoding(dynamic, list)]
     pub errors: Vec<ApplyOperationError>,
@@ -394,7 +394,7 @@ impl From<Vec<ApplyOperationError>> for ApplyOperationErrors {
 
 // Inspired from `operation_result` in `src/proto_alpha/lib_protocol/apply_operation_result.ml`
 // Still need to implement Backtracked and Skipped
-#[derive(PartialEq, Debug, BinWriter, NomReader, Clone)]
+#[derive(PartialEq, Debug, BinWriter, NomReader)]
 pub enum ContentResult<M: OperationKind> {
     Applied(M::Success),
     Failed(ApplyOperationErrors),
@@ -404,7 +404,7 @@ pub enum ContentResult<M: OperationKind> {
 
 /// A [Balance] updates can be triggered on different target
 /// inspired from src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 #[encoding(tags = "u8")]
 pub enum Balance {
     #[encoding(tag = 0)]
@@ -418,14 +418,14 @@ pub enum Balance {
 }
 
 /// Inspired from update_origin_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub enum UpdateOrigin {
     BlockApplication,
 }
 
 /// Depending of the sign of [changes], the balance is credited or debited
 /// Inspired from balance_updates_encoding src/proto_alpha/lib_protocol/receipt_repr.ml
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct BalanceUpdate {
     pub balance: Balance,
     pub changes: i64,
@@ -435,7 +435,7 @@ pub struct BalanceUpdate {
 // Inspired from `Manager_operation_result` case in 'kind contents_result type
 // from `src/proto_alpha/lib_protocol/apply_results.ml` file.
 // Still need to implement internal_results
-#[derive(PartialEq, Debug, NomReader, BinWriter, Clone)]
+#[derive(PartialEq, Debug, NomReader, BinWriter)]
 pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, list)]
     pub balance_updates: Vec<BalanceUpdate>,
@@ -444,7 +444,7 @@ pub struct OperationResult<M: OperationKind> {
     #[encoding(dynamic, bytes)]
     pub internal_operation_results: Vec<u8>,
 }
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug)]
 pub enum OperationResultSum {
     Reveal(OperationResult<Reveal>),
     Transfer(OperationResult<Transfer>),
@@ -465,28 +465,27 @@ pub fn is_applied(res: &OperationResultSum) -> bool {
     }
 }
 
-pub fn transform_result_backtrack(op: OperationResultSum) -> OperationResultSum {
+fn backtrack_if_applied<T: OperationKind>(result: &mut ContentResult<T>) {
+    if let ContentResult::Applied(_) = result {
+        // Lowkey optimisation: takes the ownership of the content result by replacing
+        // the result with Skipped as a place holder
+        let current_content_result = std::mem::replace(result, ContentResult::Skipped);
+        if let ContentResult::Applied(success) = current_content_result {
+            *result = ContentResult::BackTracked(success);
+        }
+    }
+}
+
+pub fn transform_result_backtrack(op: &mut OperationResultSum) {
     match op {
-        OperationResultSum::Reveal(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Reveal(op_result)
+        OperationResultSum::Transfer(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
-        OperationResultSum::Transfer(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Transfer(op_result)
+        OperationResultSum::Reveal(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
-        OperationResultSum::Origination(mut op_result) => {
-            op_result.result = match op_result.result {
-                ContentResult::Applied(success) => ContentResult::BackTracked(success),
-                other => other,
-            };
-            OperationResultSum::Origination(op_result)
+        OperationResultSum::Origination(op_result) => {
+            backtrack_if_applied(&mut op_result.result)
         }
     }
 }
