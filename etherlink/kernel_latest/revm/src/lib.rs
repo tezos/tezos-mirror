@@ -53,7 +53,7 @@ pub(crate) fn custom<E: std::fmt::Display>(e: E) -> Error {
 
 impl DBErrorMarker for Error {}
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct ExecutionOutcome {
     /// Result of the VM transaction execution.
     /// In particular contains gas used and emitted logs.
