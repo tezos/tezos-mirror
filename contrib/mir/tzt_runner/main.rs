@@ -25,7 +25,7 @@ fn run_test(file: &str) -> Result<(), String> {
         .parse_tzt_test(&contents)
         .map_err(|e| e.to_string())?;
     let arena = Arena::new();
-    run_tzt_test(tzt_test, &arena).map_err(|e| format!("{}", e))
+    run_tzt_test(tzt_test, &arena).map_err(|e| format!("{e}"))
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,19 +46,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let short_test = match Path::new(test).file_name() {
             Some(name) => name.to_string_lossy().to_string(),
             None => {
-                eprintln!("Failed to get file name for '{}'", test);
+                eprintln!("Failed to get file name for '{test}'");
                 process::exit(1);
             }
         };
 
-        print!("Running {}: ", short_test);
+        print!("Running {short_test}: ");
         match run_test(test) {
             Ok(_) => {
                 println!("Ok");
                 results.insert(short_test, true);
             }
             Err(e) => {
-                println!("{}", e);
+                println!("{e}");
                 failed_tests += 1;
                 results.insert(short_test, false);
             }
@@ -212,7 +212,7 @@ mod tztrunner_tests {
         let tzt_test = parse_tzt_test(TZT_SAMPLE_FAIL_WITH_UNEXPECTED).unwrap();
         assert!(matches!(
             run_tzt_test(tzt_test),
-            Err(ExpectedDifferentError(_, _))
+            Err(ExpectedDifferentError(_))
         ));
     }
 

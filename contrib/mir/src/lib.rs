@@ -159,7 +159,7 @@ mod tests {
 
     use crate::interpreter;
     use crate::parser::test_helpers::{parse, parse_contract_script};
-    use crate::stack::{FailingTypeStack, Stack, TypeStack, stk, tc_stk};
+    use crate::stack::{stk, tc_stk, FailingTypeStack, Stack, TypeStack};
     use crate::typechecker;
     use crate::typechecker::typecheck_instruction;
     use std::collections::HashMap;
@@ -181,10 +181,9 @@ mod tests {
             .unwrap();
         let mut istack = stk![TypedValue::nat(10)];
         let temp = Arena::new();
-        assert!(
-            ast.interpret(&mut Ctx::default(), &temp, &mut istack)
-                .is_ok()
-        );
+        assert!(ast
+            .interpret(&mut Ctx::default(), &temp, &mut istack)
+            .is_ok());
         assert!(istack.len() == 1 && istack[0] == TypedValue::int(55));
     }
 
@@ -238,10 +237,9 @@ mod tests {
             .unwrap();
         let mut istack = stk![TypedValue::new_option(Some(TypedValue::nat(5)))];
         let temp = Arena::new();
-        assert!(
-            ast.interpret(&mut Ctx::default(), &temp, &mut istack)
-                .is_ok()
-        );
+        assert!(ast
+            .interpret(&mut Ctx::default(), &temp, &mut istack)
+            .is_ok());
         assert_eq!(istack, stk![TypedValue::nat(6)]);
     }
 
@@ -1156,10 +1154,10 @@ mod multisig_tests {
     use crate::interpreter::{ContractInterpretError, InterpretError};
     use crate::lexer::Prim;
     use crate::parser::test_helpers::parse_contract_script;
-    use Type as T;
-    use TypedValue as TV;
     use num_bigint::BigUint;
     use typed_arena::Arena;
+    use Type as T;
+    use TypedValue as TV;
 
     // The comments below detail the steps used to
     // prepare the signature for calling the multisig contract.

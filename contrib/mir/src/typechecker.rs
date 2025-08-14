@@ -17,7 +17,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 use tezos_crypto_rs::{base58::FromBase58CheckError, hash::FromBytesError};
-use tezos_data_encoding::nom::{NomReader, error::convert_error};
+use tezos_data_encoding::nom::{error::convert_error, NomReader};
 
 pub mod type_props;
 
@@ -84,7 +84,7 @@ pub enum TcError {
     #[error("sequence elements must contain no duplicate keys for type {0:?}")]
     DuplicateElements(Type),
     /// The given instruction can not be used with its input stack.
-    #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
+    #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {x}")))]
     NoMatchingOverload {
         /// The instruction being typechecked.
         instr: Prim,
@@ -339,7 +339,7 @@ impl<'a> Micheline<'a> {
                 | micheline_types!()
                 | micheline_fields!()
                 | micheline_values!() => {
-                    return Err(TcError::UnexpectedMicheline(format!("{elt:?}")))
+                    return Err(TcError::UnexpectedMicheline(format!("{elt:?}")));
                 }
             }
         }
@@ -556,7 +556,7 @@ fn parse_ty_with_entrypoints<'a>(
                 let entry = eps.entry(entrypoint);
                 match entry {
                     Entry::Occupied(e) => {
-                        return Err(TcError::DuplicateEntrypoint(e.key().clone()))
+                        return Err(TcError::DuplicateEntrypoint(e.key().clone()));
                     }
                     Entry::Vacant(e) => {
                         e.insert(parsed_ty.clone());
@@ -1957,7 +1957,7 @@ pub(crate) fn typecheck_instruction<'a>(
                         instr: APPLY,
                         stack: stack.clone(),
                         reason: Option::Some(NMOR::ExpectedPair(t.clone())),
-                    })
+                    });
                 }
             };
             ensure_ty_eq(&mut ctx.gas, &pair_ty.0, &ty)?;
@@ -6490,7 +6490,7 @@ mod typecheck_tests {
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(
-                &parse(&format!("PUSH chain_id \"{}\"", lit)).unwrap(),
+                &parse(&format!("PUSH chain_id \"{lit}\"")).unwrap(),
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
@@ -6498,7 +6498,7 @@ mod typecheck_tests {
         );
         assert_eq!(
             &typecheck_instruction(
-                &parse(&format!("PUSH chain_id 0x{}", bytes)).unwrap(),
+                &parse(&format!("PUSH chain_id 0x{bytes}")).unwrap(),
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),

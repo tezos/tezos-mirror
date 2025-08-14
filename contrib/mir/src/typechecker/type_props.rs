@@ -36,7 +36,7 @@ impl std::fmt::Display for TypeProperty {
             TypeProperty::BigMapValue => "allowed big_map value",
             TypeProperty::Duplicable => "duplicable",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 

@@ -98,9 +98,9 @@ impl<'a> ContractScript<'a> {
                         .map(|x| (*irrefutable_match!(x; V::Operation))),
                     storage,
                 )),
-                (v, _) => panic!("expected `list operation`, got {:?}", v),
+                (v, _) => panic!("expected `list operation`, got {v:?}"),
             },
-            v => panic!("expected `pair 'a 'b`, got {:?}", v),
+            v => panic!("expected `pair 'a 'b`, got {v:?}"),
         }
     }
 
@@ -6657,16 +6657,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -6805,16 +6803,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -6953,16 +6949,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
@@ -7048,16 +7042,14 @@ mod interpreter_tests {
                 Some((parsed_path, parsed_ty)) => {
                     assert_eq!(
                         parsed_path, &path,
-                        "Incorrect path for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect path for entrypoint: {entrypoint:?}"
                     );
                     assert_eq!(
                         parsed_ty, &ty,
-                        "Incorrect type for entrypoint: {:?}",
-                        entrypoint
+                        "Incorrect type for entrypoint: {entrypoint:?}"
                     );
                 }
-                _ => panic!("Entrypoint not parsed: {:?}", entrypoint),
+                _ => panic!("Entrypoint not parsed: {entrypoint:?}"),
             }
         }
     }
