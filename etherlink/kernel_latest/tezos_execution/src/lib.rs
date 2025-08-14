@@ -4,7 +4,6 @@
 
 use account_storage::TezlinkAccount;
 use account_storage::{Manager, TezlinkImplicitAccount, TezlinkOriginatedAccount};
-use address::generate_kt1;
 use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
@@ -20,6 +19,7 @@ use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
 use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
+use tezos_tezlink::enc_wrappers::OperationHash;
 use tezos_tezlink::operation::{Operation, OriginationContent, Script};
 use tezos_tezlink::operation_result::{
     produce_skipped_receipt, ApplyOperationError, ContentResult,
@@ -38,6 +38,8 @@ use tezos_tezlink::{
     },
 };
 use validate::{validate_individual_operation, ValidationInfo};
+
+use crate::address::OriginationNonce;
 
 extern crate alloc;
 pub mod account_storage;
@@ -434,13 +436,14 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
+    origination_nonce: &mut OriginationNonce,
     src: &PublicKeyHash,
     src_account: &mut TezlinkImplicitAccount,
     balance: &Narith,
     script: &Script,
 ) -> Result<OriginationSuccess, OriginationError> {
     // Generate a simple KT1 address depending on the source of the operation
-    let contract = generate_kt1(src)?;
+    let contract = origination_nonce.generate_kt1()?;
     let dest_contract = Contract::Originated(contract.clone());
 
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
@@ -710,6 +713,7 @@ fn execute_validation<Host: Runtime>(
 pub fn validate_and_apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &context::Context,
+    hash: OperationHash,
     operation: Operation,
 ) -> Result<Vec<OperationResultSum>, OperationError> {
     let mut safe_host = SafeStorage {
@@ -740,7 +744,13 @@ pub fn validate_and_apply_operation<Host: Runtime>(
     safe_host.promote_trace()?;
     safe_host.start()?;
 
-    let (receipts, applied) = apply_batch(&mut safe_host, context, validation_info);
+    let mut origination_nonce = OriginationNonce::initial(hash);
+    let (receipts, applied) = apply_batch(
+        &mut safe_host,
+        context,
+        &mut origination_nonce,
+        validation_info,
+    );
 
     log!(safe_host, Debug, "Receipts: {:#?}", receipts);
 
@@ -767,6 +777,7 @@ pub fn validate_and_apply_operation<Host: Runtime>(
 fn apply_batch<Host: Runtime>(
     host: &mut Host,
     context: &Context,
+    origination_nonce: &mut OriginationNonce,
     validation_info: ValidationInfo,
 ) -> (Vec<OperationResultSum>, bool) {
     let ValidationInfo {
@@ -802,6 +813,7 @@ fn apply_batch<Host: Runtime>(
             apply_operation(
                 host,
                 context,
+                origination_nonce,
                 &content,
                 &source,
                 &mut source_account,
@@ -829,6 +841,7 @@ fn apply_batch<Host: Runtime>(
 fn apply_operation<Host: Runtime>(
     host: &mut Host,
     context: &Context,
+    origination_nonce: &mut OriginationNonce,
     content: &ManagerOperation<OperationContent>,
     source: &PublicKeyHash,
     source_account: &mut TezlinkImplicitAccount,
@@ -875,6 +888,7 @@ fn apply_operation<Host: Runtime>(
             let origination_result = originate_contract(
                 host,
                 context,
+                origination_nonce,
                 source,
                 source_account,
                 balance,
@@ -893,11 +907,13 @@ fn apply_operation<Host: Runtime>(
 #[cfg(test)]
 mod tests {
     use crate::{
-        account_storage::TezlinkOriginatedAccount, address, TezlinkImplicitAccount,
+        account_storage::TezlinkOriginatedAccount, address::OriginationNonce,
+        TezlinkImplicitAccount,
     };
     use mir::ast::{Entrypoint, Micheline};
     use num_traits::ops::checked::CheckedSub;
     use pretty_assertions::assert_eq;
+    use primitive_types::H256;
     use tezos_crypto_rs::hash::{ContractKt1Hash, SecretKeyEd25519};
     use tezos_data_encoding::enc::BinWriter;
     use tezos_data_encoding::types::Narith;
@@ -905,6 +921,7 @@ mod tests {
     use tezos_smart_rollup::types::{Contract, PublicKey, PublicKeyHash};
     use tezos_tezlink::{
         block::TezBlock,
+        enc_wrappers::OperationHash,
         operation::{
             sign_operation, ManagerOperation, ManagerOperationContent, Operation,
             OperationContent, OriginationContent, Parameter, RevealContent, Script,
@@ -1201,6 +1218,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         );
 
@@ -1231,6 +1249,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         );
 
@@ -1261,6 +1280,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         );
 
@@ -1305,6 +1325,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1364,6 +1385,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1418,6 +1440,7 @@ mod tests {
         let result = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         );
 
@@ -1457,6 +1480,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1526,6 +1550,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1599,6 +1624,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1683,6 +1709,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -1789,11 +1816,14 @@ mod tests {
                 value: Micheline::from(requested_amount as i128).encode(),
             }),
         );
-        let res = validate_and_apply_operation(&mut host, &context, operation)
-            .expect(
-                "validate_and_apply_operation should not have failed with a kernel error",
-            )
-            .remove(0);
+        let res = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect("validate_and_apply_operation should not have failed with a kernel error")
+        .remove(0);
         assert_eq!(
             res,
             OperationResultSum::Transfer(OperationResult {
@@ -1917,6 +1947,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -2024,6 +2055,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -2100,6 +2132,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -2160,6 +2193,7 @@ mod tests {
         let receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             operation,
         )
         .expect(
@@ -2234,7 +2268,13 @@ mod tests {
             vec![reveal_content, transfer_content_1, transfer_content_2],
         );
 
-        let receipts = validate_and_apply_operation(&mut host, &ctx, batch).unwrap();
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &ctx,
+            OperationHash(H256::zero()),
+            batch,
+        )
+        .unwrap();
 
         let expected_receipts = vec![
             OperationResultSum::Reveal(OperationResult {
@@ -2395,7 +2435,12 @@ mod tests {
             vec![reveal_content, transfer_content],
         );
 
-        let receipts = validate_and_apply_operation(&mut host, &ctx, batch);
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &ctx,
+            OperationHash(H256::zero()),
+            batch,
+        );
 
         let expected_error =
             OperationError::Validation(ValidityError::CantPayFees(100_u64.into()));
@@ -2485,6 +2530,7 @@ mod tests {
         let receipts = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            OperationHash(H256::zero()),
             batch,
         )
         .unwrap();
@@ -2595,12 +2641,20 @@ mod tests {
         let origination_storage_fee: u64 =
             ((code.len() as u64) + (storage.len() as u64)) * COST_PER_BYTES;
 
-        let receipt = validate_and_apply_operation(&mut host, &context, operation)
-            .expect(
-                "validate_and_apply_operation should not have failed with a kernel error",
-            );
+        let receipt = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
 
-        let expected_kt1 = address::generate_kt1(&src.pkh)
+        let mut origination_nonce =
+            OriginationNonce::initial(OperationHash(H256::zero()));
+        let expected_kt1 = origination_nonce
+            .generate_kt1()
             .expect("Should have succeeded to generate a KT1");
 
         let expected_receipt = OperationResultSum::Origination(OperationResult {
@@ -2802,10 +2856,15 @@ mod tests {
             ],
         );
         let context = context::Context::init_context();
-        let receipts = validate_and_apply_operation(&mut host, &context, operation)
-            .expect(
-                "validate_and_apply_operation should not have failed with a kernel error",
-            );
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
         assert_eq!(
             receipts.len(),
             2,
@@ -2958,6 +3017,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            operation.hash().unwrap(),
             operation,
         )
         .expect(
@@ -3018,6 +3078,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            operation.hash().unwrap(),
             operation,
         )
         .expect(
@@ -3082,6 +3143,7 @@ mod tests {
         let _receipt = validate_and_apply_operation(
             &mut host,
             &context::Context::init_context(),
+            operation.hash().unwrap(),
             operation,
         )
         .expect(
