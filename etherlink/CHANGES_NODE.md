@@ -6,6 +6,10 @@
 
 ### Configuration changes
 
+- Changes the default snapshot provider URL. It still the same
+  provider but the snapshot is downloaded from another source.
+  (!18969)
+
 ### RPCs changes
 
 - To stay aligned with Ethereum standards, the sequencer will now refuse transactions
