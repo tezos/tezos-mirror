@@ -84,7 +84,7 @@ pub enum TcError {
     #[error("sequence elements must contain no duplicate keys for type {0:?}")]
     DuplicateElements(Type),
     /// The given instruction can not be used with its input stack.
-    #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {}", x)))]
+    #[error("no matching overload for {instr} on stack {stack:?}{}", .reason.as_ref().map_or("".to_owned(), |x| format!(", reason: {x}")))]
     NoMatchingOverload {
         /// The instruction being typechecked.
         instr: Prim,
@@ -6490,7 +6490,7 @@ mod typecheck_tests {
         let lit = "NetXynUjJNZm7wi";
         assert_eq!(
             &typecheck_instruction(
-                &parse(&format!("PUSH chain_id \"{}\"", lit)).unwrap(),
+                &parse(&format!("PUSH chain_id \"{lit}\"")).unwrap(),
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),
@@ -6498,7 +6498,7 @@ mod typecheck_tests {
         );
         assert_eq!(
             &typecheck_instruction(
-                &parse(&format!("PUSH chain_id 0x{}", bytes)).unwrap(),
+                &parse(&format!("PUSH chain_id 0x{bytes}")).unwrap(),
                 &mut Ctx::default(),
                 &mut tc_stk![],
             ),

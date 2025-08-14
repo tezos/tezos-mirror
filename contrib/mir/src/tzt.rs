@@ -56,23 +56,21 @@ impl fmt::Display for TztTestError<'_> {
         use TztTestError::*;
         match self {
             StackMismatch(e, r) => {
-                write!(f, "Stack mismatch: Expected {:?}, Real {:?}", e, r)
+                write!(f, "Stack mismatch: Expected {e:?}, Real {r:?}")
             }
             UnexpectedError(e) => {
-                write!(f, "Unexpected error during test code execution: {}", e)
+                write!(f, "Unexpected error during test code execution: {e}")
             }
             UnexpectedSuccess(e, stk) => {
                 write!(
                     f,
-                    "Expected an error but none occurred. Expected {} but ended with stack {:?}.",
-                    e, stk
+                    "Expected an error but none occurred. Expected {e} but ended with stack {stk:?}."
                 )
             }
             ExpectedDifferentError(e, r) => {
                 write!(
                     f,
-                    "Expected an error but got a different one.\n expected: {}\n got: {}.",
-                    e, r
+                    "Expected an error but got a different one.\n expected: {e}\n got: {r}."
                 )
             }
         }
@@ -113,7 +111,7 @@ pub struct TztTest<'a> {
 }
 
 fn populate_ctx_with_known_contracts(
-    ctx: &mut Ctx,
+    _ctx: &mut Ctx,
     self_param: Option<(AddressHash, Option<Entrypoints>)>,
     m_other_contracts: Option<HashMap<AddressHash, Entrypoints>>,
 ) {
@@ -135,7 +133,7 @@ fn populate_ctx_with_known_contracts(
 
     // Set known contracts in context.
     #[cfg(feature = "runtime_entrypoint_verification")]
-    ctx.set_known_contracts(known_contracts);
+    _ctx.set_known_contracts(known_contracts);
 }
 
 fn typecheck_stack<'a>(
@@ -170,7 +168,7 @@ impl<'a> Parser<'a> {
 // If it is none, then fill it with the provided value.
 fn set_tzt_field<T>(field_name: &str, t: &mut Option<T>, v: T) -> Result<(), String> {
     match t {
-        Some(_) => Err(format!("Duplicate field '{}' in test", field_name)),
+        Some(_) => Err(format!("Duplicate field '{field_name}' in test")),
         None => {
             *t = Some(v);
             Ok(())
@@ -432,8 +430,8 @@ impl fmt::Display for ErrorExpectation<'_> {
         use ErrorExpectation::*;
         match self {
             TypecheckerError(None) => write!(f, "some typechecker error"),
-            TypecheckerError(Some(err)) => write!(f, "typechecker error: {}", err),
-            InterpreterError(err) => write!(f, "interpreter error: {}", err),
+            TypecheckerError(Some(err)) => write!(f, "typechecker error: {err}"),
+            InterpreterError(err) => write!(f, "interpreter error: {err}"),
         }
     }
 }
@@ -458,11 +456,11 @@ impl fmt::Display for InterpreterErrorExpectation<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use InterpreterErrorExpectation::*;
         match self {
-            GeneralOverflow(a1, a2) => write!(f, "General Overflow {} {}", a1, a2),
+            GeneralOverflow(a1, a2) => write!(f, "General Overflow {a1} {a2}"),
             Overflow => write!(f, "Overflow"),
-            MutezOverflow(a1, a2) => write!(f, "MutezOverflow {} {}", a1, a2),
+            MutezOverflow(a1, a2) => write!(f, "MutezOverflow {a1} {a2}"),
             OutOfGas(_) => write!(f, "OutOfGas"),
-            FailedWith(v) => write!(f, "FailedWith {:?}", v),
+            FailedWith(v) => write!(f, "FailedWith {v:?}"),
         }
     }
 }
