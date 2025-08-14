@@ -369,7 +369,7 @@ let () =
     [
       external_lib "merlin" V.(at_least "4.18");
       external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
-      external_lib "odoc" V.(at_least "2.4.2" && less_than "3.0.0");
+      external_lib "odoc" V.(at_least "3.0.0");
       external_lib "ocp-indent" V.True;
       external_lib "merge-fmt" V.True;
     ]
