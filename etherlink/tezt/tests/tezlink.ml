@@ -1451,7 +1451,61 @@ let test_tezlink_internal_receipts =
     ~contract:Constant.bootstrap1.public_key_hash
     ~change:amount
     ~origin:"block" ;
+  unit
 
+let test_tezlink_origination =
+  let faucet = Tezt_etherlink.Michelson_contracts.faucet_contract () in
+  register_tezlink_test
+    ~title:"Contract origination"
+    ~tags:["origination"; "operation"]
+    ~bootstrap_accounts:[Constant.bootstrap1]
+  @@ fun {sequencer; client; _} _protocol ->
+  let endpoint =
+    Client.(
+      Foreign_endpoint
+        Endpoint.
+          {(Evm_node.rpc_endpoint_record sequencer) with path = "/tezlink"})
+  in
+  let* deployed_faucet =
+    Client.originate_contract
+      ~endpoint
+      ~amount:Tez.one
+      ~alias:"faucet"
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:faucet.initial_storage
+      ~prg:faucet.path
+      ~burn_cap:Tez.one
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* faucet_balance =
+    Client.get_balance_for ~endpoint ~account:deployed_faucet client
+  in
+  Check.((Tez.to_mutez faucet_balance = Tez.(to_mutez one)) int)
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
+  let* bootstrap_balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  let* () =
+    Client.transfer
+      ~endpoint
+      ~fee:Tez.zero
+      ~amount:Tez.zero
+      ~giver:Constant.bootstrap1.alias
+      ~receiver:deployed_faucet
+      ~burn_cap:Tez.one
+      ~entrypoint:"fund"
+      ~arg:"1000000"
+      client
+  in
+  let*@ _ = produce_block sequencer in
+  let* balance =
+    Client.get_balance_for ~endpoint ~account:Constant.bootstrap1.alias client
+  in
+  Check.(
+    (Tez.to_mutez balance = Tez.to_mutez bootstrap_balance + Tez.(to_mutez one))
+      int)
+    ~error_msg:"Wrong balance for bootstrap1: expected %R, actual %L" ;
   unit
 
 let () =
@@ -1488,4 +1542,5 @@ let () =
   test_tezlink_bootstrap_block_info [Alpha] ;
   test_tezlink_sandbox () ;
   test_tezlink_internal_operation [Alpha] ;
-  test_tezlink_internal_receipts [Alpha]
+  test_tezlink_internal_receipts [Alpha] ;
+  test_tezlink_origination [Alpha]
