@@ -48,13 +48,11 @@ val start_private_server :
     If [data_dir] is provided and the host provides the necessary binaries,
     performance metrics are enabled. *)
 val start_public_server :
-  is_sequencer:bool ->
   rpc_server_family:'f Rpc_types.rpc_server_family ->
   l2_chain_id:L2_types.chain_id option ->
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
   ?data_dir:string ->
-  Validate.validation_mode ->
   Configuration.t ->
   'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->

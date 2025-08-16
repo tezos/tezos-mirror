@@ -283,12 +283,13 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   if not legacy_block_storage then
     Block_storage_setup.enable ~keep_alive:config.keep_alive ctxt.store ;
 
-  let rpc_backend = Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint in
+  let (module Rpc_backend) =
+    Evm_ro_context.ro_backend ctxt config ~evm_node_endpoint
+  in
 
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ctxt in
   let* l2_chain_id, Ex_chain_family chain_family =
-    let (module Backend) = rpc_backend in
-    Backend.single_chain_id_and_family ~config ~enable_multichain
+    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
   let* ping_tx_pool, tx_container =
@@ -317,7 +318,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
           Tx_pool.start
             ~tx_pool_parameters:
               {
-                backend = rpc_backend;
+                backend = (module Rpc_backend);
                 smart_rollup_address =
                   Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
                     ctxt.smart_rollup_address;
@@ -353,20 +354,19 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     }
   in
 
+  let* () = Prevalidator.start ~chain_family Minimal (module Rpc_backend) in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* server_public_finalizer =
     Rpc_server.start_public_server
-      ~is_sequencer:false
       ~l2_chain_id
       ~delegate_health_check_to:evm_node_endpoint
       ~evm_services:
         Evm_ro_context.(evm_services_methods ctxt time_between_blocks)
       ~data_dir
       ~rpc_server_family
-      Minimal
       rpc_config
       tx_container
-      (rpc_backend, ctxt.smart_rollup_address)
+      ((module Rpc_backend), ctxt.smart_rollup_address)
   in
 
   let (_ : Lwt_exit.clean_up_callback_id) =
@@ -400,6 +400,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
             when_ (Option.is_some blueprint.kernel_upgrade) @@ fun () ->
             Evm_ro_context.preload_kernel_from_level ctxt (Qty number)
           in
+          let* () = Prevalidator.refresh_state () in
           Broadcast.notify_blueprint blueprint ;
           Metrics.set_level ~level:number ;
           let* () = set_metrics_confirmed_levels ctxt in

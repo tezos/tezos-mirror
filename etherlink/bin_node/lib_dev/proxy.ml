@@ -185,8 +185,8 @@ let main
   end) in
   let validation_mode =
     match config.proxy.evm_node_endpoint with
-    | Some _base -> Validate.Minimal
-    | None -> Validate.Full
+    | Some _base -> Prevalidator.Minimal
+    | None -> Full
   in
   let* l2_chain_id, Ex_chain_family chain_family =
     if finalized_view then
@@ -247,6 +247,9 @@ let main
         in
         return (None, tx_container)
   in
+  let* () =
+    Prevalidator.start ~chain_family validation_mode (module Rollup_node_rpc)
+  in
   let () =
     Rollup_node_follower.start
       ~keep_alive:config.keep_alive
@@ -257,10 +260,8 @@ let main
 
   let* server_finalizer =
     Rpc_server.start_public_server
-      ~is_sequencer:false
       ~rpc_server_family:(Rpc_types.Single_chain_node_rpc_server chain_family)
       ~l2_chain_id
-      validation_mode
       config
       tx_container
       ((module Rollup_node_rpc), smart_rollup_address)

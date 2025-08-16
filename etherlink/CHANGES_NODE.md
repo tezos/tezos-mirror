@@ -8,6 +8,11 @@
 
 ### RPCs changes
 
+- Improves performances of the `eth_sendRawTransaction` RPC, dividing the
+  average time to process these requests by up to 5 times. (!18989)
+- Delays broadcasting blueprints through the `/evm/messages` streamed RPC until
+  after the blueprints have been committed to disk. (!18989)
+
 ### Metrics changes
 
 - Size informations about tx container was using tx_pool only. Now

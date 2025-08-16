@@ -504,10 +504,9 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (type f) ~is_sequencer ~websocket
+let dispatch_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
-    (config : Configuration.t)
+    (rpc : Configuration.rpc) (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -864,26 +863,16 @@ let dispatch_request (type f) ~is_sequencer ~websocket
                     transactions"
                    None
             else
-              let max_number_of_chunks =
-                if is_sequencer then Some config.sequencer.max_number_of_chunks
-                else None
-              in
               let f raw_tx =
                 let txn = Ethereum_types.hex_to_bytes raw_tx in
-                let* is_valid =
-                  Validate.is_tx_valid
-                    ?max_number_of_chunks
-                    (module Backend_rpc)
-                    ~mode:validation
-                    txn
-                in
+                let* is_valid = Prevalidator.prevalidate_raw_transaction txn in
                 match is_valid with
                 | Error err ->
                     let*! () =
                       Tx_pool_events.invalid_transaction ~transaction:raw_tx
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok (next_nonce, transaction_object) -> (
+                | Ok {next_nonce; transaction_object} -> (
                     Octez_telemetry.Trace.(
                       add_attrs (fun () ->
                           Telemetry.Attributes.
@@ -1169,7 +1158,7 @@ let dispatch_private_request (type f) ~websocket
                 | None -> Ethereum_types.Qty Z.zero
                 | Some next_nonce -> next_nonce
               in
-              return @@ Ok (next_nonce, transaction_object)
+              return @@ Ok Prevalidator.{next_nonce; transaction_object}
             in
             (* If the tx_queue is enabled the validation is done by
                the block producer *)
@@ -1180,8 +1169,7 @@ let dispatch_private_request (type f) ~websocket
                  partially done by the attached rpc node. *)
               let* mode = Tx_pool.mode () in
               match mode with
-              | Sequencer ->
-                  Validate.is_tx_valid (module Backend_rpc) ~mode:Full raw_txn
+              | Sequencer -> Prevalidator.prevalidate_raw_transaction raw_txn
               | _ -> get_nonce ()
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in
@@ -1189,7 +1177,7 @@ let dispatch_private_request (type f) ~websocket
           | Error err ->
               let*! () = Tx_pool_events.invalid_transaction ~transaction in
               rpc_error (Rpc_errors.transaction_rejected err None)
-          | Ok (next_nonce, transaction_object) -> (
+          | Ok {next_nonce; transaction_object} -> (
               let* tx_hash =
                 let* (module Tx_container) =
                   match tx_container with
@@ -1317,10 +1305,9 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket ~is_sequencer
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config tx_container ctx
-    (input : JSONRPC.request) =
+let dispatch_websocket (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
+    =
   let open Lwt_syntax in
   match
     map_method_name
@@ -1368,11 +1355,9 @@ let dispatch_websocket ~is_sequencer
   | _ ->
       let+ response =
         dispatch_request
-          ~is_sequencer
           ~websocket:true
           rpc_server_family
           rpc
-          validation
           config
           tx_container
           ctx
@@ -1411,9 +1396,8 @@ let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
         input
       |> Lwt_result.ok)
 
-let dispatch_public (type f) ~is_sequencer
-    (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config
+let dispatch_public (type f) (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) config
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
     ~service_name:"public_rpc"
@@ -1423,12 +1407,7 @@ let dispatch_public (type f) ~is_sequencer
     ctx
     dir
     Path.root
-    (dispatch_request
-       ~is_sequencer
-       ~websocket:false
-       rpc_server_family
-       rpc
-       validation)
+    (dispatch_request ~websocket:false rpc_server_family rpc)
 
 let dispatch_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
@@ -1460,9 +1439,9 @@ let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
         path
         (dispatch_websocket config tx_container ctx)
 
-let dispatch_websocket_public (type f) ~is_sequencer
+let dispatch_websocket_public (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) validation config
+    (rpc : Configuration.rpc) config
     (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
     config
@@ -1470,7 +1449,7 @@ let dispatch_websocket_public (type f) ~is_sequencer
     ctx
     dir
     "/ws"
-    (dispatch_websocket ~is_sequencer rpc_server_family rpc validation)
+    (dispatch_websocket rpc_server_family rpc)
 
 let dispatch_websocket_private (type f)
     (rpc_server_family : _ Rpc_types.rpc_server_family)
@@ -1484,9 +1463,8 @@ let dispatch_websocket_private (type f)
     "/private/ws"
     (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory (type f) ~is_sequencer
-    ~(rpc_server_family : f Rpc_types.rpc_server_family)
-    ?delegate_health_check_to rpc validation config
+let directory (type f) ~(rpc_server_family : f Rpc_types.rpc_server_family)
+    ?delegate_health_check_to rpc config
     (tx_container : f Services_backend_sig.tx_container) backend dir =
   let db_liveness_check () =
     let open Lwt_result_syntax in
@@ -1507,22 +1485,8 @@ let directory (type f) ~is_sequencer
 
   dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to db_liveness_check
-  |> dispatch_public
-       ~is_sequencer
-       rpc_server_family
-       rpc
-       validation
-       config
-       tx_container
-       backend
-  |> dispatch_websocket_public
-       ~is_sequencer
-       rpc_server_family
-       rpc
-       validation
-       config
-       tx_container
-       backend
+  |> dispatch_public rpc_server_family rpc config tx_container backend
+  |> dispatch_websocket_public rpc_server_family rpc config tx_container backend
 
 let private_directory ~rpc_server_family rpc config
     (tx_container : _ Services_backend_sig.tx_container) backend

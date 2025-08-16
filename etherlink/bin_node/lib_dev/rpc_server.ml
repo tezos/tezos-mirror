@@ -145,10 +145,9 @@ let monitor_performances ~data_dir =
   (* Run in background *)
   ignore domain
 
-let start_public_server (type f) ~is_sequencer
+let start_public_server (type f)
     ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
-    ?delegate_health_check_to ?evm_services ?data_dir validation
-    (config : Configuration.t)
+    ?delegate_health_check_to ?evm_services ?data_dir (config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let can_start_performance_metrics =
@@ -215,11 +214,9 @@ let start_public_server (type f) ~is_sequencer
   let directory =
     register_tezos_services
     |> Services.directory
-         ~is_sequencer
          ~rpc_server_family
          ?delegate_health_check_to
          rpc
-         validation
          config
          tx_container
          ctxt

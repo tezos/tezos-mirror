@@ -1498,6 +1498,22 @@ preloaded_kernel:
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
   
+prevalidator_cannot_start:
+  description: prevalidator cannot start with current node data dir, will retry later
+  level: warning
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_cannot_start version 0 */
+      "prevalidator_cannot_start.v0": any }
+  
+prevalidator_is_ready:
+  description: prevalidator is ready
+  level: notice
+  section: evm_node.dev.prevalidator
+  json format:
+    { /* prevalidator_is_ready version 0 */
+      "prevalidator_is_ready.v0": any }
+  
 private_server_is_ready:
   description: the EVM node private RPC server ({backend}) is listening to {addr}:{port} {websockets}
   level: notice

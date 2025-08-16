@@ -40,16 +40,16 @@ let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
   let* () = Signals_publisher.shutdown () in
   return_unit
 
-let validate_and_add_etherlink_tx backend
+let validate_and_add_etherlink_tx
     ~(tx_container :
        L2_types.evm_chain_family Services_backend_sig.tx_container) raw_tx =
   let open Lwt_result_syntax in
   let (Evm_tx_container (module Tx_container)) = tx_container in
-  let* res = Validate.is_tx_valid backend ~mode:Minimal raw_tx in
+  let* res = Prevalidator.prevalidate_raw_transaction raw_tx in
   match res with
-  | Ok (next_nonce, txn_obj) ->
+  | Ok {next_nonce; transaction_object} ->
       let raw_tx = Ethereum_types.hex_of_utf8 raw_tx in
-      let* _ = Tx_container.add ~next_nonce txn_obj ~raw_tx in
+      let* _ = Tx_container.add ~next_nonce transaction_object ~raw_tx in
       return_unit
   | Error reason ->
       let hash = Ethereum_types.hash_raw_tx raw_tx in
@@ -76,16 +76,16 @@ let validate_and_add_tezlink_operation
   in
   return_unit
 
-let validate_and_add_tx (type f) backend
+let validate_and_add_tx (type f)
     ~(tx_container : f Services_backend_sig.tx_container) :
     string -> unit tzresult Lwt.t =
   match tx_container with
   | Evm_tx_container _ as tx_container ->
-      validate_and_add_etherlink_tx backend ~tx_container
+      validate_and_add_etherlink_tx ~tx_container
   | Michelson_tx_container _ as tx_container ->
       validate_and_add_tezlink_operation ~tx_container
 
-let loop_sequencer (type f) multichain backend
+let loop_sequencer (type f) multichain
     ~(tx_container : f Services_backend_sig.tx_container) ?sandbox_config
     time_between_blocks =
   let open Lwt_result_syntax in
@@ -114,9 +114,7 @@ let loop_sequencer (type f) multichain backend
               Blueprint_decoder.transactions blueprint.blueprint.payload
             in
             let txns = List.filter_map snd all_txns in
-            let* () =
-              List.iter_es (validate_and_add_tx backend ~tx_container) txns
-            in
+            let* () = List.iter_es (validate_and_add_tx ~tx_container) txns in
             let* _ =
               Block_producer.produce_block
                 ~force:true
@@ -395,6 +393,18 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       configuration
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
+  let (module Rpc_backend) = Evm_ro_context.ro_backend ro_ctxt configuration in
+  let* () =
+    Prevalidator.start
+      ~max_number_of_chunks:sequencer_config.max_number_of_chunks
+      ~chain_family
+      (* When the tx_queue is enabled the validation is done in the
+         block_producer instead of in the RPC. This allows for a more
+         accurate validation as it's delayed up to when the block is
+         created. *)
+      (if Configuration.is_tx_queue_enabled configuration then Minimal else Full)
+      (module Rpc_backend)
+  in
   let* () =
     when_ (not is_sandbox) @@ fun () ->
     Blueprints_publisher.start
@@ -439,17 +449,17 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     else return_unit
   in
 
-  let backend = Evm_ro_context.ro_backend ro_ctxt configuration in
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
-    let (module Backend) = backend in
-    Backend.single_chain_id_and_family ~config:configuration ~enable_multichain
+    Rpc_backend.single_chain_id_and_family
+      ~config:configuration
+      ~enable_multichain
   in
   let* () =
     start_tx_container
       ~tx_pool_parameters:
         {
-          backend;
+          backend = (module Rpc_backend);
           smart_rollup_address = smart_rollup_address_b58;
           mode = Sequencer;
           tx_timeout_limit = configuration.tx_pool_timeout_limit;
@@ -492,9 +502,9 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       in
       return_unit
   in
+
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~is_sequencer:true
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(
@@ -503,14 +513,9 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       ~rpc_server_family:
         (if enable_multichain then Rpc_types.Multichain_sequencer_rpc_server
          else Rpc_types.Single_chain_node_rpc_server chain_family)
-      (* When the tx_queue is enabled the validation is done in the
-         block_producer instead of in the RPC. This allows for a more
-         accurate validation as it's delayed up to when the block is
-         created. *)
-      (if Configuration.is_tx_queue_enabled configuration then Minimal else Full)
       configuration
       tx_container
-      (backend, smart_rollup_address_typed)
+      ((module Rpc_backend), smart_rollup_address_typed)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
@@ -520,7 +525,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       ~block_production:`Single_node
       configuration
       tx_container
-      (backend, smart_rollup_address_typed)
+      ((module Rpc_backend), smart_rollup_address_typed)
   in
   let*! finalizer_rpc_process =
     Option.map_s
@@ -551,7 +556,6 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
   let* () =
     loop_sequencer
       enable_multichain
-      backend
       ~tx_container
       ?sandbox_config
       sequencer_config.time_between_blocks
