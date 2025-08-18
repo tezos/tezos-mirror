@@ -11365,7 +11365,7 @@ let register ~protocols =
     Garbage_collection.test_gc_simple_producer
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "attester"]
+    ~tags:["gc"; "attester"; Tag.slow]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
@@ -11373,7 +11373,7 @@ let register ~protocols =
     Garbage_collection.test_gc_producer_and_attester
     protocols ;
   scenario_with_layer1_and_dal_nodes
-    ~tags:["gc"; "multi"]
+    ~tags:["gc"; "multi"; Tag.slow]
     ~bootstrap_profile:true
     ~l1_history_mode:Default_with_refutation
     ~number_of_slots:1
