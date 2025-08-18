@@ -15,12 +15,16 @@
 
 ### Metrics changes
 
-- Size informations about tx container was using tx_pool only. Now if you
-  activate tx_queue it show the size of the tx_queue.
+- Fixes the metrics related to the tx pool. Now
+  if you activate tx_queue it show the size of the tx_queue. (!18996)
 - The EVM node now exports its logs to Opentelemetry when enabled in the
   configuration file or with `--profiling true`. (!18910)
 
 ### Command-line interface changes
+
+- Deprecates the fields `tx_pool_timeout_limit`, `tx_pool_addr_limit` and
+  `tx_pool_tx_per_addr_limit` in favor of a top-level `tx_pool`
+  top-level field. (!18994)
 
 ### Execution changes
 
@@ -34,6 +38,8 @@
 features. They can be modified or removed without any deprecation notices. If
 you start using them, you probably want to use `octez-evm-node check config
 --config-file PATH` to assert your configuration file is still valid.*
+
+- Removes the `tx_queue` configuration parameters. (!18994)
 
 ## Version 0.38 (2025-08-13)
 

@@ -23,7 +23,6 @@ type parameters = {
   on_finalized_levels : on_finalized_levels_handler;
   time_between_blocks : Configuration.time_between_blocks;
   evm_node_endpoint : Uri.t;
-  ping_tx_pool : bool;
 }
 
 type error += Timeout
@@ -254,10 +253,6 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
         monitor
   | Ok (Some (Blueprint blueprint)) -> (
       let* r = params.on_new_blueprint (Qty next_blueprint_number) blueprint in
-      let* () =
-        when_ params.ping_tx_pool @@ fun () ->
-        Tx_pool.pop_and_inject_transactions ()
-      in
       match r with
       | `Continue ->
           (stream_loop [@tailcall])
@@ -287,9 +282,8 @@ and stream_loop ~multichain (Qty next_blueprint_number) params monitor =
       Evm_services.close_monitor monitor ;
       fail err
 
-let start ?(ping_tx_pool = true) ~multichain ~time_between_blocks
-    ~evm_node_endpoint ~next_blueprint_number ~on_new_blueprint
-    ~on_finalized_levels () =
+let start ~multichain ~time_between_blocks ~evm_node_endpoint
+    ~next_blueprint_number ~on_new_blueprint ~on_finalized_levels () =
   let open Lwt_result_syntax in
   let*! res =
     catchup
@@ -301,7 +295,6 @@ let start ?(ping_tx_pool = true) ~multichain ~time_between_blocks
         evm_node_endpoint;
         on_new_blueprint;
         on_finalized_levels;
-        ping_tx_pool;
       }
   in
   (* The blueprint follower should never fail. If it does, we better exit with

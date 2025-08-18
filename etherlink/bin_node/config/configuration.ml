@@ -127,24 +127,6 @@ let tx_queue_encoding =
        (dft "max_lifespan" int31 default_tx_queue.max_lifespan_s)
        (dft "tx_per_addr_limit" int64 default_tx_queue.tx_per_addr_limit))
 
-let tx_queue_opt_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        ~title:"tx queue configuration"
-        Json_only
-        (option tx_queue_encoding)
-        (function Some tx_queue -> Some (Some tx_queue) | None -> Some None)
-        Fun.id;
-      case
-        ~title:"tx queue enable"
-        Json_only
-        bool
-        (function _ -> None)
-        (function true -> Some default_tx_queue | _ -> None);
-    ]
-
 type websocket_rate_limit = {
   max_frames : int;
   max_messages : int option;
@@ -182,7 +164,6 @@ type experimental_features = {
   rpc_server : rpc_server;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
 }
 
@@ -273,10 +254,8 @@ type t = {
   history_mode : history_mode option;
   db : db;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  tx_queue : tx_queue;
 }
-
-let is_tx_queue_enabled {experimental_features = {enable_tx_queue; _}; _} =
-  Option.is_some enable_tx_queue
 
 let retrieve_chain_family ~l2_chains =
   match l2_chains with
@@ -339,7 +318,6 @@ let default_experimental_features =
     rpc_server = Resto;
     spawn_rpc = None;
     l2_chains = default_l2_chains;
-    enable_tx_queue = Some default_tx_queue;
     periodic_snapshot_path = None;
   }
 
@@ -1002,7 +980,6 @@ let experimental_features_encoding =
            rpc_server;
            spawn_rpc;
            l2_chains : l2_chain list option;
-           enable_tx_queue;
            periodic_snapshot_path;
          }
        ->
@@ -1012,22 +989,14 @@ let experimental_features_encoding =
           None,
           overwrite_simulation_tick_limit,
           None ),
-        ( rpc_server,
-          spawn_rpc,
-          l2_chains,
-          enable_tx_queue,
-          periodic_snapshot_path ) ))
+        (rpc_server, spawn_rpc, l2_chains, periodic_snapshot_path) ))
     (fun ( ( drop_duplicate_on_injection,
              blueprints_publisher_order_enabled,
              enable_send_raw_transaction,
              _node_transaction_validation,
              overwrite_simulation_tick_limit,
              _next_wasm_runtime ),
-           ( rpc_server,
-             spawn_rpc,
-             l2_chains,
-             enable_tx_queue,
-             periodic_snapshot_path ) )
+           (rpc_server, spawn_rpc, l2_chains, periodic_snapshot_path) )
        ->
       {
         drop_duplicate_on_injection;
@@ -1037,7 +1006,6 @@ let experimental_features_encoding =
         rpc_server;
         spawn_rpc;
         l2_chains;
-        enable_tx_queue;
         periodic_snapshot_path;
       })
     (merge_objs
@@ -1089,7 +1057,7 @@ let experimental_features_encoding =
                 DEPRECATED: You should remove this option from your \
                 configuration file."
              bool))
-       (obj5
+       (obj4
           (dft
              "rpc_server"
              ~description:
@@ -1110,11 +1078,6 @@ let experimental_features_encoding =
                 chain behaviour."
              (option (list l2_chain_encoding))
              default_l2_chains)
-          (dft
-             "enable_tx_queue"
-             ~description:"Replace the observer tx pool by a tx queue"
-             tx_queue_opt_encoding
-             default_experimental_features.enable_tx_queue)
           (dft
              "periodic_snapshot_path"
              ~description:"Path to the periodic snapshot file"
@@ -1565,6 +1528,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            history_mode;
            db;
            opentelemetry;
+           tx_queue;
          }
        ->
       ( (log_filter, sequencer, observer),
@@ -1585,7 +1549,8 @@ let encoding ?network data_dir : t Data_encoding.t =
             finalized_view,
             history_mode,
             db,
-            opentelemetry ) ) ))
+            opentelemetry,
+            tx_queue ) ) ))
     (fun ( (log_filter, sequencer, observer),
            ( ( tx_pool_timeout_limit,
                tx_pool_addr_limit,
@@ -1604,7 +1569,8 @@ let encoding ?network data_dir : t Data_encoding.t =
                finalized_view,
                history_mode,
                db,
-               opentelemetry ) ) )
+               opentelemetry,
+               tx_queue ) ) )
        ->
       {
         public_rpc;
@@ -1628,6 +1594,7 @@ let encoding ?network data_dir : t Data_encoding.t =
         history_mode;
         db;
         opentelemetry;
+        tx_queue;
       })
     (merge_objs
        (obj3
@@ -1642,20 +1609,24 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft
                 "tx_pool_timeout_limit"
                 ~description:
-                  "Transaction timeout limit inside the transaction pool"
+                  "Transaction timeout limit inside the transaction pool. \
+                   DEPRECATED: You should use \"tx_pool.max_lifespan\" \
+                   instead."
                 int64
                 default_tx_pool_timeout_limit)
              (dft
                 "tx_pool_addr_limit"
                 ~description:
-                  "Maximum allowed addresses inside the transaction pool."
+                  "Maximum allowed addresses inside the transaction pool. \
+                   DEPRECATED: You should use \"tx_pool.max_size\" instead."
                 int64
                 default_tx_pool_addr_limit)
              (dft
                 "tx_pool_tx_per_addr_limit"
                 ~description:
                   "Maximum allowed transactions per user address inside the \
-                   transaction pool."
+                   transaction pool. DEPRECATED: You should use \
+                   \"tx_pool.tx_per_addr_limit\" instead."
                 int64
                 default_tx_pool_tx_per_addr_limit)
              (dft
@@ -1683,7 +1654,7 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj8
+          (obj9
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1716,7 +1687,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                 "opentelemetry"
                 ~description:"Enable or disable opentelemetry profiling"
                 Octez_telemetry.Opentelemetry_config.encoding
-                Octez_telemetry.Opentelemetry_config.default))))
+                Octez_telemetry.Opentelemetry_config.default)
+             (dft
+                "tx_pool"
+                ~description:"Configuration for the tx pool"
+                tx_queue_encoding
+                default_tx_queue))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1927,6 +1903,7 @@ module Cli = struct
       history_mode = None;
       db = default_db;
       opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+      tx_queue = default_tx_queue;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -2117,6 +2094,15 @@ module Cli = struct
       | Some false -> None
       | Some true -> Some default_websockets_config
     in
+    let tx_queue =
+      {
+        max_lifespan_s = configuration.tx_queue.max_lifespan_s;
+        max_size = configuration.tx_queue.max_size;
+        tx_per_addr_limit = configuration.tx_queue.tx_per_addr_limit;
+        max_transaction_batch_length =
+          configuration.tx_queue.max_transaction_batch_length;
+      }
+    in
     {
       public_rpc;
       private_rpc;
@@ -2148,6 +2134,7 @@ module Cli = struct
       history_mode = Option.either history_mode configuration.history_mode;
       db = configuration.db;
       opentelemetry;
+      tx_queue;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins

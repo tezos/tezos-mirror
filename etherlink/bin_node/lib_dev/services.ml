@@ -1071,7 +1071,7 @@ let dispatch_request (type f) ~websocket
 
 let dispatch_private_request (type f) ~websocket
     (rpc_server_family : f Rpc_types.rpc_server_family)
-    (rpc : Configuration.rpc) (config : Configuration.t)
+    (rpc : Configuration.rpc) (_config : Configuration.t)
     (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
@@ -1160,17 +1160,7 @@ let dispatch_private_request (type f) ~websocket
               in
               return @@ Ok Prevalidator.{next_nonce; transaction_object}
             in
-            (* If the tx_queue is enabled the validation is done by
-               the block producer *)
-            if Configuration.is_tx_queue_enabled config then get_nonce ()
-            else
-              (* With the legacy tx_pool we do the full validation
-                 when receiving the transaction even if it was already
-                 partially done by the attached rpc node. *)
-              let* mode = Tx_pool.mode () in
-              match mode with
-              | Sequencer -> Prevalidator.prevalidate_raw_transaction raw_txn
-              | _ -> get_nonce ()
+            get_nonce ()
           in
           let transaction = Ethereum_types.hex_encode_string raw_txn in
           match is_valid with

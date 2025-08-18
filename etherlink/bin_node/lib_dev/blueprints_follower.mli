@@ -34,14 +34,8 @@ type on_finalized_levels_handler =
     [next_blueprint_number] is the height of the current local head, while
     [time_between_blocks] is used to detect when a connection to
     [evm_node_endpoint] is stalling.
-    [multichain] is used to know where to retrieve the block number.
-
-    If [ping_tx_pool] is set to [true] (as it is if omitted), then the
-    blueprint follower will ping the {!Tx_pool} for every blueprint it
-    receives. Conversely, setting it to [false] allows to call [start] without a
-    running {!Tx_pool}. *)
+    [multichain] is used to know where to retrieve the block number. *)
 val start :
-  ?ping_tx_pool:bool ->
   multichain:bool ->
   time_between_blocks:Configuration.time_between_blocks ->
   evm_node_endpoint:Uri.t ->

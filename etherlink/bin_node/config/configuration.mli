@@ -126,7 +126,6 @@ type experimental_features = {
   rpc_server : rpc_server;
   spawn_rpc : int option;
   l2_chains : l2_chain list option;
-  enable_tx_queue : tx_queue option;
   periodic_snapshot_path : string option;
 }
 
@@ -225,9 +224,8 @@ type t = {
   history_mode : history_mode option;
   db : db;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
+  tx_queue : tx_queue;
 }
-
-val is_tx_queue_enabled : t -> bool
 
 (** [chain_family_from_l2_chains t] returns the chain_family in
   the experimental feature if there's only one chain.
