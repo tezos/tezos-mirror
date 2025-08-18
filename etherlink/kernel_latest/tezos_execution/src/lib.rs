@@ -1075,7 +1075,7 @@ mod tests {
             FAILWITH
         }"#;
 
-    static SCRIPT_EMITING_INTERNAL_OP: &str = r#"
+    static SCRIPT_EMITING_INTERNAL_TRANSFER: &str = r#"
         parameter (list address);
         storage unit;
         code {
@@ -1091,6 +1091,41 @@ mod tests {
             SWAP;
             PAIR
         }"#;
+
+    /// Build the whole CREATE_CONTRACT { ... } block.
+    fn make_create_contract_block(
+        param_ty: &str,
+        storage_ty: &str,
+        code_body: &str, // inside `code { ... }`
+    ) -> String {
+        // Michelson `{ ... }` need to be doubled to escape Rust’s format! braces
+        format!(
+            "
+                parameter {param_ty} ;
+                storage {storage_ty} ;
+                code {{ {code_body} }}
+            "
+        )
+    }
+
+    /// Embed a whole contract creation block into a surrounding
+    /// script, with delegate hard-coded as `NONE key_hash`.
+    /// Also, the created script must have a storage of type `unit`.
+    fn make_script_emitting_internal_origination(create_block: &str) -> String {
+        format!(
+            r#"
+            parameter unit;
+            storage (option address);
+            code {{
+                DROP;
+                UNIT;                   # starting storage for contract
+                AMOUNT;                 # starting balance for the child
+                NONE key_hash;          # delegate is always None
+                CREATE_CONTRACT {{ {create_block} }};
+                DIP {{ SOME ; NIL operation }} ; CONS ; PAIR
+            }}"#
+        )
+    }
 
     fn make_operation(
         fee: u64,
@@ -2854,7 +2889,7 @@ mod tests {
         init_contract(
             &mut host,
             &contract_chapo_hash,
-            SCRIPT_EMITING_INTERNAL_OP,
+            SCRIPT_EMITING_INTERNAL_TRANSFER,
             &Micheline::from(()),
             &100_u64.into(),
         );
@@ -3219,5 +3254,383 @@ mod tests {
             micheline_address.encode(),
             "Storage should contain the self address of the contract"
         );
+    }
+
+    fn get_internal_receipts(op: &OperationResultSum) -> &Vec<InternalOperationSum> {
+        if let OperationResultSum::Transfer(OperationResult {
+            internal_operation_results,
+            ..
+        }) = op
+        {
+            internal_operation_results
+        } else {
+            panic!("Expected a Transfer operation result")
+        }
+    }
+
+    #[test]
+    fn test_internal_origination_of_a_smart_contract() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 100);
+        reveal_account(&mut host, &src);
+        let context = context::Context::init_context();
+
+        let originated_code = "CDR;
+                        NIL operation;
+                        PAIR;";
+        let originated_script =
+            make_create_contract_block("unit", "unit", originated_code);
+        let parsed_script = parser
+            .parse_top_level(&originated_script)
+            .expect("Should have parsed the script");
+        let init_script = make_script_emitting_internal_origination(&originated_script);
+
+        // Create a script that emits internal operations to multiple targets
+        let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &contract_chapo_hash,
+            &init_script,
+            &Micheline::prim0(mir::lexer::Prim::None),
+            &1000000_u64.into(),
+        );
+
+        let operation = make_operation(
+            10,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![OperationContent::Transfer(TransferContent {
+                amount: 0.into(),
+                destination: Contract::Originated(contract_chapo_hash.clone()),
+                parameters: Some(Parameter {
+                    entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                    value: Micheline::from(()).encode(),
+                }),
+            })],
+        );
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        assert_eq!(
+            receipts.len(),
+            1,
+            "There should be one receipt for the transfer operation"
+        );
+        assert!(
+            matches!(
+                &receipts[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            ),
+            "First receipt should be an Applied Transfer but is {:?}",
+            receipts[0]
+        );
+        let internal_receipts = get_internal_receipts(&receipts[0]);
+
+        assert_eq!(
+            internal_receipts.len(),
+            1,
+            "There should be one internal operation"
+        );
+        let expected_address = OriginationNonce::initial(OperationHash(H256::zero()))
+            .generate_kt1()
+            .expect("Should have succeeded to generate a KT1");
+
+        assert_eq!(
+            internal_receipts[0],
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                content: OriginationContent {
+                    balance: 0.into(),
+                    delegate: None,
+                    script: Script {
+                        code: parsed_script.encode(),
+                        storage: Micheline::from(()).encode(),
+                    },
+                },
+                result: ContentResult::Applied(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_address,
+                    }],
+                    consumed_gas: 0_u64.into(),
+                    storage_size: 30_u64.into(),
+                    paid_storage_size_diff: 30_u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                sender: Contract::Originated(contract_chapo_hash),
+                nonce: 1
+            }),
+            "Internal origination should match the expected structure"
+        );
+    }
+
+    #[test]
+    fn test_try_apply_three_origination_batch() {
+        let mut host = MockKernelHost::default();
+        let ctx = context::Context::init_context();
+        let parser = mir::parser::Parser::new();
+
+        let src = bootstrap1();
+
+        // src & dest each credited with 400ꜩ
+        let src_acc = init_account(&mut host, &src.pkh, 400);
+
+        // op‑1: reveal
+        let reveal_content = OperationContent::Reveal(RevealContent {
+            pk: src.pk.clone(),
+            proof: None,
+        });
+
+        println!("Balance: {:?}", src_acc.balance(&host).unwrap());
+
+        // op‑2 orgination: create a contract with 15ꜩ balance successfully
+        let origination_content_1 = OperationContent::Origination(OriginationContent {
+            balance: 15.into(),
+            delegate: None,
+            script: Script {
+                code: parser.parse_top_level(UNIT_SCRIPT).unwrap().encode(),
+                storage: Micheline::from(()).encode(),
+            },
+        });
+
+        // op‑3 orgination: create a contract with 20ꜩ balance successfully
+        let origination_content_2 = OperationContent::Origination(OriginationContent {
+            balance: 20.into(),
+            delegate: None,
+            script: Script {
+                code: parser.parse_top_level(UNIT_SCRIPT).unwrap().encode(),
+                storage: Micheline::from(()).encode(),
+            },
+        });
+
+        // op‑4 orgination: create a contract with 999ꜩ balance fails
+        let origination_content_3 = OperationContent::Origination(OriginationContent {
+            balance: 999.into(),
+            delegate: None,
+            script: Script {
+                code: parser.parse_top_level(UNIT_SCRIPT).unwrap().encode(),
+                storage: Micheline::from(()).encode(),
+            },
+        });
+
+        let batch = make_operation(
+            5,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![
+                reveal_content,
+                origination_content_1,
+                origination_content_2,
+                origination_content_3,
+            ],
+        );
+
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &ctx,
+            OperationHash(H256::zero()),
+            batch,
+        )
+        .unwrap();
+
+        let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+        let expected_kt1_1 = orignation_nonce
+            .generate_kt1()
+            .expect("Should have succeeded to generate a KT1");
+        let expected_kt1_2 = orignation_nonce
+            .generate_kt1()
+            .expect("Should have succeeded to generate a KT1");
+        let expected_receipts = vec![
+            OperationResultSum::Reveal(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(RevealSuccess {
+                    consumed_gas: 0_u64.into(),
+                }),
+                internal_operation_results: vec![],
+            }),
+            OperationResultSum::Origination(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -15,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_kt1_1.clone(),
+                            )),
+                            changes: 15,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_kt1_1.clone(),
+                    }],
+                    consumed_gas: 0_u64.into(),
+                    storage_size: 0_u64.into(),
+                    paid_storage_size_diff: 0_u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                internal_operation_results: vec![],
+            }),
+            OperationResultSum::Origination(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::BackTracked(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -20,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                expected_kt1_2.clone(),
+                            )),
+                            changes: 20,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_kt1_2.clone(),
+                    }],
+                    consumed_gas: 0_u64.into(),
+                    storage_size: 0_u64.into(),
+                    paid_storage_size_diff: 0_u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                internal_operation_results: vec![],
+            }),
+            OperationResultSum::Origination(OperationResult {
+                balance_updates: vec![
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::BlockFees,
+                        changes: 5,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                ],
+                result: ContentResult::Failed(
+                    ApplyOperationError::Origination(
+                        OriginationError::FailedToApplyBalanceUpdate,
+                    )
+                    .into(),
+                ),
+                internal_operation_results: vec![],
+            }),
+        ];
+        assert_eq!(
+            receipts, expected_receipts,
+            "Receipts do not match the expected ones"
+        );
+        // Check the balances
+        assert_eq!(
+            src_acc.balance(&host).unwrap(),
+            380.into(),
+            "Source account balance should be 380ꜩ after the operations"
+        );
+
+        // Check the counters
+        assert_eq!(
+            src_acc.counter(&host).unwrap(),
+            4.into(),
+            "Source account counter should be 4 after the operations"
+        );
+
+        // Check the originated contracts
+        let expected_contracts = [expected_kt1_1, expected_kt1_2];
+        for (i, expected_kt1) in expected_contracts.iter().enumerate() {
+            let account = TezlinkOriginatedAccount::from_contract(
+                &ctx,
+                &Contract::Originated(expected_kt1.clone()),
+            )
+            .unwrap();
+            assert!(
+                account.code(&host).is_err(),
+                "Account {i} for KT1{expected_kt1} should not exist"
+            );
+        }
     }
 }
