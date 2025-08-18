@@ -39,6 +39,8 @@ echo "installing formula from https://$BUCKET.storage.googleapis.com/$TARGETDIR/
 
 # get around the fact that we cannot install a formula directly from https
 curl -q "https://$BUCKET.storage.googleapis.com/$TARGETDIR/octez.rb" -O
-brew install -v ./octez.rb
+# Create pre-compiled bottle from local octez formula
+# with verbose output and developer checks enabled
+HOMEBREW_DEVELOPER=1 brew install -v --formula --build-bottle ./octez.rb
 
 octez-node --version

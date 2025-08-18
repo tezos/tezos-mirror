@@ -15,7 +15,7 @@ class Octez < Formula
   version "%%VERSION%%"
   license "MIT"
 
-  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake]
+  build_dependencies = %w[pkg-config coreutils autoconf rsync wget opam protobuf cmake rustup]
   build_dependencies.each do |dependency|
     depends_on dependency => :build
   end
@@ -32,6 +32,7 @@ class Octez < Formula
     ENV["OPAMYES"]="true"
     ENV["BLST_PORTABLE"]="yes"
     ENV["LDFLAGS"] = "-L#{HOMEBREW_PREFIX}/lib"
+    ENV["DUNE_BUILD_JOBS"]="-j 12"
 
 
     (buildpath/"script.sh").write <<~EOS
@@ -40,16 +41,13 @@ class Octez < Formula
       set +x
 
       . ./scripts/version.sh
-      wget https://sh.rustup.rs/rustup-init.sh
-      chmod +x rustup-init.sh
-      ./rustup-init.sh --profile minimal --default-toolchain $recommended_rust_version -y
+      rustup install $recommended_rust_version
       opam init --bare --disable-sandboxing
 
-      . $CARGO_HOME/env
       make build-deps
 
       eval $(opam env)
-      make
+      make release
     EOS
 
     chmod 0755, buildpath/"script.sh"
