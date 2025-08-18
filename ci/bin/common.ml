@@ -923,7 +923,13 @@ let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
     ?rules
     ~name:"build-layer1-profiling"
     ~cpu:Very_high
-    ~artifacts:(artifacts ~expire_in ["./octez-binaries/x86_64/octez-node"])
+    ~artifacts:
+      (artifacts
+         ~expire_in
+         [
+           "./octez-binaries/x86_64/octez-node";
+           "./octez-binaries/x86_64/octez-client";
+         ])
     ~before_script:
       (before_script
          ~take_ownership:true
@@ -936,12 +942,14 @@ let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
       (* turn on -opaque for all subsequent builds *)
       "scripts/custom-flags.sh set -opaque";
       (* 1) compile with PPX profiling *)
-      "TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node";
-      (* 2) compile with OpenTelemetry PPX *)
+      "TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=\"octez-node \
+       octez-client\"";
+      (* 2) compile with OpenTelemetry PPX (overwrites binaries) *)
       "TEZOS_PPX_PROFILER=opentelemetry make build \
-       OCTEZ_EXECUTABLES?=octez-node";
+       OCTEZ_EXECUTABLES?=\"octez-node octez-client\"";
       "mkdir -p octez-binaries/x86_64/";
       "mv octez-node octez-binaries/x86_64/";
+      "mv octez-client octez-binaries/x86_64/";
     ]
   |> enable_cargo_cache |> enable_sccache
 
