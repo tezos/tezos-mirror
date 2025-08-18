@@ -317,10 +317,12 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           tezlink_sequencer_agent
       in
       let* () =
-        init_tzkt
-          ~tzkt_api_port:Cli.tzkt_api_port
-          ~agent:tezlink_sequencer_agent
-          ~tezlink_sandbox_endpoint
+        if Cli.tzkt then
+          init_tzkt
+            ~tzkt_api_port:Cli.tzkt_api_port
+            ~agent:tezlink_sequencer_agent
+            ~tezlink_sandbox_endpoint
+        else return ()
       in
       let () = toplog "Starting main loop" in
       loop 0)
