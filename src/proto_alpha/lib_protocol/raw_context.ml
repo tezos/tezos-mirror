@@ -273,6 +273,10 @@ module Raw_dal = struct
     }
 end
 
+module Raw_address_registry = struct
+  type diff = {address : Destination_repr.t; index : Z.t}
+end
+
 type back = {
   context : Context.t;
   constants : Constants_parametric_repr.t;
@@ -303,6 +307,7 @@ type back = {
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
   adaptive_issuance_enable : bool;
+  address_registry_diff_rev : Raw_address_registry.diff list;
 }
 
 (*
@@ -942,6 +947,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
         adaptive_issuance_enable;
+        address_registry_diff_rev = [];
       };
   }
 
@@ -2400,6 +2406,26 @@ module Dal = struct
   let only_if_incentives_enabled ctxt ~default f =
     let constants = constants ctxt in
     if constants.dal.incentives_enable then f ctxt else default ctxt
+end
+
+module Address_registry = struct
+  type diff = Raw_address_registry.diff = {
+    address : Destination_repr.t;
+    index : Z.t;
+  }
+
+  let register_diff ctxt diff =
+    {
+      ctxt with
+      back =
+        {
+          ctxt.back with
+          address_registry_diff_rev =
+            diff :: ctxt.back.address_registry_diff_rev;
+        };
+    }
+
+  let get_diffs ctxt = List.rev ctxt.back.address_registry_diff_rev
 end
 
 (* The type for relative context accesses instead from the root. In order for

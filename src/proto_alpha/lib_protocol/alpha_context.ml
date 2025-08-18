@@ -449,7 +449,27 @@ module Contract = struct
 end
 
 module Global_constants_storage = Global_constants_storage
-module Address_registry_storage = Address_registry_storage
+
+module Address_registry = struct
+  type diff = Raw_context.Address_registry.diff = {
+    address : Destination.t;
+    index : Z.t;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {address; index} -> (address, index))
+      (fun (address, index) -> {address; index})
+      (obj2 (req "address" Destination.encoding) (req "index" z))
+
+  let register_diff ctxt (diff : diff) =
+    Raw_context.Address_registry.register_diff ctxt diff
+
+  let get_diffs = Raw_context.Address_registry.get_diffs
+
+  include Address_registry_storage
+end
 
 module Big_map = struct
   module Big_map = Lazy_storage_kind.Big_map

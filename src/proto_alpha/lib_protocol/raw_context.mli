@@ -544,3 +544,17 @@ module Dal : sig
      DAL incentives flag is enabled and otherwise [default ctxt]. *)
   val only_if_incentives_enabled : t -> default:(t -> 'a) -> (t -> 'a) -> 'a
 end
+
+module Address_registry : sig
+  (** Type representing the addition of an address in the registry.
+      - [address]: The address added in the storage.
+      - [index]: The index newly associated to the address.
+
+      This type is used in transaction receipts.
+  *)
+  type diff = {address : Destination_repr.t; index : Z.t}
+
+  val register_diff : t -> diff -> t
+
+  val get_diffs : t -> diff list
+end

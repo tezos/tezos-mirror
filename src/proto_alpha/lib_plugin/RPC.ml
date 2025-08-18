@@ -1300,6 +1300,7 @@ module Scripts = struct
                  lazy_storage_diff;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ ) =
           Script_interpreter.execute
@@ -1371,6 +1372,7 @@ module Scripts = struct
                    lazy_storage_diff;
                    ticket_diffs = _;
                    ticket_receipt = _;
+                   address_registry_diff = _;
                  },
                  _ctxt ),
                trace ) =
@@ -1459,6 +1461,7 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
@@ -1557,6 +1560,7 @@ module Scripts = struct
                  lazy_storage_diff = _;
                  ticket_diffs = _;
                  ticket_receipt = _;
+                 address_registry_diff = _;
                },
                _ctxt ) =
           Script_interpreter.execute
