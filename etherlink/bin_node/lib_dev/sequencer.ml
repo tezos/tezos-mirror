@@ -459,9 +459,12 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
           chain_family = Ex_chain_family chain_family;
         }
   in
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Metrics.init
     ~mode:"sequencer"
-    ~tx_pool_size_info:Tx_pool.size_info
+    ~tx_pool_size_info:Tx_container.size_info
     ~smart_rollup_address:smart_rollup_address_typed ;
   let* () =
     Block_producer.start

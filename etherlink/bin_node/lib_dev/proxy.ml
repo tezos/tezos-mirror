@@ -71,6 +71,10 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
           ~initial_validation_state:_ =
         Lwt_result_syntax.return_nil
 
+      let size_info () =
+        Lwt_result.return
+          Metrics.Tx_pool.{number_of_addresses = 0; number_of_transactions = 0}
+
       let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
         Lwt_result_syntax.return_unit
     end : Services_backend_sig.Tx_container
