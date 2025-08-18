@@ -349,6 +349,9 @@ module Delegate : sig
   val is_forbidden : t -> public_key_hash -> bool tzresult Lwt.t
 
   val stake_for_cycle : t -> Cycle.t -> public_key_hash -> stake tzresult Lwt.t
+
+  val stake_info :
+    t -> manager_pkh:public_key_hash -> (int64 * int64 option) tzresult Lwt.t
 end
 
 module Sc_rollup : sig

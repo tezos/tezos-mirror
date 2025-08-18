@@ -657,6 +657,17 @@ module Delegate = struct
       Protocol.Tez_repr.to_mutez weighted_delegated |> Tez.of_mutez_exn
     in
     return {frozen; weighted_delegated}
+
+  let stake_info ctxt ~manager_pkh =
+    let open Lwt_result_wrap_syntax in
+    let* total_stake, stakes = Plugin.RPC.stake_info rpc_ctxt ctxt in
+    let stakes =
+      List.map (fun (ck, stake) -> (ck.Consensus_key.delegate, stake)) stakes
+    in
+    let stake_opt =
+      List.assoc ~equal:Signature.Public_key_hash.equal manager_pkh stakes
+    in
+    return (total_stake, stake_opt)
 end
 
 module Sc_rollup = struct
