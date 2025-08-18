@@ -44,8 +44,6 @@ val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
     complete *)
 val pop_and_inject_transactions_lazy : unit -> unit tzresult Lwt.t
 
-val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
-
 val clear_popped_transactions : unit -> unit tzresult Lwt.t
 
 (** [mode] retrieves the current pool mode *)

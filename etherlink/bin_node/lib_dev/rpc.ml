@@ -198,6 +198,10 @@ module Forward_container
   let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
     Lwt_result_syntax.return_unit
 
+  let size_info () =
+    Lwt_result.return
+      Metrics.Tx_pool.{number_of_addresses = 0; number_of_transactions = 0}
+
   let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
       ~initial_validation_state:_ =
     Lwt_result_syntax.return_nil
@@ -331,9 +335,13 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   let* () = set_metrics_level ctxt in
   let* () = set_metrics_confirmed_levels ctxt in
 
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
+
   Metrics.init
     ~mode:"rpc"
-    ~tx_pool_size_info:Tx_pool.size_info
+    ~tx_pool_size_info:Tx_container.size_info
     ~smart_rollup_address:ctxt.smart_rollup_address ;
 
   (* Never spawn from an RPC node *)

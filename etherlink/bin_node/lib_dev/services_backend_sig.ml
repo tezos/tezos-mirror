@@ -272,6 +272,9 @@ module type Tx_container = sig
       [`Keep of 'a | `Drop | `Stop] tzresult Lwt.t) ->
     initial_validation_state:'a ->
     (string * legacy_transaction_object) list tzresult Lwt.t
+
+  (** [size_info] returns the size of the tx container. *)
+  val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
 end
 
 (** ['f tx_container] is a GADT parametrized by the same type argument

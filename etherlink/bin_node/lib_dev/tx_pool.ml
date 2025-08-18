@@ -868,12 +868,6 @@ let pop_and_inject_transactions_lazy () =
       in
       return_unit
 
-let size_info () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Size_info
-  |> handle_request_error
-
 let get_tx_pool_content () =
   let open Lwt_result_syntax in
   let*? w = Lazy.force worker in
@@ -990,6 +984,12 @@ module Tx_container = struct
   let pop_transactions ~maximum_cumulative_size ~validate_tx:_
       ~initial_validation_state:_ =
     pop_transactions ~maximum_cumulative_size
+
+  let size_info () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Size_info
+    |> handle_request_error
 end
 
 let tx_container (type f) ~(chain_family : f L2_types.chain_family) :

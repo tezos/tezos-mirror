@@ -166,6 +166,10 @@ let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
       let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
         Lwt_result_syntax.return_unit
 
+      let size_info () =
+        Lwt_result.return
+          Metrics.Tx_pool.{number_of_addresses = 0; number_of_transactions = 0}
+
       let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
           ~initial_validation_state:_ =
         Lwt_result_syntax.return_nil
@@ -302,9 +306,12 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
         }
   in
 
+  let (module Tx_container) =
+    Services_backend_sig.tx_container_module tx_container
+  in
   Metrics.init
     ~mode:"observer"
-    ~tx_pool_size_info:Tx_pool.size_info
+    ~tx_pool_size_info:Tx_container.size_info
     ~smart_rollup_address ;
 
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in

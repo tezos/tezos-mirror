@@ -166,6 +166,8 @@ struct
     let find htbl (Hash (Hex hash)) = S.find htbl hash
 
     let remove htbl (Hash (Hex hash)) = S.remove htbl hash
+
+    let length s = S.length s
   end
 
   module Pending_transactions = struct
@@ -232,6 +234,8 @@ struct
       match current with
       | Some i -> add s address (Int64.succ i)
       | None -> add s address 1L
+
+    let length s = S.length s
   end
 
   type state = {
@@ -285,6 +289,7 @@ struct
       | Unlock_transactions : (unit, tztrace) t
       | Is_locked : (bool, tztrace) t
       | Content : (Ethereum_types.txpool, tztrace) t
+      | Size_info : (Metrics.Tx_pool.size_info, tztrace) t
       | Pop_transactions : {
           validation_state : 'a;
           validate_tx :
@@ -311,6 +316,7 @@ struct
       | Unlock_transactions -> "Unlock_transactions"
       | Is_locked -> "Is_locked"
       | Content -> "Content"
+      | Size_info -> "Size_info"
       | Pop_transactions _ -> "Pop_transactions"
       | Confirm_transactions _ -> "Confirm_transactions"
 
@@ -439,6 +445,7 @@ struct
       | Unlock_transactions -> Format.fprintf fmt "Unlocking the transactions"
       | Is_locked -> Format.fprintf fmt "Checking if the tx queue is locked"
       | Content -> fprintf fmt "Content"
+      | Size_info -> fprintf fmt "Size_info"
       | Pop_transactions {validation_state = _; validate_tx = _} ->
           fprintf fmt "Popping transactions with validation function"
       | Confirm_transactions _ -> fprintf fmt "Confirming transactions"
@@ -809,6 +816,16 @@ struct
               txns
           in
           return_unit
+      | Size_info ->
+          protect @@ fun () ->
+          return
+            Metrics.Tx_pool.
+              {
+                number_of_transactions =
+                  Transaction_objects.length state.tx_object;
+                number_of_addresses =
+                  Transactions_per_addr.length state.tx_per_address;
+              }
       | Clear ->
           protect @@ fun () ->
           clear state ;
@@ -1039,6 +1056,11 @@ struct
     let open Lwt_result_syntax in
     let*? w = Lazy.force worker in
     Worker.Queue.push_request_and_wait w Content |> handle_request_error
+
+  let size_info () =
+    let open Lwt_result_syntax in
+    let*? w = Lazy.force worker in
+    Worker.Queue.push_request_and_wait w Size_info |> handle_request_error
 
   let shutdown () =
     let open Lwt_result_syntax in

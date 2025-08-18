@@ -10,6 +10,9 @@
 
 ### Metrics changes
 
+- Size informations about tx container was using tx_pool only. Now
+if you activate tx_queue it show the size of the tx_queue.
+
 ### Command-line interface changes
 
 ### Execution changes
