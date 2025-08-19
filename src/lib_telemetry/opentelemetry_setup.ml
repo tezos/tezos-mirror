@@ -39,7 +39,13 @@ end
 let instance_id_filename = "telemetry_id"
 
 let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
-    {Opentelemetry_config.enable; instance_id; environment; config} =
+    {
+      Opentelemetry_config.enable;
+      instance_id;
+      environment;
+      config;
+      gc_telemetry;
+    } =
   let open Lwt_result_syntax in
   let no_clean_up = return (fun () -> ()) in
   if enable then (
@@ -70,6 +76,11 @@ let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
     Opentelemetry_ambient_context.set_storage_provider
       (Opentelemetry_ambient_context_lwt.storage ()) ;
     Opentelemetry_client_cohttp_lwt.setup ~enable ~config () ;
+    if gc_telemetry.enable then
+      Gc.instrument
+        ?filter:gc_telemetry.filter
+        ?min_duration_ms:gc_telemetry.min_duration_ms
+        () ;
     match Opentelemetry.Collector.get_backend () with
     | None -> no_clean_up
     | Some (module Backend) ->
