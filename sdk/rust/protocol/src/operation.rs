@@ -6,8 +6,18 @@
 /// The whole module is inspired of `src/proto_alpha/lib_protocol/operation_repr.ml` to represent the operation
 use crate::contract::Contract;
 use crate::entrypoint::Entrypoint;
-use tezos_crypto_rs::{hash::BlsSignature, public_key::PublicKey, public_key_hash::PublicKeyHash};
+use tezos_crypto_rs::{
+    hash::{BlockHash, BlsSignature},
+    public_key::PublicKey,
+    public_key_hash::PublicKeyHash,
+};
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct UnsignedOperation {
+    pub branch: BlockHash,
+    pub content_list: OperationContentList,
+}
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 pub struct OperationContentList {
@@ -861,6 +871,133 @@ mod tests {
         let (bytes, decoded_content_list) =
             OperationContentList::nom_read(&encoded_content_list).unwrap();
         assert_eq!(content_list, decoded_content_list);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.unsigned" from '{
+      "branch": "BLsyiLvAMFD7Yuk84hDuzLqgj7Sr8h4DTMWfxfE9TKtzff9LiFX",
+      "contents": [
+        {
+          "kind": "reveal",
+          "source": "tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw",
+          "fee": "711",
+          "counter": "624692",
+          "gas_limit": "4959",
+          "storage_limit": "200",
+          "public_key": "BLpk1wQsAuwyhy6z5rmRXiB3AQriT3Pes2gBQ9anuQwF99WypxHNyRjBnugF7sCVXCQgmPGdAHEr",
+          "proof": "BLsigAUhX5J5G9uM94eTfL69paT7y6fiLQMLTxS9sWzHX8vX4317jZhxm2HCsJwdw61NAx3qH4WDzWdTMddkjZSUaRQtbU3L6nyhx2e94dKMCuiJ1Pg9RsM6ZTKjHYo6cNW7wK3k212SPN"
+        },
+        {
+          "kind": "delegation",
+          "source": "tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw",
+          "fee": "620",
+          "counter": "624693",
+          "gas_limit": "5032",
+          "storage_limit": "138"
+        },
+        {
+          "kind": "origination",
+          "source": "tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw",
+          "fee": "285",
+          "counter": "624694",
+          "gas_limit": "7741",
+          "storage_limit": "139",
+          "balance": "50",
+          "delegate": "tz2K1cCKb5HXoXX19yhmr8ChKbn4T8teV9Ei",
+          "script": {
+            "code": [
+              { "prim": "parameter", "args": [ { "prim": "unit" } ] },
+              { "prim": "storage", "args": [ { "prim": "mutez" } ] },
+              { "prim": "code",
+                "args": [
+                  [
+                    { "prim": "DROP" },
+                    { "prim": "BALANCE" },
+                    { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                    { "prim": "PAIR" }
+                  ]
+                ]
+              }
+            ],
+            "storage": { "int": "0" }
+          }
+        }
+      ]
+    }'
+    */
+    #[test]
+    fn unsigned_encoding() {
+        let reveal = OperationContent::Reveal(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw").unwrap(),
+            fee: 711.into(),
+            counter: 624692.into(),
+            gas_limit: 4959.into(),
+            storage_limit: 200.into(),
+            operation: RevealContent {
+                pk: PublicKey::from_b58check(
+                    "BLpk1wQsAuwyhy6z5rmRXiB3AQriT3Pes2gBQ9anuQwF99WypxHNyRjBnugF7sCVXCQgmPGdAHEr",
+                )
+                .unwrap(),
+                proof: Some(BlsSignature::from_b58check("BLsigAUhX5J5G9uM94eTfL69paT7y6fiLQMLTxS9sWzHX8vX4317jZhxm2HCsJwdw61NAx3qH4WDzWdTMddkjZSUaRQtbU3L6nyhx2e94dKMCuiJ1Pg9RsM6ZTKjHYo6cNW7wK3k212SPN").unwrap()),
+            },
+        });
+
+        let delegation = OperationContent::Delegation(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw").unwrap(),
+            fee: 620.into(),
+            counter: 624693.into(),
+            gas_limit: 5032.into(),
+            storage_limit: 138.into(),
+            operation: DelegationContent { delegate: None },
+        });
+
+        let origination = OperationContent::Origination(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz4W54guExgiT71XKrNxkYQUdTKVQuJUq5mw").unwrap(),
+            fee: 285.into(),
+            counter: 624694.into(),
+            gas_limit: 7741.into(),
+            storage_limit: 139.into(),
+            operation: OriginationContent {
+                balance: 50.into(),
+                delegate: Some(
+                    PublicKeyHash::from_b58check("tz2K1cCKb5HXoXX19yhmr8ChKbn4T8teV9Ei").unwrap(),
+                ),
+                script: Script {
+                    /*
+                    octez-client convert script "
+                              parameter unit;
+                              storage mutez;
+                              code {DROP; BALANCE; NIL operation; PAIR}
+                            " from Michelson to binary
+                     */
+                    code: hex::decode(
+                        "02000000190500036c0501036a0502020000000a03200315053d036d0342",
+                    )
+                    .unwrap(),
+                    // octez-client convert data "0" from Michelson to binary
+                    storage: hex::decode("0000").unwrap(),
+                },
+            },
+        });
+
+        let content_list = OperationContentList {
+            contents: vec![reveal, delegation, origination],
+        };
+
+        let unsigned = UnsignedOperation {
+            branch: BlockHash::from_b58check("BLsyiLvAMFD7Yuk84hDuzLqgj7Sr8h4DTMWfxfE9TKtzff9LiFX")
+                .unwrap(),
+            content_list,
+        };
+
+        let encoded_unsigned = unsigned.to_bytes().unwrap();
+
+        let bytes = hex::decode("99b6629866d30896c198f26db69e0a937cbd0f2c3778cf13f6e977d94f46397b6b03e71335ab27e461cbada3a6d682580cc4e221f78ac705b49026df26c80103acdc542d7eadf36d6f3df4f1cdfa42a7238e89d8a8111f231a4234db9612066c7ae975b7185ab00da40faa07ad89783cff00000060990404e54f617bc3be20da2960744a67b874c446a2e673f028be7103878322710134714da0159196179e6738ea71ed100943b33c213672d40b1fe413b72d0f49805ecfe86939d06d9dcf3a5fcaff9f2f1d55c59a8c4ea2c944888a178b9673e26e03e71335ab27e461cbada3a6d682580cc4e221f78aec04b59026a8278a01006d03e71335ab27e461cbada3a6d682580cc4e221f78a9d02b69026bd3c8b0132ff017553df46bf9d1994760cfa8ca26e0e8a509d3f900000001e02000000190500036c0501036a0502020000000a03200315053d036d0342000000020000").unwrap();
+        assert_eq!(bytes, encoded_unsigned);
+
+        let (bytes, decoded_unsigned) = UnsignedOperation::nom_read(&encoded_unsigned).unwrap();
+        assert_eq!(unsigned, decoded_unsigned);
         assert!(bytes.is_empty());
     }
 }
