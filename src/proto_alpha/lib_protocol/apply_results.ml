@@ -888,26 +888,26 @@ type 'kind contents_result =
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attestation_power_repr.t;
+      consensus_power : Attestation_power.t;
     }
       -> Kind.preattestation contents_result
   | Attestation_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.public_key_hash;
       consensus_key : Signature.public_key_hash;
-      consensus_power : Attestation_power_repr.t;
+      consensus_power : Attestation_power.t;
     }
       -> Kind.attestation contents_result
   | Preattestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attestation_power_repr.t) list;
-      total_consensus_power : Attestation_power_repr.t;
+      committee : (Consensus_key.t * Attestation_power.t) list;
+      total_consensus_power : Attestation_power.t;
     }
       -> Kind.preattestations_aggregate contents_result
   | Attestations_aggregate_result : {
       balance_updates : Receipt.balance_updates;
-      committee : (Consensus_key.t * Attestation_power_repr.t) list;
-      total_consensus_power : Attestation_power_repr.t;
+      committee : (Consensus_key.t * Attestation_power.t) list;
+      total_consensus_power : Attestation_power.t;
     }
       -> Kind.attestations_aggregate contents_result
   | Seed_nonce_revelation_result :
@@ -1035,7 +1035,7 @@ module Encoding = struct
     obj4
       (dft "balance_updates" Receipt.balance_updates_encoding [])
       (req "delegate" Signature.Public_key_hash.encoding)
-      (req "consensus_power" Attestation_power_repr.encoding)
+      (req "consensus_power" Attestation_power.encoding)
       (req "consensus_key" Signature.Public_key_hash.encoding)
 
   let consensus_aggregate_result_encoding =
@@ -1047,8 +1047,8 @@ module Encoding = struct
          (list
             (merge_objs
                Consensus_key.encoding
-               (obj1 (req "consensus_power" Attestation_power_repr.encoding)))))
-      (req "total_consensus_power" Attestation_power_repr.encoding)
+               (obj1 (req "consensus_power" Attestation_power.encoding)))))
+      (req "total_consensus_power" Attestation_power.encoding)
 
   type case =
     | Case : {

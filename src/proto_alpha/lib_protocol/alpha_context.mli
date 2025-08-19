@@ -2242,6 +2242,25 @@ module Receipt : sig
   val balance_updates_encoding : balance_updates Data_encoding.t
 end
 
+(** This module re-exports definitions from {!Attestation_power_repr}. *)
+module Attestation_power : sig
+  type t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val zero : t
+
+  val make : slots:int -> stake:int64 -> t
+
+  val add : t -> t -> t
+
+  val get : context -> Level.t -> t -> int64
+
+  val get_slots : t -> int
+end
+
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)
 module Consensus_key : sig
   type pk = {
@@ -2259,7 +2278,7 @@ module Consensus_key : sig
 
   type power = {
     consensus_key : pk;
-    attestation_power : Attestation_power_repr.t;
+    attestation_power : Attestation_power.t;
     dal_power : int;
   }
 
@@ -2364,7 +2383,7 @@ module Delegate : sig
     context ->
     delegate:public_key_hash ->
     participation:level_participation ->
-    attesting_power:int ->
+    attesting_slots:int ->
     context tzresult Lwt.t
 
   val record_dal_participation :
@@ -5234,8 +5253,6 @@ end
 (** This module re-exports definitions from {!Stake_storage},
     {!Delegate_storage} and {!Delegate}. *)
 module Stake_distribution : sig
-  val check_all_bakers_attest_at_level : context -> Level.t -> bool
-
   val baking_rights_owner :
     context ->
     Level.t ->
@@ -5532,6 +5549,7 @@ module Consensus : sig
        and type 'a level_map := 'a Level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
+       and type attestation_power := Attestation_power.t
        and type consensus_power := Consensus_key.power
 
   (** [store_attestation_branch context branch] sets the "attestation branch"

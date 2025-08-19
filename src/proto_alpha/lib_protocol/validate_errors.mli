@@ -290,7 +290,7 @@ type error += Failing_noop_error
 
 module Block : sig
   type error +=
-    | Not_enough_attestations of {required : int; provided : int}
+    | Not_enough_attestations of {required : int64; provided : int64}
     | Inconsistent_validation_passes_in_block of {
         expected : int;
         provided : int;
@@ -304,7 +304,7 @@ module Block : sig
         round : Round.t;
       }
     | Insufficient_locked_round_evidence of {
-        total_attesting_power : int;
-        consensus_threshold : int;
+        total_attesting_power : int64;
+        consensus_threshold : int64;
       }
 end

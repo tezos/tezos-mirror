@@ -3916,7 +3916,8 @@ module Attestation_rights = struct
             delegate;
             consensus_key;
             first_slot;
-            attestation_power = attestation_power.slots;
+            (* TODO ABAAB (this RPC is only used for tests) *)
+            attestation_power = Attestation_power.get_slots attestation_power;
           }
           :: acc)
         rights

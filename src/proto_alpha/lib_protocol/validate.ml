@@ -431,8 +431,8 @@ type block_state = {
   remaining_block_gas : Gas.Arith.fp;
   recorded_operations_rev : Operation_hash.t list;
   last_op_validation_pass : int option;
-  locked_round_evidence : (Round.t * Attestation_power_repr.t) option;
-  attestation_power : Attestation_power_repr.t;
+  locked_round_evidence : (Round.t * Attestation_power.t) option;
+  attestation_power : Attestation_power.t;
 }
 
 type validation_state = {
@@ -480,7 +480,7 @@ let init_block_state vi =
     recorded_operations_rev = [];
     last_op_validation_pass = None;
     locked_round_evidence = None;
-    attestation_power = Attestation_power_repr.zero;
+    attestation_power = Attestation_power.zero;
   }
 
 let get_initial_ctxt {info; _} = info.ctxt
@@ -751,9 +751,7 @@ module Consensus = struct
                  construction mode. *)
               Some
                 ( consensus_content.round,
-                  Attestation_power_repr.add
-                    total_attesting_power
-                    attesting_power ))
+                  Attestation_power.add total_attesting_power attesting_power ))
     in
     {block_state with locked_round_evidence}
 
@@ -960,9 +958,7 @@ module Consensus = struct
         {
           block_state with
           attestation_power =
-            Attestation_power_repr.add
-              block_state.attestation_power
-              attesting_power;
+            Attestation_power.add block_state.attestation_power attesting_power;
         }
 
   (* Hypothesis: this function will only be called in mempool mode *)
@@ -1335,11 +1331,11 @@ module Consensus = struct
               | Bls pk ->
                   return
                     ( pk :: public_keys,
-                      Attestation_power_repr.add
+                      Attestation_power.add
                         attestation_power
                         total_attestation_power )
               | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
-            ([], Attestation_power_repr.zero)
+            ([], Attestation_power.zero)
             committee
         in
         (* Fail on empty committee *)
@@ -1441,7 +1437,7 @@ module Consensus = struct
               in
               let* () = check_dal_content info level slot consensus_key dal in
               let total_power =
-                Attestation_power_repr.add attestation_power total_power
+                Attestation_power.add attestation_power total_power
               in
               match consensus_key.consensus_pk with
               | Bls consensus_pk -> (
@@ -1468,7 +1464,7 @@ module Consensus = struct
                         (Missing_companion_key_for_bls_dal
                            (Consensus_key.pkh consensus_key)))
               | _ -> tzfail Validate_errors.Consensus.Non_bls_key_in_aggregate)
-            ([], [], Attestation_power_repr.zero)
+            ([], [], Attestation_power.zero)
             committee
         in
         (* Fail on empty committee *)
@@ -4028,11 +4024,13 @@ let check_attestation_power vi bs =
     return Compare.Int32.(level_position_in_protocol > 1l)
   in
   if are_attestations_required then
-    let required = Constants.consensus_threshold_size vi.ctxt in
-    (* TODO ABAÆB *)
-    let provided = bs.attestation_power.slots in
+    let required = Constants.consensus_threshold_size vi.ctxt |> Int64.of_int in
+    (* TODO ABAAB : required should depend on the flag *)
+    let provided =
+      Attestation_power.get vi.ctxt vi.current_level bs.attestation_power
+    in
     fail_unless
-      Compare.Int.(provided >= required)
+      Compare.Int64.(provided >= required)
       (Not_enough_attestations {required; provided})
   else return_unit
 
@@ -4076,21 +4074,17 @@ let check_preattestation_round_and_power vi vs round =
           (Locked_round_after_block_round
              {locked_round = preattestation_round; round})
       in
-      let consensus_threshold = Constants.consensus_threshold_size vi.ctxt in
-      let all_bakers_attest_enabled =
-        Stake_distribution.check_all_bakers_attest_at_level
-          vi.ctxt
-          vi.current_level
+      (* TODO ABAAB : threshold should depend on abaab flag *)
+      let consensus_threshold =
+        Constants.consensus_threshold_size vi.ctxt |> Int64.of_int
       in
-      if all_bakers_attest_enabled then
-        error Validate_errors.Consensus.All_bakers_attest_not_implemented
-        (* TODO ABAAB *)
-      else
-        let total_attesting_power = total_attesting_power.slots in
-        error_when
-          Compare.Int.(total_attesting_power < consensus_threshold)
-          (Insufficient_locked_round_evidence
-             {total_attesting_power; consensus_threshold})
+      let total_attesting_power =
+        Attestation_power.get vi.ctxt vi.current_level total_attesting_power
+      in
+      error_when
+        Compare.Int64.(total_attesting_power < consensus_threshold)
+        (Insufficient_locked_round_evidence
+           {total_attesting_power; consensus_threshold})
 
 let check_payload_hash block_state ~predecessor_hash
     (block_header_contents : Block_header.contents) =
