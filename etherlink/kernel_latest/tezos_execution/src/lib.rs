@@ -12,7 +12,7 @@ use mir::{
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigInt;
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
@@ -148,7 +148,11 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 destination_address,
                 amount,
             }) => {
-                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let amount = Narith(amount.try_into().map_err(
+                    |err: num_bigint::TryFromBigIntError<()>| {
+                        TransferError::MirAmountToNarithError(err.to_string())
+                    },
+                )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 let value = param.into_micheline_optimized_legacy(&parser.arena);
                 let encoded_value = value.encode();
@@ -296,6 +300,11 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut dest_account,
             )?;
             ctx.sender = address_from_contract(src_contract.clone());
+            ctx.amount = amount.0.clone().try_into().map_err(
+                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                    TransferError::MirAmountToNarithError(err.to_string())
+                },
+            )?;
             let code = dest_account
                 .code(host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
@@ -2777,5 +2786,66 @@ mod tests {
         } else {
             panic!("Second receipt is not a Transfer with Internal Operations");
         }
+    }
+
+    #[test]
+    fn test_smart_contract_amount_instruction() {
+        // Write AMOUNT in the storage
+        const SCRIPT: &str = "
+            parameter unit;
+            storage mutez;
+            code {
+                DROP;
+                AMOUNT;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let initial_amount = 0;
+        let transfer_amount = 30;
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT,
+            &Micheline::from(initial_amount),
+            &0_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            transfer_amount.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            Micheline::from(i128::from(transfer_amount)).encode(),
+            "Storage should contain the amount sent"
+        );
     }
 }
