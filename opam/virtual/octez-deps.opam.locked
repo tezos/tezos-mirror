@@ -24,8 +24,7 @@ depends: [
   "astring" {= "0.8.5"}
   "atomic" {= "base"}
   "backoff" {= "0.1.1"}
-  "bam" {= "0.3"}
-  "bam-ppx" {= "0.3"}
+  "bam" {= "0.4"}
   "base" {= "v0.16.4"}
   "base-bigarray" {= "base"}
   "base-bytes" {= "base"}
