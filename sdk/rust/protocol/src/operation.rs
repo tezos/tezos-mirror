@@ -10,6 +10,11 @@ use tezos_crypto_rs::{hash::BlsSignature, public_key::PublicKey, public_key_hash
 use tezos_data_encoding::{enc::BinWriter, nom::NomReader, types::Narith, types::WithDefaultValue};
 
 #[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
+pub struct OperationContentList {
+    pub contents: Vec<OperationContent>,
+}
+
+#[derive(PartialEq, Debug, Clone, NomReader, BinWriter)]
 #[encoding(tags = "u8")]
 pub enum OperationContent {
     #[encoding(tag = 107)]
@@ -570,6 +575,292 @@ mod tests {
 
         let (bytes, decoded_operation) = OperationContent::nom_read(&encoded_operation).unwrap();
         assert_eq!(operation, decoded_operation);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents_list" from '[
+      {
+        "kind": "reveal",
+        "source": "tz1i4tRMvnyb672Wm7HGTi21MHyW4DSxSqvd",
+        "fee": "264",
+        "counter": "756631",
+        "gas_limit": "155",
+        "storage_limit": "0",
+        "public_key": "edpkuwYfBr7zWiUmzwppY75v8ut7Xfg73qht3Hpbwfa9GVAmcFDUwT"
+      },
+      {
+        "kind": "transaction",
+        "source": "tz1i4tRMvnyb672Wm7HGTi21MHyW4DSxSqvd",
+        "fee": "472",
+        "counter": "756632",
+        "gas_limit": "2169",
+        "storage_limit": "277",
+        "amount": "20000",
+        "destination": "tz1Rc6wtS349fFTyuUhDXTXoBUZ9j7XiN61o"
+      }
+    ]'
+    */
+    #[test]
+    fn basic_content_list_encoding() {
+        let reveal = OperationContent::Reveal(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1i4tRMvnyb672Wm7HGTi21MHyW4DSxSqvd").unwrap(),
+            fee: 264.into(),
+            counter: 756631.into(),
+            gas_limit: 155.into(),
+            storage_limit: 0.into(),
+            operation: RevealContent {
+                pk: PublicKey::from_b58check(
+                    "edpkuwYfBr7zWiUmzwppY75v8ut7Xfg73qht3Hpbwfa9GVAmcFDUwT",
+                )
+                .unwrap(),
+                proof: None,
+            },
+        });
+
+        let transaction = OperationContent::Transaction(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1i4tRMvnyb672Wm7HGTi21MHyW4DSxSqvd").unwrap(),
+            fee: 472.into(),
+            counter: 756632.into(),
+            gas_limit: 2169.into(),
+            storage_limit: 277.into(),
+            operation: TransactionContent {
+                amount: 20000.into(),
+                destination: Contract::from_b58check("tz1Rc6wtS349fFTyuUhDXTXoBUZ9j7XiN61o")
+                    .unwrap(),
+                parameters: Parameters::default().into(),
+            },
+        });
+
+        let content_list = OperationContentList {
+            contents: vec![reveal, transaction],
+        };
+
+        let encoded_content_list = content_list.to_bytes().unwrap();
+
+        let bytes = hex::decode("6b00f60642ed6e39e3a5ecf6e8313cd044323a315c03880297972e9b010000ab0795c320972960ffe5e222a163494294a8d9259acab890f96fcbd18fd158f8006c00f60642ed6e39e3a5ecf6e8313cd044323a315c03d80398972ef9109502a09c0100004173796fda78e7ca2512edbb87124834f358bca200").unwrap();
+        assert_eq!(bytes, encoded_content_list);
+
+        let (bytes, decoded_content_list) =
+            OperationContentList::nom_read(&encoded_content_list).unwrap();
+        assert_eq!(content_list, decoded_content_list);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    octez-codec encode "023-PtSeouLo.operation.contents_list" from '[
+      {
+        "kind": "reveal",
+        "source": "tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy",
+        "fee": "469",
+        "counter": "1",
+        "gas_limit": "2169",
+        "storage_limit": "277",
+        "public_key": "sppk7aDbxVasHyAqzGXYKRHBXCq4xjs1qYD8MsCfgDRb2kb3Wqkssxf"
+      },
+      {
+        "kind": "transaction",
+        "source": "tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy",
+        "fee": "733",
+        "counter": "2",
+        "gas_limit": "3250",
+        "storage_limit": "0",
+        "amount": "10000000",
+        "destination": "KT1Cdu5oK8anYaDnXoDJMDnF9AKZS7fQ4fah",
+        "parameters": {
+          "entrypoint": "balance_of",
+          "value": { "string": "tz3j873xGK219DrCKYL4usxM8EQgHUmDdbJB" }
+        }
+      },
+      {
+        "kind": "origination",
+        "source": "tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy",
+        "fee": "5871",
+        "counter": "3",
+        "gas_limit": "1728",
+        "storage_limit": "1000000",
+        "balance": "0",
+        "script": {
+          "code": [
+            {
+              "prim": "parameter",
+              "args": [
+                { "prim": "list", "args": [ { "prim": "bytes" } ] }
+              ]
+            },
+            { "prim": "storage", "args": [ { "prim": "bytes" } ] },
+            { "prim": "code",
+              "args": [
+                [
+                  { "prim": "UNPAIR" },
+                  { "prim": "SWAP" },
+                  { "prim": "CONS" },
+                  { "prim": "CONCAT" },
+                  { "prim": "NIL", "args": [ { "prim": "operation" } ] },
+                  { "prim": "PAIR" }
+                ]
+              ]
+            }
+          ],
+          "storage": { "bytes": "dead" }
+        }
+      },
+      {
+        "kind": "delegation",
+        "source": "tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy",
+        "fee": "572",
+        "counter": "4",
+        "gas_limit": "928",
+        "storage_limit": "0",
+        "delegate": "tz1QfAJGaWpTnrDg8KMGkAtUxAavYnJ7pn13"
+      }
+    ]'
+    */
+    #[test]
+    fn all_operations_content_list_encoding() {
+        let reveal = OperationContent::Reveal(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy").unwrap(),
+            fee: 469.into(),
+            counter: 1.into(),
+            gas_limit: 2169.into(),
+            storage_limit: 277.into(),
+            operation: RevealContent {
+                pk: PublicKey::from_b58check(
+                    "sppk7aDbxVasHyAqzGXYKRHBXCq4xjs1qYD8MsCfgDRb2kb3Wqkssxf",
+                )
+                .unwrap(),
+                proof: None,
+            },
+        });
+
+        let transaction = OperationContent::Transaction(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy").unwrap(),
+            fee: 733.into(),
+            counter: 2.into(),
+            gas_limit: 3250.into(),
+            storage_limit: 0.into(),
+            operation: TransactionContent {
+                amount: 10000000.into(),
+                destination: Contract::from_b58check("KT1Cdu5oK8anYaDnXoDJMDnF9AKZS7fQ4fah")
+                    .unwrap(),
+                parameters: Parameters {
+                    entrypoint: Entrypoint::try_from("balance_of").unwrap(),
+                    // octez-client convert data '"tz3j873xGK219DrCKYL4usxM8EQgHUmDdbJB"' from Michelson to binary
+                    value: hex::decode("0100000024747a336a38373378474b3231394472434b594c347573784d3845516748556d4464624a42").unwrap(),
+                }
+                .into(),
+            },
+        });
+
+        let origination = OperationContent::Origination(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy").unwrap(),
+            fee: 5871.into(),
+            counter: 3.into(),
+            gas_limit: 1728.into(),
+            storage_limit: 1000000.into(),
+            operation: OriginationContent {
+                balance: 0.into(),
+                delegate: None,
+                script: Script {
+                    /*
+                    octez-client convert script "
+                              parameter (list bytes);
+                              storage bytes;
+                              code { UNPAIR ; SWAP ; CONS ; CONCAT; NIL operation; PAIR}
+                            " from Michelson to binary
+                     */
+                    code: hex::decode(
+                        "020000001f0500055f0369050103690502020000000e037a034c031b031a053d036d0342",
+                    )
+                    .unwrap(),
+                    // octez-client convert data "0xdead" from Michelson to binary
+                    storage: hex::decode("0a00000002dead").unwrap(),
+                },
+            },
+        });
+
+        let delegation = OperationContent::Delegation(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz2DdCuWDUQffJxQLJQb6fk1MDAzKcP9LtMy").unwrap(),
+            fee: 572.into(),
+            counter: 4.into(),
+            gas_limit: 928.into(),
+            storage_limit: 0.into(),
+            operation: DelegationContent {
+                delegate: Some(
+                    PublicKeyHash::from_b58check("tz1QfAJGaWpTnrDg8KMGkAtUxAavYnJ7pn13").unwrap(),
+                ),
+            },
+        });
+
+        let content_list = OperationContentList {
+            contents: vec![reveal, transaction, origination, delegation],
+        };
+
+        let encoded_content_list = content_list.to_bytes().unwrap();
+
+        let bytes = hex::decode("6b013a3ea68f994f44c4790124ca15f6feda471f07c2d50301f910950201027844c87c7eda69da7248e3aa977247dbaff53c1fead305721cb0ba03001ae231006c013a3ea68f994f44c4790124ca15f6feda471f07c2dd0502b2190080ade204012c7806ce4f30169a32212537d5383b4810d0322c00ffff0a62616c616e63655f6f66000000290100000024747a336a38373378474b3231394472434b594c347573784d3845516748556d4464624a426d013a3ea68f994f44c4790124ca15f6feda471f07c2ef2d03c00dc0843d000000000024020000001f0500055f0369050103690502020000000e037a034c031b031a053d036d0342000000070a00000002dead6e013a3ea68f994f44c4790124ca15f6feda471f07c2bc0404a00700ff00370f64e2866fd59ff21271a806331465a54ccf79").unwrap();
+        assert_eq!(bytes, encoded_content_list);
+
+        let (bytes, decoded_content_list) =
+            OperationContentList::nom_read(&encoded_content_list).unwrap();
+        assert_eq!(content_list, decoded_content_list);
+        assert!(bytes.is_empty());
+    }
+
+    /*
+    jq -n '[range(1024) | {
+        "kind": "reveal",
+        "source": "tz1RwaPNHJVUTcY5cNPD6yK7PsyJ1KBQzAhF",
+        "fee": "931",
+        "counter": "236025",
+        "gas_limit": "692",
+        "storage_limit": "789",
+        "public_key": "edpkvNBSpWssiLZYRdLwneLSLunkYjkWbdddeZjh4Y1ZZYJXbBphBX"
+    }]' > /tmp/tezos-sdk-tests-many-operations.json
+    octez-codec encode "023-PtSeouLo.operation.contents_list" from /tmp/tezos-sdk-tests-many-operations.json
+    */
+    #[test]
+    fn many_operations_content_list_encoding() {
+        const NB_REVEAL: usize = 1024;
+        let reveal = OperationContent::Reveal(ManagerOperationContent {
+            source: PublicKeyHash::from_b58check("tz1RwaPNHJVUTcY5cNPD6yK7PsyJ1KBQzAhF").unwrap(),
+            fee: 931.into(),
+            counter: 236025.into(),
+            gas_limit: 692.into(),
+            storage_limit: 789.into(),
+            operation: RevealContent {
+                pk: PublicKey::from_b58check(
+                    "edpkvNBSpWssiLZYRdLwneLSLunkYjkWbdddeZjh4Y1ZZYJXbBphBX",
+                )
+                .unwrap(),
+                proof: None,
+            },
+        });
+
+        let content_list = OperationContentList {
+            contents: vec![reveal; NB_REVEAL],
+        };
+
+        let encoded_content_list = content_list.to_bytes().unwrap();
+
+        /*
+        octez-codec encode "023-PtSeouLo.operation.contents" from '{
+          "kind": "reveal",
+          "source": "tz1RwaPNHJVUTcY5cNPD6yK7PsyJ1KBQzAhF",
+          "fee": "931",
+          "counter": "236025",
+          "gas_limit": "692",
+          "storage_limit": "789",
+          "public_key": "edpkvNBSpWssiLZYRdLwneLSLunkYjkWbdddeZjh4Y1ZZYJXbBphBX"
+        }'
+        */
+        let bytes = hex::decode("6b0045224867079dbc728ac2f7566bfd0adb31e2b266a307f9b30eb405950600e2f6f7b871734c41d121dc3351a6234433b8df8098447f8cf22c82e094a148c500".repeat(NB_REVEAL)).unwrap();
+
+        assert_eq!(bytes, encoded_content_list);
+
+        let (bytes, decoded_content_list) =
+            OperationContentList::nom_read(&encoded_content_list).unwrap();
+        assert_eq!(content_list, decoded_content_list);
         assert!(bytes.is_empty());
     }
 }
