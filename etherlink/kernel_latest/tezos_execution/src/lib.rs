@@ -994,9 +994,9 @@ mod tests {
         operation_result::{
             ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
             CounterError, InternalContentWithMetadata, InternalOperationSum,
-            OperationResult, OperationResultSum, Originated, OriginationSuccess,
-            RevealError, RevealSuccess, TransferError, TransferSuccess, TransferTarget,
-            UpdateOrigin, ValidityError,
+            OperationResult, OperationResultSum, Originated, OriginationError,
+            OriginationSuccess, RevealError, RevealSuccess, TransferError,
+            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -1234,6 +1234,7 @@ mod tests {
     fn init_account(
         host: &mut impl Runtime,
         src: &PublicKeyHash,
+        amount: u64,
     ) -> TezlinkImplicitAccount {
         // Setting the account in TezlinkImplicitAccount
         let contract = Contract::from_b58check(&src.to_b58check())
@@ -1250,7 +1251,7 @@ mod tests {
 
         // Setting the balance to pass the validity check
         account
-            .set_balance(host, &50_u64.into())
+            .set_balance(host, &amount.into())
             .expect("Set balance should have succeed");
 
         account
@@ -1310,7 +1311,7 @@ mod tests {
         // to avoid getting an error when initializing the safe_storage
         let other = bootstrap2();
 
-        let src_account = init_account(&mut host, &other.pkh);
+        let src_account = init_account(&mut host, &other.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source);
 
@@ -1340,7 +1341,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let src_account = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh, 50);
 
         // Fees are too high for source's balance
         let operation = make_reveal_operation(100, 1, 4, 5, source);
@@ -1371,7 +1372,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let src_account = init_account(&mut host, &source.pkh);
+        let src_account = init_account(&mut host, &source.pkh, 50);
 
         // Counter is incoherent for source's counter
         let operation = make_reveal_operation(15, 15, 4, 5, source);
@@ -1406,7 +1407,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &source.pkh);
+        let mut account = init_account(&mut host, &source.pkh, 50);
 
         // Setting the manager key of this account to its public_key, this account
         // will be considered as revealed and the reveal operation should fail
@@ -1468,7 +1469,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let mut account = init_account(&mut host, &source.pkh);
+        let mut account = init_account(&mut host, &source.pkh, 50);
 
         // Set the an inconsistent manager with the source
         let inconsistent_pkh =
@@ -1532,7 +1533,7 @@ mod tests {
         let source = Bootstrap { pk, ..bootstrap1() };
 
         // Even if we don't use it we need to init the account
-        let account = init_account(&mut host, &source.pkh);
+        let account = init_account(&mut host, &source.pkh, 50);
 
         let operation = make_reveal_operation(15, 1, 4, 5, source.clone());
 
@@ -1561,7 +1562,7 @@ mod tests {
 
         let source = bootstrap1();
 
-        let account = init_account(&mut host, &source.pkh);
+        let account = init_account(&mut host, &source.pkh, 50);
 
         let manager = account
             .manager(&host)
@@ -1630,10 +1631,10 @@ mod tests {
         let dest = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance
-        let source_account = init_account(&mut host, &source.pkh);
+        let source_account = init_account(&mut host, &source.pkh, 50);
         reveal_account(&mut host, &source);
 
-        let destination_account = init_account(&mut host, &dest.pkh);
+        let destination_account = init_account(&mut host, &dest.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -1704,10 +1705,10 @@ mod tests {
         let dst = bootstrap2();
 
         // Setup accounts with 50 mutez in their balance and reveal the source
-        let source = init_account(&mut host, &src.pkh);
+        let source = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
-        let destination = init_account(&mut host, &dst.pkh);
+        let destination = init_account(&mut host, &dst.pkh, 50);
 
         let operation = make_transfer_operation(
             15,
@@ -1791,7 +1792,7 @@ mod tests {
         let dest = src.clone();
 
         // Setup account with 50 mutez in its balance
-        let source = init_account(&mut host, &src.pkh);
+        let source = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let operation = make_transfer_operation(
@@ -1876,7 +1877,7 @@ mod tests {
             ContractKt1Hash::from_base58_check("KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton")
                 .expect("ContractKt1Hash b58 conversion should have succeeded");
         // Setup accounts with 50 mutez in their balance
-        let requester = init_account(&mut host, &src.pkh);
+        let requester = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
         let (code, storage) = (
             r#"
@@ -2023,7 +2024,7 @@ mod tests {
 
         let initial_storage = Micheline::from("initial");
 
-        let source = init_account(&mut host, &src.pkh);
+        let source = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
         let destination =
             init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
@@ -2126,7 +2127,7 @@ mod tests {
 
         let initial_storage = Micheline::from(());
 
-        let source = init_account(&mut host, &src.pkh);
+        let source = init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let destination = init_contract(
@@ -2211,7 +2212,7 @@ mod tests {
 
         let dest = bootstrap2();
 
-        init_account(&mut host, &src.pkh);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let operation = make_transfer_operation(
@@ -2271,7 +2272,7 @@ mod tests {
 
         let dest = bootstrap2();
 
-        init_account(&mut host, &src.pkh);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let operation = make_transfer_operation(
@@ -2333,8 +2334,8 @@ mod tests {
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(&mut host, &src.pkh);
-        let dest_acc = init_account(&mut host, &dest.pkh);
+        let src_acc = init_account(&mut host, &src.pkh, 50);
+        let dest_acc = init_account(&mut host, &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -2509,8 +2510,8 @@ mod tests {
         let dest = bootstrap2();
 
         // src & dest each credited with 50ꜩ
-        let src_acc = init_account(&mut host, &src.pkh);
-        let _dst_acc = init_account(&mut host, &dest.pkh);
+        let src_acc = init_account(&mut host, &src.pkh, 50);
+        let _dst_acc = init_account(&mut host, &dest.pkh, 50);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -2574,7 +2575,7 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let src = bootstrap1();
-        let src_acc = init_account(&mut host, &src.pkh);
+        let src_acc = init_account(&mut host, &src.pkh, 50);
 
         let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
@@ -2693,9 +2694,7 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let src = bootstrap1();
-        let mut src_acc = init_account(&mut host, &src.pkh);
-        src_acc.set_balance(&mut host, &1000000_u64.into()).unwrap();
-
+        init_account(&mut host, &src.pkh, 1000000_u64);
         reveal_account(&mut host, &src);
 
         let context = context::Context::init_context();
@@ -2880,8 +2879,7 @@ mod tests {
         let src = bootstrap1();
 
         // Initialize accounts with higher balances for the test
-        let mut src_acc = init_account(&mut host, &src.pkh);
-        src_acc.set_balance(&mut host, &100_u64.into()).unwrap();
+        init_account(&mut host, &src.pkh, 100);
 
         // Create a script that emits internal operations to multiple targets
         let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
@@ -3083,7 +3081,7 @@ mod tests {
         ";
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
@@ -3145,7 +3143,7 @@ mod tests {
         ";
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
@@ -3206,7 +3204,7 @@ mod tests {
         ";
         let mut host = MockKernelHost::default();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
 
         let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
@@ -3273,7 +3271,7 @@ mod tests {
         let mut host = MockKernelHost::default();
         let parser = mir::parser::Parser::new();
         let src = bootstrap1();
-        init_account(&mut host, &src.pkh, 100);
+        init_account(&mut host, &src.pkh, 50);
         reveal_account(&mut host, &src);
         let context = context::Context::init_context();
 
@@ -3410,8 +3408,8 @@ mod tests {
 
         let src = bootstrap1();
 
-        // src & dest each credited with 400ꜩ
-        let src_acc = init_account(&mut host, &src.pkh, 400);
+        // src & dest each credited with 400000ꜩ
+        let src_acc = init_account(&mut host, &src.pkh, 400000);
 
         // op‑1: reveal
         let reveal_content = OperationContent::Reveal(RevealContent {
@@ -3441,9 +3439,9 @@ mod tests {
             },
         });
 
-        // op‑4 orgination: create a contract with 999ꜩ balance fails
+        // op‑4 orgination: create a contract with 999999ꜩ balance fails
         let origination_content_3 = OperationContent::Origination(OriginationContent {
-            balance: 999.into(),
+            balance: 999999.into(),
             delegate: None,
             script: Script {
                 code: parser.parse_top_level(UNIT_SCRIPT).unwrap().encode(),
@@ -3528,13 +3526,37 @@ mod tests {
                             changes: 15,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
                     ],
                     originated_contracts: vec![Originated {
                         contract: expected_kt1_1.clone(),
                     }],
                     consumed_gas: 0_u64.into(),
-                    storage_size: 0_u64.into(),
-                    paid_storage_size_diff: 0_u64.into(),
+                    storage_size: 30.into(),
+                    paid_storage_size_diff: 30.into(),
                     lazy_storage_diff: None,
                 }),
                 internal_operation_results: vec![],
@@ -3568,13 +3590,37 @@ mod tests {
                             changes: 20,
                             update_origin: UpdateOrigin::BlockApplication,
                         },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Implicit(
+                                src.pkh.clone(),
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
                     ],
                     originated_contracts: vec![Originated {
                         contract: expected_kt1_2.clone(),
                     }],
                     consumed_gas: 0_u64.into(),
-                    storage_size: 0_u64.into(),
-                    paid_storage_size_diff: 0_u64.into(),
+                    storage_size: 30.into(),
+                    paid_storage_size_diff: 30.into(),
                     lazy_storage_diff: None,
                 }),
                 internal_operation_results: vec![],
@@ -3608,8 +3654,8 @@ mod tests {
         // Check the balances
         assert_eq!(
             src_acc.balance(&host).unwrap(),
-            380.into(),
-            "Source account balance should be 380ꜩ after the operations"
+            399980.into(),
+            "Source account balance should be 399980ꜩ after the operations"
         );
 
         // Check the counters
