@@ -291,7 +291,9 @@ let () =
        of 'tezos/tezos', e.g. to the 'nomadic-labs/tezos' project." ;
   register
     "octez_smart_rollup_node_release_tag"
-    If.(push && has_tag_match octez_smart_rollup_node_release_tag_re)
+    If.(
+      on_tezos_namespace && push
+      && has_tag_match octez_smart_rollup_node_release_tag_re)
     ~jobs:(Rollup_node.Release.jobs ())
     ~description:
       ("Release tag pipelines for the Smart Rollup node.\n\n\

@@ -85,6 +85,61 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
     ~tag:Gcp_not_interruptible
 
+let job_static_x86_64_release =
+  job_build_static_binaries ~__POS__ ~arch:Amd64 ~cpu:Very_high ()
+
+let job_static_arm64_release =
+  job_build_static_binaries ~__POS__ ~arch:Arm64 ~storage:Ramfs ()
+
+let job_release_page ~test () =
+  job
+    ~__POS__
+    ~image:Images.CI.build
+    ~stage:Stages.publish
+    ~description:
+      "A job to update the rollup node release page. If running in a test \
+       pipeline, the assets are pushed in the \
+       [release-page-test.nomadic-labs.com] bucket. Otherwise they are pushed \
+       in [site.prod.octez.tezos.com]. Then its [index.html] is updated \
+       accordingly."
+    ~name:"publish:release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["index.md"; "index.html"])
+    ~dependencies:
+      (Dependent
+         [
+           Artifacts job_static_x86_64_release;
+           Artifacts job_static_arm64_release;
+         ])
+    ~before_script:
+      [
+        (* Required for creating the release page.*)
+        "sudo apk add aws-cli pandoc";
+        "eval $(opam env)";
+      ]
+    ~after_script:["cp /tmp/release_page*/index.md ./index.md"]
+    ~variables:
+      (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
+         [
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+         ]
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com/releases");
+           ("URL", "octez.tezos.com");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
+    ["./scripts/rollup_node/releases/publish_release_page.sh"]
+    ~retry:Gitlab_ci.Types.{max = 0; when_ = []}
+
 let jobs ?(test = false) () =
   let job_docker_amd64 = job_docker_build ~__POS__ ~arch:Amd64 ~test () in
   let job_docker_arm64 =
@@ -97,13 +152,6 @@ let jobs ?(test = false) () =
       ~job_docker_amd64
       ~job_docker_arm64
   in
-  let job_static_x86_64_release =
-    job_build_static_binaries ~__POS__ ~arch:Amd64 ~cpu:Very_high ()
-  in
-  let job_static_arm64_release =
-    job_build_static_binaries ~__POS__ ~arch:Arm64 ~storage:Ramfs ()
-  in
-
   let job_gitlab_release : Tezos_ci.tezos_job =
     let dependencies =
       Dependent
@@ -130,4 +178,5 @@ let jobs ?(test = false) () =
     job_docker_arm64;
     job_docker_merge;
     job_gitlab_release;
+    job_release_page ~test ();
   ]
