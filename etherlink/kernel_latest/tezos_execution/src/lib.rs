@@ -305,6 +305,14 @@ pub fn transfer<'a, Host: Runtime>(
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
+            let balance = dest_account
+                .balance(host)
+                .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+            ctx.balance = balance.0.try_into().map_err(
+                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                    TransferError::MirAmountToNarithError(err.to_string())
+                },
+            )?;
             let code = dest_account
                 .code(host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
@@ -2846,6 +2854,66 @@ mod tests {
             src_contract.storage(&host).unwrap(),
             Micheline::from(i128::from(transfer_amount)).encode(),
             "Storage should contain the amount sent"
+        );
+    }
+
+    #[test]
+    fn test_smart_contract_balance_instruction() {
+        // Write BALANCE in the storage
+        const SCRIPT: &str = "
+            parameter unit;
+            storage mutez;
+            code {
+                DROP;
+                BALANCE;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let transfer_amount = 30;
+        let initial_balance = 200;
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT,
+            &Micheline::from(0),
+            &initial_balance.into(),
+        );
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            transfer_amount.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            Micheline::from(i128::from(initial_balance + transfer_amount)).encode(),
+            "Storage should contain the balance of the contract"
         );
     }
 }
