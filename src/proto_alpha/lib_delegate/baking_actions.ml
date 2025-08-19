@@ -896,7 +896,9 @@ let inject_consensus_vote state (signed_consensus_vote : signed_consensus_vote)
            {verbosity = Debug}
              (Format.sprintf
                 "injecting consensus vote: %s"
-                (match unsigned_consensus_vote.vote_kind with
+                (match
+                   signed_consensus_vote.unsigned_consensus_vote.vote_kind
+                 with
                 | Preattestation -> "preattestation"
                 | Attestation -> "attestation"))])
       in
