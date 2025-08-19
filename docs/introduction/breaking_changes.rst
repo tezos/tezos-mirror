@@ -191,7 +191,7 @@ If you do not wish to use a DAL node, you can opt-out by using the ``--without-d
 Unique baker executable
 -----------------------
 
-Starting with Octez ``v23``, the single executable ``octez-baker`` (previously named ``octez-experimental-agnosic-baker``) is no longer experimental, and should be preferred over the protocol-suffixed executables ``octez-baker-<proto-hash>``, which will be deprecated in ``v24``, and will be removed in a later version.
+Starting with Octez ``v23``, the single executable ``octez-baker`` (previously named ``octez-experimental-agnostic-baker``) is no longer experimental, and should be preferred over the protocol-suffixed executables ``octez-baker-<proto-hash>``, which will be deprecated in ``v24``, and will be removed in a later version.
 
 Upcoming changes
 ================

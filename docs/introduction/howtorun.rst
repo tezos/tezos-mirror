@@ -222,7 +222,7 @@ baking for user "mybaker"::
    octez-baker run with local node ~/.tezos-node mybaker --liquidity-baking-toggle-vote pass
 
 .. note::
-	Previously, you had to run a baker specific for a given protocol, such as ``octez-baker-<PROTO_HASH>``,
+	Previously, you had to run a specific baker for a given protocol, such as ``octez-baker-<PROTO_HASH>``,
 	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 	These protocol-specific bakers are still available for now, but will be deprecated.
 
@@ -308,7 +308,7 @@ cause the offender to be :ref:`slashed<slashing>`, that is, to lose part of its 
    octez-accuser run
 
 .. note::
-	Previously, you had to run an accuser specific for a given protocol, such as ``octez-accuser-<PROTO_HASH>``,
+	Previously, you had to run a specific accuser for a given protocol, such as ``octez-accuser-<PROTO_HASH>``,
 	where ``PROTO_HASH`` is the short hash of the current protocol of the network you want to bake on.
 	These protocol-specific accusers are still available for now, but will be deprecated.
 
