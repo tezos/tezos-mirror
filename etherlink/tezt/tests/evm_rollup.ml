@@ -304,12 +304,12 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
         (Array.to_list Eth_account.bootstrap_accounts))
     ?(with_administrator = true) ?da_fee_per_byte ?minimum_base_fee_per_gas
     ~admin ?sequencer_admin ?commitment_period ?challenge_window ?timestamp
-    ?tx_pool_timeout_limit ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit
+    ?tx_queue_max_lifespan ?tx_queue_max_size ?tx_queue_tx_per_addr_limit
     ?max_number_of_chunks ?(setup_mode = Setup_proxy)
     ?(force_install_kernel = true) ?whitelist ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ?(enable_dal = false)
     ?dal_slots ?(enable_multichain = false) ?websockets
-    ?(enable_fast_withdrawal = false) ?enable_tx_queue protocol =
+    ?(enable_fast_withdrawal = false) protocol =
   let _, kernel_installee = Kernel.to_uses_and_tags kernel in
   let* node, client =
     setup_l1 ?commitment_period ?challenge_window ?timestamp protocol
@@ -432,9 +432,7 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
       unit
     else unit
   in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature ?enable_tx_queue ()
-  in
+  let patch_config = Evm_node.patch_config_with_experimental_feature () in
   let* produce_block, evm_node =
     match setup_mode with
     | Setup_proxy ->
@@ -476,9 +474,9 @@ let setup_evm_kernel ?additional_config ?(setup_kernel_root_hash = true)
               catchup_cooldown = None;
               max_number_of_chunks;
               wallet_dir = Some (Client.base_dir client);
-              tx_pool_timeout_limit;
-              tx_pool_addr_limit;
-              tx_pool_tx_per_addr_limit;
+              tx_queue_max_lifespan;
+              tx_queue_max_size;
+              tx_queue_tx_per_addr_limit;
               dal_slots;
               sequencer_sunset_sec = None;
             }
@@ -528,8 +526,7 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
     ?minimum_base_fee_per_gas ?rollup_operator_key ?maximum_allowed_ticks
     ?maximum_gas_per_transaction ?restricted_rpcs ~setup_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [4] else None) ~enable_multichain
-    ?websockets ?enable_fast_withdrawal ?evm_version ?enable_tx_queue f
-    protocols =
+    ?websockets ?enable_fast_withdrawal ?evm_version f protocols =
   let extra_tag =
     match setup_mode with
     | Setup_proxy -> "proxy"
@@ -587,7 +584,6 @@ let register_test ~title ~tags ?(kernels = Kernel.all) ?additional_config ?admin
               ?websockets
               ?enable_fast_withdrawal
               ?evm_version
-              ?enable_tx_queue
               protocol
           in
           f ~protocol ~evm_setup)
@@ -637,7 +633,7 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
     ?minimum_base_fee_per_gas ?time_between_blocks ?whitelist
     ?rollup_operator_key ?maximum_allowed_ticks ?maximum_gas_per_transaction
     ?restricted_rpcs ?max_blueprints_ahead ?websockets ?evm_version
-    ?genesis_timestamp ?enable_tx_queue f protocols =
+    ?genesis_timestamp f protocols =
   let register ~enable_dal ~enable_multichain : unit =
     register_test
       ~title
@@ -658,7 +654,6 @@ let register_sequencer ?(return_sequencer = false) ~title ~tags ?kernels
       ?restricted_rpcs
       ?websockets
       ?evm_version
-      ?enable_tx_queue
       f
       protocols
       ~enable_dal
@@ -1830,203 +1825,6 @@ let test_chunked_transaction =
   let title = "Check L2 chunked transfers are applied" in
   let tags = ["evm"; "l2_transfer"; "chunked"] in
   register_both ~title ~tags ~da_fee_per_byte test_f
-
-let test_rpc_txpool_content =
-  register_sequencer
-    ~return_sequencer:true (* See {Note: TX Pool RPC mode} *)
-    ~kernels:[Latest]
-    ~tags:["evm"; "rpc"; "txpool_content"]
-    ~title:"Check RPC txpool_content is available"
-    ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~time_between_blocks:Nothing
-    ~enable_tx_queue:(Enable false)
-  (*This test does not work for the tx_queue yet. It needs to be adapted *)
-  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
-  let get_transaction_field transaction_content field_name =
-    transaction_content |> JSON.get field_name |> JSON.as_string_opt
-    |> Option.value ~default:"null"
-  in
-  let check_transaction_content ~transaction_content ~blockHash ~blockNumber
-      ~from ~gas ~gasPrice ~hash ~input ~nonce ~to_ ~transactionIndex ~value ~v
-      ~r ~s =
-    Check.(
-      (get_transaction_field transaction_content "blockHash" = blockHash) string)
-      ~error_msg:"Expected block hash to be %%R, got %%L." ;
-    Check.(
-      (get_transaction_field transaction_content "blockNumber" = blockNumber)
-        string)
-      ~error_msg:"Expected block number to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "from" = from) string)
-      ~error_msg:"Expected caller to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "gas" = gas) string)
-      ~error_msg:"Expected gas to be %%R, got %%L." ;
-    Check.(
-      (get_transaction_field transaction_content "gasPrice" = gasPrice) string)
-      ~error_msg:"Expected gas price to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "hash" = hash) string)
-      ~error_msg:"Expected hash to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "input" = input) string)
-      ~error_msg:"Expected input to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "nonce" = nonce) string)
-      ~error_msg:"Expected nonce to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "to" = to_) string)
-      ~error_msg:"Expected callee to be %%R, got %%L." ;
-    Check.(
-      (get_transaction_field transaction_content "transactionIndex"
-      = transactionIndex)
-        string)
-      ~error_msg:"Expected transaction index to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "value" = value) string)
-      ~error_msg:"Expected value to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "v" = v) string)
-      ~error_msg:"Expected v to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "r" = r) string)
-      ~error_msg:"Expected r to be %%R, got %%L." ;
-    Check.((get_transaction_field transaction_content "s" = s) string)
-      ~error_msg:"Expected s to be %%R, got %%L."
-  in
-  let* tx1 =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:100_000
-      ~gas:23_300
-      ~value:(Wei.of_string "100")
-      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
-      ()
-  in
-  let* tx2 =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:1
-      ~gas_price:100_000
-      ~gas:23_300
-      ~value:(Wei.of_string "100")
-      ~address:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
-      ()
-  in
-  let*@ tx_hash1 = Rpc.send_raw_transaction ~raw_tx:tx1 evm_node in
-
-  let*@! transaction_object =
-    Rpc.get_transaction_by_hash ~transaction_hash:tx_hash1 evm_node
-  in
-
-  Check.(
-    ((transaction_object.hash = tx_hash1) string)
-      ~error_msg:"Incorrect transaction hash, should be %R, but got %L.") ;
-  Check.(
-    ((transaction_object.blockHash = None) (option string))
-      ~error_msg:"Incorrect block hash, should be %R, but got %L.") ;
-  Check.(
-    ((transaction_object.blockNumber = None) (option int32))
-      ~error_msg:"Incorrect block number, should be %R, but got %L.") ;
-  Check.(
-    ((transaction_object.transactionIndex = None) (option int32))
-      ~error_msg:"Incorrect transaction index, should be %R, but got %L.") ;
-  let*@ _tx_hash2 = Rpc.send_raw_transaction ~raw_tx:tx2 evm_node in
-  let*@ txpool_pending, txpool_queued = Rpc.txpool_content evm_node in
-  Check.((List.length txpool_pending = 1) int)
-    ~error_msg:
-      "Expected number of addresses with pending transaction to be %R, got %L." ;
-  Check.((List.length txpool_queued = 1) int)
-    ~error_msg:
-      "Expected number of addresses with queued transaction to be %R, got %L." ;
-  let transaction_addr_pending = List.nth txpool_pending 0 in
-  let transaction_addr_queued = List.nth txpool_queued 0 in
-  Check.(
-    (transaction_addr_pending.address
-   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
-      string)
-    ~error_msg:"Expected caller of transaction_1 to be %R, got %L." ;
-  Check.(
-    (transaction_addr_queued.address
-   = "0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c")
-      string)
-    ~error_msg:"Expected caller of transaction_2 to be %R, got %L." ;
-  let num_pending_transaction_addr_1 =
-    List.length transaction_addr_pending.transactions
-  in
-  let num_queued_transaction_addr_1 =
-    List.length transaction_addr_queued.transactions
-  in
-  Check.((num_pending_transaction_addr_1 = 1) int)
-    ~error_msg:"Expected number of pending transaction to be %R, got %L." ;
-  Check.((num_queued_transaction_addr_1 = 1) int)
-    ~error_msg:"Expected number of queued transaction to be %R, got %L." ;
-  let pending_transaction_addr_1_nonce, pending_transaction_addr_1_content =
-    List.nth transaction_addr_pending.transactions 0
-  in
-  let queued_transaction_addr_1_nonce, queued_transaction_addr_1_content =
-    List.nth transaction_addr_queued.transactions 0
-  in
-  Check.((pending_transaction_addr_1_nonce = 0L) int64)
-    ~error_msg:"Expected nonce pending transaction to be %R, got %L." ;
-
-  Check.((queued_transaction_addr_1_nonce = 1L) int64)
-    ~error_msg:"Expected nonce queued transaction to be %R, got %L." ;
-
-  let () =
-    check_transaction_content
-      ~transaction_content:pending_transaction_addr_1_content
-      ~blockHash:"null"
-      ~blockNumber:"null"
-      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
-      ~gas:"0x5b04"
-      ~gasPrice:"0x186a0"
-      ~hash:"0xed148f664807dfcb3c7095de22a6c63e72ae4f9d503549c525f5014327b51693"
-      ~input:"0x"
-      ~nonce:"0x0"
-      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
-      ~transactionIndex:"null"
-      ~value:"0x64"
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
-           v is currently incorrectly encoded as big-endian by the kernel,
-           causing the decoded value to be incorrect. Should be 0xa96 here *)
-      ~v:"0xa96"
-      ~r:"0x4217494c4c98d5f8015399c004e088d094fcee43bcb9a4a6b29bdff27d6f1079"
-      ~s:"0x23ca4eeac30b72e7582f2fcd9a151a855ae943ffb40f4a3ef616f5ae5483a592"
-  in
-
-  let () =
-    check_transaction_content
-      ~transaction_content:queued_transaction_addr_1_content
-      ~blockHash:"null"
-      ~blockNumber:"null"
-      ~from:"0x6ce4d79d4e77402e1ef3417fdda433aa744c6e1c"
-      ~gas:"0x5b04"
-      ~gasPrice:"0x186a0"
-      ~hash:"0x38b2831803a0f9a82bcc68f79bf167311b0adfe9e3d111a7f9579cdfcbae0f0f"
-      ~input:"0x"
-      ~nonce:"0x1"
-      ~to_:"0x11d3c9168db9d12a3c591061d555870969b43dc9"
-      ~transactionIndex:"null"
-      ~value:"0x64"
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7194
-           v is currently incorrectly encoded as big-endian by the kernel,
-           causing the decoded value to be incorrect. Should be 0xa95 here *)
-      ~v:"0xa95"
-      ~r:"0x30d35547c7d39738a85fd6e96d9c9308070b83f334d64f51a94404d20902f970"
-      ~s:"0x45ccee6d401d77df59f6831b7d73d1e3df7a9584070f45c117f55a9b81fa997c"
-  in
-  let*@ _level = produce_block () in
-  let*@ txpool_pending, txpool_queued = Rpc.txpool_content evm_node in
-
-  Check.((List.length txpool_pending = 1) int)
-    ~error_msg:
-      "Expected number of addresses with pending transaction to be %%R, got \
-       %%L." ;
-  Check.((List.length txpool_queued = 0) int)
-    ~error_msg:
-      "Expected number of addresses with queued transaction to be %%R, got %%L." ;
-  let transaction_addr_pending = List.nth txpool_pending 0 in
-  let num_pending_transaction_addr_1 =
-    List.length transaction_addr_pending.transactions
-  in
-  Check.((num_pending_transaction_addr_1 = 1) int)
-    ~error_msg:"Expected number of pending transaction to be %%R, got %%L." ;
-  unit
 
 let test_rpc_web3_clientVersion =
   register_both
@@ -5084,9 +4882,9 @@ let test_migrate_proxy_to_sequencer_future =
           catchup_cooldown = None;
           max_number_of_chunks = None;
           wallet_dir = Some (Client.base_dir client);
-          tx_pool_timeout_limit = None;
-          tx_pool_addr_limit = None;
-          tx_pool_tx_per_addr_limit = None;
+          tx_queue_max_lifespan = None;
+          tx_queue_max_size = None;
+          tx_queue_tx_per_addr_limit = None;
           dal_slots = None;
           sequencer_sunset_sec = None;
         }
@@ -5255,9 +5053,9 @@ let test_migrate_proxy_to_sequencer_past =
           catchup_cooldown = None;
           max_number_of_chunks = None;
           wallet_dir = Some (Client.base_dir client);
-          tx_pool_timeout_limit = None;
-          tx_pool_addr_limit = None;
-          tx_pool_tx_per_addr_limit = None;
+          tx_queue_max_lifespan = None;
+          tx_queue_max_size = None;
+          tx_queue_tx_per_addr_limit = None;
           dal_slots = None;
           sequencer_sunset_sec = None;
         }
@@ -5977,97 +5775,6 @@ let test_block_gas_limit =
   check_gas_limit block_gas_limit ;
   unit
 
-let test_tx_pool_timeout =
-  Protocol.register_test
-    ~__FILE__
-    ~tags:["evm"; "tx_pool"; "timeout"]
-    ~title:"Check that transactions correctly timeout."
-    ~uses:(fun _protocol ->
-      [
-        Constant.octez_smart_rollup_node;
-        Constant.octez_evm_node;
-        Constant.smart_rollup_installer;
-        Constant.WASM.evm_kernel;
-      ])
-  @@ fun protocol ->
-  let sequencer_admin = Constant.bootstrap1 in
-  let admin = Some Constant.bootstrap3 in
-  let setup_mode =
-    Setup_sequencer
-      {
-        return_sequencer = false;
-        time_between_blocks = Some Nothing;
-        sequencer = sequencer_admin;
-        max_blueprints_ahead = None;
-        genesis_timestamp = None;
-      }
-  in
-  let ttl = 15 in
-  let* {evm_node = sequencer_node; produce_block; _} =
-    setup_evm_kernel
-      ~sequencer_admin
-      ~admin
-      ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-      ~tx_pool_timeout_limit:ttl
-      ~setup_mode
-      ~enable_tx_queue:(Enable false)
-      protocol
-  in
-  (* We send one transaction and produce a block immediatly to check that it's included
-     as it should (within the TTL that was set). *)
-  let* tx =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:21_000
-      ~gas:2_000_000
-      ~value:Wei.zero
-      ~address:Eth_account.bootstrap_accounts.(0).address
-      ()
-  in
-  let*@ tx_hash_expected = Rpc.send_raw_transaction ~raw_tx:tx sequencer_node in
-  let*@ block_number = produce_block () in
-  let*@ block =
-    Rpc.get_block_by_number ~block:(Int.to_string block_number) sequencer_node
-  in
-  let tx_hash =
-    match block.transactions with
-    | Hash txs -> List.hd txs
-    | Empty ->
-        Test.fail
-          "Inspected block should contain a list of one transaction hash and \
-           not be empty."
-    | Full _ ->
-        Test.fail
-          "Inspected block should contain a list of one transaction hash, not \
-           full objects."
-  in
-  Check.((tx_hash = tx_hash_expected) string)
-    ~error_msg:"Expected transaction hash is %R, got %L" ;
-  (* We send one transaction and produce a block after the TTL to check that the
-     produced block is empty. *)
-  let* tx' =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:1
-      ~gas_price:21_000
-      ~gas:2_000_000
-      ~value:Wei.zero
-      ~address:Eth_account.bootstrap_accounts.(0).address
-      ()
-  in
-  let*@ _tx_hash' = Rpc.send_raw_transaction ~raw_tx:tx' sequencer_node in
-  let* () = Lwt_unix.sleep (Int.to_float ttl *. 1.5) in
-  let*@ block_number = produce_block () in
-  let*@ block =
-    Rpc.get_block_by_number ~block:(Int.to_string block_number) sequencer_node
-  in
-  match block.transactions with
-  | Empty -> unit
-  | _ -> Test.fail "Inspected block shoud be empty."
-
 let test_tx_pool_address_boundaries =
   Protocol.register_test
     ~__FILE__
@@ -6097,12 +5804,11 @@ let test_tx_pool_address_boundaries =
   in
   let* {evm_node = sequencer_node; produce_block; _} =
     setup_evm_kernel
-      ~enable_tx_queue:(Enable false)
       ~sequencer_admin
       ~admin
       ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-      ~tx_pool_addr_limit:1
-      ~tx_pool_tx_per_addr_limit:1
+      ~tx_queue_max_size:1
+      ~tx_queue_tx_per_addr_limit:1
       ~setup_mode
       protocol
   in
@@ -6146,7 +5852,7 @@ let test_tx_pool_address_boundaries =
   in
   Check.(
     (rejected_transaction'.message
-   = "Limit of transaction for a user was reached. Transaction is rejected.")
+   = "Transaction limit was reached. Transaction is rejected.")
       string)
     ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
   (* Limitation on the number of allowed address inside the transaction pool *)
@@ -6155,8 +5861,7 @@ let test_tx_pool_address_boundaries =
   in
   Check.(
     (rejected_transaction''.message
-   = "The transaction pool has reached its maximum threshold for user \
-      transactions. Transaction is rejected.")
+   = "Transaction limit was reached. Transaction is rejected.")
       string)
     ~error_msg:"This transaction should be rejected with error msg %R not %L" ;
   let*@ block_number = produce_block () in
@@ -6667,7 +6372,6 @@ let register_evm_node ~protocols =
   test_l2_blocks_progression protocols ;
   test_l2_transfer protocols ;
   test_chunked_transaction protocols ;
-  test_rpc_txpool_content protocols ;
   test_rpc_web3_clientVersion protocols ;
   test_rpc_web3_sha3 protocols ;
   test_simulate protocols ;
@@ -6744,7 +6448,6 @@ let register_evm_node ~protocols =
   test_block_constants_opcode protocols ;
   test_revert_is_correctly_propagated protocols ;
   test_block_gas_limit protocols ;
-  test_tx_pool_timeout protocols ;
   test_tx_pool_address_boundaries protocols ;
   test_tx_pool_transaction_size_exceeded protocols ;
   test_whitelist_is_executed protocols ;

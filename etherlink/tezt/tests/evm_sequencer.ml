@@ -185,7 +185,7 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
+let register_sandbox ?tx_queue_tx_per_addr_limit ~title ?set_account_code
     ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
     body =
   Test.register
@@ -204,7 +204,7 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
   @@ fun () ->
   let* sequencer =
     init_sequencer_sandbox
-      ?tx_pool_tx_per_addr_limit
+      ?tx_queue_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
@@ -341,9 +341,9 @@ let test_make_l2_kernel_installer_config chain_family =
         catchup_cooldown = None;
         max_number_of_chunks = None;
         wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_queue_max_lifespan = None;
+        tx_queue_tx_per_addr_limit = None;
+        tx_queue_max_size = None;
         dal_slots = None;
         sequencer_sunset_sec = None;
       }
@@ -517,11 +517,11 @@ let test_observer_reset =
              catchup_cooldown = None;
              max_number_of_chunks = None;
              wallet_dir = Some (Client.base_dir client);
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
              dal_slots = None;
              sequencer_sunset_sec = None;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
            })
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
@@ -561,11 +561,11 @@ let test_observer_reset =
              catchup_cooldown = None;
              max_number_of_chunks = None;
              wallet_dir = Some (Client.base_dir client);
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
              dal_slots = None;
              sequencer_sunset_sec = None;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
            })
       (Sc_rollup_node.endpoint temp_sc_rollup_node)
   in
@@ -587,6 +587,9 @@ let test_observer_reset =
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
            })
       (Evm_node.endpoint invalid_sequencer)
   in
@@ -601,6 +604,9 @@ let test_observer_reset =
              preimages_dir = Some preimages_dir;
              private_rpc_port = Some (Port.fresh ());
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
            })
       (Evm_node.endpoint invalid_sequencer)
   in
@@ -2849,6 +2855,9 @@ let test_get_balance_block_param =
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             tx_queue_max_lifespan = None;
+             tx_queue_tx_per_addr_limit = None;
+             tx_queue_max_size = None;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -2944,6 +2953,9 @@ let test_get_block_by_number_block_param =
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             tx_queue_max_lifespan = None;
+             tx_queue_tx_per_addr_limit = None;
+             tx_queue_max_size = None;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -10570,147 +10582,6 @@ let test_relay_restricted_rpcs =
   let*@? _ = Rpc.tez_kernelVersion sequencer in
   unit
 
-let test_tx_pool_replacing_transactions =
-  register_all
-    ~__FILE__
-    ~time_between_blocks:Nothing
-    ~kernels:[Latest] (* Not a kernel specific test. *)
-    ~tags:["evm"; "tx_pool"]
-    ~enable_tx_queue:(Evm_node.Enable false)
-      (* Test tx_pool specific property that does not exists in
-         tx_queue *)
-    ~title:"Transactions can be replaced"
-    ~use_multichain:Register_without_feature
-  (* TODO #7843: Adapt this test to multichain context *)
-  @@ fun {sequencer; _} _protocol ->
-  let* gas_price = Rpc.get_gas_price sequencer in
-  let gas_price = Int32.to_int gas_price in
-  let* tx_a =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price
-      ~gas:21_000
-      ~value:(Wei.of_eth_int 10)
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  let* tx_b =
-    Cast.craft_tx
-      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-      ~chain_id:1337
-      ~nonce:0
-      ~gas_price:(gas_price + 1)
-      ~gas:21_000
-      ~value:(Wei.of_eth_int 5)
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  (* Send the transactions to the proxy*)
-  let*@ tx_a_hash = Rpc.send_raw_transaction ~raw_tx:tx_a sequencer in
-  let*@ tx_b_hash = Rpc.send_raw_transaction ~raw_tx:tx_b sequencer in
-  (* Get the transaction objects, if it has been replaced, [tx_a_hash] will
-     be missing. *)
-  let*@ tx_a =
-    Rpc.get_transaction_by_hash ~transaction_hash:tx_a_hash sequencer
-  in
-  let*@ tx_b =
-    Rpc.get_transaction_by_hash ~transaction_hash:tx_b_hash sequencer
-  in
-  Check.is_true
-    (Option.is_none tx_a)
-    ~error_msg:"First transaction should have been replaced" ;
-  Check.is_true
-    (Option.is_some tx_b)
-    ~error_msg:"Second transaction should have replaced the previous one" ;
-  unit
-
-let test_tx_pool_replacing_transactions_on_limit () =
-  register_sandbox
-    ~tags:["evm"; "tx_pool"]
-    ~title:"Transactions can be replaced even when limit is reached"
-    ~patch_config:
-      (Evm_node.patch_config_with_experimental_feature
-         ~enable_tx_queue:(Enable false)
-         ())
-      (* Test tx_pool specific property that does not exists in
-         tx_queue *)
-    ~tx_pool_tx_per_addr_limit:3
-  @@ fun sequencer ->
-  let sender = Eth_account.bootstrap_accounts.(0) in
-  let* gas_price = Rpc.get_gas_price sequencer in
-  let gas_price = Int32.to_int gas_price in
-  let craft_tx ?(gas = 21_000) ?(gas_price = gas_price) nonce =
-    Cast.craft_tx
-      ~source_private_key:sender.private_key
-      ~chain_id:1337
-      ~nonce
-      ~gas_price
-      ~gas
-      ~value:(Wei.of_eth_int 10)
-      ~address:"0x0000000000000000000000000000000000000000"
-      ()
-  in
-  let txpool_content () =
-    let*@ pending, queued = Rpc.txpool_content sequencer in
-    let sender = String.lowercase_ascii sender.address in
-    let pending =
-      List.find_map
-        (fun Rpc.{address; transactions} ->
-          if String.lowercase_ascii address = sender then
-            Some (List.map fst transactions |> List.sort compare)
-          else None)
-        pending
-    in
-    let queued =
-      List.find_map
-        (fun Rpc.{address; transactions} ->
-          if String.lowercase_ascii address = sender then
-            Some (List.map fst transactions |> List.sort compare)
-          else None)
-        queued
-    in
-    return @@ Option.value ~default:[] pending @ Option.value ~default:[] queued
-  in
-  (* Craft transactions. *)
-  let* tx_0 = craft_tx 0 in
-  let* tx_2 = craft_tx 2 in
-  let* tx_4 = craft_tx 4 in
-  let* tx_6 = craft_tx 6 in
-  let* tx_8 = craft_tx 8 in
-  (* Inject 3 transactions. *)
-  let*@ _tx_hash_2 = Rpc.send_raw_transaction ~raw_tx:tx_2 sequencer in
-  let*@ _tx_hash_4 = Rpc.send_raw_transaction ~raw_tx:tx_4 sequencer in
-  let*@ _tx_hash_6 = Rpc.send_raw_transaction ~raw_tx:tx_6 sequencer in
-  let* txpool = txpool_content () in
-  Check.((txpool = [2L; 4L; 6L]) (list int64))
-    ~error_msg:"Expected a transaction pool with %R, got %L" ;
-  (* Injecting tx_8 will fail as the limit is 3 transactions per address. *)
-  let*@? err = Rpc.send_raw_transaction ~raw_tx:tx_8 sequencer in
-  Check.(
-    (err.message
-   = "Limit of transaction for a user was reached. Transaction is rejected.")
-      string)
-    ~error_msg:"Expected error %R got %L" ;
-  (* Sending tx_0 should replace tx_6 as the nonce is smaller. *)
-  let*@ _tx_hash_0 = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
-  let* txpool = txpool_content () in
-  Check.((txpool = [0L; 2L; 4L]) (list int64))
-    ~error_msg:"Expected a transaction pool with %R, got %L" ;
-  (* Re-sending tx_0 is legal as long as it replace a transaction. *)
-  let* tx_0 = craft_tx ~gas:30_000 0 in
-  let*@? err = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
-  Check.(
-    (err.message
-   = "Limit of transactions for a user was reached. Transaction is rejected as \
-      it did not replace an existing one.")
-      string)
-    ~error_msg:"Expected error %R got %L" ;
-  let* tx_0 = craft_tx ~gas_price:(gas_price * 2) 0 in
-  let*@ _new_tx_0 = Rpc.send_raw_transaction ~raw_tx:tx_0 sequencer in
-  unit
-
 let test_tx_pool_pending_nonce () =
   register_sandbox
     ~tags:["evm"; "tx_pool"]
@@ -12112,13 +11983,12 @@ let test_tx_queue =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:
-      (Config
-         {
-           max_size = 1000;
-           max_lifespan = 100000 (* absurd value so no TX are dropped *);
-           tx_per_addr_limit = 100000;
-         })
+    ~tx_queue:
+      {
+        max_size = 1000;
+        max_lifespan = 100000 (* absurd value so no TX are dropped *);
+        tx_per_addr_limit = 100000;
+      }
     ~title:"Submits a transaction to an observer with a tx queue."
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
@@ -12224,13 +12094,12 @@ let test_tx_queue_clear =
     ~__FILE__
     ~title:"Tx_queue clears after delayed inbox flush"
     ~tags:["evm"; "tx_queue"; "clear"; "delayed_inbox"; "flush"]
-    ~enable_tx_queue:
-      (Config
-         {
-           max_size = 1000;
-           max_lifespan = 100000 (* absurd value so no TX are dropped *);
-           tx_per_addr_limit = 100000;
-         })
+    ~tx_queue:
+      {
+        max_size = 1000;
+        max_lifespan = 100000 (* absurd value so no TX are dropped *);
+        tx_per_addr_limit = 100000;
+      }
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -12332,13 +12201,12 @@ let test_tx_queue_nonce =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:
-      (Config
-         {
-           max_size = 1000;
-           max_lifespan = 100000 (* absurd value so no TX are dropped *);
-           tx_per_addr_limit = 100000;
-         })
+    ~tx_queue:
+      {
+        max_size = 1000;
+        max_lifespan = 100000 (* absurd value so no TX are dropped *);
+        tx_per_addr_limit = 100000;
+      }
     ~title:
       "Submits transactions to an observer with a tx queue and make sure it \
        can respond to getTransactionCount."
@@ -12596,6 +12464,9 @@ let test_observer_init_from_snapshot =
              preimages_dir = Some "/tmp";
              private_rpc_port = None;
              rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
            })
       ~data_dir:(Temp.dir name)
       (Evm_node.endpoint sequencer)
@@ -12631,13 +12502,12 @@ let test_tx_queue_limit =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:
-      (Config
-         {
-           max_size = 1000;
-           max_lifespan = 100000 (* absurd value so no TX are dropped *);
-           tx_per_addr_limit = max_number_of_txs;
-         })
+    ~tx_queue:
+      {
+        max_size = 1000;
+        max_lifespan = 100000 (* absurd value so no TX are dropped *);
+        tx_per_addr_limit = max_number_of_txs;
+      }
     ~title:
       "Submits transactions to an observer with a tx queue and make sure its \
        limit are respected."
@@ -13103,13 +12973,12 @@ let test_block_producer_validation =
     ~kernels:[Latest] (* node only test *)
     ~use_dal:Register_without_feature
     ~websockets:false
-    ~enable_tx_queue:
-      (Config
-         {
-           max_size = 1000;
-           max_lifespan = 100000 (* absurd value so no TX are dropped *);
-           tx_per_addr_limit = 1000000 (* absurd value so no TX are limited *);
-         })
+    ~tx_queue:
+      {
+        max_size = 1000;
+        max_lifespan = 100000 (* absurd value so no TX are dropped *);
+        tx_per_addr_limit = 100000 (* absurd value so no TX are limited *);
+      }
     ~title:"Test part of the validation is done when producing blocks."
     ~use_multichain:Register_without_feature
   (* TODO #7843: Adapt this test to multichain context *)
@@ -13849,8 +13718,6 @@ let () =
   test_outbox_size_limit_resilience ~slow:true protocols ;
   test_outbox_size_limit_resilience ~slow:false protocols ;
   test_proxy_node_can_forward_to_evm_endpoint protocols ;
-  test_tx_pool_replacing_transactions protocols ;
-  test_tx_pool_replacing_transactions_on_limit () ;
   test_tx_pool_pending_nonce () ;
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;

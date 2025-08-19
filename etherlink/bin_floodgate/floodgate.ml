@@ -332,7 +332,6 @@ let start_blueprint_follower ~relay_endpoint ~rpc_endpoint =
   in
   Blueprints_follower.start
     ~multichain:false
-    ~ping_tx_pool:false
     ~time_between_blocks
     ~evm_node_endpoint:relay_endpoint
     ~next_blueprint_number

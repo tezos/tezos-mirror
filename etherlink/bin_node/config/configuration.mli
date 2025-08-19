@@ -212,9 +212,6 @@ type t = {
   observer : observer option;
   proxy : proxy;
   gcp_kms : gcp_kms;
-  tx_pool_timeout_limit : int64;
-  tx_pool_addr_limit : int64;
-  tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
@@ -302,9 +299,9 @@ module Cli : sig
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
@@ -342,9 +339,9 @@ module Cli : sig
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
@@ -382,9 +379,9 @@ module Cli : sig
     ?cors_origins:string list ->
     ?cors_headers:string list ->
     ?enable_websocket:bool ->
-    ?tx_pool_timeout_limit:int64 ->
-    ?tx_pool_addr_limit:int64 ->
-    ?tx_pool_tx_per_addr_limit:int64 ->
+    ?tx_queue_max_lifespan:int ->
+    ?tx_queue_max_size:int ->
+    ?tx_queue_tx_per_addr_limit:int64 ->
     ?keep_alive:bool ->
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->

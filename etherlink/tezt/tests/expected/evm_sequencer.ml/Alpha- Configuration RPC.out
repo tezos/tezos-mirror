@@ -15,9 +15,6 @@
     },
     "sunset_sec": 300
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
   "verbose": "notice",
@@ -29,12 +26,6 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
     "periodic_snapshot_path": null
   },
   "proxy": {
@@ -78,6 +69,12 @@
     "batch_traces": 400,
     "batch_logs": 400,
     "batch_timeout_ms": 500
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
   }
 }
 {
@@ -97,9 +94,6 @@
     },
     "sunset_sec": 0
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
   "verbose": "notice",
@@ -111,12 +105,6 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
     "periodic_snapshot_path": null
   },
   "proxy": {
@@ -160,6 +148,12 @@
     "batch_traces": 400,
     "batch_logs": 400,
     "batch_timeout_ms": 500
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
   }
 }
 {
@@ -183,9 +177,6 @@
     "evm_node_endpoint": "hidden",
     "rollup_node_tracking": true
   },
-  "tx_pool_timeout_limit": "3600",
-  "tx_pool_addr_limit": "4000",
-  "tx_pool_tx_per_addr_limit": "16",
   "keep_alive": false,
   "rollup_node_endpoint": "hidden",
   "verbose": "notice",
@@ -197,12 +188,6 @@
     "rpc_server": "resto",
     "spawn_rpc": null,
     "l2_chains": null,
-    "enable_tx_queue": {
-      "max_size": 1000,
-      "max_transaction_batch_length": null,
-      "max_lifespan": 100000,
-      "tx_per_addr_limit": "100000"
-    },
     "periodic_snapshot_path": null
   },
   "proxy": {
@@ -247,5 +232,11 @@
     "batch_traces": 400,
     "batch_logs": 400,
     "batch_timeout_ms": 500
+  },
+  "tx_pool": {
+    "max_size": 1000,
+    "max_transaction_batch_length": null,
+    "max_lifespan": 4,
+    "tx_per_addr_limit": "16"
   }
 }

@@ -51,6 +51,12 @@ type sequencer_setup = {
   l2_chains : Evm_node.l2_setup list;
 }
 
+type tx_queue_config = {
+  max_lifespan : int;
+  max_size : int;
+  tx_per_addr_limit : int;
+}
+
 (** [uses protocol] returns the list of dependencies for the tests. *)
 val uses : Protocol.t -> Uses.t list
 
@@ -71,7 +77,7 @@ val run_new_observer_node :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?l2_chain:Evm_node.l2_setup ->
   Evm_node.t ->
   Evm_node.t Lwt.t
@@ -118,7 +124,7 @@ val register_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
@@ -171,7 +177,7 @@ val register_multichain_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
@@ -223,7 +229,7 @@ val register_test_for_kernels :
   ?enable_fast_withdrawal:bool ->
   ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
@@ -275,7 +281,6 @@ val setup_sequencer :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->
@@ -338,7 +343,7 @@ val register_all :
   ?history_mode:Evm_node.history_mode ->
   ?use_dal:feature_test_registration ->
   ?use_multichain:feature_test_registration ->
-  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?signatory:bool ->

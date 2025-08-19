@@ -357,9 +357,9 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
         catchup_cooldown = None;
         max_number_of_chunks = None;
         wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_queue_max_lifespan = None;
+        tx_queue_max_size = None;
+        tx_queue_tx_per_addr_limit = None;
         dal_slots;
         sequencer_sunset_sec = None;
       }
@@ -495,6 +495,9 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
         initial_kernel = output;
         preimages_dir = Some preimages_dir;
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        tx_queue_max_lifespan = None;
+        tx_queue_max_size = None;
+        tx_queue_tx_per_addr_limit = None;
       }
   in
   let () = toplog "Init Etherlink: init producer %s" name in

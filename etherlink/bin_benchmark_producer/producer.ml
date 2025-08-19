@@ -32,18 +32,14 @@ let register ~title ~registered ~tx_per_call =
   let gas_price = 10_000_000_000 in
 
   let account = Eth_account.bootstrap_accounts.(0) in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~enable_tx_queue:
-        (Config
-           {
-             max_size = 100_000;
-             max_lifespan = 100_000;
-             tx_per_addr_limit = 100_000;
-           })
+  let* sequencer =
+    init_sequencer_sandbox
+      ~tx_queue_max_size:100_000
+      ~tx_queue_max_lifespan:100_000
+      ~tx_queue_tx_per_addr_limit:100_000
+      ~da_fee_per_byte
       ()
   in
-  let* sequencer = init_sequencer_sandbox ~patch_config ~da_fee_per_byte () in
   let*@ v = Rpc.tez_kernelVersion sequencer in
   Log.report "Kernel version is %s" v ;
 

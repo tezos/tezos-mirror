@@ -242,9 +242,6 @@ type t = {
   observer : observer option;
   proxy : proxy;
   gcp_kms : gcp_kms;
-  tx_pool_timeout_limit : int64;
-  tx_pool_addr_limit : int64;
-  tx_pool_tx_per_addr_limit : int64;
   keep_alive : bool;
   rollup_node_endpoint : Uri.t;
   verbose : Internal_event.level;
@@ -378,12 +375,6 @@ let hard_maximum_number_of_chunks =
   max_cumulated_chunks_size / chunk_size
 
 let default_max_number_of_chunks = hard_maximum_number_of_chunks
-
-let default_tx_pool_timeout_limit = Int64.of_int 3600
-
-let default_tx_pool_addr_limit = Int64.of_int 4000
-
-let default_tx_pool_tx_per_addr_limit = Int64.of_int 16
 
 let default_blueprints_publisher_config_without_dal =
   {
@@ -1515,9 +1506,6 @@ let encoding ?network data_dir : t Data_encoding.t =
            observer;
            proxy;
            gcp_kms;
-           tx_pool_timeout_limit;
-           tx_pool_addr_limit;
-           tx_pool_tx_per_addr_limit;
            keep_alive;
            rollup_node_endpoint;
            verbose;
@@ -1532,9 +1520,9 @@ let encoding ?network data_dir : t Data_encoding.t =
          }
        ->
       ( (log_filter, sequencer, observer),
-        ( ( tx_pool_timeout_limit,
-            tx_pool_addr_limit,
-            tx_pool_tx_per_addr_limit,
+        ( ( None,
+            None,
+            None,
             keep_alive,
             rollup_node_endpoint,
             verbose,
@@ -1552,9 +1540,9 @@ let encoding ?network data_dir : t Data_encoding.t =
             opentelemetry,
             tx_queue ) ) ))
     (fun ( (log_filter, sequencer, observer),
-           ( ( tx_pool_timeout_limit,
-               tx_pool_addr_limit,
-               tx_pool_tx_per_addr_limit,
+           ( ( _tx_pool_timeout_limit,
+               _tx_pool_addr_limit,
+               _tx_pool_tx_per_addr_limit,
                keep_alive,
                rollup_node_endpoint,
                verbose,
@@ -1581,9 +1569,6 @@ let encoding ?network data_dir : t Data_encoding.t =
         observer;
         proxy;
         gcp_kms;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
         keep_alive;
         rollup_node_endpoint;
         verbose;
@@ -1606,29 +1591,26 @@ let encoding ?network data_dir : t Data_encoding.t =
           (observer_field "observer" (observer_encoding ?network ())))
        (merge_objs
           (obj10
-             (dft
+             (opt
                 "tx_pool_timeout_limit"
                 ~description:
                   "Transaction timeout limit inside the transaction pool. \
                    DEPRECATED: You should use \"tx_pool.max_lifespan\" \
                    instead."
-                int64
-                default_tx_pool_timeout_limit)
-             (dft
+                int64)
+             (opt
                 "tx_pool_addr_limit"
                 ~description:
                   "Maximum allowed addresses inside the transaction pool. \
                    DEPRECATED: You should use \"tx_pool.max_size\" instead."
-                int64
-                default_tx_pool_addr_limit)
-             (dft
+                int64)
+             (opt
                 "tx_pool_tx_per_addr_limit"
                 ~description:
                   "Maximum allowed transactions per user address inside the \
                    transaction pool. DEPRECATED: You should use \
                    \"tx_pool.tx_per_addr_limit\" instead."
-                int64
-                default_tx_pool_tx_per_addr_limit)
+                int64)
              (dft
                 "keep_alive"
                 ~description:
@@ -1808,6 +1790,45 @@ let migrate_experimental_feature ?new_path ?(transform = Fun.id) path json =
       Ezjsonm.update json new_path (Some (transform v))
   | _, _ -> (* Don't override otherwise *) json
 
+let merge_tx_pool_values json =
+  let open Json_syntax in
+  let tx_queue = json |-> ["tx_pool"] in
+  let tx_pool_timeout_limit =
+    json |-> ["tx_pool_timeout_limit"]
+    |> Option.map (fun v -> Int64.of_string (Ezjsonm.get_string v))
+  in
+  let tx_pool_tx_per_addr_limit =
+    json
+    |-> ["tx_pool_tx_per_addr_limit"]
+    |> Option.map (fun v -> Int64.of_string (Ezjsonm.get_string v))
+  in
+  let json =
+    match (tx_queue, tx_pool_timeout_limit) with
+    | Some _, None -> json
+    | None, None -> json
+    | None, Some tx_pool_timeout_limit ->
+        Ezjsonm.update
+          json
+          ["tx_pool"; "max_lifespan"]
+          (Some (`String (Int64.to_string tx_pool_timeout_limit)))
+    | Some _, Some _ ->
+        Fmt.failwith
+          "tx_pool_timeout_limit and tx_pool.max_lifespan are both defined. \
+           Only define one of them"
+  in
+  match (tx_queue, tx_pool_tx_per_addr_limit) with
+  | Some _, None -> json
+  | None, None -> json
+  | None, Some tx_pool_tx_per_addr_limit ->
+      Ezjsonm.update
+        json
+        ["tx_pool"; "tx_per_addr_limit"]
+        (Some (`String (Int64.to_string tx_pool_tx_per_addr_limit)))
+  | Some _, Some _ ->
+      Fmt.failwith
+        "tx_pool_tx_per_addr_limit and tx_pool.tx_per_addr_limit both are \
+         defined. Only define one of them"
+
 let migrate_stabilized_experimental_features json =
   let open Json_syntax in
   json
@@ -1839,6 +1860,8 @@ let migrate_stabilized_experimental_features json =
   |> migrate_experimental_feature
        ["websocket_rate_limit"]
        ~new_path:["websockets"; "rate_limit"]
+  |> migrate_experimental_feature ["tx_queue"] ~new_path:["tx_pool"]
+  |> merge_tx_pool_values
 
 let load_file ?network ~data_dir path =
   let open Lwt_result_syntax in
@@ -1891,9 +1914,6 @@ module Cli = struct
       observer;
       proxy = default_proxy ();
       gcp_kms = default_gcp_kms;
-      tx_pool_timeout_limit = default_tx_pool_timeout_limit;
-      tx_pool_addr_limit = default_tx_pool_addr_limit;
-      tx_pool_tx_per_addr_limit = default_tx_pool_tx_per_addr_limit;
       keep_alive = false;
       rollup_node_endpoint = default_rollup_node_endpoint;
       verbose = Internal_event.Notice;
@@ -1936,8 +1956,8 @@ module Cli = struct
     }
 
   let patch_configuration_from_args ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
+      ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
+      ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?keep_alive
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
@@ -2096,11 +2116,19 @@ module Cli = struct
     in
     let tx_queue =
       {
-        max_lifespan_s = configuration.tx_queue.max_lifespan_s;
-        max_size = configuration.tx_queue.max_size;
-        tx_per_addr_limit = configuration.tx_queue.tx_per_addr_limit;
-        max_transaction_batch_length =
-          configuration.tx_queue.max_transaction_batch_length;
+        configuration.tx_queue with
+        max_lifespan_s =
+          Option.value
+            ~default:configuration.tx_queue.max_lifespan_s
+            tx_queue_max_lifespan;
+        max_size =
+          Option.value
+            ~default:configuration.tx_queue.max_size
+            tx_queue_max_size;
+        tx_per_addr_limit =
+          Option.value
+            ~default:configuration.tx_queue.tx_per_addr_limit
+            tx_queue_tx_per_addr_limit;
       }
     in
     {
@@ -2113,18 +2141,6 @@ module Cli = struct
       observer;
       proxy;
       gcp_kms = configuration.gcp_kms;
-      tx_pool_timeout_limit =
-        Option.value
-          ~default:configuration.tx_pool_timeout_limit
-          tx_pool_timeout_limit;
-      tx_pool_addr_limit =
-        Option.value
-          ~default:configuration.tx_pool_addr_limit
-          tx_pool_addr_limit;
-      tx_pool_tx_per_addr_limit =
-        Option.value
-          ~default:configuration.tx_pool_tx_per_addr_limit
-          tx_pool_tx_per_addr_limit;
       keep_alive = configuration.keep_alive || keep_alive;
       rollup_node_endpoint;
       verbose;
@@ -2138,8 +2154,8 @@ module Cli = struct
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
-      ?cors_headers ?enable_websocket ?tx_pool_timeout_limit ?tx_pool_addr_limit
-      ?tx_pool_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
+      ?cors_headers ?enable_websocket ?tx_queue_max_lifespan ?tx_queue_max_size
+      ?tx_queue_tx_per_addr_limit ?keep_alive ?rollup_node_endpoint
       ?dont_track_rollup_node ?verbose ?profiling ?preimages ?preimages_endpoint
       ?native_execution_policy ?time_between_blocks ?max_number_of_chunks
       ?private_rpc_port ?sequencer_key ?evm_node_endpoint
@@ -2156,9 +2172,9 @@ module Cli = struct
          ?cors_origins
          ?cors_headers
          ?enable_websocket
-         ?tx_pool_timeout_limit
-         ?tx_pool_addr_limit
-         ?tx_pool_tx_per_addr_limit
+         ?tx_queue_max_lifespan
+         ?tx_queue_max_size
+         ?tx_queue_tx_per_addr_limit
          ?keep_alive
          ?rollup_node_endpoint
          ?dont_track_rollup_node
@@ -2187,8 +2203,8 @@ module Cli = struct
          ?sunset_sec
 
   let create_or_read_config ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit
-      ?cors_origins ?cors_headers ?enable_websocket ?tx_pool_timeout_limit
-      ?tx_pool_addr_limit ?tx_pool_tx_per_addr_limit ?keep_alive
+      ?cors_origins ?cors_headers ?enable_websocket ?tx_queue_max_lifespan
+      ?tx_queue_max_size ?tx_queue_tx_per_addr_limit ?keep_alive
       ?rollup_node_endpoint ?dont_track_rollup_node ?verbose ?profiling
       ?preimages ?preimages_endpoint ?native_execution_policy
       ?time_between_blocks ?max_number_of_chunks ?private_rpc_port
@@ -2237,9 +2253,9 @@ module Cli = struct
           ?max_blueprints_ahead
           ?max_blueprints_catchup
           ?catchup_cooldown
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
+          ?tx_queue_max_lifespan
+          ?tx_queue_max_size
+          ?tx_queue_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
@@ -2279,9 +2295,9 @@ module Cli = struct
           ?max_blueprints_ahead
           ?max_blueprints_catchup
           ?catchup_cooldown
-          ?tx_pool_timeout_limit
-          ?tx_pool_addr_limit
-          ?tx_pool_tx_per_addr_limit
+          ?tx_queue_max_lifespan
+          ?tx_queue_max_size
+          ?tx_queue_tx_per_addr_limit
           ?rollup_node_endpoint
           ?dont_track_rollup_node
           ?verbose
