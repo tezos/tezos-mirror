@@ -363,7 +363,7 @@ let head_info_and_delayed_transactions ~with_delayed_transactions evm_state
   in
   return (delayed_hashes, remaining_cumulative_size)
 
-let produce_block (type f) (state : Types.state) ~force ~timestamp
+let produce_block (state : Types.state) ~force ~timestamp
     ~with_delayed_transactions =
   let open Lwt_result_syntax in
   match state.tx_container with
