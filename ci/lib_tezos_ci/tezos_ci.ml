@@ -781,8 +781,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
     ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
-    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
-    tezos_job =
+    ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
+    ~name script : tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag : Runner.Tag.t =
     let provider : Runner.Provider.t = if dev_infra then GCP_dev else GCP in
@@ -948,8 +948,10 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
       before_script =
         Some
-          ((". ./scripts/ci/datadog_send_job_info.sh" :: before_script)
-          @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]);
+          (if datadog then
+             (". ./scripts/ci/datadog_send_job_info.sh" :: before_script)
+             @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]
+           else before_script);
       cache;
       id_tokens;
       image = Option.map Image.image image;

@@ -1720,20 +1720,11 @@ let jobs pipeline_type =
     in
     let jobs_sdk_bindings : tezos_job list =
       let job_test_sdk_bindings =
-        job
-          ~__POS__
-          ~name:"test_sdk_bindings"
-          ~image:Images.rust_sdk_bindings
-          ~stage:Stages.test
+        Sdk_bindings_ci.job_test
           ~dependencies:dependencies_needs_start
-          ~before_script:(before_script ~init_python_venv:true [])
           ~rules:
             (make_rules ~dependent:true ~changes:changeset_test_sdk_bindings ())
-          [
-            "make -C contrib/sdk-bindings check";
-            "make -C contrib/sdk-bindings test";
-          ]
-        |> enable_cargo_cache |> enable_sccache
+          ()
       in
       [job_test_sdk_bindings]
     in
