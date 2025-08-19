@@ -37,6 +37,9 @@ type t = {
       (** A table to store tracking information for each domain. *)
   filter : Runtime_events.runtime_phase -> bool;
       (** A function to filter which runtime events to trace. *)
+  min_duration : int64 option;
+      (** Minimal duration in nanoseconds for the event to be emitted. Events
+          shorter than this duration will be filtered out. *)
   offset : int64;
       (** The offset between the runtime events' monotonic clock and the
           system's monotonic clock.  *)
@@ -81,6 +84,15 @@ let close_scope del_span_id tr =
   in
   tr.scopes <- remove [] tr.scopes
 
+(** Checks if the duration of an event is greater than the configured minimum
+    duration. *)
+let duration_filter_ok t ~start_time_ns ~end_time_ns =
+  match t.min_duration with
+  | None -> true
+  | Some min ->
+      let duration_ns = Int64.sub end_time_ns start_time_ns in
+      duration_ns >= min
+
 (** A callback function that is called when a runtime event ends. It closes the
     corresponding OpenTelemetry span and emits it. *)
 let runtime_end t domain_id end_time phase =
@@ -98,21 +110,23 @@ let runtime_end t domain_id end_time phase =
             (* Convert timestamps to nanoseconds and apply the offset. *)
             let start_time_ns = Runtime_events.Timestamp.to_int64 start_time in
             let end_time_ns = Runtime_events.Timestamp.to_int64 end_time in
-            let end_time = Int64.add end_time_ns t.offset in
-            let start_time = Int64.add start_time_ns t.offset in
-            (* Create and emit the span. *)
-            let span, _ =
-              Opentelemetry.Span.create
-                ?parent
-                ~id:scope.span_id
-                ~trace_id:scope.trace_id
-                ~start_time
-                ~end_time
-                ~attrs:[("ocaml.domain_id", `Int domain_id)]
-                (Runtime_events.runtime_phase_name phase)
-            in
-            Opentelemetry.Trace.emit ~service_name:"Gc" [span] ;
-            ())
+            (* Only emit if passes min duration filter. *)
+            if duration_filter_ok t ~start_time_ns ~end_time_ns then (
+              let end_time = Int64.add end_time_ns t.offset in
+              let start_time = Int64.add start_time_ns t.offset in
+              (* Create and emit the span with domain ID as an attribute. *)
+              let span, _ =
+                Opentelemetry.Span.create
+                  ?parent
+                  ~id:scope.span_id
+                  ~trace_id:scope.trace_id
+                  ~start_time
+                  ~end_time
+                  ~attrs:[("ocaml.domain_id", `Int domain_id)]
+                  (Runtime_events.runtime_phase_name phase)
+              in
+              Opentelemetry.Trace.emit ~service_name:"Gc" [span] ;
+              ()))
 
 (** A custom user event tag to mark the startup time. *)
 type Runtime_events.User.tag += Startup
@@ -158,14 +172,27 @@ let poll cursor callbacks =
 (** Initializes the GC telemetry collection. This function starts the
     [Runtime_events] listener, computes the timestamp offset, and sets up a
     polling mechanism to collect and emit GC traces.  *)
-let instrument ?(filter = runtime_events_filter) () =
+let instrument ?(filter = runtime_events_filter) ?min_duration_ms () =
   if Opentelemetry.Collector.has_backend () then (
     (* Start listening for runtime events. *)
     Runtime_events.start () ;
     let cursor = Runtime_events.create_cursor None in
     (* Compute the timestamp offset. *)
     let offset = compute_offset cursor in
-    let t = {domains = DomainTable.create 11; filter; offset} in
+    (* Convert min_duration_ms to nanoseconds. *)
+    let min_duration =
+      Option.map (fun f -> f *. 1_000_000. |> Int64.of_float) min_duration_ms
+    in
+    let t =
+      {
+        (* Create domain table with a size hint based on recommended domain
+           count. *)
+        domains = DomainTable.create (Domain.recommended_domain_count ());
+        filter;
+        min_duration;
+        offset;
+      }
+    in
     (* Register the callbacks for runtime events. *)
     let callbacks =
       Runtime_events.Callbacks.create
