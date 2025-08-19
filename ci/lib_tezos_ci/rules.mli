@@ -178,3 +178,6 @@ val never : If.t
 
 (** A rule that is always true. *)
 val always : If.t
+
+(** A rule that is true if the variable DOCKER_FORCE_REBUILD = True *)
+val force_rebuild : If.t

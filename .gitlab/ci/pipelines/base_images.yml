@@ -33,6 +33,12 @@ oc.base-images.debian:
   stage: images
   tags:
   - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -60,6 +66,12 @@ oc.base-images.ubuntu:
   stage: images
   tags:
   - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.debian
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -87,6 +99,12 @@ oc.base-images.fedora:
   stage: images
   tags:
   - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.rpm
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -114,6 +132,12 @@ oc.base-images.rockylinux:
   stage: images
   tags:
   - gcp_very_high_cpu
+  rules:
+  - changes:
+    - images/base-images/Dockerfile.rpm
+    when: on_success
+  - if: $DOCKER_FORCE_BUILD == "true" || $DOCKER_FORCE_BUILD == "True"
+    when: on_success
   dependencies: []
   timeout: 60 minutes
   before_script:

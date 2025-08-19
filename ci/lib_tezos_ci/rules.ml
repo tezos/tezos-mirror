@@ -113,6 +113,10 @@ let is_final_pipeline =
 let has_mr_label label =
   Predefined_vars.ci_merge_request_labels =~ "/(?:^|,)" ^ label ^ "(?:$|,)/"
 
+let force_rebuild =
+  var "DOCKER_FORCE_BUILD" == str "true"
+  || var "DOCKER_FORCE_BUILD" == str "True"
+
 let never = var "foo" == str "bar" && var "foo" != str "bar"
 
 let always = not never

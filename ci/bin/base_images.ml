@@ -6,6 +6,7 @@
 (*****************************************************************************)
 
 open Gitlab_ci.Types
+open Gitlab_ci.Util
 open Tezos_ci
 
 let debian_matrix = [[("RELEASE", ["unstable"; "bookworm"])]]
@@ -18,7 +19,7 @@ let fedora_matrix = [[("RELEASE", ["39"; "42"])]]
 
 let jobs =
   let make_job_base_images ~__POS__ ~name ~matrix ~distribution ?image_path
-      dockerfile =
+      ?(changes = Changeset.make []) dockerfile =
     let script =
       Printf.sprintf "scripts/ci/build-base-images.sh %s" dockerfile
     in
@@ -33,41 +34,54 @@ let jobs =
       ~name
       ~stage:Stages.images
       ~variables
+      ~rules:
+        [
+          job_rule ~changes:(Changeset.encode changes) ~when_:On_success ();
+          job_rule ~if_:Rules.force_rebuild ~when_:On_success ();
+        ]
       ~parallel:(Matrix matrix)
       ~tag:Gcp_very_high_cpu
       [script]
   in
   let job_debian_based_images =
+    let changes = Changeset.make ["images/base-images/Dockerfile.debian"] in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.debian"
       ~distribution:"debian"
       ~matrix:debian_matrix
+      ~changes
       "images/base-images/Dockerfile.debian"
   in
   let job_ubuntu_based_images =
+    let changes = Changeset.make ["images/base-images/Dockerfile.debian"] in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.ubuntu"
       ~distribution:"ubuntu"
       ~matrix:ubuntu_matrix
+      ~changes
       "images/base-images/Dockerfile.debian"
   in
   let job_fedora_based_images =
+    let changes = Changeset.make ["images/base-images/Dockerfile.rpm"] in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.fedora"
       ~distribution:"fedora"
       ~matrix:fedora_matrix
+      ~changes
       "images/base-images/Dockerfile.rpm"
   in
   let job_rockylinux_based_images =
+    let changes = Changeset.make ["images/base-images/Dockerfile.rpm"] in
     make_job_base_images
       ~__POS__
       ~name:"oc.base-images.rockylinux"
       ~distribution:"rockylinux"
       ~image_path:"rockylinux/rockylinux"
       ~matrix:rockylinux_matrix
+      ~changes
       "images/base-images/Dockerfile.rpm"
   in
   [
