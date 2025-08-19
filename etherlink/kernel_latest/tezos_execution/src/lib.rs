@@ -305,6 +305,7 @@ pub fn transfer<'a, Host: Runtime>(
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
+            ctx.self_address = address_from_contract(dest_contract.clone());
             let balance = dest_account
                 .balance(host)
                 .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
@@ -2914,6 +2915,70 @@ mod tests {
             src_contract.storage(&host).unwrap(),
             Micheline::from(i128::from(initial_balance + transfer_amount)).encode(),
             "Storage should contain the balance of the contract"
+        );
+    }
+
+    #[test]
+    fn test_smart_contract_self_address_instruction() {
+        // Write SELF_ADDRESS in the storage
+        const SCRIPT_ADDR: &str = "
+            parameter unit;
+            storage address;
+            code {
+                DROP;
+                SELF_ADDRESS;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let micheline_address = Micheline::Bytes(
+            Contract::Originated(contract_hash.clone())
+                .to_bytes()
+                .unwrap(),
+        );
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT_ADDR,
+            &micheline_address,
+            &0_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            micheline_address.encode(),
+            "Storage should contain the self address of the contract"
         );
     }
 }
