@@ -108,6 +108,7 @@ let runtime_end t domain_id end_time phase =
                 ~trace_id:scope.trace_id
                 ~start_time
                 ~end_time
+                ~attrs:[("ocaml.domain_id", `Int domain_id)]
                 (Runtime_events.runtime_phase_name phase)
             in
             Opentelemetry.Trace.emit ~service_name:"Gc" [span] ;
