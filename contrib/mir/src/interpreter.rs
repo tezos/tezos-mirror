@@ -1767,7 +1767,17 @@ fn interpret_one<'a>(
     Ok(())
 }
 
-fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Address {
+/// Computes the contract address based on the operation group hash and an origination index.
+///
+/// # Arguments
+///
+/// * `operation_group_hash` - A 32-byte array representing the hash of the operation group.
+/// * `o_index` - A 32-bit unsigned integer representing the origination index.
+///
+/// # Returns
+///
+/// Returns an `Address` struct containing the computed contract address.
+pub fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Address {
     use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
     let mut input: [u8; 36] = [0; 36];
     input[..32].copy_from_slice(operation_group_hash);
