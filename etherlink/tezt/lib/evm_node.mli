@@ -239,6 +239,9 @@ val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
 
+val wait_for_pending_sequencer_upgrade :
+  ?timeout:float -> t -> (string * string * string) Lwt.t
+
 val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
 
 val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
