@@ -69,6 +69,7 @@ echo "rust_sdk_bindings_image_tag=$image_tag" > rust_sdk_bindings_image_tag.env
 
 echo "Build ${image_name}"
 
+# shellcheck disable=SC2046
 ./images/create_image.sh \
   "rust-sdk-bindings" \
   "${image_base}" \
@@ -82,4 +83,5 @@ echo "Build ${image_name}"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
+  $(if [ "${DOCKER_FORCE_BUILD:-false}" = "true" ]; then echo "--no-cache"; fi) \
   -t "${image_base}:${docker_image_ref_tag}"
