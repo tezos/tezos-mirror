@@ -44,9 +44,6 @@ type dbl_attestation_state = {
 (** Generic generation state collecting
     information to generate any kind of operation.
 
-    For example, {!Manager.infos} for manager
-    or voters (Contract.t list) for voting operations...
-
    When adding a new operation kind, [state] might be extended if a
    new kind of information is required for this new kind valid
    operations generation. *)
@@ -55,7 +52,6 @@ type state = {
   pred : Block.t option;
   bootstraps : public_key_hash list;
   delegates : (public_key_hash * public_key_hash option) list;
-  voters : Contract.t list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
   protocol_hashes : Protocol_hash.t list;
@@ -65,10 +61,8 @@ type state = {
   manager : Manager.infos;
 }
 
-(** The initialization of a [state] requires the [voters] contracts --
-    the contracts allowed to vote -- and the [bootstraps] contracts. *)
-val init_state :
-  Block.t -> voters:Contract.t list -> bootstraps:Contract.t list -> state
+(** The initialization of a [state] requires the [bootstraps] contracts. *)
+val init_state : Block.t -> bootstraps:Contract.t list -> state
 
 (** {2 Descriptor for valid operations generation} *)
 
