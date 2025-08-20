@@ -127,13 +127,16 @@ module Node = struct
     in
     let* () = import_snapshot ~no_check:true ~name node snapshot in
     let arguments = Node_helpers.isolated_args peers in
+    let synchronisation_waiter =
+      Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
+    in
     let* () = run ~env:yes_crypto_env node arguments in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
        disconnected from real network (i.e. in a frozen state) you are likely to
-       be [stuck] (i.e. synchronised with peert but missing newer blocks) until
+       be [stuck] (i.e. synchronised with peer but missing newer blocks) until
        your bakers start to bake. *)
-    Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
+    synchronisation_waiter
 
   let client ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
