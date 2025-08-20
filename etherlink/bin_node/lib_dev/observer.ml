@@ -277,7 +277,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   in
   let* () = Evm_ro_context.preload_known_kernels ro_ctxt in
 
-  let observer_backend =
+  let (module Rpc_backend) =
     Evm_ro_context.ro_backend ro_ctxt config ~evm_node_endpoint
   in
 
@@ -285,15 +285,14 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
      kernel config. *)
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
-    let (module Backend) = observer_backend in
-    Backend.single_chain_id_and_family ~config ~enable_multichain
+    Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
   let* () =
     start_tx_container
       ~tx_pool_parameters:
         {
-          backend = observer_backend;
+          backend = (module Rpc_backend);
           smart_rollup_address =
             Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
               smart_rollup_address;
@@ -314,26 +313,31 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~tx_pool_size_info:Tx_container.size_info
     ~smart_rollup_address ;
 
+  let* () =
+    Prevalidator.start
+      ~max_number_of_chunks:config.sequencer.max_number_of_chunks
+      ~chain_family
+      Minimal
+      (module Rpc_backend)
+  in
   let rpc_server_family = Rpc_types.Single_chain_node_rpc_server chain_family in
   let* finalizer_public_server =
     Rpc_server.start_public_server
-      ~is_sequencer:false
       ~l2_chain_id
       ~evm_services:
         Evm_ro_context.(evm_services_methods ro_ctxt time_between_blocks)
       ~data_dir
       ~rpc_server_family
-      Minimal
       config
       tx_container
-      (observer_backend, smart_rollup_address)
+      ((module Rpc_backend), smart_rollup_address)
   in
   let* finalizer_private_server =
     Rpc_server.start_private_server
       ~rpc_server_family
       config
       tx_container
-      (observer_backend, smart_rollup_address)
+      ((module Rpc_backend), smart_rollup_address)
   in
 
   let* () =

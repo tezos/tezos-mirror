@@ -232,7 +232,7 @@ let validate_tx ~maximum_cumulative_size (current_size, validation_state) raw_tx
       @@ Transaction.decode raw_tx
     in
     let* validation_state_res =
-      Validate.validate_balance_gas_nonce_with_validation_state
+      Prevalidator.validate_balance_gas_nonce_with_validation_state
         validation_state
         ~caller:tx_object.from
         transaction
@@ -278,7 +278,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         let* da_fee_per_byte = Etherlink_durable_storage.da_fee_per_byte read in
         let config =
-          Validate.
+          Prevalidator.
             {
               minimum_base_fee_per_gas = Qty minimum_base_fee_per_gas;
               base_fee_per_gas;
@@ -292,7 +292,7 @@ let pop_valid_tx (type f) ~(tx_container : f Services_backend_sig.tx_container)
         in
         let initial_validation_state =
           ( 0,
-            Validate.
+            Prevalidator.
               {
                 config;
                 addr_balance = String.Map.empty;

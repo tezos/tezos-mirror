@@ -41,6 +41,10 @@ type session_state = {
   mutable evm_state : Evm_state.t;
   mutable last_split_block : (Ethereum_types.quantity * Time.Protocol.t) option;
       (** Garbage collector session related information. *)
+  mutable post_transaction_run_hook : (unit -> unit Lwt.t) option;
+      (** A function to be run by the worker at the end of the current
+          {!Transaction.run} call. This can be used to delay some computation
+          only once the commits in Irmin and SQlite have been confirmed. *)
 }
 
 type t = {
@@ -191,6 +195,7 @@ module State = struct
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
+          post_transaction_run_hook;
         } =
       {
         context;
@@ -201,6 +206,7 @@ module State = struct
         pending_sequencer_upgrade;
         evm_state;
         last_split_block;
+        post_transaction_run_hook;
       }
 
     (* [apply session session'] modifies [session] in-place to match the content of [session']. *)
@@ -214,6 +220,7 @@ module State = struct
           pending_sequencer_upgrade;
           evm_state;
           last_split_block;
+          post_transaction_run_hook;
         } =
       session.context <- context ;
       session.finalized_number <- finalized_number ;
@@ -222,7 +229,8 @@ module State = struct
       session.pending_upgrade <- pending_upgrade ;
       session.pending_sequencer_upgrade <- pending_sequencer_upgrade ;
       session.evm_state <- evm_state ;
-      session.last_split_block <- last_split_block
+      session.last_split_block <- last_split_block ;
+      session.post_transaction_run_hook <- post_transaction_run_hook
 
     let session_to_head_info session =
       {
@@ -244,19 +252,28 @@ module State = struct
         =
       let open Lwt_result_syntax in
       let ctxt' = {ctxt with session = dup ctxt.session} in
-      with_store_transaction ctxt @@ fun conn ->
-      let*! res = k ctxt' conn in
-      match res with
-      | Ok res ->
-          apply ctxt.session ctxt'.session ;
-          let*! head_info in
-          head_info := session_to_head_info ctxt.session ;
-          let (Qty level) = current_blueprint_number ctxt in
-          let (Qty finalized_level) = ctxt.session.finalized_number in
-          Metrics.set_confirmed_level ~level:finalized_level ;
-          Metrics.set_level ~level ;
-          return res
-      | Error err -> fail err
+      let* res =
+        with_store_transaction ctxt @@ fun conn ->
+        let*! res = k ctxt' conn in
+        match res with
+        | Ok res ->
+            apply ctxt.session ctxt'.session ;
+            let*! head_info in
+            head_info := session_to_head_info ctxt.session ;
+            let (Qty level) = current_blueprint_number ctxt in
+            let (Qty finalized_level) = ctxt.session.finalized_number in
+            Metrics.set_confirmed_level ~level:finalized_level ;
+            Metrics.set_level ~level ;
+            return res
+        | Error err -> fail err
+      in
+      let*! () =
+        Option.iter_s
+          (fun hook -> hook ())
+          ctxt.session.post_transaction_run_hook
+      in
+      ctxt.session.post_transaction_run_hook <- None ;
+      return res
 
     let initialize_head_info ctxt =
       let first_head = ref (session_to_head_info ctxt.session) in
@@ -1068,10 +1085,18 @@ module State = struct
       (fun (split_level, split_timestamp) ->
         ctxt.session.last_split_block <- Some (split_level, split_timestamp))
       split_info ;
-    Broadcast.notify_blueprint blueprint_with_events ;
     if applied_sequencer_upgrade then
       ctxt.session.pending_sequencer_upgrade <- None ;
     if applied_kernel_upgrade then ctxt.session.pending_upgrade <- None ;
+    ctxt.session.post_transaction_run_hook <-
+      Some
+        (fun () ->
+          let open Lwt_syntax in
+          Broadcast.notify_blueprint blueprint_with_events ;
+          (* We ignore failure. A failure means the prevalidator is not yet
+             started, meaning the call is useless for now. *)
+          let* _result = Prevalidator.refresh_state () in
+          return_unit) ;
     return_unit
 
   type error +=
@@ -1750,6 +1775,7 @@ module State = struct
             pending_sequencer_upgrade;
             evm_state;
             last_split_block;
+            post_transaction_run_hook = None;
           };
         store;
         signer;
