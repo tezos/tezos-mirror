@@ -312,7 +312,11 @@ let test_staking =
   let overrides =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
        default value for [tolerated_inactivity_period] *)
-    (["tolerated_inactivity_period"], `Int 3)
+    ( [
+        (if Protocol.(number protocol <= 023) then "tolerated_inactivity_period"
+         else "tolerated_inactivity_period_low");
+      ],
+      `Int 3 )
     :: (["issuance_weights"; "dal_rewards_weight"], `Int 0)
     :: default_overrides
   in
