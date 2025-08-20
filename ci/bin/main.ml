@@ -482,7 +482,12 @@ let () =
         Tezos_ci.job_datadog_pipeline_trace;
         Release_tag.job_release_page ~test:false ();
       ]
-    ~description:"Pipeline that updates and publishes the release page."
+    ~description:"Pipeline that updates and publishes the release page." ;
+  register
+    "redirect_gitlab_pages"
+    If.(api_redirect && on_tezos_namespace)
+    ~jobs:[Tezos_ci.job_datadog_pipeline_trace; Master_branch.redirect_job]
+    ~description:""
 
 (** {2 Entry point of the generator binary} *)
 

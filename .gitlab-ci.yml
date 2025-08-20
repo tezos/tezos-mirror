@@ -181,6 +181,11 @@ workflow:
     variables:
       PIPELINE_TYPE: publish_release_page
     when: always
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "REDIRECT" && $CI_PROJECT_NAMESPACE
+      == "tezos"
+    variables:
+      PIPELINE_TYPE: redirect_gitlab_pages
+    when: always
 
 default:
   interruptible: true
@@ -392,5 +397,10 @@ include:
 - local: .gitlab/ci/pipelines/publish_release_page.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "RELEASE_PAGE" && $CI_PROJECT_NAMESPACE
+      == "tezos"
+    when: always
+- local: .gitlab/ci/pipelines/redirect_gitlab_pages.yml
+  rules:
+  - if: $CI_PIPELINE_SOURCE == "api" && $TZ_API_KIND == "REDIRECT" && $CI_PROJECT_NAMESPACE
       == "tezos"
     when: always

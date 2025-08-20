@@ -41,6 +41,19 @@ let job_static_x86_64 =
     ~rules:rules_always
     ()
 
+let redirect_job =
+  job
+    ~__POS__
+    ~image:Images.CI.test
+    ~name:"pages"
+    ~stage:Stages.build
+    ~artifacts:(artifacts ~expire_in:(Duration (Days 1)) ["public"])
+    [
+      "mkdir public";
+      "echo \"/tezos/* https://octez.tezos.com/docs/:splat 301\" > \
+       public/_redirects";
+    ]
+
 let jobs_documentation : tezos_job list =
   let dependencies = Dependent [] in
   let job_odoc = Documentation.job_odoc ~dependencies () in
