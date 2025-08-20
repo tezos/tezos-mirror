@@ -86,12 +86,16 @@ end
 module Pipeline : sig
   (** Register a pipeline.
 
-      [register ~description ?variables name rule] will register a pipeline [name]
+      [register ~description ?variables ?default name rule] will register a pipeline [name]
       that runs when [rule] is true.
 
       If [variables] is set, then these variables will be added to the
       [workflow:] clause for this pipeline in the top-level [.gitlab-ci.yml].
       Similarly, an [auto_cancel] clause can be specified.
+
+      If [default] is specified, it will be written to the pipeline's YAML
+      as a [default:] section, providing default job configurations for all
+      jobs in the pipeline (such as retry policies, interruptible settings, etc).
 
       The [description] is printed in {!list_pipelines}.
 
@@ -100,6 +104,7 @@ module Pipeline : sig
   val register :
     ?variables:Gitlab_ci.Types.variables ->
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
+    ?default:Gitlab_ci.Types.default ->
     description:string ->
     jobs:tezos_job list ->
     string ->
@@ -117,7 +122,7 @@ module Pipeline : sig
 
       The [jobs] of the pipeline are generated to the file
       [.gitlab/ci/pipelines/NAME.yml] when {!write} is called. See
-      {!register} for info on [auto_cancel].
+      {!register} for info on [auto_cancel] and [default].
 
       The [description] is printed in {!list_pipelines}.
 
@@ -126,6 +131,7 @@ module Pipeline : sig
   val register_child :
     ?auto_cancel:Gitlab_ci.Types.auto_cancel ->
     ?inherit_:Gitlab_ci.Types.inherit_ ->
+    ?default:Gitlab_ci.Types.default ->
     description:string ->
     jobs:tezos_job list ->
     string ->

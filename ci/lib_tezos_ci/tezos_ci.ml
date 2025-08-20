@@ -169,6 +169,7 @@ module Pipeline = struct
     if_ : Gitlab_ci.If.t;
     variables : Gitlab_ci.Types.variables option;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
+    default : Gitlab_ci.Types.default option;
     jobs : tezos_job list;
   }
 
@@ -177,6 +178,7 @@ module Pipeline = struct
     description : string;
     auto_cancel : Gitlab_ci.Types.auto_cancel option;
     inherit_ : Gitlab_ci.Types.inherit_ option;
+    default : Gitlab_ci.Types.default option;
     jobs : tezos_job list;
   }
 
@@ -193,6 +195,9 @@ module Pipeline = struct
     | Child_pipeline {jobs; _} -> jobs
     | Pipeline {jobs; _} -> jobs
 
+  let default = function
+    | Pipeline {default; _} | Child_pipeline {default; _} -> default
+
   let set_jobs jobs = function
     | Child_pipeline pl -> Child_pipeline {pl with jobs}
     | Pipeline pl -> Pipeline {pl with jobs}
@@ -208,12 +213,14 @@ module Pipeline = struct
         (name pipeline)
     else pipelines := pipeline :: !pipelines
 
-  let register ?variables ?auto_cancel ~description ~jobs name if_ =
+  let register ?variables ?auto_cancel ?default ~description ~jobs name if_ =
     register_raw
-      (Pipeline {variables; if_; name; jobs; auto_cancel; description})
+      (Pipeline {variables; if_; name; jobs; auto_cancel; default; description})
 
-  let register_child ?auto_cancel ?inherit_ ~description ~jobs name =
-    let child_pipeline = {name; inherit_; jobs; auto_cancel; description} in
+  let register_child ?auto_cancel ?inherit_ ?default ~description ~jobs name =
+    let child_pipeline =
+      {name; inherit_; jobs; auto_cancel; default; description}
+    in
     register_raw (Child_pipeline child_pipeline) ;
     child_pipeline
 
@@ -437,6 +444,7 @@ module Pipeline = struct
     let pipeline = add_image_builders pipeline in
     let jobs = jobs pipeline in
     let name = name pipeline in
+    let pipeline_default = default pipeline in
     if not (Sys.getenv_opt "CI_DISABLE_PRECHECK" = Some "true") then
       precheck pipeline ;
     if jobs = [] then
@@ -456,6 +464,9 @@ module Pipeline = struct
       jobs ;
     let prepend_config =
       templates_to_config (templates pipeline)
+      @ (match pipeline_default with
+        | Some default_config -> [Gitlab_ci.Types.Default default_config]
+        | None -> [])
       @ (match pipeline with
         | Pipeline _ -> []
         | Child_pipeline _ ->
@@ -993,6 +1004,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
         jobs = _;
         auto_cancel = _;
         description = _;
+        default = _;
       } : tezos_job =
   let job_name = "trigger:" ^ child_pipeline_name in
   let needs, dependencies = resolve_dependencies job_name dependencies in
