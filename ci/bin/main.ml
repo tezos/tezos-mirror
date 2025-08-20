@@ -49,6 +49,8 @@ let variables : variables =
       "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-toolchain" );
     ( "rust_sdk_bindings_image_name",
       "${GCP_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
+    ( "rust_sdk_bindings_image_name_protected",
+      "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/rust-sdk-bindings" );
     ("jsonnet_image_name", "${GCP_REGISTRY}/${CI_PROJECT_PATH}/jsonnet");
     ( "jsonnet_image_name_protected",
       "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_PATH}/jsonnet" );

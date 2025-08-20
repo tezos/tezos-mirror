@@ -38,11 +38,12 @@ set -eu
 
 # rust_sdk_bindings_image_name is set in the variables of '.gitlab-ci.yml'
 # shellcheck disable=SC2154
-if [ -z "${rust_sdk_bindings_image_name:-}" ]; then
+if [ -z "${rust_sdk_bindings_image_name:-}" ] || [ -z "${rust_sdk_bindings_image_name_protected:-}" ]; then
   echo "Impossible to create rust-sdk-bindings docker image. rust_sdk_bindings_image_name is undefined: It should be defined in .gitlab-ci.yml."
   exit 1
 else
   image_base="${rust_sdk_bindings_image_name}"
+  image_base_protected="${rust_sdk_bindings_image_name_protected}"
 fi
 
 image_tag="${rust_sdk_bindings_image_tag:-}"
@@ -75,7 +76,7 @@ echo "Build ${image_name}"
   --push \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --cache-from="${image_base}:${docker_image_ref_tag}" \
-  --cache-from="${image_base}:${CI_DEFAULT_BRANCH}" \
+  --cache-from="${image_base_protected}:${CI_DEFAULT_BRANCH}" \
   --label "com.tezos.build-pipeline-id"="${CI_PIPELINE_ID}" \
   --label "com.tezos.build-pipeline-url"="${CI_PIPELINE_URL}" \
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
