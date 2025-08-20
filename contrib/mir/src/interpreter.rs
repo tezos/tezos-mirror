@@ -1772,7 +1772,7 @@ fn compute_contract_address(operation_group_hash: &[u8; 32], o_index: u32) -> Ad
     let mut input: [u8; 36] = [0; 36];
     input[..32].copy_from_slice(operation_group_hash);
     // append bytes representing o_index
-    input[32..36].copy_from_slice(&o_index.to_le_bytes());
+    input[32..36].copy_from_slice(&o_index.to_be_bytes());
     let digest = blake2bdigest(&input, ContractKt1Hash::hash_size()).unwrap();
 
     Address {
@@ -6538,7 +6538,7 @@ mod interpreter_tests {
             101,
         );
         let expected_addr = TypedValue::Address(
-            addr::Address::try_from("KT1CvVk9uuEpf5t88frj41xMzHc5M6FHqxZw").unwrap(),
+            addr::Address::try_from("KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K").unwrap(),
         );
         let mut stack = stk![
             TypedValue::Unit,

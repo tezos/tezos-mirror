@@ -1067,7 +1067,7 @@ mod tests {
             101,
         );
         let expected_addr =
-            TypedValue::Address(Address::try_from("KT1CvVk9uuEpf5t88frj41xMzHc5M6FHqxZw").unwrap());
+            TypedValue::Address(Address::try_from("KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K").unwrap());
         run_e2e_test(
             &Arena::new(),
             r#"CREATE_CONTRACT {
