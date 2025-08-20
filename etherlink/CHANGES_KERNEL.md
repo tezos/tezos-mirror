@@ -8,27 +8,17 @@ Its storage version is 37.
 
 - The EVM now supports optional access lists.
   See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
-- Introduces a new feature flag to enable REVM as the EVM execution
-  engine instead of Sputnik. (!18384)
-- REVM is plugged in the kernel and is guarded by a feature flag. (!18390) 
-- The validation mechanism that automatically rejects transactions
-  with over-estimated gas limits exceeding the maximum threshold will
-  be disabled. During execution, any gas limit above the maximum will
-  be automatically capped at the maximum permitted value. (!18179)
-- Bump the capacity of Etherlink to 8MGas/s (meaning a target per second to
-  4MGas/s). (!18452)
-- Update the Layer 1 governance contracts to take into account alternative voting keys for bakers. (!18505)
-    - [`KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r`](https://better-call.dev/mainnet/KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r) for the slow upgrade governance
-    - [`KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R`](https://better-call.dev/mainnet/KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R) for the fast upgrade governance
-    - [`KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf`](https://better-call.dev/mainnet/KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf) for the sequencer governance
-- REVM is activated (!18883):
-  - Fixed the 1024-call stack depth limit as per EVM specification (previously 256).
+- Replaces SputnikVM with REVM (!18384 !18390 !18883):
+  - Fixed the 1024-call stack depth limit as per EVM specification (previously
+    256).
   - Improved smart contract execution performances.
   - Reduced overall tick consumption.
-  - Better maintainability and alignment with upcoming Ethereum forks and EVM feature updates.
+  - Better maintainability and alignment with upcoming Ethereum forks and EVM
+    feature updates.
 - Etherlink's VM version was bumped from Cancun to Prague, it now supports (!18851):
     - [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702): Set Code for EOAs.
-    - [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537): Precompile for BLS12-381 curve operations.
+    - [EIP-2537](https://eips.ethereum.org/EIPS/eip-2537): Precompile for
+      BLS12-381 curve operations.
 
 ### Bug fixes
 
@@ -50,7 +40,23 @@ Its storage version is 37.
 
 ### Internal
 
-## Dionysus (1f47de0)
+## Etherlink 4 (Dionysus)
+
+### 4.1 (6d73d48)
+
+- The validation mechanism that automatically rejects transactions with
+  over-estimated gas limits exceeding the maximum threshold will be disabled.
+  During execution, any gas limit above the maximum will be automatically
+  capped at the maximum permitted value. (!18179)
+- Bump the capacity of Etherlink to 8MGas/s (meaning a target per second to
+  4MGas/s). (!18452)
+- Update the Layer 1 governance contracts to take into account alternative
+  voting keys for bakers. (!18505)
+    - [`KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r`](https://better-call.dev/mainnet/KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r) for the slow upgrade governance
+    - [`KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R`](https://better-call.dev/mainnet/KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R) for the fast upgrade governance
+    - [`KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf`](https://better-call.dev/mainnet/KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf) for the sequencer governance
+
+### 4.0  (1f47de0)
 
 This kernel has been activated on Etherlink Testnet on block
 [19,307,965][1f47-activation-testnet], and on Etherlink Mainnet on block
@@ -111,7 +117,20 @@ Its storage version is 33.
   for improved maintainability. (!16670)
 - Keeps track of execution gas in addition to estimated ticks. (!17507)
 
-## Calypso (6046630)
+## Etherlink 3 (Calypso)
+
+### 3.1 (9ab8acd)
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-3] instead.
+
+[su-3]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-3
+
+This security upgrade (named Calypso 2) addresses a severe bug found in the
+deposit of FA tokens from Tezos to Etherlink. The bug was never triggered on
+Mainnet before the activation of the kernel on block 10,453,254.
+
+### 3.0 (6046630)
 
 This kernel has been activated on Etherlink Testnet on block
 [17,443,389][6046-activation-testnet], and on Etherlink Mainnet on block
@@ -183,20 +202,9 @@ Its storage version is 26.
 - Deposits can now specify a chain id, but it is currently ignored. (!16153)
 - All blueprints in storage are deleted after a flush event. (!15673)
 
-### Security Upgrades
+## Etherlink 2 (Bifrost)
 
-#### Calypso2 (9ab8acd)
-
-**Note:** This commit is not part of the `master` branch of the Octez
-repository, but is part of [`etherlink-security-upgrades`][su-3] instead.
-
-[su-3]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-3
-
-This security upgrade addresses a severe bug found in the deposit of FA tokens
-from Tezos to Etherlink. The bug was never triggered on Mainnet before the
-activation of the kernel on block 10,453,254.
-
-## Bifrost (7386d0b)
+### 2.0 (7386d0b)
 
 This kernel has been activated on Etherlink Testnet on block
 [10,758,937][7386-activation-testnet], and on Etherlink Mainnet on
@@ -245,7 +253,9 @@ Its storage version is 22.
 - Fix call trace reporting of error messages. (!15000)
 - Fix performance regression due to struct logger. (!15319)
 
-## Version af7909023768bc4aad3120bec7bea4a64a576047
+## Etherlink 1
+
+### 1.3 (af79090)
 
 This kernel has been activated on Etherlink Testnet on block
 [4,899,480][af90-activation-testnet]. It requires the 3rd revision of the WASM
@@ -255,15 +265,15 @@ Its storage version is 14.
 
 [af90-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x2d80703e04542bd3e465d028674e19d3888e057b764a8482ed3218cc175b55d0
 
-### Features
+#### Features
 
-#### Stable
+##### Stable
 
 - Simulation now uses timestamp provided by the node. (!14186)
 
-#### Experimental
+##### Experimental
 
-##### FA Bridge
+###### FA Bridge
 
 The FA Bridge complements the native bridge already available on both Mainnet
 Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
@@ -272,7 +282,7 @@ Beta and Testnet, and allows users to deposit and withdraw FA 2.1 tokens.
 - Add FA withdrawal execution methods and FA bridge precompile. (!13941)
 - FA bridge enabled in Ghostnet. (!14342)
 
-##### DAL Integration
+###### DAL Integration
 
 Tezos Data-Availibility Layer (DAL) offers an increased bandwidth compared to
 L1 blocks, without sacrificing decentralization, and with reduced costs.
@@ -283,7 +293,7 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
   value in `/evm/feature_flags/enable_dal`, the kernel is allowed to import
   data from the DAL. (!13634)
 
-### Bug fixes
+#### Bug fixes
 
 - Simulation with parameter `from` no longer return `OutOfFunds` if the
   value is greater than zero. (!14150)
@@ -292,7 +302,7 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
   inbox, which could be an issue if an upgrade happen in the same block.
   (!14351)
 
-### Internal
+#### Internal
 
 - Forbids in the code module to overwrite the code storage of an
   account. Execution forbid this. (!14317)
@@ -300,7 +310,64 @@ L1 blocks, without sacrificing decentralization, and with reduced costs.
 - Gas cost of XTZ/FA withdrawals is increased to prevent abuses. (!14016)
 - FA deposits disallowed to invoke XTZ/FA withdrawal precompiles. (!14545)
 
-## Version 4f4457e2527cb227a90bb1c56d3a83f39c0f78fd
+### 1.2 (ec7c3b3)
+
+This kernel has been deployed on Etherlink Testnet on block
+[3,244,690][ec7c3-activation]. It has not been activated on Mainnet Beta.
+
+Its storage version is 12.
+
+[ec7c3-activation]: https://testnet-explorer.etherlink.com/block/0x5d16e74c2d5445df5944f79509c3e24dfe392f5f07556efe1b7c30ca477e7a28
+
+#### Features
+
+- The kernel has now the ability to trace a transaction (via
+  the EVM runtime). (!13185, !13502)
+- Incorporate the gas limit in the block hash. (!13280)
+- The block's miner and coinbase address are set to sequencer pool
+  address if it exists. (!13414)
+- Update Sequencer Pool address on Ghostnet. (!13614)
+
+#### Bug fixes
+
+- Withdrawal reverts if the amount loses wei during the conversion to mutez,
+  e.g. `1000000000001` would make caller lose 1 wei. (!13928)
+
+#### Breaking changes
+
+- Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
+- Introduce new block encoding to include `baseFeePerGas` and `mixHash`.
+  New blocks would contain `baseFeePerGas` and a default `mixHash`. (!13159)
+
+#### Internal
+
+- Gas price is removed from internal structure block in progress. (!13220)
+- Refactor block creation to properly add the gas limit. (!13278)
+- Gas limit is no longer optional for blocks. (!13279)
+- The kernel can limit the block production to at most one block per tezos level
+  if the file `/__at_most_one_block` exists in the storage. (!13202)
+- Stop emitting an `Info` log when running an Ethereum transaction. (!13630)
+- A FA bridge feature flag is added to the configuration. If the path has a value
+  in `/evm/feature_flags/enable_fa_bridge`, FA bridge related operations will be accepted. (!13535)
+- Uses safe increment function for deposit transaction nonce (!13712)
+
+### 1.1 (ffb8a65)
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-2] instead.
+
+[su-2]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-2
+
+This security upgrade addresses security vulnerabilities found in the underlying
+implementation of a double linked list used for the delayed inbox. The security
+vulnerability was not exploited on Mainnet before the activation of the kernel
+on block 3,400,942.
+
+The internal pointers of the double linked list were not updated correctly, which
+could lead in weird scenarios to the application of a deposit without being
+actually removed from the delayed inbox.
+
+#### 1.0 (4f4457e)
 
 This kernel has been activated on Etherlink Testnet on block
 [3,825,580][4f44-activation-testnet], and on Etherlink Mainnet Beta on block
@@ -356,79 +423,9 @@ repository, but is part of [`etherlink-mainnet-launch`][mainnet-branch] instead.
   versions. (!13895)
 - Circular calls to impure precompiles are forbidden. (!14390)
 
-### Security Upgrades
+## Etherlink 0 (Genesis)
 
-#### Version ffb8a65697b6bf4fc4231667f4680c71acc32a9b
-
-**Note:** This commit is not part of the `master` branch of the Octez
-repository, but is part of [`etherlink-security-upgrades`][su-2] instead.
-
-[su-2]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-2
-
-This security upgrade addresses security vulnerabilities found in the underlying
-implementation of a double linked list used for the delayed inbox. The security
-vulnerability was not exploited on Mainnet before the activation of the kernel
-on block 3,400,942.
-
-The internal pointers of the double linked list were not updated correctly, which
-could lead in weird scenarios to the application of a deposit without being
-actually removed from the delayed inbox.
-
-
-## Version ec7c3b349624896b269e179384d0a45cf39e1145
-
-This kernel has been deployed on Etherlink Testnet on block
-[3,244,690][ec7c3-activation]. It has not been activated on Mainnet Beta.
-
-Its storage version is 12.
-
-[ec7c3-activation]: https://testnet-explorer.etherlink.com/block/0x5d16e74c2d5445df5944f79509c3e24dfe392f5f07556efe1b7c30ca477e7a28
-
-### Features
-
-- The kernel has now the ability to trace a transaction (via
-  the EVM runtime). (!13185, !13502)
-- Incorporate the gas limit in the block hash. (!13280)
-- The block's miner and coinbase address are set to sequencer pool
-  address if it exists. (!13414)
-- Update Sequencer Pool address on Ghostnet. (!13614)
-
-### Bug fixes
-
-- Withdrawal reverts if the amount loses wei during the conversion to mutez,
-  e.g. `1000000000001` would make caller lose 1 wei. (!13928)
-
-### Breaking changes
-
-- Validation returns the transaction object instead of the address of the sender. (!12873, !13292)
-- Introduce new block encoding to include `baseFeePerGas` and `mixHash`.
-  New blocks would contain `baseFeePerGas` and a default `mixHash`. (!13159)
-
-### Internal
-
-- Gas price is removed from internal structure block in progress. (!13220)
-- Refactor block creation to properly add the gas limit. (!13278)
-- Gas limit is no longer optional for blocks. (!13279)
-- The kernel can limit the block production to at most one block per tezos level
-  if the file `/__at_most_one_block` exists in the storage. (!13202)
-- Stop emitting an `Info` log when running an Ethereum transaction. (!13630)
-- A FA bridge feature flag is added to the configuration. If the path has a value
-  in `/evm/feature_flags/enable_fa_bridge`, FA bridge related operations will be accepted. (!13535)
-- Uses safe increment function for deposit transaction nonce (!13712)
-
-## Version b9f6c9138719220db83086f0548e49c5c4c8421f
-
-This is the kernel used to originate Etherlink Mainnet Beta.
-
-Its storage version is 11.
-
-### Features
-
-- Set block gas limit to 2^50. (!13010)
-
-### Security Upgrades
-
-#### Version 4d98081699595b57512ffeff35bca320f281c806
+### 0.1 (4d98081)
 
 **Note:** This commit is not part of the `master` branch of the Octez
 repository, but is part of [`etherlink-security-upgrades`][su-1] instead.
@@ -444,6 +441,16 @@ Mainnet Beta before the activation of the kernel on block 853,175.
   contract. (!13997)
 - The withdrawal precompiled contract needs to be called with at least `10^12`
   Wei to make sure it can be transformed to a mutez.
+
+### 0.0 (b9f6c91)
+
+This is the kernel used to originate Etherlink Mainnet Beta.
+
+Its storage version is 11.
+
+#### Features
+
+- Set block gas limit to 2^50. (!13010)
 
 ## Older versions
 
