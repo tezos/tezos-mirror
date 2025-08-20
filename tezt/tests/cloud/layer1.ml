@@ -77,7 +77,7 @@ module Node = struct
           Network Network.(to_octez_network_options @@ to_public network);
           Expected_pow 26;
           Cors_origin "*";
-          Synchronisation_threshold 1;
+          Synchronisation_threshold 0;
         ]
       in
       let* () = Node.config_init node config in
@@ -85,7 +85,7 @@ module Node = struct
       let* () =
         (* When bootstrapping from the real network, we want to use the real time. *)
         let env = String_map.(add "FAKETIME" "+0" empty) in
-        run ~env node []
+        run ~env node [Synchronisation_threshold 0]
       in
       let* () = wait_for_ready node in
       let* _new_level = wait_next_level ~offset:2 node in
@@ -103,7 +103,9 @@ module Node = struct
         ~network
     in
     let arguments = Node_helpers.isolated_args peers in
-    let* () = run ~env:yes_crypto_env node arguments in
+    let* () =
+      run ~env:yes_crypto_env node (Synchronisation_threshold 0 :: arguments)
+    in
     wait_for_ready node
 
   (** Initialize a node, which means:
@@ -130,7 +132,9 @@ module Node = struct
     let synchronisation_waiter =
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
     in
-    let* () = run ~env:yes_crypto_env node arguments in
+    let* () =
+      run ~env:yes_crypto_env node (Synchronisation_threshold 0 :: arguments)
+    in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
        disconnected from real network (i.e. in a frozen state) you are likely to
