@@ -170,11 +170,36 @@ module Node = struct
         ~network:(Network.to_string network)
         yes_wallet
     in
-    let* delegates =
-      Client.list_known_addresses client |> Lwt.map (List.map snd)
+    let* delegates, consensus_keys =
+      let* known_addresses = Client.list_known_addresses client in
+      let get_pk alias =
+        let* account = Client.show_address ~alias client in
+        return account.public_key
+      in
+      (Lwt_list.fold_left_s (fun (delegates, consensus_keys) (alias, pkh) ->
+           match alias =~* rex "(\\w+)_consensus_key" with
+           | None ->
+               (* if the alias does not contain "_consensus_key" *)
+               let* pk = get_pk alias in
+               return (String_map.add alias {pkh; pk} delegates, consensus_keys)
+           | Some consensus_key_alias ->
+               (* if the alias match "baker_n_consensus_key" *)
+               let* pk = get_pk alias in
+               return
+                 ( delegates,
+                   String_map.add consensus_key_alias {pkh; pk} consensus_keys
+                 )))
+        (String_map.empty, String_map.empty)
+        (List.rev known_addresses)
+    in
+    let delegates_with_consensus_keys =
+      String_map.mapi
+        (fun alias address_and_pk ->
+          (address_and_pk, String_map.find_opt alias consensus_keys))
+        delegates
     in
     let* () = Client.forget_all_keys client in
-    Lwt.return (client, delegates)
+    Lwt.return (client, delegates_with_consensus_keys)
 
   (** Initialize the node,
       create the associated client,
@@ -467,7 +492,7 @@ let agent_and_node next_agent cloud ~name =
   Lwt.return (agent, node, name)
 
 (** Distribute the delegate accounts according to stake specification *)
-let distribute_delegates stake baker_accounts =
+let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   let sum list = List.fold_left ( + ) 0 list |> float_of_int in
   let baker_accounts =
     (* Order delegates from the most powerful to the least powerful *)
@@ -629,14 +654,28 @@ let init ~(configuration : configuration) cloud next_agent =
   let* bakers =
     toplog "Initializing bakers" ;
     let* distribution =
+      let baker_accounts =
+        String_map.fold (fun _alias a acc -> a :: acc) baker_accounts []
+      in
       match configuration.stake with
-      | [] -> List.map (fun a -> [a]) baker_accounts |> Lwt.return
+      | [] ->
+          let res =
+            List.map
+              (fun (baker_account, consensus_key_opt) ->
+                match consensus_key_opt with
+                | None -> [baker_account]
+                | Some consensus_key -> [consensus_key])
+              baker_accounts
+          in
+          Lwt.return res
       | stake ->
           let* accounts =
             toplog
               "init_network: Fetching baker accounts baking power from client" ;
             Lwt_list.map_s
-              (fun pkh ->
+              (fun ( (baker_account : baker_account),
+                     (consensus_key_opt : baker_account option) )
+                 ->
                 let* power =
                   Client.(
                     rpc
@@ -648,45 +687,20 @@ let init ~(configuration : configuration) cloud next_agent =
                         "head";
                         "context";
                         "delegates";
-                        pkh;
+                        baker_account.pkh;
                         "current_baking_power";
                       ]
                       bootstrap.client)
                 in
-                Lwt.return (pkh, power |> JSON.as_string |> int_of_string))
+                let baker_account =
+                  match consensus_key_opt with
+                  | None -> baker_account
+                  | Some consenusus_key -> consenusus_key
+                in
+                Lwt.return (baker_account, power |> JSON.as_int))
               baker_accounts
           in
-          distribute_delegates stake accounts |> Lwt.return
-    in
-    let* distribution =
-      toplog "init_network: Update consensus keys in use" ;
-      Lwt_list.map_s
-        (fun accounts ->
-          Lwt_list.fold_left_s
-            (fun acc pkh ->
-              (* FIXME: "pendings" keys if it exists *)
-              let* consensus_key =
-                Client.rpc
-                  RPC_core.GET
-                  [
-                    "chains";
-                    "main";
-                    "blocks";
-                    "head";
-                    "context";
-                    "delegates";
-                    pkh;
-                    "consensus_key";
-                  ]
-                  bootstrap.client
-              in
-              let active = JSON.(consensus_key |-> "active") in
-              let pkh' = JSON.(active |-> "pkh" |> as_string) in
-              let pk = JSON.(active |-> "pk" |> as_string) in
-              Lwt.return ({pk; pkh = pkh'} :: acc))
-            []
-            accounts)
-        distribution
+          distribute_delegates stake accounts |> return
     in
     Lwt_list.mapi_p
       (fun i accounts ->
