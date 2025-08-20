@@ -3,7 +3,7 @@
   "info": {
     "title": "Octez Protocol rio RPC",
     "description": "The RPC API for protocol rio served by the Octez node.",
-    "version": "Octez 22.1 (9758b259)"
+    "version": "Octez 23.0 ((dc9bed35))"
   },
   "paths": {
     "/": {
