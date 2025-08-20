@@ -454,7 +454,8 @@ let test_frozen_deposits_with_deactivation () =
      expected last cycles at which it is considered active and at
      which it has non-zero deposits *)
   let last_active_cycle =
-    constants.tolerated_inactivity_period + constants.consensus_rights_delay
+    (* at activation, accounts have a low tolerance grace period  *)
+    constants.tolerated_inactivity_period_low + constants.consensus_rights_delay
     (* according to [Delegate_activation_storage.set_active] *)
   in
   let last_cycle_with_deposits =
