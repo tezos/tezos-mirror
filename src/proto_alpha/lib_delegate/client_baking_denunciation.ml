@@ -187,22 +187,25 @@ let add_consensus_operation consensus_key op_kind recorded_operation map =
 let get_validator_rights state cctxt level =
   let open Lwt_result_syntax in
   match Validators_cache.find_opt state.validators_rights level with
-  | None ->
+  | None -> (
       let* validators =
         Plugin.RPC.Validators.get cctxt (cctxt#chain, `Head 0) ~levels:[level]
       in
-      let validators =
-        List.fold_left
-          (fun acc ({consensus_key; slots; _} : RPC.Validators.t) ->
+      match validators with
+      | [{delegates = validators; _}] ->
+          let validators =
             List.fold_left
-              (fun acc slot -> Slot.Map.add slot consensus_key acc)
-              acc
-              slots)
-          Slot.Map.empty
-          validators
-      in
-      Validators_cache.replace state.validators_rights level validators ;
-      return validators
+              (fun acc ({consensus_key; slots; _} : RPC.Validators.delegate) ->
+                List.fold_left
+                  (fun acc slot -> Slot.Map.add slot consensus_key acc)
+                  acc
+                  slots)
+              Slot.Map.empty
+              validators
+          in
+          Validators_cache.replace state.validators_rights level validators ;
+          return validators
+      | _ -> assert false)
   | Some t -> return t
 
 let events_of_kind op_kind =

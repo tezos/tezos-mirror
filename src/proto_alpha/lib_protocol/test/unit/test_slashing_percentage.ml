@@ -63,12 +63,14 @@ let make_fake_culprits_with_rights_from_int_list il =
 
 let get_pct ~max_slashing_threshold ~max_slashing_per_block int_list =
   let open Lwt_result_syntax in
+  (* TODO ABAAB: test with and without flag *)
   let* ctxt = raw_context ~max_slashing_threshold ~max_slashing_per_block () in
   let*? map, pkh_list = make_fake_culprits_with_rights_from_int_list int_list in
   return
   @@ Protocol.Slash_percentage.Internal_for_tests.for_double_attestation
        ctxt
        map
+       Protocol.Level_repr.level_zero_use_with_care
        pkh_list
 
 (** Tests that the slashing amount for several delegates is the same as long

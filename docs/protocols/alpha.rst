@@ -30,7 +30,7 @@ Michelson
 ---------
 
 - A new instruction named ``INDEX_ADDRESS`` has been added, it
-  provides a unique identifier of type ``nat`` for values 
+  provides a unique identifier of type ``nat`` for values
   of type ``address``, stored in the context. (MR :gl:`!18866`)
 
 Gas improvements
@@ -38,6 +38,16 @@ Gas improvements
 
 Breaking Changes
 ----------------
+
+- Updated ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/validators`` to group delegates by level.
+  The returned list contains one element for each queried level (by default, only the current level),
+  and contains four fields: the ``level`` itself, the ``consensus_threshold`` required for the current
+  level, the ``consensus_committee`` of the current level, and ``delegates`` which is the list
+  of validators for that level. Each element of this last
+  list contains the fields present in the previous version of this RPC: ``delegate``, ``slots``,
+  ``consensus_key``, and ``companion_key`` (optional).
+  (MR :gl:`!18931`)
 
 RPC Changes
 -----------

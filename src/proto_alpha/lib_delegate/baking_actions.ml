@@ -1016,8 +1016,12 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
   return new_state
 
 let prepare_waiting_for_quorum state =
+  (* TODO ABAAB *)
   let consensus_threshold =
-    state.global_state.constants.parametric.consensus_threshold_size
+    Delegate_slots.consensus_threshold state.level_state.delegate_slots
+  in
+  let consensus_committee =
+    Delegate_slots.consensus_committee state.level_state.delegate_slots
   in
   let get_slot_voting_power ~slot =
     Delegate_slots.voting_power state.level_state.delegate_slots ~slot
@@ -1036,27 +1040,31 @@ let prepare_waiting_for_quorum state =
          else None);
     }
   in
-  (consensus_threshold, get_slot_voting_power, candidate)
+  (consensus_threshold, consensus_committee, get_slot_voting_power, candidate)
 
 let start_waiting_for_preattestation_quorum state =
-  let consensus_threshold, get_slot_voting_power, candidate =
+  let consensus_threshold, consensus_committee, get_slot_voting_power, candidate
+      =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_preattestation_quorum
     operation_worker
     ~consensus_threshold
+    ~consensus_committee
     ~get_slot_voting_power
     candidate
 
 let start_waiting_for_attestation_quorum state =
-  let consensus_threshold, get_slot_voting_power, candidate =
+  let consensus_threshold, consensus_committee, get_slot_voting_power, candidate
+      =
     prepare_waiting_for_quorum state
   in
   let operation_worker = state.global_state.operation_worker in
   Operation_worker.monitor_attestation_quorum
     operation_worker
     ~consensus_threshold
+    ~consensus_committee
     ~get_slot_voting_power
     candidate
 

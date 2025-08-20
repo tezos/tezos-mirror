@@ -44,7 +44,8 @@ let companion_key_typ : companion_key Check.typ =
         (active_companion_key, pending_companion_keys))
       (tuple2 (option string) (list (tuple2 int string))))
 
-let get_validators_companion_key ?level (delegate : Account.key) client =
+let get_validators_companion_key ?level ~protocol (delegate : Account.key)
+    client =
   let* json =
     Client.RPC.call client
     @@ RPC.get_chain_block_helper_validators
@@ -52,16 +53,23 @@ let get_validators_companion_key ?level (delegate : Account.key) client =
          ~delegate:delegate.public_key_hash
          ()
   in
-  let companion_key = JSON.(json |=> 0 |-> "companion_key" |> as_string_opt) in
+  let companion_key =
+    if Protocol.number protocol >= 024 then
+      JSON.(
+        json |=> 0 |-> "delegates" |=> 0 |-> "companion_key" |> as_string_opt)
+    else JSON.(json |=> 0 |-> "companion_key" |> as_string_opt)
+  in
   Log.info
     ~color:Log.Color.FG.green
     "companion_key = %s"
     (match companion_key with Some ck -> ck | None -> "None") ;
   return companion_key
 
-let check_validators_companion_key ~__LOC__ ?level (delegate : Account.key)
-    client ~expected =
-  let* companion_key = get_validators_companion_key ?level delegate client in
+let check_validators_companion_key ~__LOC__ ?level ~protocol
+    (delegate : Account.key) client ~expected =
+  let* companion_key =
+    get_validators_companion_key ?level ~protocol delegate client
+  in
   Check.(
     (companion_key = expected)
       (option string)
@@ -135,7 +143,7 @@ let init_node_and_client ~protocol =
   in
   return (node, client)
 
-let check_active_companion_and_consensus_keys delegate ~companion_key
+let check_active_companion_and_consensus_keys ~protocol delegate ~companion_key
     ~consensus_key client =
   Log.info "Checking keys are activated" ;
   let* () =
@@ -149,12 +157,18 @@ let check_active_companion_and_consensus_keys delegate ~companion_key
     check_companion_key ~__LOC__ delegate ~expected_active:companion_key client
   in
   let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+    check_validators_companion_key
+      ~__LOC__
+      ~protocol
+      delegate
+      ~expected:None
+      client
   in
   let* current_level = get_current_level client in
   let* () =
     check_validators_companion_key
       ~__LOC__
+      ~protocol
       ~level:(current_level.level + 1)
       delegate
       ~expected:(Some companion_key.public_key_hash)
@@ -200,6 +214,7 @@ let test_update_companion_key =
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_active_companion_and_consensus_keys
+      ~protocol
       delegate
       ~companion_key:companion_key_bls
       ~consensus_key:consensus_key_bls
@@ -241,12 +256,18 @@ let test_update_companion_key_for_non_tz4_delegate =
       client
   in
   let* () =
-    check_validators_companion_key ~__LOC__ delegate ~expected:None client
+    check_validators_companion_key
+      ~__LOC__
+      ~protocol
+      delegate
+      ~expected:None
+      client
   in
   let* current_level = get_current_level client in
   let* () =
     check_validators_companion_key
       ~__LOC__
+      ~protocol
       ~level:(current_level.level + 1)
       delegate
       ~expected:None
@@ -303,6 +324,7 @@ let test_update_companion_key_for_tz4_delegate =
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_active_companion_and_consensus_keys
+      ~protocol
       delegate
       ~companion_key:companion_key_bls
       ~consensus_key:delegate
@@ -407,6 +429,7 @@ let test_register_keys_and_stake =
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_active_companion_and_consensus_keys
+      ~protocol
       delegate
       ~companion_key:companion_key_bls
       ~consensus_key:consensus_key_bls
@@ -489,6 +512,7 @@ let test_register_keys_with_proofs_and_stake =
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_active_companion_and_consensus_keys
+      ~protocol
       delegate
       ~companion_key:companion_key_bls
       ~consensus_key:consensus_key_bls
@@ -542,6 +566,7 @@ let test_update_keys_with_proofs =
   let* () = bake_n_cycles (consensus_rights_delay + 1) client in
   let* () =
     check_active_companion_and_consensus_keys
+      ~protocol
       delegate
       ~companion_key:companion_key_bls
       ~consensus_key:consensus_key_bls

@@ -148,15 +148,11 @@ module Random = struct
     return (c, pk)
 end
 
-let check_all_bakers_attest_at_level ctxt level =
-  match Constants_storage.all_bakers_attest_activation_level ctxt with
-  | None -> false
-  | Some act_level -> Raw_level_repr.(level.Level_repr.level >= act_level)
-
 let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 
 let baking_rights_owner c (level : Level_repr.t) ~round =
   let open Lwt_result_syntax in
+  (* This committee is used for rounds *)
   let committee_size = Constants_storage.consensus_committee_size c in
   (* We use [Round.to_slot] to have a limited number of unique rounds
      (it should loop after some time) *)
@@ -291,7 +287,11 @@ let clear_outdated_sampling_data ctxt ~new_cycle =
       let* ctxt = Delegate_sampler_state.remove_existing ctxt outdated_cycle in
       Seed_storage.remove_for_cycle ctxt outdated_cycle
 
+(* This function is relevant only when all bakers don't attest *)
 let attesting_rights_count ctxt level =
+  assert (
+    not
+      (Consensus_parameters_storage.check_all_bakers_attest_at_level ctxt level)) ;
   let consensus_committee_size =
     Constants_storage.consensus_committee_size ctxt
   in

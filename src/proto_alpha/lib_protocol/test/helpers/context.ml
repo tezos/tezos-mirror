@@ -135,15 +135,19 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
-type attester = Plugin.RPC.Validators.t = {
-  level : Raw_level.t;
+type attester = Plugin.RPC.Validators.delegate = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
   slots : Slot.t list;
 }
 
-let get_attesters ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
+let get_attesters ctxt =
+  let open Lwt_result_syntax in
+  let* attesters = Plugin.RPC.Validators.get rpc_ctxt ctxt in
+  match attesters with
+  | [{delegates; _}] -> return delegates
+  | _ -> assert false
 
 let get_attester ?manager_pkh ctxt =
   let open Lwt_result_syntax in
@@ -165,7 +169,7 @@ let get_first_different_attesters ctxt =
 
 let get_attester_n ctxt n =
   let open Lwt_result_syntax in
-  let+ attesters = Plugin.RPC.Validators.get rpc_ctxt ctxt in
+  let+ attesters = get_attesters ctxt in
   let attester =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth attesters n
   in
@@ -190,14 +194,17 @@ let get_attesting_power_for_delegate ctxt ?level pkh =
   let open Lwt_result_syntax in
   let levels = Option.map (fun level -> [level]) level in
   let* attesters = Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt in
-  let rec find_slots_for_delegate = function
-    | [] -> return 0
-    | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
-        if Signature.Public_key_hash.equal delegate pkh then
-          return (List.length slots)
-        else find_slots_for_delegate t
-  in
-  find_slots_for_delegate attesters
+  match attesters with
+  | [{delegates = attesters; _}] ->
+      let rec find_slots_for_delegate = function
+        | [] -> return 0
+        | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
+            if Signature.Public_key_hash.equal delegate pkh then
+              return (List.length slots)
+            else find_slots_for_delegate t
+      in
+      find_slots_for_delegate attesters
+  | _ -> assert false
 
 let get_cumulated_attesting_power_for_delegate ctxt ~levels pkh =
   let open Lwt_result_syntax in
@@ -284,6 +291,7 @@ let get_bonus_reward ctxt ~attesting_power =
   let* {Constants.parametric = {consensus_threshold_size; _} as csts; _} =
     get_constants ctxt
   in
+  (* TODO ABAAB: will depend on level/feature flag *)
   let*?@ baking_reward_bonus_per_slot =
     Delegate.Rewards.For_RPC.reward_from_constants
       csts

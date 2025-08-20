@@ -270,6 +270,7 @@ type pqc_watched = {
   candidate_watched : candidate;
   get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
+  consensus_committee : int;
   mutable current_voting_power : int;
   mutable preattestations_received : Preattestation_set.t;
   mutable preattestations_count : int;
@@ -280,6 +281,7 @@ type qc_watched = {
   candidate_watched : candidate;
   get_slot_voting_power : slot:Slot.t -> int option;
   consensus_threshold : int;
+  consensus_committee : int;
   mutable current_voting_power : int;
   mutable attestations_received : Attestation_set.t;
   mutable attestations_count : int;
@@ -305,7 +307,6 @@ type t = {
   qc_event_stream : quorum_event_stream;
   lock : Lwt_mutex.t;
   monitor_node_operations : bool; (* Keep on monitoring node operations *)
-  committee_size : int;
 }
 
 let monitor_operations (cctxt : #Protocol_client_context.full) =
@@ -339,13 +340,10 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
   in
   return ((shell_header.level, round), operation_stream, stream_stopper)
 
-let make_initial_state ?(monitor_node_operations = true) ~constants () =
+let make_initial_state ?(monitor_node_operations = true) () =
   let qc_event_stream =
     let stream, push = Lwt_stream.create () in
     {stream; push}
-  in
-  let committee_size =
-    constants.Constants.parametric.consensus_committee_size
   in
   let canceler = Lwt_canceler.create () in
   let operation_pool = Operation_pool.empty in
@@ -357,7 +355,6 @@ let make_initial_state ?(monitor_node_operations = true) ~constants () =
     qc_event_stream;
     lock;
     monitor_node_operations;
-    committee_size;
   }
 
 let is_eligible (candidate : candidate) branch consensus_content =
@@ -547,7 +544,8 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         let* () =
           let current_ratio =
-            pqc_watched.current_voting_power * 100 / state.committee_size
+            pqc_watched.current_voting_power * 100
+            / pqc_watched.consensus_committee
           in
           (* We only want to output an event if the quorum progression has
              progressed of at least [quorum_progression_increment] *)
@@ -595,7 +593,8 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         let* () =
           let current_ratio =
-            qc_watched.current_voting_power * 100 / state.committee_size
+            qc_watched.current_voting_power * 100
+            / qc_watched.consensus_committee
           in
           (* We only want to output an event if the quorum progression has
              progressed of at least [quorum_progression_increment] *)
@@ -632,7 +631,7 @@ let monitor_quorum state new_proposal_watched =
   update_monitoring ~should_lock:false state current_consensus_operations
 
 let monitor_preattestation_quorum state ~consensus_threshold
-    ~get_slot_voting_power candidate_watched =
+    ~consensus_committee ~get_slot_voting_power candidate_watched =
   let new_proposal =
     Some
       (Pqc_watch
@@ -640,6 +639,7 @@ let monitor_preattestation_quorum state ~consensus_threshold
            candidate_watched;
            get_slot_voting_power;
            consensus_threshold;
+           consensus_committee;
            current_voting_power = 0;
            preattestations_received = Preattestation_set.empty;
            preattestations_count = 0;
@@ -648,8 +648,8 @@ let monitor_preattestation_quorum state ~consensus_threshold
   in
   monitor_quorum state new_proposal
 
-let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
-    candidate_watched =
+let monitor_attestation_quorum state ~consensus_threshold ~consensus_committee
+    ~get_slot_voting_power candidate_watched =
   let new_proposal =
     Some
       (Qc_watch
@@ -657,6 +657,7 @@ let monitor_attestation_quorum state ~consensus_threshold ~get_slot_voting_power
            candidate_watched;
            get_slot_voting_power;
            consensus_threshold;
+           consensus_committee;
            current_voting_power = 0;
            attestations_received = Attestation_set.empty;
            attestations_count = 0;
@@ -717,12 +718,11 @@ let flush_operation_pool state (head_level, head_round) =
   let operation_pool = {Operation_pool.empty with consensus = attestations} in
   state.operation_pool <- operation_pool
 
-let run ?(monitor_node_operations = true) ~constants
+let run ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
   let open Lwt_syntax in
   let state =
     (make_initial_state
-       ~constants
        ~monitor_node_operations
        () [@profiler.record_f {verbosity = Notice} "make initial state"])
   in

@@ -103,7 +103,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
       let* () =
         let voting_power =
           List.fold_left
-            (fun acc (delegate : RPC.Validators.t) ->
+            (fun acc (delegate : RPC.Validators.delegate) ->
               List.length delegate.slots + acc)
             0
             attesters

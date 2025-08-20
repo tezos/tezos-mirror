@@ -39,8 +39,7 @@ val pred_branch : t -> Block_hash.t
 val get_level : t -> Raw_level.t tzresult
 
 (** A delegate's keys and attesting slots at a given level. *)
-type attester = Plugin.RPC.Validators.t = {
-  level : Raw_level.t;
+type attester = Plugin.RPC.Validators.delegate = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
@@ -60,8 +59,7 @@ val get_attesters : t -> attester list tzresult Lwt.t
 val get_attester : ?manager_pkh:public_key_hash -> t -> attester tzresult Lwt.t
 
 (** Return the two first elements of the list returns by [get_attesters]. *)
-val get_first_different_attesters :
-  t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
+val get_first_different_attesters : t -> (attester * attester) tzresult Lwt.t
 
 (** Return the [n]th element of the list returns by [get_attesters]. *)
 val get_attester_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t

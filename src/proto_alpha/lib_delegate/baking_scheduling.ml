@@ -933,19 +933,27 @@ let try_resolve_consensus_keys cctxt key =
               ~consensus_keys:[pkh]
           in
           match attesting_rights with
-          | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
+          | Error _ | Ok [Plugin.RPC.Validators.{delegates = []; _}] ->
+              try_find_delegate_key (head_offset - 1)
           | Ok
-              (Plugin.RPC.Validators.
-                 {
-                   delegate;
-                   level = _;
-                   consensus_key = _;
-                   companion_key = _;
-                   slots = _;
-                 }
-              :: _) ->
+              Plugin.RPC.Validators.
+                [
+                  {
+                    delegates =
+                      {
+                        delegate;
+                        consensus_key = _;
+                        companion_key = _;
+                        slots = _;
+                      }
+                      :: _;
+                    _;
+                  };
+                ] ->
               (* The primary registered key as delegate found. Return it. *)
               return delegate
+          | Ok (_ :: _ :: _) | Ok [] -> assert false
+        (* we query only one level, the returned list length must be 1 *)
       in
       try_find_delegate_key levels_to_inspect
 
@@ -1007,7 +1015,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     | Some current_head -> return current_head
     | None -> failwith "head stream unexpectedly ended"
   in
-  let*! operation_worker = Operation_worker.run ~constants cctxt in
+  let*! operation_worker = Operation_worker.run cctxt in
   Option.iter
     (fun canceler ->
       Lwt_canceler.on_cancel canceler (fun () ->

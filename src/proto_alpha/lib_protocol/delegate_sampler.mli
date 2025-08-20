@@ -93,10 +93,6 @@ val attesting_rights_count :
   Level_repr.t ->
   (Raw_context.t * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
-(** [check_all_bakers_attest_at_level ctxt level] checks that at the given
-    level, all bakers were allowed (and expected) to attest. *)
-val check_all_bakers_attest_at_level : Raw_context.t -> Level_repr.t -> bool
-
 val cleanup_values_for_protocol_t :
   Raw_context.t ->
   previous_consensus_rights_delay:int ->

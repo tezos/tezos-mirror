@@ -673,10 +673,11 @@ module Migration = Migration_repr
 
 module Attestation_power = struct
   include Attestation_power_repr
+  include Consensus_parameters_storage
 
   let get ctxt level {slots; stake} =
     let all_bakers_attest_enabled =
-      Delegate_sampler.check_all_bakers_attest_at_level ctxt level
+      check_all_bakers_attest_at_level ctxt level
     in
     if all_bakers_attest_enabled then stake else Int64.of_int slots
 

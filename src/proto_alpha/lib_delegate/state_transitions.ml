@@ -222,8 +222,9 @@ let extract_pqc state (new_proposal : proposal) =
           0
           prequorum.preattestations
       in
+      (* TODO ABAAB *)
       let consensus_threshold =
-        state.global_state.constants.parametric.consensus_threshold_size
+        Delegate_slots.consensus_threshold state.level_state.delegate_slots
       in
       if Compare.Int.(voting_power >= consensus_threshold) then
         Some (prequorum.preattestations, prequorum.round)

@@ -61,10 +61,7 @@ type event =
    [true]).  Set [monitor_node_operations] to [false] to only consider
    externally provided (non-node) operations.  *)
 val run :
-  ?monitor_node_operations:bool ->
-  constants:Constants.t ->
-  #Protocol_client_context.full ->
-  t Lwt.t
+  ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
 
 (** {1 Utilities} *)
 
@@ -87,6 +84,7 @@ val get_quorum_event_stream : t -> event Lwt_stream.t
 val monitor_preattestation_quorum :
   t ->
   consensus_threshold:int ->
+  consensus_committee:int ->
   get_slot_voting_power:(slot:Slot.t -> int option) ->
   candidate ->
   unit Lwt.t
@@ -99,6 +97,7 @@ val monitor_preattestation_quorum :
 val monitor_attestation_quorum :
   t ->
   consensus_threshold:int ->
+  consensus_committee:int ->
   get_slot_voting_power:(slot:Slot.t -> int option) ->
   candidate ->
   unit Lwt.t
