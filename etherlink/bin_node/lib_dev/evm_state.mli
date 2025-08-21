@@ -36,7 +36,7 @@ val execute :
   config:Wasm_debugger.config ->
   native_execution:bool ->
   t ->
-  [< `Input of string] list ->
+  Wasm_runtime.kernel_input ->
   t tzresult Lwt.t
 
 (** [init ~kernel] initializes the local [evm_state] with [kernel]. *)

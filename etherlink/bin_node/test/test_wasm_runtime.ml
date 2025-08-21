@@ -46,7 +46,7 @@ let test_wasm_runtime_id () =
       ~native_execution:true
       tree
       Tezos_crypto.Hashed.Smart_rollup_address.zero
-      []
+      (`Inbox [])
   in
   Log.info "Check state consistency" ;
   let* quantity =
