@@ -114,23 +114,23 @@ We support the following distribution/releases:
 
 both on ``amd64`` and ``arm64`` architectures.
 
-In order to add the Tezos package repository to your machine, do:
+In order to set the Tezos package repository to your machine, do:
 
 ::
 
   export distribution=debian
   export release=bookworm
 
-and run:
+We also maintain a separate repository for release candidates. To set
+the last release candidate simply prepend ``RC/`` to the distribution name
+as in ``export distribution=RC/debian``.
+
+Now add the Tezos package repository:
 
 .. literalinclude:: install-bin-deb.sh
    :language: shell
    :start-after: [add repository]
    :end-before: [end add repository]
-
-We also maintain a separate repository for release candidates. To install
-the last release candidate simply prepend ``RC/`` to the distribution name
-as in ``export distribution=RC/debian``
 
 Then, to install the binaries, run the following command to install the octez-baker and all its dependencies:
 
