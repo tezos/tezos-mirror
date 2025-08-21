@@ -919,6 +919,8 @@ mod tests {
         },
     };
 
+    use crate::COST_PER_BYTES;
+    use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
@@ -2546,8 +2548,9 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let src = bootstrap1();
+        let mut src_acc = init_account(&mut host, &src.pkh);
+        src_acc.set_balance(&mut host, &1000000_u64.into()).unwrap();
 
-        init_account(&mut host, &src.pkh);
         reveal_account(&mut host, &src);
 
         let context = context::Context::init_context();
@@ -2589,6 +2592,9 @@ mod tests {
             },
         );
 
+        let origination_storage_fee: u64 =
+            ((code.len() as u64) + (storage.len() as u64)) * COST_PER_BYTES;
+
         let receipt = validate_and_apply_operation(&mut host, &context, operation)
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -2624,6 +2630,26 @@ mod tests {
                         changes: 30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -9500,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::StorageFees,
+                        changes: 9500,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -64250,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::StorageFees,
+                        changes: 64250,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
                 ],
                 originated_contracts: vec![Originated {
                     contract: expected_kt1.clone(),
@@ -2650,7 +2676,11 @@ mod tests {
             .checked_sub(&fee.into())
             .expect("Should have been able to debit the fees")
             .checked_sub(&smart_contract_balance.into())
-            .expect("Should have been able to debit the smart contract balance");
+            .expect("Should have been able to debit the smart contract balance")
+            .checked_sub(&ORIGINATION_COST.into())
+            .expect("Should have been able to debit the origination cost")
+            .checked_sub(&origination_storage_fee.into())
+            .expect("Should have been able to debit the storage fees");
 
         assert_eq!(
             current_balance.0, expected_balance,
@@ -2671,8 +2701,7 @@ mod tests {
         assert_eq!(
             current_kt1_balance,
             smart_contract_balance.into(),
-            "Smart cont
-            ract current balance doesn't match the expected one"
+            "Smart contract current balance doesn't match the expected one"
         );
 
         // Verify code and storage
