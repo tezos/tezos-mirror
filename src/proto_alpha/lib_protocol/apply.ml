@@ -377,6 +377,7 @@ let apply_transaction_to_implicit ~ctxt ~sender ~amount ~pkh ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -432,6 +433,7 @@ let apply_stake ~ctxt ~sender ~amount ~destination ~before_operation =
             storage_size = Z.zero;
             paid_storage_size_diff = Z.zero;
             allocated_destination_contract;
+            address_registry_diff = [];
           }
       in
       return (ctxt, result, [])
@@ -464,6 +466,7 @@ let apply_unstake ~ctxt ~sender ~amount ~destination ~before_operation =
             storage_size = Z.zero;
             paid_storage_size_diff = Z.zero;
             allocated_destination_contract = false;
+            address_registry_diff = [];
           }
       in
       return (ctxt, result, [])
@@ -489,6 +492,7 @@ let apply_finalize_unstake ~ctxt ~amount ~destination ~before_operation =
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = not already_allocated;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -525,6 +529,7 @@ let apply_set_delegate_parameters ~ctxt ~sender ~destination
         storage_size = Z.zero;
         paid_storage_size_diff = Z.zero;
         allocated_destination_contract = false;
+        address_registry_diff = [];
       }
   in
   return (ctxt, result, [])
@@ -583,6 +588,7 @@ let apply_transaction_to_implicit_with_ticket ~sender ~destination ~ty ~ticket
           storage_size = Z.zero;
           paid_storage_size_diff = Z.zero;
           allocated_destination_contract = not already_allocated;
+          address_registry_diff = [];
         },
       [] )
 
@@ -628,6 +634,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
            operations;
            ticket_diffs;
            ticket_receipt;
+           address_registry_diff;
          },
          ctxt ) =
     execute
@@ -686,6 +693,7 @@ let apply_transaction_to_smart_contract ~ctxt ~sender ~contract_hash ~amount
               paid_storage_diff_acc
               (add contract_paid_storage_size_diff ticket_paid_storage_diff));
         allocated_destination_contract = false;
+        address_registry_diff;
       }
   in
   return (ctxt, result, operations)
@@ -1755,6 +1763,7 @@ let burn_transaction_storage_fees ctxt trr ~storage_limit ~payer =
               paid_storage_size_diff = payload.paid_storage_size_diff;
               allocated_destination_contract =
                 payload.allocated_destination_contract;
+              address_registry_diff = payload.address_registry_diff;
             } )
   | Transaction_to_sc_rollup_result _ -> return (ctxt, storage_limit, trr)
   | Transaction_to_zk_rollup_result payload ->
@@ -2900,6 +2909,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                      operations;
                      ticket_diffs;
                      ticket_receipt;
+                     address_registry_diff;
                    },
                    ctxt ) =
               Script_interpreter.execute_with_typed_parameter
@@ -2969,6 +2979,7 @@ let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
                          paid_storage_size_diff =
                            Z.add paid_storage_size_diff ticket_paid_storage_diff;
                          allocated_destination_contract = false;
+                         address_registry_diff;
                        })
                 in
                 let ctxt = Gas.set_unlimited ctxt in

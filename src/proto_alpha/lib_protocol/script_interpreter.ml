@@ -1813,6 +1813,7 @@ type execution_result = {
   operations : packed_internal_operation list;
   ticket_diffs : Z.t Ticket_token_map.t;
   ticket_receipt : Ticket_receipt.t;
+  address_registry_diff : Address_registry.diff list;
 }
 
 let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
@@ -1929,6 +1930,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      in [unparse_data]. *)
   let size, cost = Script_ir_translator.script_size script in
   let*? ctxt = Gas.consume ctxt cost in
+  let address_registry_diff = Alpha_context.Address_registry.get_diffs ctxt in
   return
     ( {
         script;
@@ -1938,6 +1940,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
         operations;
         ticket_diffs;
         ticket_receipt;
+        address_registry_diff;
       },
       ctxt )
 

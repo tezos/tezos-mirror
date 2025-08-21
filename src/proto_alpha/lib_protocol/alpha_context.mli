@@ -4449,7 +4449,7 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
-module Address_registry_storage : sig
+module Address_registry : sig
   type add_result = {ctxt : context; index : Z.t; existed : bool}
 
   val init : context -> context tzresult Lwt.t
@@ -4457,6 +4457,14 @@ module Address_registry_storage : sig
   val find : context -> Destination.t -> (context * Z.t option) tzresult Lwt.t
 
   val add_if_missing : context -> Destination.t -> add_result tzresult Lwt.t
+
+  type diff = {address : Destination.t; index : Z.t}
+
+  val encoding : diff Data_encoding.t
+
+  val register_diff : context -> diff -> context
+
+  val get_diffs : context -> diff list
 
   module Internal_for_tests : sig
     val set_counter : context -> Z.t -> context tzresult Lwt.t

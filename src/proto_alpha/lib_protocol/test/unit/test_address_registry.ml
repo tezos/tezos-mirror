@@ -31,13 +31,13 @@ let test_init_context_counter () =
   let open Lwt_result_wrap_syntax in
   let* ctxt = init_context () in
   let*@ first_available_counter =
-    Alpha_context.Address_registry_storage.Internal_for_tests.get_counter ctxt
+    Alpha_context.Address_registry.Internal_for_tests.get_counter ctxt
   in
   let initial_address =
     Alpha_context.Destination.Contract (Implicit Signature.Public_key_hash.zero)
   in
   let*@ _ctxt, initial_address_counter =
-    Alpha_context.Address_registry_storage.find ctxt initial_address
+    Alpha_context.Address_registry.find ctxt initial_address
   in
   if initial_address_counter <> Some Z.zero then
     failwith
@@ -57,12 +57,12 @@ let test_counter_increases ?(initial_counter = 10) () =
   let* ctxt = init_context () in
   let initial_counter = Z.of_int initial_counter in
   let*@ ctxt =
-    Alpha_context.Address_registry_storage.Internal_for_tests.set_counter
+    Alpha_context.Address_registry.Internal_for_tests.set_counter
       ctxt
       initial_counter
   in
-  let*@ Alpha_context.Address_registry_storage.{ctxt; index = _; existed} =
-    Alpha_context.Address_registry_storage.add_if_missing
+  let*@ Alpha_context.Address_registry.{ctxt; index = _; existed} =
+    Alpha_context.Address_registry.add_if_missing
       ctxt
       (Alpha_context.Destination.Sc_rollup
          (Alpha_context.Sc_rollup.Address.of_b58check_exn
@@ -70,7 +70,7 @@ let test_counter_increases ?(initial_counter = 10) () =
   in
   assert (existed = false) ;
   let*@ next_counter =
-    Alpha_context.Address_registry_storage.Internal_for_tests.get_counter ctxt
+    Alpha_context.Address_registry.Internal_for_tests.get_counter ctxt
   in
   if Z.(next_counter <> succ initial_counter) then
     failwith
