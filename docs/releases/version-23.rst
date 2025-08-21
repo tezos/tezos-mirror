@@ -31,7 +31,7 @@ This binary is a protocol-independent that dynamically selects the
 appropriate baking process based on the active protocol.
 
 The bakers names with protocols are still released, but they will be deprecated in an upcoming version.
- 
+
 Similarly, there is also a protocol-independent binary ``octez-accuser`` starting from v23.
 
 .. _bls_v23:
@@ -81,6 +81,7 @@ Ubuntu and Debian packages
   sudo apt update octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
 
 If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+
 .. warning::
 
    If you are running the Octez node with a non-default data directory, check instructions :ref:`here <node_as_service>`.
