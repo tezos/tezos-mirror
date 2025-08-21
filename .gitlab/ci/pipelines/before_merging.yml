@@ -3396,11 +3396,11 @@ oc.install_opam_noble:
   variables:
     OPAMJOBS: "4"
 
-oc.compile_sources_doc_bookworm:
-  image: ocaml/opam:debian-12
+oc.compile_sources_doc_master:
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_very_high_cpu_ramfs
   rules:
   - changes:
     - docs/introduction/compile-sources.sh
@@ -3422,6 +3422,10 @@ oc.compile_sources_doc_bookworm:
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  parallel:
+    matrix:
+    - IMAGE:
+      - build-debian-bookworm:master
 
 tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}

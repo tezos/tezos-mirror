@@ -1441,12 +1441,39 @@ let jobs pipeline_type =
           ~timeout:(Hours 2)
           ["./docs/introduction/install-opam.sh"]
       in
-      let job_compile_sources ~__POS__ ~name ~image ~project ~branch ?retry () =
+      let job_compile_sources_build ~__POS__ ~name ~matrix ?retry () =
         job
           ~__POS__
           ~name
-          ~image
-          ~cpu:Tezt
+          ~cpu:Very_high
+          ~image:
+            (Image.mk_external
+               ~image_path:
+                 "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE")
+          ~parallel:(Matrix matrix)
+          ?retry
+          ~dependencies:dependencies_needs_start
+          ~rules:compile_octez_rules
+          ~stage:Stages.test
+            (* This job uses a CARGO_HOME different from
+               {!Common.cargo_home}. That CARGO_HOME used is outside the
+               CI_PROJECT_DIR, and is thus uncachable. *)
+          ~variables:[("CARGO_HOME", "/home/opam/.cargo")]
+          [sf "./docs/introduction/compile-sources-setup.sh"]
+        |> enable_networked_cargo
+      in
+      let job_compile_sources ~__POS__ ~name ~matrix ~project ~branch ?retry ()
+          =
+        job
+          ~__POS__
+          ~name
+          ~cpu:Very_high
+          ~storage:Ramfs
+          ~image:
+            (Image.mk_external
+               ~image_path:
+                 "${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE")
+          ~parallel:(Matrix matrix)
           ?retry
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
@@ -1458,6 +1485,7 @@ let jobs pipeline_type =
           [sf "./docs/introduction/compile-sources.sh %s %s" project branch]
         |> enable_networked_cargo
       in
+
       [(* Test installing through opam *) job_install_opam_noble]
       @
       match pipeline_type with
@@ -1465,19 +1493,26 @@ let jobs pipeline_type =
          in master are still valid for the latest-release branch *)
       | Schedule_extended_test ->
           [
-            job_compile_sources
+            job_compile_sources_build
               ~__POS__
-              ~name:"oc.compile_sources_doc_bookworm"
-              ~image:Images.opam_debian_bookworm
-              ~project:"tezos/tezos"
-              ~branch:"latest-release"
+              ~name:"oc.compile_sources_doc_deps"
+              ~matrix:[[("IMAGE", ["debian:bookworm"; "ubuntu:noble"])]]
               ();
             job_compile_sources
               ~__POS__
-              ~name:"oc.compile_sources_doc_oracular"
-              ~image:Images.opam_ubuntu_oracular
+              ~name:"oc.compile_sources_doc"
               ~project:"tezos/tezos"
               ~branch:"latest-release"
+              ~matrix:
+                [
+                  [
+                    ( "IMAGE",
+                      [
+                        "build-debian-bookworm:master";
+                        "build-ubuntu-noble:master";
+                      ] );
+                  ];
+                ]
               ();
           ]
       (* Test compiling the [master] branch on Bookworm, to make sure
@@ -1488,10 +1523,10 @@ let jobs pipeline_type =
           [
             job_compile_sources
               ~__POS__
-              ~name:"oc.compile_sources_doc_bookworm"
-              ~image:Images.opam_debian_bookworm
+              ~name:"oc.compile_sources_doc_master"
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
+              ~matrix:[[("IMAGE", ["build-debian-bookworm:master"])]]
               ();
           ]
     in

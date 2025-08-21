@@ -3129,11 +3129,11 @@ oc.install_opam_noble:
   variables:
     OPAMJOBS: "4"
 
-oc.compile_sources_doc_bookworm:
-  image: ocaml/opam:debian-12
+oc.compile_sources_doc_deps:
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies: []
@@ -3143,18 +3143,23 @@ oc.compile_sources_doc_bookworm:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
+  - ./docs/introduction/compile-sources-setup.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  parallel:
+    matrix:
+    - IMAGE:
+      - debian:bookworm
+      - ubuntu:noble
 
-oc.compile_sources_doc_oracular:
-  image: ocaml/opam:ubuntu-24.10
+oc.compile_sources_doc:
+  image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
   stage: test
   tags:
-  - gcp_tezt
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   dependencies: []
@@ -3170,6 +3175,11 @@ oc.compile_sources_doc_oracular:
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  parallel:
+    matrix:
+    - IMAGE:
+      - build-debian-bookworm:master
+      - build-ubuntu-noble:master
 
 tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
