@@ -397,6 +397,12 @@ pub fn transfer_external<Host: Runtime>(
     .map(Into::into)
 }
 
+// Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
+const ORIGINATION_SIZE: u64 = 257;
+const COST_PER_BYTES: u64 = 250;
+#[allow(dead_code)]
+const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
+
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
 fn originate_contract<Host: Runtime>(
