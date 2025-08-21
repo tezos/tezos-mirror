@@ -1,7 +1,7 @@
-From b8aa886aa2185e7a7672d8d88023353ad2ce01da Mon Sep 17 00:00:00 2001
-From: Pierrick Couderc <pierrick.couderc@nomadic-labs.com>
-Date: Tue, 29 Jul 2025 10:05:07 +0200
-Subject: [PATCH 1/1] [PATCH] Patch alpha
+From 9fb4fb9d53fb048ac23bdb54abb939bfb55755cb Mon Sep 17 00:00:00 2001
+From: Lucas Randazzo <lucas@nomadic-labs.com>
+Date: Thu, 21 Aug 2025 16:23:33 +0200
+Subject: [PATCH 1/1] Patch alpha
 
 ---
  src/lib_protocol_environment/sigs/v15.in.ml   |  2 +
@@ -18,26 +18,26 @@ Subject: [PATCH 1/1] [PATCH] Patch alpha
  11 files changed, 217 insertions(+), 85 deletions(-)
 
 diff --git a/src/lib_protocol_environment/sigs/v15.in.ml b/src/lib_protocol_environment/sigs/v15.in.ml
-index e86731c9cb..05291026e6 100644
+index e86731c9cbd..05291026e6b 100644
 --- a/src/lib_protocol_environment/sigs/v15.in.ml
 +++ b/src/lib_protocol_environment/sigs/v15.in.ml
 @@ -105,6 +105,8 @@ module type T = sig
- 
+
    module Operation_list_list_hash : [%sig "v15/operation_list_list_hash.mli"]
- 
+
 +  module Profiler : [%sig "v15/profiler.mli"]
 +
    module Protocol_hash : [%sig "v15/protocol_hash.mli"]
- 
+
    module Context_hash : [%sig "v15/context_hash.mli"]
 diff --git a/src/lib_protocol_environment/sigs/v15.ml b/src/lib_protocol_environment/sigs/v15.ml
-index f412c985e9..313466717b 100644
+index f412c985e9c..313466717b9 100644
 --- a/src/lib_protocol_environment/sigs/v15.ml
 +++ b/src/lib_protocol_environment/sigs/v15.ml
 @@ -10060,6 +10060,48 @@ end
  # 106 "v15.in.ml"
- 
- 
+
+
 +  module Profiler : sig
 +# 1 "v15/profiler.mli"
 +(*****************************************************************************)
@@ -89,17 +89,17 @@ index f412c985e9..313466717b 100644
  end
 -# 108 "v15.in.ml"
 +# 110 "v15.in.ml"
- 
- 
+
+
    module Context_hash : sig
 @@ -10143,7 +10185,7 @@ end
- 
+
  type version = Version.t
  end
 -# 110 "v15.in.ml"
 +# 112 "v15.in.ml"
- 
- 
+
+
    module Sapling : sig
 @@ -10291,7 +10333,7 @@ module Verification : sig
    val final_check : t -> UTXO.transaction -> string -> bool
@@ -107,8 +107,8 @@ index f412c985e9..313466717b 100644
  end
 -# 112 "v15.in.ml"
 +# 114 "v15.in.ml"
- 
- 
+
+
    module Timelock : sig
 @@ -10348,7 +10390,7 @@ val open_chest : chest -> chest_key -> time:int -> opening_result
      Used for gas accounting*)
@@ -116,8 +116,8 @@ index f412c985e9..313466717b 100644
  end
 -# 114 "v15.in.ml"
 +# 116 "v15.in.ml"
- 
- 
+
+
    module Vdf : sig
 @@ -10436,7 +10478,7 @@ val prove : discriminant -> challenge -> difficulty -> result * proof
      @raise Invalid_argument when inputs are invalid *)
@@ -125,26 +125,26 @@ index f412c985e9..313466717b 100644
  end
 -# 116 "v15.in.ml"
 +# 118 "v15.in.ml"
- 
- 
+
+
    module Micheline : sig
 @@ -10496,7 +10538,7 @@ val annotations : ('l, 'p) node -> string list
- 
+
  val strip_locations : (_, 'p) node -> 'p canonical
  end
 -# 118 "v15.in.ml"
 +# 120 "v15.in.ml"
- 
- 
+
+
    module Block_header : sig
 @@ -10553,7 +10595,7 @@ type t = {shell : shell_header; protocol_data : bytes}
- 
+
  include S.HASHABLE with type t := t and type hash := Block_hash.t
  end
 -# 120 "v15.in.ml"
 +# 122 "v15.in.ml"
- 
- 
+
+
    module Bounded : sig
 @@ -10702,7 +10744,7 @@ module Int8 (B : BOUNDS with type ocaml_type := int) :
  module Uint8 (B : BOUNDS with type ocaml_type := int) :
@@ -152,8 +152,8 @@ index f412c985e9..313466717b 100644
  end
 -# 122 "v15.in.ml"
 +# 124 "v15.in.ml"
- 
- 
+
+
    module Fitness : sig
 @@ -10736,7 +10778,7 @@ end
      compared in a lexicographical order (longer list are greater). *)
@@ -161,17 +161,17 @@ index f412c985e9..313466717b 100644
  end
 -# 124 "v15.in.ml"
 +# 126 "v15.in.ml"
- 
- 
+
+
    module Operation : sig
 @@ -10780,7 +10822,7 @@ type t = {shell : shell_header; proto : bytes}
- 
+
  include S.HASHABLE with type t := t and type hash := Operation_hash.t
  end
 -# 126 "v15.in.ml"
 +# 128 "v15.in.ml"
- 
- 
+
+
    module Context : sig
 @@ -11417,7 +11459,7 @@ module Cache :
       and type key = cache_key
@@ -179,8 +179,8 @@ index f412c985e9..313466717b 100644
  end
 -# 128 "v15.in.ml"
 +# 130 "v15.in.ml"
- 
- 
+
+
    module Updater : sig
 @@ -11953,7 +11995,7 @@ end
      not complete until [init] in invoked. *)
@@ -188,8 +188,8 @@ index f412c985e9..313466717b 100644
  end
 -# 130 "v15.in.ml"
 +# 132 "v15.in.ml"
- 
- 
+
+
    module RPC_context : sig
 @@ -12107,7 +12149,7 @@ val make_opt_call3 :
    'i ->
@@ -197,17 +197,17 @@ index f412c985e9..313466717b 100644
  end
 -# 132 "v15.in.ml"
 +# 134 "v15.in.ml"
- 
- 
+
+
    module Context_binary : sig
 @@ -12150,7 +12192,7 @@ module Tree :
- 
+
  val make_empty_context : ?root:string -> unit -> t
  end
 -# 134 "v15.in.ml"
 +# 136 "v15.in.ml"
- 
- 
+
+
    module Wasm_2_0_0 : sig
 @@ -12224,7 +12266,7 @@ module Make
    val get_info : Tree.tree -> info Lwt.t
@@ -215,8 +215,8 @@ index f412c985e9..313466717b 100644
  end
 -# 136 "v15.in.ml"
 +# 138 "v15.in.ml"
- 
- 
+
+
    module Plonk : sig
 @@ -12343,7 +12385,7 @@ val scalar_array_encoding : scalar array Data_encoding.t
      on the given [inputs] according to the [public_parameters]. *)
@@ -224,8 +224,8 @@ index f412c985e9..313466717b 100644
  end
 -# 138 "v15.in.ml"
 +# 140 "v15.in.ml"
- 
- 
+
+
    module Dal : sig
 @@ -12498,7 +12540,7 @@ val share_is_trap :
    traps_fraction:Q.t ->
@@ -233,8 +233,8 @@ index f412c985e9..313466717b 100644
  end
 -# 140 "v15.in.ml"
 +# 142 "v15.in.ml"
- 
- 
+
+
    module Skip_list : sig
 @@ -12730,7 +12772,7 @@ module Make (_ : sig
    val basis : int
@@ -242,8 +242,8 @@ index f412c985e9..313466717b 100644
  end
 -# 142 "v15.in.ml"
 +# 144 "v15.in.ml"
- 
- 
+
+
    module Smart_rollup : sig
 @@ -12787,7 +12829,7 @@ module Inbox_hash : S.HASH
  (** Smart rollup merkelized payload hashes' hash *)
@@ -251,11 +251,11 @@ index f412c985e9..313466717b 100644
  end
 -# 144 "v15.in.ml"
 +# 146 "v15.in.ml"
- 
- 
+
+
    module Riscv : sig
 diff --git a/src/proto_alpha/lib_protocol/apply.ml b/src/proto_alpha/lib_protocol/apply.ml
-index f1224801d2..0bbf37a35f 100644
+index 97965b0f7af..ad18f8ccf98 100644
 --- a/src/proto_alpha/lib_protocol/apply.ml
 +++ b/src/proto_alpha/lib_protocol/apply.ml
 @@ -2538,7 +2538,11 @@ let apply_manager_operations ctxt ~payload_producer chain_id ~mempool_mode
@@ -286,36 +286,36 @@ index f1224801d2..0bbf37a35f 100644
 +       let+ ctxt = Bootstrap.cycle_end ctxt last_cycle in
 +       (ctxt, balance_updates, deactivated))
 +      [@profiler.record_s {verbosity = Notice} "delegate end cycle"]
- 
+
  let apply_liquidity_baking_subsidy ctxt ~per_block_vote =
    let open Lwt_result_syntax in
 diff --git a/src/proto_alpha/lib_protocol/baking.ml b/src/proto_alpha/lib_protocol/baking.ml
-index fd49c03e5b..ac6bb84e32 100644
+index 3c3bd980bc3..2c48b44392c 100644
 --- a/src/proto_alpha/lib_protocol/baking.ml
 +++ b/src/proto_alpha/lib_protocol/baking.ml
-@@ -87,7 +87,7 @@ type ordered_slots = {
+@@ -109,7 +109,7 @@ type ordered_slots = {
+ (* Slots returned by this function are assumed by consumers to be in increasing
+    order, hence the use of [Slot.Range.rev_fold_es]. *)
  let attesting_rights (ctxt : t) level =
-   let consensus_committee_size = Constants.consensus_committee_size ctxt in
-   let open Lwt_result_syntax in
--  let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
-+  (let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
-   Slot.Range.rev_fold_es
-     (fun (ctxt, map) slot ->
-       let* ctxt, consensus_pk = Stake_distribution.slot_owner ctxt level slot in
-@@ -108,7 +108,7 @@ let attesting_rights (ctxt : t) level =
-       in
-       return (ctxt, map))
-     (ctxt, Signature.Public_key_hash.Map.empty)
--    slots
-+    slots) [@profiler.record_s {verbosity = Notice} "attesting_rights_by_first_slot"]
- 
- let attesting_rights_by_first_slot ctxt level :
-     (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
+-  let consensus_committee_size = Constants.consensus_committee_size ctxt in
++  (let consensus_committee_size = Constants.consensus_committee_size ctxt in
+   let all_bakers_attest_enabled =
+     Attesting_power.check_all_bakers_attest_at_level ctxt level
+   in
+@@ -165,7 +165,7 @@ let attesting_rights (ctxt : t) level =
+         else {t with attesting_power = List.length slots |> Int64.of_int})
+       map
+   in
+-  return (ctxt, map)
++  return (ctxt, map)) [@profiler.record_s {verbosity = Notice} "attesting_rights"]
+
+ let incr_slot att_rights =
+   let one = Attesting_power.make ~slots:1 ~stake:0L in
 diff --git a/src/proto_alpha/lib_protocol/delegate_cycles.ml b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-index 38b0e96c9c..3de66a1efc 100644
+index 9f3949710a9..5f1a6242a80 100644
 --- a/src/proto_alpha/lib_protocol/delegate_cycles.ml
 +++ b/src/proto_alpha/lib_protocol/delegate_cycles.ml
-@@ -218,42 +218,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
+@@ -227,42 +227,92 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
  let cycle_end ctxt last_cycle =
    let open Lwt_result_syntax in
    (* attributing attesting rewards   *)
@@ -423,7 +423,7 @@ index 38b0e96c9c..3de66a1efc 100644
    let balance_updates = slashing_balance_updates @ attesting_balance_updates in
    return (ctxt, balance_updates, deactivated_delegates)
 diff --git a/src/proto_alpha/lib_protocol/dune b/src/proto_alpha/lib_protocol/dune
-index 9d8c157e2f..6348104b4d 100644
+index fa81fbafe08..4b46d91a7e5 100644
 --- a/src/proto_alpha/lib_protocol/dune
 +++ b/src/proto_alpha/lib_protocol/dune
 @@ -23,6 +23,8 @@
@@ -436,7 +436,7 @@ index 9d8c157e2f..6348104b4d 100644
   (flags
    (:standard)
 diff --git a/src/proto_alpha/lib_protocol/init_storage.ml b/src/proto_alpha/lib_protocol/init_storage.ml
-index 209f77c75f..209c8d6006 100644
+index 209f77c75fb..209c8d6006f 100644
 --- a/src/proto_alpha/lib_protocol/init_storage.ml
 +++ b/src/proto_alpha/lib_protocol/init_storage.ml
 @@ -247,22 +247,38 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
@@ -504,7 +504,7 @@ index 209f77c75f..209c8d6006 100644
    in
    return ctxt
 diff --git a/src/proto_alpha/lib_protocol/raw_context.ml b/src/proto_alpha/lib_protocol/raw_context.ml
-index c3eb705da0..97096a6d44 100644
+index 910c9d5dad7..ea684a8f115 100644
 --- a/src/proto_alpha/lib_protocol/raw_context.ml
 +++ b/src/proto_alpha/lib_protocol/raw_context.ml
 @@ -1753,12 +1753,13 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
@@ -526,9 +526,9 @@ index c3eb705da0..97096a6d44 100644
 +     [@profiler.record_s {verbosity = Notice} "Prepare"])
    in
    (previous_proto, previous_proto_constants, ctxt)
- 
+
 diff --git a/src/proto_alpha/lib_protocol/script_cache.ml b/src/proto_alpha/lib_protocol/script_cache.ml
-index 70a79eb8f4..9724bc4246 100644
+index 70a79eb8f44..9724bc4246b 100644
 --- a/src/proto_alpha/lib_protocol/script_cache.ml
 +++ b/src/proto_alpha/lib_protocol/script_cache.ml
 @@ -98,15 +98,16 @@ let find ctxt addr =
@@ -554,14 +554,14 @@ index 70a79eb8f4..9724bc4246 100644
 +           in
 +           return (ctxt, identifier, Some (unparsed_script, script_ir)))
 +      [@profiler.record_s {verbosity = Notice} "cache_miss"])
- 
+
  let update ctxt identifier updated_script approx_size =
    Cache.update ctxt identifier (Some (updated_script, approx_size))
 diff --git a/src/proto_alpha/lib_protocol/script_interpreter.ml b/src/proto_alpha/lib_protocol/script_interpreter.ml
-index 5d3723d900..1b9a2e2e0a 100644
+index 3527a81698c..efd4ffebbe8 100644
 --- a/src/proto_alpha/lib_protocol/script_interpreter.ml
 +++ b/src/proto_alpha/lib_protocol/script_interpreter.ml
-@@ -1827,7 +1827,7 @@ type execution_result = {
+@@ -1826,7 +1826,7 @@ type execution_result = {
  let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      unparsed_script cached_script arg =
    let open Lwt_result_syntax in
@@ -570,7 +570,7 @@ index 5d3723d900..1b9a2e2e0a 100644
      Script_ir_translator_config.make
        ~legacy:true
        ~keep_extra_types_for_interpreter_logging:(Option.is_some logger)
-@@ -1880,9 +1880,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1879,9 +1879,10 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
      Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage
    in
    let* (ops, new_storage), ctxt =
@@ -584,20 +584,20 @@ index 5d3723d900..1b9a2e2e0a 100644
    in
    let* storage, lazy_storage_diff, ctxt =
      Script_ir_translator.extract_lazy_storage_diff
-@@ -1950,7 +1951,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
+@@ -1949,7 +1950,7 @@ let execute_any_arg logger ctxt mode step_constants ~entrypoint ~internal
          ticket_receipt;
          address_registry_diff;
        },
 -      ctxt )
 +      ctxt )) [@profiler.record_s {verbosity = Notice} "execute"]
- 
+
  let execute_with_typed_parameter ?logger ctxt ~cached_script mode step_constants
      ~script ~entrypoint ~parameter_ty ~location ~parameter ~internal =
 diff --git a/src/proto_alpha/lib_protocol/script_ir_translator.ml b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-index 6ca28c7b22..d50aa670af 100644
+index 8356e1e2ba1..9d6b1929f55 100644
 --- a/src/proto_alpha/lib_protocol/script_ir_translator.ml
 +++ b/src/proto_alpha/lib_protocol/script_ir_translator.ml
-@@ -5238,17 +5238,21 @@ let parse_script :
+@@ -5244,17 +5244,21 @@ let parse_script :
               (Code
                 {code; arg_type; storage_type; views; entrypoints; code_size}),
             ctxt ) =
@@ -628,8 +628,8 @@ index 6ca28c7b22..d50aa670af 100644
      in
      ( Ex_script
          (Script
-@@ -5948,15 +5952,15 @@ let list_of_big_map_ids ids =
- 
+@@ -5954,15 +5958,15 @@ let list_of_big_map_ids ids =
+
  let parse_data ~elab_conf ctxt ~allow_forged_tickets
      ~allow_forged_lazy_storage_id ty t =
 -  parse_data
@@ -650,9 +650,8 @@ index 6ca28c7b22..d50aa670af 100644
 +     ctxt
 +     ty
 +     t [@profiler.record_s {verbosity = Notice} "parse_data"])
- 
+
  let parse_view ~elab_conf ctxt ty view =
    parse_view ~unparse_code_rec ~elab_conf ctxt ty view
--- 
-2.50.1
-
+--
+2.43.0
