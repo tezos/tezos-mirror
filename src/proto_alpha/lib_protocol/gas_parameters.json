@@ -361,6 +361,8 @@
     "interpreter/N_IIf_none_const": 10,
     "interpreter/N_IImplicit_account_alloc_const": 8,
     "interpreter/N_IImplicit_account_const": 10,
+    "interpreter/N_IIndex_address_alloc_const": 0,
+    "interpreter/N_IIndex_address_const": 3480.323814,
     "interpreter/N_IInt_bls12_381_z_fr_alloc_const": 28,
     "interpreter/N_IInt_bls12_381_z_fr_const": 115,
     "interpreter/N_IInt_bytes_alloc_coeff": 0.5050913657784812,
