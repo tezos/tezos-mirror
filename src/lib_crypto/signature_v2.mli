@@ -9,19 +9,19 @@ type public_key_hash =
   | Ed25519 of Ed25519.Public_key_hash.t
   | Secp256k1 of Secp256k1.Public_key_hash.t
   | P256 of P256.Public_key_hash.t
-  | Bls_aug of Bls_aug.Public_key_hash.t
+  | Bls of Bls.Public_key_hash.t
 
 type public_key =
   | Ed25519 of Ed25519.Public_key.t
   | Secp256k1 of Secp256k1.Public_key.t
   | P256 of P256.Public_key.t
-  | Bls_aug of Bls_aug.Public_key.t
+  | Bls of Bls.Public_key.t
 
 type secret_key =
   | Ed25519 of Ed25519.Secret_key.t
   | Secp256k1 of Secp256k1.Secret_key.t
   | P256 of P256.Secret_key.t
-  | Bls_aug of Bls_aug.Secret_key.t
+  | Bls of Bls.Secret_key.t
 
 type watermark = Signature_v0.watermark =
   | Block_header of Chain_id.t
@@ -37,7 +37,7 @@ type signature =
   | Ed25519 of Ed25519.t
   | Secp256k1 of Secp256k1.t
   | P256 of P256.t
-  | Bls_aug of Bls_aug.t
+  | Bls of Bls.t
   | Unknown of Bytes.t
 
 (** A signature prefix holds data only for signature that are more than 64 bytes
@@ -52,6 +52,12 @@ include
      and type watermark := watermark
      and type prefix := prefix
      and type t = signature
+
+module Public_key_hash : sig
+  include module type of Public_key_hash
+
+  val is_bls : t -> bool
+end
 
 (** [append sk buf] is the concatenation of [buf] and the
     serialization of the signature of [buf] signed by [sk]. *)
@@ -79,10 +85,10 @@ val of_ed25519 : Ed25519.t -> t
 val of_p256 : P256.t -> t
 
 (** [of_bls s] returns a wrapped version of the BLS signature [s] in {!t}. *)
-val of_bls : Bls_aug.t -> t
+val of_bls : Bls.t -> t
 
 (** The type of signing algorithms. *)
-type algo = Ed25519 | Secp256k1 | P256 | Bls_aug
+type algo = Ed25519 | Secp256k1 | P256 | Bls
 
 (** The list of signing algorithm supported, i.e. all constructors of type
     {!algo}. *)
@@ -101,16 +107,16 @@ val generate_key :
     total because [Signature_v1] supports more signature kinds than
     {!Signature_v0}. *)
 module Of_V0 : sig
-  (** Convert a public key hash from V0 to V1. *)
+  (** Convert a public key hash from V0 to V2. *)
   val public_key_hash : Signature_v0.Public_key_hash.t -> Public_key_hash.t
 
-  (** Convert a public key from V0 to V1. *)
+  (** Convert a public key from V0 to V2. *)
   val public_key : Signature_v0.Public_key.t -> Public_key.t
 
-  (** Convert a secret key from V0 to V1. *)
+  (** Convert a secret key from V0 to V2. *)
   val secret_key : Signature_v0.Secret_key.t -> Secret_key.t
 
-  (** Convert a signature from V0 to V1. *)
+  (** Convert a signature from V0 to V2. *)
   val signature : Signature_v0.t -> t
 end
 

@@ -1,0 +1,60 @@
+services:
+  octez-evm-node-sequencer-init:
+    image: tx-park/etherlink:${PROJECT_USER}.${PROJECT_NAME}
+    user: root
+    entrypoint:
+      - sh
+      - -c
+      - |
+        mkdir -p /home/tezos/.octez-evm-node-sequencer/wasm_2_0_0/
+        cp -r /build/app/wasm_2_0_0/* /home/tezos/.octez-evm-node-sequencer/wasm_2_0_0/
+        cp -r /build/app/config/octez-evm-node-sequencer.json /home/tezos/.octez-evm-node-sequencer/
+        cp /build/app/installer.hex /home/tezos/.octez-evm-node-sequencer/installer.hex
+        chown -R tezos:tezos /home/tezos/.octez-evm-node-sequencer/
+
+  octez-evm-node-sequencer:
+    image: tx-park/etherlink:${PROJECT_USER}.${PROJECT_NAME}
+    command: >
+      octez-evm-node run sequencer
+      --data-dir /home/tezos/.octez-evm-node-sequencer/
+      --config-file /home/tezos/.octez-evm-node-sequencer/config.json
+      --rpc-addr ${EVM_SEQ_RPC_ADDR}
+      --rpc-port ${EVM_SEQ_RPC_PORT}
+      --initial-kernel /home/tezos/.octez-evm-node-sequencer/installer.hex
+      ${EVM_SEQ_RPC_BATCH_LIMIT:+--rpc-batch-limit ${EVM_SEQ_RPC_BATCH_LIMIT}}
+      ${EVM_SEQ_CORS_ORIGINS:+--cors-origins ${EVM_SEQ_CORS_ORIGINS}}
+      ${EVM_SEQ_CORS_HEADERS:+--cors-headers ${EVM_SEQ_CORS_HEADERS}}
+      ${EVM_SEQ_MAX_NUMBER_BLOCKS:+--max-number-blocks ${EVM_SEQ_MAX_NUMBER_BLOCKS}}
+      ${EVM_SEQ_MAX_NUMBER_LOGS:+--max-number-logs ${EVM_SEQ_MAX_NUMBER_LOGS}}
+      ${EVM_SEQ_CHUNK_SIZE:+--chunk-size ${EVM_SEQ_CHUNK_SIZE}}
+      ${EVM_SEQ_KEEP_ALIVE+--keep-alive}
+      --rollup-node-endpoint ${EVM_OBS_ROLLUP_NODE_ENDPOINT:-http://smart-rollup-node-batcher:${SRN_RPC_PORT}}
+      ${EVM_SEQ_TX_POOL_TIMEOUT_LIMIT:+--tx-pool-timeout-limit ${EVM_SEQ_TX_POOL_TIMEOUT_LIMIT}}
+      ${EVM_SEQ_TX_POOL_ADDR_LIMIT:+--tx-pool-addr-limit ${EVM_SEQ_TX_POOL_ADDR_LIMIT}}
+      ${EVM_SEQ_TX_POOL_TX_PER_ADDR_LIMIT:+--tx-pool-tx-per-addr-limit ${EVM_SEQ_TX_POOL_TX_PER_ADDR_LIMIT}}
+      ${EVM_SEQ_VERBOSE+--verbose}
+      ${EVM_SEQ_RESTRICTED_RPCS:+--restricted-rpcs ${EVM_SEQ_RESTRICTED_RPCS}}
+      ${EVM_SEQ_BLACKLISTED_RPCS:+--blacklisted-rpcs ${EVM_SEQ_BLACKLISTED_RPCS}}
+      ${EVM_SEQ_WHITELISTED_RPCS:+--whitelisted-rpcs ${EVM_SEQ_WHITELISTED_RPCS}}
+      ${EVM_SEQ_FINALIZED_VIEW+--finalized-view}
+      --preimages-dir /home/tezos/.octez-evm-node-sequencer/wasm_2_0_0/
+      ${EVM_SEQ_PREIMAGES_ENDPOINT:+--preimages-endpoint ${EVM_SEQ_PREIMAGES_ENDPOINT}}
+      ${EVM_SEQ_TIME_BETWEEN_BLOCKS:+--time-between-blocks ${EVM_SEQ_TIME_BETWEEN_BLOCKS}}
+      ${EVM_SEQ_MAX_NUMBER_OF_CHUNKS:+--max-number-of-chunks ${EVM_SEQ_MAX_NUMBER_OF_CHUNKS}}
+      ${EVM_SEQ_PRIVATE_RPC_PORT:+--private-rpc-port ${EVM_SEQ_PRIVATE_RPC_PORT}}
+      --sequencer-key ${SEQUENCER_SK}
+      ${EVM_SEQ_MAXIMUM_BLUEPRINTS_LAG:+--maximum-blueprints-lag ${EVM_SEQ_MAXIMUM_BLUEPRINTS_LAG}}
+      ${EVM_SEQ_MAXIMUM_BLUEPRINTS_AHEAD:+--maximum-blueprints-ahead ${EVM_SEQ_MAXIMUM_BLUEPRINTS_AHEAD}}
+      ${EVM_SEQ_MAXIMUM_BLUEPRINTS_CATCH_UP:+--maximum-blueprints-catch-up ${EVM_SEQ_MAXIMUM_BLUEPRINTS_CATCH_UP}}
+      ${EVM_SEQ_CATCH_UP_COOLDOWN:+--catch-up-cooldown ${EVM_SEQ_CATCH_UP_COOLDOWN}}
+      ${EVM_SEQ_GENESIS_TIMESTAMP:+--genesis-timestamp ${EVM_SEQ_GENESIS_TIMESTAMP}}
+      ${EVM_SEQ_WALLET_DIR:+--wallet-dir ${EVM_SEQ_WALLET_DIR}}
+      ${EVM_SEQ_PASSWORD_FILENAME:+--password-filename ${EVM_SEQ_PASSWORD_FILENAME}}
+      ${EVM_SEQ_DAL_SLOTS:+--dal-slots ${EVM_SEQ_DAL_SLOTS}}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://${EVM_SEQ_RPC_ADDR}:${EVM_SEQ_RPC_PORT}/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

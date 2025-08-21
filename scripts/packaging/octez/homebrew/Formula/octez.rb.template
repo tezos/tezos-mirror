@@ -67,6 +67,8 @@ class Octez < Formula
     install_template "octez-node"
     install_template "octez-client"
     install_template "octez-signer"
+    install_template "octez-baker"
+    install_template "octez-accuser"
     install_template "octez-accuser-%%PROTO_CURRENT%%"
     install_template "octez-baker-%%PROTO_CURRENT%%"
     install_template "octez-accuser-%%PROTO_NEXT%%"

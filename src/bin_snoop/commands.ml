@@ -1812,8 +1812,8 @@ let list_solvers, list_models =
   ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
         Short) ;
   let result =
     Lwt_main.run

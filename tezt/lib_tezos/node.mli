@@ -312,6 +312,12 @@ val data_dir : t -> string
 (** Get the identity file of a node. *)
 val identity_file : t -> string
 
+(** Get the pid of the node, or none if it is not yet running. *)
+val pid : t -> int option
+
+(** Get the executable path of the node. *)
+val path : t -> string
+
 (** Get the runner associated to a node.
 
     Return [None] if the node runs on the local machine. *)
@@ -373,6 +379,18 @@ module Config_file : sig
   (** Write the configuration file of a node, replacing the existing one. *)
   val write : t -> JSON.t -> unit Lwt.t
 
+  (** Basic network configuration for ghostnet
+      (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
+  val ghostnet_network_config : JSON.u
+
+  (** Basic network configuration for rionet
+      (genesis, genesis_parameters, chain_name and sandboxed_chain_name *)
+  val rionet_network_config : JSON.u
+
+  (** Basic network configuration for mainnet
+      (genesis, chain_name and sandboxed_chain_name *)
+  val mainnet_network_config : JSON.u
+
   (** Update the configuration file of a node. If the node is already
      running, it needs to be restarted manually.
 
@@ -389,8 +407,8 @@ module Config_file : sig
   val set_sandbox_network_with_user_activated_overrides :
     (string * string) list -> JSON.t -> JSON.t
 
-  (** Set the network config to a sandbox with the given dal config. *)
-  val set_sandbox_network_with_dal_config :
+  (** Updates the network config to add the given dal config. *)
+  val set_network_with_dal_config :
     Tezos_crypto_dal.Cryptobox.Config.t -> JSON.t -> JSON.t
 
   (** Update the network config with the given user
@@ -409,10 +427,31 @@ module Config_file : sig
   (** Set the peer_validator configuration in the given configuration. *)
   val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
 
+  (** Set the network config to a sandbox chain. *)
+  val set_sandbox_network : JSON.t -> JSON.t
+
+  (** Set the network config to a Mainnet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_mainnet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Ghostnet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_ghostnet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
   (** Set the network config to a sandbox with the same chain_id than Ghostnet.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
   val set_ghostnet_sandbox_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
+  (** Set the network config to a Rionet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_rionet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 end
 
@@ -450,7 +489,7 @@ val spawn_snapshot_export :
   Process.t
 
 (** Run [octez-node snapshot info]. *)
-val snapshot_info : ?json:bool -> t -> string -> unit Lwt.t
+val snapshot_info : ?json:bool -> t -> string -> string Lwt.t
 
 (** Same as [snapshot_info], but do not wait for the process to
     exit. *)
@@ -458,11 +497,16 @@ val spawn_snapshot_info : ?json:bool -> t -> string -> Process.t
 
 (** Run [octez-node snapshot import]. *)
 val snapshot_import :
-  ?no_check:bool -> ?reconstruct:bool -> t -> string -> unit Lwt.t
+  ?force:bool ->
+  ?no_check:bool ->
+  ?reconstruct:bool ->
+  t ->
+  string ->
+  unit Lwt.t
 
 (** Same as [snapshot_import], but do not wait for the process to exit. *)
 val spawn_snapshot_import :
-  ?no_check:bool -> ?reconstruct:bool -> t -> string -> Process.t
+  ?force:bool -> ?no_check:bool -> ?reconstruct:bool -> t -> string -> Process.t
 
 (** Run [octez-node reconstruct]. *)
 val reconstruct : t -> unit Lwt.t
@@ -605,6 +649,11 @@ val wait_for_connections : t -> int -> unit Lwt.t
     [n] ["disconnection"] Chain validator events. *)
 val wait_for_disconnections : t -> int -> unit Lwt.t
 
+(** Waits for the node to switch branches.
+    Resolves when the new branch matches [hash] and [level], if provided. *)
+val wait_for_branch_switch :
+  ?level:int -> ?hash:string -> t -> (int * string) Lwt.t
+
 (** Raw events. *)
 type event = {name : string; value : JSON.t; timestamp : float}
 
@@ -653,6 +702,7 @@ val init :
   ?color:Log.Color.t ->
   ?data_dir:string ->
   ?event_pipe:string ->
+  ?net_addr:string ->
   ?net_port:int ->
   ?advertised_net_port:int ->
   ?metrics_addr:string ->

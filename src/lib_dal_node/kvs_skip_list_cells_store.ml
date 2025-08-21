@@ -203,9 +203,8 @@ let insert {cells_store; hashes_store} ~attested_level items =
   let open Lwt_result_syntax in
   let cells, hashes =
     List.to_seq items
-    |> Seq.zip (Seq.ints 0)
-    |> Seq.map (fun (index, (hash, cell)) ->
-           ((hash, (), cell), (attested_level, index, hash)))
+    |> Seq.map (fun (hash, cell, slot_index) ->
+           ((hash, (), cell), (attested_level, slot_index, hash)))
     |> Seq.split
   in
   let* () = Cells.(write_values cells_store cells) in

@@ -27,7 +27,7 @@ fn process_slot(
         );
 
         match result {
-            Ok(num) if num == 0 => {
+            Ok(0) => {
                 // Currently, we send empty pages to kernels for non-attested slots.
                 debug_msg!(
                     host,
@@ -48,6 +48,7 @@ fn process_slot(
                 );
                 let slot_path = format!("/output/slot-{}", slot_index);
                 let path: OwnedPath = slot_path.as_bytes().to_vec().try_into().unwrap();
+
                 host.store_write(&path, &buffer, 0)
                     .map_err(|_| "Error writing to storage".to_string())
                     .unwrap_or_default();
@@ -87,7 +88,7 @@ pub fn entry(host: &mut impl Runtime) {
     let parameters = host.reveal_dal_parameters();
     debug_msg!(host, "Running kernel with parameters: {:?}\n", parameters);
     let RollupDalParameters {
-        number_of_slots: _,
+        number_of_slots: _number_of_slots,
         attestation_lag,
         slot_size,
         page_size,

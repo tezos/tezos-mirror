@@ -8,37 +8,51 @@
 open Error_monad
 include Progress
 
-type 'a line = {when_tty : 'a Line.t; when_no_tty : string}
+type 'a line = {
+  when_tty : 'a Line.t;
+  when_no_tty : string option;
+  update_interval : float option;
+}
 
-let progress_bar ~message ~counter ?color total =
+let progress_bar ~message ~counter ?update_interval ?color
+    ?(no_tty_quiet = false) total =
   let open Line in
-  let pcount = match counter with `Bytes -> bytes | `Int -> count_to total in
+  let pcount =
+    match counter with `Bytes | `Bytes_speed -> bytes | `Int -> count_to total
+  in
+  let additional =
+    match counter with `Bytes_speed -> [brackets bytes_per_sec] | _ -> []
+  in
   {
-    when_no_tty = message;
+    update_interval;
+    when_no_tty = (if no_tty_quiet then None else Some message);
     when_tty =
       list
-        [
-          const message;
-          pcount;
-          elapsed ();
-          bar ~style:`UTF8 ?color total;
-          percentage_of total;
-        ];
+        ([const message; pcount]
+        @ additional
+        @ [elapsed (); bar ~style:`UTF8 ?color total; percentage_of total]);
   }
 
-let spinner ~message =
+let spinner ?(no_tty_quiet = false) message =
   let open Line in
   {
-    when_no_tty = message;
+    update_interval = None;
+    when_no_tty = (if no_tty_quiet then None else Some message);
     when_tty = list [const (message ^ " "); spinner (); const " "; elapsed ()];
   }
 
-let with_reporter_tty {when_tty; _} = with_reporter ?config:None when_tty
+let with_reporter_tty {when_tty; update_interval; _} =
+  let min_interval =
+    match update_interval with
+    | None -> None
+    | Some i -> Some (Some (Duration.of_sec i))
+  in
+  with_reporter ~config:(Config.v ?min_interval ()) when_tty
 
 let with_reporter_no_tty {when_no_tty; _} f =
-  Format.eprintf "%s ...%!" when_no_tty ;
+  Option.iter (Format.eprintf "%s ...%!.") when_no_tty ;
   let res = f ignore in
-  Format.eprintf " Done.@." ;
+  Option.iter (fun _ -> Format.eprintf " Done.@.") when_no_tty ;
   res
 
 let with_reporter line f =
@@ -54,15 +68,19 @@ module Lwt = struct
     let+ () = Lwt_io.eprintf "%s\n%!" @@ Format.flush_str_formatter () in
     Terminal.Ansi.move_up Format.str_formatter 1
 
-  let with_reporter_tty {when_tty = line; _} f =
+  let with_reporter_tty {when_tty = line; update_interval; _} f =
     let open Lwt_syntax in
+    let min_interval =
+      match update_interval with
+      | None -> None
+      | Some i -> Some (Some (Duration.of_sec i))
+    in
     let config =
       Config.v
         ~ppf:Format.str_formatter
         ~hide_cursor:false
         ~persistent:true
-        ~max_width:None
-        ~min_interval:None
+        ?min_interval
         ()
     in
     let display = Display.start ~config (Multi.line line) in
@@ -81,9 +99,11 @@ module Lwt = struct
 
   let with_reporter_no_tty {when_no_tty; _} f =
     let open Lwt_syntax in
-    let* () = Lwt_io.eprintf "%s ...%!" when_no_tty in
+    let* () = Option.iter_s (Lwt_io.eprintf "%s ...%!") when_no_tty in
     let* res = f (fun _ -> Lwt.return_unit) in
-    let* () = Lwt_io.eprintf " Done.\n%!" in
+    let* () =
+      Option.iter_s (fun _ -> Lwt_io.eprintf " Done.\n%!") when_no_tty
+    in
     return res
 
   let with_reporter line f =
@@ -91,9 +111,9 @@ module Lwt = struct
     let* tty = Lwt_unix.isatty Lwt_unix.stderr in
     if tty then with_reporter_tty line f else with_reporter_no_tty line f
 
-  let with_background_spinner ~message promise =
+  let with_background_spinner ?no_tty_quiet ~message promise =
     let open Lwt_syntax in
-    let spinner = spinner ~message in
+    let spinner = spinner ?no_tty_quiet message in
     with_reporter spinner @@ fun count_progress ->
     let rec spin_loop () =
       let* () = Lwt_unix.sleep 0.1 in

@@ -6,7 +6,26 @@ set -x
 REPO="https://storage.googleapis.com/${GCP_LINUX_PACKAGES_BUCKET:-tezos-linux-repo}/$CI_COMMIT_REF_NAME"
 DISTRO=$1
 RELEASE=$2
-DATADIR=${3:-}
+
+shift 2
+DATADIR=
+AGNOSTIC_BAKER=
+while [ $# -gt 0 ]; do
+  case "$1" in
+  --data-dir)
+    DATADIR="$2"
+    shift 2
+    ;;
+  --agnostic-baker)
+    AGNOSTIC_BAKER="$2"
+    shift 2
+    ;;
+  *)
+    echo "Unknown argument: $1"
+    exit 1
+    ;;
+  esac
+done
 
 # include apt-get function with retry
 . scripts/packaging/tests/tests-common.inc.sh
@@ -60,3 +79,23 @@ fi
 # This file include the systemd tests and diagnistic common
 # to both rpm and deb
 . scripts/packaging/tests/tests-systemd-common.inc.sh
+
+apt-get autopurge -y octez-node
+apt-get autopurge -y octez-baker
+
+printf "Check if the user tezos was removed:"
+if id tezos > /dev/null 2>&1; then
+  echo "Tezos user not correctly removed"
+  id tezos
+  exit 1
+else
+  echo "Ok."
+fi
+
+printf "Check if the datadir was correctly removed:"
+if [ -e /var/tezos ]; then
+  echo "Datadir /var/tezos not correctly removed"
+  ls -la /var/tezos
+else
+  echo "Ok."
+fi

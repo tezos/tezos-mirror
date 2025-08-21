@@ -12,6 +12,7 @@ from tests.helpers.contracts.sequencer_governance import SequencerGovernance
 from tests.helpers.utility import pkh
 from pytezos.contract.result import ContractCallResult
 from pytezos.operation.group import OperationGroup
+from tests.helpers.contracts.delegated_governance import DelegatedGovernance
 
 class BaseTestCase(SandboxedNodeTestCase):
     accounts: list = []
@@ -70,6 +71,13 @@ class BaseTestCase(SandboxedNodeTestCase):
         opg = SequencerGovernance.originate(self.manager, custom_config).send()
         self.bake_block()
         return SequencerGovernance.from_opg(self.manager, opg)
+     
+    def deploy_delegated_governance(self) -> DelegatedGovernance:
+        """Deploys Delegated Governance contract"""
+
+        opg = DelegatedGovernance.originate(self.manager).send()
+        self.bake_block()
+        return DelegatedGovernance.from_opg(self.manager, opg)
 
     @contextmanager
     def raisesMichelsonError(self, error_message):

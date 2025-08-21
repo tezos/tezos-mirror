@@ -52,6 +52,10 @@ module Config = struct
   include Daemon_config
 
   let default_daily_logs_path = Some ("octez-baker-" ^ Protocol.name)
+
+  let advertise_log_levels = Some true
 end
 
-let () = Client_main_run.run (module Config) ~select_commands
+let () =
+  Memtrace.trace_if_requested () ;
+  Client_main_run.run (module Config) ~select_commands

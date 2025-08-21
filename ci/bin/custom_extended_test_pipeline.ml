@@ -63,29 +63,9 @@ let jobs =
         (* Exclude all tests with tags in [tezt_tags_always_disable] or
            [tezt_tags_exclusive_tags]. *)
       ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
-      ~tezt_parallel:3
-      ~parallel:(Vector 100)
+      ~tezt_parallel:6
+      ~parallel:(Vector 50)
       ~timeout:(Minutes 40)
-      ~dependencies
-      ()
-  in
-  let tezt_memory_3k : tezos_job =
-    Tezt.job
-      ~__POS__
-      ~name:"tezt-memory-3k"
-      ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
-      ~tezt_variant:"-memory_3k"
-      ~parallel:(Vector 6)
-      ~dependencies
-      ()
-  in
-  let tezt_memory_4k : tezos_job =
-    Tezt.job
-      ~__POS__
-      ~name:"tezt-memory-4k"
-      ~tezt_tests:(Tezt.tests_tag_selector ~memory_4k:true [])
-      ~tezt_variant:"-memory_4k"
-      ~parallel:(Vector 4)
       ~dependencies
       ()
   in
@@ -127,6 +107,19 @@ let jobs =
       ~tezt_parallel:3
       ~parallel:(Vector 20)
       ~dependencies
+      ~disable_test_timeout:true
+      ()
+  in
+  let tezt_extra : tezos_job =
+    Tezt.job
+      ~__POS__
+      ~name:"tezt-extra"
+      ~tezt_tests:(Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
+      ~tezt_variant:"-extra"
+      ~retry:2
+      ~tezt_parallel:6
+      ~parallel:(Vector 10)
+      ~dependencies
       ()
   in
   let tezt_flaky : tezos_job =
@@ -153,10 +146,9 @@ let jobs =
   in
   [
     tezt;
-    tezt_memory_3k;
-    tezt_memory_4k;
     tezt_time_sensitive;
     tezt_slow;
+    tezt_extra;
     tezt_flaky;
     job_build_x86_64_release;
     job_build_x86_64_exp_dev_extra;

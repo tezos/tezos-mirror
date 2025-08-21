@@ -36,20 +36,7 @@
 open Protocol.Alpha_context
 open Sc_rollup
 
-(** [process_head node_ctxt ~predecessor head operations] changes the state of
-    the inbox to react to [head] (where [predecessor] is the predecessor of
-    [head] in the L1 chain). In particular, this process filters the provided
-    [operations] of the [head] block. *)
-val process_head :
-  Node_context.rw ->
-  predecessor:Layer1.header ->
-  Layer1.header ->
-  (Octez_smart_rollup.Inbox.Hash.t
-  * Octez_smart_rollup.Inbox.t
-  * Merkelized_payload_hashes_hash.t
-  * string list)
-  tzresult
-  Lwt.t
+include Protocol_plugin_sig.INBOX
 
 (** [add_messages ~is_first_block ~predecessor_timestamp
     ~predecessor inbox messages] adds [messages] to the [inbox] using
@@ -83,39 +70,3 @@ val payloads_history_of_messages :
     history for the list of serialzied messages [messages]. *)
 val payloads_history_of_all_messages :
   string list -> Sc_rollup.Inbox_merkelized_payload_hashes.History.t tzresult
-
-(** [same_as_layer_1 node_ctxt block node_inbox] ensures that the rollup
-    node agrees with the L1 node that inbox for [block] is [node_inbox]. *)
-val same_as_layer_1 :
-  _ Node_context.t ->
-  Block_hash.t ->
-  Octez_smart_rollup.Inbox.t ->
-  unit tzresult Lwt.t
-
-(** Serialize an external messages to the protocol representation. NOTE: this
-    adds a tag ['\001'] at the beginning. *)
-val serialize_external_message : string -> string tzresult
-
-(** Returns the initial global inbox where [level] is the first level of the
-    protocol with smart rollups. *)
-val init :
-  predecessor_timestamp:Time.Protocol.t ->
-  predecessor:Block_hash.t ->
-  level:int32 ->
-  Octez_smart_rollup.Inbox.t
-
-(**/**)
-
-module Internal_for_tests : sig
-  val process_messages :
-    Node_context.rw ->
-    is_first_block:bool ->
-    predecessor:Layer1.header ->
-    string list ->
-    (Octez_smart_rollup.Inbox.Hash.t
-    * Octez_smart_rollup.Inbox.t
-    * Merkelized_payload_hashes_hash.t
-    * string list)
-    tzresult
-    Lwt.t
-end

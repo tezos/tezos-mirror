@@ -32,6 +32,16 @@ pub enum Event<'a> {
 		index: H256,
 		value: H256,
 	},
+	TLoad {
+		address: H160,
+		index: H256,
+		value: H256,
+	},
+	TStore {
+		address: H160,
+		index: H256,
+		value: H256,
+	},
 }
 
 // Expose `listener::with` to the crate only.

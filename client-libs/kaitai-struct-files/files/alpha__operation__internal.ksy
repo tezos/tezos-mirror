@@ -366,10 +366,10 @@ enums:
       id: elt
       doc: Elt
     5:
-      id: left
+      id: left_0
       doc: Left
     6:
-      id: none
+      id: none_0
       doc: None
     7:
       id: pair_1
@@ -504,7 +504,7 @@ enums:
       id: le
       doc: LE
     51:
-      id: left_0
+      id: left
       doc: LEFT
     52:
       id: loop
@@ -537,7 +537,7 @@ enums:
       id: nil
       doc: NIL
     62:
-      id: none_0
+      id: none
       doc: NONE
     63:
       id: not
@@ -752,6 +752,9 @@ enums:
     157:
       id: ticket_1
       doc: Ticket
+    158:
+      id: is_implicit_account
+      doc: IS_IMPLICIT_ACCOUNT
   alpha__transaction_destination_tag:
     0: implicit
     1: originated

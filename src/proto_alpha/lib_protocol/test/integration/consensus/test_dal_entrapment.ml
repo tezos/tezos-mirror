@@ -73,13 +73,12 @@ let indexes_to_delegates =
 
     The simplest scenario, when all optional arguments are not given, is as
     follows:
-    1. Bake two blocks (because of #7686, see below).
-    2. Bake a block that publishes a slot.
-    3. Bake [lag - 1] blocks.
-    4. Build an attestation.
-    5. Bake one block before accusing.
-    6. Retrieve traps and build an accusation.
-    7. Bake a block with the accusation.
+    1. Bake a block that publishes a slot.
+    2. Bake [lag - 1] blocks.
+    3. Build an attestation.
+    4. Bake one block before accusing.
+    5. Retrieve traps and build an accusation.
+    6. Bake a block with the accusation.
 
     This scenario varies slightly depending on the optional arguments. For their
     use, look first at the relevant tests.
@@ -104,7 +103,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       consensus_threshold_size = 0;
     }
   in
-  let slot_index =
+  let dal_slot_index =
     Dal.Slot_index.of_int_opt ~number_of_slots 3 |> Stdlib.Option.get
   in
   let other_slot_index =
@@ -115,7 +114,9 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
     | Some result -> result
     | None ->
         Log.info "generate slot and compute commitments and shards" ;
-        let slot = Tezt_tezos.Dal_common.Helpers.generate_slot ~slot_size in
+        let slot =
+          Tezos_crypto_dal.Cryptobox.Internal_for_tests.generate_slot ~slot_size
+        in
         let result =
           Tezt_tezos.Dal_common.Helpers.get_commitment_and_shards_with_proofs
             cryptobox
@@ -131,15 +132,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   let* blk =
     let blocks_to_bake =
       match inclusion_time with
-      | Now -> (
-          match initial_blocks_to_bake with
-          | None ->
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-                 We bake two blocks because we need the accusation to be introduced
-                 at level at least 10 (2 = 10 - attestation_lag). In protocol S we
-                 will not need this restriction. *)
-              2
-          | Some v -> v)
+      | Now -> Option.value ~default:0 initial_blocks_to_bake
       | _ ->
           (* In this case we want the attestation to be as far as possible from
              the accusation, so we want the attestation level to be the first
@@ -150,27 +143,28 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
           Int32.(
             rem (sub blocks_per_cycle (of_int lag)) blocks_per_cycle |> to_int)
     in
-    Log.info "1. Bake %d blocks" blocks_to_bake ;
+    if blocks_to_bake > 0 then Log.info "0. Bake %d blocks" blocks_to_bake ;
     Block.bake_n blocks_to_bake genesis
   in
 
   let slot_header =
-    Dal.Operations.Publish_commitment.{slot_index; commitment; commitment_proof}
+    Dal.Operations.Publish_commitment.
+      {slot_index = dal_slot_index; commitment; commitment_proof}
   in
   let* op = Op.dal_publish_commitment (B genesis) contract slot_header in
   let* blk =
     if publish_slot then (
-      Log.info "2. Bake a block with a publish operation" ;
+      Log.info "1. Bake a block with a publish operation" ;
       Block.bake blk ~operation:op)
     else (
-      Log.info "2. Bake a block without a publish operation" ;
+      Log.info "1. Bake a block without a publish operation" ;
       Block.bake blk)
   in
 
-  Log.info "3. Bake 'attestation_lag - 1' blocks" ;
+  Log.info "2. Bake 'attestation_lag - 1' blocks" ;
   let* blk = Block.bake_n (lag - 1) blk in
 
-  Log.info "4. Build an attestation" ;
+  Log.info "3. Build an attestation" ;
   (match inclusion_time with
   | Now -> ()
   | _ ->
@@ -183,7 +177,7 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   let dal_content =
     if with_dal_content then
       let attestation =
-        if attest_slot then Dal.Attestation.(commit empty slot_index)
+        if attest_slot then Dal.Attestation.(commit empty dal_slot_index)
         else Dal.Attestation.(commit empty other_slot_index)
       in
       Some {attestation}
@@ -204,6 +198,16 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
   in
   let* attestation = Op.raw_attestation blk ~delegate ?dal_content in
   let attestation_level = blk.header.shell.level in
+  let* consensus_slot =
+    let+ all_slots = Context.get_attester_slot (B blk) delegate in
+    let fst_slot = Option.bind all_slots List.hd in
+    match fst_slot with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "Unexpected case: delegate is not in attestation committee"
+    | Some slot -> slot
+  in
 
   let* blk =
     let blocks_to_bake =
@@ -217,11 +221,11 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       | Last_valid -> (2 * blocks_per_cycle) - 2 - position
       | First_invalid -> (2 * blocks_per_cycle) - 1 - position
     in
-    Log.info "5. Bake %d blocks before including an accusation" blocks_to_bake ;
+    Log.info "4. Bake %d blocks before including an accusation" blocks_to_bake ;
     Block.bake_n blocks_to_bake blk
   in
 
-  Log.info "6. Retrieve traps and build accusation" ;
+  Log.info "5. Retrieve traps and build accusation" ;
   let shard_with_proof =
     let owner =
       if wrong_owner then (
@@ -246,10 +250,15 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
         if not_trap then Stdlib.List.hd not_traps else Stdlib.List.hd traps
   in
   let accusation =
-    Op.dal_entrapment (B blk) attestation slot_index shard_with_proof
+    Op.dal_entrapment
+      (B blk)
+      attestation
+      ~consensus_slot
+      dal_slot_index
+      shard_with_proof
   in
 
-  Log.info "7. Bake a block with the accusation" ;
+  Log.info "6. Bake a block with the accusation" ;
   let* blk =
     match expect_failure with
     | None -> Block.bake ~operation:accusation blk
@@ -281,24 +290,6 @@ let test_accusation_injection ?initial_blocks_to_bake ?expect_failure
       let* _ = Incremental.add_operation ctxt accusation ~expect_failure in
       return_unit
   | _ -> return_unit
-
-let test_invalid_accusation_too_close_to_migration =
-  let expect_failure attestation_level = function
-    | [
-        Environment.Ecoproto_error
-          (Validate_errors.Anonymous
-           .Denunciations_not_allowed_just_after_migration {level; _});
-      ]
-      when Raw_level.to_int32 level = attestation_level ->
-        Lwt_result_syntax.return_unit
-    | errs ->
-        Test.fail
-          ~__LOC__
-          "Error trace:@, %a does not match the expected one"
-          Error_monad.pp_print_trace
-          errs
-  in
-  test_accusation_injection ~initial_blocks_to_bake:1 ~expect_failure
 
 let test_invalid_accusation_no_dal_content =
   let expect_failure attestation_level = function
@@ -416,10 +407,6 @@ let test_invalid_accusation_wrong_shard_owner =
 let tests =
   [
     Tztest.tztest "test valid accusation" `Quick test_accusation_injection;
-    Tztest.tztest
-      "test invalid accusation (too_close_to_migration)"
-      `Quick
-      test_invalid_accusation_too_close_to_migration;
     Tztest.tztest
       "test invalid accusation (no_dal_content)"
       `Quick

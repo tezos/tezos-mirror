@@ -83,7 +83,8 @@ let start ~rpc_addr ~rpc_port ~acl ~cors dir =
     RPC_server.launch
       ~host
       server
-      ~callback:(RPC_server.resto_callback server)
+      ~callback:
+        (Octez_telemetry.HTTP_server.resto_callback ~port:rpc_port server)
       node
   in
   return {server; host; node; acl}

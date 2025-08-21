@@ -25,6 +25,8 @@ module Request : sig
         (** Request to publish a blueprint. *)
     | New_rollup_node_block : int32 -> (unit, error trace) t
 
+  val name : ('a, 'b) t -> string
+
   type view = View : _ t -> view
 
   (** [inbox_payload payload] returns the inbox payload associated

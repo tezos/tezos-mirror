@@ -34,8 +34,8 @@ module EIP_2930 = struct
     value : quantity;
     access_list : access list;
     v : quantity;
-    r : hex;
-    s : hex;
+    r : quantity;
+    s : quantity;
   }
 
   let encoding =
@@ -115,10 +115,10 @@ module EIP_2930 = struct
          (obj6
             (req "transactionIndex" (option quantity_encoding))
             (req "value" quantity_encoding)
-            (dft "access_list" (list access_encoding) [])
+            (req "accessList" (list access_encoding))
             (req "v" quantity_encoding)
-            (req "r" hex_encoding)
-            (req "s" hex_encoding)))
+            (req "r" quantity_encoding)
+            (req "s" quantity_encoding)))
 end
 
 module EIP_1559 = struct
@@ -138,8 +138,8 @@ module EIP_1559 = struct
     access_list : access list;
     input : hex;
     v : quantity;
-    r : hex;
-    s : hex;
+    r : quantity;
+    s : quantity;
   }
 
   let encoding =
@@ -176,6 +176,9 @@ module EIP_1559 = struct
             gas ),
           ( max_fee_per_gas,
             max_priority_fee_per_gas,
+            Some max_fee_per_gas
+            (* Other providers set gasPrice as the effectiveGasPrice, but this
+               information is only available in the receipt. *),
             access_list,
             input,
             v,
@@ -193,6 +196,7 @@ module EIP_1559 = struct
                gas ),
              ( max_fee_per_gas,
                max_priority_fee_per_gas,
+               _gas_price,
                access_list,
                input,
                v,
@@ -229,14 +233,21 @@ module EIP_1559 = struct
             (req "to" (option address_encoding))
             (req "value" quantity_encoding)
             (req "gas" quantity_encoding))
-         (obj7
+         (obj8
             (req "maxFeePerGas" quantity_encoding)
             (req "maxPriorityFeePerGas" quantity_encoding)
-            (dft "access_list" (list access_encoding) [])
+            (opt
+               "gasPrice"
+               quantity_encoding
+               ~description:
+                 "Identical to maxFeePerGas. Purely for compatibility with \
+                  hardhat although the spec specifies this should be null for \
+                  EIP 1559.")
+            (req "accessList" (list access_encoding))
             (req "input" hex_encoding)
             (req "v" quantity_encoding)
-            (req "r" hex_encoding)
-            (req "s" hex_encoding)))
+            (req "r" quantity_encoding)
+            (req "s" quantity_encoding)))
 end
 
 type t =
@@ -245,8 +256,6 @@ type t =
   | Legacy of legacy_transaction_object
   | EIP_2930 of EIP_2930.t
   | EIP_1559 of EIP_1559.t
-
-let unhash (Hash h) = h
 
 let from_store_transaction_object (obj : legacy_transaction_object) = Kernel obj
 
@@ -309,10 +318,10 @@ let reconstruct_from_eip_2930_transaction (obj : legacy_transaction_object)
           gas = obj.gas;
           gas_price = obj.gasPrice;
           access_list;
-          input = unhash obj.input;
+          input = obj.input;
           v = obj.v;
-          r = unhash obj.r;
-          s = unhash obj.s;
+          r = obj.r;
+          s = obj.s;
         }
   | _ -> error_with "failed to decode EIP-2930 transaction"
 
@@ -358,10 +367,10 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
           max_fee_per_gas;
           max_priority_fee_per_gas;
           access_list;
-          input = unhash obj.input;
+          input = obj.input;
           v = obj.v;
-          r = unhash obj.r;
-          s = unhash obj.s;
+          r = obj.r;
+          s = obj.s;
         }
   | _ ->
       (* This should not happen, but we cannot decode the transaction *)
@@ -447,6 +456,18 @@ let block_number = function
   | EIP_2930 obj -> obj.block_number
   | EIP_1559 obj -> obj.block_number
 
+let input = function
+  | Kernel obj -> obj.input
+  | Legacy obj -> obj.input
+  | EIP_2930 obj -> obj.input
+  | EIP_1559 obj -> obj.input
+
+let to_ = function
+  | Kernel obj -> obj.to_
+  | Legacy obj -> obj.to_
+  | EIP_2930 obj -> obj.to_
+  | EIP_1559 obj -> obj.to_
+
 let encoding =
   let open Data_encoding in
   union
@@ -459,14 +480,14 @@ let encoding =
         (fun o -> Legacy o);
       case
         ~title:"eip-2930"
-        (Tag 1)
-        (merge_objs (obj1 (req "type" (constant "0x01"))) EIP_2930.encoding)
+        (Tag 3)
+        (merge_objs (obj1 (req "type" (constant "0x1"))) EIP_2930.encoding)
         (function EIP_2930 o -> Some ((), o) | _ -> None)
         (fun ((), o) -> EIP_2930 o);
       case
         ~title:"eip-1559"
-        (Tag 2)
-        (merge_objs (obj1 (req "type" (constant "0x02"))) EIP_1559.encoding)
+        (Tag 4)
+        (merge_objs (obj1 (req "type" (constant "0x2"))) EIP_1559.encoding)
         (function EIP_1559 o -> Some ((), o) | _ -> None)
         (fun ((), o) -> EIP_1559 o);
       case
@@ -475,4 +496,20 @@ let encoding =
         Ethereum_types.legacy_transaction_object_encoding
         (function Kernel o -> Some o | _ -> None)
         (fun o -> Kernel o);
+      (* The following are incorrect but kept for backward compatibility. See
+         https://ethereum.org/en/developers/docs/apis/json-rpc/#quantities-encoding
+         and
+         https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope. *)
+      case
+        ~title:"eip-2930-backward-compat"
+        (Tag 1)
+        (merge_objs (obj1 (req "type" (constant "0x01"))) EIP_2930.encoding)
+        (fun _ -> None)
+        (fun ((), o) -> EIP_2930 o);
+      case
+        ~title:"eip-1559-backward-compat"
+        (Tag 2)
+        (merge_objs (obj1 (req "type" (constant "0x02"))) EIP_1559.encoding)
+        (fun _ -> None)
+        (fun ((), o) -> EIP_1559 o);
     ]

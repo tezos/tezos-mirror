@@ -16,12 +16,19 @@ type public =
     string
     (* date of the genesis block of the current weeklynet;
        typically it is last wednesday.
-       format is YYYY-MM-DD *) ]
+       format is YYYY-MM-DD *)
+  | `Rionet ]
 
 type t = [public | `Sandbox]
 
-(** ["mainnet" | "ghostnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
-val to_string : t -> string
+type stake_repartition =
+  | Custom of int list
+  | Mimic of {network : public; max_nb_bakers : int option}
+
+val to_public : t -> public
+
+(** ["mainnet" | "ghostnet" | "rionet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
+val to_string : [< t] -> string
 
 (** Known protocol used by the network *)
 val default_protocol : t -> Protocol.t

@@ -84,9 +84,11 @@ type consensus_filter = {
   level : int32;
   round : Round.t;
   payload_hash : Block_payload_hash.t;
+  branch : Block_hash.t;
 }
 
 val filter_with_relevant_consensus_ops :
+  aggregate_attestation_feature_flag:bool ->
   attestation_filter:consensus_filter ->
   preattestation_filter:consensus_filter option ->
   Operation_set.t ->

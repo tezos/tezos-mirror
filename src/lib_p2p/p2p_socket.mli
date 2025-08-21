@@ -29,7 +29,7 @@
     This module defines:
     - primitive functions to implement a session-establishment protocol
       (set up an authentication/encryption symmetric session key,
-       check proof of work target, authenticate hosts, exchange meta data),
+       check proof of work target, authenticate hosts, exchange metadata),
     - a higher-level, authenticated and encrypted, type of connection.
 
     It is parametric in two (abstract data) types. ['msg] is the unit of
@@ -203,6 +203,10 @@ val stat : ('msg, 'meta) t -> P2p_stat.t
 val add_closing_reason :
   reason:P2p_disconnection_reason.t -> ('msg, 'meta) t -> unit
 
+(** [close ?wait ~reason t] closes the internal worker created by {!accept}
+    that reads and writes messages from/to the peer. If [wait] is [true], we do not
+    close the socket before having cancelled all the current messages in the
+    write buffer (it defaults to false). *)
 val close :
   ?wait:bool ->
   reason:P2p_disconnection_reason.t ->
@@ -291,11 +295,12 @@ module Internal_for_tests : sig
 
   val raw_write_sync : ('msg, 'meta) t -> Bytes.t -> unit tzresult Lwt.t
 
-  val mock_authenticated_connection : 'meta -> 'meta authenticated_connection
+  val mock_authenticated_connection :
+    'meta -> 'meta authenticated_connection tzresult Lwt.t
 
   val mock :
     ?reader:(int * 'msg) tzresult Lwt_pipe.Maybe_bounded.t ->
     ?writer:(bytes list * unit tzresult Lwt.u option) Lwt_pipe.Maybe_bounded.t ->
     'meta authenticated_connection ->
-    ('msg, 'meta) t
+    ('msg, 'meta) t tzresult Lwt.t
 end

@@ -5,9 +5,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type public = [`Mainnet | `Ghostnet | `Nextnet of string | `Weeklynet of string]
+type public =
+  [`Mainnet | `Ghostnet | `Nextnet of string | `Weeklynet of string | `Rionet]
 
 type t = [public | `Sandbox]
+
+type stake_repartition =
+  | Custom of int list
+  | Mimic of {network : public; max_nb_bakers : int option}
+
+let to_public = function
+  | `Sandbox -> failwith "Sandbox is not public"
+  | #public as p -> p
 
 let to_string = function
   | `Mainnet -> "mainnet"
@@ -15,32 +24,35 @@ let to_string = function
   | `Nextnet _ -> "nextnet"
   | `Weeklynet date -> sf "weeklynet-%s" date
   | `Sandbox -> "sandbox"
+  | `Rionet -> "rionet"
 
 let default_protocol : t -> Protocol.t = function
-  | `Mainnet -> Quebec
-  | `Ghostnet -> Quebec
+  | `Mainnet -> R022
+  | `Ghostnet -> R022
   | `Weeklynet _ -> Alpha
   | `Sandbox -> Alpha
-  | `Nextnet _ -> failwith "Next is not active"
+  | `Nextnet _ -> S023
+  | `Rionet -> R022
 
 let public_rpc_endpoint testnet =
-  Endpoint.
-    {
-      scheme = "https";
-      host =
-        (match testnet with
-        | `Mainnet -> "rpc.tzbeta.net"
-        | `Ghostnet -> "rpc.ghostnet.teztnets.com"
-        | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
-        | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date);
-      port = 443;
-    }
+  Endpoint.make
+    ~scheme:"https"
+    ~host:
+      (match testnet with
+      | `Mainnet -> "rpc.tzbeta.net"
+      | `Ghostnet -> "rpc.ghostnet.teztnets.com"
+      | `Nextnet date -> sf "rpc.nextnet-%s.teztnets.com" date
+      | `Weeklynet date -> sf "rpc.weeklynet-%s.teztnets.com" date
+      | `Rionet -> "rpc.rionet.teztnets.com")
+    ~port:443
+    ()
 
 let snapshot_service = function
   | `Mainnet -> "https://snapshots.eu.tzinit.org/mainnet"
   | `Ghostnet -> "https://snapshots.eu.tzinit.org/ghostnet"
   | `Nextnet _ -> "https://snapshots.eu.tzinit.org/nextnet"
   | `Weeklynet _ -> "https://snapshots.eu.tzinit.org/weeklynet"
+  | `Rionet -> "https://snapshots.eu.tzinit.org/rionet"
 
 (* Argument to give to the --network option of `octez-node config init`. *)
 let to_octez_network_options = function
@@ -48,12 +60,14 @@ let to_octez_network_options = function
   | `Ghostnet -> "ghostnet"
   | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
+  | `Rionet -> "https://teztnets.com/rionet"
 
 let default_bootstrap = function
   | `Mainnet -> "boot.tzinit.org"
   | `Ghostnet -> "ghostnet.tzinit.org" (* Taken from ghostnet configuration *)
   | `Nextnet date -> sf "nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "weeklynet-%s.teztnets.com" date
+  | `Rionet -> "rionet.teztnets.com"
 
 let default_dal_bootstrap = function
   | `Mainnet -> "dalboot.mainnet.tzboot.net"
@@ -61,6 +75,7 @@ let default_dal_bootstrap = function
       "dalboot.ghostnet.tzboot.net" (* Taken from ghostnet configuration *)
   | `Nextnet date -> sf "dal.nextnet-%s.teztnets.com" date
   | `Weeklynet date -> sf "dal.weeklynet-%s.teztnets.com" date
+  | `Rionet -> "dal.rionet.teztnets.com"
 
 let get_level endpoint =
   let* json = RPC_core.call endpoint (RPC.get_chain_block_header_shell ()) in
@@ -91,12 +106,11 @@ let versions network =
             decoder)
       in
       let endpoint =
-        Endpoint.
-          {
-            host = Format.asprintf "api.%s.tzkt.io" (to_string public_network);
-            scheme = "https";
-            port = 443;
-          }
+        Endpoint.make
+          ~host:(Format.asprintf "api.%s.tzkt.io" (to_string public_network))
+          ~scheme:"https"
+          ~port:443
+          ()
       in
       let* response = RPC_core.call_raw endpoint rpc in
       try
@@ -108,16 +122,17 @@ let versions network =
           response.code
           (Printexc.to_string exn) ;
         Lwt.return_none)
-  | `Weeklynet _ ->
+  | `Weeklynet _ | `Rionet ->
       (* No easy way to get this information. *)
       Lwt.return_some (Hashtbl.create 0)
   | `Sandbox ->
-      (* Not sure what to do here since it depends on the docker image. We can figure that out later. *)
+      (* Not sure what to do here since it depends on the docker image. We can
+         figure that out later. *)
       Lwt.return_some (Hashtbl.create 0)
 
 let delegates ?(accounts = []) network =
   match network with
-  | (`Mainnet | `Ghostnet) as network -> (
+  | (`Mainnet | `Ghostnet | `Rionet) as network -> (
       let decoder json =
         json |> JSON.as_list
         |> List.map (fun json_account ->
@@ -135,12 +150,11 @@ let delegates ?(accounts = []) network =
             decoder)
       in
       let endpoint =
-        Endpoint.
-          {
-            host = Format.asprintf "api.%s.tzkt.io" (to_string network);
-            scheme = "https";
-            port = 443;
-          }
+        Endpoint.make
+          ~host:(Format.asprintf "api.%s.tzkt.io" (to_string network))
+          ~scheme:"https"
+          ~port:443
+          ()
       in
       let* response = RPC_core.call_raw endpoint rpc in
       try
@@ -153,7 +167,7 @@ let delegates ?(accounts = []) network =
           (Printexc.to_string exn) ;
         Lwt.return_none)
   | `Weeklynet _ | `Nextnet _ ->
-      (* There is no aliases for weeklynet. *)
+      (* There are no aliases for these networks. *)
       Lwt.return_none
   | `Sandbox ->
       accounts

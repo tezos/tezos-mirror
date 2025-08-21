@@ -705,15 +705,25 @@ where
     }
 
     fn reboot_left(&self) -> Result<u32, RuntimeError> {
-        const PATH_REBOOT_COUNTER: RefPath =
-            RefPath::assert_from_readonly(b"/readonly/kernel/env/reboot_counter");
-        const SIZE: usize = core::mem::size_of::<i32>();
+        #[cfg(not(pvm_kind = "riscv"))]
+        {
+            const PATH_REBOOT_COUNTER: RefPath =
+                RefPath::assert_from_readonly(b"/readonly/kernel/env/reboot_counter");
+            const SIZE: usize = core::mem::size_of::<i32>();
 
-        let mut bytes: [u8; SIZE] = [0; SIZE];
-        self.store_read_slice(&PATH_REBOOT_COUNTER, 0, &mut bytes)?;
+            let mut bytes: [u8; SIZE] = [0; SIZE];
+            self.store_read_slice(&PATH_REBOOT_COUNTER, 0, &mut bytes)?;
 
-        let counter = u32::from_le_bytes(bytes);
-        Ok(counter)
+            let counter = u32::from_le_bytes(bytes);
+            Ok(counter)
+        }
+
+        // Kernels for the RISC-V PVM do not need to reboot. This function is only
+        // implemented for compatibility with existing kernels.
+        #[cfg(pvm_kind = "riscv")]
+        {
+            Ok(u32::MAX)
+        }
     }
 
     #[cfg(feature = "alloc")]

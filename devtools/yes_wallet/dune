@@ -10,8 +10,8 @@
   ezjsonm
   octez-node-config
   octez-shell-libs.store
-  tezos-protocol-021-PsQuebec.protocol
   tezos-protocol-022-PsRiotum.protocol
+  tezos-protocol-023-PtSeouLo.protocol
   tezos-protocol-alpha.protocol)
  (library_flags (:standard -linkall))
  (flags
@@ -22,7 +22,7 @@
 (executable
  (name yes_wallet)
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
   yes_wallet_lib)
  (link_flags

@@ -77,6 +77,11 @@ module Dal_worker_types = struct
                ~pp_sep:(fun fmt () -> Format.fprintf fmt ", ")
                (fun fmt id -> Format.fprintf fmt "%d" id))
             idx
+
+    let name : type a b. (a, b) t -> string = function
+      | Register _ -> "Register"
+      | Produce_dal_slots _ -> "Produce_dal_slots"
+      | Set_dal_slot_indices _ -> "Set_dal_slot_indices"
   end
 end
 
@@ -260,7 +265,7 @@ end
 
 type state = {
   node_ctxt : Node_context.ro;
-  dal_node_ctxt : Dal_node_client.cctxt;
+  dal_node_ctxt : Tezos_dal_node_lib.Dal_node_client.cctxt;
   recent_dal_injections : Recent_dal_injections.t;
   mutable count_messages : int;
   pending_messages : Pending_messages.t;
@@ -276,7 +281,10 @@ let inject_slot state ~slot_index ~slot_content =
   let dal_cctxt = state.dal_node_ctxt in
   let* commitment, operation =
     let* commitment, commitment_proof =
-      Dal_node_client.post_slot dal_cctxt ~slot_index slot_content
+      Tezos_dal_node_lib.Dal_node_client.post_slot
+        dal_cctxt
+        ~slot_index
+        slot_content
     in
     return
       ( commitment,
@@ -470,11 +478,11 @@ module Types = struct
 
   type parameters = {
     node_ctxt : Node_context.ro;
-    dal_node_ctxt : Dal_node_client.cctxt;
+    dal_node_ctxt : Tezos_dal_node_lib.Dal_node_client.cctxt;
   }
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 

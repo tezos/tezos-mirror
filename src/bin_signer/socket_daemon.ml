@@ -26,15 +26,22 @@
 open Signer_messages
 module Events = Signer_events.Socket_daemon
 
-let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
-    cctxt fd =
+let handle_client_step ?signing_version ?magic_bytes ?timeout
+    ?(allow_list_known_keys = false) ?(allow_to_prove_possession = false)
+    ~check_high_watermark ~require_auth cctxt fd =
   let open Lwt_result_syntax in
   let* recved = Tezos_base_unix.Socket.recv ?timeout fd Request.encoding in
   match recved with
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
       let*! res =
-        Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
+        Handler.sign
+          ?signing_version
+          cctxt
+          req
+          ?magic_bytes
+          ~check_high_watermark
+          ~require_auth
       in
       Tezos_base_unix.Socket.send fd encoding res
   | Deterministic_nonce req ->
@@ -71,15 +78,34 @@ let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
         else return Authorized_keys.Response.No_authentication
       in
       Tezos_base_unix.Socket.send fd encoding res
+  | Known_keys ->
+      let encoding = result_encoding Known_keys.Response.encoding in
+      let*! res =
+        if allow_list_known_keys then Handler.known_keys cctxt
+        else failwith "List known keys request not allowed."
+      in
+      Tezos_base_unix.Socket.send fd encoding res
+  | Bls_prove_possession (pkh, override_pk) ->
+      let encoding = result_encoding Bls_prove_possession.Response.encoding in
+      let*! res =
+        if allow_to_prove_possession then
+          Handler.bls_prove_possession cctxt ?override_pk pkh
+        else failwith "Request to prove possession is not allowed"
+      in
+      Tezos_base_unix.Socket.send fd encoding res
 
-let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark ~require_auth
-    cctxt fd =
+let handle_client_loop ?signing_version ?magic_bytes ?timeout
+    ?allow_list_known_keys ?allow_to_prove_possession ~check_high_watermark
+    ~require_auth cctxt fd =
   let rec loop () =
     let open Lwt_result_syntax in
     let* () =
       handle_client_step
+        ?signing_version
         ?magic_bytes
         ?timeout
+        ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         cctxt
@@ -89,7 +115,8 @@ let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark ~require_auth
   in
   loop ()
 
-let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
+let run ?signing_version ?magic_bytes ?timeout ?allow_list_known_keys
+    ?allow_to_prove_possession ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet) path =
   let open Lwt_result_syntax in
   let open Tezos_base_unix.Socket in
@@ -120,8 +147,11 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
               (fun () ->
                 let* (_ : unit tzresult) =
                   handle_client_loop
+                    ?signing_version
                     ?magic_bytes
                     ?timeout
+                    ?allow_list_known_keys
+                    ?allow_to_prove_possession
                     ~check_high_watermark
                     ~require_auth
                     cctxt

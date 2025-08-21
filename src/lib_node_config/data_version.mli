@@ -54,7 +54,10 @@ val default_peers_file_name : string
     - Is_compatible: similar to [Exists] but, additionally, will
       check the version compatibility.
 *)
-type ensure_mode = Exists | Is_bare | Is_compatible
+type ensure_mode =
+  | Exists
+  | Is_bare of {clean_if_needed : bool}
+  | Is_compatible
 
 (** [ensure_data_dir ~mode genesis data_dir] ensures that a directory
     is valid with regards to the given [mode]. See [ensure_mode] for

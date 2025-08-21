@@ -22,18 +22,7 @@
   -open Tezos_layer2_store
   -open Octez_sqlite
   -open Octez_smart_rollup)
- (modules
-  store_version
-  sql_store
-  store_sig
-  store_v0
-  store_v1
-  store_v2
-  store_v3
-  store_v4
-  store_v5
-  store
-  store_migration))
+ (modules store_version sql_store store_sig store))
 
 (library
  (name octez_smart_rollup_node)
@@ -57,7 +46,10 @@
   octez-l2-libs.octez-smart-rollup-node-lib.store
   octez-crawler
   octez-libs.tezos-workers
-  octez-l2-libs.smart-rollup)
+  octez-l2-libs.smart-rollup
+  octez-l2-libs.scoru-wasm-fast
+  opentelemetry-lwt
+  octez-libs.octez-telemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -66,7 +58,6 @@
   -open Tezos_crypto
   -open Tezos_client_base
   -open Tezos_client_base_unix
-  -open Tezos_dal_node_lib
   -open Octez_injector
   -open Tezos_version_value
   -open Tezos_layer2_store
@@ -74,17 +65,4 @@
   -open Octez_crawler
   -open Tezos_workers
   -open Octez_smart_rollup)
- (modules
-  (:standard
-   \
-   store_version
-   sql_store
-   store_sig
-   store_v0
-   store_v1
-   store_v2
-   store_v3
-   store_v4
-   store_v5
-   store
-   store_migration)))
+ (modules (:standard \ store_version sql_store store_sig store)))

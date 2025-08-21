@@ -10,6 +10,12 @@ a:hover {
     color: rgb(0, 83, 173);
 }
 
+:root {
+    --feedback-modal-footer-link: #0D61FF;
+    --biel-bot-footer-link: rgb(27, 85, 126);
+    --biel-bot-content-z-index: 1040;
+}
+
 /* sidebar
  * ------
  */
@@ -172,4 +178,13 @@ nav[class='contents'] {
 /* Fix for text in tabs showing up as white on white */
 [data-theme='dark'] button.tablinks {
     color: rgb(0, 0, 0);
+}
+
+/* Fix for Mermaid diagrams in dark mode */
+[data-theme='dark'] .mermaid .messageText {
+    fill: white!important;
+}
+[data-theme='dark'] .mermaid line,
+[data-theme='dark'] .mermaid path {
+    stroke: white!important;
 }

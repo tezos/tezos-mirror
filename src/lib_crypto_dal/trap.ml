@@ -6,7 +6,7 @@
 (*****************************************************************************)
 
 (* [share_is_trap pkh share ~traps_fraction] checks that
-     `hash(pkh . share) < trap_rate * 2^hash_size`,
+     `hash(pkh . share) < traps_fraction * 2^hash_size`,
    where the dot denotes concatenation and |v| the length of the bitstring v. *)
 let share_is_trap =
   let hash_size_bits = 8 * Tezos_crypto.Blake2B.size in

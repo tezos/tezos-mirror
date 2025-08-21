@@ -49,8 +49,58 @@ let message_size s =
   (* Encoded as length of s on 4 bytes + s *)
   4 + String.length s
 
+let link_batch_scope scope batch =
+  Opentelemetry.Scope.add_links scope @@ fun () ->
+  let scope_link = Opentelemetry.Scope.to_span_link scope in
+  List.filter_map
+    (fun msg ->
+      match L2_message.scope msg with
+      | None -> None
+      | Some msg_scope ->
+          Opentelemetry.Scope.add_links msg_scope (fun () -> [scope_link]) ;
+          Some (Opentelemetry.Scope.to_span_link msg_scope))
+    batch
+
+let add_etherlink_attrs ?scope state order =
+  if state.node_ctxt.config.etherlink then
+    match (order, Opentelemetry.Scope.get_ambient_scope ?scope ()) with
+    | None, _ | _, None -> ()
+    | Some order, Some scope ->
+        Opentelemetry.Scope.add_attrs scope @@ fun () ->
+        (* The sequencer sets the order as the etherlink block number for
+           them to be injected on L1 in order, so we reuse that for the
+           trace here. *)
+        [("etherlink.block.number", `Int (Z.to_int order))]
+
+let add_etherlink_events name state scope msgs =
+  if state.node_ctxt.config.etherlink then
+    List.iter
+      (fun msg ->
+        match L2_message.order msg with
+        | Some order ->
+            Opentelemetry.Scope.add_event scope @@ fun () ->
+            Opentelemetry_lwt.Event.make
+              ~attrs:[("etherlink.block.number", `Int (Z.to_int order))]
+              name
+        | _ -> ())
+      msgs
+
 let inject_batch ?order state (l2_messages : L2_message.t list) =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Batcher" "inject_batch"
+  @@ fun scope ->
+  Opentelemetry.Scope.add_attrs scope (fun () ->
+      match order with
+      | None -> []
+      | Some order ->
+          [("rollup_node.batcher.inject.order", `Int (Z.to_int order))]) ;
+  add_etherlink_attrs ~scope state order ;
+  link_batch_scope scope l2_messages ;
+  add_etherlink_events
+    "rollup_node.batcher.inject_etherlink_block"
+    state
+    scope
+    l2_messages ;
   let messages = List.map L2_message.content l2_messages in
   let operation = L1_operation.Add_messages {messages} in
   let* l1_id =
@@ -137,6 +187,8 @@ let get_batches state ~only_full =
 
 let produce_batches state ~only_full =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Batcher" "produce_batches"
+  @@ fun _ ->
   let start_timestamp = Time.System.now () in
   let batches = get_batches state ~only_full in
   let get_timestamp = Time.System.now () in
@@ -192,11 +244,12 @@ let make_l2_messages ?order ~unique state (messages : string list) =
      + 4 (* We add 4 because [message_size] adds 4. *))
       (max_batch_size state)
   in
+  let scope = Opentelemetry.Scope.get_ambient_scope () in
   List.mapi_e
     (fun i message ->
       if message_size message > max_size_msg then
         error_with "Message %d is too large (max size is %d)" i max_size_msg
-      else Ok (L2_message.make ?order ~unique message))
+      else Ok (L2_message.make ?order ?scope ~unique message))
     messages
 
 type error += Heap_insertion_failed of string
@@ -233,6 +286,7 @@ let add_messages_into_heap ~drop_duplicate state =
 let on_register ?order ~drop_duplicate state (messages : string list) =
   let open Lwt_result_syntax in
   let module Plugin = (val state.plugin) in
+  add_etherlink_attrs state order ;
   let*? messages =
     make_l2_messages ?order ~unique:(not drop_duplicate) state messages
   in
@@ -289,7 +343,7 @@ module Name = struct
   let equal () () = true
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
@@ -430,6 +484,10 @@ let handle_request_error rq =
 let register_messages ?order ~drop_duplicate messages =
   let open Lwt_result_syntax in
   let*? w = worker () in
+  Octez_telemetry.Trace.with_tzresult
+    ~service_name:"Batcher"
+    "register_messages"
+  @@ fun _ ->
   Worker.Queue.push_request_and_wait
     w
     (Request.Register {order; messages; drop_duplicate})

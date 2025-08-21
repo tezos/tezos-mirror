@@ -207,8 +207,8 @@ let load_client_context (cctxt : ctxt_kind) =
 
 let get_delegates (cctxt : Protocol_client_context.full) =
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
-    Baking_state.Consensus_key.make
-      ~alias:(Some alias)
+    Baking_state_types.Key.make
+      ~alias
       ~public_key_hash
       ~public_key
       ~secret_key_uri
@@ -219,10 +219,8 @@ let get_delegates (cctxt : Protocol_client_context.full) =
   let* () =
     Tezos_signer_backends.Encrypted.decrypt_list
       cctxt
-      (List.filter_map
-         (function
-           | {Baking_state.Consensus_key.alias = Some alias; _} -> Some alias
-           | _ -> None)
+      (List.map
+         (function {Baking_state_types.Key.alias; _} -> alias)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in
@@ -252,7 +250,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
   let monitor_node_operations = monitor_node_mempool in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
   let* constants =
-    Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
   let*! operation_worker =
     Operation_worker.run ?monitor_node_operations ~constants cctxt

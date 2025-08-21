@@ -3,29 +3,32 @@
 
 (executable
  (name main_agnostic_baker)
- (public_name octez-experimental-agnostic-baker)
- (package octez-experimental-agnostic-baker)
+ (public_name octez-baker)
+ (package octez-baker)
  (instrumentation (backend bisect_ppx))
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
-  octez-libs.data-encoding
   octez-libs.base
   octez-libs.base.unix
-  octez-shell-libs.validation
   octez-shell-libs.client-base-unix
-  octez-shell-libs.client-base
-  octez-libs.rpc
-  octez-libs.rpc-http-client
-  octez-libs.rpc-http-client-unix
-  octez-libs.rpc-http
-  octez-libs.cohttp-lwt-unix
-  octez-node-config
-  octez-libs.clic
-  octez-libs.stdlib-unix
-  octez-libs.event-logging
-  octez-shell-libs.signer-services
-  octez-version.value)
+  octez-baker-lib
+  octez-libs.octez-profiler
+  (select void_for_linking-octez-protocol-021-PsQuebec-libs-dal from
+   (octez-protocol-021-PsQuebec-libs.dal -> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty))
+  octez-protocol-022-PsRiotum-libs.agnostic-baker
+  octez-protocol-022-PsRiotum-libs.dal
+  octez-protocol-023-PtSeouLo-libs.agnostic-baker
+  octez-protocol-023-PtSeouLo-libs.dal
+  (select void_for_linking-octez-protocol-alpha-libs-agnostic-baker from
+   (octez-protocol-alpha-libs.agnostic-baker -> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty))
+  (select void_for_linking-octez-protocol-alpha-libs-dal from
+   (octez-protocol-alpha-libs.dal -> void_for_linking-octez-protocol-alpha-libs-dal.empty)
+   (-> void_for_linking-octez-protocol-alpha-libs-dal.empty)))
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)
@@ -33,16 +36,16 @@
   (-linkall))
  (flags
   (:standard)
-  -open Data_encoding
   -open Tezos_base.TzPervasives
   -open Tezos_base
   -open Tezos_base_unix
-  -open Tezos_validation
   -open Tezos_client_base_unix
-  -open Tezos_client_base
-  -open Tezos_rpc
-  -open Tezos_rpc_http_client
-  -open Tezos_rpc_http_client_unix
-  -open Tezos_rpc_http
-  -open Tezos_stdlib_unix
-  -open Tezos_event_logging))
+  -open Octez_agnostic_baker
+  -open Tezos_profiler))
+
+(rule
+ (action
+  (progn
+   (write-file void_for_linking-octez-protocol-021-PsQuebec-libs-dal.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-agnostic-baker.empty "")
+   (write-file void_for_linking-octez-protocol-alpha-libs-dal.empty ""))))

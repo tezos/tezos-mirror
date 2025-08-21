@@ -12,6 +12,12 @@ su tezos -c "octez-client gen keys alice"
 key=$(su tezos -c "octez-client show address alice" | grep Hash: | awk '{ print $2 }')
 echo "BAKER_KEY=$key" >> /etc/default/octez-baker
 
+if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
+  echo "AGNOSTIC_BAKER=true" >> /etc/default/octez-baker
+else
+  echo "AGNOSTIC_BAKER=false" >> /etc/default/octez-baker
+fi
+
 systemctl start octez-baker.service
 
 su tezos -c "octez-node config show"
@@ -28,19 +34,38 @@ echo "-----------------------"
 tail /var/log/tezos/node.log
 
 systemctl status octez-baker.service
+if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
+  systemctl status octez-agnostic-baker.service
 
-for logfile in /var/log/tezos/baker-P*.log; do
-  proto=$(basename "$logfile" | sed -E 's/baker-(P[^.]+).log/\1/')
-  systemctl status "octez-baker@$proto.service"
-  echo "Log: $logfile"
+  echo "Log: /var/log/tezos/baker.log"
   echo "-----------------------"
-  tail "$logfile"
-done
+  tail /var/log/tezos/baker.log
+else
+  for logfile in /var/log/tezos/baker-P*.log; do
+    proto=$(basename "$logfile" | sed -E 's/baker-(P[^.]+).log/\1/')
+    systemctl status "octez-baker@$proto.service"
+    echo "Log: $logfile"
+    echo "-----------------------"
+    tail "$logfile"
+  done
+fi
 
-for logfile in /var/log/tezos/accuser-P*.log; do
-  proto=$(basename "$logfile" | sed -E 's/accuser-(P[^.]+).log/\1/')
-  systemctl status "octez-accuser@$proto.service"
-  echo "Log: $logfile"
+if [ "${AGNOSTIC_BAKER:-}" = "true" ]; then
+  systemctl status octez-agnostic-baker.service
+
+  echo "Log: /var/log/tezos/accuser.log"
   echo "-----------------------"
-  tail "$logfile"
-done
+  tail /var/log/tezos/accuser.log
+else
+  for logfile in /var/log/tezos/accuser-P*.log; do
+    proto=$(basename "$logfile" | sed -E 's/accuser-(P[^.]+).log/\1/')
+    systemctl status "octez-accuser@$proto.service"
+    echo "Log: $logfile"
+    echo "-----------------------"
+    tail "$logfile"
+  done
+fi
+
+systemctl stop octez-node.service
+systemctl stop octez-baker.service
+systemctl stop octez-agnostic-baker.service

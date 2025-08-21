@@ -48,6 +48,8 @@ let of_wei_z z = z
 let of_tez z =
   z |> Tez.mutez_int64 |> Z.of_int64 |> Z.mul Z.(pow (of_int 10) 12) |> to_wei_z
 
+let to_tez w = Z.div w Z.(pow (of_int 10) 12) |> Z.to_int |> Tez.of_mutez_int
+
 let of_eth_int eth = Z.of_string @@ Int.to_string eth ^ wei_pow
 
 let of_eth_string eth =

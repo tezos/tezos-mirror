@@ -10,6 +10,11 @@ module Request = struct
     | New_rollup_node_block : Int32.t -> (unit, error trace) t
     | Apply_evm_events : Int32.t -> (unit, error trace) t
 
+  let name (type a b) (t : (a, b) t) =
+    match t with
+    | New_rollup_node_block _ -> "New_rollup_node_block"
+    | Apply_evm_events _ -> "Apply_evm_events"
+
   type view = View : _ t -> view
 
   let view (req : _ t) = View req

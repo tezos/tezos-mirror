@@ -4,9 +4,11 @@ distroname=$1
 release=$2
 
 bucket="$GCP_LINUX_PACKAGES_BUCKET"
-protocol=$(head -1 script-inputs/active_protocol_versions_without_number)
 
 . scripts/ci/octez-packages-version.sh
+
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
 
 case "$RELEASETYPE" in
 ReleaseCandidate | TestReleaseCandidate)
@@ -41,14 +43,15 @@ if [ "$RELEASETYPE" = "Master" ]; then
 
   # Add the repository
   dnf -y config-manager --add-repo "https://packages.nomadic-labs.com/$distribution/dists/$release/"
+  # Install public key
+  rpm --import "https://packages.nomadic-labs.com/$distribution/octez.asc"
+  # [end add repository]
+
   if [ "$distroname" = "rockylinux" ]; then
     dnf -y config-manager --set-enabled devel
   fi
   dnf -y update
 
-  # Install public key
-  rpm --import "https://packages.nomadic-labs.com/$distribution/octez.asc"
-  # [end add repository]
 else
   # Update and install the config-mananger plugin
   dnf -y update
@@ -66,22 +69,3 @@ else
   rpm --import "https://storage.googleapis.com/$bucket/$distribution/octez.asc"
 
 fi
-
-dnf -y install sudo
-
-# [install tezos]
-sudo dnf -y install octez-node
-sudo dnf -y install octez-client
-sudo dnf -y install octez-node
-sudo dnf -y install octez-baker
-sudo dnf -y install octez-dal-node
-sudo dnf -y install octez-smart-rollup-node
-
-# [test executables]
-octez-client --version
-octez-node --version
-"octez-baker-$protocol" --version
-"octez-accuser-$protocol" --version
-
-# [test autopurge]
-sudo dnf -y remove octez-node octez-client octez-baker octez-dal-node

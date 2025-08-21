@@ -60,12 +60,10 @@ let cargo_home =
    optional arguments. *)
 let before_script ?(take_ownership = false) ?(source_version = false)
     ?(eval_opam = false) ?(init_python_venv = false) ?(install_js_deps = false)
-    ?(datadog_job_info = false) before_script =
+    before_script =
   let toggle t x = if t then [x] else [] in
-  (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
-  toggle datadog_job_info ". ./scripts/ci/datadog_send_job_info.sh"
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2865 *)
-  @ toggle take_ownership "./scripts/ci/take_ownership.sh"
+  toggle take_ownership "./scripts/ci/take_ownership.sh"
   @ toggle source_version ". ./scripts/version.sh"
     (* TODO: this must run in the before_script of all jobs that use the opam environment.
        how to enforce? *)
@@ -140,78 +138,6 @@ let enable_kernels =
 (** {2 Caches} *)
 
 (* Common GitLab CI caches *)
-
-(** Add variable enabling sccache.
-
-    This function should be applied to jobs that build rust files and
-    which has a configured sccache Gitlab CI cache.
-
-    - [key] and [path] configure the key under which the cache is
-    stored, and the path that will be cached. By default, the [key]
-    contains the name of the job, thus scoping the cache to all
-    instances of that job. By default, [path] is the folder
-    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
-    environment dir [SCCACHE_DIR] such that sccache stores its caches
-    there.
-
-    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
-    that configures the maximum size of the cache.
-
-    - [error_log], [idle_timeout] and [log] sets the environment
-    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
-    [SCCACHE_LOG] respectively. See the sccache documentation for more
-    information on these variables. *)
-let enable_sccache ?key ?error_log ?idle_timeout ?log
-    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
-  let key =
-    Option.value
-      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  job
-  |> append_variables
-       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
-       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
-       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
-       @ opt_var "SCCACHE_LOG" Fun.id log)
-  |> append_cache (cache ~key [path])
-  (* Starts sccache and sets [RUSTC_WRAPPER] *)
-  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
-  |> append_after_script ["./scripts/ci/sccache-stop.sh"]
-
-let enable_octez_rust_deps_target_dir ?key job =
-  let key =
-    Option.value
-      ~default:
-        ("rust-deps-target-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-      key
-  in
-  let path = "$CI_PROJECT_DIR/_target" in
-  job
-  |> append_variables [("OCTEZ_RUST_DEPS_TARGET_DIR", path)]
-  |> append_cache (cache ~key [path])
-
-(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
-
-    This function should only be applied to jobs that have a GitLab CI
-    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
-    function calls this function, so there is no need to apply both).
-    Exceptions can be made for jobs that must have CARGO_HOME set to
-    something different than {!cargo_home}. *)
-let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
-
-(** Adds a GitLab CI cache for the CARGO_HOME folder.
-
-    More precisely, we only cache the non-SCM dependencies in the
-    sub-directory [registry/cache]. *)
-let enable_cargo_cache job =
-  job
-  |> append_cache
-       (cache
-          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
-          [cargo_home // "registry/cache"])
-  (* Allow Cargo to access the network *)
-  |> enable_networked_cargo
 
 (** Add variable enabling dune cache.
 
@@ -306,12 +232,16 @@ let changeset_base = Changeset.make [".gitlab/**/*"; ".gitlab-ci.yml"]
 
 let changeset_images = Changeset.make ["images/**/*"]
 
+let changeset_base_images =
+  Changeset.make ["images/base-images/**/*"; "scripts/ci/build-base-images.sh"]
+
 (** Only if octez source code has changed *)
 let changeset_octez =
   let octez_source_content =
     List.map
       (fun path -> if Sys.is_directory path then path ^ "/**/*" else path)
       (read_lines_from_file "script-inputs/octez-source-content")
+    |> List.filter (fun f -> f <> "CHANGES.rst" && f <> "LICENSES/**/*")
     |> Changeset.make
   in
   Changeset.(
@@ -325,7 +255,10 @@ let changeset_octez =
 
 (* Only if Etherlink has changed *)
 let changeset_etherlink =
-  Changeset.(changeset_base @ make ["etherlink/**/*"; "Makefile"])
+  Changeset.(
+    changeset_base
+    @ make
+        ["etherlink/**/*"; "Makefile"; "src/kernel_sdk/**/*"; "sdk/rust/**/*"])
 
 (** Only if octez source code has changed, if the images has changed or
     if kernels.mk changed. *)
@@ -357,8 +290,7 @@ let changeset_octez_docs =
         ])
 
 (** Only if reStructured Text files have changed *)
-let changeset_octez_docs_rst =
-  Changeset.(changeset_base @ make ["docs/**/*.rst"])
+let changeset_octez_docs_rst = Changeset.(changeset_base @ make ["**/*.rst"])
 
 let changeset_octez_docker_changes_or_master =
   Changeset.(
@@ -405,7 +337,7 @@ let changeset_rpm_packages =
   Changeset.(
     make
       [
-        "scripts/packaging/build-deb-local.sh";
+        "scripts/packaging/build-rpm-local.sh";
         "scripts/packaging/octez/rpm/*";
         "scripts/packaging/tests/rpm/*";
         "rpm-deps-build.Dockerfile";
@@ -554,19 +486,35 @@ let changeset_test_sdk_rust =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["sdk/rust"])
+    @ make ["sdk/rust/**/*"])
+
+(* TODO: add sdk/rust to the changesets once the bindings code depends
+   on the Rust SDK: https://linear.app/tezos/issue/SDK-59. *)
+let changeset_test_sdk_bindings =
+  Changeset.(
+    changeset_base
+    @ changeset_images (* Run if the [rust-toolchain] image is updated *)
+    @ make ["sdk/rust/**/*"]
+    @ make ["contrib/sdk-bindings"])
 
 let changeset_test_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["kernels.mk"; "src/kernel_*/**/*"])
+    @ make
+        ["kernels.mk"; "src/kernel_*/**/*"; "src/riscv/**/*"; "sdk/rust/**/*"])
 
 let changeset_test_etherlink_kernel =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["etherlink.mk"; "etherlink/**/*.rs"; "src/kernel_sdk/**/*"])
+    @ make
+        [
+          "etherlink.mk";
+          "etherlink/**/*.rs";
+          "src/kernel_sdk/**/*";
+          "sdk/rust/**/*";
+        ])
 
 let changeset_test_etherlink_firehose =
   Changeset.(
@@ -581,7 +529,7 @@ let changeset_riscv_kernels =
   Changeset.(
     changeset_base
     @ changeset_images (* Run if the [rust-toolchain] image is updated *)
-    @ make ["src/kernel_sdk/**/*"; "src/riscv/**/*"])
+    @ make ["sdk/rust/**/*"; "src/kernel_sdk/**/*"; "src/riscv/**/*"])
 
 let changeset_test_evm_compatibility =
   Changeset.(
@@ -590,8 +538,8 @@ let changeset_test_evm_compatibility =
     @ make
         [
           "etherlink.mk";
-          "etherlink/kernel_evm/evm_execution/**/*";
-          "etherlink/kernel_evm/evm_evaluation/**/*";
+          "etherlink/kernel_latest/evm_execution/**/*";
+          "etherlink/kernel_latest/evm_evaluation/**/*";
         ])
 
 let changeset_mir =
@@ -616,9 +564,11 @@ let changeset_mir_tzt =
      (no need to test that we pass the -static flag twice)
    - released variants exist, that are used in release tag pipelines
      (they do not build experimental executables) *)
-let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
-    ?(executable_files = "script-inputs/released-executables")
-    ?version_executable ?(release = false) ?rules ?dependencies () : tezos_job =
+let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal) ?storage
+    ?(executable_files = "script-inputs/octez-released-executables")
+    ?(experimental_executables = "script-inputs/octez-experimental-executables")
+    ?version_executable ?(release = false) ?rules ?dependencies ?retry () :
+    tezos_job =
   let arch_string = arch_to_string arch in
   let name = "oc.build:static-" ^ arch_string ^ "-linux-binaries" in
   let artifacts =
@@ -628,7 +578,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
   in
   let executable_files =
     executable_files
-    ^ if not release then " script-inputs/experimental-executables" else ""
+    ^ if not release then " " ^ experimental_executables else ""
   in
   let version_executable =
     match version_executable with
@@ -642,7 +592,9 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ~stage:Stages.build
     ~arch
     ~cpu
+    ?storage
     ~name
+    ?retry
     ~image:Images.CI.build
     ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
     ~variables:
@@ -652,7 +604,7 @@ let job_build_static_binaries ~__POS__ ~arch ?(cpu = Normal)
     ["./scripts/ci/build_static_binaries.sh"]
   |> enable_cargo_cache
   |> enable_sccache ~cache_size:"2G"
-  |> enable_octez_rust_deps_target_dir
+  |> enable_cargo_target_caches
 
 (** Type of Docker build jobs.
 
@@ -683,8 +635,8 @@ type docker_build_type =
   | Test_manual
 
 (** Creates a Docker build job of the given [arch] and [docker_build_type]. *)
-let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
-    tezos_job =
+let job_docker_build ?rules ?dependencies ~__POS__ ~arch ?storage
+    docker_build_type : tezos_job =
   let arch_string = arch_to_string_alt arch in
   let ci_docker_hub =
     match docker_build_type with
@@ -739,6 +691,7 @@ let job_docker_build ?rules ?dependencies ~__POS__ ~arch docker_build_type :
     ~__POS__
     ~stage
     ~arch
+    ?storage
     ~name
     ~variables
     ["./scripts/ci/docker_release.sh"]
@@ -747,7 +700,7 @@ let job_docker_merge_manifests ~__POS__ ~ci_docker_hub ~job_docker_amd64
     ~job_docker_arm64 : tezos_job =
   job_docker_authenticated
     ~__POS__
-    ~stage:Stages.prepare_release
+    ~stage:Stages.publish
     ~name:"docker:merge_manifests"
       (* This job merges the images produced in the jobs
          [docker:{amd64,arm64}] into a single multi-architecture image, and
@@ -760,7 +713,7 @@ let job_docker_promote_to_latest ?dependencies ~ci_docker_hub () : tezos_job =
   job_docker_authenticated
     ~__POS__
     ?dependencies
-    ~stage:Stages.publish_release
+    ~stage:Stages.publish
     ~name:"docker:promote_to_latest"
     ~ci_docker_hub
     ["./scripts/ci/docker_promote_to_latest.sh"]
@@ -771,8 +724,8 @@ type bin_package_group = A | B
 
 let bin_package_image = Image.mk_external ~image_path:"$DISTRIBUTION"
 
-let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
-    ?(release = false) ?dependencies () =
+let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
+    ?(release = false) ?dependencies ?(sccache_size = "5G") () =
   let arch_string = arch_to_string arch in
   let name =
     sf
@@ -834,6 +787,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
       ~arch
       ?retry
       ?cpu
+      ?storage
       ~name
       ~image:Images.CI.build
       ~before_script:
@@ -845,7 +799,9 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
       ~variables
       ~artifacts
       ["./scripts/ci/build_full_unreleased.sh"]
-    |> enable_cargo_cache |> enable_sccache |> enable_octez_rust_deps_target_dir
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:sccache_size
+    |> enable_cargo_target_caches
   in
   (* Disable coverage for arm64 *)
   if arch = Amd64 then enable_coverage_instrumentation job else job
@@ -853,10 +809,23 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu
 (** {2 Shared jobs} *)
 
 let job_build_arm64_release ?rules () : tezos_job =
-  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:true ()
+  job_build_dynamic_binaries
+    ?rules
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~release:true
+    ()
 
 let job_build_arm64_exp_dev_extra ?rules () : tezos_job =
-  job_build_dynamic_binaries ?rules ~__POS__ ~arch:Arm64 ~release:false ()
+  job_build_dynamic_binaries
+    ?rules
+    ~__POS__
+    ~arch:Arm64
+    ~storage:Ramfs
+    ~release:false
+    ~sccache_size:"2G"
+    ()
 
 let job_build_kernels ?rules () : tezos_job =
   job
@@ -865,13 +834,7 @@ let job_build_kernels ?rules () : tezos_job =
     ~image:Images.rust_toolchain
     ~stage:Stages.build
     ?rules
-    [
-      "make -f kernels.mk build";
-      "make -f etherlink.mk evm_kernel.wasm";
-      "make -C src/riscv riscv-sandbox riscv-dummy.elf";
-      "make -C src/riscv riscv-sandbox riscv-dummy-sdk.elf";
-      "make -C src/riscv/tests/ build";
-    ]
+    ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
     ~artifacts:
       (artifacts
          ~name:"build-kernels-$CI_COMMIT_REF_SLUG"
@@ -884,10 +847,6 @@ let job_build_kernels ?rules () : tezos_job =
            "tx_kernel.wasm";
            "tx_kernel_dal.wasm";
            "dal_echo_kernel.wasm";
-           "src/riscv/riscv-sandbox";
-           "src/riscv/riscv-dummy.elf";
-           "src/riscv/riscv-dummy-sdk.elf";
-           "src/riscv/tests/inline_asm/rv64-inline-asm-tests";
          ])
   |> enable_kernels
   |> enable_sccache ~key:"kernels-sccache" ~path:"$CI_PROJECT_DIR/_sccache"
@@ -909,45 +868,15 @@ let job_build_dsn_node ?rules () : tezos_job =
          ["octez-dsn-node"])
   |> enable_kernels |> enable_sccache |> enable_cargo_cache
 
-let job_datadog_pipeline_trace : tezos_job =
-  job
-    ~__POS__
-    ~allow_failure:Yes
-    ~name:"datadog_pipeline_trace"
-    ~image:Images.datadog_ci
-    ~before_script:(before_script ~datadog_job_info:true [])
-    ~stage:Stages.start
-    [
-      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
-      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
-       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
-    ]
-
-(* Job that scans a Docker image *)
-let job_container_scanning ~docker_image ~dockerfile_path : tezos_job =
-  job
-    ~__POS__
-    ~name:"container_scanning"
-    ~stage:Stages.scan
-    ~template:Jobs_container_scanning
-    ~variables:
-      [
-        ("CS_IMAGE", docker_image);
-        ("SECURE_LOG_LEVEL", "debug");
-        ("CS_DOCKERFILE_PATH", dockerfile_path);
-      ]
-    ~description:(Format.sprintf "Scanning image %s" docker_image)
-    ~artifacts:(artifacts ["scan.log"])
-    ~git_strategy:Fetch
-    ["gtcs scan > scan.log"; "grep \"Vulnerability DB:\" -B2 -A4 scan.log"]
-
-let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
+let job_build_layer1_profiling ?rules ?(expire_in = Duration (Days 1)) () =
   job
     ~__POS__
     ~stage:Stages.build
     ~image:Images.CI.build
+    ?rules
     ~name:"build-layer1-profiling"
     ~cpu:Very_high
+    ~retry:{max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
     ~artifacts:(artifacts ~expire_in ["./octez-binaries/x86_64/octez-node"])
     ~before_script:
       (before_script
@@ -955,9 +884,16 @@ let job_build_layer1_profiling ?(expire_in = Duration (Days 1)) () =
          ~source_version:true
          ~eval_opam:true
          [])
-    ~variables:[("TEZOS_PPX_PROFILER", "profiling"); ("PROFILE", "static")]
+    ~variables:[("PROFILE", "static")]
     [
-      "make octez-layer1";
+      "scripts/slim-mode.sh on";
+      (* turn on -opaque for all subsequent builds *)
+      "scripts/custom-flags.sh set -opaque";
+      (* 1) compile with PPX profiling *)
+      "TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node";
+      (* 2) compile with OpenTelemetry PPX *)
+      "TEZOS_PPX_PROFILER=opentelemetry make build \
+       OCTEZ_EXECUTABLES?=octez-node";
       "mkdir -p octez-binaries/x86_64/";
       "mv octez-node octez-binaries/x86_64/";
     ]
@@ -973,13 +909,9 @@ module Tezt = struct
   let job ~__POS__ ?rules ?parallel ?(tag = Gcp_tezt) ~name
       ~(tezt_tests : Tezt_core.TSL_AST.t) ?(retry = 2) ?(tezt_retry = 1)
       ?(tezt_parallel = 1) ?(tezt_variant = "")
-      ?(before_script =
-        before_script
-          ~source_version:true
-          ~eval_opam:false
-          ~datadog_job_info:true
-          []) ?timeout ?job_select_tezts ~dependencies ?allow_failure () :
-      tezos_job =
+      ?(before_script = before_script ~source_version:true ~eval_opam:false [])
+      ?timeout ?(disable_test_timeout = false) ?job_select_tezts ~dependencies
+      ?allow_failure ?(keep_going = false) () : tezos_job =
     let variables =
       [
         ("JUNIT", "tezt-junit.xml");
@@ -1039,6 +971,32 @@ module Tezt = struct
       | None -> ("--without-select-tezts", dependencies)
     in
     let retry = if retry = 0 then None else Some {max = retry; when_ = []} in
+    let junit_tags =
+      (* List of tags to include in JUnit reports that we send to DataDog. *)
+      [
+        (* Tags that change the job that runs the test.
+           Useful to be able to filter on only a specific job type in DataDog. *)
+        "flaky";
+        "time_sensitive";
+        "slow";
+        "extra";
+        (* Tags that denote the owner of tests.
+           Useful in case we want to send alerts to specific teams. *)
+        "infrastructure";
+        "layer1";
+        "tezos2";
+        "etherlink";
+        (* Tags that change alert thresholds. *)
+        "memory_hungry";
+      ]
+    in
+    let junit_tags =
+      junit_tags
+      |> List.map (fun tag ->
+             Printf.sprintf " --junit-tag 'dd_tags[tezt-tag.%s]=%s'" tag tag)
+      |> String.concat ""
+    in
+    let keep_going_opt = if keep_going then " --keep-going" else "" in
     job
       ?timeout
       ~__POS__
@@ -1082,14 +1040,26 @@ module Tezt = struct
            because if the CI timeout is reached, there are no artefacts,
            and thus no logs to investigate.
            See also: https://gitlab.com/gitlab-org/gitlab/-/issues/19818 *)
+        (* To observe memory usage of tests, we use the following options:
+           - --record-mem-peak causes Tezt to measure memory usage
+             (it is implied by --mem-warn so we could omit it);
+           - --junit-mem-peak tells Tezt to store peak memory usage
+             in a <property> named dd_tags[memory.peak] in JUnit reports,
+             which makes DataDog aware of it
+             (see https://docs.datadoghq.com/tests/setup/junit_xml/?tab=linux#providing-metadata-through-property-elements);
+           - --mem-warn causes Tezt to warn if a test uses more than the specified
+             amount of memory (in bytes). We set the threshold to 5 GB. *)
         "./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh \
          --send-junit " ^ with_or_without_select_tezts
         ^ " \"${TESTS}\" --color --log-buffer-size 5000 --log-file tezt.log \
-           --global-timeout 1800 --on-unknown-regression-files fail --junit \
-           ${JUNIT} --from-record tezt/records --job \
-           ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
+           --global-timeout 1800"
+        ^ (if disable_test_timeout then "" else " --test-timeout 540")
+        ^ " --on-unknown-regression-files fail --junit ${JUNIT} \
+           --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records \
+           --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record \
            tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count \
-           ${TEZT_PARALLEL} --retry ${TEZT_RETRY}";
+           ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn \
+           5_000_000_000" ^ keep_going_opt ^ junit_tags;
       ]
 
   (** Tezt tag selector string.
@@ -1097,24 +1067,23 @@ module Tezt = struct
     It returns a TSL expression that:
     - always deselects tags with [ci_disabled];
     - selects, respectively deselects, the tests with the tags
-      [memory_3k], [memory_4k], [time_sensitive], [slow] or [cloud],
-      depending on the value of the corresponding function
-      argument. These arguments all default to false.
+      [time_sensitive], [slow], [extra] or [cloud],
+      depending on the value of the corresponding function argument.
+      These arguments all default to false.
 
     See [src/lib_test/tag.mli] for a description of the above tags.
 
     The list of TSL expressions [and_] are appended to the final
     selector, allowing to modify the selection further. *)
-  let tests_tag_selector ?(memory_3k = false) ?(memory_4k = false)
-      ?(time_sensitive = false) ?(slow = false) ?(cloud = false)
-      (and_ : Tezt_core.TSL_AST.t list) : Tezt_core.TSL_AST.t =
+  let tests_tag_selector ?(time_sensitive = false) ?(slow = false)
+      ?(extra = false) ?(cloud = false) (and_ : Tezt_core.TSL_AST.t list) :
+      Tezt_core.TSL_AST.t =
     let tags =
       [
         (false, "ci_disabled");
-        (memory_3k, "memory_3k");
-        (memory_4k, "memory_4k");
         (time_sensitive, "time_sensitive");
         (slow, "slow");
+        (extra, "extra");
         (cloud, "cloud");
       ]
     in
@@ -1209,7 +1178,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:odoc"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1222,6 +1191,8 @@ module Documentation = struct
       [
         "export OPAMFETCH='wget'";
         "opam remote add default https://opam.ocaml.org/";
+        "opam repo add archive \
+         git+https://github.com/ocaml/opam-repository-archive";
         "opam update";
         "opam install --yes odoc.2.4.4";
         "make -C docs " ^ target;
@@ -1234,12 +1205,12 @@ module Documentation = struct
       of octez binaries, for inclusion in the documentation.
 
       This job is one of the prerequisites to {!job_build_all}. *)
-  let job_manuals ?rules ?dependencies () : tezos_job =
+  let job_manuals ?rules ?dependencies ~use_static_executables () : tezos_job =
     job
       ~__POS__
       ~name:"documentation:manuals"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1253,8 +1224,9 @@ module Documentation = struct
              "docs/developer/rollup_metrics.csv";
              "docs/user/node-config.json";
            ])
-      ["./scripts/ci/documentation:manuals.sh"]
-    |> enable_cargo_cache |> enable_sccache
+      (if use_static_executables then
+         ["scripts/ci/documentation:manuals_static.sh"]
+       else ["make -C docs -j octez-gen"])
 
   (** Create the docgen job.
 
@@ -1268,7 +1240,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:docgen"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ?dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true [])
@@ -1300,7 +1272,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:build_all"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.build
       ~dependencies
       ?rules
       ~before_script:(before_script ~eval_opam:true ~init_python_venv:true [])
@@ -1324,7 +1296,7 @@ module Documentation = struct
       ~__POS__
       ~name:"documentation:linkcheck"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.test
       ~dependencies
         (* Warning: the [documentation:linkcheck] job must have at least the same
            restrictions in the rules as [documentation:build_all], otherwise the CI
@@ -1350,9 +1322,9 @@ module Documentation = struct
     let dependencies = mk_artifact_dependencies ?dependencies [job_build_all] in
     job
       ~__POS__
-      ~name:"publish:documentation"
+      ~name:"documentation:publish"
       ~image:Images.CI.test
-      ~stage:Stages.doc
+      ~stage:Stages.publish
       ~dependencies
       ~before_script:
         (before_script

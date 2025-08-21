@@ -1,0 +1,19 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name test)
+ (libraries
+  octez-rust-deps
+  bls12-381.archive
+  bls12-381
+  octez-libs.octez-profiler.backends
+  octez-libs.crypto
+  octez-libs.tezos-bees
+  octez-shell-libs.client-base-unix)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (link_flags
+  (:standard)
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall)))

@@ -115,11 +115,12 @@ module type INJECTOR_OPERATION = sig
     order : Z.t option;
     counter : Z.t;
     operation : operation;
+    scope : Opentelemetry.Scope.t option;
     mutable errors : errors;
   }
 
   (** [make op] returns an L1 operation with the corresponding hash. *)
-  val make : ?order:Z.t -> operation -> t
+  val make : ?order:Z.t -> ?scope:Opentelemetry.Scope.t -> operation -> t
 
   (** Encoding for L1 operations *)
   val encoding : t Data_encoding.t

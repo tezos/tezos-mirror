@@ -69,6 +69,7 @@ type outbox_message_filter =
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  etherlink : bool;
   boot_sector_file : string option;
   operators : Purpose.operators;
   rpc_addr : string;
@@ -101,6 +102,7 @@ type t = {
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -130,7 +132,9 @@ let default_storage_dir data_dir = Filename.concat data_dir storage_dir
 
 let default_context_dir data_dir = Filename.concat data_dir context_dir
 
-let config_filename ~data_dir = Filename.concat data_dir "config.json"
+let config_filename ~data_dir = function
+  | Some path -> path
+  | None -> Filename.concat data_dir "config.json"
 
 let default_rpc_addr = "127.0.0.1"
 
@@ -505,6 +509,7 @@ let encoding default_display : t Data_encoding.t =
   conv
     (fun {
            sc_rollup_address;
+           etherlink;
            boot_sector_file;
            operators;
            rpc_addr;
@@ -516,7 +521,7 @@ let encoding default_display : t Data_encoding.t =
            fee_parameters;
            mode;
            loser_mode;
-           apply_unsafe_patches = _;
+           apply_unsafe_patches;
            execute_outbox_messages_filter;
            unsafe_pvm_patches;
            dal_node_endpoint;
@@ -537,8 +542,10 @@ let encoding default_display : t Data_encoding.t =
            history_mode;
            cors;
            bail_on_disagree;
+           opentelemetry;
          } ->
       ( ( ( sc_rollup_address,
+            Some etherlink,
             boot_sector_file,
             operators,
             rpc_addr,
@@ -550,6 +557,7 @@ let encoding default_display : t Data_encoding.t =
             fee_parameters,
             mode,
             loser_mode,
+            apply_unsafe_patches,
             unsafe_pvm_patches,
             execute_outbox_messages_filter ) ),
         ( ( dal_node_endpoint,
@@ -565,9 +573,14 @@ let encoding default_display : t Data_encoding.t =
               irmin_cache_size,
               log_kernel_debug,
               unsafe_disable_wasm_kernel_checks ),
-            (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
-          ) ) ))
+            ( no_degraded,
+              gc_parameters,
+              history_mode,
+              cors,
+              bail_on_disagree,
+              opentelemetry ) ) ) ))
     (fun ( ( ( sc_rollup_address,
+               etherlink,
                boot_sector_file,
                operators,
                rpc_addr,
@@ -579,6 +592,7 @@ let encoding default_display : t Data_encoding.t =
                fee_parameters,
                mode,
                loser_mode,
+               apply_unsafe_patches,
                unsafe_pvm_patches,
                execute_outbox_messages_filter ) ),
            ( ( dal_node_endpoint,
@@ -594,10 +608,18 @@ let encoding default_display : t Data_encoding.t =
                  irmin_cache_size,
                  log_kernel_debug,
                  unsafe_disable_wasm_kernel_checks ),
-               (no_degraded, gc_parameters, history_mode, cors, bail_on_disagree)
-             ) ) ) ->
+               ( no_degraded,
+                 gc_parameters,
+                 history_mode,
+                 cors,
+                 bail_on_disagree,
+                 opentelemetry ) ) ) ) ->
       {
         sc_rollup_address;
+        etherlink =
+          (match etherlink with
+          | Some b -> b
+          | None -> Address.is_etherlink sc_rollup_address);
         boot_sector_file;
         operators;
         rpc_addr;
@@ -609,10 +631,7 @@ let encoding default_display : t Data_encoding.t =
         fee_parameters;
         mode;
         loser_mode;
-        apply_unsafe_patches =
-          (* Flag --apply-unsafe-patches must always be given on command
-             line. *)
-          false;
+        apply_unsafe_patches;
         unsafe_pvm_patches;
         execute_outbox_messages_filter;
         dal_node_endpoint;
@@ -633,14 +652,21 @@ let encoding default_display : t Data_encoding.t =
         history_mode;
         cors;
         bail_on_disagree;
+        opentelemetry;
       })
     (merge_objs
        (merge_objs
-          (obj6
+          (obj7
              (req
                 "smart-rollup-address"
                 ~description:"Smart rollup address"
                 Tezos_crypto.Hashed.Smart_rollup_address.encoding)
+             (opt
+                "etherlink"
+                ~description:
+                  "Whether the rollup is an Etherlink rollup. Defaults to \
+                   identification based on known Etherlink addresses."
+                bool)
              (opt "boot-sector" ~description:"Boot sector" string)
              (dft
                 "smart-rollup-node-operator"
@@ -656,7 +682,7 @@ let encoding default_display : t Data_encoding.t =
                 ~description:"Access control list"
                 Tezos_rpc_http_server.RPC_server.Acl.policy_encoding
                 default_acl))
-          (obj8
+          (obj9
              (opt "metrics-addr" ~description:"Metrics address" string)
              (dft "performance-metrics" bool true)
              (dft
@@ -683,6 +709,13 @@ let encoding default_display : t Data_encoding.t =
                    (for test only!)"
                 Loser_mode.encoding
                 Loser_mode.no_failures)
+             (dft
+                "apply-unsafe-patches"
+                ~description:
+                  "Apply the unsafe PVM patches for this rollup (either user \
+                   provided or hardcoded)."
+                bool
+                false)
              (dft
                 "unsafe-pvm-patches"
                 ~description:
@@ -724,7 +757,7 @@ let encoding default_display : t Data_encoding.t =
                    "unsafe-disable-wasm-kernel-checks"
                    Data_encoding.bool
                    false))
-             (obj5
+             (obj6
                 (dft "no-degraded" Data_encoding.bool false)
                 (dft
                    "gc-parameters"
@@ -732,7 +765,12 @@ let encoding default_display : t Data_encoding.t =
                    default_gc_parameters)
                 (opt "history-mode" history_mode_encoding)
                 (dft "cors" cors_encoding Resto_cohttp.Cors.default)
-                (dft "bail-on-disagree" bool false)))))
+                (dft "bail-on-disagree" bool false)
+                (dft
+                   "opentelemetry"
+                   ~description:"Enable or disable opentelemetry profiling"
+                   Octez_telemetry.Opentelemetry_config.encoding
+                   Octez_telemetry.Opentelemetry_config.default)))))
 
 let encoding_no_default = encoding `Show
 
@@ -807,23 +845,22 @@ let override_acl ~rpc_addr ~rpc_port acl = function
       in
       Tezos_rpc_http_server.RPC_server.Acl.put_policy (addr, new_acl) acl
 
-let save ~force ~data_dir config =
+let save ~force ~config_file config =
   loser_warning_message config ;
   let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding config in
-  let config_file = config_filename ~data_dir in
   let*! exists = Lwt_unix.file_exists config_file in
   if exists && not force then
     failwith
       "Configuration file %S already exists. Use --force to overwrite."
       config_file
   else
-    let*! () = Lwt_utils_unix.create_dir data_dir in
+    let*! () = Lwt_utils_unix.create_dir (Filename.dirname config_file) in
     Lwt_utils_unix.Json.write_file config_file json
 
-let load ~data_dir =
+let load ~config_file =
   let open Lwt_result_syntax in
-  let+ json = Lwt_utils_unix.Json.read_file (config_filename ~data_dir) in
+  let+ json = Lwt_utils_unix.Json.read_file config_file in
   let config = Data_encoding.Json.destruct encoding json in
   loser_warning_message config ;
   config
@@ -849,7 +886,8 @@ module Cli = struct
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
     let*? purposed_operators, default_operator =
       get_purposed_and_default_operators operators
@@ -867,6 +905,7 @@ module Cli = struct
     return
       {
         sc_rollup_address;
+        etherlink = force_etherlink || Address.is_etherlink sc_rollup_address;
         boot_sector_file;
         operators;
         rpc_addr;
@@ -918,6 +957,11 @@ module Cli = struct
                 Option.value ~default:default.allowed_origins allowed_origins;
             };
         bail_on_disagree;
+        opentelemetry =
+          (match profiling with
+          | None -> Octez_telemetry.Opentelemetry_config.default
+          | Some enable ->
+              {Octez_telemetry.Opentelemetry_config.default with enable});
       }
 
   let patch_configuration_from_args configuration ~rpc_addr ~rpc_port
@@ -927,7 +971,8 @@ module Cli = struct
       ~sc_rollup_address ~boot_sector_file ~operators ~index_buffer_size
       ~irmin_cache_size ~log_kernel_debug ~no_degraded ~gc_frequency
       ~history_mode ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
     let mode = Option.value ~default:configuration.mode mode in
     let*? () = check_custom_mode mode in
@@ -944,6 +989,13 @@ module Cli = struct
     let rpc_addr = Option.value ~default:configuration.rpc_addr rpc_addr in
     let rpc_port = Option.value ~default:configuration.rpc_port rpc_port in
     let acl = override_acl ~rpc_addr ~rpc_port configuration.acl acl_override in
+    let* () =
+      when_ ((not apply_unsafe_patches) && configuration.apply_unsafe_patches)
+      @@ fun () ->
+      failwith
+        "Configuration is registered to apply unsafe PVM patches. Flag \
+         --apply-unsafe-patches must always be given on command line."
+    in
     return
       {
         configuration with
@@ -951,6 +1003,7 @@ module Cli = struct
           Option.value
             ~default:configuration.sc_rollup_address
             sc_rollup_address;
+        etherlink = force_etherlink || configuration.etherlink;
         boot_sector_file =
           Option.either boot_sector_file configuration.boot_sector_file;
         operators;
@@ -1018,35 +1071,27 @@ module Cli = struct
                   allowed_origins;
             };
         bail_on_disagree = bail_on_disagree || configuration.bail_on_disagree;
+        opentelemetry =
+          (match profiling with
+          | None -> configuration.opentelemetry
+          | Some enable -> {configuration.opentelemetry with enable});
       }
 
-  let create_or_read_config ~data_dir ~rpc_addr ~rpc_port ~acl_override
+  let create_or_read_config ~config_file ~rpc_addr ~rpc_port ~acl_override
       ~metrics_addr ~disable_performance_metrics ~loser_mode ~reconnection_delay
       ~dal_node_endpoint ~pre_images_endpoint ~injector_retention_period
       ~injector_attempts ~injection_ttl ~mode ~sc_rollup_address
       ~boot_sector_file ~operators ~index_buffer_size ~irmin_cache_size
       ~log_kernel_debug ~no_degraded ~gc_frequency ~history_mode
       ~allowed_origins ~allowed_headers ~apply_unsafe_patches
-      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree =
+      ~unsafe_disable_wasm_kernel_checks ~bail_on_disagree ~profiling
+      ~force_etherlink =
     let open Lwt_result_syntax in
-    let open Filename.Infix in
-    (* Check if the data directory of the smart rollup node is not the one of Octez node *)
-    let* () =
-      let*! identity_file_in_data_dir_exists =
-        Lwt_unix.file_exists (data_dir // "identity.json")
-      in
-      if identity_file_in_data_dir_exists then
-        failwith
-          "Invalid data directory. This is a data directory for an Octez node, \
-           please choose a different directory for the smart rollup node data."
-      else return_unit
-    in
-    let config_file = config_filename ~data_dir in
     let*! exists_config = Lwt_unix.file_exists config_file in
     if exists_config then
       (* Read configuration from file and patch if user wanted to override
          some fields with values provided by arguments. *)
-      let* configuration = load ~data_dir in
+      let* configuration = load ~config_file in
       let* configuration =
         patch_configuration_from_args
           configuration
@@ -1077,6 +1122,8 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~profiling
+          ~force_etherlink
       in
       return configuration
     else
@@ -1128,6 +1175,8 @@ module Cli = struct
           ~apply_unsafe_patches
           ~unsafe_disable_wasm_kernel_checks
           ~bail_on_disagree
+          ~profiling
+          ~force_etherlink
       in
       return config
 end

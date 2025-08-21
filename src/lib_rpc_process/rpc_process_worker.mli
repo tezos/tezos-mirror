@@ -53,7 +53,12 @@ val create :
     until the restart is successful.
     The promise is blocking until the RPC server is fully
     available to answer to RPCs. *)
-val start : process -> unit tzresult Lwt.t
+val start :
+  Config_file.t ->
+  Internal_event_config.t ->
+  string ->
+  Tezos_version.Octez_node_version.t ->
+  (process, tztrace) result Lwt.t
 
 (** Stops gracefully the RPC process worker*)
 val stop : process -> unit Lwt.t

@@ -53,3 +53,6 @@ let committer_date =
 let octez_version = Generated_git_info.git_describe_octez
 
 let octez_evm_node_version = Generated_git_info.git_describe_octez_evm_node
+
+let octez_smart_rollup_node_version =
+  Generated_git_info.git_describe_octez_smart_rollup_node

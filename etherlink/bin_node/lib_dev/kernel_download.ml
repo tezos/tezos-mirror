@@ -62,7 +62,7 @@ let rec reveal_and_check ~preimages_endpoint ~preimages ~num_download_retries
     hash =
   let open Lwt_result_syntax in
   let*! preimage =
-    Commands.reveal_preimage
+    Octez_smart_rollup_wasm_debugger_lib.Commands.reveal_preimage
       ~preimages_endpoint
       ~preimages
       0

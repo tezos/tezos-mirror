@@ -6,14 +6,11 @@ workflow:
   - if: $foo != "bar" || $foo == "bar"
     when: always
 
-variables:
-  PIPELINE_TYPE: rpm_repository_full
-
 stages:
 - start
 - images
 - build
-- publishing
+- publish
 - publishing_tests
 
 datadog_pipeline_trace:
@@ -32,13 +29,14 @@ datadog_pipeline_trace:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 oc.docker-build-rockylinux-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -60,17 +58,18 @@ oc.docker-build-rockylinux-dependencies:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-systemd_tests-rpm:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+oc.docker-systemd-tests-rpm-rockylinux:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
@@ -87,7 +86,7 @@ oc.docker-systemd_tests-rpm:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-rockylinux:
@@ -105,6 +104,7 @@ oc.build-rockylinux:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -131,7 +131,7 @@ oc.build-rockylinux:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 oc.build-rockylinux-data:
@@ -149,6 +149,7 @@ oc.build-rockylinux-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -175,12 +176,12 @@ oc.build-rockylinux-data:
     - RELEASE:
       - "9.3"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_rockylinux:
   image: rockylinux:9.3
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -191,6 +192,7 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -209,13 +211,14 @@ rpm_repo_rockylinux:
     - runner_system_failure
 
 oc.docker-build-fedora-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - $TAGS
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
@@ -238,7 +241,36 @@ oc.docker-build-fedora-dependencies:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
+      - gcp_arm64
+
+oc.docker-systemd-tests-rpm-fedora:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - $TAGS
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    FLAVOUR: systemd-tests
+    DEP_IMAGE: ${GCP_REGISTRY}/$CI_PROJECT_NAMESPACE/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
+    DISTRIBUTION: fedora
+  parallel:
+    matrix:
+    - RELEASE:
+      - "39"
+      - "42"
+      TAGS:
+      - gcp_very_high_cpu
       - gcp_arm64
 
 oc.build-fedora:
@@ -256,6 +288,7 @@ oc.build-fedora:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -283,7 +316,7 @@ oc.build-fedora:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
 oc.build-fedora-data:
@@ -301,6 +334,7 @@ oc.build-fedora-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
@@ -328,12 +362,12 @@ oc.build-fedora-data:
       - "39"
       - "42"
       TAGS:
-      - gcp
+      - gcp_very_high_cpu
       - gcp_arm64
 
 rpm_repo_fedora:
   image: fedora:39
-  stage: publishing
+  stage: publish
   tags:
   - gcp
   needs:
@@ -344,6 +378,7 @@ rpm_repo_fedora:
   - oc.build-fedora-data
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   script:
@@ -361,24 +396,6 @@ rpm_repo_fedora:
     - stuck_or_timeout_failure
     - runner_system_failure
 
-oc.install_bin_fedora_39:
-  image: fedora:39
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - rpm_repo_fedora
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./scripts/packaging/tests/rpm/rpm-install.sh fedora 39
-  variables: {}
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
-
 oc.install_bin_fedora_39.doc:
   image: fedora:39
   stage: publishing_tests
@@ -388,6 +405,8 @@ oc.install_bin_fedora_39.doc:
   - rpm_repo_fedora
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-bin-rpm.sh fedora 39
   variables: {}
@@ -398,19 +417,22 @@ oc.install_bin_fedora_39.doc:
     - runner_system_failure
 
 oc.install_bin_fedora_39_systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests-rpm
+  - oc.docker-systemd-tests-rpm-fedora
   - rpm_repo_fedora
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
-  - ./scripts/ci/systemd-packages-test.sh docs/introduction/install-bin-rpm.sh images/packages/rpm-systemd-tests.Dockerfile
+  - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
+    images/packages/rpm-systemd-tests.Dockerfile
   services:
   - docker:${DOCKER_VERSION}-dind
   variables:
@@ -420,19 +442,6 @@ oc.install_bin_fedora_39_systemd:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: fedora
     RELEASE: "39"
-
-oc.install_bin_rockylinux_9.3:
-  image: rockylinux:9.3
-  stage: publishing_tests
-  tags:
-  - gcp
-  needs:
-  - rpm_repo_rockylinux
-  dependencies: []
-  timeout: 60 minutes
-  script:
-  - ./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3
-  variables: {}
   retry:
     max: 2
     when:
@@ -448,6 +457,8 @@ oc.install_bin_rockylinux_9.3.doc:
   - rpm_repo_rockylinux
   dependencies: []
   timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-bin-rpm.sh rockylinux 9.3
   variables: {}
@@ -458,16 +469,18 @@ oc.install_bin_rockylinux_9.3.doc:
     - runner_system_failure
 
 oc.install_bin_rockylinux_93_systemd:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests-rpm
+  - oc.docker-systemd-tests-rpm-rockylinux
   - rpm_repo_rockylinux
   dependencies: []
+  allow_failure: true
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/systemd-packages-test.sh scripts/packaging/tests/rpm/rpm-install.sh
@@ -481,3 +494,8 @@ oc.install_bin_rockylinux_93_systemd:
     DEP_IMAGE_PROTECTED: ${GCP_PROTECTED_REGISTRY}/tezos/tezos/$FLAVOUR-$DISTRIBUTION-$RELEASE
     DISTRIBUTION: rockylinux
     RELEASE: "9.3"
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure

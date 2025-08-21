@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rustzcash-deps
   octez-libs.error-monad
   octez-libs.stdlib
   octez-libs.crypto
@@ -30,6 +29,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rustzcash-deps
   src_lib_signer_backends_unix_test_tezt_lib
   tezt)
  (link_flags

@@ -14,7 +14,10 @@
   octez-libs.base.unix
   octez-libs.stdlib-unix
   octez-libs.stdlib
-  octez-libs.version)
+  octez-libs.version
+  octez-libs.octez-profiler)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
  (flags
   (:standard)
   -open Tezos_error_monad
@@ -22,4 +25,5 @@
   -open Tezos_base.TzPervasives
   -open Tezos_base_unix
   -open Tezos_stdlib_unix
-  -open Tezos_stdlib))
+  -open Tezos_stdlib
+  -open Tezos_profiler))

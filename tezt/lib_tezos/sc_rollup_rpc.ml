@@ -88,19 +88,6 @@ let get_global_tezos_head () = make GET ["global"; "tezos_head"] Fun.id
 
 let get_global_tezos_level () = make GET ["global"; "tezos_level"] Fun.id
 
-type slot_header = {level : int; commitment : string; index : int}
-
-let get_global_block_dal_slot_headers ?(block = "head") () =
-  make GET ["global"; "block"; block; "dal"; "slot_headers"] (fun json ->
-      JSON.(
-        as_list json
-        |> List.map (fun obj ->
-               {
-                 level = obj |-> "level" |> as_int;
-                 commitment = obj |-> "commitment" |> as_string;
-                 index = obj |-> "index" |> as_int;
-               })))
-
 let get_local_batcher_queue () =
   make GET ["local"; "batcher"; "queue"] (fun json ->
       JSON.as_list json
@@ -166,14 +153,6 @@ let post_global_block_simulate ?(block = "head") ?(reveal_pages = [])
           num_ticks = obj |-> "num_ticks" |> as_string |> int_of_string;
           insights = obj |-> "insights" |> as_list |> List.map as_string_opt;
         })
-
-let get_global_block_dal_processed_slots ?(block = "head") () =
-  make GET ["global"; "block"; block; "dal"; "processed_slots"] (fun json ->
-      JSON.as_list json
-      |> List.map (fun obj ->
-             let index = JSON.(obj |-> "index" |> as_int) in
-             let status = JSON.(obj |-> "status" |> as_string) in
-             (index, status)))
 
 type commitment_and_hash = {
   commitment : RPC.smart_rollup_commitment;

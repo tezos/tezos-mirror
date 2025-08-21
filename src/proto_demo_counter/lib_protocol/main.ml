@@ -306,6 +306,13 @@ module Mempool = struct
 
   let encoding = State.encoding
 
+  let partial_op_validation ?check_signature:_ _ _ = Lwt.return_ok []
+
+  let add_valid_operation ?conflict_handler:_ state (_oph, op)  =
+  match Apply.apply state op.protocol_data with
+    | None -> Error (Validation_error (trace_of_error Error.Invalid_operation))
+    | Some state -> Ok (state, Added)
+
   let add_operation ?check_signature:_ ?conflict_handler:_
       (_info : validation_info) state ((_oph : Operation_hash.t), op) =
     match Apply.apply state op.protocol_data with

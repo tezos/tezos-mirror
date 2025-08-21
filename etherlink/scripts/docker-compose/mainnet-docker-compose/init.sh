@@ -94,17 +94,6 @@ init_evm_node() {
   # here we do "eval" + ${EVM_NODE_CONFIG_ARGS[*]} else the command
   # fails (or shellcheck is unhappy).
   eval "run_in_docker_compose evm-node init config ${EVM_NODE_CONFIG_ARGS[*]}"
-  # download snapshot and import it.
-  if [[ -n ${EVM_NODE_SNAPSHOT_URL} ]]; then
-    # Do not download the snapshot if it already exists.
-    if [ ! -e "${HOST_TEZOS_DATA_DIR}/evm-snapshot" ]; then
-      wget -O "${HOST_TEZOS_DATA_DIR}/evm-snapshot" "${EVM_NODE_SNAPSHOT_URL}"
-    else
-      echo "Snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot already exists, using it."
-    fi
-    echo "importing snapshot ${HOST_TEZOS_DATA_DIR}/evm-snapshot"
-    run_in_docker_compose evm-node snapshot import /home/tezos/evm-snapshot
-  fi
 }
 
 init() {

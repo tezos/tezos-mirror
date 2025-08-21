@@ -567,8 +567,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            `kernel_run`, please open an issue.\n\
            %!"
 
-  let eval_and_profile ~collapse ~with_time ~no_reboot config function_symbols
-      tree =
+  let eval_and_profile ?hooks ~collapse ~with_time ~no_reboot config
+      function_symbols tree =
     let open Lwt_syntax in
     trap_exn (fun () ->
         Format.printf
@@ -578,6 +578,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
            %!" ;
         let+ tree, ticks, graph =
           Prof.eval_and_profile
+            ?hooks
             ~write_debug:(write_debug_default config)
             ~reveal_builtins:(reveals config)
             ~with_time
@@ -681,8 +682,8 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
                  config
                  tree))
 
-  let profile ?migrate_to ~collapse ~with_time ~no_reboot level inboxes config
-      function_symbols tree =
+  let profile ?migrate_to ?hooks ~collapse ~with_time ~no_reboot level inboxes
+      config function_symbols tree =
     let open Lwt_result_syntax in
     let*! pvm_state =
       Wasm_utils.Tree_encoding_runner.decode Wasm_pvm.pvm_state_encoding tree
@@ -704,6 +705,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
         in
         let* tree =
           eval_and_profile
+            ?hooks
             ~collapse
             ~with_time
             ~no_reboot
@@ -715,6 +717,7 @@ module Make (Wasm_utils : Wasm_utils_intf.S) = struct
     | Error _ when is_profilable ->
         let* tree =
           eval_and_profile
+            ?hooks
             ~collapse
             ~with_time
             ~no_reboot

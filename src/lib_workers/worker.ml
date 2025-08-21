@@ -148,6 +148,9 @@ module type T = sig
       Cannot be called from within the handlers.  *)
   val shutdown : _ t -> unit Lwt.t
 
+  (** Waits for completion, but doesn't trigger the shutdown. *)
+  val wait_for_completion : _ t -> unit Lwt.t
+
   module type BOX = sig
     type t
 
@@ -195,6 +198,9 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
+
+  (** Access the internal state if available. *)
+  val state_opt : _ t -> Types.state option
 
   val with_state :
     _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t
@@ -706,13 +712,14 @@ struct
                    close handlers w (Some errs)))
           [@profiler.wrap_f
             {driver_ids = [Opentelemetry]}
-              (Tezos_profiler_backend.Opentelemetry_profiler.update_scope
+              (Tezos_profiler_complex_backends.Opentelemetry_profiler
+               .update_scope
                  _scope)])
     in
     let* r = protect_result ~canceler:w.canceler (fun () -> loop ()) in
     match r with
     | Ok () -> Lwt.return_unit
-    | Error Lwt.Canceled | Error Lwt_pipe.Closed | Error Lwt_dropbox.Closed ->
+    | Error (Lwt.Canceled | Lwt_pipe.Closed | Lwt_dropbox.Closed) ->
         let* () = Worker_events.(emit terminated) () in
         close handlers w None
     | Error exn ->
@@ -799,6 +806,8 @@ struct
     let* () = Error_monad.cancel_with_exceptions w.canceler in
     w.worker
 
+  let wait_for_completion w = w.worker
+
   let state w =
     match (w.state, w.status) with
     | None, Launching _ ->
@@ -817,6 +826,8 @@ struct
              w.name)
     | None, _ -> assert false
     | Some state, _ -> state
+
+  let state_opt w = w.state
 
   let with_state :
       _ t -> (Types.state -> (unit, 'b) result Lwt.t) -> (unit, 'b) result Lwt.t

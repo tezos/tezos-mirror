@@ -5,32 +5,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  fast_exec_invalid_kernel :
+type fast_exec = {
+  invalid_kernel :
     [`Check_with_hook of (unit -> unit Lwt.t) option | `No_check];
-  fast_exec_panicked : (exn -> unit Lwt.t) option;
-  fast_exec_completed : (unit -> unit Lwt.t) option;
-  fast_exec_fallback : bool;
+  panicked : (exn -> unit Lwt.t) option;
+  completed : (unit -> unit Lwt.t) option;
+  fallback : bool;
 }
+
+type pvm = {reboot : (int64 -> unit Lwt.t) option}
+
+type t = {fast_exec : fast_exec; pvm : pvm}
 
 let no_hooks =
   {
-    fast_exec_invalid_kernel = `Check_with_hook None;
-    fast_exec_panicked = None;
-    fast_exec_completed = None;
-    fast_exec_fallback = true;
+    fast_exec =
+      {
+        invalid_kernel = `Check_with_hook None;
+        panicked = None;
+        completed = None;
+        fallback = true;
+      };
+    pvm = {reboot = None};
   }
 
 let disable_fast_exec_invalid_kernel_check hooks =
-  {hooks with fast_exec_invalid_kernel = `No_check}
+  {hooks with fast_exec = {hooks.fast_exec with invalid_kernel = `No_check}}
 
 let on_fast_exec_invalid_kernel hook hooks =
-  {hooks with fast_exec_invalid_kernel = `Check_with_hook (Some hook)}
+  {
+    hooks with
+    fast_exec =
+      {hooks.fast_exec with invalid_kernel = `Check_with_hook (Some hook)};
+  }
 
 let on_fast_exec_panicked hook hooks =
-  {hooks with fast_exec_panicked = Some hook}
+  {hooks with fast_exec = {hooks.fast_exec with panicked = Some hook}}
 
 let on_fast_exec_completed hook hooks =
-  {hooks with fast_exec_completed = Some hook}
+  {hooks with fast_exec = {hooks.fast_exec with completed = Some hook}}
 
-let fast_exec_fallback c hooks = {hooks with fast_exec_fallback = c}
+let fast_exec_fallback c hooks =
+  {hooks with fast_exec = {hooks.fast_exec with fallback = c}}
+
+let on_pvm_reboot hook hooks = {hooks with pvm = {reboot = Some hook}}

@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.base
   octez-libs.tree-encoding
   octez-libs.base.unix
@@ -43,6 +42,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_scoru_wasm_fast_test_tezt_lib
   tezt)
  (modules main))

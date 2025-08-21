@@ -96,7 +96,7 @@ val prepare :
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
+  | (* Alpha predecessor *) S023 (* Alpha predecessor *)
 
 (** Prepares the context for the first block of the protocol.
 
@@ -264,6 +264,8 @@ type consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 val consensus_pk_encoding : consensus_pk Data_encoding.t
@@ -293,6 +295,30 @@ val sampler_for_cycle :
   t ->
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
+
+(** [init_stake_info_for_cycle ctxt cycle total_stake stakes_pk] caches the stakes
+    of the active delegates for [cycle] in memory for quick access.
+
+    @return [Error Stake_info_already_set] if the info was already
+    cached. *)
+val init_stake_info_for_cycle :
+  t ->
+  Cycle_repr.t ->
+  Stake_repr.t ->
+  (consensus_pk * Int64.t) list ->
+  t tzresult
+
+(** [stake_info_for_cycle ~read ctxt cycle] returns the stakes
+    for [cycle]. The stake info is read in memory if
+    [init_stake_info_for_cycle] or [stake_info_for_cycle] was previously
+    called for the same [cycle]. Otherwise, it is read "on-disk" with
+    the [read] function and then cached in [ctxt] like
+    [init_stake_info_for_cycle]. *)
+val stake_info_for_cycle :
+  read:(t -> (Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
+  t ->
+  Cycle_repr.t ->
+  (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t
 
 (* The stake distribution is stored both in [t] and in the cache. It
    may be sufficient to only store it in the cache. *)
@@ -334,6 +360,8 @@ module type CONSENSUS = sig
 
   type 'value slot_map
 
+  type 'value level_map
+
   type slot_set
 
   type slot
@@ -349,6 +377,12 @@ module type CONSENSUS = sig
 
   (** See {!allowed_attestations}. *)
   val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
+
+  (** Returns a map that associates a level with a slot map.
+      The slot map links a delegate's public key to a tuple containing
+      (minimal_slot, voting_power, dal_power). See {!allowed_attestations} *)
+  val allowed_consensus :
+    t -> (consensus_pk * int * int) slot_map level_map option
 
   (** Returns the set of delegates that are not allowed to bake or
       attest blocks; i.e., delegates which have zero frozen deposit
@@ -369,6 +403,7 @@ module type CONSENSUS = sig
     t ->
     allowed_attestations:(consensus_pk * int * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int * int) slot_map option ->
+    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
     t
 
   (** [record_attestation ctx ~initial_slot ~power] records an
@@ -427,6 +462,7 @@ module Consensus :
     with type t := t
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
+     and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type consensus_pk := consensus_pk

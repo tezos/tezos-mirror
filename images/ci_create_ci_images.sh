@@ -5,6 +5,7 @@
 # Reads the following environment variables:
 #  - 'ci_image_name'
 #  - 'ci_image_tag' (optional)
+#  - 'DOCKER_FORCE_BUILD': set by the operator
 #  - 'ARCH'
 #  - 'CI_COMMIT_REF_SLUG': set by GitLab CI
 #  - 'CI_DEFAULT_BRANCH': set by GitLab CI
@@ -50,6 +51,8 @@ cd "$repo_dir"
 # ci_image_name is set in the variables of '.gitlab-ci.yml'
 # shellcheck disable=SC2154
 image_base="${ci_image_name}"
+# shellcheck disable=SC2154
+image_name_protected="${ci_image_name_protected}"
 
 arch=${ARCH:-amd64}
 
@@ -68,26 +71,38 @@ echo "ci_image_tag=$image_tag" > ci_image_tag.env
 
 # Build images unless they already exists in the registry..
 exists="true"
-for layer_target in $valid_layer_targets; do
-  image_name="${image_base}/${layer_target}:${image_tag}"
-  if ! docker manifest inspect "${image_name}" > /dev/null 2>&1; then
-    echo "Image ${image_name} does not exists in the registry, re-build."
-    exists="false"
-  else
-    image_name_extra=${image_base}/${layer_target}:${arch}--${CI_COMMIT_REF_SLUG}
-    echo "Image ${image_name} already exists in the registry, update tag ${image_name_extra}."
-    regctl image copy "${image_name}" "${image_name_extra}"
-  fi
-done
-if [ "$exists" = "true" ]; then
-  echo "CI images at ${image_base} with tag suffix ${image_tag_suffix} already exists in the registry, do nothing."
-  exit 0
-fi
 
+# Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
+# for security updates purposes)
+skip_registry_cache_check=${DOCKER_FORCE_BUILD:-"false"}
+docker_no_cache_option_placeholder="--no-cache"
+
+if [ "$skip_registry_cache_check" != "true" ]; then
+  docker_no_cache_option_placeholder=""
+  for layer_target in $valid_layer_targets; do
+    image_name="${image_base}/${layer_target}:${image_tag}"
+    if ! docker manifest inspect "${image_name}" > /dev/null 2>&1; then
+      echo "Image ${image_name} does not exist in the registry, re-build."
+      exists="false"
+    else
+      image_name_extra=${image_base}/${layer_target}:${arch}--${CI_COMMIT_REF_SLUG}
+      echo "Image ${image_name} already exists in the registry, update tag ${image_name_extra}."
+      regctl image copy "${image_name}" "${image_name_extra}"
+    fi
+  done
+  if [ "$exists" = "true" ]; then
+    echo "CI images at ${image_base} with tag suffix ${image_tag_suffix} already exists in the registry, do nothing."
+    exit 0
+  fi
+fi
+if [ "$skip_registry_cache_check" = "true" ]; then
+  echo "Force rebuild of CI images, using no cached layers"
+fi
 echo "Build CI images with image_tag_suffix $image_tag_suffix"
 
 ./images/create_ci_images.sh \
   --image-base "${image_base}" \
+  --image-base-protected "${image_name_protected}" \
   --tag-suffix "${image_tag_suffix}" \
   --tag-cache-suffix "${CI_DEFAULT_BRANCH}" \
   --tag-extra "${CI_COMMIT_REF_SLUG}" \
@@ -98,7 +113,9 @@ echo "Build CI images with image_tag_suffix $image_tag_suffix"
   --label "com.tezos.build-job-id"="${CI_JOB_ID}" \
   --label "com.tezos.build-job-url"="${CI_JOB_URL}" \
   --label "com.tezos.build-tezos-revision"="${CI_COMMIT_SHA}" \
-  --push
+  --secret "id=npm_token,src=/tmp/npm_token.txt" \
+  --push \
+  $docker_no_cache_option_placeholder
 
 ./images/ci/scripts/check_versions.sh \
   "${image_base}" "${image_tag_suffix}" "${arch}"

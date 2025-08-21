@@ -75,17 +75,46 @@ type history_mode =
       (** Keep all blocks and transactions. Keep operations and states for a period defined by
               {!type-garbage_collector_parameters}. *)
 
+(** Compare history modes and ignore [garbage_collector_parameters] *)
+val history_mode_partial_eq : history_mode -> history_mode -> bool
+
 (** RPC server implementation. *)
 type rpc_server =
   | Resto  (** Resto/Cohttp (default) *)
   | Dream  (** Dream/httpun *)
 
+(** Profiling mode for PVM execution. *)
+type profile_mode = Minimal | Flamegraph
+
 (** Parameters for monitoring websocket connection heartbeats. *)
 type monitor_websocket_heartbeat = {ping_interval : float; ping_timeout : float}
 
-val chain_id : supported_network -> Ethereum_types.chain_id
+val chain_id : supported_network -> L2_types.chain_id
 
-type l2_chain = {chain_id : Ethereum_types.chain_id}
+type l2_chain = {
+  chain_id : L2_types.chain_id;
+  chain_family : L2_types.ex_chain_family;
+}
+
+type tx_queue = {
+  max_size : int;
+  max_transaction_batch_length : int option;
+  max_lifespan_s : int;
+  tx_per_addr_limit : int64;
+}
+
+type websocket_rate_limit = {
+  max_frames : int;
+  max_messages : int option;
+  interval : int;
+  strategy : [`Wait | `Error | `Close];
+}
+
+type websockets_config = {
+  max_message_length : int;
+  monitor_heartbeat : monitor_websocket_heartbeat option;
+  rate_limit : websocket_rate_limit option;
+}
 
 (** Configuration settings for experimental features, with no backward
     compatibility guarantees. *)
@@ -95,39 +124,32 @@ type experimental_features = {
   enable_send_raw_transaction : bool;
   overwrite_simulation_tick_limit : bool;
   rpc_server : rpc_server;
-  enable_websocket : bool;
-  max_websocket_message_length : int;
-  monitor_websocket_heartbeat : monitor_websocket_heartbeat option;
+  spawn_rpc : int option;
   l2_chains : l2_chain list option;
+  enable_tx_queue : tx_queue option;
+  periodic_snapshot_path : string option;
 }
+
+type gcp_key = {
+  project : string;
+  keyring : string;
+  region : string;
+  key : string;
+  version : int;
+}
+
+type sequencer_key = Wallet of Client_keys.sk_uri | Gcp_key of gcp_key
 
 type sequencer = {
   time_between_blocks : time_between_blocks;
       (** See {!type-time_between_blocks}. *)
   max_number_of_chunks : int;
       (** The maximum number of chunks per blueprints. *)
-  sequencer : Client_keys.sk_uri;  (** The key used to sign the blueprints. *)
+  sequencer : sequencer_key option;  (** The key used to sign the blueprints. *)
   blueprints_publisher_config : blueprints_publisher_config;
 }
 
-type threshold_encryption_sequencer =
-  | Threshold_encryption_sequencer of {
-      time_between_blocks : time_between_blocks;
-          (** See {!type-time_between_blocks}. *)
-      max_number_of_chunks : int;
-          (** The maximum number of chunks per blueprints. *)
-      sequencer : Client_keys.sk_uri;
-          (** The key used to sign the blueprints. *)
-      blueprints_publisher_config : blueprints_publisher_config;
-      sidecar_endpoint : Uri.t;
-          (** Endpoint of the sequencer sidecar this sequencer connects to. *)
-    }
-
-type observer = {
-  evm_node_endpoint : Uri.t;
-  threshold_encryption_bundler_endpoint : Uri.t option;
-  rollup_node_tracking : bool;
-}
+type observer = {evm_node_endpoint : Uri.t; rollup_node_tracking : bool}
 
 type proxy = {
   finalized_view : bool option;
@@ -162,15 +184,34 @@ type rpc = {
   restricted_rpcs : restricted_rpcs;
 }
 
+type db = {
+  pool_size : int;  (** Size of the database connection pool *)
+  max_conn_reuse_count : int option;
+      (** Maximum number of times a connection can be reused *)
+}
+
+type gcp_authentication_method = Gcloud_auth | Metadata_server
+
+type gcp_kms = {
+  pool_size : int;
+  authentication_method : gcp_authentication_method;
+  authentication_retries : int;
+  authentication_frequency_min : int;
+  authentication_retry_backoff_sec : int;
+  authentication_timeout_sec : int;
+  gcloud_path : string;
+}
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
+  websockets : websockets_config option;
   log_filter : log_filter_config;
   kernel_execution : kernel_execution_config;
-  sequencer : sequencer option;
-  threshold_encryption_sequencer : threshold_encryption_sequencer option;
+  sequencer : sequencer;
   observer : observer option;
   proxy : proxy;
+  gcp_kms : gcp_kms;
   tx_pool_timeout_limit : int64;
   tx_pool_addr_limit : int64;
   tx_pool_tx_per_addr_limit : int64;
@@ -181,7 +222,18 @@ type t = {
   fee_history : fee_history;
   finalized_view : bool;
   history_mode : history_mode option;
+  db : db;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
+
+val is_tx_queue_enabled : t -> bool
+
+(** [chain_family_from_l2_chains t] returns the chain_family in
+  the experimental feature if there's only one chain.
+
+  This function will be removed when multichain is implemented *)
+val retrieve_chain_family :
+  l2_chains:l2_chain list option -> L2_types.ex_chain_family
 
 val history_mode_encoding : history_mode Data_encoding.t
 
@@ -200,75 +252,33 @@ val encoding : ?network:supported_network -> string -> t Data_encoding.t
 (** Encoding for {!type-rpc_server}. *)
 val rpc_server_encoding : rpc_server Data_encoding.t
 
-(** [default_data_dir] is the default value for [data_dir]. *)
-val default_data_dir : string
-
-(** [config_filename data_dir] returns
-    the configuration filename from the [data_dir] *)
-val config_filename : data_dir:string -> string
-
-(** [save ~force ~data_dir configuration] writes the [configuration]
-    file in [data_dir]. If [force] is [true], existing configurations
-    are overwritten. *)
-val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
+(** [save ~force ~data_dir configuration config_file] writes the
+    [config_file] file. If [force] is [true], existing configurations are
+    overwritten. *)
+val save : force:bool -> data_dir:string -> t -> string -> unit tzresult Lwt.t
 
 val load_file :
   ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
-(** [load ~data_dir] loads a proxy configuration stored in [data_dir]. *)
+(** [load ~data_dir config_file] loads the configuration stored in
+    [config_file] with preimage directory relative to [data_dir]. *)
 val load :
-  ?network:supported_network -> data_dir:string -> unit -> t tzresult Lwt.t
+  ?network:supported_network -> data_dir:string -> string -> t tzresult Lwt.t
 
-(** [sequencer_config_exn config] returns the sequencer config of
-    [config] or fails *)
-val sequencer_config_exn : t -> sequencer tzresult
+(** [sequencer_key config] returns the key the sequencer should use, or
+    fails. *)
+val sequencer_key : t -> sequencer_key tzresult
 
-(** [threshold_encryption_sequencer_config_exn config] returns the threshold
-    encryption sequencer config of [config] or fails. *)
-val threshold_encryption_sequencer_config_exn :
-  t -> threshold_encryption_sequencer tzresult
+val gcp_key_from_string_opt : string -> gcp_key option
 
 (** [observer_config_exn config] returns the observer config of
     [config] or fails *)
 val observer_config_exn : t -> observer tzresult
 
-(** [sequencer_config_dft ()] returns the default sequencer config
-    populated with given value. *)
-val sequencer_config_dft :
-  ?time_between_blocks:time_between_blocks ->
-  ?max_number_of_chunks:int ->
-  sequencer:Client_keys.sk_uri ->
-  ?max_blueprints_lag:int ->
-  ?max_blueprints_ahead:int ->
-  ?max_blueprints_catchup:int ->
-  ?catchup_cooldown:int ->
-  ?dal_slots:int list ->
-  unit ->
-  sequencer
-
-(** [threshold_encryption_sequencer_config_dft ()] returns the default
-    threshold encryption sequencer config populated with given value. *)
-val threshold_encryption_sequencer_config_dft :
-  ?time_between_blocks:time_between_blocks ->
-  ?max_number_of_chunks:int ->
-  sequencer:Client_keys.sk_uri ->
-  ?sidecar_endpoint:Uri.t ->
-  ?max_blueprints_lag:int ->
-  ?max_blueprints_ahead:int ->
-  ?max_blueprints_catchup:int ->
-  ?catchup_cooldown:int ->
-  ?dal_slots:int list ->
-  unit ->
-  threshold_encryption_sequencer
-
 (** [observer_config_dft ()] returns the default observer config
     populated with given value. *)
 val observer_config_dft :
-  evm_node_endpoint:Uri.t ->
-  ?threshold_encryption_bundler_endpoint:Uri.t ->
-  ?rollup_node_tracking:bool ->
-  unit ->
-  observer
+  evm_node_endpoint:Uri.t -> ?rollup_node_tracking:bool -> unit -> observer
 
 val make_pattern_restricted_rpcs : string -> restricted_rpcs
 
@@ -292,6 +302,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -299,15 +310,15 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
@@ -315,7 +326,6 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
@@ -331,6 +341,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string trace ->
     ?cors_headers:string trace ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -338,15 +349,15 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
@@ -354,7 +365,6 @@ module Cli : sig
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
     ?catchup_cooldown:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
@@ -370,6 +380,7 @@ module Cli : sig
     ?rpc_batch_limit:limit ->
     ?cors_origins:string list ->
     ?cors_headers:string list ->
+    ?enable_websocket:bool ->
     ?tx_pool_timeout_limit:int64 ->
     ?tx_pool_addr_limit:int64 ->
     ?tx_pool_tx_per_addr_limit:int64 ->
@@ -377,15 +388,15 @@ module Cli : sig
     ?rollup_node_endpoint:Uri.t ->
     ?dont_track_rollup_node:bool ->
     ?verbose:bool ->
+    ?profiling:bool ->
     ?preimages:string ->
     ?preimages_endpoint:Uri.t ->
     ?native_execution_policy:native_execution_policy ->
     ?time_between_blocks:time_between_blocks ->
     ?max_number_of_chunks:int ->
     ?private_rpc_port:int ->
-    ?sequencer_key:Client_keys.sk_uri ->
+    ?sequencer_key:sequencer_key ->
     ?evm_node_endpoint:Uri.t ->
-    ?threshold_encryption_bundler_endpoint:Uri.t ->
     ?max_blueprints_lag:int ->
     ?max_blueprints_ahead:int ->
     ?max_blueprints_catchup:int ->
@@ -393,14 +404,13 @@ module Cli : sig
     ?log_filter_max_nb_blocks:int ->
     ?log_filter_max_nb_logs:int ->
     ?log_filter_chunk_size:int ->
-    ?sequencer_sidecar_endpoint:Uri.t ->
     ?restricted_rpcs:restricted_rpcs ->
     ?finalized_view:bool ->
     ?proxy_ignore_block_param:bool ->
     ?dal_slots:int list ->
     ?network:supported_network ->
     ?history_mode:history_mode ->
-    unit ->
+    string ->
     t tzresult Lwt.t
 end
 
@@ -413,3 +423,7 @@ val pp_time_between_blocks : Format.formatter -> time_between_blocks -> unit
 val describe : unit -> unit
 
 val pp_print_json : data_dir:string -> Format.formatter -> t -> unit
+
+val observer_evm_node_endpoint : supported_network -> string
+
+val default_gcp_kms : gcp_kms

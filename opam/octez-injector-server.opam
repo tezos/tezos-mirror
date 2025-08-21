@@ -10,20 +10,20 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-rustzcash-deps" { = version }
+  "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
   "octez-injector" { = version }
   "octez-shell-libs" { = version }
 ]
 depopts: [
-  "tezos-injector-021-PsQuebec"
   "tezos-injector-022-PsRiotum"
+  "tezos-injector-023-PtSeouLo"
   "tezos-injector-alpha"
 ]
 conflicts: [
-  "tezos-injector-021-PsQuebec" { != version }
   "tezos-injector-022-PsRiotum" { != version }
+  "tezos-injector-023-PtSeouLo" { != version }
   "tezos-injector-alpha" { != version }
 ]
 build: [

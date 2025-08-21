@@ -138,3 +138,17 @@ val faketime : string option
 
 (** Where to find binaries path by default in the docker image. *)
 val binaries_path : string
+
+(** How many log rotation until we remove older logs
+    Defaults to 300
+    Use 0 to disable log-rotation *)
+val log_rotation : int
+
+(** The hostname of the host accessed by ssh on which to deploy *)
+val ssh_host : string option
+
+(** Slack channel id to send notifications on *)
+val slack_channel_id : string option
+
+(** Slack authentication token to allow publication *)
+val slack_bot_token : string option

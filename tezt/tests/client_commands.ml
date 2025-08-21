@@ -480,25 +480,20 @@ module Transfer = struct
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
     @@ fun protocol ->
     let* parameter_file =
-      if Protocol.(number protocol > number Quebec) then
-        let* parameter_file =
-          Protocol.write_parameter_file
-            ~base:(Right (protocol, None))
-            [(["allow_tz4_delegate_enable"], `Bool false)]
-        in
-        return (Some parameter_file)
-      else return None
+      Protocol.write_parameter_file
+        ~base:(Right (protocol, None))
+        [(["allow_tz4_delegate_enable"], `Bool false)]
     in
     let* _node, client =
-      Client.init_with_protocol `Client ?parameter_file ~protocol ()
+      Client.init_with_protocol `Client ~parameter_file ~protocol ()
     in
     let* () =
       let Account.{alias; secret_key; _} = Constant.tz4_account in
       Client.import_secret_key client ~alias secret_key
     in
     let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let*? set_delegate_process =
-      Client.set_delegate
+    let set_delegate_process =
+      Client.spawn_set_delegate
         client
         ~src:Constant.tz4_account.public_key_hash
         ~delegate:Constant.tz4_account.public_key_hash
@@ -513,7 +508,7 @@ module Transfer = struct
       ~__FILE__
       ~title:"Set delegate allowed on tz4"
       ~tags:[team; "client"; "set_delegate"; "bls"; "tz4"]
-      ~supports:Protocol.(From_protocol (number Quebec + 1))
+      ~supports:Protocol.(From_protocol 22)
     @@ fun protocol ->
     let* parameter_file =
       Protocol.write_parameter_file
@@ -528,13 +523,177 @@ module Transfer = struct
       Client.import_secret_key client ~alias secret_key
     in
     let* () = airdrop_and_reveal client [Constant.tz4_account] in
-    let*? set_delegate_process =
-      Client.set_delegate
+    let set_delegate_process =
+      Client.spawn_set_delegate
         client
         ~src:Constant.tz4_account.public_key_hash
         ~delegate:Constant.tz4_account.public_key_hash
     in
     Process.check set_delegate_process
+
+  let set_delegate_and_stake =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 10_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
+
+  let set_delegate_and_stake_less_6000 =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake less than 6000 tez"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 3_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
+
+  let set_delegate_and_stake_fail =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set delegate and stake more than balance"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 16_000 in
+    let set_delegate_process =
+      Client.spawn_set_delegate
+        ~src:staker.alias
+        ~delegate:staker.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () =
+      Process.check_error
+        ~msg:(rex "Balance of contract ([^ ]+) too low")
+        set_delegate_process
+    in
+    unit
+
+  let set_external_delegate_and_stake =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Set external delegate and stake"
+      ~tags:[team; "client"; "set_delegate"; "stake"]
+      ~supports:Protocol.(From_protocol 23)
+    @@ fun protocol ->
+    let* _node, client = Client.init_with_protocol `Client ~protocol () in
+    let parameters = JSON.parse_file (Protocol.parameter_file protocol) in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let delegate_parameters_activation_delay =
+      JSON.(get "delegate_parameters_activation_delay" parameters |> as_int)
+    in
+    let delegate = Constant.bootstrap3 in
+    (* [delegate] accepts external staking *)
+    let set_delegate_parameters =
+      Client.spawn_set_delegate_parameters
+        ~delegate:delegate.alias
+        ~limit:"3"
+        ~edge:"0.05"
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* () = set_delegate_parameters |> Process.check in
+    let* () =
+      Client.bake_for_and_wait
+        ~count:(blocks_per_cycle * (delegate_parameters_activation_delay + 1))
+        client
+    in
+    (* create a new account to stake with [delegate] *)
+    let* staker = Client.gen_and_show_keys ~alias:"staker" client in
+    let* () =
+      Client.transfer
+        ~burn_cap:Tez.one
+        ~amount:(Tez.of_int 15_000)
+        ~giver:Constant.bootstrap1.alias
+        ~receiver:staker.alias
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let amount = Tez.of_int 10_000 in
+    let* () =
+      Client.set_delegate
+        ~src:staker.alias
+        ~delegate:delegate.alias
+        ~amount
+        client
+    in
+    let* () = Client.bake_for_and_wait client in
+    let* staked_balance =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_contract_staked_balance
+           staker.public_key_hash
+    in
+    Check.((staked_balance = Tez.to_mutez amount) ~__LOC__ int)
+      ~error_msg:"Expected staked balance %R to be equal to %L" ;
+    unit
 
   let balance_too_low =
     Protocol.register_test
@@ -693,6 +852,10 @@ module Transfer = struct
     batch_transfers_tz4 protocols ;
     forbidden_set_delegate_tz4 protocols ;
     allowed_set_delegate_tz4 protocols ;
+    set_delegate_and_stake protocols ;
+    set_delegate_and_stake_less_6000 protocols ;
+    set_delegate_and_stake_fail protocols ;
+    set_external_delegate_and_stake protocols ;
     balance_too_low protocols ;
     transfers_bootstraps5_bootstrap1 protocols ;
     safety_guard protocols
@@ -941,9 +1104,72 @@ module Account_activation = struct
   let register protocols = test_activate_accounts protocols
 end
 
+module Gen_keys = struct
+  let test_gen_keys_mainnet =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test gen keys on mainnet setup"
+      ~tags:[team; "client"; "gen"; "keys"; "mainnet"]
+    @@ fun _protocol ->
+    let* _node, client =
+      Client.init_with_node
+        ~nodes_args:[Network "mainnet"; Private_mode]
+        `Client
+        ()
+    in
+    Log.info "Generating an encrypted key" ;
+    let* alias = Client.gen_keys ~key_encryption:(Encrypted "pwd") client in
+    let* account = Client.show_address ~alias client in
+    let* () =
+      match account.Account.secret_key with
+      | Encrypted _ -> unit
+      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+    in
+    Log.info "Generating an unencrypted key (need to add --unencrypted)" ;
+    let* alias = Client.gen_keys ~key_encryption:Forced_unencrypted client in
+    let* account = Client.show_address ~alias client in
+    match account.Account.secret_key with
+    | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
+    | Unencrypted _ -> unit
+
+  let test_gen_keys_testnet =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test gen keys on testnet setup"
+      ~tags:[team; "client"; "gen"; "keys"; "testnet"]
+    @@ fun _protocol ->
+    let* _node, client =
+      Client.init_with_node
+        ~nodes_args:[Network "ghostnet"; Private_mode]
+        `Client
+        ()
+    in
+    Log.info "Generating an encrypted key (need to add --encrypted)" ;
+    let* alias =
+      Client.gen_keys ~key_encryption:(Forced_encrypted "pwd") client
+    in
+    let* account = Client.show_address ~alias client in
+    let* () =
+      match account.Account.secret_key with
+      | Encrypted _ -> unit
+      | Unencrypted _ -> Test.fail "Secret key generated should be encrypted"
+    in
+    Log.info "Generating an unencrypted key (default)" ;
+    let* alias = Client.gen_keys client in
+    let* account = Client.show_address ~alias client in
+    match account.Account.secret_key with
+    | Encrypted _ -> Test.fail "Secret key generated should be unencrypted"
+    | Unencrypted _ -> unit
+
+  let register protocols =
+    test_gen_keys_mainnet protocols ;
+    test_gen_keys_testnet protocols
+end
+
 let register ~protocols =
   Simulation.register protocols ;
   Transfer.register protocols ;
   Dry_run.register protocols ;
   Signatures.register protocols ;
-  Account_activation.register protocols
+  Account_activation.register protocols ;
+  Gen_keys.register protocols

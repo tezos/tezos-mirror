@@ -9,7 +9,7 @@ open Tezos_rpc.Context
 
 module type REGISTERED = sig
   type t = {
-    registered_backend : Profiler.view list;
+    registered_backends : Profiler.view list;
     backends : (string * Profiler.view) list;
   }
 

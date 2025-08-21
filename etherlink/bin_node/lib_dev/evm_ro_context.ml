@@ -29,6 +29,19 @@ let read state path =
   let*! res = Evm_state.inspect state path in
   return res
 
+let read_chain_family ctxt chain_id =
+  let open Lwt_result_syntax in
+  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
+  let* evm_state = get_evm_state ctxt hash in
+  let* chain_family = Durable_storage.chain_family (read evm_state) chain_id in
+  return chain_family
+
+let read_enable_multichain_flag ctxt =
+  let open Lwt_result_syntax in
+  let* _, hash = Evm_store.(use ctxt.store Context_hashes.get_latest) in
+  let* evm_state = get_evm_state ctxt hash in
+  Durable_storage.is_multichain_enabled (read evm_state)
+
 let network_sanity_check ~network ctxt =
   let open Lwt_result_syntax in
   let expected_smart_rollup_address = Constants.rollup_address network in
@@ -75,9 +88,16 @@ let network_sanity_check ~network ctxt =
 
   return_unit
 
-let load ?network ?smart_rollup_address ~data_dir configuration =
+let load ?network ?smart_rollup_address ~data_dir
+    (configuration : Configuration.t) =
   let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* store =
+    Evm_store.init
+      ~data_dir
+      ~perm:(Read_only {pool_size = configuration.db.pool_size})
+      ?max_conn_reuse_count:configuration.db.max_conn_reuse_count
+      ()
+  in
   let* index =
     Irmin_context.(
       load ~cache_size:100_000 Read_only (Evm_state.irmin_store_path ~data_dir))
@@ -98,7 +118,7 @@ let load ?network ?smart_rollup_address ~data_dir configuration =
       store;
       index;
       data_dir;
-      preimages = configuration.Configuration.kernel_execution.preimages;
+      preimages = configuration.kernel_execution.preimages;
       preimages_endpoint = configuration.kernel_execution.preimages_endpoint;
       native_execution_policy =
         configuration.kernel_execution.native_execution_policy;
@@ -130,7 +150,7 @@ let find_finalized_hash ctxt =
   | Some (_, hash) -> return hash
   | None -> failwith "No state available"
 
-let find_irmin_hash_from_number ctxt number =
+let get_irmin_hash_from_number ctxt number =
   let open Lwt_result_syntax in
   let* res =
     Evm_store.(use ctxt.store @@ fun conn -> Context_hashes.find conn number)
@@ -143,18 +163,19 @@ let find_irmin_hash_from_number ctxt number =
         Ethereum_types.pp_quantity
         number
 
-let find_irmin_hash_from_block_hash ctxt hash =
+let get_irmin_hash_from_block_hash ~chain_family ctxt hash =
   let open Lwt_result_syntax in
   (* we use the latest state to read the contents of the block *)
   let* latest_hash = find_latest_hash ctxt in
   let* evm_tree = get_evm_state ctxt latest_hash in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let*! res =
-    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash hash)
+    Evm_state.inspect evm_tree Durable_storage_path.Block.(by_hash ~root hash)
   in
   match res with
   | Some block_bytes ->
-      let block = Ethereum_types.block_from_rlp block_bytes in
-      find_irmin_hash_from_number ctxt block.number
+      let block = L2_types.block_from_bytes ~chain_family block_bytes in
+      get_irmin_hash_from_number ctxt (L2_types.block_number block)
   | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
 
 let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
@@ -190,7 +211,7 @@ let find_irmin_hash ctxt (block : Ethereum_types.Block_parameter.extended) =
         match context_hash_opt with
         | Some context_hash -> return context_hash
         | None -> failwith "Unknown block %a" Ethereum_types.pp_block_hash hash
-      else find_irmin_hash_from_block_hash ctxt hash
+      else get_irmin_hash_from_block_hash ~chain_family:L2_types.EVM ctxt hash
 
 module MakeBackend (Ctxt : sig
   val ctxt : t
@@ -299,7 +320,7 @@ struct
     let simulate_and_read ?state_override simulate_state ~input =
       let open Lwt_result_syntax in
       let config =
-        Config.config
+        Wasm_debugger.config
           ~preimage_directory:Ctxt.ctxt.preimages
           ?preimage_endpoint:Ctxt.ctxt.preimages_endpoint
           ~kernel_debug:false
@@ -328,9 +349,26 @@ struct
     Tezos_crypto.Hashed.Smart_rollup_address.to_string
       Ctxt.ctxt.smart_rollup_address
 
-  let block_param_to_block_number
+  let list_l1_l2_levels ~from_l1_level =
+    let open Lwt_result_syntax in
+    Evm_store.use Ctxt.ctxt.store @@ fun conn ->
+    let* last = Evm_store.L1_l2_finalized_levels.last conn in
+    match last with
+    | None -> return_nil
+    | Some (end_l1_level, _) ->
+        Evm_store.L1_l2_finalized_levels.list_by_l1_levels
+          conn
+          ~start_l1_level:from_l1_level
+          ~end_l1_level
+
+  let l2_levels_of_l1_level l1_level =
+    Evm_store.use Ctxt.ctxt.store @@ fun conn ->
+    Evm_store.L1_l2_finalized_levels.find conn ~l1_level
+
+  let block_param_to_block_number ~chain_family
       (block_param : Ethereum_types.Block_parameter.extended) =
     let open Lwt_result_syntax in
+    let root = Durable_storage_path.root_of_chain_family chain_family in
     match block_param with
     | Block_parameter (Number n) -> return n
     | Block_parameter (Latest | Pending) when Ctxt.ctxt.finalized_view -> (
@@ -363,12 +401,14 @@ struct
         let* irmin_hash = find_irmin_hash Ctxt.ctxt block_param in
         let* evm_state = get_evm_state Ctxt.ctxt irmin_hash in
         let*! bytes =
-          Evm_state.inspect evm_state Durable_storage_path.(Block.by_hash hash)
+          Evm_state.inspect
+            evm_state
+            Durable_storage_path.(Block.by_hash ~root hash)
         in
         match bytes with
         | Some bytes ->
-            let block = Ethereum_types.block_from_rlp bytes in
-            return block.number
+            let block = L2_types.block_from_bytes ~chain_family bytes in
+            return (L2_types.block_number block)
         | None -> failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
 end
 
@@ -384,38 +424,139 @@ end) =
   Services_backend_sig.Make (MakeBackend (Base)) (Base.Executor)
 
 let pvm_config ctxt =
-  Config.config
+  Wasm_debugger.config
     ~preimage_directory:ctxt.preimages
     ?preimage_endpoint:ctxt.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
     ()
 
+let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =
+  let da_fees =
+    Fees.gas_used_for_da_fees
+      ~da_fee_per_byte
+      ~base_fee_per_gas
+      Ethereum_types.(Transaction_object.input object_ |> hex_to_real_bytes)
+  in
+  let (Qty gas_used) = receipt.Transaction_receipt.gasUsed in
+  Z.sub gas_used da_fees
+
+let cumulative_execution_gas ~base_fee_per_gas ~da_fee_per_byte ctxt =
+  let open Lwt_result_syntax in
+  function
+  | L2_types.Eth block ->
+      let hashes =
+        match block.transactions with
+        | TxFull _l -> assert false
+        | TxHash l -> l
+      in
+      let+ result =
+        List.fold_left_es
+          (fun cumulative_execution_gas hash ->
+            let* object_ =
+              Evm_store.(
+                use ctxt.store @@ fun conn -> Transactions.find_object conn hash)
+            in
+            let object_ = WithExceptions.Option.get ~loc:__LOC__ object_ in
+            let+ receipt =
+              Evm_store.(
+                use ctxt.store @@ fun conn ->
+                Transactions.find_receipt conn hash)
+            in
+            let receipt = WithExceptions.Option.get ~loc:__LOC__ receipt in
+            Z.add cumulative_execution_gas
+            @@ execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_)
+          Z.zero
+          hashes
+      in
+      Ethereum_types.Qty result
+  | Tez _ -> return (Ethereum_types.Qty Z.zero)
+
+type replay_result =
+  | Replay_success of {
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
+      evm_state : Evm_state.t;
+      diverged : bool;
+      process_time : Ptime.span;
+      execution_gas : Ethereum_types.quantity;
+    }
+  | Replay_failure
+
 let replay ctxt ?(log_file = "replay") ?profile
     ?(alter_evm_state = Lwt_result_syntax.return) (Ethereum_types.Qty number) =
   let open Lwt_result_syntax in
-  let* hash = find_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
+  let* hash = get_irmin_hash_from_number ctxt (Qty (Z.pred number)) in
   let* evm_state = get_evm_state ctxt hash in
   let* evm_state = alter_evm_state evm_state in
   let* blueprint =
     Evm_store.use ctxt.store @@ fun conn ->
     Evm_store.Blueprints.get_with_events conn (Qty number)
   in
-  Evm_state.apply_blueprint
-    ~log_file
-    ?profile
-    ~data_dir:ctxt.data_dir
-    ~config:(pvm_config ctxt)
-    ~native_execution_policy:ctxt.native_execution_policy
-    evm_state
-    blueprint.blueprint.payload
+  let* expected_block =
+    if ctxt.block_storage_sqlite3 then
+      Evm_store.use ctxt.store @@ fun conn ->
+      Evm_store.Blocks.get_with_level
+        ~full_transaction_object:false
+        conn
+        (Qty number)
+    else failwith "Todo: support legacy mode"
+  in
+  let log_file = Printf.sprintf "%s_%s" log_file (Z.to_string number) in
+  let*! () = Evm_state.preload_kernel evm_state in
+  let process_time = ref (Ptime.Span.of_int_s 0) in
+  let* apply_result =
+    Misc.with_timing (fun dt ->
+        process_time := dt ;
+        Lwt.return_unit)
+    @@ fun () ->
+    Evm_state.apply_blueprint
+      ~log_file
+      ?profile
+      ~data_dir:ctxt.data_dir
+      ~chain_family:EVM
+      ~config:(pvm_config ctxt)
+      ~native_execution_policy:ctxt.native_execution_policy
+      evm_state
+      blueprint.blueprint.payload
+  in
+  match apply_result with
+  | Apply_success {block; evm_state} ->
+      let* (Qty base_fee_per_gas) =
+        Etherlink_durable_storage.base_fee_per_gas (fun path ->
+            let*! result = Evm_state.inspect evm_state path in
+            return result)
+      in
+      let* da_fee_per_byte =
+        Etherlink_durable_storage.da_fee_per_byte (fun path ->
+            let*! result = Evm_state.inspect evm_state path in
+            return result)
+      in
+      let* execution_gas =
+        cumulative_execution_gas ~base_fee_per_gas ~da_fee_per_byte ctxt block
+      in
+      return
+        (Replay_success
+           {
+             block;
+             evm_state;
+             diverged = L2_types.block_hash block <> expected_block.hash;
+             process_time = !process_time;
+             execution_gas;
+           })
+  | Apply_failure -> return Replay_failure
 
 let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     =
   let module Executor = struct
     let pvm_config = pvm_config ctxt
 
-    let replay = replay ctxt
+    let replay ?log_file ?profile ?alter_evm_state number =
+      let open Lwt_result_syntax in
+      let+ result = replay ctxt ?log_file ?profile ?alter_evm_state number in
+      match result with
+      | Replay_success {block; evm_state; _} ->
+          Evm_state.Apply_success {block; evm_state}
+      | Replay_failure -> Apply_failure
 
     let execute ?(alter_evm_state = Lwt_result_syntax.return) input block =
       let open Lwt_result_syntax in
@@ -451,9 +592,16 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
     (module struct
       include Backend
 
-      module Block_storage = struct
+      (* This function is generic that's why we don't define it in Tezlink block storage
+         (even if for now this is the only place where it's used) *)
+      let nth_block_hash level =
+        Evm_store.use ctxt.store @@ fun conn ->
+        Evm_store.Blocks.find_hash_of_number conn (Qty level)
+
+      (* Overwrite Etherlink_block_storage module *)
+      module Etherlink_block_storage = struct
         (* Current block number is kept in durable storage. *)
-        let current_block_number = Block_storage.current_block_number
+        let current_block_number = Etherlink_block_storage.current_block_number
 
         let nth_block ~full_transaction_object level =
           let open Lwt_result_syntax in
@@ -497,7 +645,11 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           Evm_store.Transactions.find_object conn hash
       end
 
-      let block_param_to_block_number
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
+
+      let block_param_to_block_number ~chain_family
           (block_param : Ethereum_types.Block_parameter.extended) =
         let open Lwt_result_syntax in
         match block_param with
@@ -508,17 +660,41 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
             | Some number -> return number
             | None ->
                 failwith "Missing block %a" Ethereum_types.pp_block_hash hash)
-        | param -> block_param_to_block_number param
+        | param -> block_param_to_block_number ~chain_family param
 
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+      module Tezlink_block_storage : Tezlink_block_storage_sig.S = struct
+        let nth_block level =
+          let open Lwt_result_syntax in
+          Evm_store.use ctxt.store @@ fun conn ->
+          let* block_opt =
+            Evm_store.Blocks.tez_find_with_level conn (Qty level)
+          in
+          match block_opt with
+          | None -> failwith "Block %a not found" Z.pp_print level
+          | Some block -> return block
+
+        let nth_block_hash = nth_block_hash
+      end
+
+      (* Overwrites Tezlink using the store instead of the durable_storage *)
+      module Tezlink =
+        Tezlink_services_impl.Make
+          (struct
+            include Backend.Reader
+
+            let block_param_to_block_number =
+              block_param_to_block_number ~chain_family:L2_types.Michelson
+          end)
+          (Tezlink_block_storage)
     end)
   else
     (module struct
       include Backend
 
-      module Block_storage = struct
+      (* Overwrite Etherlink_block_storage module *)
+      module Etherlink_block_storage = struct
         (* Current block number is kept in durable storage. *)
-        let current_block_number = Block_storage.current_block_number
+        let current_block_number = Etherlink_block_storage.current_block_number
 
         let with_blueprint ~default level k =
           let open Lwt_result_syntax in
@@ -531,7 +707,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
 
         let nth_block ~full_transaction_object level =
           let open Lwt_result_syntax in
-          let* block = Block_storage.nth_block ~full_transaction_object level in
+          let* block =
+            Etherlink_block_storage.nth_block ~full_transaction_object level
+          in
           if full_transaction_object then
             with_blueprint ~default:block block.number @@ fun blueprint ->
             Lwt.return
@@ -544,7 +722,7 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
         let block_by_hash ~full_transaction_object hash =
           let open Lwt_result_syntax in
           let* block =
-            Block_storage.block_by_hash ~full_transaction_object hash
+            Etherlink_block_storage.block_by_hash ~full_transaction_object hash
           in
           if full_transaction_object then
             with_blueprint ~default:block block.number @@ fun blueprint ->
@@ -555,13 +733,13 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
                need to try to reconstruct the transaction objects. *)
             return block
 
-        let block_receipts = Block_storage.block_receipts
+        let block_receipts = Etherlink_block_storage.block_receipts
 
-        let transaction_receipt = Block_storage.transaction_receipt
+        let transaction_receipt = Etherlink_block_storage.transaction_receipt
 
         let transaction_object hash =
           let open Lwt_result_syntax in
-          let* obj = Block_storage.transaction_object hash in
+          let* obj = Etherlink_block_storage.transaction_object hash in
           match obj with
           | Some obj -> (
               match Transaction_object.block_number obj with
@@ -575,7 +753,9 @@ let ro_backend ?evm_node_endpoint ctxt config : (module Services_backend_sig.S)
           | None -> return_none
       end
 
-      include Tracer_sig.Make (Executor) (Block_storage) (Tracer)
+      (* Overwrite Etherlink Tracer using the new Etherlink_block_storage *)
+      module Tracer_etherlink =
+        Tracer_sig.Make (Executor) (Etherlink_block_storage) (Tracer)
     end)
 
 let next_blueprint_number ctxt =
@@ -587,10 +767,15 @@ let next_blueprint_number ctxt =
 
 let preload_kernel_from_level ctxt level =
   let open Lwt_result_syntax in
-  let* hash = find_irmin_hash_from_number ctxt level in
-  let* evm_state = get_evm_state ctxt hash in
-  let*! () = Evm_state.preload_kernel evm_state in
-  return_unit
+  let* hash =
+    Evm_store.(use ctxt.store @@ fun conn -> Context_hashes.find conn level)
+  in
+  match hash with
+  | Some hash ->
+      let* evm_state = get_evm_state ctxt hash in
+      let*! () = Evm_state.preload_kernel evm_state in
+      return_unit
+  | None -> return_unit
 
 let preload_known_kernels ctxt =
   let open Lwt_result_syntax in
@@ -617,6 +802,10 @@ let evm_services_methods ctxt time_between_blocks =
           match res with
           | Ok res -> res
           | Error _ -> Stdlib.failwith "Couldn't fetch next blueprint number");
+      find_blueprint_legacy =
+        (fun level ->
+          Evm_store.use ctxt.store (fun conn ->
+              Evm_store.Blueprints.find_with_events_legacy conn level));
       find_blueprint =
         (fun level ->
           Evm_store.use ctxt.store (fun conn ->

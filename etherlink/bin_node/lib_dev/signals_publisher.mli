@@ -5,16 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [start ~cctxt ~smart_rollup_address ~sequencer_key
-    ~rollup_node_endpoint ()] starts the signal
-    publisher. It should only be called once and only if DAL is
-    enabled. The signal publisher should be started before the
-    blueprint publisher because it expects messages from the blueprint
-    publisher.*)
+(** [start ~signer ~smart_rollup_address ~rollup_node_endpoint ()] starts the
+    signal publisher. It should only be called once and only if DAL is enabled.
+    The signal publisher should be started before the blueprint publisher
+    because it expects messages from the blueprint publisher.*)
 val start :
-  cctxt:Client_context.wallet ->
+  signer:Signer.t ->
   smart_rollup_address:string ->
-  sequencer_key:Client_keys.sk_uri ->
   rollup_node_endpoint:Uri.t ->
   unit ->
   unit tzresult Lwt.t

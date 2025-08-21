@@ -95,6 +95,28 @@ let () =
     (function Unexisting_scheme uri -> Some uri | _ -> None)
     (fun uri -> Unexisting_scheme uri)
 
+let make_uri (x : Uri.t) : Uri.t tzresult =
+  let open Result_syntax in
+  match Uri.scheme x with
+  | None ->
+      tzfail (Exn (Failure "Error while parsing URI: no scheme were found"))
+  | Some _ -> return x
+
+let uri_parameter () =
+  Tezos_clic.parameter (fun _ s -> Lwt.return @@ make_uri (Uri.of_string s))
+
+let uri_param ?name ?desc params =
+  let name = Option.value ~default:"uri" name in
+  let desc =
+    Option.value
+      ~default:
+        "remote signer\n\
+         Varies from one scheme to the other.\n\
+         Use command `list signing schemes` for more information."
+      desc
+  in
+  Tezos_clic.param ~name ~desc (uri_parameter ()) params
+
 type pk_uri = Uri.t
 
 module Pk_uri_hashtbl = Hashtbl.Make (struct
@@ -131,23 +153,40 @@ let make_sk_uri (x : Uri.t) : sk_uri tzresult =
       tzfail (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
   | Some _ -> return x
 
-type error += Signature_mismatch of sk_uri
+type signer_output = Signature | Proof_of_possession
+
+let signer_output_pp fmt out =
+  Format.fprintf
+    fmt
+    "%s"
+    (match out with
+    | Signature -> "signature"
+    | Proof_of_possession -> "proof of possession")
+
+let signer_output_encoding =
+  Data_encoding.string_enum
+    [("Signature", Signature); ("Proof of possession", Proof_of_possession)]
+
+type error += Signer_output_mismatch of signer_output * sk_uri
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"cli.signature_mismatch"
-    ~title:"Signature mismatch"
-    ~description:"The signer produced an invalid signature"
-    ~pp:(fun ppf sk ->
+    ~id:"cli.signer_output_mismatch"
+    ~title:"Signer output mismatch"
+    ~description:"The signer produced an invalid output"
+    ~pp:(fun ppf (out, sk) ->
       Format.fprintf
         ppf
-        "The signer for %a produced an invalid signature"
+        "The signer for %a produced an invalid %a"
         Uri.pp_hum
-        sk)
-    Data_encoding.(obj1 (req "locator" uri_encoding))
-    (function Signature_mismatch sk -> Some sk | _ -> None)
-    (fun sk -> Signature_mismatch sk)
+        sk
+        signer_output_pp
+        out)
+    Data_encoding.(
+      obj2 (req "output" signer_output_encoding) (req "locator" uri_encoding))
+    (function Signer_output_mismatch (out, sk) -> Some (out, sk) | _ -> None)
+    (fun (out, sk) -> Signer_output_mismatch (out, sk))
 
 type sapling_uri = Uri.t
 
@@ -295,6 +334,8 @@ module type Signature_S = sig
 
   val concat : Bytes.t -> t -> Bytes.t
 
+  val version : Tezos_crypto.Signature.version
+
   module Adapter : sig
     val public_key_hash :
       Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult
@@ -310,6 +351,7 @@ module type SIMPLE_SIGNER = sig
   include COMMON_SIGNER with type pk_uri = pk_uri and type sk_uri = sk_uri
 
   val sign :
+    ?version:Tezos_crypto.Signature.version ->
     ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->
@@ -320,6 +362,14 @@ module type SIMPLE_SIGNER = sig
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
+
+  val bls_prove_possession :
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 module type S = sig
@@ -387,11 +437,20 @@ module type S = sig
     Bytes.t ->
     bool tzresult Lwt.t
 
+  val bls_prove_possession :
+    #Client_context.wallet ->
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 
   val register_key :
     #Client_context.wallet ->
@@ -599,9 +658,11 @@ module Make (Signature : Signature_S) :
       let*? pk = Option.map_e Signature.Adapter.public_key pk in
       return (pkh, pk)
 
-    let sign ?watermark sk msg =
+    let list_known_keys uri = S.list_known_keys uri
+
+    let sign ?version ?watermark sk msg =
       let open Lwt_result_syntax in
-      let* signature = S.sign ?watermark sk msg in
+      let* signature = S.sign ?version ?watermark sk msg in
       let*? signature = Signature.Adapter.signature signature in
       return signature
 
@@ -610,6 +671,8 @@ module Make (Signature : Signature_S) :
     let deterministic_nonce_hash = S.deterministic_nonce_hash
 
     let supports_deterministic_nonces = S.supports_deterministic_nonces
+
+    let bls_prove_possession = S.bls_prove_possession
   end
 
   let adapt_signer (module Signer : SIGNER) =
@@ -655,10 +718,16 @@ module Make (Signature : Signature_S) :
     with_scheme_simple_signer pk_uri (fun (module Signer) ->
         Signer.import_secret_key ~io pk_uri)
 
+  let list_known_keys uri =
+    with_scheme_simple_signer uri (fun (module Signer) ->
+        Signer.list_known_keys uri)
+
   let sign cctxt ?watermark sk_uri buf =
     let open Lwt_result_syntax in
     with_scheme_simple_signer sk_uri (fun (module Signer) ->
-        let* signature = Signer.sign ?watermark sk_uri buf in
+        let* signature =
+          Signer.sign ~version:Signature.version ?watermark sk_uri buf
+        in
         let* pk_uri = Signer.neuterize sk_uri in
         let* pubkey =
           let* o = Secret_key.rev_find cctxt sk_uri in
@@ -676,9 +745,37 @@ module Make (Signature : Signature_S) :
         let* () =
           fail_unless
             (Signature.check ?watermark pubkey signature buf)
-            (Signature_mismatch sk_uri)
+            (Signer_output_mismatch (Signature, sk_uri))
         in
         return signature)
+
+  let bls_prove_possession cctxt ?override_pk sk_uri =
+    let open Lwt_result_syntax in
+    with_scheme_simple_signer sk_uri (fun (module Signer) ->
+        let* proof = Signer.bls_prove_possession ?override_pk sk_uri in
+        let* pk_uri = Signer.neuterize sk_uri in
+        let* pubkey =
+          let* o = Secret_key.rev_find cctxt sk_uri in
+          match o with
+          | None -> public_key pk_uri
+          | Some name -> (
+              let* r = Public_key.find cctxt name in
+              match r with
+              | _, None ->
+                  let* pk = public_key pk_uri in
+                  let* () = Public_key.update cctxt name (pk_uri, Some pk) in
+                  return pk
+              | _, Some pubkey -> return pubkey)
+        in
+        let* () =
+          fail_unless
+            (Signature.pop_verify
+               pubkey
+               ?msg:override_pk
+               (Tezos_crypto.Signature.Bls.to_bytes proof))
+            (Signer_output_mismatch (Proof_of_possession, sk_uri))
+        in
+        return proof)
 
   let append cctxt ?watermark loc buf =
     let open Lwt_result_syntax in
@@ -877,7 +974,7 @@ module V0 = Make (struct
         Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug _ ->
+      | Bls _ ->
           tzfail (Exn (Failure "BLS public key hash not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : Public_key_hash.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key_hash.t)
@@ -887,7 +984,7 @@ module V0 = Make (struct
         Tezos_crypto.Signature.Public_key.t -> Public_key.t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug _ -> tzfail (Exn (Failure "BLS public key not supported by V0"))
+      | Bls _ -> tzfail (Exn (Failure "BLS public key not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : Public_key.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key.t)
       | P256 k -> return (P256 k : Public_key.t)
@@ -895,7 +992,7 @@ module V0 = Make (struct
     let signature : Tezos_crypto.Signature.t -> t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug _ -> tzfail (Exn (Failure "BLS signature not supported by V0"))
+      | Bls _ -> tzfail (Exn (Failure "BLS signature not supported by V0"))
       | Ed25519 k -> return (Ed25519 k : t)
       | Secp256k1 k -> return (Secp256k1 k : t)
       | P256 k -> return (P256 k : t)
@@ -913,7 +1010,7 @@ module V1 = Make (struct
         Tezos_crypto.Signature.Public_key_hash.t -> Public_key_hash.t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug k -> return (Bls k : Public_key_hash.t)
+      | Bls k -> return (Bls k : Public_key_hash.t)
       | Ed25519 k -> return (Ed25519 k : Public_key_hash.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key_hash.t)
       | P256 k -> return (P256 k : Public_key_hash.t)
@@ -922,7 +1019,7 @@ module V1 = Make (struct
         Tezos_crypto.Signature.Public_key.t -> Public_key.t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug k -> return (Bls k : Public_key.t)
+      | Bls k -> return (Bls k : Public_key.t)
       | Ed25519 k -> return (Ed25519 k : Public_key.t)
       | Secp256k1 k -> return (Secp256k1 k : Public_key.t)
       | P256 k -> return (P256 k : Public_key.t)
@@ -930,7 +1027,7 @@ module V1 = Make (struct
     let signature : Tezos_crypto.Signature.t -> t tzresult =
       let open Result_syntax in
       function
-      | Bls_aug k -> return (Bls k : t)
+      | Bls k -> return (Bls k : t)
       | Ed25519 k -> return (Ed25519 k : t)
       | Secp256k1 k -> return (Secp256k1 k : t)
       | P256 k -> return (P256 k : t)

@@ -126,29 +126,11 @@ let delegate_and_second_slot block =
   in
   return (delegate, slot)
 
-(** Test that the mempool accepts attestations with a non-normalized
-    slot (that is, a slot that belongs to the delegate but is not the
-    delegate's smallest slot) at all three allowed levels for
-    attestations (and various rounds). *)
-let test_mempool_second_slot () =
-  let open Lwt_result_syntax in
-  let* _genesis, grandparent = init_genesis () in
-  let* predecessor = Block.bake grandparent ~policy:(By_round 3) in
-  let* future_block = Block.bake predecessor ~policy:(By_round 5) in
-  let check_non_smallest_slot_ok loc attested_block =
-    let* delegate, slot = delegate_and_second_slot attested_block in
-    Consensus_helpers.test_consensus_operation
-      ~loc
-      ~attested_block
-      ~predecessor
-      ~delegate
-      ~slot
-      Attestation
-      Mempool
-  in
-  let* () = check_non_smallest_slot_ok __LOC__ grandparent in
-  let* () = check_non_smallest_slot_ok __LOC__ predecessor in
-  check_non_smallest_slot_ok __LOC__ future_block
+let error_wrong_slot = function
+  | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation {kind; _}
+    when kind = Validate_errors.Consensus.Attestation ->
+      true
+  | _ -> false
 
 (** {1 Negative tests}
 
@@ -176,19 +158,11 @@ let test_negative_slot () =
 
 (** Attestation with a non-normalized slot (that is, a slot that
     belongs to the delegate but is not the delegate's smallest slot).
-    It should fail in application and construction modes, but be
-    accepted in mempool mode. *)
+    This should fail in all validation modes. *)
 let test_not_smallest_slot () =
   let open Lwt_result_syntax in
   let* _genesis, b = init_genesis () in
   let* delegate, slot = delegate_and_second_slot b in
-  let error_wrong_slot = function
-    | Validate_errors.Consensus.Wrong_slot_used_for_consensus_operation
-        {kind; _}
-      when kind = Validate_errors.Consensus.Attestation ->
-        true
-    | _ -> false
-  in
   Consensus_helpers.test_consensus_operation_all_modes_different_outcomes
     ~loc:__LOC__
     ~attested_block:b
@@ -196,7 +170,7 @@ let test_not_smallest_slot () =
     ~slot
     ~application_error:error_wrong_slot
     ~construction_error:error_wrong_slot
-    ?mempool_error:None
+    ~mempool_error:error_wrong_slot
     Attestation
 
 let delegate_and_someone_elses_slot block =
@@ -558,8 +532,8 @@ let test_no_conflict_with_preattestation_block () =
   let bake_both_ops baking_mode =
     Block.bake
       ~baking_mode
-      ~payload_round:(Some Round.zero)
-      ~locked_round:(Some Round.zero)
+      ~payload_round:Round.zero
+      ~locked_round:Round.zero
       ~policy:(By_round 1)
       ~operations:[op_attestation; op_preattestation]
       predecessor
@@ -654,9 +628,7 @@ let test_two_attestations_with_same_attester () =
   let* _genesis, attested_block = init_genesis ~dal_enable:true () in
   let* op1 = Op.raw_attestation attested_block in
   let dal_content =
-    let attestation =
-      Dal.Attestation.commit Dal.Attestation.empty Dal.Slot_index.zero
-    in
+    let attestation = Dal_helpers.dal_attestation [Dal.Slot_index.zero] in
     {attestation}
   in
   let* op2 = Op.raw_attestation ~dal_content attested_block in
@@ -679,13 +651,13 @@ let test_two_attestations_with_same_attester () =
   in
   Assert.proto_error ~loc:__LOC__ res error
 
-(* Check that if an attester includes some DAL content but is not in the DAL
-   committee, then an error is returned at block validation.
+(* Check that if an attester includes some DAL content but they have no assigned
+   shards, then an error is returned at block validation.
 
    Note that we change the value of [consensus_committee_size] because with the
    default test parameters, [consensus_committee_size = 25 < 64 =
    number_of_shards], so that test would not work! *)
-let test_attester_not_in_dal_committee () =
+let test_attester_with_no_assigned_shards () =
   let open Lwt_result_syntax in
   let bal_high = 80_000_000_000L in
   let bal_low = 08_000_000_000L in
@@ -718,20 +690,14 @@ let test_attester_not_in_dal_committee () =
   let pkh = Stdlib.List.hd contracts |> Context.Contract.pkh in
   let rec iter b i =
     let* committee = Context.get_attesters (B b) in
-    let* dal_committee = Context.Dal.shards (B b) () in
     let in_committee =
       List.exists
         (fun del ->
           Signature.Public_key_hash.equal pkh del.RPC.Validators.delegate)
         committee
     in
-    let in_dal_committee =
-      List.exists
-        (fun ({delegate; _} : Plugin.RPC.Dal.S.shards_assignment) ->
-          Signature.Public_key_hash.equal pkh delegate)
-        dal_committee
-    in
-    if in_committee && not in_dal_committee then
+    let* has_assigned_shards = Dal_helpers.has_assigned_shards (B b) pkh in
+    if in_committee && not has_assigned_shards then
       let dal_content = {attestation = Dal.Attestation.empty} in
       let* op = Op.attestation ~delegate:pkh ~dal_content b in
       let* ctxt = Incremental.begin_construction b in
@@ -795,7 +761,7 @@ let test_dal_attestation_threshold () =
   let* b = Block.bake genesis ~operation:op in
   let* b = Block.bake_n (attestation_lag - 1) b in
   let* dal_committee = Context.Dal.shards (B b) () in
-  let attestation = Dal.Attestation.commit Dal.Attestation.empty slot_index in
+  let attestation = Dal_helpers.dal_attestation [slot_index] in
   let dal_content = {attestation} in
   let min_power = attestation_threshold * number_of_shards / 100 in
   Log.info "Number of minimum required attested shards: %d" min_power ;
@@ -972,7 +938,6 @@ let tests =
     Tztest.tztest "Arbitrary branch" `Quick test_arbitrary_branch;
     Tztest.tztest "Non-zero round" `Quick test_non_zero_round;
     Tztest.tztest "Fitness gap" `Quick test_fitness_gap;
-    Tztest.tztest "Mempool: non-smallest slot" `Quick test_mempool_second_slot;
     (* Negative tests *)
     (* Wrong slot *)
     Tztest.tztest "Attestation with slot -1" `Quick test_negative_slot;
@@ -1021,9 +986,9 @@ let tests =
       `Quick
       test_two_attestations_with_same_attester;
     Tztest.tztest
-      "attester not in DAL committee"
+      "attester without assigned shards"
       `Quick
-      test_attester_not_in_dal_committee;
+      test_attester_with_no_assigned_shards;
     Tztest.tztest
       "DAL attestation_threshold"
       `Quick

@@ -181,7 +181,7 @@ let chunk_of_rlp s =
         (Signature.of_bytes_opt signature)
   | _ -> None
 
-let prepare ~cctxt ~sequencer_key ~timestamp ~number ~parent_hash
+let prepare ~signer ~timestamp ~number ~parent_hash
     ~(delayed_transactions : Ethereum_types.hash list) ~transactions =
   let open Lwt_result_syntax in
   let open Rlp in
@@ -199,9 +199,7 @@ let prepare ~cctxt ~sequencer_key ~timestamp ~number ~parent_hash
     let rlp_unsigned_blueprint =
       unsigned_chunk_to_rlp unsigned_chunk |> encode
     in
-    let+ signature =
-      Client_keys.sign cctxt sequencer_key rlp_unsigned_blueprint
-    in
+    let+ signature = Signer.sign signer rlp_unsigned_blueprint in
     {unsigned_chunk; signature}
   in
   List.mapi_ep (message_from_chunk nb_chunks) chunks

@@ -17,4 +17,4 @@ mod decode;
 mod encode;
 mod integration_tests;
 
-pub use {decode::*, encode::*};
+pub use decode::*;

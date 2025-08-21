@@ -1,13 +1,24 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023-2024 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2023-2025 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (*****************************************************************************)
 
 let tests =
   [
+    ( "Backend",
+      [
+        ( "PVM advances the expected number of steps",
+          `Quick,
+          Test_backend.test_advance_dummy_kernel );
+        ( "Proofs produced via the OCaml API match those produced by the \
+           sandboxed RISC-V PVM",
+          `Quick,
+          Test_backend.test_jstz_proof_regression );
+        ("Proofs are immutable", `Quick, Test_backend.test_proof_immutability);
+      ] );
     ( "Storage",
       [
         ("Simple test", `Quick, Test_storage.test_simple);

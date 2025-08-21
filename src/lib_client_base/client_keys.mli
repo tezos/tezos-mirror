@@ -33,6 +33,12 @@ type sk_uri = private Uri.t
 
 type sapling_uri = private Uri.t
 
+val uri_param :
+  ?name:string ->
+  ?desc:string ->
+  ('a, 'b) Tezos_clic.params ->
+  (Uri.t -> 'a, 'b) Tezos_clic.params
+
 val pk_uri_parameter : unit -> (pk_uri, 'a) Tezos_clic.parameter
 
 val pk_uri_param :
@@ -131,6 +137,7 @@ module type SIGNER = sig
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
   val sign :
+    ?version:Tezos_crypto.Signature.version ->
     ?watermark:Tezos_crypto.Signature.watermark ->
     sk_uri ->
     Bytes.t ->
@@ -147,6 +154,16 @@ module type SIGNER = sig
   (** [supports_deterministic_nonces] indicates whether the
       [deterministic_nonce] functionality is supported. *)
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  (** [list_known_keys] returns the list of public key hashes known by
+      the signer. *)
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
+
+  val bls_prove_possession :
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
 end
 
 type signer = (module SIGNER)
@@ -224,11 +241,20 @@ module type S = sig
     Bytes.t ->
     bool tzresult Lwt.t
 
+  val bls_prove_possession :
+    #Client_context.wallet ->
+    ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+    sk_uri ->
+    Tezos_crypto.Signature.Bls.t tzresult Lwt.t
+
   val deterministic_nonce : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val deterministic_nonce_hash : sk_uri -> Bytes.t -> Bytes.t tzresult Lwt.t
 
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
+
+  val list_known_keys :
+    Uri.t -> Tezos_crypto.Signature.Public_key_hash.t list tzresult Lwt.t
 
   val register_key :
     #Client_context.wallet ->

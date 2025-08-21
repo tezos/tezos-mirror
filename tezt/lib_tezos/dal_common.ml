@@ -26,6 +26,7 @@
 
 module Cryptobox = Tezos_crypto_dal.Cryptobox
 
+(* Use the node for RPC call when possible because it is much faster *)
 module Parameters = struct
   type t = {
     feature_enabled : bool;
@@ -34,9 +35,6 @@ module Parameters = struct
     number_of_slots : int;
     attestation_lag : int;
     attestation_threshold : int;
-    blocks_per_epoch : int;
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/6923
-           To be removed when [Protocol.previous_protocol Alpha >= P]. *)
   }
 
   let parameter_file protocol =
@@ -54,10 +52,6 @@ module Parameters = struct
     let attestation_threshold =
       JSON.(json |-> "attestation_threshold" |> as_int)
     in
-    let blocks_per_epoch =
-      JSON.(json |-> "blocks_per_epoch" |> as_int_opt)
-      |> Option.value ~default:1
-    in
     let feature_enabled = JSON.(json |-> "feature_enable" |> as_bool) in
     let incentives_enabled =
       JSON.(json |-> "incentives_enable" |> as_bool_opt)
@@ -72,12 +66,12 @@ module Parameters = struct
       number_of_slots;
       attestation_lag;
       attestation_threshold;
-      blocks_per_epoch;
     }
 
   let from_client client =
     let* json =
-      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+      Client.RPC.call_via_endpoint client
+      @@ RPC.get_chain_block_context_constants ()
     in
     from_protocol_parameters json |> return
 
@@ -191,14 +185,14 @@ module Dal_RPC = struct
 
   type commitment = string
 
-  type operator_profile =
+  type controller_profile =
     | Attester of string
-    | Producer of int
+    | Operator of int
     | Observer of int
 
-  type operator_profiles = operator_profile list
+  type controller_profiles = controller_profile list
 
-  type profile = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Controller of controller_profiles
 
   type slot_header = {
     slot_level : int;
@@ -297,18 +291,18 @@ module Dal_RPC = struct
       ]
       JSON.as_string
 
-  let json_of_operator_profile list =
-    let attesters, producers, observers =
+  let json_of_controller_profile list =
+    let attesters, operators, observers =
       List.fold_left
-        (fun (attesters, producers, observers) -> function
-          | Attester pkh -> (`String pkh :: attesters, producers, observers)
-          | Producer slot_index ->
+        (fun (attesters, operators, observers) -> function
+          | Attester pkh -> (`String pkh :: attesters, operators, observers)
+          | Operator slot_index ->
               ( attesters,
-                `Float (float_of_int slot_index) :: producers,
+                `Float (float_of_int slot_index) :: operators,
                 observers )
           | Observer slot_index ->
               ( attesters,
-                producers,
+                operators,
                 `Float (float_of_int slot_index) :: observers ))
         ([], [], [])
         list
@@ -316,17 +310,17 @@ module Dal_RPC = struct
     `O
       [
         ("attesters", `A (List.rev attesters));
-        ("operators", `A (List.rev producers));
+        ("operators", `A (List.rev operators));
         ("observers", `A (List.rev observers));
       ]
 
-  let operator_profile_of_json json =
+  let controller_profile_of_json json =
     let open JSON in
     let attesters = json |-> "attesters" |> as_list |> List.map as_string in
-    let producers = json |-> "operators" |> as_list |> List.map as_int in
+    let operators = json |-> "operators" |> as_list |> List.map as_int in
     let observers = json |-> "observers" |> as_list |> List.map as_int in
     List.map (fun pkh -> Attester pkh) attesters
-    @ List.map (fun i -> Producer i) producers
+    @ List.map (fun i -> Operator i) operators
     @ List.map (fun i -> Observer i) observers
 
   let profiles_of_json json =
@@ -334,14 +328,14 @@ module Dal_RPC = struct
     match json |-> "kind" |> as_string with
     | "bootstrap" -> Bootstrap
     | "controller" ->
-        let operator_profiles =
-          operator_profile_of_json (json |-> "controller_profiles")
+        let controller_profiles =
+          controller_profile_of_json (json |-> "controller_profiles")
         in
-        Operator operator_profiles
+        Controller controller_profiles
     | _ -> failwith "invalid case"
 
   let patch_profiles profiles =
-    let data : RPC_core.data = Data (json_of_operator_profile profiles) in
+    let data : RPC_core.data = Data (json_of_controller_profile profiles) in
     make ~data PATCH ["profiles"] as_empty_object_or_fail
 
   let get_profiles () = make GET ["profiles"] profiles_of_json
@@ -632,25 +626,6 @@ module Helpers = struct
     assert (String.length slot = slot_size) ;
     slot
 
-  let pp_cryptobox_error fmt = function
-    | `Fail message -> Format.fprintf fmt "Fail: %s" message
-    | `Not_enough_shards message ->
-        Format.fprintf fmt "Not enough shards: %s" message
-    | `Shard_index_out_of_range message ->
-        Format.fprintf fmt "Shard index out of range: %s" message
-    | `Invalid_shard_length message ->
-        Format.fprintf fmt "Invalid shard length: %s" message
-    | `Invalid_page -> Format.fprintf fmt "Invalid page"
-    | `Page_index_out_of_range -> Format.fprintf fmt "Page index out of range"
-    | `Invalid_degree_strictly_less_than_expected _ ->
-        Format.fprintf fmt "Invalid degree strictly less than expected"
-    | `Page_length_mismatch -> Format.fprintf fmt "Page length mismatch"
-    | `Slot_wrong_size message ->
-        Format.fprintf fmt "Slot wrong size: %s" message
-    | `Prover_SRS_not_loaded -> Format.fprintf fmt "Prover SRS not loaded"
-    | `Shard_length_mismatch -> Format.fprintf fmt "Shard length mismatch"
-    | `Invalid_shard -> Format.fprintf fmt "Invalid shard"
-
   let make_cryptobox
       ?(on_error =
         fun msg -> Test.fail "Dal_common.make: Unexpected error: %s" msg)
@@ -684,48 +659,31 @@ module Helpers = struct
           e
     | Ok () -> unit
 
-  let generate_slot ~slot_size =
-    Bytes.init slot_size (fun _ ->
-        let x = Random.int 26 in
-        Char.chr (x + Char.code 'a'))
+  let get_commitment_and_shards_with_proofs ?precomputation cryptobox ~slot =
+    let res =
+      Tezos_crypto_dal.Cryptobox.Internal_for_tests
+      .get_commitment_and_shards_with_proofs
+        ?precomputation
+        cryptobox
+        ~slot
+    in
+    match res with
+    | Error err ->
+        Test.fail
+          "Unexpected error:@.%a@."
+          Tezos_crypto_dal.Cryptobox.pp_error
+          err
+    | Ok v -> v
 
-  let get_commitment_and_shards_with_proofs cryptobox ~slot =
-    let open Cryptobox in
-    let ( let*? ) x f =
-      match x with
-      | Error err -> Test.fail "Unexpected error:@.%a@." pp_cryptobox_error err
-      | Ok x -> f x
-    in
-    let*? precomputation = precompute_shards_proofs cryptobox in
-    let*? polynomial = polynomial_from_slot cryptobox slot in
-    let shards = shards_from_polynomial cryptobox polynomial in
-    let shard_proofs =
-      prove_shards cryptobox ~precomputation ~polynomial |> Array.to_seq
-    in
-    let*? commitment = commit cryptobox polynomial in
-    let*? commitment_proof = prove_commitment cryptobox polynomial in
-    let shards =
-      Seq.fold_left2
-        (fun seq shard proof -> Seq.cons (shard, proof) seq)
-        Seq.empty
-        shards
-        shard_proofs
-    in
-    (commitment, commitment_proof, shards)
-
-  let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?error ~index
-      ~commitment ~proof client =
-    (* We scale the fees to match the actual gas cost of publishing a slot header.
-       Doing this here allows to keep the diff small as gas cost for
-       publishing slot header is adjusted. *)
-    let fee = Option.map (fun x -> x * 13) fee in
+  let publish_commitment ?dont_wait ?counter ?force ?source ?fee ?gas_limit
+      ?error ~index ~commitment ~proof client =
     Operation.Manager.(
       inject
         ?dont_wait
         ?error
         ?force
         [
-          make ?source ?fee ?counter
+          make ?source ?fee ?counter ?gas_limit
           @@ dal_publish_commitment ~index ~commitment ~proof;
         ]
         client)
@@ -746,16 +704,15 @@ module Helpers = struct
     | None -> store_slot ~slot_index (Either.Left dal_node) slot
     | Some runner ->
         let endpoint =
-          Endpoint.
-            {
-              host = runner.Runner.address;
-              scheme = "http";
-              port = Dal_node.rpc_port dal_node;
-            }
+          Endpoint.make
+            ~host:runner.Runner.address
+            ~scheme:"http"
+            ~port:(Dal_node.rpc_port dal_node)
+            ()
         in
         store_slot ~slot_index (Either.Right endpoint) slot
 
-  let publish_and_store_slot ?dont_wait ?counter ?force ?(fee = 1_200) client
+  let publish_and_store_slot ?dont_wait ?counter ?force ?fee ?gas_limit client
       dal_node source ~index content =
     (* We override store slot so that it uses a DAL node in this file. *)
     let* commitment_string, proof =
@@ -769,7 +726,8 @@ module Helpers = struct
         ?counter
         ?force
         ~source
-        ~fee
+        ?fee
+        ?gas_limit
         ~index
         ~commitment
         ~proof
@@ -850,15 +808,15 @@ module Check = struct
   open Dal_RPC
 
   let profiles_typ : profile Check.typ =
-    let pp_operator_profile ppf = function
+    let pp_controller_profile ppf = function
       | Attester pkh -> Format.fprintf ppf "Attester %s" pkh
-      | Producer slot_index -> Format.fprintf ppf "Producer %d" slot_index
+      | Operator slot_index -> Format.fprintf ppf "Operator %d" slot_index
       | Observer slot_index -> Format.fprintf ppf "Observer %d" slot_index
     in
-    let equal_operator_profile op1 op2 =
-      match (op1, op2) with
+    let equal_controller_profile c1 c2 =
+      match (c1, c2) with
       | Attester pkh1, Attester pkh2 -> String.equal pkh1 pkh2
-      | Producer slot_index1, Producer slot_index2 ->
+      | Operator slot_index1, Operator slot_index2 ->
           Int.equal slot_index1 slot_index2
       | Observer slot_index1, Observer slot_index2 ->
           Int.equal slot_index1 slot_index2
@@ -866,20 +824,20 @@ module Check = struct
     in
     let pp ppf = function
       | Bootstrap -> Format.fprintf ppf "Bootstrap"
-      | Operator operator_profiles ->
+      | Controller controller_profiles ->
           Format.fprintf
             ppf
-            "Operator [%a]"
-            (Format.pp_print_list pp_operator_profile)
-            operator_profiles
+            "Controller [%a]"
+            (Format.pp_print_list pp_controller_profile)
+            controller_profiles
     in
     let equal p1 p2 =
       match (p1, p2) with
       | Bootstrap, Bootstrap -> true
-      | Operator ops1, Operator ops2 ->
-          let ops1 = List.sort compare ops1 in
-          let ops2 = List.sort compare ops2 in
-          List.equal equal_operator_profile ops1 ops2
+      | Controller c1, Controller c2 ->
+          let c1 = List.sort compare c1 in
+          let c2 = List.sort compare c2 in
+          List.equal equal_controller_profile c1 c2
       | _, _ -> false
     in
     Check.equalable pp equal

@@ -3,7 +3,7 @@
 
 stages:
 - start
-- publish_release
+- publish
 
 datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
@@ -21,13 +21,14 @@ datadog_pipeline_trace:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 docker:promote_to_latest:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: publish_release
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
   tags:
   - gcp
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_promote_to_latest.sh

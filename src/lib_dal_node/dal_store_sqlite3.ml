@@ -8,7 +8,6 @@
 
 open Filename.Infix
 open Sqlite
-open Caqti_request.Infix
 open Caqti_type.Std
 
 let sqlite_file_name = "store.sqlite"
@@ -16,6 +15,8 @@ let sqlite_file_name = "store.sqlite"
 type conn = Sqlite.conn
 
 module Q = struct
+  open Sqlite.Request
+
   let table_exists =
     (string ->! bool)
     @@ {|
@@ -56,7 +57,7 @@ module Q = struct
         - Create a .sql file led by the next migration number [N = version + 1]
           (with leading 0s) followed by the name of the migration (e.g.
           [005_create_blueprints_table.sql])
-        - Run [src/bin_dal_node/scripts/check_dal_store_migrations.sh promote]
+        - Run [src/lib_dal_node/scripts/check_dal_store_migrations.sh promote]
         - Regenerate the schemas, using [[
               dune exec tezt/tests/main.exe -- --file dal.ml store \
                 schemas regression --reset-regressions
@@ -155,24 +156,38 @@ let with_connection store conn =
       fun k -> Sqlite.use store @@ fun conn -> Sqlite.with_connection conn k
 
 module Skip_list_cells = struct
-  type nonrec t = t
+  type t = Sqlite.t
 
   open Types
 
   module Q = struct
+    open Sqlite.Request
     open Dal_proto_types
     open Tezos_dal_node_services.Types
 
-    let find : (Skip_list_hash.t, Skip_list_cell.t, [`One]) Caqti_request.t =
-      (skip_list_hash ->! skip_list_cell)
+    let find_opt : (Skip_list_hash.t, Skip_list_cell.t, [`Zero | `One]) t =
+      (skip_list_hash ->? skip_list_cell)
       @@ {sql|
       SELECT cell
       FROM skip_list_cells
       WHERE hash = $1
       |sql}
 
+    let find_by_slot_id_opt :
+        (level * slot_index, Skip_list_cell.t, [`One | `Zero]) t =
+      let open Caqti_type.Std in
+      (t2 attested_level dal_slot_index ->? skip_list_cell)
+      @@ {sql|
+      SELECT cell
+      FROM skip_list_cells
+      WHERE hash = (
+        SELECT skip_list_cell_hash
+        FROM skip_list_slots
+        WHERE attested_level = $1 AND slot_index = $2
+      )|sql}
+
     let insert_skip_list_slot :
-        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) Caqti_request.t =
+        (level * slot_index * Skip_list_hash.t, unit, [`Zero]) t =
       (t3 attested_level dal_slot_index skip_list_hash ->. unit)
       @@ {sql|
       INSERT INTO skip_list_slots
@@ -182,7 +197,7 @@ module Skip_list_cells = struct
       |sql}
 
     let insert_skip_list_cell :
-        (Skip_list_hash.t * Skip_list_cell.t, unit, [`Zero]) Caqti_request.t =
+        (Skip_list_hash.t * Skip_list_cell.t, unit, [`Zero]) t =
       (t2 skip_list_hash skip_list_cell ->. unit)
       @@ {sql|
       INSERT INTO skip_list_cells
@@ -191,7 +206,7 @@ module Skip_list_cells = struct
       ON CONFLICT(hash) DO UPDATE SET cell = $2
       |sql}
 
-    let delete_skip_list_cell : (level, unit, [`Zero]) Caqti_request.t =
+    let delete_skip_list_cell : (level, unit, [`Zero]) t =
       (attested_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_cells
@@ -201,7 +216,7 @@ module Skip_list_cells = struct
         WHERE attested_level = $1)
       |sql}
 
-    let delete_skip_list_slot : (level, unit, [`Zero]) Caqti_request.t =
+    let delete_skip_list_slot : (level, unit, [`Zero]) t =
       (attested_level ->. unit)
       @@ {sql|
       DELETE FROM skip_list_slots
@@ -209,9 +224,13 @@ module Skip_list_cells = struct
       |sql}
   end
 
-  let find ?conn store skip_list_hash =
+  let find_opt ?conn store skip_list_hash =
     with_connection store conn @@ fun conn ->
-    Sqlite.Db.find conn Q.find skip_list_hash
+    Sqlite.Db.find_opt conn Q.find_opt skip_list_hash
+
+  let find_by_slot_id_opt ?conn store ~attested_level ~slot_index =
+    with_connection store conn @@ fun conn ->
+    Sqlite.Db.find_opt conn Q.find_by_slot_id_opt (attested_level, slot_index)
 
   let remove ?conn store ~attested_level =
     let open Lwt_result_syntax in
@@ -223,8 +242,8 @@ module Skip_list_cells = struct
   let insert ?conn store ~attested_level items =
     let open Lwt_result_syntax in
     with_connection store conn @@ fun conn ->
-    List.iteri_es
-      (fun slot_index (cell_hash, cell) ->
+    List.iter_es
+      (fun (cell_hash, cell, slot_index) ->
         let* () =
           Sqlite.Db.exec
             conn
@@ -255,7 +274,7 @@ module Skip_list_cells = struct
       let* migrations = Migrations.missing_migrations conn in
       let*? () =
         match (perm, migrations) with
-        | `Read_only, _ :: _ ->
+        | Read_only _, _ :: _ ->
             error_with
               "The store has %d missing migrations but was opened in read-only \
                mode."
@@ -287,10 +306,10 @@ module Skip_list_cells = struct
 
   module Internal_for_tests = struct
     module Q = struct
+      open Sqlite.Request
       open Dal_proto_types
 
-      let skip_list_hash_exists :
-          (Skip_list_hash.t, bool, [`One]) Caqti_request.t =
+      let skip_list_hash_exists : (Skip_list_hash.t, bool, [`One]) t =
         (skip_list_hash ->! bool)
         @@ {sql|
     SELECT EXISTS (

@@ -85,7 +85,7 @@ module Transport_layer : sig
       creates a new instance of type {!t}. It is a wrapper on top of
       {!P2p.create}. *)
   val create :
-    network_name:string ->
+    network_name:Distributed_db_version.Name.t ->
     public_addr:P2p_point.Id.t ->
     is_bootstrap_peer:bool ->
     P2p.config ->
@@ -103,34 +103,34 @@ module Transport_layer : sig
 
   (** [connect t ?timeout point] initiates a connection to the point
       [point]. The promise returned by this function is resolved once
-      the P2P handhshake successfully completes. If the [timeout] is
+      the P2P handshake successfully completes. If the [timeout] is
       set, an error is returned if the P2P handshake takes more than
       [timeout] to complete. *)
   val connect :
     t -> ?timeout:Ptime.Span.t -> P2p_point.Id.t -> unit tzresult Lwt.t
 
-  (** [disconnect_point t ?wait point] initiaties a disconnection to
+  (** [disconnect_point t ?wait point] initiates a disconnection to
       the point [point]. The promise returned by this function is
-      fullfiled when the socket is closed on our side. If [wait] is
-      [true], we do not close the socket before having canceled all
+      fulfilled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having cancelled all
       the current messages in the write buffer. Should not matter in
       practice.
 
       Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
 
-      it may occur that a discconnection takes several minutes. *)
+      it may occur that a disconnection takes several minutes. *)
   val disconnect_point : t -> ?wait:bool -> P2p_point.Id.t -> unit Lwt.t
 
-  (** [disconnect_peer t ?wait point] initiaties a disconnection to
+  (** [disconnect_peer t ?wait point] initiates a disconnection to
       the point [peer]. The promise returned by this function is
-      fullfiled when the socket is closed on our side. If [wait] is
-      [true], we do not close the socket before having canceled all
+      fulfilled when the socket is closed on our side. If [wait] is
+      [true], we do not close the socket before having cancelled all
       the current messages in the write buffer. Should not matter in
       practice.
 
       Due to the following issue https://gitlab.com/tezos/tezos/-/issues/5319
 
-      it may occur that a discconnection takes several minutes. *)
+      it may occur that a disconnection takes several minutes. *)
   val disconnect_peer :
     t -> ?wait:bool -> Crypto_box.Public_key_hash.t -> unit Lwt.t
 
@@ -139,7 +139,7 @@ module Transport_layer : sig
       currently connected. Otherwise, it returns a list of known
       points (points for which we were already successfully connected
       in the past.) *)
-  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult Lwt.t
+  val get_points : ?connected:bool -> t -> P2p_point.Id.t list tzresult
 
   (** [get_points_info ?connected t] returns a list of info for
       points. If [connected] is [true] (default), it returns only info
@@ -147,20 +147,17 @@ module Transport_layer : sig
       list of infos for known points (points for which we were already
       successfully connected in the past.) *)
   val get_points_info :
-    ?connected:bool ->
-    t ->
-    (P2p_point.Id.t * P2p_point.Info.t) list tzresult Lwt.t
+    ?connected:bool -> t -> (P2p_point.Id.t * P2p_point.Info.t) list tzresult
 
   (** [get_point_info t point] returns the info of the corresponding
       point if found. *)
-  val get_point_info :
-    t -> P2p_point.Id.t -> P2p_point.Info.t option tzresult Lwt.t
+  val get_point_info : t -> P2p_point.Id.t -> P2p_point.Info.t option tzresult
 
   (** [get_peers ?connected t] returns a list of peers. If [connected]
       is [true] (default), it returns only the peers we are connected
       to. Otherwise, it returns a list of known peers (peers for which we
       were already successfully connected in the past.) *)
-  val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult Lwt.t
+  val get_peers : ?connected:bool -> t -> P2p_peer.Id.t list tzresult
 
   (** [get_peers_info ?connected t] returns a list of info for
       peers. If [connected] is [true] (default), it returns only info
@@ -170,11 +167,11 @@ module Transport_layer : sig
   val get_peers_info :
     ?connected:bool ->
     t ->
-    (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult Lwt.t
+    (P2p_peer.Id.t * Types.P2P.Peer.Info.t) list tzresult
 
   (** [get_peer_info t peer] returns the info of the corresponding peer if found. *)
   val get_peer_info :
-    t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult Lwt.t
+    t -> P2p_peer.Id.t -> Types.P2P.Peer.Info.t option tzresult
 
   (** [patch_peer t peer acl] patches the acl of the corresponding
       peer if found and returns the info. When [acl] is [None] this is
@@ -201,4 +198,14 @@ module Transport_layer_hooks : sig
 end
 
 (** [version ~network_name] returns the current version of the P2P. *)
-val version : network_name:string -> Network_version.t
+val version : network_name:Distributed_db_version.Name.t -> Network_version.t
+
+module Profiler : sig
+  open Tezos_profiler.Profiler
+
+  val gossipsub_profiler : profiler
+
+  val init : (name:string -> instance option) -> unit
+
+  val create_reset_block_section : profiler -> Block_hash.t * metadata -> unit
+end

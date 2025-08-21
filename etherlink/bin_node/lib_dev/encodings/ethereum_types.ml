@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -105,39 +105,13 @@ end
 
 let quantity_of_z z = Qty z
 
-let z_to_hexa = Z.format "#x"
-
 let quantity_encoding =
   Data_encoding.conv
-    (fun (Qty q) -> z_to_hexa q)
+    (fun (Qty q) -> Helpers.z_to_hexa q)
     (fun q -> Qty (Z.of_string q))
     Data_encoding.string
 
 let pp_quantity fmt (Qty q) = Z.pp_print fmt q
-
-let decode_z_le bytes = Bytes.to_string bytes |> Z.of_bits
-
-let decode_z_be bytes =
-  Bytes.fold_left
-    (fun acc c ->
-      let open Z in
-      add (of_int (Char.code c)) (shift_left acc 8))
-    Z.zero
-    bytes
-
-type chain_id = Chain_id of Z.t [@@ocaml.unboxed]
-
-module Chain_id = struct
-  let encoding =
-    Data_encoding.conv
-      (fun (Chain_id c) -> z_to_hexa c)
-      (fun c -> Chain_id (Z.of_string c))
-      Data_encoding.string
-
-  let decode_le bytes = Chain_id (decode_z_le bytes)
-
-  let decode_be bytes = Chain_id (decode_z_be bytes)
-end
 
 type block_hash = Block_hash of hex [@@ocaml.unboxed]
 
@@ -150,6 +124,8 @@ let block_hash_encoding =
     conv (fun (Block_hash h) -> hex_to_string h) block_hash_of_string string)
 
 let block_hash_to_bytes (Block_hash h) = hex_to_bytes h
+
+let block_hash_of_bytes s = Block_hash (hex_of_bytes s)
 
 let genesis_parent_hash = Block_hash (Hex (String.make 64 'f'))
 
@@ -258,9 +234,12 @@ let hash_to_bytes (Hash h) = hex_to_bytes h
 
 let hash_encoding = Data_encoding.(conv hash_to_string hash_of_string string)
 
-let pp_hash fmt (Hash (Hex h)) = Format.pp_print_string fmt h
+let equal_hash (Hash (Hex h1)) (Hash (Hex h2)) = String.equal h1 h2
 
-let pp_block_hash fmt (Block_hash (Hex h)) = Format.pp_print_string fmt h
+let pp_hash fmt h = Format.pp_print_string fmt (hash_to_string h)
+
+let pp_block_hash fmt (Block_hash h) =
+  Format.pp_print_string fmt (hex_to_string h)
 
 let decode_hex bytes = Hex Hex.(of_bytes bytes |> show)
 
@@ -268,13 +247,15 @@ let encode_hex (Hex hex) = Hex.to_bytes_exn (`Hex hex)
 
 let decode_block_hash bytes = Block_hash (decode_hex bytes)
 
+let encode_block_hash (Block_hash hash) = encode_hex hash
+
 let decode_address bytes = Address (decode_hex bytes)
 
 let encode_address (Address address) = encode_hex address
 
-let decode_number_le bytes = decode_z_le bytes |> quantity_of_z
+let decode_number_le bytes = Helpers.decode_z_le bytes |> quantity_of_z
 
-let decode_number_be bytes = decode_z_be bytes |> quantity_of_z
+let decode_number_be bytes = Helpers.decode_z_be bytes |> quantity_of_z
 
 let decode_hash bytes = Hash (decode_hex bytes)
 
@@ -382,15 +363,15 @@ type legacy_transaction_object = {
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash;
+  input : hex;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity option;
-      (* It can be null if it's in a pending block. *)
+  (* It can be null if it's in a pending block. *)
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : quantity;
+  s : quantity;
 }
 
 let legacy_transaction_object_from_rlp_item block_hash rlp_item =
@@ -423,7 +404,7 @@ let legacy_transaction_object_from_rlp_item block_hash rlp_item =
       let gas = decode_number_le gas_used in
       let gas_price = decode_number_le gas_price in
       let hash = decode_hash hash in
-      let input = decode_hash input in
+      let input = decode_hex input in
       let nonce = decode_number_le nonce in
       let to_ = if to_ = Bytes.empty then None else Some (decode_address to_) in
       let index = decode_optional_number_be index in
@@ -431,8 +412,8 @@ let legacy_transaction_object_from_rlp_item block_hash rlp_item =
       (* The signature is taken from the raw transaction, that is encoded in big
          endian. *)
       let v = decode_number_be v in
-      let r = decode_hash r in
-      let s = decode_hash s in
+      let r = decode_number_be r in
+      let s = decode_number_be s in
       {
         blockHash = block_hash;
         blockNumber = block_number;
@@ -521,15 +502,15 @@ let legacy_transaction_object_encoding =
           (req "gas" quantity_encoding)
           (req "gasPrice" quantity_encoding)
           (req "hash" hash_encoding)
-          (req "input" hash_encoding)
+          (req "input" hex_encoding)
           (req "nonce" quantity_encoding)
           (req "to" (option address_encoding))
           (req "transactionIndex" (option quantity_encoding)))
        (obj4
           (req "value" quantity_encoding)
           (req "v" quantity_encoding)
-          (req "r" hash_encoding)
-          (req "s" hash_encoding)))
+          (req "r" quantity_encoding)
+          (req "s" quantity_encoding)))
 
 type 'transaction_object block_transactions =
   | TxHash of hash list
@@ -577,6 +558,11 @@ type 'transaction_object block = {
      them*)
   baseFeePerGas : quantity option;
   prevRandao : block_hash option;
+  withdrawals : hash list option;
+  withdrawalsRoot : hash option;
+  blobGasUsed : hex option;
+  excessBlobGas : hex option;
+  parentBeaconBlockRoot : hash option;
 }
 
 let decode_list decoder list =
@@ -681,6 +667,11 @@ let block_from_rlp_v0 bytes =
         uncles = [];
         baseFeePerGas = None;
         prevRandao = None;
+        withdrawals = None;
+        withdrawalsRoot = None;
+        blobGasUsed = None;
+        excessBlobGas = None;
+        parentBeaconBlockRoot = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 13 elements")
 
@@ -778,14 +769,40 @@ let block_from_rlp_v1 bytes =
         uncles = [];
         baseFeePerGas;
         prevRandao;
+        withdrawals = None;
+        withdrawalsRoot = None;
+        blobGasUsed = None;
+        excessBlobGas = None;
+        parentBeaconBlockRoot = None;
       }
   | _ -> raise (Invalid_argument "Expected a List of 15 elements")
 
+let block_from_rlp_v2 bytes =
+  {
+    (block_from_rlp_v1 bytes) with
+    withdrawals = Some [];
+    (* merkle root of an empty SSZ list, this hash is reused across many zero-root structures in Ethereum *)
+    withdrawalsRoot =
+      Some
+        (Hash
+           (Hex
+              "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"));
+    blobGasUsed = Some (Hex "0");
+    excessBlobGas = Some (Hex "0");
+    parentBeaconBlockRoot =
+      Some
+        (Hash
+           (Hex
+              "0000000000000000000000000000000000000000000000000000000000000000"));
+  }
+
 let block_from_rlp bytes =
   let first_byte = Bytes.get bytes 0 in
+  let length = Bytes.length bytes in
   if first_byte = Char.chr 1 then
-    let length = Bytes.length bytes in
     block_from_rlp_v1 (Bytes.sub bytes 1 (length - 1))
+  else if first_byte = Char.chr 2 then
+    block_from_rlp_v2 (Bytes.sub bytes 1 (length - 1))
   else block_from_rlp_v0 bytes
 
 let block_encoding transaction_object_encoding =
@@ -813,6 +830,11 @@ let block_encoding transaction_object_encoding =
            uncles;
            baseFeePerGas;
            prevRandao;
+           withdrawals;
+           withdrawalsRoot;
+           blobGasUsed;
+           excessBlobGas;
+           parentBeaconBlockRoot;
          } ->
       ( ( ( number,
             hash,
@@ -834,7 +856,12 @@ let block_encoding transaction_object_encoding =
             transactions,
             uncles,
             baseFeePerGas ) ),
-        prevRandao ))
+        ( prevRandao,
+          withdrawals,
+          withdrawalsRoot,
+          blobGasUsed,
+          excessBlobGas,
+          parentBeaconBlockRoot ) ))
     (fun ( ( ( number,
                hash,
                parent,
@@ -855,7 +882,12 @@ let block_encoding transaction_object_encoding =
                transactions,
                uncles,
                baseFeePerGas ) ),
-           prevRandao ) ->
+           ( prevRandao,
+             withdrawals,
+             withdrawalsRoot,
+             blobGasUsed,
+             excessBlobGas,
+             parentBeaconBlockRoot ) ) ->
       {
         number;
         hash;
@@ -878,6 +910,11 @@ let block_encoding transaction_object_encoding =
         transactions;
         uncles;
         prevRandao;
+        withdrawals;
+        withdrawalsRoot;
+        blobGasUsed;
+        excessBlobGas;
+        parentBeaconBlockRoot;
       })
     (merge_objs
        (merge_objs
@@ -905,7 +942,17 @@ let block_encoding transaction_object_encoding =
                 (block_transactions_encoding transaction_object_encoding))
              (req "uncles" (list hash_encoding))
              (opt "baseFeePerGas" quantity_encoding)))
-       (obj1 (opt "prevRandao" block_hash_encoding)))
+       (obj6
+          (* [mixHash] has been replaced by [prevRandao] internally in the
+             Paris EVM version, but every public RPC endpoints we have been
+             testing keep using [mixHash] in their JSON encoding (probably for
+             backward compatibility). *)
+          (opt "mixHash" block_hash_encoding)
+          (opt "withdrawals" (list hash_encoding))
+          (opt "withdrawalsRoot" hash_encoding)
+          (opt "blobGasUsed" hex_encoding)
+          (opt "excessBlobGas" hex_encoding)
+          (opt "parentBeaconBlockRoot" hash_encoding)))
 
 type call = {
   from : address option;
@@ -1026,6 +1073,8 @@ module Address = struct
   type t = address
 
   let compare (Address (Hex h)) (Address (Hex h')) = String.compare h h'
+
+  let equal (Address (Hex h)) (Address (Hex h')) = String.equal h h'
 
   let to_string = address_to_string
 
@@ -1269,34 +1318,85 @@ module Subscription = struct
          (opt "address" Filter.filter_address_encoding)
          (opt "topics" (list @@ option Filter.topic_encoding)))
 
-  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+  type etherlink_extension = L1_L2_levels of int32 option
+
+  type kind =
+    | NewHeads
+    | Logs of logs
+    | NewPendingTransactions
+    | Syncing
+    | Etherlink of etherlink_extension
+
+  let etherlink_extension_encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          ~title:"tez_l1_l2_levels"
+          (Tag 0)
+          (tup1 (constant "tez_l1L2Levels"))
+          (function L1_L2_levels None -> Some () | _ -> None)
+          (fun () -> L1_L2_levels None);
+        case
+          ~title:"tez_l1_l2_levels_with_history"
+          (Tag 1)
+          (tup2
+             (constant "tez_l1L2Levels")
+             (obj1
+                (req
+                   "fromL1Level"
+                   ~description:
+                     "When provided all L1 levels with their associated L2 \
+                      levels will be notified starting from this value. If it \
+                      is below the earliest level known by the EVM node, only \
+                      levels starting from the earliest known L1 level will be \
+                      notified."
+                   int32)))
+          (function L1_L2_levels (Some start) -> Some ((), start) | _ -> None)
+          (fun ((), start) -> L1_L2_levels (Some start));
+      ]
 
   let kind_encoding =
     let open Data_encoding in
     union
       [
         case
-          ~title:"params_size_two"
+          ~title:"newHead"
           (Tag 0)
-          (tup2 string logs_encoding)
-          (function Logs logs -> Some ("logs", logs) | _ -> None)
-          (function
-            | "logs", logs -> Logs logs | _ -> raise Unknown_subscription);
+          (tup1 (constant "newHeads"))
+          (function NewHeads -> Some () | _ -> None)
+          (fun () -> NewHeads);
         case
-          ~title:"params_size_one"
+          ~title:"newPendingTransactions"
           (Tag 1)
-          (tup1 string)
+          (tup1 (constant "newPendingTransactions"))
+          (function NewPendingTransactions -> Some () | _ -> None)
+          (fun () -> NewPendingTransactions);
+        case
+          ~title:"logs"
+          (Tag 2)
+          (tup2 (constant "logs") logs_encoding)
+          (function Logs logs -> Some ((), logs) | _ -> None)
+          (fun ((), logs) -> Logs logs);
+        case
+          ~title:"logs_all"
+          (Tag 3)
+          (tup1 (constant "logs"))
           (function
-            | NewHeads -> Some "newHeads"
-            | NewPendingTransactions -> Some "newPendingTransactions"
-            | Syncing -> Some "syncing"
-            | Logs _ -> Some "logs")
-          (function
-            | "newHeads" -> NewHeads
-            | "newPendingTransactions" -> NewPendingTransactions
-            | "syncing" -> Syncing
-            | "logs" -> Logs {address = None; topics = None}
-            | _ -> raise Unknown_subscription);
+            | Logs {address = None; topics = None} -> Some () | _ -> None)
+          (fun () -> Logs {address = None; topics = None});
+        case
+          ~title:"syncing"
+          (Tag 4)
+          (tup1 (constant "syncing"))
+          (function Syncing -> Some () | _ -> None)
+          (fun () -> Syncing);
+        case
+          ~title:"etherlink_extension"
+          (Tag 0xff)
+          etherlink_extension_encoding
+          (function Etherlink e -> Some e | _ -> None)
+          (fun e -> Etherlink e);
       ]
 
   type id = Id of hex [@@ocaml.unboxed]
@@ -1347,11 +1447,32 @@ module Subscription = struct
       (fun (syncing, status) -> {syncing; status})
       (obj2 (req "syncing" bool) (req "status" sync_status_encoding))
 
+  type l1_l2_levels_output = {
+    l1_level : int32;
+    start_l2_level : quantity;
+    end_l2_level : quantity;
+  }
+
+  let l1_l2_levels_output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {l1_level; start_l2_level; end_l2_level} ->
+        (l1_level, start_l2_level, end_l2_level))
+      (fun (l1_level, start_l2_level, end_l2_level) ->
+        {l1_level; start_l2_level; end_l2_level})
+      (obj3
+         (req "l1Level" int32)
+         (req "startBlockNumber" quantity_encoding)
+         (req "endBlockNumber" quantity_encoding))
+
+  type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
+
   type 'transaction_object output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | Etherlink of etherlink_extension_output
 
   let output_encoding transaction_object_encoding =
     let open Data_encoding in
@@ -1381,5 +1502,11 @@ module Subscription = struct
           sync_output_encoding
           (function Syncing l -> Some l | _ -> None)
           (fun l -> Syncing l);
+        case
+          ~title:"tez_l1l2Levels"
+          (Tag 4)
+          l1_l2_levels_output_encoding
+          (function Etherlink (L1_l2_levels l) -> Some l | _ -> None)
+          (fun l -> Etherlink (L1_l2_levels l));
       ]
 end

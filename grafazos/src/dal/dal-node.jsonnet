@@ -55,7 +55,7 @@ local graph = base.graph;
     local shards = 'Stored shards';
     local shardsQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_number_of_stored_shards' + base.node_instance_query + '[1m])')
                         + query.prometheus.withLegendFormat(shards);
-    graph.new('The shards stored by this node (1-minute interval)', [shardsQuery], h, w, x, y)
+    graph.new('The number of shards stored per second (over 1min)', [shardsQuery], h, w, x, y)
     + graph.withQueryColor([[shards, 'blue']]),
 
   slotsAttesatationSummary(h, w, x, y):
@@ -78,4 +78,9 @@ local graph = base.graph;
     local q = grafonnet.query.prometheus.new('Prometheus', namespace + '_slots_attested' + base.slot_index_instance_query)
               + query.prometheus.withLegendFormat('Slot index: {{ slot_index }}');
     graph.new('Indexes of attested slots', [q], h, w, x, y),
+
+  L1BlockProcessingTime(h, w, x, y):
+    local head = 'Processing time per level';
+    local query = prometheus('per_level_processing_time', legendFormat=head, namespace=namespace);
+    graph.new('Processing time for each level', [query], h, w, x, y),
 }

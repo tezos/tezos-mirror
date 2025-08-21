@@ -20,6 +20,11 @@ let generic_packages_image =
   Image.mk_external
     ~image_path:"$DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 
+let tag_amd64 ~ramfs =
+  if ramfs then "gcp_very_high_cpu_ramfs" else "gcp_very_high_cpu"
+
+let tag_arm64 = "gcp_arm64"
+
 (** These are the set of Rocky Linux release-architecture combinations for
     which we build rpm packages in the job
     [job_build_rockylinux_package]. A dependency image will be built once
@@ -27,9 +32,10 @@ let generic_packages_image =
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let rockylinux_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp"])]]
-  | Full | Release -> [[("RELEASE", ["9.3"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+let rockylinux_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs])]]
+  | Full | Release ->
+      [[("RELEASE", ["9.3"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (** These are the set of Fedora release-architecture combinations for
     which we build rpm packages in the job
@@ -38,13 +44,13 @@ let rockylinux_package_release_matrix = function
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let fedora_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["39"]); ("TAGS", ["gcp"])]]
+let fedora_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["39"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["39"; "42"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [[("RELEASE", ["39"; "42"]); ("TAGS", [tag_amd64 ~ramfs; tag_arm64])]]
 
 (* Push .rpm artifacts to storagecloud rpm repository. *)
-let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+let make_job_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?(prefix = false) ?dependencies ~variables ?id_tokens ~image ~before_script
     script : tezos_job =
   let variables =
@@ -96,12 +102,19 @@ let jobs pipeline_type =
          images/packages/rpm-systemd-tests.Dockerfile";
       ]
   in
-  let job_docker_systemd_test_rpm_dependencies : tezos_job =
+  let job_docker_systemd_test_rpm_rockylinux_dependencies : tezos_job =
     make_job_docker_systemd_tests
       ~__POS__
-      ~name:"oc.docker-systemd_tests-rpm"
+      ~name:"oc.docker-systemd-tests-rpm-rockylinux"
       ~distribution:"rockylinux"
       ~matrix:(rockylinux_package_release_matrix pipeline_type)
+  in
+  let job_docker_systemd_test_rpm_fedora_dependencies : tezos_job =
+    make_job_docker_systemd_tests
+      ~__POS__
+      ~name:"oc.docker-systemd-tests-rpm-fedora"
+      ~distribution:"fedora"
+      ~matrix:(fedora_package_release_matrix pipeline_type)
   in
 
   let make_job_docker_build_dependencies ~__POS__ ~name ~matrix ~distribution =
@@ -141,7 +154,7 @@ let jobs pipeline_type =
       ~name:"oc.build-rockylinux"
       ~dependencies:(Dependent [Job job_docker_build_rockylinux_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(rockylinux_package_release_matrix pipeline_type)
+      ~matrix:(rockylinux_package_release_matrix ~ramfs:true pipeline_type)
       ~variables:(variables [("DISTRIBUTION", "rockylinux")])
       ~image:generic_packages_image
   in
@@ -151,7 +164,7 @@ let jobs pipeline_type =
       ~name:"oc.build-fedora"
       ~dependencies:(Dependent [Job job_docker_build_fedora_dependencies])
       ~script:"./scripts/ci/build-rpm-packages.sh binaries"
-      ~matrix:(fedora_package_release_matrix pipeline_type)
+      ~matrix:(fedora_package_release_matrix ~ramfs:true pipeline_type)
       ~variables:(variables [("DISTRIBUTION", "fedora")])
       ~image:generic_packages_image
   in
@@ -254,17 +267,13 @@ let jobs pipeline_type =
       ~name
       ~dependencies
       ~variables
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
   let test_fedora_packages_jobs =
     [
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_fedora_39"
-        ~dependencies:(Dependent [Job job_rpm_repo_fedora])
-        ~image:Images.fedora_39
-        ["./scripts/packaging/tests/rpm/rpm-install.sh fedora 39"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_fedora_39.doc"
@@ -274,10 +283,11 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_fedora_39_systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_docker_systemd_test_rpm_fedora_dependencies;
                Job job_rpm_repo_fedora;
              ])
         ~variables:
@@ -286,19 +296,13 @@ let jobs pipeline_type =
              [("DISTRIBUTION", "fedora"); ("RELEASE", "39")])
         [
           "./scripts/ci/systemd-packages-test.sh \
-           docs/introduction/install-bin-rpm.sh \
+           scripts/packaging/tests/rpm/rpm-install.sh \
            images/packages/rpm-systemd-tests.Dockerfile";
         ];
     ]
   in
   let test_rockylinux_packages_jobs =
     [
-      job_install_bin
-        ~__POS__
-        ~name:"oc.install_bin_rockylinux_9.3"
-        ~dependencies:(Dependent [Job job_rpm_repo_rockylinux])
-        ~image:Images.rockylinux_93
-        ["./scripts/packaging/tests/rpm/rpm-install.sh rockylinux 9.3"];
       job_install_bin
         ~__POS__
         ~name:"oc.install_bin_rockylinux_9.3.doc"
@@ -308,10 +312,11 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_rockylinux_93_systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
-               Job job_docker_systemd_test_rpm_dependencies;
+               Job job_docker_systemd_test_rpm_rockylinux_dependencies;
                Job job_rpm_repo_rockylinux;
              ])
         ~variables:
@@ -328,7 +333,7 @@ let jobs pipeline_type =
   let rockylinux_jobs =
     [
       job_docker_build_rockylinux_dependencies;
-      job_docker_systemd_test_rpm_dependencies;
+      job_docker_systemd_test_rpm_rockylinux_dependencies;
       job_build_rockylinux_package;
       job_build_rockylinux_package_data;
       job_rpm_repo_rockylinux;
@@ -337,6 +342,7 @@ let jobs pipeline_type =
   let fedora_jobs =
     [
       job_docker_build_fedora_dependencies;
+      job_docker_systemd_test_rpm_fedora_dependencies;
       job_build_fedora_package;
       job_build_fedora_package_data;
       job_rpm_repo_fedora;

@@ -53,6 +53,17 @@ module type CURVE = sig
   (** Build a OCaml array of [t] values from the contiguous C array *)
   val of_affine_array : affine_array -> t array
 
+  (** [affine_array_of_compressed_bytes_opt pts] builds a contiguous C
+      array and populate it with the points [pts] in affine
+      coordinates from their compressed representation in bytes.
+
+      If [subgroup_check] is set, the function also checks if the
+      points are in the prime subgroup.
+
+      Use it with {!affine_add_bulk} to get better performance *)
+  val affine_array_of_compressed_bytes_opt :
+    subgroup_check:bool -> Bytes.t array -> affine_array option
+
   (** Return the number of elements in the array *)
   val size_of_affine_array : affine_array -> int
 
@@ -111,9 +122,13 @@ module type CURVE = sig
   (** Return the addition of two element *)
   val add : t -> t -> t
 
-  val add_inplace : t -> t -> unit
+  val add_inplace : t -> t -> t -> unit
 
   val add_bulk : t list -> t
+
+  (** [affine_add_bulk xs] returns the sum of the elements of [xs] by
+      performing only one allocation for the output. *)
+  val affine_add_bulk : affine_array -> t
 
   (** [double g] returns [2g] *)
   val double : t -> t
@@ -127,7 +142,7 @@ module type CURVE = sig
   (** Multiply an element by a scalar *)
   val mul : t -> Scalar.t -> t
 
-  val mul_inplace : t -> Scalar.t -> unit
+  val mul_inplace : t -> t -> Scalar.t -> unit
 
   val hash_to_curve : Bytes.t -> Bytes.t -> t
 
@@ -173,6 +188,27 @@ module type CURVE = sig
       {b Warning.} Undefined behavior if the point to infinity is in the array *)
   val pippenger_with_affine_array :
     ?start:int -> ?len:int -> affine_array -> Scalar.t array -> t
+
+  (** [pippenger_with_compressed_bytes_array_opt points scalars]
+      computes the multi-scalar multiplication, i.e., the sum of
+      [scalars[i] * points[i]].
+
+      If [subgroup_check] is set, the function also checks if the points
+      are in the prime subgroup.
+
+      Returns [None] if deserialization of points fails. *)
+  val pippenger_with_compressed_bytes_array_opt :
+    subgroup_check:bool -> Bytes.t array -> Scalar.t array -> Bytes.t option
+
+  (** [add_bulk_with_compressed_bytes_array_opt points]
+      computes the sum of [points[i]].
+
+      If [subgroup_check] is set, the function also checks if the points
+      are in the prime subgroup.
+
+      Returns [None] if deserialization of points fails. *)
+  val add_bulk_with_compressed_bytes_array_opt :
+    subgroup_check:bool -> Bytes.t array -> Bytes.t option
 end
 
 module Fr = Fr

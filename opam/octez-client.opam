@@ -10,13 +10,13 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-rustzcash-deps" { = version }
+  "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "octez-protocol-021-PsQuebec-libs" { = version }
   "octez-protocol-022-PsRiotum-libs" { = version }
+  "octez-protocol-023-PtSeouLo-libs" { = version }
 ]
 depopts: [
   "tezos-client-genesis"
@@ -42,6 +42,7 @@ depopts: [
   "octez-protocol-018-Proxford-libs"
   "octez-protocol-019-PtParisB-libs"
   "octez-protocol-020-PsParisC-libs"
+  "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -68,6 +69,7 @@ conflicts: [
   "octez-protocol-018-Proxford-libs" { != version }
   "octez-protocol-019-PtParisB-libs" { != version }
   "octez-protocol-020-PsParisC-libs" { != version }
+  "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

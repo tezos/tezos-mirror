@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    lib_p2p (test lib)
-   Invocation:   dune exec src/lib_p2p/test/test_p2p_node.exe
+   Invocation:   dune exec src/lib_p2p/tezt/main.exe -- --file test_p2p_node.ml
    Subject:      Check p2p test framework.
 *)
 module Event = struct

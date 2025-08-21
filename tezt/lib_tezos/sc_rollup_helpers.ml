@@ -4,6 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022-2023 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -209,6 +210,59 @@ let prepare_installer_kernel_with_arbitrary_file ?output
     root_hash;
   }
 
+(* This function takes a path and retrieve the name of the file without
+   all the dir and the extension *)
+let name_of_file path = Filename.(remove_extension (basename path))
+
+let merge_setup_files ?smart_rollup_installer_path ?runner ?output configs =
+  let open Tezt.Base in
+  let open Lwt.Syntax in
+  let output =
+    match output with
+    | None ->
+        Temp.file (String.concat "_" (List.map name_of_file configs) ^ ".yaml")
+    | Some output -> output
+  in
+  let* process =
+    let smart_rollup_installer_path =
+      match smart_rollup_installer_path with
+      | None -> project_root // Uses.path Constant.smart_rollup_installer
+      | Some path -> path
+    in
+    Process.spawn
+      ?runner
+      ~name:output
+      smart_rollup_installer_path
+      (["merge-setup-files"; "--output"; output; "--setup-files"] @ configs)
+    |> Lwt.return
+  in
+  let+ () = Runnable.run @@ Runnable.{value = process; run = Process.check} in
+  output
+
+let prepare_installer_kernel_with_multiple_setup_file ?output
+    ?smart_rollup_installer_path ?runner ?boot_sector ~preimages_dir ?configs
+    installee =
+  let open Tezt.Base in
+  let open Lwt.Syntax in
+  let* config =
+    match configs with
+    | None -> return None
+    | Some [config] -> return (Some (`Path config))
+    | Some configs ->
+        let+ output =
+          merge_setup_files ?smart_rollup_installer_path ?runner configs
+        in
+        Some (`Path output)
+  in
+  prepare_installer_kernel_with_arbitrary_file
+    ?output
+    ?smart_rollup_installer_path
+    ?runner
+    ?boot_sector
+    ~preimages_dir
+    ?config
+    installee
+
 let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
   prepare_installer_kernel_with_arbitrary_file
     ?output
@@ -217,13 +271,37 @@ let prepare_installer_kernel ?output ?runner ~preimages_dir ?config installee =
     ?config
     (Uses.path installee)
 
+let riscv_dummy_kernel =
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf" ()
+
+let riscv_dummy_kernel_checksum =
+  Uses.make ~tag:"riscv" ~path:"src/riscv/assets/riscv-dummy.elf.checksum" ()
+
+(* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
+ * Originate RISC-V kernels using installer kernel instead *)
+let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
+  let checksum =
+    String.split_on_char ' ' (read_file (Uses.path checksum_path))
+  in
+  "kernel:" ^ Uses.path kernel_path ^ ":" ^ List.hd checksum
+
 let default_boot_sector_of ~kind =
   match kind with
   | "arith" -> ""
   | "wasm_2_0_0" -> Constant.wasm_echo_kernel_boot_sector
-  | "riscv" -> ""
+  | "riscv" ->
+      let checksum =
+        Uses.path riscv_dummy_kernel_checksum
+        |> read_file |> String.split_on_char ' ' |> List.hd
+      in
+      "kernel:" ^ Uses.path riscv_dummy_kernel ^ ":" ^ checksum
   | kind ->
       Format.kasprintf Stdlib.invalid_arg "default_boot_sector_of: %s" kind
+
+let default_boot_sector_uses_of ~kind =
+  match kind with
+  | "riscv" -> [riscv_dummy_kernel; riscv_dummy_kernel_checksum]
+  | _ -> []
 
 let make_parameter name = function
   | None -> []
@@ -266,11 +344,9 @@ let setup_l1 ?timestamp ?bootstrap_smart_rollups ?bootstrap_contracts
     @ make_bool_parameter_l
         ["dal_parametric"; "incentives_enable"]
         dal_incentives
-    @ (if Protocol.(number protocol > number Quebec) then
-         make_int_parameter
-           ["issuance_weights"; "dal_rewards_weight"]
-           dal_rewards_weight
-       else [])
+    @ make_int_parameter
+        ["issuance_weights"; "dal_rewards_weight"]
+        dal_rewards_weight
     @
     if riscv_pvm_enable then [(["smart_rollup_riscv_pvm_enable"], `Bool true)]
     else []
@@ -454,6 +530,7 @@ let setup_bootstrap_smart_rollup ?(name = "smart-rollup") ~address
 type refutation_scenario_parameters = {
   loser_modes : string list;
   inputs : string list list;
+  input_format : [`Raw | `Hex];
   final_level : int;
   empty_levels : int list;
   stop_loser_at : int list;
@@ -466,10 +543,11 @@ type refutation_scenario_parameters = {
 let refutation_scenario_parameters ?(loser_modes = []) ~final_level
     ?(empty_levels = []) ?(stop_loser_at = []) ?(reset_honest_on = [])
     ?(bad_reveal_at = []) ?(priority = `No_priority) ?(allow_degraded = false)
-    inputs =
+    ?(input_format = `Raw) inputs =
   {
     loser_modes;
     inputs;
+    input_format;
     final_level;
     empty_levels;
     stop_loser_at;
@@ -850,8 +928,8 @@ let prioritize_refute_operations sc_rollup_node =
          ))
     config
 
-let send_text_messages ?(format = `Raw) ?hooks ?src client msgs =
-  match format with
+let send_text_messages ?(input_format = `Raw) ?hooks ?src client msgs =
+  match input_format with
   | `Raw -> send_message ?hooks ?src client (to_text_messages_arg msgs)
   | `Hex -> send_message ?hooks ?src client (to_hex_messages_arg msgs)
 
@@ -888,12 +966,12 @@ let bake_until ?hook cond n client =
 (*
 
    To check the refutation game logic, we evaluate a scenario with one
-   honest rollup node and one dishonest rollup node configured as with
-   a given [loser_mode].
+   honest rollup node and one dishonest rollup node configured with
+   the given [loser_mode].
 
    For a given sequence of [inputs], distributed amongst several
    levels, with some possible [empty_levels]. We check that at some
-   [final_level], the crime does not pay: the dishonest node has losen
+   [final_level] crime does not pay: the dishonest node has lost
    its deposit while the honest one has not.
 
 *)
@@ -901,6 +979,7 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
     {
       loser_modes;
       inputs;
+      input_format;
       final_level;
       empty_levels;
       stop_loser_at;
@@ -1072,7 +1151,11 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
         else
           let* () =
             retry @@ fun () ->
-            send_text_messages ~src:Constant.bootstrap3.alias client inputs
+            send_text_messages
+              ~input_format
+              ~src:Constant.bootstrap3.alias
+              client
+              inputs
           in
           consume_inputs next_batches
   in
@@ -1085,7 +1168,11 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
       if List.mem level bad_reveal_at then
         let hash = reveal_hash ~protocol ~kind "Missing data" in
         retry @@ fun () ->
-        send_text_messages ~src:Constant.bootstrap3.alias client [hash.message]
+        send_text_messages
+          ~input_format
+          ~src:Constant.bootstrap3.alias
+          client
+          [hash.message]
       else unit
     in
     stop_losers level
@@ -1100,6 +1187,12 @@ let test_refutation_scenario_aux ~(mode : Sc_rollup_node.mode) ~kind
            ()
     in
     let has_games = JSON.as_list games <> [] in
+
+    (* Picking up on the conflict detected event can be flaky with slower
+     * block times, such as when testing the RISC-V PVM.
+     * If a game is ever in progress, a conflict must have been detected. *)
+    if has_games then conflict_detected := true ;
+
     if !game_started then return has_games
     else (
       game_started := has_games ;

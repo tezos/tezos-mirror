@@ -71,7 +71,7 @@ let fetch_attested_level kvs_store slots attested_level =
         ~slot_index
     in
     let* cell = Kvs_skip_list_cells_store.find kvs_store hash in
-    return (hash, cell)
+    return (hash, cell, slot_index)
   in
   let+ payload =
     List.map_es (fun slot_index -> fetch_slot_index ~slot_index) slots

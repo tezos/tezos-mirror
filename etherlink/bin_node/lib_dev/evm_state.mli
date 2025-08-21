@@ -11,22 +11,27 @@ type t = Irmin_context.PVMState.value
     expect the directory to exist.*)
 val kernel_logs_directory : data_dir:string -> string
 
-(** [execute ?simulation ~data_dir ?log_file ~wasm_entrypoint ~config
-    evm_state messages] executes the [wasm_entrypoint] function
-    (default to [kernel_run]) with [messages] within the inbox of
-    [evm_state].
+(** [execute ?execution_timestamp ?simulation ~data_dir ?log_file
+    ~wasm_entrypoint ~config evm_state messages] executes the
+    [wasm_entrypoint] function (default to [kernel_run]) with
+    [messages] within the inbox of [evm_state].
 
     Kernel logs are stored under the {!kernel_logs_directory} in [log_file].
     [simulation] adds a prefix to the event to differenciate the logs.
+
+    When [execution_timestamp] is provided it's used as the l1
+    timestamp of in the Info_per_level message of the inbox, default
+    value is `epoch`.
 *)
 val execute :
+  ?execution_timestamp:Time.Protocol.t ->
   ?wasm_pvm_fallback:bool ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   ?kind:Events.kernel_log_kind ->
   data_dir:string ->
   ?log_file:string ->
   ?wasm_entrypoint:string ->
-  config:Config.config ->
+  config:Wasm_debugger.config ->
   native_execution:bool ->
   t ->
   [< `Input of string] list ->
@@ -54,6 +59,10 @@ val inspect : t -> string -> bytes option Lwt.t
     [evm_state]. *)
 val subkeys : t -> string -> string trace Lwt.t
 
+(** [read evm_state key] returns the bytes stored under [key] in
+    [evm_state]. *)
+val read : t -> string -> bytes option tzresult Lwt.t
+
 (** [execute_and_inspect ~data_dir ?wasm_entrypoint ~config ~input
     evm_state] executes the [wasm_entrypoint] function (default to
     [kernel_run]) with [input] within the inbox of [evm_state], and
@@ -62,23 +71,27 @@ val execute_and_inspect :
   ?wasm_pvm_fallback:bool ->
   data_dir:string ->
   ?wasm_entrypoint:string ->
-  config:Config.config ->
+  config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   input:Simulation.Encodings.simulate_input ->
   t ->
   bytes option list tzresult Lwt.t
 
-(** [current_block_height evm_state] returns the height of the latest block
-    produced by the kernel. *)
-val current_block_height : t -> Ethereum_types.quantity Lwt.t
+(** [current_block_height ~root evm_state] returns the height of the latest
+    block produced by the kernel at [root]. *)
+val current_block_height :
+  root:Durable_storage_path.path -> t -> Ethereum_types.quantity Lwt.t
 
 (** Same as {!current_block_height} for the block hash. *)
-val current_block_hash : t -> Ethereum_types.block_hash tzresult Lwt.t
+val current_block_hash :
+  chain_family:_ L2_types.chain_family ->
+  t ->
+  Ethereum_types.block_hash tzresult Lwt.t
 
 type apply_result =
   | Apply_success of {
       evm_state : t;
-      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
     }
   | Apply_failure
 
@@ -93,9 +106,10 @@ type apply_result =
 val apply_blueprint :
   ?wasm_pvm_fallback:bool ->
   ?log_file:string ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   data_dir:string ->
-  config:Config.config ->
+  chain_family:_ L2_types.chain_family ->
+  config:Wasm_debugger.config ->
   native_execution_policy:Configuration.native_execution_policy ->
   t ->
   Blueprint_types.payload ->
@@ -127,11 +141,11 @@ val preload_kernel : t -> unit Lwt.t
 val get_delayed_inbox_item :
   t -> Ethereum_types.hash -> Evm_events.Delayed_transaction.t tzresult Lwt.t
 
-(**[clear_block_storage block state] removes the parent of [block], and all
-   durable storage information stored for [block], if this function is called
-   they need to be store elsewhere, mainly it consists in transactions. *)
+(** [clear_block_storage chain_family block state] removes the parent of [block],
+    and all durable storage information stored for [block], if this function is
+    called they need to be store elsewhere, mainly it consists in transactions. *)
 val clear_block_storage :
-  'transaction_object Ethereum_types.block -> t -> t Lwt.t
+  _ L2_types.chain_family -> 'transaction_object L2_types.block -> t -> t Lwt.t
 
 (** [storage_version tree] returns the current storage version set by the
     kernel. This storage version is used by the EVM node to determine whether a

@@ -3,7 +3,10 @@
 # Checklist
 
 - [ ] Provide automatic testing.
-- [ ] Add an item in the [changelog](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/CHANGES_NODE.md)
+- [ ] Add an item in the
+      [changelog](https://gitlab.com/tezos/tezos/-/blob/master/etherlink/CHANGES_NODE.md)
+- [ ] Add a page in the
+      [doc](https://gitlab.com/tezos/tezos/-/tree/master/etherlink/docs)
 
 # What
 
@@ -22,9 +25,7 @@
 
 <!-- Explain how to test you MR, preferably manually or by running a test. -->
 
-/assign @antoine.lanco @brahima.dibassi @lthms @mebsout @pe.cornilleau @pikatos @rodibozman @sribaroud @thomas.plisson @rafoo\_ @jtcoolen
-/unassign me
-
+/assign me
 
 /labels ~evm::node
 

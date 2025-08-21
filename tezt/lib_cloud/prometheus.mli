@@ -13,6 +13,18 @@ val get_name : t -> string
 (** Get the port used on localhost used for port [9090] of the docker machine *)
 val get_port : t -> int
 
+(** [get_query_endpoint ~query] returns the endpoint corresponding
+    to the prometheus server, extended with the [query] provided.
+    Returns [None] if the prometheus service is not running.
+    Useful to perform GET requests.
+
+    It assumes the prometheus instance is running on [localhost] and
+    uses [Env.port]. As a consequence, the returned [Uri.t] is valid
+    for the tezt-cloud orchestrator but may be not suited for other
+    services.
+*)
+val get_query_endpoint : query:string -> Uri.t option
+
 type target = {address : string; port : int; app_name : string}
 
 type alert

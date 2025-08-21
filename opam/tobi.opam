@@ -12,6 +12,7 @@ depends: [
   "ocaml" { >= "4.14" }
   "base-unix"
   "clap" { >= "0.3.0" }
+  "opam-file-format" { >= "2.1.6" }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

@@ -77,10 +77,37 @@ let public_key_hash pk_uri =
 
 let import_secret_key ~io:_ = public_key_hash
 
-let sign ?watermark sk_uri buf =
+let list_known_keys path = Client_keys.list_known_keys path
+
+let sign ?version ?watermark sk_uri buf =
   let open Lwt_result_syntax in
   let* sk = secret_key sk_uri in
-  return (Signature.sign ?watermark sk buf)
+  match version with
+  | Some Tezos_crypto.Signature.Version_0 -> (
+      match Tezos_crypto.Signature.V0.Of_V_latest.secret_key sk with
+      | Some sk ->
+          let s = Tezos_crypto.Signature.V0.sign ?watermark sk buf in
+          return (Signature.V_latest.Of_V0.signature s)
+      | None ->
+          Error_monad.failwith
+            "Failed to handle secret key in Signature version 0")
+  | Some Version_1 -> (
+      match Tezos_crypto.Signature.V1.Of_V_latest.secret_key sk with
+      | Some sk ->
+          let s = Tezos_crypto.Signature.V1.sign ?watermark sk buf in
+          return (Signature.V_latest.Of_V1.signature s)
+      | None ->
+          Error_monad.failwith
+            "Failed to handle secret key in Signature version 1")
+  | Some Version_2 -> (
+      match Tezos_crypto.Signature.V2.Of_V_latest.secret_key sk with
+      | Some sk ->
+          let s = Tezos_crypto.Signature.V2.sign ?watermark sk buf in
+          return s
+      | None ->
+          Error_monad.failwith
+            "Failed to handle secret key in Signature version 2")
+  | None -> return (Tezos_crypto.Signature.V_latest.sign ?watermark sk buf)
 
 let deterministic_nonce sk_uri buf =
   let open Lwt_result_syntax in
@@ -93,3 +120,15 @@ let deterministic_nonce_hash sk_uri buf =
   return (Signature.deterministic_nonce_hash sk buf)
 
 let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
+
+let bls_prove_possession ?override_pk sk_uri =
+  let open Lwt_result_syntax in
+  let* sk = secret_key sk_uri in
+  match sk with
+  | Bls sk ->
+      return
+      @@ Signature.Bls.of_bytes_exn
+           (Signature.Bls.pop_prove ?msg:override_pk sk)
+  | _ ->
+      Error_monad.failwith
+        "Proof of possession can only be requested for BLS keys."

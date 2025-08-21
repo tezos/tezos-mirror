@@ -121,16 +121,16 @@ let main commands =
     ignore
       Tezos_clic.(
         setup_formatter
+          ~isatty:(Unix.isatty Unix.stdout)
           Format.std_formatter
-          (if Unix.isatty Unix.stdout then Ansi else Plain)
-          Short) ;
+          Details) ;
     warn_if_argv0_name_not_octez () ;
     ignore
       Tezos_clic.(
         setup_formatter
+          ~isatty:(Unix.isatty Unix.stderr)
           Format.err_formatter
-          (if Unix.isatty Unix.stderr then Ansi else Plain)
-          Short) ;
+          Details) ;
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
     let* base_dir, argv = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in
@@ -159,39 +159,39 @@ let main commands =
     | None -> Tezos_clic.dispatch commands ctxt argv
   in
   Stdlib.exit
-    (Tezos_base_unix.Event_loop.main_run
-       (let*! retcode =
-          let*! r =
-            Lwt.catch run (function
-                | Failure msg -> failwith "%s" msg
-                | exn -> failwith "%s" (Printexc.to_string exn))
-          in
-          match r with
-          | Ok () -> Lwt.return 0
-          | Error [Tezos_clic.Version] ->
-              let version =
-                Tezos_version_value.Bin_version.octez_version_string
-              in
-              Format.printf "%s\n" version ;
-              Lwt.return 0
-          | Error [Tezos_clic.Help command] ->
-              Tezos_clic.usage
-                Format.std_formatter
-                ~executable_name
-                ~global_options
-                (match command with None -> [] | Some c -> [c]) ;
-              Lwt.return 0
-          | Error errs ->
-              Tezos_clic.pp_cli_errors
-                Format.err_formatter
-                ~executable_name
-                ~global_options
-                ~default:Error_monad.pp
-                errs ;
-              Lwt.return 1
-        in
-        Format.pp_print_flush Format.err_formatter () ;
-        Format.pp_print_flush Format.std_formatter () ;
-        Lwt.return retcode))
+    (Tezos_base_unix.Event_loop.main_run ~process_name:"codec" (fun () ->
+         let*! retcode =
+           let*! r =
+             Lwt.catch run (function
+                 | Failure msg -> failwith "%s" msg
+                 | exn -> failwith "%s" (Printexc.to_string exn))
+           in
+           match r with
+           | Ok () -> Lwt.return 0
+           | Error [Tezos_clic.Version] ->
+               let version =
+                 Tezos_version_value.Bin_version.octez_version_string
+               in
+               Format.printf "%s\n" version ;
+               Lwt.return 0
+           | Error [Tezos_clic.Help command] ->
+               Tezos_clic.usage
+                 Format.std_formatter
+                 ~executable_name
+                 ~global_options
+                 (match command with None -> [] | Some c -> [c]) ;
+               Lwt.return 0
+           | Error errs ->
+               Tezos_clic.pp_cli_errors
+                 Format.err_formatter
+                 ~executable_name
+                 ~global_options
+                 ~default:Error_monad.pp
+                 errs ;
+               Lwt.return 1
+         in
+         Format.pp_print_flush Format.err_formatter () ;
+         Format.pp_print_flush Format.std_formatter () ;
+         Lwt.return retcode))
 
 let () = main commands

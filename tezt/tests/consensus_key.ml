@@ -38,6 +38,7 @@ let hooks =
   let replacements =
     ("edsig\\w{94}", "[SIGNATURE]")
     :: ("BLsig\\w{137}", "[BLS_SIGNATURE]")
+    :: ("BLpk\\w{72}", "[BLS_PUBLIC_KEY]")
     :: Tezos_regression.replacements
   in
   Tezos_regression.hooks_custom
@@ -108,10 +109,7 @@ let test_update_consensus_key =
       (["cache_sampler_state_cycles"], `Int (consensus_rights_delay + 3));
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
-    @
-    if Protocol.(number protocol > number Quebec) then
-      [(["allow_tz4_delegate_enable"], `Bool true)]
-    else [(["adaptive_issuance_force_activation"], `Bool true)]
+    @ [(["allow_tz4_delegate_enable"], `Bool true)]
   in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
@@ -181,21 +179,13 @@ let test_update_consensus_key =
       client
   in
   let* () =
-    if Protocol.(number protocol > number Quebec) then (
-      Log.info "Valid update: changing the consensus key to a BLS key." ;
-      Client.update_consensus_key
-        ~hooks
-        ~expect_failure:false
-        ~src:Constant.bootstrap5.alias
-        ~pk:key_bls.alias
-        client)
-    else (
-      Log.info "Invalid update: changing the consensus key to a BLS key." ;
-      Client.update_consensus_key
-        ~expect_failure:true
-        ~src:Constant.bootstrap1.alias
-        ~pk:key_bls.alias
-        client)
+    Log.info "Valid update: changing the consensus key to a BLS key." ;
+    Client.update_consensus_key
+      ~hooks
+      ~expect_failure:false
+      ~src:Constant.bootstrap5.alias
+      ~pk:key_bls.alias
+      client
   in
 
   Log.info "Trying a valid consensus key update." ;
@@ -582,18 +572,28 @@ let check_consensus_key ~__LOC__ delegate ?(expected_active = delegate)
 
 let register_key_as_delegate ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(owner : Account.key)
-    ~(consensus_key : Account.key) client =
+    ~(consensus_key : Account.key) ~(companion_key : Account.key) ~protocol
+    client =
   let* _ =
     Client.RPC.call ~hooks client
     @@ RPC.get_chain_block_context_contract ~id:consensus_key.public_key_hash ()
   in
   let* () =
-    Client.register_key
-      ~hooks
-      ~expect_failure
-      ~consensus:consensus_key.alias
-      owner.alias
-      client
+    if Protocol.(number protocol >= 023) then
+      Client.register_key
+        ~hooks
+        ~expect_failure
+        ~consensus:consensus_key.alias
+        ~companion:companion_key.alias
+        owner.alias
+        client
+    else
+      Client.register_key
+        ~hooks
+        ~expect_failure
+        ~consensus:consensus_key.alias
+        owner.alias
+        client
   in
   let* () = Client.bake_for_and_wait ~keys:[baker] client in
   let* _ =
@@ -657,10 +657,6 @@ let register ?(regression = true) title test =
       (["cache_stake_distribution_cycles"], `Int (consensus_rights_delay + 3));
     ]
   in
-  let parameters =
-    if Protocol.(number protocol > number Quebec) then parameters
-    else (["adaptive_issuance_force_activation"], `Bool true) :: parameters
-  in
   let* parameter_file =
     Protocol.write_parameter_file ~base:(Right (protocol, None)) parameters
   in
@@ -671,11 +667,15 @@ let register ?(regression = true) title test =
   let baker_1 = Constant.bootstrap2 in
   let* account_0 = Client.gen_and_show_keys ~alias:"dummy_account_0" client in
   let* account_1 = Client.gen_and_show_keys ~alias:"dummy_account_1" client in
-  test client baker_0 baker_1 account_0 account_1
+  let* account_2 =
+    Client.gen_and_show_keys ~alias:"dummy_account_2" ~sig_alg:"bls" client
+  in
+  test protocol client baker_0 baker_1 account_0 account_1 account_2
 
 let test_register_delegate_with_consensus_key ?(expect_failure = false)
     ?(baker = Constant.bootstrap1.alias) ~(new_delegate : Account.key)
-    ~(new_consensus_key : Account.key) client =
+    ~(new_consensus_key : Account.key) ~(new_companion_key : Account.key)
+    ~protocol client =
   let* () =
     transfer
       ~source:baker
@@ -689,7 +689,9 @@ let test_register_delegate_with_consensus_key ?(expect_failure = false)
       ~expect_failure
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
+      ~companion_key:new_companion_key
       ~baker
+      ~protocol
       client
   in
 
@@ -703,9 +705,16 @@ let test_register_delegate_with_consensus_key ?(expect_failure = false)
    does not store a regression trace. Instead, it [Check]s that the new
    consensus key is as expected. *)
 let register_key_as_delegate_no_reg ?(baker = Constant.bootstrap1.alias)
-    ~(owner : Account.key) ~(consensus_key : Account.key) client =
+    ~(owner : Account.key) ~(consensus_key : Account.key)
+    ~(companion_key : Account.key) ~protocol client =
   let* () =
-    Client.register_key ~consensus:consensus_key.alias owner.alias client
+    if Protocol.(number protocol >= 023) then
+      Client.register_key
+        ~consensus:consensus_key.alias
+        ~companion:companion_key.alias
+        owner.alias
+        client
+    else Client.register_key ~consensus:consensus_key.alias owner.alias client
   in
   let* level_information = Helpers.get_current_level client in
   let* () = Client.bake_for_and_wait ~keys:[baker] client in
@@ -766,7 +775,8 @@ let update_consensus_key_no_reg ?(baker = Constant.bootstrap1.alias)
     client
 
 let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
-    ~(new_delegate : Account.key) ~(new_consensus_key : Account.key) client =
+    ~(new_delegate : Account.key) ~(new_consensus_key : Account.key)
+    ~(new_companion_key : Account.key) ~protocol client =
   (* Set a new consensus key *)
   Log.info "Transfer 1_000_000 tez from baker to new_delegate" ;
   let* () =
@@ -782,7 +792,9 @@ let test_revert_to_unique_consensus_key ?(baker = Constant.bootstrap1.alias)
     register_key_as_delegate_no_reg
       ~owner:new_delegate
       ~consensus_key:new_consensus_key
+      ~companion_key:new_companion_key
       ~baker
+      ~protocol
       client
   in
   let* () = Client.bake_for_and_wait client in
@@ -867,12 +879,64 @@ let test_drain_delegate_1 ?(baker = Constant.bootstrap1.alias)
   in
   unit
 
+let test_update_consensus_key_with_external_pop =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:"update consensus key with external pop"
+    ~tags:[team; "consensus_key"; "pop"]
+    ~supports:(Protocol.From_protocol 023)
+  @@ fun protocol ->
+  let* node, client = Client.init_with_protocol ~protocol `Client () in
+  let delegate = Constant.bootstrap1 in
+  (* gen keys consensus_key -s bls *)
+  (* set consensus key for delegate to consensus_key *)
+  Log.info
+    "Init second client, generate a BLS consensus key and its proof of \
+     possession" ;
+  let* client2 = Client.init ~endpoint:(Node node) () in
+  let* consensus_key_bls =
+    Client.gen_and_show_keys ~alias:"consensus_key" ~sig_alg:"bls" client2
+  in
+  let* consensus_key_pop =
+    Client.create_bls_proof ~signer:consensus_key_bls.alias client2
+  in
+
+  Log.info "Import the key on the first client" ;
+  let* () =
+    Client.import_public_key
+      ~alias:"consensus_key"
+      ~public_key:consensus_key_bls.public_key
+      client
+  in
+  Log.info "Updating consensus key without secret key nor proof of possession" ;
+  let* () =
+    Client.update_consensus_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:consensus_key_bls.alias
+      ~expect_failure:true
+      client
+  in
+  Log.info "Updating consensus key with BLS proof of possession" ;
+  let* () =
+    Client.update_consensus_key
+      ~hooks
+      ~src:delegate.alias
+      ~pk:consensus_key_bls.alias
+      ~consensus_key_pop
+      client
+  in
+  unit
+
 let register ~protocols =
-  let () = test_update_consensus_key protocols in
+  let () =
+    test_update_consensus_key protocols ;
+    test_update_consensus_key_with_external_pop protocols
+  in
   let () =
     register
       "Test set consensus key - baker is not delegate"
-      (fun client baker_0 baker_1 account_0 _account_1 ->
+      (fun _protocol client baker_0 baker_1 account_0 _account_1 _account_2 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -887,7 +951,7 @@ let register ~protocols =
   let () =
     register
       "Test set consensus key - baker is delegate"
-      (fun client baker_0 _baker_1 account_0 _account_1 ->
+      (fun _protocol client baker_0 _baker_1 account_0 _account_1 _account_2 ->
         let baker_0_consensus_key = account_0 in
         let* () =
           test_consensus_key_update
@@ -902,13 +966,16 @@ let register ~protocols =
   let () =
     register
       "Test register with consensus key"
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun protocol client baker_0 _baker_1 account_0 account_1 account_2 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
+        let new_companion_key = account_2 in
         test_register_delegate_with_consensus_key
           ~baker:baker_0.alias
           ~new_delegate
           ~new_consensus_key
+          ~new_companion_key
+          ~protocol
           client)
       protocols
   in
@@ -916,20 +983,23 @@ let register ~protocols =
     register
       "Test revert to unique consensus key"
       ~regression:false
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun protocol client baker_0 _baker_1 account_0 account_1 account_2 ->
         let new_delegate = account_0 in
         let new_consensus_key = account_1 in
+        let new_companion_key = account_2 in
         test_revert_to_unique_consensus_key
           ~baker:baker_0.alias
           ~new_delegate
           ~new_consensus_key
+          ~new_companion_key
+          ~protocol
           client)
       protocols
   in
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus = destination)"
-      (fun client baker_0 _baker_1 account_0 _account_1 ->
+      (fun _protocol client baker_0 _baker_1 account_0 _account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -944,7 +1014,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker = delegate & consensus <> destination)"
-      (fun client baker_0 _baker_1 account_0 account_1 ->
+      (fun _protocol client baker_0 _baker_1 account_0 account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in
@@ -959,7 +1029,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus = destination)"
-      (fun client baker_0 baker_1 account_0 _account_1 ->
+      (fun _protocol client baker_0 baker_1 account_0 _account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_0 in
@@ -974,7 +1044,7 @@ let register ~protocols =
   let () =
     register
       "Test drain delegate with (baker <> delegate & consensus <> destination)"
-      (fun client baker_0 baker_1 account_0 account_1 ->
+      (fun _protocol client baker_0 baker_1 account_0 account_1 _account_2 ->
         let delegate = baker_0 in
         let consensus = account_0 in
         let destination = account_1 in

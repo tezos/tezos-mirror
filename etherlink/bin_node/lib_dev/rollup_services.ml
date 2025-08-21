@@ -37,12 +37,23 @@ let () =
     (fun () -> Lost_connection)
 
 let is_connection_error trace =
+  let open RPC_client_errors in
   TzTrace.fold
     (fun yes error ->
       yes
       ||
       match error with
-      | RPC_client_errors.(Request_failed {error = Connection_failed _; _}) ->
+      | Request_failed
+          {
+            error =
+              ( Connection_failed _
+              | Unexpected_status_code
+                  {
+                    code = `Bad_gateway | `Gateway_timeout | `Service_unavailable;
+                    _;
+                  } );
+            _;
+          } ->
           true
       | _ -> false)
     false
@@ -271,13 +282,7 @@ let call_service ~base ?(media_types = Media_type.all_media_types) rpc b c input
     =
   let open Lwt_result_syntax in
   let*! res =
-    Tezos_rpc_http_client_unix.RPC_client_unix.call_service
-      media_types
-      ~base
-      rpc
-      b
-      c
-      input
+    Octez_telemetry.HTTP_client.call_service media_types ~base rpc b c input
   in
   match res with
   | Ok res -> return res

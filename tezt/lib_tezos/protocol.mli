@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = R022 | Quebec | Alpha
+type t = S023 | R022 | Alpha
 
 val encoding : t Data_encoding.t
 
@@ -84,17 +84,6 @@ val protocol_zero_hash : string
     This returns the path to one of the parameter files of the ["parameters"]
     directory of the protocol, relative to the root of the repository. *)
 val parameter_file : ?constants:constants -> t -> string
-
-(** Get the path of the accuser of a protocol, such as ["./octez-accuser-alpha"]. *)
-val accuser : t -> Uses.t
-
-(** Get the path of the baker of a protocol, such as ["./octez-baker-alpha"]. *)
-val baker : t -> Uses.t
-
-(** Get the part of the daemon name that is specific to a protocol (e.g. ["PtEdo2Zk"]).
-
-    This should not be used for anything except to compute the name of executables. *)
-val daemon_name : t -> string
 
 (** Get the part which is added at the beginning of all encoding names. *)
 val encoding_prefix : t -> string

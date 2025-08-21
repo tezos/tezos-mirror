@@ -54,7 +54,9 @@ Run the following commands:
    artifact registries of Google (necessary for pushing docker images).
 
 5. `sudo usermod -aG docker $USER` where `$USER` is your user. This is to enable
-   `docker` commands to be run without being sudo.
+   `docker` commands to be run without being sudo. This is only required for `Linux`
+   distributions, as on `macOS` `docker` runs inside a virtualized environment and
+   the user automatically has the necessary privileges.
 
 6. `gcloud config set project [YOUR_PROJECT_ID]`: For configuring the default
     project.
@@ -91,7 +93,7 @@ provided in `tezt/lib_cloud/dockerfiles/debian.Dockerfile`.
 The library takes care for you to push this image on a dedicated GCP
 registry. A docker image such as the one generated from
 `debian.Dockerfile` may contain some binaries. Tezt cloud always
-try to rebuild the docker image to be sure it uses the last version,
+tries to rebuild the docker image to be sure it uses the last version,
 however be sure to compile the binaries beforehand.
 
 Finally, do note that with Tezt cloud you can specify for each VM
@@ -153,7 +155,7 @@ not exists already. The name of the docker registry depends on the
 `TEZT_CLOUD` value.
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- docker registry deploy -v
+dune exec tezt/tests/cloud/main.exe -- CLOUD docker registry deploy -v
 ```
 
 ## Deployment
@@ -161,7 +163,7 @@ dune exec tezt/tests/cloud/main.exe -- docker registry deploy -v
 If you want to push your image manually on the registry you can do:
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- docker push -v
+dune exec tezt/tests/cloud/main.exe -- CLOUD docker push -v
 ```
 
 ## Run your first scenario
@@ -181,13 +183,13 @@ scenario, so that `--vms` is not mandatory.
 We recommend to test it twice: using localhost or not:
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- cloud health --localhost -v
+dune exec tezt/tests/cloud/main.exe -- BASIC health --localhost -v
 ```
 
 and using VMs:
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- cloud health -v
+dune exec tezt/tests/cloud/main.exe -- BASIC health -v
 ```
 
 (Any scenario using this library should contain the tag `cloud`.)
@@ -204,7 +206,7 @@ point, either by specifying `--destroy` when running your scenario or by
 running:
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- terraform destroy -v
+dune exec tezt/tests/cloud/main.exe -- CLOUD terraform destroy -v
 ```
 
 However, all your VMs may come with a time to live parameter. For the
@@ -248,7 +250,7 @@ snapshot can be specified via `--prometheus-snapshot-filename`.
 After being exported, a snapshot can be imported by running:
 
 ```bash
-dune exec tezt/tests/cloud/main.exe -- prometheus import --prometheus-snapshot-filename <filename>
+dune exec tezt/tests/cloud/main.exe -- CLOUD prometheus import --prometheus-snapshot-filename <filename>
 ```
 
 ### Exporting ad-hoc metrics
@@ -287,7 +289,7 @@ instead of your local machine. This may have several benefits, but in
 particular, it can be used to set up long experiments (that can last
 for weeks).
 
-When running a test in `--proxy` mode, you can detach it after the
+When running a test in proxy mode, you can detach it after the
 deployement has been made and the scenario start to kick in. In that
 case, you can detach from your experiment by pressing `ctrl+d`. By
 doing so, you can do whatever you want, but the experiment is still
@@ -308,14 +310,14 @@ If you make a mistake during the shutdown, the scenario may not end
 properly. In that case, you can clean up the VMs by running:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud clean up -v
+dune exec tezt/tests/cloud/main.exe -- CLOUD clean up -v
 ```
 
 UX-wise, the proxy mode has still some awkwards behaviour regarding
 how log events are printed on `Ctrl+D` or `Ctrl+C`. Moreover, the
 handling of `sigint` (Ctrl+C) may be a bit fragile.
 
-We recommend to use first the `Cloud` mode before using the `Proxy`
+We recommend to use first the default mode before using the proxy
 mode to ensure the scenario behaves as expected.
 
 With the proxy mode, we recommend to use the website if you want to
@@ -323,7 +325,7 @@ follow your experiment. The website should be provided in the logs
 once you detach from the experiment.
 
 Otherwise, you can connect to it by looking at the external IP address
-of the `proxy` machine on GCP and use the port `8080`.
+of the proxy machine on GCP and use the port `8080`.
 
 ### DNS
 
@@ -337,7 +339,7 @@ To make it work, any project must register a subdomain zone
 beforehand. This can be done via:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud create dns zone -v --dns-domain <domain>
+dune exec tezt/tests/cloud/main.exe -- CLOUD create dns zone -v --dns-domain <domain>
 ```
 
 The name servers associated with this domain must be added manually to
@@ -389,7 +391,7 @@ You should see the name servers you just added.
    - The clean-up of tezt or tezt-cloud failed. A manual clean-up can be done via
 
    ```bash
-   dune exec tezt/tests/cloud/main.exe -- clean up -v
+   dune exec tezt/tests/cloud/main.exe -- CLOUD clean up -v
    ```
 
    - There is an internal issue with `tezt-cloud`. Please feel free to report
@@ -439,3 +441,18 @@ You should see the name servers you just added.
     ControlPath ~/.ssh/master-%r@%h:%p
     ControlPersist 120
    ```
+
+# Deploying on non-gcp machines via ssh.
+
+You need ssh access to the machine, and the ssh-key to be loaded in your
+ssh-agent. If the login used to connect to the machine is not 'root',
+`tezt-cloud` will automatically enable 'root' connections by key pair.
+
+At this point, the machine is expected to be a debian. It does not need to be
+provisionned, it will be provisionned automatically, by installing docker and
+setting up docker repository access.
+
+The following command should deploy and start an experiment:
+```
+dune exec tezt/tests/cloud/main.exe -- DAL -v --bootstrap --vms-limit 0 --ssh-host my.ssh.machine
+```

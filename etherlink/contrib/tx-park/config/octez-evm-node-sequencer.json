@@ -1,0 +1,11 @@
+{
+  "experimental_features": {
+    "enable_tx_queue": {
+        "max_lifespan": 4,
+        "tx_per_addr_limit": "1000",
+        "max_size": 10000
+    },
+    "drop_duplicate_on_injection": true,
+    "blueprints_publisher_order_enabled": true
+  }
+}

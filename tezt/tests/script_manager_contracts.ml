@@ -161,9 +161,9 @@ let test_manager_contracts =
       client
   in
   Log.info "Manager set delegate" ;
-  let*! () = Client.set_delegate ~src:"manager" ~delegate:"bootstrap2" client in
+  let* () = Client.set_delegate ~src:"manager" ~delegate:"bootstrap2" client in
   let bootstrap2_pkh = Constant.bootstrap2.public_key_hash in
-  let*! () =
+  let* () =
     Client.set_delegate
       ~src:"delegatable_target"
       ~delegate:bootstrap2_pkh
@@ -172,8 +172,8 @@ let test_manager_contracts =
   let delegate = Constant.bootstrap2.public_key_hash in
   let* () = check_delegate ~__LOC__ "manager" (Some delegate) in
   let* () = check_delegate ~__LOC__ "delegatable_target" (Some delegate) in
-  let*! () = Client.set_delegate ~src:"manager" ~delegate:"bootstrap3" client in
-  let*! () =
+  let* () = Client.set_delegate ~src:"manager" ~delegate:"bootstrap3" client in
+  let* () =
     Client.set_delegate ~src:"delegatable_target" ~delegate:"bootstrap3" client
   in
   let delegate = Constant.bootstrap3.public_key_hash in

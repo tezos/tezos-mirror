@@ -217,6 +217,15 @@ let default_media_type = Media_type.Command_line.Any
 
 let default_daily_logs_path = None
 
+let signing_version_for_test =
+  Option.map
+    (function
+      | "0" -> Signature.Version_0
+      | "1" -> Signature.Version_1
+      | "2" -> Signature.Version_2
+      | _ -> Signature.V_latest.version)
+    (Sys.getenv_opt "TEZOS_SIGNER_SIGNING_VERSION")
+
 open Filename.Infix
 
 module Cfg_file = struct
@@ -232,9 +241,11 @@ module Cfg_file = struct
     endpoint : Uri.t option;
     web_port : int;
     remote_signer : Uri.t option;
+    signing_version : Signature.version option;
     confirmations : int option;
     password_filename : string option;
     internal_events : Tezos_base.Internal_event_config.t option;
+    log : Tezos_base_unix.Logs_simple_config.cfg option;
   }
 
   let default =
@@ -247,9 +258,11 @@ module Cfg_file = struct
       tls = None;
       web_port = 8080;
       remote_signer = None;
+      signing_version = None;
       confirmations = Some 0;
       password_filename = None;
       internal_events = None;
+      log = None;
     }
 
   open Data_encoding
@@ -265,9 +278,11 @@ module Cfg_file = struct
              endpoint;
              web_port;
              remote_signer;
+             signing_version;
              confirmations;
              password_filename;
              internal_events;
+             log;
            } ->
         ( ( base_dir,
             node_addr,
@@ -277,9 +292,9 @@ module Cfg_file = struct
             endpoint,
             Some web_port,
             remote_signer,
-            confirmations,
-            password_filename ),
-          internal_events ))
+            signing_version,
+            confirmations ),
+          (password_filename, internal_events, log) ))
       (fun ( ( base_dir,
                node_addr,
                node_port,
@@ -288,9 +303,9 @@ module Cfg_file = struct
                endpoint,
                web_port,
                remote_signer,
-               confirmations,
-               password_filename ),
-             internal_events ) ->
+               signing_version,
+               confirmations ),
+             (password_filename, internal_events, log) ) ->
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -301,9 +316,11 @@ module Cfg_file = struct
           endpoint;
           web_port;
           remote_signer;
+          signing_version;
           confirmations;
           password_filename;
           internal_events;
+          log;
         })
       (merge_objs
          (obj10
@@ -315,10 +332,17 @@ module Cfg_file = struct
             (opt "endpoint" Tezos_rpc.Encoding.uri_encoding)
             (opt "web_port" uint16)
             (opt "remote_signer" Tezos_rpc.Encoding.uri_encoding)
-            (opt "confirmations" int8)
-            (opt "password_filename" string))
-         (obj1
-            (opt "internal_events" Tezos_base.Internal_event_config.encoding)))
+            (opt "signing_version" Signature.version_encoding)
+            (opt "confirmations" int8))
+         (obj3
+            (opt "password_filename" string)
+            (opt "internal_events" Tezos_base.Internal_event_config.encoding)
+            (opt
+               "log"
+               ~description:
+                 "Configuration of the Lwt-log sink (part of the logging \
+                  framework)"
+               Tezos_base_unix.Logs_simple_config.cfg_encoding)))
 
   let from_json json = Data_encoding.Json.destruct encoding json
 
@@ -1218,6 +1242,9 @@ let parse_config_args (ctx : #Client_context.full) argv =
     Option.either remote_signer
     @@ Option.either remote_signer_env cfg.remote_signer
   in
+  let signing_version =
+    Option.either signing_version_for_test cfg.signing_version
+  in
   let confirmations = Option.value ~default:cfg.confirmations confirmations in
   (* --password-filename has precedence over --config-file's
      "password-filename" json field *)
@@ -1234,6 +1261,7 @@ let parse_config_args (ctx : #Client_context.full) argv =
       media_type;
       endpoint = Some endpoint;
       remote_signer;
+      signing_version;
       confirmations;
       password_filename;
     }
@@ -1324,3 +1352,7 @@ let clic_commands ~base_dir:_ ~config_commands ~builtin_commands ~other_commands
   config_commands @ builtin_commands @ other_commands
 
 let logger = None
+
+let advertise_log_levels = None
+
+let version = None

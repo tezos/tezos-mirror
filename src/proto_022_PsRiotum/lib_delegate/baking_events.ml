@@ -39,39 +39,6 @@ module Commands = struct
 
   let section = section @ ["commands"]
 
-  let node_version_check_bypass =
-    declare_0
-      ~section
-      ~name:"node_version_check_bypass"
-      ~level:Warning
-      ~msg:"Compatibility between node version and baker version by passed"
-      ()
-
-  let node_version_check =
-    declare_4
-      ~section
-      ~name:"node_version_check"
-      ~level:Debug
-      ~msg:
-        "Checking compatibility between node version {node_version} \
-         ({node_commit}) and baker version {baker_version} ({baker_commit})"
-      ~pp1:Tezos_version.Version.pp_simple
-      ("node_version", Tezos_version.Octez_node_version.version_encoding)
-      ~pp2:
-        (Format.pp_print_option
-           Tezos_version.Octez_node_version.commit_info_pp_short)
-      ( "node_commit",
-        Data_encoding.option
-          Tezos_version.Octez_node_version.commit_info_encoding )
-      ~pp3:Tezos_version.Version.pp_simple
-      ("baker_version", Tezos_version.Octez_node_version.version_encoding)
-      ~pp4:
-        (Format.pp_print_option
-           Tezos_version.Octez_node_version.commit_info_pp_short)
-      ( "baker_commit",
-        Data_encoding.option
-          Tezos_version.Octez_node_version.commit_info_encoding )
-
   let no_dal_node_provided =
     declare_0
       ~section
@@ -110,6 +77,27 @@ module Commands = struct
          Please check your DAL node and possibly restart it."
       ~pp1:Uri.pp
       ("endpoint", Tezos_rpc.Encoding.uri_encoding)
+
+  let recommend_octez_baker =
+    declare_0
+      ~section
+      ~name:"recommend_octez_baker"
+      ~level:Warning
+      ~msg:
+        "The `octez-baker` binary is now available. We recommend using it \
+         instead of `octez-baker-<protocol>`, as it automatically handles \
+         protocol switches."
+      ()
+
+  let unused_cli_adaptive_issuance_vote =
+    declare_0
+      ~section
+      ~name:"unused_cli_adaptive_issuance_vote"
+      ~level:Warning
+      ~msg:
+        "Adaptive issuance is now enabled, voting is no longer necessary. \
+         Please remove the argument from the CLI."
+      ()
 end
 
 module State_transitions = struct
@@ -159,7 +147,7 @@ module State_transitions = struct
       ~level:Notice
       ~msg:"received new forge event: {event}"
       ~pp1:pp_forge_event
-      ("event", forge_event_encoding)
+      ("event", forge_event_encoding_for_logging__cannot_decode)
 
   let no_proposal_slot =
     declare_3
@@ -191,7 +179,7 @@ module State_transitions = struct
       ~pp3:Round.pp
       ("next_round", Round.encoding)
       ~pp4:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
 
   let new_head_while_waiting_for_qc =
     declare_0
@@ -387,7 +375,7 @@ module State_transitions = struct
       ~level:Info
       ~msg:"preparing fresh block for {delegate} at round {round}"
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Round.pp
       ("round", Round.encoding)
 
@@ -454,7 +442,7 @@ module State_transitions = struct
         "discarding outdated preattestation for {delegate} at level {level}, \
          round {round}"
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -469,7 +457,7 @@ module State_transitions = struct
         "discarding outdated attestation for {delegate} at level {level}, \
          round {round}"
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -485,7 +473,7 @@ module State_transitions = struct
          level {level}, round {round} where the prequorum was locked on a \
          different payload {state_payload}."
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Block_payload_hash.pp
       ("payload", Block_payload_hash.encoding)
       ~pp3:pp_int32
@@ -504,7 +492,7 @@ module State_transitions = struct
         "discarding attestation for {delegate} at level {level}, round {round} \
          where no prequorum was reached."
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
       ~pp3:Round.pp
@@ -520,7 +508,7 @@ module State_transitions = struct
          {level}, round {round} where the prequorum was on a different payload \
          {state_payload}."
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Block_payload_hash.pp
       ("payload", Block_payload_hash.encoding)
       ~pp3:pp_int32
@@ -579,6 +567,14 @@ module Node_rpc = struct
       ~msg:"error while monitoring valid proposals {trace}"
       ~pp1:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
+
+  let chain_id =
+    declare_1
+      ~section
+      ~name:"node_chain_id"
+      ~level:Info
+      ~msg:"Running baker with chain id: {chain_id}"
+      ("chain_id", Chain_id.encoding)
 end
 
 module Delegates = struct
@@ -592,12 +588,17 @@ module Delegates = struct
       ~alternative_color:Internal_event.Cyan
       ~name:"delegates_used"
       ~level:Notice
-      ~msg:"Baker will run with the following delegates:\n  {delegates}"
-      ~pp1:
-        (Format.pp_print_list
-           (fun fmt (delegate : Baking_state.Consensus_key.t) ->
-             Format.fprintf fmt "%a" Baking_state.Consensus_key.pp delegate))
-      ("delegates", Data_encoding.list Baking_state.Consensus_key.encoding)
+      ~msg:"Baker will run with the following delegates:{delegates}"
+      ~pp1:(fun ppf delegates ->
+        Format.fprintf
+          ppf
+          "@[<v 2>@,%a@]"
+          Format.(
+            pp_print_list ~pp_sep:pp_print_cut Baking_state.Consensus_key.pp)
+          delegates)
+      ( "delegates",
+        Data_encoding.list
+          Baking_state.Consensus_key.encoding_for_logging__cannot_decode )
 end
 
 module Scheduling = struct
@@ -659,7 +660,7 @@ module Scheduling = struct
       ~pp3:Timestamp.pp
       ("timestamp", Timestamp.encoding)
       ~pp4:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
 
   let waiting_end_of_round =
     declare_3
@@ -828,7 +829,7 @@ module Actions = struct
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
       ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp3:pp_int32
       ("level", Data_encoding.int32)
       ~pp4:Round.pp
@@ -863,7 +864,7 @@ module Actions = struct
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
       ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp3:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -874,7 +875,7 @@ module Actions = struct
       ~level:Error
       ~msg:"failed to forge block for {delegate} -- {trace}"
       ~pp1:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp2:Error_monad.pp_print_trace
       ("trace", Error_monad.trace_encoding)
 
@@ -902,7 +903,7 @@ module Actions = struct
       ~pp2:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
       ~pp3:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp4:pp_int32
       ("level", Data_encoding.int32)
       ~pp5:Round.pp
@@ -954,7 +955,7 @@ module Actions = struct
       ~pp3:Baking_state.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
 
   let forging_block =
     declare_4
@@ -969,7 +970,7 @@ module Actions = struct
       ~pp3:Baking_state.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ("force_apply", Data_encoding.bool)
 
   let delayed_block_injection =
@@ -986,7 +987,7 @@ module Actions = struct
       ~pp2:pp_int32
       ("round", Round.encoding)
       ~pp3:Round.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ~pp4:Baking_state.Delegate.pp
 
   let injecting_block =
@@ -1000,7 +1001,7 @@ module Actions = struct
       ~pp3:Baking_state.Delegate.pp
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
 
   let block_injected =
     declare_5
@@ -1027,7 +1028,7 @@ module Actions = struct
       ("block", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("round", Round.encoding)
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
       ( "manager_operations_infos",
         Data_encoding.option Baking_state.manager_operations_infos_encoding )
 
@@ -1051,7 +1052,7 @@ module Actions = struct
       ~pp1:Baking_state.pp_consensus_vote_kind
       ("vote_kind", Baking_state.consensus_vote_kind_encoding)
       ~pp2:Baking_state.Delegate.pp
-      ("delegate", Baking_state.Delegate.encoding)
+      ("delegate", Baking_state.Delegate.encoding_for_logging__cannot_decode)
 
   let invalid_json_file =
     declare_1
@@ -1122,7 +1123,9 @@ module Actions = struct
         "The following delegates have no attesting rights at level {level}: \
          {delegates}"
       ~pp1:(Format.pp_print_list Baking_state.Consensus_key.pp)
-      ("delegates", Data_encoding.list Baking_state.Consensus_key.encoding)
+      ( "delegates",
+        Data_encoding.list
+          Baking_state.Consensus_key.encoding_for_logging__cannot_decode )
       ~pp2:pp_int32
       ("level", Data_encoding.int32)
 

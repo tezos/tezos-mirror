@@ -1,0 +1,53 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name src_lib_bees_test_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.stdlib
+  octez-libs.stdlib-unix
+  octez-libs.base
+  octez-libs.tezos-bees
+  octez-libs.test-helpers
+  octez-libs.base-test-helpers
+  octez-alcotezt)
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_stdlib
+  -open Tezos_stdlib_unix
+  -open Tezos_base
+  -open Tezos_base.TzPervasives
+  -open Tezos_base.Worker_types
+  -open Tezos_bees
+  -open Tezos_test_helpers
+  -open Tezos_base_test_helpers
+  -open Octez_alcotezt)
+ (modules
+  mocked_worker
+  test_bees_unit
+  test_bees_unit_eio
+  test_bees_task_worker))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  src_lib_bees_test_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package octez-libs)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

@@ -1,0 +1,39 @@
+# SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
+#
+# SPDX-License-Identifier: MIT
+
+[package]
+name = 'revm-etherlink'
+version = '0.1.0'
+edition = '2021'
+license = "MIT"
+
+[dependencies]
+
+# VM
+revm.workspace = true
+
+# Types
+hex.workspace = true
+primitive-types.workspace = true
+tezos_ethereum.workspace = true
+alloy-sol-types = { version = "1.2.0", default-features = false, features = [
+    "json",
+] }
+num-bigint.workspace = true
+
+# SDK
+tezos-evm-runtime.workspace = true
+tezos-smart-rollup-host.workspace = true
+tezos-smart-rollup-storage.workspace = true
+tezos-smart-rollup-encoding.workspace = true
+tezos_crypto_rs.workspace = true
+tezos_data_encoding.workspace = true
+
+# Miscs
+format_no_std = { version = "1.2.0" }
+thiserror.workspace = true
+tezos-evm-logging.workspace = true
+
+[dev-dependencies]
+serde_json = "1"

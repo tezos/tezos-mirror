@@ -79,6 +79,8 @@ module Section : sig
   (** Build a {!Section.t} by replacing special characters with ['_']. *)
   val make_sanitized : string list -> t
 
+  val append : t -> string -> t
+
   (** [is_prefix ~prefix p] checks that [p] starts with [~prefix].  *)
   val is_prefix : prefix:t -> t -> bool
 
@@ -115,6 +117,12 @@ module type EVENT_DEFINITION = sig
       are restricted to alphanumeric characters or [".@-_+=,~"].*)
   val name : string
 
+  (** Defines the bare identifier for the event.
+
+      Since [name] can be prefixed by the section, [simple_name] holds
+      the unmodified [name] provided when creating an event.*)
+  val simple_name : string
+
   (** A display-friendly text which describes what the event means. *)
   val doc : string
 
@@ -145,7 +153,7 @@ module type EVENT = sig
 
   (** Registers an event of type {!t} to be output when event sinks activate.
       Does not output anything if called after sink activation. *)
-  val emit_at_top_level : t -> unit
+  val emit_at_top_level : ?section:Section.t -> t -> unit
 end
 
 (** Build an event from an event-definition. *)
@@ -223,7 +231,7 @@ module Simple : sig
       You must declare events only once for a given name.
       Usually you should thus declare them as global variables.
 
-      A way to enforce name uniqueness is to set [prefix_name_with_sections] to [true]. 
+      A way to enforce name uniqueness is to set [prefix_name_with_sections] to [true].
       In the example above, this would compute a new event name of the form "foo.bar.inject".
 
       There is one [declare_n] function for each number [n] of parameters.

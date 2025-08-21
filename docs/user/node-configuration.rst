@@ -285,14 +285,14 @@ HTTP Caching Headers
 It is possible to enable http caching headers in the RPC responses with the
 ``--enable-http-cache-headers`` option. This feature is disabled by default.
 
-When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control#response_directives>`_ 
+When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#response_directives>`_ 
 header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related 
 queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths 
 that are relative to ``head`` such as ``head-n`` and ``head~n``. The response is cacheable throughout the ``<duration>``
 of the head block's consensus round where ``<duration>`` is the remaining time until the :ref:`estimated end time<time_between_blocks>`
 of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers. 
 
-The RPC server will also support the conditional request header `If-None-Match <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/If-None-Match>`_
+The RPC server will also support the conditional request header `If-None-Match <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match>`_
 and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query 
 is related to. If the client sends a request with ``If-None-Match: <comma-separated list of ETag values>`` header and the block hash
 is included in the list of etag values, the RPC server will respond with a ``304 Not Modified`` status code with an empty body.

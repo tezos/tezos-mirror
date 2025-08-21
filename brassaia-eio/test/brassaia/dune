@@ -1,0 +1,50 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name brassaia_eio_test_brassaia_tezt_lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezt.core
+  bls12-381.archive
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.brassaia_eio_test_helpers
+  octez-libs.brassaia_eio.mem
+  octez-alcotezt
+  octez-libs.stdlib-unix
+  octez-libs.test-helpers
+  eio
+  tezt)
+ (preprocess (pps octez-libs.ppx_brassaia_eio.internal))
+ (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -open Tezt_core
+  -open Tezt_core.Base
+  -open Tezos_base.TzPervasives
+  -open Brassaia_eio_test_helpers
+  -open Octez_alcotezt
+  -open Tezos_stdlib_unix
+  -open Tezos_test_helpers
+  -open Tezt
+  -open Tezt.Base)
+ (modules test test_lru test_hash test_tree test_conf))
+
+(executable
+ (name main)
+ (instrumentation (backend bisect_ppx --bisect-sigterm))
+ (libraries
+  brassaia_eio_test_brassaia_tezt_lib
+  tezt)
+ (modules main))
+
+(rule
+ (alias runtest)
+ (package tezos_internal_brassaia_eio_tests)
+ (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
+ (action (run %{dep:./main.exe} /flaky /ci_disabled)))
+
+(rule
+ (targets main.ml)
+ (action (with-stdout-to %{targets} (echo "let () = Tezt.Test.run ()"))))

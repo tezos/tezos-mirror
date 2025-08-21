@@ -74,7 +74,7 @@ local mkPeersPanel(h, w, x, y, legendRightSide) =
                           + query.prometheus.withLegendFormat(received);
     local sentQuery = grafonnet.query.prometheus.new('Prometheus', 'deriv(' + namespace + '_p2p_io_scheduler_total_sent' + base.node_instance_query + '[1m]) / 1000')
                       + query.prometheus.withLegendFormat(sent);
-    graph.new('Average data exchange (1-minute interval)', [receivedQuery, sentQuery], h, w, x, y)
+    graph.new('Average data exchange per second (over 1min)', [receivedQuery, sentQuery], h, w, x, y)
     + graph.withQueryColor([[received, 'blue'], [sent, 'green']])
     + graph.withLegendBottom(),
 

@@ -8,16 +8,16 @@ stages:
 - build
 - test
 - packaging
-- doc
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -31,13 +31,14 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
   dependencies: []
   timeout: 60 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/docker_client_libs_dependencies_build.sh
   services:
@@ -50,13 +51,14 @@ oc.docker:client-libs-dependencies:
       dotenv: client_libs_dependencies_image_tag.env
 
 oc.docker:jsonnet:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
@@ -70,13 +72,14 @@ oc.docker:jsonnet:amd64:
       dotenv: jsonnet_image_tag.env
 
 oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
   dependencies: []
   timeout: 60 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
   services:
@@ -88,14 +91,36 @@ oc.docker:rust-toolchain:amd64:
     reports:
       dotenv: rust_toolchain_image_tag.env
 
+oc.docker:rust-sdk-bindings:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_rust_sdk_bindings_build.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_sdk_bindings_image_tag.env
+
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -129,15 +154,16 @@ datadog_pipeline_trace:
     --tags mr_number:$CI_MERGE_REQUEST_IID
 
 sanity_ci:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
   - gcp
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   script:
@@ -151,22 +177,25 @@ docker:hadolint:
   - gcp
   rules:
   - when: always
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - hadolint build.Dockerfile
   - hadolint Dockerfile
 
 oc.ocaml_fmt:
-  image: ${ci_image_name}/build:${ci_image_tag}
+  image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: always
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
     key: dune_cache-$CI_JOB_NAME_SLUG
@@ -175,6 +204,7 @@ oc.ocaml_fmt:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -196,26 +226,30 @@ oc.semgrep:
   - gcp
   rules:
   - when: always
+  needs: []
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - echo "OCaml code linting. For information on how to reproduce locally, check out
     scripts/semgrep/README.md"
   - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
 
 oc.misc_checks:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: always
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -225,20 +259,21 @@ oc.misc_checks:
   - scripts/check_wasm_pvm_regressions.sh check
   - etherlink/scripts/check_evm_store_migrations.sh check
   - ./scripts/check_rollup_node_sql_migrations.sh check
-  - ./src/bin_dal_node/scripts/check_dal_store_migrations.sh check
+  - ./src/lib_dal_node/scripts/check_dal_store_migrations.sh check
 
 check_jsonnet:
-  image: ${jsonnet_image_name}:${jsonnet_image_tag}
+  image: ${jsonnet_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:jsonnet:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   - cd ../
@@ -247,31 +282,34 @@ check_jsonnet:
   - scripts/lint.sh --check-jsonnet-lint
 
 check_rust_fmt:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - scripts/check-format-rust.sh
 
 documentation:rst-check:
-  image: ${ci_image_name}/test:${ci_image_tag}
+  image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: always
-  dependencies:
-  - oc.docker:ci:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
   script:
   - make --silent -C docs sphinx-check
@@ -295,12 +333,13 @@ oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -315,7 +354,9 @@ oc.build_arm64-released:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -348,12 +389,13 @@ oc.build_arm64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -369,8 +411,10 @@ oc.build_arm64-exp-dev-extra:
       tezt/tests/main.exe
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
     expire_in: 1 day
@@ -388,7 +432,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   dependencies:
@@ -403,12 +447,13 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -418,11 +463,64 @@ oc.build:static-x86_64-linux-binaries:
   - ./scripts/ci/sccache-stop.sh
   variables:
     ARCH: x86_64
-    EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+    EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+  artifacts:
+    paths:
+    - octez-binaries/$ARCH/*
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+
+oc.build:static-arm64-linux-binaries:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - ./scripts/ci/build_static_binaries.sh
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    ARCH: arm64
+    EXECUTABLE_FILES: script-inputs/octez-released-executables script-inputs/octez-experimental-executables
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
@@ -431,7 +529,7 @@ oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_high_cpu
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   dependencies:
@@ -446,12 +544,13 @@ oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -465,8 +564,10 @@ oc.build_x86_64-released:
     EXECUTABLE_FILES: script-inputs/released-executables
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
   artifacts:
     name: build-$ARCH-$CI_COMMIT_REF_SLUG
@@ -505,7 +606,7 @@ oc.build_x86_64-exp-dev-extra:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
@@ -515,6 +616,7 @@ oc.build_x86_64-exp-dev-extra:
     policy: push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -533,7 +635,9 @@ oc.build_x86_64-exp-dev-extra:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
     COVERAGE_OPTIONS: --instrument-with bisect_ppx
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
@@ -577,6 +681,7 @@ wasm-runtime-check:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -589,54 +694,6 @@ wasm-runtime-check:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
-
-ocaml-check:
-  image: ${ci_image_name}/build:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp_high_cpu
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  - key: dune_cache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - ./scripts/ci/take_ownership.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - dune build @check --stop-on-first-error
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  - eval $(opam env)
-  - dune cache trim --size=5GB
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    DUNE_CACHE: enabled
-    DUNE_CACHE_STORAGE_MODE: hardlink
-    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
-  retry:
-    max: 2
-    when:
-    - stuck_or_timeout_failure
-    - runner_system_failure
 
 oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -659,13 +716,11 @@ oc.build_kernels:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
-  - make -C src/riscv riscv-sandbox riscv-dummy.elf
-  - make -C src/riscv riscv-sandbox riscv-dummy-sdk.elf
-  - make -C src/riscv/tests/ build
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -684,10 +739,6 @@ oc.build_kernels:
     - tx_kernel.wasm
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
-    - src/riscv/riscv-sandbox
-    - src/riscv/riscv-dummy.elf
-    - src/riscv/riscv-dummy-sdk.elf
-    - src/riscv/tests/inline_asm/rv64-inline-asm-tests
     when: on_success
 
 oc.build_dsn_node:
@@ -711,6 +762,7 @@ oc.build_dsn_node:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk octez-dsn-node
@@ -742,6 +794,7 @@ oc.tezt:fetch-records:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -762,7 +815,7 @@ build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   dependencies:
@@ -779,6 +832,7 @@ build_octez_source:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -797,9 +851,9 @@ build_octez_source:
   variables:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_CACHE_SIZE: 2G
 
-build_grafazos_dashboards:
+grafazos.build_dashboards:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
   stage: build
   tags:
@@ -811,6 +865,7 @@ build_grafazos_dashboards:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   script:
@@ -826,7 +881,7 @@ teztale.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp
+  - gcp_very_high_cpu_ramfs
   rules:
   - when: always
   dependencies:
@@ -843,6 +898,7 @@ teztale.build:static-x86_64:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -857,7 +913,7 @@ teztale.build:static-x86_64:
     PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+    SCCACHE_CACHE_SIZE: 2G
   artifacts:
     name: teztale-binaries
     expire_in: 1 day
@@ -886,6 +942,7 @@ teztale.build:static-arm64:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -908,11 +965,114 @@ teztale.build:static-arm64:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
 
+etherlink.build:static-x86_64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make evm-node-static
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+  artifacts:
+    name: evm-binaries
+    paths:
+    - octez-evm-*
+    - etherlink-*
+    when: on_success
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
+
+etherlink.build:static-arm64:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp_arm64
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:arm64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: rust-targets-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_target
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make evm-node-static
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 2G
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
+  artifacts:
+    name: evm-binaries
+    paths:
+    - octez-evm-*
+    - etherlink-*
+    when: on_success
+
 build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu
+  rules:
+  - when: always
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -927,18 +1087,21 @@ build-layer1-profiling:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make octez-layer1
+  - scripts/slim-mode.sh on
+  - scripts/custom-flags.sh set -opaque
+  - TEZOS_PPX_PROFILER=profiling make build OCTEZ_EXECUTABLES?=octez-node
+  - TEZOS_PPX_PROFILER=opentelemetry make build OCTEZ_EXECUTABLES?=octez-node
   - mkdir -p octez-binaries/x86_64/
   - mv octez-node octez-binaries/x86_64/
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
-    TEZOS_PPX_PROFILER: profiling
     PROFILE: static
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
@@ -947,6 +1110,11 @@ build-layer1-profiling:
     expire_in: 1 day
     paths:
     - ./octez-binaries/x86_64/octez-node
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 opam:prepare:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -961,6 +1129,7 @@ opam:prepare:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - git init _opam-repo-for-release
@@ -985,7 +1154,7 @@ opam:all_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -997,6 +1166,7 @@ opam:all_6:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1028,12 +1198,13 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-protocol-022-PsRiotum
-      - tezos-protocol-021-PsQuebec
+      - tezos-dal-node-services
+      - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
       - octez-proto-libs
       - octez-performance-metrics
+      - octez-lib-upnp
       - octez-l2-libs
       - efunc_core
       - dal_node_migrations
@@ -1052,7 +1223,7 @@ opam:exec_6:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1064,6 +1235,7 @@ opam:exec_6:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1108,7 +1280,7 @@ opam:all_2:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1120,6 +1292,7 @@ opam:all_2:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1147,12 +1320,13 @@ opam:all_2:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-wasm-debugger-lib
       - octez-smart-rollup-node-lib
-      - octez-smart-rollup-node-alpha
       - octez-smart-rollup-node-PtParisB
+      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-node-PsQuebec
+      - octez-smart-rollup-node-PsParisC
+      - octez-smart-rollup-node-Proxford
       - octez-protocol-alpha-libs
-      - octez-protocol-022-PsRiotum-libs
       - octez-protocol-021-PsQuebec-libs
       - octez-protocol-020-PsParisC-libs
       - octez-protocol-019-PtParisB-libs
@@ -1161,6 +1335,7 @@ opam:all_2:
       - octez-protocol-016-PtMumbai-libs
       - octez-protocol-000-Ps9mPmXa-libs
       - octez-injector
+      - octez-baker-lib
 
 opam:all_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1176,7 +1351,7 @@ opam:all_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1188,6 +1363,7 @@ opam:all_1:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1215,66 +1391,11 @@ opam:all_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-node-PtNairob
+      - octez-smart-rollup-node-alpha
+      - octez-smart-rollup-node-PtSeouLo
       - octez-smart-rollup-node-PsRiotum
-      - octez-smart-rollup-node-PsQuebec
-      - octez-smart-rollup-node-PsParisC
-      - octez-smart-rollup-node-Proxford
-
-opam:exec_2:
-  image: ${ci_image_name}/prebuild:${ci_image_tag}
-  stage: packaging
-  tags:
-  - gcp
-  rules:
-  - when: delayed
-    start_in: 2 minutes
-  needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
-  timeout: 60 minutes
-  cache:
-  - key: opam-sccache
-    paths:
-    - $CI_PROJECT_DIR/_build/_sccache
-    policy: pull-push
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - eval $(opam env)
-  - mkdir -p $CI_PROJECT_DIR/opam_logs
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - opam remote add dev-repo ./_opam-repo-for-release
-  - opam install --yes ${package}.dev
-  - opam reinstall --yes --with-test ${package}.dev
-  after_script:
-  - eval $(opam env)
-  - OPAM_LOGS=opam_logs ./scripts/ci/opam_handle_output.sh
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    RUNTEZTALIAS: "true"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_build/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-    SCCACHE_ERROR_LOG: $CI_PROJECT_DIR/opam_logs/sccache.log
-    SCCACHE_IDLE_TIMEOUT: "0"
-    CARGO_NET_OFFLINE: "false"
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - opam_logs/
-    when: always
-  retry: 2
-  parallel:
-    matrix:
-    - package:
-      - octez-experimental-agnostic-baker
+      - octez-protocol-023-PtSeouLo-libs
+      - octez-protocol-022-PsRiotum-libs
 
 opam:all_3:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1290,7 +1411,7 @@ opam:all_3:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1302,6 +1423,7 @@ opam:all_3:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1329,6 +1451,7 @@ opam:all_3:
   parallel:
     matrix:
     - package:
+      - octez-rpc-process
       - octez-protocol-015-PtLimaPt-libs
       - octez-protocol-014-PtKathma-libs
       - octez-protocol-013-PtJakart-libs
@@ -1359,7 +1482,7 @@ opam:exec_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1371,6 +1494,7 @@ opam:exec_4:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1414,7 +1538,7 @@ opam:all_4:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1426,6 +1550,7 @@ opam:all_4:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1453,6 +1578,8 @@ opam:all_4:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-008-PtEdo2Zk
+      - tezos-protocol-007-PsDELPH1
       - tezos-protocol-006-PsCARTHA
       - tezos-protocol-005-PsBabyM1
       - tezos-protocol-005-PsBABY5H
@@ -1464,7 +1591,6 @@ opam:all_4:
       - tezos-dal-node-lib
       - tezos-client-genesis
       - tezos-client-demo-counter
-      - octez-rpc-process
       - octez-node-config
       - octez-crawler
 
@@ -1482,7 +1608,7 @@ opam:exec_1:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1494,6 +1620,7 @@ opam:exec_1:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1521,16 +1648,17 @@ opam:exec_1:
   parallel:
     matrix:
     - package:
-      - octez-smart-rollup-wasm-debugger
       - octez-smart-rollup-node
       - octez-node
       - octez-dal-node
       - octez-codec
       - octez-client
+      - octez-baker-PtSeouLo
       - octez-baker-PsRiotum
-      - octez-baker-PsQuebec
+      - octez-baker
+      - octez-accuser-PtSeouLo
       - octez-accuser-PsRiotum
-      - octez-accuser-PsQuebec
+      - octez-accuser
 
 opam:all_5:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1546,7 +1674,7 @@ opam:all_5:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1558,6 +1686,7 @@ opam:all_5:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1585,6 +1714,9 @@ opam:all_5:
   parallel:
     matrix:
     - package:
+      - tezos-protocol-023-PtSeouLo
+      - tezos-protocol-022-PsRiotum
+      - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
       - tezos-protocol-019-PtParisB
       - tezos-protocol-018-Proxford
@@ -1598,8 +1730,6 @@ opam:all_5:
       - tezos-protocol-010-PtGRANAD
       - tezos-protocol-009-PsFLoren
       - tezos-protocol-008-PtEdoTez
-      - tezos-protocol-008-PtEdo2Zk
-      - tezos-protocol-007-PsDELPH1
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1615,7 +1745,7 @@ opam:all_7:
   dependencies:
   - oc.docker:ci:amd64
   - opam:prepare
-  timeout: 60 minutes
+  timeout: 90 minutes
   cache:
   - key: opam-sccache
     paths:
@@ -1627,6 +1757,7 @@ opam:all_7:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - mkdir -p $CI_PROJECT_DIR/opam_logs
   - . ./scripts/ci/sccache-start.sh
@@ -1656,15 +1787,14 @@ opam:all_7:
     - package:
       - tezt-tezos
       - tezos-openapi
-      - tezos-dal-node-services
-      - tezos-benchmark
-      - octez-smart-rollup-wasm-debugger-plugin
       - octez-rustzcash-deps
       - octez-rust-deps
       - octez-riscv-api
       - octez-protocol-compiler-compat
       - octez-libs
+      - octez-lib-upnp-args
       - octez-internal-libs
+      - octez-igd-next
       - octez-distributed-lwt-internal
       - octez-distributed-internal
       - octez-alcotezt
@@ -1672,22 +1802,43 @@ opam:all_7:
 
 trigger:debian_repository_full:
   stage: test
+  variables:
+    PIPELINE_TYPE: debian_repository_full
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_full.yml
+    strategy: depend
 
 trigger:rpm_repository_full:
   stage: test
+  variables:
+    PIPELINE_TYPE: rpm_repository_full
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_full.yml
+    strategy: depend
 
 trigger:homebrew:
   stage: test
+  variables:
+    PIPELINE_TYPE: homebrew
   rules:
   - when: always
+  needs: []
   trigger:
     include: .gitlab/ci/pipelines/homebrew.yml
+    strategy: depend
+
+trigger:base_images:
+  stage: images
+  variables:
+    PIPELINE_TYPE: base_images
+  rules:
+  - when: always
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/base_images.yml
+    strategy: depend
 
 kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1710,6 +1861,7 @@ kaitai_checks:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -1745,6 +1897,7 @@ kaitai_e2e_checks:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/install_build_deps.js.sh
   script:
@@ -1772,6 +1925,7 @@ oc.check_lift_limits_patch:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -1799,6 +1953,7 @@ oc.python_check:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
@@ -1830,6 +1985,7 @@ oc.integration:compiler-rejections:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -1854,6 +2010,7 @@ oc.script:test-gen-genesis:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - cd scripts/gen-genesis
   script:
@@ -1884,6 +2041,7 @@ oc.script:snapshot_alpha_and_link:
     policy: pull
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1901,6 +2059,11 @@ oc.script:snapshot_alpha_and_link:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1918,6 +2081,7 @@ oc.script:test_octez_release_versions:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -1936,6 +2100,7 @@ oc.script:b58_prefix:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . $HOME/.venv/bin/activate
   script:
@@ -1961,6 +2126,7 @@ oc.test-liquidity-baking-scripts:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -1975,6 +2141,8 @@ oc:scripts:release_script_values:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - scripts/ci/test_release_values.sh
 
@@ -1994,6 +2162,8 @@ mir_unit:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - cargo test --manifest-path contrib/mir/Cargo.toml
   variables:
@@ -2015,6 +2185,8 @@ mir_tzt:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: pull-push
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - cargo run --manifest-path contrib/mir/Cargo.toml --bin tzt_runner tzt_reference_test_suite/*.tzt
   variables:
@@ -2041,10 +2213,45 @@ test_sdk_rust:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C sdk/rust check
   - make -C sdk/rust test
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+
+test_sdk_bindings:
+  image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - when: on_success
+  dependencies:
+  - oc.docker:rust-sdk-bindings:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . $HOME/.venv/bin/activate
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - make -C contrib/sdk-bindings check
+  - make -C contrib/sdk-bindings test
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2076,6 +2283,7 @@ test_kernels:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk check
@@ -2113,6 +2321,7 @@ test_etherlink_kernel:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk check
@@ -2150,6 +2359,7 @@ test_etherlink_firehose:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C etherlink/firehose check
@@ -2163,14 +2373,14 @@ test_etherlink_firehose:
     SCCACHE_CACHE_SIZE: 5G
 
 audit_riscv_deps:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
+  image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
   - gcp
   rules:
   - when: on_success
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
+  needs: []
+  dependencies: []
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2183,6 +2393,7 @@ audit_riscv_deps:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -C src/riscv audit
@@ -2197,7 +2408,7 @@ audit_riscv_deps:
 
 check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: build
+  stage: test
   tags:
   - gcp
   rules:
@@ -2219,117 +2430,11 @@ check_riscv_kernels:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
-  - make -C src/riscv CHECK_FEATURES= check
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-
-test_riscv_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - check_riscv_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C src/riscv test
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-
-test_long_riscv_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - check_riscv_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C src/riscv test-long
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CC: clang
-    NATIVE_TARGET: x86_64-unknown-linux-musl
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-
-test_miri_riscv_kernels:
-  image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:rust-toolchain:amd64
-  - check_riscv_kernels
-  dependencies:
-  - oc.docker:rust-toolchain:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C src/riscv test-miri
+  - make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='--no-default-features --features ci'
+    check
   after_script:
   - ./scripts/ci/sccache-stop.sh
   variables:
@@ -2363,11 +2468,13 @@ test_evm_compatibility:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs evm-evaluation-assessor
-  - git clone --depth 1 --branch v13 https://github.com/ethereum/tests ethereum_tests
-  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_evm/evm_evaluation/resources/
+  - git clone --depth 1 --branch v14.1@etherlink https://github.com/functori/tests
+    ethereum_tests
+  - ./evm-evaluation-assessor --eth-tests ./ethereum_tests/ --resources ./etherlink/kernel_latest/evm_evaluation/resources/
     -c
   after_script:
   - ./scripts/ci/sccache-stop.sh
@@ -2377,6 +2484,55 @@ test_evm_compatibility:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+
+ocaml-check:
+  image: ${ci_image_name}/build:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_very_high_cpu
+  rules:
+  - when: always
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  - key: dune_cache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_dune_cache
+    policy: pull-push
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/take_ownership.sh
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - dune build @check --stop-on-first-error
+  after_script:
+  - ./scripts/ci/sccache-stop.sh
+  - eval $(opam env)
+  - dune cache trim --size=5GB
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+    DUNE_CACHE: enabled
+    DUNE_CACHE_STORAGE_MODE: hardlink
+    DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2407,6 +2563,7 @@ oc.unit:non-proto-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2468,6 +2625,7 @@ oc.unit:etherlink-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2529,6 +2687,7 @@ oc.unit:other-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2590,6 +2749,7 @@ oc.unit:proto-x86_64:
     policy: pull
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2647,6 +2807,7 @@ oc.unit:non-proto-arm64:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2688,6 +2849,7 @@ oc.unit:webassembly-x86_64:
   timeout: 20 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   script:
@@ -2718,6 +2880,7 @@ oc.unit:protocol_compiles:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -2751,6 +2914,7 @@ de.unit:x86_64:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest data-encoding
@@ -2771,6 +2935,7 @@ de.unit:arm64:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest data-encoding
@@ -2788,9 +2953,10 @@ resto.unit:x86_64:
   - oc.build_x86_64-exp-dev-extra
   dependencies:
   - oc.docker:ci:amd64
-  timeout: 60 minutes
+  timeout: 10 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest resto
@@ -2808,9 +2974,10 @@ resto.unit:arm64:
   - oc.build_arm64-exp-dev-extra
   dependencies:
   - oc.docker:ci:arm64
-  timeout: 60 minutes
+  timeout: 10 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   script:
   - dune runtest resto
@@ -2826,6 +2993,8 @@ oc.install_opam_noble:
   allow_failure: true
   timeout: 2 hours
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/install-opam.sh
   variables:
@@ -2835,17 +3004,24 @@ oc.compile_sources_doc_bookworm:
   image: ocaml/opam:debian-12
   stage: test
   tags:
-  - gcp
+  - gcp_very_high_cpu
   rules:
   - when: always
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.compile_sources_doc_oracular:
   image: ocaml/opam:ubuntu-24.10
@@ -2857,6 +3033,8 @@ oc.compile_sources_doc_oracular:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/introduction/compile-sources.sh tezos/tezos latest-release
   variables:
@@ -2896,17 +3074,22 @@ tezt:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag
+    'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
-    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
-      /cloud && /flaky
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && /flaky
     TEZT_RETRY: "1"
-    TEZT_PARALLEL: "3"
+    TEZT_PARALLEL: "6"
     TEZT_NO_NPX: "true"
     BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
   artifacts:
@@ -2923,131 +3106,7 @@ tezt:
       junit: $JUNIT
     when: always
   retry: 2
-  parallel: 100
-
-tezt-memory-3k:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt_memory_3k
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  script:
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --without-select-tezts "${TESTS}" --from-record tezt/records
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
-  - ./scripts/ci/merge_coverage.sh
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -memory_3k
-    TESTS: memory_3k && /ci_disabled && /memory_4k && /time_sensitive && /slow &&
-      /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
-    TEZT_NO_NPX: "true"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-  artifacts:
-    name: coverage-files-$CI_JOB_ID
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 6
-
-tezt-memory-4k:
-  image: ${ci_image_name}/e2etest:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp_tezt_memory_4k
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_x86_64-exp-dev-extra
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
-  timeout: 60 minutes
-  interruptible: false
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  script:
-  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
-    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
-  - ./scripts/ci/tezt.sh --without-select-tezts "${TESTS}" --from-record tezt/records
-    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
-  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
-    --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
-  - ./scripts/ci/merge_coverage.sh
-  variables:
-    JUNIT: tezt-junit.xml
-    TEZT_VARIANT: -memory_4k
-    TESTS: memory_4k && /ci_disabled && /memory_3k && /time_sensitive && /slow &&
-      /cloud
-    TEZT_RETRY: "1"
-    TEZT_PARALLEL: "1"
-    TEZT_NO_NPX: "true"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-  artifacts:
-    name: coverage-files-$CI_JOB_ID
-    expire_in: 7 days
-    paths:
-    - selected_tezts.tsv
-    - tezt.log
-    - tezt-*.log
-    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    - $JUNIT
-    - $BISECT_FILE/$CI_JOB_NAME_SLUG.*
-    reports:
-      junit: $JUNIT
-    when: always
-  retry: 2
-  parallel: 4
+  parallel: 50
 
 tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3082,15 +3141,20 @@ tezt-time-sensitive:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag
+    'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -time_sensitive
-    TESTS: time_sensitive && /ci_disabled && /memory_3k && /memory_4k && /slow &&
-      /cloud
+    TESTS: time_sensitive && /ci_disabled && /slow && /extra && /cloud
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
@@ -3143,14 +3207,20 @@ tezt-slow:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --junit-mem-peak
+    'dd_tags[memory.peak]' --from-record tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1}
+    --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json --job-count ${TEZT_PARALLEL}
+    --retry ${TEZT_RETRY} --record-mem-peak --mem-warn 5_000_000_000 --keep-going
+    --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag 'dd_tags[tezt-tag.time_sensitive]=time_sensitive'
+    --junit-tag 'dd_tags[tezt-tag.slow]=slow' --junit-tag 'dd_tags[tezt-tag.extra]=extra'
+    --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
+    --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
+    --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -slow
-    TESTS: slow && /ci_disabled && /memory_3k && /memory_4k && /time_sensitive &&
-      /cloud && not (file = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
+    TESTS: slow && /ci_disabled && /time_sensitive && /extra && /cloud && not (file
+      = src/proto_019_PtParisA/lib_protocol/test/integration/test_adaptive_issuance_launch.ml)
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
@@ -3167,6 +3237,69 @@ tezt-slow:
     when: always
   retry: 2
   parallel: 20
+
+tezt-extra:
+  image: ${ci_image_name}/e2etest:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp_tezt
+  rules:
+  - when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
+  - oc.tezt:fetch-records
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/version.sh
+  script:
+  - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
+    CI_NODE_TOTAL=\"${CI_NODE_TOTAL}\" TEZT_PARALLEL=\"${TEZT_PARALLEL}\" TEZT_VARIANT=\"${TEZT_VARIANT}\""
+  - ./scripts/ci/tezt.sh --without-select-tezts "${TESTS}" --from-record tezt/records
+    --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
+  - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
+    --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag
+    'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  variables:
+    JUNIT: tezt-junit.xml
+    TEZT_VARIANT: -extra
+    TESTS: extra && /ci_disabled && /time_sensitive && /slow && /cloud && /flaky
+    TEZT_RETRY: "1"
+    TEZT_PARALLEL: "6"
+    TEZT_NO_NPX: "true"
+  artifacts:
+    expire_in: 7 days
+    paths:
+    - selected_tezts.tsv
+    - tezt.log
+    - tezt-*.log
+    - tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    - $JUNIT
+    reports:
+      junit: $JUNIT
+    when: always
+  retry: 2
+  parallel: 10
 
 tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3202,15 +3335,20 @@ tezt-flaky:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag
+    'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   - ./scripts/ci/merge_coverage.sh
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: -flaky
-    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
-      /cloud && flaky
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && flaky
     TEZT_RETRY: "3"
     TEZT_PARALLEL: "1"
     TEZT_NO_NPX: "true"
@@ -3250,6 +3388,7 @@ tezt:static-binaries:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - mv octez-binaries/x86_64/octez-* .
   script:
   - echo "TESTS=\"${TESTS}\" JUNIT=\"${JUNIT}\" CI_NODE_INDEX=\"${CI_NODE_INDEX}\"
@@ -3258,14 +3397,20 @@ tezt:static-binaries:
     --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --list-tsv > selected_tezts.tsv
   - ./scripts/ci/exit_code.sh timeout -k 60 1860 ./scripts/ci/tezt.sh --send-junit
     --without-select-tezts "${TESTS}" --color --log-buffer-size 5000 --log-file tezt.log
-    --global-timeout 1800 --on-unknown-regression-files fail --junit ${JUNIT} --from-record
-    tezt/records --job ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
-    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY}
+    --global-timeout 1800 --test-timeout 540 --on-unknown-regression-files fail --junit
+    ${JUNIT} --junit-mem-peak 'dd_tags[memory.peak]' --from-record tezt/records --job
+    ${CI_NODE_INDEX:-1}/${CI_NODE_TOTAL:-1} --record tezt-results-${CI_NODE_INDEX:-1}${TEZT_VARIANT}.json
+    --job-count ${TEZT_PARALLEL} --retry ${TEZT_RETRY} --record-mem-peak --mem-warn
+    5_000_000_000 --keep-going --junit-tag 'dd_tags[tezt-tag.flaky]=flaky' --junit-tag
+    'dd_tags[tezt-tag.time_sensitive]=time_sensitive' --junit-tag 'dd_tags[tezt-tag.slow]=slow'
+    --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
+    --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
+    --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
   variables:
     JUNIT: tezt-junit.xml
     TEZT_VARIANT: ""
-    TESTS: /ci_disabled && /memory_3k && /memory_4k && /time_sensitive && /slow &&
-      /cloud && cli && /flaky
+    TESTS: /ci_disabled && /time_sensitive && /slow && /extra && /cloud && cli &&
+      /flaky
     TEZT_RETRY: "1"
     TEZT_PARALLEL: "3"
     TEZT_NO_NPX: "true"
@@ -3281,9 +3426,9 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-oc.install_python_noble:
+documentation:install_python_noble:
   image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3291,12 +3436,14 @@ oc.install_python_noble:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_jammy:
+documentation:install_python_jammy:
   image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3304,12 +3451,14 @@ oc.install_python_jammy:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
-oc.install_python_bookworm:
+documentation:install_python_bookworm:
   image: debian:bookworm
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3317,12 +3466,14 @@ oc.install_python_bookworm:
   dependencies: []
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
 
 documentation:odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3341,11 +3492,13 @@ documentation:odoc:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
   - export OPAMFETCH='wget'
   - opam remote add default https://opam.ocaml.org/
+  - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
   - opam update
   - opam install --yes odoc.2.4.4
   - make -C docs odoc-lite
@@ -3364,35 +3517,30 @@ documentation:odoc:
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
   - when: always
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
   dependencies:
   - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_x86_64-exp-dev-extra
+  - oc.build_kernels
+  - oc.build_dsn_node
   timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
-  - . ./scripts/ci/sccache-start.sh
   script:
-  - ./scripts/ci/documentation:manuals.sh
-  after_script:
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
+  - make -C docs -j octez-gen
   artifacts:
     expire_in: 1 week
     paths:
@@ -3404,7 +3552,7 @@ documentation:manuals:
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3423,6 +3571,7 @@ documentation:docgen:
     policy: pull-push
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
   script:
@@ -3444,7 +3593,7 @@ documentation:docgen:
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: build
   tags:
   - gcp
   rules:
@@ -3462,6 +3611,7 @@ documentation:build_all:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate
   script:
@@ -3475,7 +3625,7 @@ documentation:build_all:
 
 documentation:linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
-  stage: doc
+  stage: test
   tags:
   - gcp
   rules:
@@ -3494,6 +3644,7 @@ documentation:linkcheck:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
   - . $HOME/.venv/bin/activate

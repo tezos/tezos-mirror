@@ -10,10 +10,10 @@ let one_xtz = Z.(of_int 1_000_000_000 * of_int 1_000_000_000)
 
 let xtz_of_int x = Z.(of_int x * one_xtz)
 
-let controller_from_sk ~rpc_endpoint ~min_balance controller =
+let controller_from_signer ~rpc_endpoint ~min_balance controller =
   let open Lwt_result_syntax in
   let* controller =
-    Account.from_secret_key ~evm_node_endpoint:rpc_endpoint controller
+    Account.from_signer ~evm_node_endpoint:rpc_endpoint controller
   in
   let* (Qty controller_balance) =
     Batch.call
@@ -57,31 +57,20 @@ let send_transaction_and_wait ~infos ~gas_limit ~from ~to_ ~value =
   in
   result
 
-let rec spam_with_account ~token ~infos ~gas_limit account =
+let transactions_count = ref 0
+
+let rec report_tps ~elapsed_time =
   let open Lwt_syntax in
-  let start = ref (Time.System.now ()) in
-
-  let callback reason =
-    match reason with
-    | `Accepted _ ->
-        start := Time.System.now () ;
-        return_unit
-    | `Confirmed ->
-        let end_ = Time.System.now () in
-        let* () =
-          Floodgate_events.transaction_confirmed
-            account
-            Ptime.(diff end_ !start)
-        in
-        spam_with_account ~token ~infos ~gas_limit account
-    | `Refused ->
-        let* () = Floodgate_events.transaction_refused account in
-        spam_with_account ~token ~infos ~gas_limit account
-    | `Dropped ->
-        let* () = Floodgate_events.transaction_dropped account in
-        spam_with_account ~token ~infos ~gas_limit account
+  let start = Time.System.now () in
+  transactions_count := 0 ;
+  let* () = Lwt_unix.sleep elapsed_time in
+  let stop = Time.System.now () in
+  let* () =
+    Floodgate_events.measured_tps !transactions_count (Ptime.diff stop start)
   in
+  report_tps ~elapsed_time
 
+let spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit account =
   let data, to_ =
     match token with
     | `Native -> (None, Account.address account)
@@ -94,7 +83,46 @@ let rec spam_with_account ~token ~infos ~gas_limit account =
         in
         (Some data, contract)
   in
-  Tx_queue.transfer ~infos ~callback ~gas_limit ~from:account ~to_ ?data ()
+  let rec salvo ~start ~nonce_limit ~nonce =
+    let is_last_nonce = Compare.Z.(Z.succ nonce = nonce_limit) in
+    let open Lwt_syntax in
+    let callback reason =
+      match reason with
+      | `Accepted _ -> return_unit
+      | `Refused ->
+          let* () = Floodgate_events.transaction_refused account in
+          return_unit
+      | `Confirmed ->
+          let end_ = Time.System.now () in
+          let* () =
+            Floodgate_events.transaction_confirmed
+              account
+              Ptime.(diff end_ start)
+          in
+          if is_last_nonce then loop () else return_unit
+      | `Dropped ->
+          let* () = Floodgate_events.transaction_dropped account in
+          if is_last_nonce then loop () else return_unit
+    in
+    let* () =
+      Tx_queue.transfer
+        ~nonce
+        ~infos
+        ~callback
+        ~gas_limit
+        ~from:account
+        ~to_
+        ?data
+        ()
+    in
+    if not is_last_nonce then salvo ~start ~nonce_limit ~nonce:(Z.succ nonce)
+    else return_unit
+  and loop () =
+    let start = Time.System.now () in
+    let nonce_limit = Z.(of_int txs_per_salvo + account.nonce) in
+    salvo ~start ~nonce_limit ~nonce:account.nonce
+  in
+  loop ()
 
 let rec get_transaction_receipt rpc_endpoint txn_hash =
   let open Lwt_result_syntax in
@@ -255,10 +283,14 @@ let prepare_scenario ~rpc_endpoint ~scenario infos simple_gas_limit controller =
 
 let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
     ~max_transaction_batch_length ~spawn_interval ~tick_interval
-    ~base_fee_factor ~initial_balance =
+    ~base_fee_factor ~initial_balance ~txs_per_salvo
+    ~elapsed_time_between_report =
   let open Lwt_result_syntax in
   let* controller =
-    controller_from_sk ~rpc_endpoint ~min_balance:(xtz_of_int 100) controller
+    controller_from_signer
+      ~rpc_endpoint
+      ~min_balance:(xtz_of_int 100)
+      controller
   in
   let* infos = Network_info.fetch ~rpc_endpoint ~base_fee_factor in
   let* () = Tx_queue.start ~relay_endpoint ~max_transaction_batch_length () in
@@ -285,18 +317,24 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
   let*! () = Floodgate_events.is_ready infos.chain_id infos.base_fee_per_gas in
   let* () =
     Blueprints_follower.start
+      ~multichain:false
       ~ping_tx_pool:false
       ~time_between_blocks
       ~evm_node_endpoint:relay_endpoint
       ~next_blueprint_number
-      (fun number blueprint ->
+      ~on_new_blueprint:(fun number blueprint ->
         let*! () = Floodgate_events.received_blueprint number in
         let* () =
           match Blueprint_decoder.transaction_hashes blueprint with
-          | Ok hashes -> List.iter_es Tx_queue.confirm hashes
+          | Ok hashes ->
+              transactions_count := !transactions_count + List.length hashes ;
+              List.iter_es Tx_queue.confirm hashes
           | Error _ -> return_unit
         in
         return `Continue)
+      ~on_finalized_levels:(fun ~l1_level:_ ~start_l2_level:_ ~end_l2_level:_ ->
+        return_unit)
+      ()
   and* () = Tx_queue.beacon ~tick_interval
   and* () =
     let* token, gas_limit =
@@ -318,11 +356,12 @@ let run ~scenario ~relay_endpoint ~rpc_endpoint ~controller ~max_active_eoa
             let*! () =
               Floodgate_events.spam_started (Account.address_et node)
             in
-            Lwt_result.ok (spam_with_account ~token ~infos ~gas_limit node)
+            Lwt_result.ok
+              (spam_with_account ~txs_per_salvo ~token ~infos ~gas_limit node)
           in
           return_unit)
         (Seq.ints 0 |> Stdlib.Seq.take max_active_eoa)
     in
     Lwt_result.ok (Floodgate_events.setup_completed ())
-  in
+  and* () = report_tps ~elapsed_time:elapsed_time_between_report in
   return_unit

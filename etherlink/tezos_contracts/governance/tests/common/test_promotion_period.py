@@ -7,12 +7,14 @@ from pytezos.client import PyTezosClient
 class KernelGovernancePromotionPeriodTestCase(BaseTestCase):
     def prepare_promotion_period(self, custom_config=None):
         proposer = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1
         config = {
             'started_at_level': governance_started_at_level,
             'period_length': 3,
-            'proposal_quorum': 10 # 1 bakers out of 5 voted
+            'proposal_quorum': 10, # 1 bakers out of 5 voted
+            'delegation_contract': delegation.address
         }
         if custom_config is not None:
             config.update(custom_config)
@@ -101,8 +103,8 @@ class KernelGovernancePromotionPeriodTestCase(BaseTestCase):
         baker1 = self.bootstrap_baker()
 
         # Period index: 1. Block: 2 of 3
-        governance.using(proposer).vote(YEA_VOTE).send()
-        governance.using(baker1).vote(NAY_VOTE).send()
+        governance.using(proposer).vote(YEA_VOTE).send(gas_reserve=500) # Increase gas_reserve to avoid gas_exhausted failure
+        governance.using(baker1).vote(NAY_VOTE).send(gas_reserve=500)
         self.bake_block()
 
         storage = governance.contract.storage()
@@ -150,9 +152,9 @@ class KernelGovernancePromotionPeriodTestCase(BaseTestCase):
         baker2 = self.bootstrap_baker()
 
         # Period index: 1. Block: 2 of 3
-        governance.using(proposer).vote(YEA_VOTE).send()
-        governance.using(baker1).vote(NAY_VOTE).send()
-        governance.using(baker2).vote(PASS_VOTE).send()
+        governance.using(proposer).vote(YEA_VOTE).send(gas_reserve=500) # Increase gas_reserve to avoid gas_exhausted failure
+        governance.using(baker1).vote(NAY_VOTE).send(gas_reserve=500)
+        governance.using(baker2).vote(PASS_VOTE).send(gas_reserve=500)
         self.bake_block()
 
         storage = governance.contract.storage()
@@ -293,9 +295,9 @@ class KernelGovernancePromotionPeriodTestCase(BaseTestCase):
         baker2 = self.bootstrap_baker()
 
         # Period index: 1. Block: 2 of 3
-        governance.using(proposer).vote(YEA_VOTE).send()
-        governance.using(baker1).vote(NAY_VOTE).send()
-        governance.using(baker2).vote(PASS_VOTE).send()
+        governance.using(proposer).vote(YEA_VOTE).send(gas_reserve=500) # Increase gas_reserve to avoid gas_exhausted failure
+        governance.using(baker1).vote(NAY_VOTE).send(gas_reserve=500)
+        governance.using(baker2).vote(PASS_VOTE).send(gas_reserve=500)
         self.bake_block()
 
         storage = governance.contract.storage()

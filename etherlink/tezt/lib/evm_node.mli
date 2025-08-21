@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,6 +29,27 @@
 (** EVM node server state. *)
 type t
 
+type tez_contract = {address : string; path : string; initial_storage : string}
+
+type l2_setup = {
+  l2_chain_id : int;
+  l2_chain_family : string;
+  world_state_path : string option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : tez_contract list option;
+  sequencer_pool_address : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  maximum_gas_per_transaction : int64 option;
+}
+
+val eth_default_bootstrap_accounts : string list
+
+val tez_default_bootstrap_accounts : Account.key list
+
+val default_l2_setup : l2_chain_id:int -> l2_setup
+
 type time_between_blocks =
   | Nothing  (** Does not produce any block if not forced by the private RPC *)
   | Time_between_blocks of float
@@ -42,12 +63,6 @@ type mode =
       preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
-    }
-  | Threshold_encryption_observer of {
-      initial_kernel : string;
-      preimages_dir : string;
-      rollup_node_endpoint : string;
-      bundler_node_endpoint : string;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -88,36 +103,6 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
     }
-  | Threshold_encryption_sequencer of {
-      initial_kernel : string;
-          (** Path to the initial kernel used by the sequencer. *)
-      preimage_dir : string option;
-          (** Path to the directory with the associated preimages. *)
-      private_rpc_port : int option;  (** Port for private RPC server*)
-      time_between_blocks : time_between_blocks option;
-          (** See {!time_between_blocks}, if the value is not
-              provided, the sequencer uses it default value. *)
-      sequencer : string;  (** Secret key used to sign the blueprints. *)
-      genesis_timestamp : Client.timestamp option;  (** Genesis timestamp *)
-      max_blueprints_lag : int option;
-      max_blueprints_ahead : int option;
-      max_blueprints_catchup : int option;
-      catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_pool_timeout_limit : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
-      tx_pool_addr_limit : int option;
-          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
-              the pool. *)
-      tx_pool_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
-              simultaneously inside the pool. *)
-      sequencer_sidecar_endpoint : string;
-          (** --sequencer-sidecar-endpoint: Uri of the sidecar endpoints to which
-              proposals are forwarded, and from where preblocks are fetched. *)
-      dal_slots : int list option;
-    }
   | Proxy
   | Rpc of mode
 
@@ -135,18 +120,22 @@ val name : t -> string
 (** Returns the data_dir of the EVM node. *)
 val data_dir : t -> string
 
+(** Optionally returns the config file used by the EVM node, if not the one by
+    default inside the data directory. *)
+val config_file : t -> string option
+
 (** Returns the path to the directory storing the preimages used by the
-    kernel runned by the node. *)
+    kernel run by the node. *)
 val preimages_dir : t -> string
 
-val supports_threshold_encryption : t -> bool
-
 (** [create ?name ?runner ?mode ?history ?data_dir ?rpc_addr ?rpc_port
-    rollup_node_endpoint] creates an EVM node server.
+    ?spawn_rpc ?websockets rollup_node_endpoint] creates an EVM node server.
 
     The server listens to requests at address [rpc_addr] and the port
     [rpc_port]. [rpc_addr] defaults to [Constant.default_host] and a fresh port
     is chosen if [rpc_port] is not set.
+
+    If [websockets] is true, activates the websocket server.
 
     The server communicates with a rollup-node and sets its endpoint via
     [rollup_node_endpoint].
@@ -160,9 +149,12 @@ val create :
   ?mode:mode ->
   ?history:history_mode ->
   ?data_dir:string ->
+  ?config_file:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
+  ?spawn_rpc:int ->
+  ?websockets:bool ->
   string ->
   t
 
@@ -204,6 +196,9 @@ val wait_for_blueprint_finalized : ?timeout:float -> t -> int -> unit Lwt.t
 val wait_for_predownload_kernel :
   ?timeout:float -> t -> root_hash:string -> unit Lwt.t
 
+val wait_for_predownload_kernel_failed :
+  ?timeout:float -> t -> root_hash:string -> unit Lwt.t
+
 (** [wait_for_blueprint_invalid ~timeout evm_node] waits until
     [evm_node] has seen an invalid blueprint. *)
 val wait_for_blueprint_invalid : ?timeout:float -> t -> unit Lwt.t
@@ -229,6 +224,12 @@ val wait_for_signal_signed :
 val wait_for_pending_upgrade : ?timeout:float -> t -> (string * string) Lwt.t
 
 val wait_for_successful_upgrade : ?timeout:float -> t -> (string * int) Lwt.t
+
+val wait_for_spawn_rpc_ready : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_import_finished : ?timeout:float -> t -> unit Lwt.t
+
+val wait_for_finished_exporting_snapshot : ?timeout:float -> t -> string Lwt.t
 
 val wait_for_block_producer_locked : ?timeout:float -> t -> unit Lwt.t
 
@@ -287,6 +288,7 @@ val spawn_init_config : ?extra_arguments:string list -> t -> Process.t
     Unlike [spawn_init_config], does not require a [Evm_node.t] instance. *)
 val spawn_init_config_minimal :
   data_dir:string ->
+  ?config_file:string ->
   ?path:string ->
   ?extra_arguments:string list ->
   unit ->
@@ -294,44 +296,65 @@ val spawn_init_config_minimal :
 
 type rpc_server = Resto | Dream
 
-(** [patch_config_with_experimental_feature ?drop_duplicate_when_injection
-    ?next_wasm_runtime ?rpc_server ?enable_websocket
-    ?max_websocket_message_length json_config] patches a config to add
-    experimental feature. Each optional argument add the correspondent
-    experimental feature. *)
+type tx_queue_config =
+  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
+  | Enable of bool
+
+(** [patch_config_with_experimental_feature
+    ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
+    json_config]
+    patches a config to add experimental feature. Each optional
+    argument adds the corresponding experimental feature. *)
 val patch_config_with_experimental_feature :
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
   ?next_wasm_runtime:bool ->
   ?rpc_server:rpc_server ->
-  ?enable_websocket:bool ->
-  ?max_websocket_message_length:int ->
+  ?enable_tx_queue:tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_chains:l2_setup list ->
   unit ->
+  JSON.t ->
+  JSON.t
+
+(** Edit websockets server configuration if websockets server is enabled. *)
+val patch_config_websockets_if_enabled :
+  ?max_message_length:int ->
+  ?monitor_heartbeat:bool ->
+  ?rate_limit:Ezjsonm.value ->
   JSON.t ->
   JSON.t
 
 (** Edit garbage collector parameters in the configuration file. *)
 val patch_config_gc : ?history_mode:history_mode -> JSON.t -> JSON.t
 
-(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr
-    ?rpc_port rollup_node_endpoint] creates an EVM node server with
-    {!create}, init the config with {!spawn_init_config}, patch it
-    with [patch_config], then runs it with {!run}. *)
+(** [init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
+    ?websockets rollup_node_endpoint] creates an EVM node server with {!create},
+    init the config with {!spawn_init_config}, patch it with [patch_config],
+    then runs it with {!run}. *)
 val init :
   ?patch_config:(JSON.t -> JSON.t) ->
   ?name:string ->
   ?runner:Runner.t ->
   ?mode:mode ->
   ?data_dir:string ->
+  ?config_file:string ->
   ?rpc_addr:string ->
   ?rpc_port:int ->
   ?restricted_rpcs:string ->
   ?history_mode:history_mode ->
+  ?spawn_rpc:int ->
+  ?websockets:bool ->
+  ?extra_arguments:string list ->
   string ->
   t Lwt.t
 
 (** Get the RPC port given as [--rpc-port] to a node. *)
 val rpc_port : t -> int
+
+(** Get the spawn_rpc value given on creation. *)
+val spawn_rpc : t -> int option
 
 (** [spawn_run ?extra_arguments evm_node] same as {!run} but spawns a
     process. *)
@@ -391,13 +414,39 @@ val wait_for_rollup_node_ahead : t -> int Lwt.t
     hash. *)
 val wait_for_tx_pool_add_transaction : ?timeout:float -> t -> string Lwt.t
 
+(** [wait_for_tx_queue_add_transaction ?timeout evm_node] waits for the event
+    [tx_queue_add_transaction.v0] using {!wait_for} and returns the transaction
+    hash. *)
+val wait_for_tx_queue_add_transaction : ?timeout:float -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node]
+    waits for the event [tx_queue_transaction_confirmed.v0] using
+    {!wait_for} and returns the transaction hash. If [hash] is
+    provided, wait for that hash to be confirmed. *)
+val wait_for_tx_queue_transaction_confirmed :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
+(** [wait_for_tx_queue_injecting_transaction ?timeout evm_node] waits
+    for the event [tx_queue_injecting_transaction.v0] using
+    {!wait_for} and returns the number of transactions injected. *)
+val wait_for_tx_queue_injecting_transaction : ?timeout:float -> t -> int Lwt.t
+
+(** [wait_for_tx_queue_cleared ?timeout evm_node] waits for the [tx_queue_cleared.v0]. *)
+val wait_for_tx_queue_cleared : ?timeout:float -> t -> unit Lwt.t
+
+(** [wait_for_block_producer_rejected_transaction ?timeout ?hash
+    evm_node] waits for the [block_producer_rejected_transaction.v0]
+    and returns the reason for the tx to be rejected. *)
+val wait_for_block_producer_rejected_transaction :
+  ?timeout:float -> ?hash:string -> t -> string Lwt.t
+
 (** [wait_for_shutdown ?can_terminate evm_node] waits until a node terminates
     and return its status. If the node is not running, make the test fail. If
     [can_terminate] is `true` and the node was already terminated, returns
     `None`. *)
 val wait_for_shutdown_event : ?can_terminate:bool -> t -> int option Lwt.t
 
-(** [wait_for_split ?level evm_node] waits untils the node terminates
+(** [wait_for_split ?level evm_node] waits until the node terminates
     splitting its irmin context at level [level] if provided. *)
 val wait_for_split : ?level:int -> t -> int Lwt.t
 
@@ -420,6 +469,15 @@ val wait_for_start_history_mode : ?history_mode:string -> t -> string Lwt.t
     the [runner] argument).
 *)
 val rpc_endpoint : ?local:bool -> ?private_:bool -> t -> string
+
+(** [rpc_endpoint ?local ?private_ evm_node] returns the endpoint to communicate with the
+    [evm_node] in the {!Endpoint.t} format.
+
+    If [local] is given ([false] by default),
+    then [Constant.default_host] is used (it overrides [rpc-addr] or
+    the [runner] argument).
+*)
+val rpc_endpoint_record : ?local:bool -> t -> Endpoint.t
 
 (** A deprecated alias for [rpc_endpoint] where [local] optional parameter is not given. *)
 val endpoint : ?private_:bool -> t -> string
@@ -550,16 +608,37 @@ val snapshot_info : snapshot_file:string -> (Process.t, string) runnable
 
 val wait_termination : t -> unit Lwt.t
 
+(** [make_l2_kernel_installer_config ~output ()] creates the config needed for
+    an l2 chain in a multichain kernel *)
+val make_l2_kernel_installer_config :
+  ?chain_id:int ->
+  ?chain_family:string ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?tez_bootstrap_balance:Tez.t ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:string list ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?da_fee_per_byte:Wei.t ->
+  ?sequencer_pool_address:string ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?set_account_code:(string * string) list ->
+  ?world_state_path:string ->
+  output:string ->
+  unit ->
+  (Process.t, unit) runnable
+
 (** [make_kernel_installer_config ~output ()] create the config needed for the
     evm kernel used by the installer *)
 val make_kernel_installer_config :
+  ?l2_chain_ids:int list ->
   ?max_delayed_inbox_blueprint_length:int ->
   ?mainnet_compat:bool ->
   ?remove_whitelist:bool ->
   ?kernel_root_hash:string ->
   ?chain_id:int ->
-  ?bootstrap_balance:Wei.t ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_balance:Wei.t ->
+  ?eth_bootstrap_accounts:string list ->
   ?sequencer:string ->
   ?delayed_bridge:string ->
   ?ticketer:string ->
@@ -577,10 +656,13 @@ val make_kernel_installer_config :
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?set_account_code:(string * string) list ->
   ?enable_fa_bridge:bool ->
+  ?enable_revm:bool ->
   ?enable_dal:bool ->
   ?dal_slots:int list ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?enable_multichain:bool ->
+  ?evm_version:Evm_version.t ->
   output:string ->
   unit ->
   (Process.t, unit) Runnable.t
@@ -605,3 +687,5 @@ val list_events :
 
 (** Switch history mode of an EVM node with command switch history. *)
 val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
+
+val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t

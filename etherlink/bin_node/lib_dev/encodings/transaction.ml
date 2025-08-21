@@ -7,6 +7,7 @@
 (*****************************************************************************)
 
 open Ethereum_types
+open L2_types
 
 type transaction_type = Legacy | Eip2930 | Eip1559
 
@@ -24,8 +25,8 @@ type transaction = {
   data : bytes;
   access_list : access_list_item list;
   v : Z.t;
-  r : bytes;
-  s : bytes;
+  r : Z.t;
+  s : Z.t;
 }
 
 let decode_access_list_item (item : Rlp.item) :
@@ -84,6 +85,8 @@ let decode_transaction ?chain_id ~tx_type ~nonce ~max_priority_fee_per_gas
   let to_ = if to_ = Bytes.empty then None else Some to_ in
   let (Qty value) = decode_number_be value in
   let (Qty v) = decode_number_be v in
+  let (Qty r) = decode_number_be r in
+  let (Qty s) = decode_number_be s in
   let* access_list = decode_access_list_rlp access_list in
   let* chain_id =
     match chain_id with
@@ -345,6 +348,20 @@ let encode_eip2930_transaction : transaction -> bytes = function
       Bytes.cat prefix (encode rlp)
   | _ -> invalid_arg "Transaction is not eip 2930"
 
+let decode tx_raw =
+  let decode, tx_raw =
+    match String.get_uint8 tx_raw 0 with
+    | 1 ->
+        let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+        (decode_eip2930, tx_raw)
+    | 2 ->
+        let tx_raw = String.sub tx_raw 1 (String.length tx_raw - 1) in
+        (decode_eip1559, tx_raw)
+    | _ -> (decode_legacy, tx_raw)
+  in
+  let tx_raw = Bytes.unsafe_of_string tx_raw in
+  decode tx_raw
+
 (** [message transaction] returns the "message" of the transaction, the
     binary blob that is signed and then to be used in signature recovery. *)
 let message : transaction -> bytes =
@@ -383,19 +400,23 @@ let secp256k1n_2 =
   Z.of_string
     "0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0"
 
-let is_high s =
-  let (Qty s) = decode_number_be s in
-  if s > secp256k1n_2 then Error "High s value" else Ok ()
+let is_high s = if s > secp256k1n_2 then Error "High s value" else Ok ()
+
+let encode_z_be z =
+  let rv = Z.to_bits z in
+  let len = String.length rv in
+  Bytes.init len (fun i -> rv.[len - 1 - i])
 
 let uncompressed_signature ~r ~s recovery_id =
   let open Result_syntax in
   let uncompressed_32_bytes v =
+    let v = encode_z_be v in
     let len = Bytes.length v in
     if len < 32 then Bytes.cat (Bytes.make (32 - len) '\000') v else v
   in
+  let+ () = is_high s in
   let r = uncompressed_32_bytes r in
   let s = uncompressed_32_bytes s in
-  let+ () = is_high s in
   Bytes.concat Bytes.empty [r; s; recovery_id]
 
 let caller ({r; s; _} as transaction) =
@@ -438,12 +459,12 @@ let to_transaction_object :
       gas = Qty gas_limit;
       gasPrice = Qty max_fee_per_gas;
       hash;
-      input = decode_hash data;
+      input = decode_hex data;
       nonce = Qty nonce;
       to_;
       transactionIndex = None;
       value = Qty value;
       v = Qty v;
-      r = decode_hash r;
-      s = decode_hash s;
+      r = Qty r;
+      s = Qty s;
     }

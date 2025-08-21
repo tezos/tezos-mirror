@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1208,6 +1209,7 @@ module Target = struct
     c_library_flags : string list option;
     conflicts : t list;
     deps : t list;
+    link_deps : Manifest_link_deps.t list;
     tests_deps : t option list;
     dune : Dune.s_expr;
     flags : Flags.t option;
@@ -1327,10 +1329,18 @@ module Target = struct
           "Manifest.Target.inline_tests_backend cannot be given no_target"
     | Some target -> Inline_tests_backend target
 
+  let is_internal_kind_lib (kind : kind) =
+    match kind with
+    | Public_library _ | Private_library _ -> true
+    | Public_executable _ | Private_executable _ | Test_executable _ -> false
+
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
   (* List of all targets, in reverse order of registration. *)
   let registered = ref []
+
+  (* List of executables targets sorted by product. *)
+  let executables_by_product = ref String_map.empty
 
   (* List of targets sorted by path,
      so that we can create dune files with multiple targets. *)
@@ -1342,24 +1352,6 @@ module Target = struct
 
   (* Set to [false] by [generate] to prevent further modifying the above references. *)
   let can_register = ref true
-
-  let register_internal ({path; opam; _} as internal) =
-    let path = sanitize_path path in
-    if not !can_register then
-      invalid_arg
-        "cannot register new targets after calling Manifest.check or \
-         Manifest.generate" ;
-    let old = String_map.find_opt path !by_path |> Option.value ~default:[] in
-    by_path := String_map.add path (internal :: old) !by_path ;
-    Option.iter
-      (fun opam ->
-        let old =
-          String_map.find_opt opam !by_opam |> Option.value ~default:[]
-        in
-        by_opam := String_map.add opam (internal :: old) !by_opam)
-      opam ;
-    registered := internal :: !registered ;
-    Some (Internal internal)
 
   let kind_name_for_errors kind =
     match kind with
@@ -1379,6 +1371,55 @@ module Target = struct
     | Open (target, _) ->
         name_for_errors target
     | Internal {kind; _} -> kind_name_for_errors kind
+
+  module TargetLinkDeps = Manifest_link_deps.LinkDeps (struct
+    type target = t
+
+    type internal_target = internal
+
+    type target_kind = kind
+
+    let get_internal = get_internal
+
+    let get_link_deps t = t.link_deps
+
+    let is_internal_kind_lib = is_internal_kind_lib
+
+    let debug_name = name_for_errors
+
+    let debug_kind = kind_name_for_errors
+
+    let path_of_internal_target t = t.path
+
+    let error = error
+  end)
+
+  let register_internal ({path; opam; product; kind; _} as internal) =
+    let path = sanitize_path path in
+    if not !can_register then
+      invalid_arg
+        "cannot register new targets after calling Manifest.check or \
+         Manifest.generate" ;
+    let old = String_map.find_opt path !by_path |> Option.value ~default:[] in
+    by_path := String_map.add path (internal :: old) !by_path ;
+    Option.iter
+      (fun opam ->
+        let old =
+          String_map.find_opt opam !by_opam |> Option.value ~default:[]
+        in
+        by_opam := String_map.add opam (internal :: old) !by_opam)
+      opam ;
+    (match kind with
+    | Public_executable _ ->
+        let old =
+          String_map.find_opt product !executables_by_product
+          |> Option.value ~default:[]
+        in
+        executables_by_product :=
+          String_map.add product (internal :: old) !executables_by_product
+    | _ -> ()) ;
+    registered := internal :: !registered ;
+    Some (Internal internal)
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
@@ -1426,6 +1467,7 @@ module Target = struct
     ?dep_globs:string list ->
     ?dep_globs_rec:string list ->
     ?deps:t option list ->
+    ?link_deps:Manifest_link_deps.t list ->
     ?dune:Dune.s_expr ->
     ?flags:Flags.t ->
     ?foreign_archives:string list ->
@@ -1493,8 +1535,8 @@ module Target = struct
 
   let internal ~product make_kind ?all_modules_except ?bisect_ppx
       ?c_library_flags ?(conflicts = []) ?(dep_files = []) ?(dep_globs = [])
-      ?(dep_globs_rec = []) ?(deps = []) ?(dune = Dune.[]) ?flags
-      ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
+      ?(dep_globs_rec = []) ?(deps = []) ?(link_deps = []) ?(dune = Dune.[])
+      ?flags ?foreign_archives ?foreign_stubs ?ctypes ?implements ?inline_tests
       ?inline_tests_deps ?inline_tests_link_flags ?inline_tests_libraries
       ?wrapped ?documentation ?(link_flags = []) ?(linkall = false) ?modes
       ?modules ?(modules_without_implementation = [])
@@ -1508,8 +1550,19 @@ module Target = struct
       ?default_implementation ?(cram = false) ?license ?(extra_authors = [])
       ?(with_macos_security_framework = false) ?(source = []) ~path ?enabled_if
       names =
+    let kind = make_kind names in
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
+    let TargetLinkDeps.
+          {deps; link_deps; inline_tests_libraries; inline_tests_link_flags} =
+      TargetLinkDeps.compute_opts
+        ~kind
+        ~deps
+        ~link_deps
+        ~inline_tests
+        ~inline_tests_libraries
+        ~inline_tests_link_flags
+    in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
     let ppx_runtime_libraries = List.filter_map Fun.id ppx_runtime_libraries in
     let implements =
@@ -1528,7 +1581,6 @@ module Target = struct
       in
       List.flatten (List.map (get_opens []) deps)
     in
-    let kind = make_kind names in
     let preprocess, inline_tests =
       match
         ( inline_tests,
@@ -1845,6 +1897,7 @@ module Target = struct
         c_library_flags;
         conflicts;
         deps;
+        link_deps;
         dune;
         flags;
         foreign_archives;
@@ -1898,6 +1951,12 @@ module Target = struct
         dep_globs_rec;
         enabled_if;
       }
+
+  let rust_archive link_deps ?inline_tests_link_flags target =
+    target
+    |> Option.map
+       @@ TargetLinkDeps.register_archive link_deps ?inline_tests_link_flags
+    |> Option.to_list |> List.flatten
 
   let public_lib ?internal_name =
     internal @@ fun public_name ->
@@ -2276,7 +2335,15 @@ let register_tezt_targets ~make_tezt_exe =
                     ];
               ]
           ~product:"tezt-tests"
-          ~source:["src/"; "brassaia/"; "etherlink/"; "irmin/"; "tezt/"]
+          ~source:
+            [
+              "src/";
+              "brassaia/";
+              "brassaia-eio/";
+              "etherlink/";
+              "irmin/";
+              "tezt/";
+            ]
       in
       ()
     in
@@ -2394,6 +2461,7 @@ module Sub_lib = struct
        ?dep_globs
        ?dep_globs_rec
        ?deps
+       ?link_deps
        ?dune
        ?flags
        ?foreign_archives
@@ -2482,6 +2550,7 @@ module Sub_lib = struct
       ?c_library_flags
       ?conflicts
       ?deps
+      ?link_deps
       ?dep_files
       ?dep_globs
       ?dep_globs_rec
@@ -2601,6 +2670,8 @@ module Product (M : sig
   val source : string list
 end) =
 struct
+  let rust_archive = Target.rust_archive
+
   let public_lib = Target.public_lib ~product:M.name ~source:M.source
 
   let private_lib = Target.private_lib ~product:M.name ~source:M.source
@@ -2679,11 +2750,7 @@ let generate_dune (internal : Target.internal) =
     in
     (libraries, ppx_runtime_libraries, List.rev !empty_files_to_create)
   in
-  let is_lib =
-    match internal.kind with
-    | Public_library _ | Private_library _ -> true
-    | Public_executable _ | Private_executable _ | Test_executable _ -> false
-  in
+  let is_lib = Target.is_internal_kind_lib internal.kind in
   let library_flags =
     if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
     else None
@@ -3603,18 +3670,55 @@ let generate_dune_project_files () =
     Format.fprintf fmt "(package (name %s)%s)@." package allow_empty ) ;
   pp_do_not_edit ~comment_start:";" fmt ()
 
-let generate_executable_list filename release_status_to_list =
-  write filename @@ fun fmt ->
-  Fun.flip List.iter !Target.registered @@ fun (internal : Target.internal) ->
-  if internal.release_status = release_status_to_list then
-    match internal.kind with
-    | Public_library _ | Private_library _ | Private_executable _
-    | Test_executable _ ->
-        ()
-    | Public_executable ne_list ->
-        Fun.flip List.iter (Ne_list.to_list ne_list)
-        @@ fun (full_name : Target.full_name) ->
-        Format.fprintf fmt "%s@." full_name.public_name
+let generate_executable_list path release_status_to_list =
+  let all_filename =
+    path
+    // (Target.show_release_status release_status_to_list
+       |> String.lowercase_ascii)
+    ^ "-executables"
+  in
+  (* Generate one file for all products. *)
+  write all_filename @@ fun fmt ->
+  !Target.executables_by_product
+  |> String_map.iter @@ fun product internal_list ->
+     let filename =
+       (path // product) ^ "-"
+       ^ (Target.show_release_status release_status_to_list
+         |> String.lowercase_ascii)
+       ^ "-executables"
+     in
+     let executables_list =
+       List.filter_map
+         (fun (internal : Target.internal) ->
+           if internal.release_status = release_status_to_list then
+             Some internal
+           else None)
+         internal_list
+     in
+     (* Generate one file for each product. *)
+     (if executables_list != [] then
+        write filename @@ fun fmt ->
+        Fun.flip List.iter executables_list
+        @@ fun (internal : Target.internal) ->
+        if internal.release_status = release_status_to_list then
+          match internal.kind with
+          | Public_library _ | Private_library _ | Private_executable _
+          | Test_executable _ ->
+              ()
+          | Public_executable ne_list ->
+              Fun.flip List.iter (Ne_list.to_list ne_list)
+              @@ fun (full_name : Target.full_name) ->
+              Format.fprintf fmt "%s@." full_name.public_name) ;
+     Fun.flip List.iter internal_list @@ fun (internal : Target.internal) ->
+     if internal.release_status = release_status_to_list then
+       match internal.kind with
+       | Public_library _ | Private_library _ | Private_executable _
+       | Test_executable _ ->
+           ()
+       | Public_executable ne_list ->
+           Fun.flip List.iter (Ne_list.to_list ne_list)
+           @@ fun (full_name : Target.full_name) ->
+           Format.fprintf fmt "%s@." full_name.public_name
 
 let generate_workspace env dune =
   let pp_dune fmt dune =
@@ -4627,6 +4731,31 @@ let generate_opam_dependency_graph ?(source = []) ?(without = [])
   (* Output the DOT file. *)
   write_raw filename @@ fun fmt -> G.output_dot_file fmt graph
 
+let generate_tobi_cfg () =
+  write "tobi/config" @@ fun fmt ->
+  pp_do_not_edit ~comment_start:"#" fmt () ;
+  (* Include manual rules from tobi/config-manual. *)
+  (let input = open_in "tobi/config-manual" in
+   Fun.protect ~finally:(fun () -> close_in input) @@ fun () ->
+   let rec copy () =
+     match input_line input with
+     | exception End_of_file -> ()
+     | line ->
+         Format.fprintf fmt "%s@." line ;
+         copy ()
+   in
+   copy ()) ;
+  (* Add automatic rules. *)
+  Target.iter_internal_by_opam @@ fun package internals ->
+  let paths =
+    List.fold_left
+      (fun acc (internal : Target.internal) -> String_set.add internal.path acc)
+      String_set.empty
+      internals
+    |> String_set.elements
+  in
+  Format.fprintf fmt "%s: %s@." package (String.concat ", " paths)
+
 let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
     =
   Printexc.record_backtrace true ;
@@ -4655,17 +4784,16 @@ let generate ~make_tezt_exe ~tezt_exe_deps ~default_profile ~add_to_meta_package
          opam_release_graph)
       opam_dep_graph ;
     generate_opam_ci_input opam_release_graph ;
-    generate_executable_list "script-inputs/released-executables" Released ;
-    generate_executable_list
-      "script-inputs/experimental-executables"
-      Experimental ;
+    generate_executable_list "script-inputs/" Released ;
+    generate_executable_list "script-inputs/" Experimental ;
     generate_profiles ~default_profile ;
     Option.iter
       (generate_opam_files_for_release
          packages_dir
          opam_release_graph
          add_to_meta_package)
-      release
+      release ;
+    generate_tobi_cfg ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;

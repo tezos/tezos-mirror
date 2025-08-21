@@ -19,33 +19,44 @@ module State = Riscv_context.PVMState
 module Backend = Octez_riscv_pvm.Backend
 module Ctxt_wrapper = Context_wrapper.Riscv
 
+(** Converts a protocol input to a RISC-V PVM backend-specific input. *)
 let to_pvm_input (input : Sc_rollup.input) : Backend.input =
   match input with
   | Sc_rollup.Inbox_message {inbox_level; message_counter; payload} ->
-      InboxMessage
+      Inbox_message
         ( Raw_level.to_int32 inbox_level,
           Z.to_int64 message_counter,
           Sc_rollup.Inbox_message.unsafe_to_string payload )
-  | Sc_rollup.(Reveal (Metadata {address; origination_level})) ->
-      Reveal
-        (Metadata
-           ( Sc_rollup.Address.to_bytes address,
-             Raw_level.to_int32 origination_level ))
-  | Sc_rollup.(Reveal (Raw_data data)) -> Reveal (RawData data)
-  | _ -> assert false
+  | Sc_rollup.(Reveal reveal_data) ->
+      let reveal_data_bytes = Sc_rollup.reveal_response_to_bytes reveal_data in
+      Reveal (String.of_bytes reveal_data_bytes)
 
-let of_pvm_input_request (_input_request : Backend.input_request) :
-    Sc_rollup.input_request =
-  raise (Invalid_argument "input_request not implemented")
+(** Tries to convert a RISC-V PVM backend-specific input request to a protocol
+  * input request. Returns [None] in case of failure. *)
+let of_pvm_input_request (input_request : Backend.input_request) :
+    Sc_rollup.input_request option =
+  let open Option_syntax in
+  match input_request with
+  | Backend.No_input_required -> return Sc_rollup.No_input_required
+  | Backend.Initial -> return Sc_rollup.Initial
+  | Backend.First_after (level, index) ->
+      let+ raw_level = Option.of_result @@ Raw_level.of_int32 level in
+      Sc_rollup.First_after (raw_level, Z.of_int64 index)
+  | Backend.Needs_reveal raw_string ->
+      let+ reveal_data =
+        Data_encoding.Binary.of_string_opt Sc_rollup.reveal_encoding raw_string
+      in
+      Sc_rollup.Needs_reveal reveal_data
 
 let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
     (get_current_level : 'a -> int32 option Lwt.t)
-    (get_message_counter : 'a -> int64 Lwt.t) ~is_reveal_enabled:_ state =
+    (get_message_counter : 'a -> int64 Lwt.t)
+    (get_reveal_request : 'a -> string Lwt.t) ~is_reveal_enabled:_ state =
   let open Lwt_syntax in
   let* status = get_status state in
   match status with
   | Evaluating -> return Sc_rollup.No_input_required
-  | WaitingForInput -> (
+  | Waiting_for_input -> (
       let* level = get_current_level state in
       match level with
       | None -> return Sc_rollup.Initial
@@ -54,20 +65,21 @@ let make_is_input_state (get_status : 'a -> Backend.status Lwt.t)
           return
             (Sc_rollup.First_after
                (Raw_level.of_int32_exn level, Z.of_int64 message_counter)))
-  | WaitingForMetadata -> return Sc_rollup.(Needs_reveal Reveal_metadata)
-  | WaitingForReveal ->
-      (* TODO: RV-407: Rollup node handles reveal request from riscv pvm *)
-      assert false
-
-module Insert_failure_impl = struct
-  let insert_failure _state =
-    raise (Invalid_argument "insert_failure not implemented")
-end
+  | Waiting_for_reveal -> (
+      let+ reveal_request_string = get_reveal_request state in
+      match
+        Data_encoding.Binary.of_string
+          Alpha_context.Sc_rollup.reveal_encoding
+          reveal_request_string
+      with
+      | Ok reveal -> Sc_rollup.(Needs_reveal reveal)
+      | Error _ -> Sc_rollup.No_input_required)
 
 module PVM :
   Sc_rollup.PVM.S
     with type state = tree
-     and type context = Riscv_context.rw_index = struct
+     and type context = Riscv_context.rw_index
+     and type proof = Backend.proof = struct
   let parse_boot_sector s = Some s
 
   let pp_boot_sector fmt s = Format.fprintf fmt "%s" s
@@ -91,12 +103,9 @@ module PVM :
 
   type proof = Backend.proof
 
-  let proof_encoding =
-    Data_encoding.(
-      conv_with_guard
-        (function (_ : proof) -> ())
-        (fun _ -> Error "proofs not implemented")
-        unit)
+  let proof_encoding : Backend.proof Data_encoding.t =
+    let open Data_encoding in
+    conv_with_guard Backend.serialise_proof Backend.deserialise_proof bytes
 
   let proof_start_state proof = Backend.proof_start_state proof
 
@@ -114,6 +123,7 @@ module PVM :
       Backend.get_status
       Backend.get_current_level
       Backend.get_message_counter
+      Backend.get_reveal_request
 
   let set_input input state = Backend.set_input state (to_pvm_input input)
 
@@ -121,9 +131,16 @@ module PVM :
 
   let verify_proof ~is_reveal_enabled:_ input_given proof =
     let open Environment.Error_monad.Lwt_result_syntax in
-    match Backend.verify_proof (Option.map to_pvm_input input_given) proof with
+    let* input_request =
+      match
+        Backend.verify_proof (Option.map to_pvm_input input_given) proof
+      with
+      | Some request -> return request
+      | None -> tzfail Sc_rollup_riscv.RISCV_proof_verification_failed
+    in
+    match of_pvm_input_request input_request with
+    | Some request -> return request
     | None -> tzfail Sc_rollup_riscv.RISCV_proof_verification_failed
-    | Some request -> return (of_pvm_input_request request)
 
   let produce_proof _context ~is_reveal_enabled:_ input_given state =
     let open Environment.Error_monad.Lwt_result_syntax in
@@ -152,7 +169,10 @@ module PVM :
     let* level = Backend.get_current_level state in
     return (Option.map Raw_level.of_int32_exn level)
 
-  module Internal_for_tests = Insert_failure_impl
+  module Internal_for_tests = struct
+    (* TODO: RV-575 Remove unused function from pvm signature *)
+    let insert_failure state = Backend.insert_failure state
+  end
 end
 
 include PVM
@@ -205,6 +225,7 @@ module Mutable_state :
       Backend.Mutable_state.get_status
       Backend.Mutable_state.get_current_level
       Backend.Mutable_state.get_message_counter
+      Backend.Mutable_state.get_reveal_request
 
   let set_input input state =
     Backend.Mutable_state.set_input state @@ to_pvm_input input
@@ -222,7 +243,9 @@ module Mutable_state :
       ~max_steps
       initial_state
 
-  module Internal_for_tests = Insert_failure_impl
+  module Internal_for_tests = struct
+    let insert_failure state = Backend.Mutable_state.insert_failure state
+  end
 end
 
 let new_dissection = Game_helpers.default_new_dissection

@@ -137,25 +137,12 @@ let wait_for_denunciation_injection node client accuser =
   if List.mem oph mempool.validated then return oph
   else Test.fail "the denunciation operation was rejected by the mempool"
 
-let default_overrides ~protocol =
-  let common =
-    [
-      (* Shorter cycles *)
-      (["blocks_per_cycle"], `Int blocks_per_cycle);
-      (["nonce_revelation_threshold"], `Int nonce_revelation_threshold);
-    ]
-  in
-  if Protocol.(number protocol <= number Quebec) then
-    [
-      (* Activate adaptive issuance feature vote *)
-      (["adaptive_issuance_activation_vote_enable"], `Bool true);
-      (* Make adaptive issuance activation faster *)
-      (["adaptive_issuance_launch_ema_threshold"], `Int 1);
-      (["adaptive_issuance_force_activation"], `Bool true);
-    ]
-    @ common
-  else (* AI activation feature flags have been removed in protocol R. *)
-    common
+let default_overrides =
+  [
+    (* Shorter cycles *)
+    (["blocks_per_cycle"], `Int blocks_per_cycle);
+    (["nonce_revelation_threshold"], `Int nonce_revelation_threshold);
+  ]
 
 let launch_ema_threshold client =
   let* json =
@@ -176,7 +163,7 @@ let init ?(overrides = default_overrides) protocol =
   let* sandbox_client = Client.init ~endpoint:sandbox_endpoint () in
   let* parameter_file =
     let base = Either.Right (protocol, None) in
-    Protocol.write_parameter_file ~base (overrides ~protocol)
+    Protocol.write_parameter_file ~base overrides
   in
   let* () = Client.activate_protocol ~protocol sandbox_client ~parameter_file in
   Log.info "Activated protocol." ;
@@ -222,190 +209,6 @@ let activate_ai protocol sandbox_client sandbox_endpoint =
     bake
     (Option.get launch_cycle - current_level.cycle)
     sandbox_client
-
-(** This test starts from a protocol with AI feature flag enabled. It
-    tests the correct activation of AI features behind the
-    feature vote. *)
-let test_AI_activation =
-  Protocol.register_test
-    ~__FILE__
-      (* In protocols R+, AI is always immediately active; there is no
-         feature vote. *)
-    ~supports:Protocol.(Until_protocol (number Quebec))
-    ~title:"AI Activation - test AI activation after feature vote"
-    ~tags:["adaptive_issuance"; "staking"]
-  @@ fun protocol ->
-  let overrides ~protocol =
-    (* Remove AI force activation *)
-    List.filter
-      (function
-        | ["adaptive_issuance_force_activation"], _ -> false | _ -> true)
-      (default_overrides ~protocol)
-  in
-  let* _proto_hash, endpoint, client, _node = init ~overrides protocol in
-
-  let* staking_parameters =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
-         Constant.bootstrap3.public_key_hash
-  in
-  let limit_before =
-    JSON.(
-      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
-  in
-  let edge_before =
-    JSON.(
-      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
-  in
-
-  assert (limit_before = 0 && edge_before = 1000000000) ;
-
-  log_step 0 "Update staking parameters prior to AI activation" ;
-  (* set bootstrap3 parameters to accept stakers *)
-  let set_delegate_parameters =
-    Client.spawn_set_delegate_parameters
-      ~delegate:"bootstrap3"
-      ~limit:"5"
-      ~edge:"0.5"
-      client
-  in
-
-  log_step 1 "Bake 3 cycles for new parameters to be taken into account" ;
-  let bake ?keys client =
-    Client.bake_for_and_wait ~endpoint ~protocol ?keys client
-  in
-  let* () = Helpers.bake_n_cycles bake 3 client in
-  let* () = set_delegate_parameters |> Process.check in
-
-  log_step 2 "Check new staking parameters" ;
-  let* staking_parameters =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
-         Constant.bootstrap3.public_key_hash
-  in
-  let limit_after =
-    JSON.(
-      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
-  in
-  let edge_after =
-    JSON.(
-      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
-  in
-
-  assert (limit_after = 5000000 && edge_after = 500000000) ;
-  log_step 3 "Check staking is not allowed before AI activation" ;
-  let* () =
-    let stake =
-      Client.spawn_stake ~wait:"1" (Tez.of_int 1) ~staker:"bootstrap2" client
-    in
-    Process.check_error
-      ~msg:
-        (rex
-           "Manual staking operations are forbidden because staking is \
-            currently automated.")
-      stake
-  in
-
-  log_step 4 "Activate AI" ;
-  let* _ = activate_ai protocol client endpoint in
-
-  log_step 5 "Check staking is now possible" ;
-  (* Make sure AI is activated by trying to explictly stake with one delegate *)
-  let stake = Client.spawn_stake (Tez.of_int 1) ~staker:"bootstrap2" client in
-  let* () =
-    Client.bake_for_and_wait
-      ~endpoint
-      ~protocol
-      ~keys:(List.map (fun x -> x.Account.alias) bootstrap_accounts)
-      client
-      ~ai_vote:On
-  in
-  let* () = Process.check stake in
-  Lwt.return_unit
-
-(** This test starts from a protocol with AI feature flag enabled and forces activation.  *)
-let test_AI_activation_bypass_vote =
-  Protocol.register_test
-    ~__FILE__
-      (* The "adaptive_issuance_force_activation" feature flag no longer
-         exists in protocols R+ *)
-    ~supports:Protocol.(Until_protocol (number Quebec))
-    ~title:
-      "AI Activation - test AI activation with feature flag force_activation \
-       set"
-    ~tags:["adaptive_issuance"; "staking"]
-  @@ fun protocol ->
-  let* _proto_hash, endpoint, client, _node = init protocol in
-
-  let* launch_cycle =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_adaptive_issuance_launch_cycle ()
-  in
-  assert (Option.get launch_cycle = 0) ;
-
-  let* staking_parameters =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
-         Constant.bootstrap3.public_key_hash
-  in
-  let limit_before =
-    JSON.(
-      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
-  in
-  let edge_before =
-    JSON.(
-      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
-  in
-
-  assert (limit_before = 0 && edge_before = 1000000000) ;
-
-  log_step 0 "Update staking parameters" ;
-  (* set bootstrap2 parameters to accept stakers *)
-  let set_delegate_parameters =
-    Client.spawn_set_delegate_parameters
-      ~delegate:"bootstrap3"
-      ~limit:"5"
-      ~edge:"0.5"
-      client
-  in
-
-  log_step 1 "Bake 3 cycles for new parameters to be taken into account" ;
-  let bake ?keys client =
-    Client.bake_for_and_wait ~endpoint ~protocol ?keys client
-  in
-  let* () = Helpers.bake_n_cycles bake 3 client in
-  let* () = set_delegate_parameters |> Process.check in
-
-  log_step 2 "Check new staking parameters" ;
-  let* staking_parameters =
-    Client.RPC.call client
-    @@ RPC.get_chain_block_context_delegate_active_staking_parameters
-         Constant.bootstrap3.public_key_hash
-  in
-  let limit_after =
-    JSON.(
-      staking_parameters |-> "limit_of_staking_over_baking_millionth" |> as_int)
-  in
-  let edge_after =
-    JSON.(
-      staking_parameters |-> "edge_of_baking_over_staking_billionth" |> as_int)
-  in
-
-  assert (limit_after = 5000000 && edge_after = 500000000) ;
-
-  log_step 3 "Check staking is now possible" ;
-  (* Make sure AI is activated by trying to explictly stake with one delegate *)
-  let stake = Client.spawn_stake (Tez.of_int 1) ~staker:"bootstrap2" client in
-  let* () =
-    Client.bake_for_and_wait
-      ~endpoint
-      ~protocol
-      ~keys:(List.map (fun x -> x.Account.alias) bootstrap_accounts)
-      client
-      ~ai_vote:On
-  in
-  let* () = Process.check stake in
-  Lwt.return_unit
 
 let get_hash_of operation =
   let* stdout = Process.check_and_read_stdout operation in
@@ -504,17 +307,14 @@ let test_staking =
         "rewards";
         "slashing";
       ]
-    ~uses:(fun protocol -> [Protocol.accuser protocol])
+    ~uses:(fun _protocol -> [Constant.octez_accuser])
   @@ fun protocol ->
-  let overrides ~protocol =
-    let overrides = default_overrides ~protocol in
-    if Protocol.(number protocol > number Quebec) then
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
-         default value for [tolerated_inactivity_period] *)
-      (["tolerated_inactivity_period"], `Int 3)
-      :: (["issuance_weights"; "dal_rewards_weight"], `Int 0)
-      :: overrides
-    else overrides
+  let overrides =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7576 use a
+       default value for [tolerated_inactivity_period] *)
+    (["tolerated_inactivity_period"], `Int 3)
+    :: (["issuance_weights"; "dal_rewards_weight"], `Int 0)
+    :: default_overrides
   in
 
   let* _proto_hash, endpoint, client_1, node_1 = init ~overrides protocol in
@@ -582,10 +382,10 @@ let test_staking =
       unstake
   in
   log_step 4 "Set delegate for stakers" ;
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker0.alias ~delegate:"bootstrap2" client_1
   in
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker1.alias ~delegate:"bootstrap2" client_1
   in
   let* () = bake_n ~endpoint ~protocol client_1 1 in
@@ -1094,7 +894,9 @@ let test_staking =
   log_step 16 "Run Node 3, bake one block and wait for the accuser to be ready." ;
   let* node_3 = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client_3 = Client.init ~endpoint:(Node node_3) () in
-  let* accuser_3 = Accuser.init ~protocol node_3 in
+  (* Need to know the protocol for the agnostic accuser to start. *)
+  let* () = Client.activate_protocol ~protocol client_3 in
+  let* accuser_3 = Accuser.init node_3 in
   let denunciation_injection =
     wait_for_denunciation_injection node_3 client_3 accuser_3
   in
@@ -1447,7 +1249,7 @@ let test_staking =
           ~ai_vote:On)
   in
 
-  let*! () =
+  let* () =
     Client.set_delegate ~src:staker1.alias ~delegate:"bootstrap3" client_1
   in
   let* () =
@@ -1500,7 +1302,7 @@ let test_fix_delegated_balance =
   let* () = bake_n ~endpoint ~protocol client 1 in
 
   log_step 2 "Preparing delegate account" ;
-  let*! () = Client.set_delegate ~src:delegator.alias ~delegate client in
+  let* () = Client.set_delegate ~src:delegator.alias ~delegate client in
   let* () = bake_n ~endpoint ~protocol client 1 in
   let set_delegate_parameters =
     Client.spawn_set_delegate_parameters ~delegate ~limit:"5" ~edge:"0.5" client
@@ -1524,12 +1326,12 @@ let test_fix_delegated_balance =
   let* () = Process.check ~expect_failure:false stake in
 
   log_step 6 "Delegator delegates to itself" ;
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegator.alias ~delegate:delegator.alias client
   in
   let* () = bake_n ~endpoint ~protocol client 2 in
 
-  let*! () =
+  let* () =
     Client.set_delegate ~src:delegator2.alias ~delegate:delegator.alias client
   in
   let* () = bake_n ~endpoint ~protocol client 2 in
@@ -1553,8 +1355,117 @@ let test_fix_delegated_balance =
   in
   Lwt.return_unit
 
+(* This scenario tests set_delegate_parameters and update_delegate_parameters UX
+*)
+let test_delegate_parameter_UX =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      "Staking - test set_delegate_parameters and update_delegate_parameters UX"
+    ~tags:["staking"; "node"; "client"]
+  @@ fun protocol ->
+  let* _proto_hash, endpoint, client, _node_1 = init protocol in
+  let bake = Helpers.bake ~ai_vote:Pass ~endpoint ~protocol in
+  let current_cycle () =
+    let* level =
+      Client.RPC.call client @@ RPC.get_chain_block_helper_current_level ()
+    in
+    return level.cycle
+  in
+
+  let* delegate_parameters_activation_delay =
+    let* json =
+      Client.RPC.call client @@ RPC.get_chain_block_context_constants ()
+    in
+    Lwt.return
+    @@ JSON.(json |-> "delegate_parameters_activation_delay" |> as_int)
+  in
+  let delegate = "bootstrap2" in
+  let* delegate_key = Client.show_address ~alias:delegate client in
+  log_step 1 "set delegate parameters" ;
+  let limit_int = 10 in
+  let edge_pct = 2 in
+  let* () =
+    Client.set_delegate_parameters
+      ~delegate
+      ~limit:(string_of_int limit_int)
+      ~edge:(string_of_int edge_pct ^ "%")
+      client
+  in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = Helpers.bake_n_cycles bake 1 client in
+  let check_parameters ~operation_cycle ~limit ~edge_pct =
+    let* json =
+      Client.RPC.call client
+      @@ RPC.get_chain_block_context_delegate_pending_staking_parameters
+           Account.(delegate_key.public_key_hash)
+    in
+    let cycle = operation_cycle + 1 + delegate_parameters_activation_delay in
+    let parameter_json =
+      try
+        List.find
+          (fun json -> JSON.(json |-> "cycle" |> as_int) = cycle)
+          JSON.(as_list json)
+      with Not_found ->
+        Log.error "cycle %d not found in %s@." cycle (JSON.encode json) ;
+        failwith "NOT_found"
+    in
+    let expected_limit = limit * 1_000_000 in
+    let expected_edge = edge_pct * 1_000_000_000 / 100 in
+    if
+      JSON.(
+        parameter_json |-> "parameters"
+        |-> "limit_of_staking_over_baking_millionth" |> as_int)
+      = expected_limit
+      && JSON.(
+           parameter_json |-> "parameters"
+           |-> "edge_of_baking_over_staking_billionth" |> as_int)
+         = expected_edge
+    then return ()
+    else (
+      Log.error
+        "expected: limit %d, edge %d at cycle %d. got %s"
+        expected_limit
+        expected_edge
+        cycle
+        (JSON.encode json) ;
+      failwith "wrong delegate parameter")
+  in
+  let* () = check_parameters ~operation_cycle ~limit:limit_int ~edge_pct in
+  let* () =
+    Client.set_delegate_parameters ~delegate ~limit:"10" ~edge:"3%" client
+  in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:10 ~edge_pct:3 in
+  let updater =
+    Client.spawn_update_delegate_parameters
+      ~delegate
+      ~limit:"10"
+      ~edge:"3%"
+      client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let updater =
+    Client.spawn_update_delegate_parameters ~delegate ~edge:"3%" client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let updater =
+    Client.spawn_update_delegate_parameters ~delegate ~limit:"10" client
+  in
+  let* () = Process.check ~expect_failure:true updater in
+  let* () = Client.update_delegate_parameters ~delegate ~edge:"4%" client in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:10 ~edge_pct:4 in
+  let* () = Client.update_delegate_parameters ~delegate ~limit:"9" client in
+  let* () = bake client in
+  let* operation_cycle = current_cycle () in
+  let* () = check_parameters ~operation_cycle ~limit:9 ~edge_pct:4 in
+  unit
+
 let register ~protocols =
-  test_AI_activation_bypass_vote protocols ;
-  test_AI_activation protocols ;
   test_staking protocols ;
-  test_fix_delegated_balance protocols
+  test_fix_delegated_balance protocols ;
+  test_delegate_parameter_UX protocols

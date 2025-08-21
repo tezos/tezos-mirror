@@ -67,24 +67,6 @@ let () =
            (Unix.error_message code))
   | _ -> None
 
-let () =
-  (* The default allocation policy of Octez is "best-fit" which gives
-     the best compromise in terms of performances and memory
-     consumption. This default policy can be changed if the user set
-     an environment variable. *)
-  (* Any change to this constant should be replicated into the
-     external validator in [src/bin_validation/main_validator.ml]. *)
-  let default_allocation_policy = 2 in
-  let current = Gc.get () in
-  (match Sys.getenv_opt "OCAMLRUNPARAM" with
-  | None -> Gc.set {current with allocation_policy = default_allocation_policy}
-  | Some _ -> ()) ;
-  if (Gc.get ()).allocation_policy <> default_allocation_policy then
-    Format.eprintf
-      "WARNING: Default allocation policy changed: %d (default %d)@."
-      current.allocation_policy
-      default_allocation_policy
-
 (* This can be removed once the protocol is fixed
    (currently there is [to_int Int32.max_int] which is obviously invalid). *)
 let () =
@@ -107,11 +89,23 @@ let () =
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-validator" then
-    Tezos_validation.Command_line.run ()
+    Tezos_validation.Command_line.Validator.run ()
+
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-validator-hypervisor" then
+    Tezos_validation.Command_line.Hypervisor.run ()
 
 let () =
   if Filename.basename Sys.argv.(0) = "octez-rpc-process" then
     exit (Cmdliner.Cmd.eval Octez_rpc_process.Main.cmd)
+
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-rpc-process-watchdog-hypervisor"
+  then Octez_rpc_process.Command_line.Hypervisor.run ()
+
+let () =
+  if Filename.basename Sys.argv.(0) = "octez-rpc-process-watchdog" then
+    Octez_rpc_process.Command_line.Watchdog.run ()
 
 let term =
   let open Cmdliner.Term in
@@ -172,7 +166,10 @@ module Node_metrics_command = struct
     Format.printf "@]@." ;
     return_unit
 
-  let dump_metrics () = Tezos_base_unix.Event_loop.main_run (dump_metrics ())
+  let dump_metrics () =
+    Tezos_base_unix.Event_loop.main_run
+      ~process_name:"dump metrics"
+      dump_metrics
 
   module Term = struct
     let process _ = `Ok (dump_metrics ())
@@ -219,8 +216,10 @@ let commands =
       Node_reconstruct_command.cmd;
       Node_storage_command.cmd;
       Node_metrics_command.cmd;
+      Node_upnp_commands.cmd;
     ]
 
 let () =
   Random.self_init () ;
+  Memtrace.trace_if_requested () ;
   exit (Cmdliner.Cmd.eval commands)

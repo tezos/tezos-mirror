@@ -46,18 +46,20 @@ impl KernelsCache {
         self.0.insert(hash.as_bytes().to_owned(), kernel);
     }
 
-    pub fn load(&mut self, engine: &Engine, evm_tree: &EvmTree) -> Result<&Kernel, Error> {
+    pub fn load(&mut self, engine: &Engine, evm_tree: &EvmTree) -> Result<(&Kernel, bool), Error> {
         const KERNEL_PATH: &'static str = "/kernel/boot.wasm";
         let hash = bindings::store_get_hash(evm_tree, &KERNEL_PATH)?;
 
-        if self.miss(&hash) {
+        let missed = self.miss(&hash);
+
+        if missed {
             trace!("KernelsCache::load cache miss");
             let code = bindings::read_value(&evm_tree, KERNEL_PATH)?;
             let kernel = Kernel::new(engine, code.as_bytes())?;
             let _previous = self.insert(&hash, kernel);
         }
 
-        Ok(self.get(&hash))
+        Ok((self.get(&hash), missed))
     }
 }
 
@@ -150,9 +152,12 @@ pub fn wasm_runtime_run(
 }
 
 #[ocaml::func]
-#[ocaml::sig("context -> Irmin_context.tree -> unit")]
-pub fn wasm_runtime_preload_kernel(mut ctxt: Pointer<Context>, tree: EvmTree) -> Result<(), Error> {
+#[ocaml::sig("context -> Irmin_context.tree -> bool")]
+pub fn wasm_runtime_preload_kernel(
+    mut ctxt: Pointer<Context>,
+    tree: EvmTree,
+) -> Result<bool, Error> {
     let ctxt = ctxt.as_mut();
-    let _kernel = ctxt.kernels_cache.load(&ctxt.engine, &tree)?;
-    Ok(())
+    let (_kernel, loaded) = ctxt.kernels_cache.load(&ctxt.engine, &tree)?;
+    Ok(loaded)
 }

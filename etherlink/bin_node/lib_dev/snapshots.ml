@@ -9,10 +9,12 @@ open Snapshot_utils
 
 type error +=
   | Data_dir_populated of string
-  | File_not_found of string
   | Incorrect_rollup of Address.t * Address.t
   | Outdated_snapshot of Z.t * Z.t
   | Invalid_snapshot_file of string
+  | History_mode_mismatch of
+      Configuration.history_mode * Configuration.history_mode
+  | Invalid_snapshot_provider of string
 
 let () =
   register_error_kind
@@ -28,15 +30,6 @@ let () =
     Data_encoding.(obj1 (req "data_dir_already_populated" string))
     (function Data_dir_populated path -> Some path | _ -> None)
     (fun path -> Data_dir_populated path) ;
-  register_error_kind
-    `Permanent
-    ~id:"file_not_found"
-    ~title:"File not found"
-    ~description:"Raise an error when a file is not found"
-    ~pp:(fun ppf file -> Format.fprintf ppf "File %s is not found" file)
-    Data_encoding.(obj1 (req "file_not_found" string))
-    (function File_not_found file -> Some file | _ -> None)
-    (fun file -> File_not_found file) ;
   register_error_kind
     `Permanent
     ~id:"evm_incorrect_rollup"
@@ -65,8 +58,8 @@ let () =
     ~pp:(fun ppf (snap_level, exp_level) ->
       Format.fprintf
         ppf
-        "The snapshot is outdated (for level %a) while the \n\
-        \ existing EVM node is already at %a@."
+        "The snapshot is outdated (for level %a) while the existing EVM node \
+         is already at %a"
         Z.pp_print
         snap_level
         Z.pp_print
@@ -78,17 +71,40 @@ let () =
     `Permanent
     ~id:"evm_invalid_snapshot_file"
     ~title:"Invalid snapshot file path"
-    ~description:"The snapshot file path is invalid."
+    ~description:"The snapshot file path is invalid"
     ~pp:(fun ppf name ->
-      Format.fprintf
-        ppf
-        "%s is not a valid snapshot file name. It is likely because you are \
-         using an invalid string interpolation variable or have a trailing \
-         percent"
-        name)
+      Format.fprintf ppf "%s is not a valid snapshot file name." name)
     Data_encoding.(obj1 (req "snapshot_file" string))
     (function Invalid_snapshot_file name -> Some name | _ -> None)
-    (fun name -> Invalid_snapshot_file name)
+    (fun name -> Invalid_snapshot_file name) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_history_mode_mismatch"
+    ~title:"History mode mismatch"
+    ~description:"Configuration history mode does not match snapshot's."
+    ~pp:(fun ppf (config_mode, snapshot_mode) ->
+      Format.fprintf
+        ppf
+        "History mode values are: Configuration = %s; Snapshot = %s. Consider \
+         running with `--history-mode`."
+        (Configuration.string_of_history_mode_info config_mode)
+        (Configuration.string_of_history_mode_info snapshot_mode))
+    Data_encoding.(
+      obj2
+        (req "config_history_mode" Configuration.history_mode_encoding)
+        (req "snapshot_history_mode" Configuration.history_mode_encoding))
+    (function History_mode_mismatch (a1, a2) -> Some (a1, a2) | _ -> None)
+    (fun (a1, a2) -> History_mode_mismatch (a1, a2)) ;
+  register_error_kind
+    `Permanent
+    ~id:"evm_invalid_snapshot_provider"
+    ~title:"Invalid snapshot provider"
+    ~description:"The snapshot provider is invalid."
+    ~pp:(fun ppf name ->
+      Format.fprintf ppf "%s is not a valid snapshot provider name" name)
+    Data_encoding.(obj1 (req "snapshot_provider" string))
+    (function Invalid_snapshot_provider name -> Some name | _ -> None)
+    (fun name -> Invalid_snapshot_provider name)
 
 type compression = No | On_the_fly | After
 
@@ -162,113 +178,150 @@ end
 
 open Snapshot_utils.Make (Header)
 
-let interpolate_snapshot_file current_level rollup_address filename =
-  let percent = ('%', "%") in
-  let rollup_address_short = ('r', Address.to_short_b58check rollup_address) in
-  let rollup_address_long = ('R', Address.to_b58check rollup_address) in
-  let current_level =
-    ('l', Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
+let interpolate_snapshot_file current_level rollup_address history_mode filename
+    =
+  let rollup_address_short =
+    ('r', `Available (Address.to_short_b58check rollup_address))
   in
-  try
-    Ok
-      (Misc.interpolate
-         filename
-         [percent; rollup_address_short; rollup_address_long; current_level])
-  with _ -> Result_syntax.tzfail (Invalid_snapshot_file filename)
+  let rollup_address_long =
+    ('R', `Available (Address.to_b58check rollup_address))
+  in
+  let current_level =
+    ( 'l',
+      `Available (Format.asprintf "%a" Ethereum_types.pp_quantity current_level)
+    )
+  in
+  let history_mode =
+    ( 'h',
+      `Available
+        (Configuration.string_of_history_mode_info history_mode
+        |> String.lowercase_ascii) )
+  in
+  record_trace (Invalid_snapshot_file filename)
+  @@ Misc.interpolate
+       filename
+       [rollup_address_short; rollup_address_long; current_level; history_mode]
+
+let default_snapshot_file = "evm-%h-snapshot-%r-%l"
 
 let export ?snapshot_file ~compression ~data_dir () =
   let open Lwt_result_syntax in
   let* () = Data_dir.lock ~data_dir in
   let evm_state_path = Data_dir.store_path ~data_dir in
-  let* dest_file =
-    let evm_context_files =
-      Tezos_stdlib_unix.Utils.fold_files
-        evm_state_path
-        (fun relative_path acc ->
-          let full_path = Filename.concat evm_state_path relative_path in
-          (full_path, Filename.concat "store" relative_path) :: acc)
-        []
-    in
-    let files = evm_context_files in
-    (* Export SQLite database *)
-    Lwt_utils_unix.with_tempdir "evm_node_sqlite_export_" @@ fun tmp_dir ->
-    let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
-    let* {
-           rollup_address;
-           current_number = current_level;
-           legacy_block_storage;
-           history_mode;
-           first_number = first_level;
-         } =
-      Data_dir.export_store ~data_dir ~output_db_file
-    in
-    let header =
-      if legacy_block_storage then
-        Header.(V0_legacy {rollup_address; current_level})
-      else
-        Header.(V1 {rollup_address; current_level; history_mode; first_level})
-    in
-    let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
-    let writer =
-      match compression with
-      | On_the_fly -> gzip_writer
-      | No | After -> stdlib_writer
-    in
-    let*? dest_file =
-      let open Result_syntax in
-      match snapshot_file with
-      | Some f -> (
-          let+ f = interpolate_snapshot_file current_level rollup_address f in
-          match compression with
-          | No | On_the_fly -> f
-          | After -> f ^ ".uncompressed")
-      | None ->
-          let suffix =
-            match compression with
-            | On_the_fly -> ""
-            | No | After -> ".uncompressed"
-          in
-          let filename =
-            Format.asprintf
-              "evm-snapshot-%a-%a%s"
-              Address.pp_short
-              rollup_address
-              Ethereum_types.pp_quantity
-              current_level
-              suffix
-          in
-          return filename
-    in
-    let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
-    create stdlib_reader writer header ~files ~dest:dest_file ;
-    return dest_file
+
+  let evm_context_files =
+    Tezos_stdlib_unix.Utils.fold_files
+      evm_state_path
+      (fun relative_path acc ->
+        let full_path = Filename.concat evm_state_path relative_path in
+        (full_path, Filename.concat "store" relative_path) :: acc)
+      []
+  in
+  let files = evm_context_files in
+  (* Export SQLite database *)
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".evm_node_sqlite_export_"
+  @@ fun tmp_dir ->
+  let output_db_file = Filename.concat tmp_dir Evm_store.sqlite_file_name in
+  let* {
+         rollup_address;
+         current_number = current_level;
+         legacy_block_storage;
+         history_mode;
+         first_number = first_level;
+       } =
+    Data_dir.export_store ~data_dir ~output_db_file
+  in
+  let header =
+    if legacy_block_storage then
+      Header.(V0_legacy {rollup_address; current_level})
+    else Header.(V1 {rollup_address; current_level; history_mode; first_level})
+  in
+  let files = (output_db_file, Evm_store.sqlite_file_name) :: files in
+  let writer =
+    match compression with
+    | On_the_fly -> gzip_writer
+    | No | After -> stdlib_writer
   in
   let snapshot_file =
-    match compression with
-    | No | On_the_fly -> dest_file
-    | After -> compress ~snapshot_file:dest_file
+    match (snapshot_file, compression) with
+    | Some f, After -> f ^ ".uncompressed"
+    | Some f, (No | On_the_fly) -> f
+    | None, On_the_fly -> default_snapshot_file ^ ".gz"
+    | None, After -> default_snapshot_file ^ ".gz.uncompressed"
+    | None, No -> default_snapshot_file
   in
-  return snapshot_file
+  let*? extract_dest_file =
+    interpolate_snapshot_file
+      current_level
+      rollup_address
+      history_mode
+      snapshot_file
+  in
+  let dest_file =
+    Option.value
+      ~default:extract_dest_file
+      (Filename.chop_suffix_opt ~suffix:".uncompressed" extract_dest_file)
+  in
+  let*! () = Events.exporting_snapshot dest_file in
+  let tmp_dest = Filename.(Infix.(tmp_dir // basename extract_dest_file)) in
+  let*! () =
+    create
+      ~cancellable:true
+      ~display_progress:
+        (`Periodic_event (Events.still_exporting_snapshot dest_file))
+      writer
+      header
+      ~files
+      ~dest:tmp_dest
+      ()
+  in
+  let*! tmp_dest =
+    match compression with
+    | No | On_the_fly -> Lwt.return tmp_dest
+    | After ->
+        let*! () = Events.compressing_snapshot dest_file in
+        compress
+          ~cancellable:true
+          ~display_progress:
+            (`Periodic_event (Events.still_compressing_snapshot dest_file))
+          ~snapshot_file:tmp_dest
+          ()
+  in
 
-let check_snapshot_exists snapshot_file =
-  let open Lwt_result_syntax in
-  let*! snapshot_file_exists = Lwt_unix.file_exists snapshot_file in
-  fail_when (not snapshot_file_exists) (File_not_found snapshot_file)
+  let*! () = Lwt_utils_unix.create_dir (Filename.dirname dest_file) in
+  let*! () = Lwt_unix.rename tmp_dest dest_file in
+  let*! () = Events.finished_exporting_snapshot dest_file in
+  return dest_file
 
-let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
-    =
+let check_header ~populated ~force ~data_dir (header : Header.t) :
+    unit tzresult Lwt.t =
   let open Lwt_result_syntax in
-  let header_rollup_address, Qty header_current_level, header_history =
+  let ( header_rollup_address,
+        Qty header_current_level,
+        header_history,
+        header_legacy ) =
     match header with
     | V0_legacy {rollup_address; current_level} ->
-        (rollup_address, current_level, None)
+        (rollup_address, current_level, None, true)
     | V1 {rollup_address; current_level; history_mode; first_level} ->
-        (rollup_address, current_level, Some (history_mode, first_level))
+        (rollup_address, current_level, Some (history_mode, first_level), false)
+  in
+  let* () =
+    if (not populated) && header_legacy && not force then
+      failwith
+        "Snapshot uses legacy block storage, please import a snapshot \
+         generated from a more recent node (or use --force to still import the \
+         legacy snapshot)."
+    else if header_legacy then
+      let*! () = Events.importing_legacy_snapshot () in
+      return_unit
+    else return_unit
   in
   when_ populated @@ fun () ->
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.find conn in
+  let* legacy = Evm_store.Block_storage_mode.legacy conn in
   let* () =
     match metadata with
     | None -> return_unit
@@ -276,6 +329,17 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
         fail_unless
           Address.(header_rollup_address = r)
           (Incorrect_rollup (header_rollup_address, r))
+  in
+  let* () =
+    match (header_legacy, legacy) with
+    | true, _ ->
+        (* Legacy block storage will be replaced with new block storage *)
+        return_unit
+    | false, false -> return_unit
+    | false, true ->
+        failwith
+          "Snapshot uses legacy block storage but already populated with new \
+           Sqlite3 block storage"
   in
   let* () =
     match (header_history, metadata) with
@@ -317,14 +381,32 @@ let check_header ~populated ~data_dir (header : Header.t) : unit tzresult Lwt.t
   in
   return_unit
 
-let import ~cancellable ~force ~data_dir ~snapshot_file =
+let info ~snapshot_file =
+  with_open_snapshot ~progress:false snapshot_file
+  @@ fun snapshot_header snapshot_input ->
+  let format = input_format snapshot_input in
+  Lwt_result_syntax.return (snapshot_header, format)
+
+let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
   let open Lwt_result_syntax in
   let open Filename.Infix in
+  Data_dir.use ~data_dir @@ fun () ->
+  let*! () = Events.importing_snapshot snapshot_file in
+  Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
+  @@ fun dest ->
+  with_open_snapshot ~progress:true snapshot_file
+  @@ fun header snapshot_input ->
+  let* store_history_mode =
+    match (history_mode, header) with
+    | Some h1, V1 {history_mode = h2; _} ->
+        if Configuration.history_mode_partial_eq h1 h2 then return_some h1
+        else tzfail (History_mode_mismatch (h1, h2))
+    | _ -> return_none
+  in
   let*! populated = Data_dir.populated ~data_dir in
   let*? () =
     error_when ((not force) && populated) (Data_dir_populated data_dir)
   in
-  let* () = check_snapshot_exists snapshot_file in
   let*! () = Lwt_utils_unix.create_dir data_dir in
   let* () = Data_dir.lock ~data_dir in
   let* () =
@@ -335,58 +417,84 @@ let import ~cancellable ~force ~data_dir ~snapshot_file =
     let*! () = Lwt_utils_unix.remove_dir (Data_dir.store_path ~data_dir) in
     return_unit
   in
-  let reader =
-    if Snapshot_utils.is_compressed_snapshot snapshot_file then gzip_reader
-    else stdlib_reader
+  let* () = check_header ~force ~populated ~data_dir header in
+  let*! is_tty = Lwt_unix.isatty Lwt_unix.stderr in
+  (* We always emit the importing event for local files. For remote files, we
+     only show the event if the output is not a TTY because if it is, the
+     progress bar will already be shown, and if it's not, no progress indicator
+     would be logged otherwise. *)
+  let archive_name, emit_event =
+    match input_source snapshot_input with
+    | `Local s -> (s, true)
+    | `Remote s -> (s, not is_tty)
+    | `Stdin -> ("(stdin)", true)
+  in
+  let*! () =
+    extract
+      snapshot_input
+      ~cancellable:true
+      ~display_progress:
+        (`Periodic_event
+          (fun elapsed_time ->
+            if emit_event then
+              Events.import_snapshot_archive_in_progress
+                ~archive_name
+                ~elapsed_time
+            else Lwt.return_unit))
+        (* [progress] modifies the signal handlers, which are necessary for
+           [Lwt_exit] to work. As a consequence, if we want to be
+           cancellable, we cannot have display bar. *)
+      ~dest
+  in
+  Unix.rename
+    (Data_dir.store_path ~data_dir:dest)
+    (Data_dir.store_path ~data_dir) ;
+  let rm f =
+    try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
+  in
+  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
+  rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
+  Unix.rename
+    (dest // Evm_store.sqlite_file_name)
+    (data_dir // Evm_store.sqlite_file_name) ;
+  let*! () = Events.import_finished () in
+  return store_history_mode
+
+let interpolate_snapshot_provider ?rollup_address ?network history_mode provider
+    =
+  let inferred_rollup_address = Option.map Constants.rollup_address network in
+  let reason = "try specifying the network with --network" in
+  let rollup_address_short, rollup_address_long =
+    match (rollup_address, inferred_rollup_address) with
+    | Some rollup_address, _ | None, Some rollup_address ->
+        ( ( 'r',
+            `Available
+              (Tezos_crypto.Hashed.Smart_rollup_address.to_short_b58check
+                 rollup_address) ),
+          ( 'R',
+            `Available
+              (Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
+                 rollup_address) ) )
+    | None, None -> (('r', `Disabled reason), ('R', `Disabled reason))
+  in
+  let history_mode =
+    ( 'h',
+      `Available
+        (Configuration.string_of_history_mode_info history_mode
+        |> String.lowercase_ascii) )
+  in
+  let network =
+    match
+      (network, Option.bind rollup_address Constants.network_of_address)
+    with
+    | Some n, _ | None, Some n ->
+        ( 'n',
+          `Available (Format.asprintf "%a" Configuration.pp_supported_network n)
+        )
+    | None, None -> ('n', `Disabled reason)
   in
 
-  let display_progress = not cancellable in
-
-  let start_time = Ptime_clock.now () in
-  let rec periodic_emit () =
-    let*! () = Lwt_unix.sleep 60.0 in
-    let elapsed_time = Ptime.diff (Ptime_clock.now ()) start_time in
-    let*! () =
-      Events.extract_snapshot_archive_in_progress
-        ~archive_name:snapshot_file
-        ~elapsed_time
-    in
-    periodic_emit ()
-  in
-  let extract_snapshot_archive =
-    Lwt_utils_unix.with_tempdir ~temp_dir:data_dir ".octez_evm_node_import_"
-    @@ fun dest ->
-    let* _snapshot_header, () =
-      extract
-        reader
-        stdlib_writer
-        (check_header ~populated ~data_dir)
-        ~cancellable
-        ~display_progress
-          (* [progress] modifies the signal handlers, which are necessary for
-             [Lwt_exit] to work. As a consequence, if we want to be
-             cancellable, we cannot have display bar. *)
-        ~snapshot_file
-        ~dest
-    in
-    Unix.rename
-      (Data_dir.store_path ~data_dir:dest)
-      (Data_dir.store_path ~data_dir) ;
-    let rm f =
-      try Unix.unlink f with Unix.Unix_error (Unix.ENOENT, _, _) -> ()
-    in
-    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-shm" ;
-    rm @@ (data_dir // Evm_store.sqlite_file_name) ^ "-wal" ;
-    Unix.rename
-      (dest // Evm_store.sqlite_file_name)
-      (data_dir // Evm_store.sqlite_file_name) ;
-    return_unit
-  in
-  if display_progress then extract_snapshot_archive
-  else Lwt.pick [extract_snapshot_archive; periodic_emit ()]
-
-let info ~snapshot_file =
-  let compressed = is_compressed_snapshot snapshot_file in
-  let reader = if compressed then gzip_reader else stdlib_reader in
-  let snapshot_header = read_header reader ~snapshot_file in
-  (snapshot_header, if compressed then `Compressed else `Uncompressed)
+  record_trace (Invalid_snapshot_provider provider)
+  @@ Misc.interpolate
+       provider
+       [rollup_address_short; rollup_address_long; history_mode; network]

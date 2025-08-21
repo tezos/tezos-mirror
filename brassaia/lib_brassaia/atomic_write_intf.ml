@@ -33,7 +33,7 @@ module type S = sig
   val set : t -> key -> value -> unit Lwt.t
   (** [set t k v] replaces the contents of [k] by [v] in [t]. If [k] is not
       already defined in [t], create a fresh binding. Raise [Invalid_argument]
-      if [k] is the {{!Brassaia.Path.S.empty} empty path}. *)
+      if [k] is the {{!Brassaia_eio.Brassaia.Path.S.empty} empty path}. *)
 
   val test_and_set :
     t -> key -> test:value option -> set:value option -> bool Lwt.t

@@ -160,7 +160,18 @@ struct
           return_some signature
       | None -> return_none
 
-    let sign ?watermark uri msg =
+    let list_known_keys base =
+      RPC_client.call_service
+        ~logger:P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base
+        Signer_services.known_keys
+        ()
+        ()
+        ()
+
+    let sign ?version ?watermark uri msg =
       let open Lwt_result_syntax in
       let* base, pkh = parse (uri : sk_uri :> Uri.t) in
       let msg =
@@ -177,7 +188,7 @@ struct
         ~base
         Signer_services.sign
         ((), pkh)
-        signature
+        (signature, version)
         msg
 
     let deterministic_nonce uri msg =
@@ -226,6 +237,19 @@ struct
       | Ok ans -> return ans
       | Error (Tezos_rpc.Context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
+
+    let bls_prove_possession ?override_pk uri =
+      let open Lwt_result_syntax in
+      let* base, pkh = parse (uri : sk_uri :> Uri.t) in
+      RPC_client.call_service
+        ~logger:P.logger
+        ?headers
+        Media_type.all_media_types
+        ~base
+        Signer_services.bls_prove_possession
+        ((), pkh)
+        override_pk
+        ()
   end
 
   let make_base host port = Uri.make ~scheme ~host ~port ()

@@ -167,6 +167,16 @@ module type METHOD = sig
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+(* A simple equality check for two (module METHOD) values by comparing the method_ field. *)
+let equal_method (module M1 : METHOD) (module M2 : METHOD) =
+  M1.method_ = M2.method_
+
+let get_diff (list1 : (module METHOD) list) (list2 : (module METHOD) list) :
+    (module METHOD) list =
+  List.filter
+    (fun m1 -> not (List.exists (fun m2 -> equal_method m1 m2) list2))
+    list1
+
 let encoding_with_optional_extended_block_param encoding =
   Evm_node_lib_dev_encoding.Helpers.encoding_with_optional_last_param
     encoding
@@ -207,6 +217,22 @@ module Kernel_root_hash = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Generic_block_number = struct
+  open Ethereum_types
+
+  type input = unit
+
+  type output = quantity
+
+  let input_encoding = Data_encoding.unit
+
+  let output_encoding = quantity_encoding
+
+  let method_ = "tez_blockNumber"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Network_id = struct
   type input = unit
 
@@ -224,13 +250,27 @@ end
 module Chain_id = struct
   type input = unit
 
-  type output = Ethereum_types.chain_id
+  type output = L2_types.chain_id
 
   let input_encoding = Data_encoding.unit
 
-  let output_encoding = Ethereum_types.Chain_id.encoding
+  let output_encoding = L2_types.Chain_id.encoding
 
   let method_ = "eth_chainId"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+module Chain_family = struct
+  type input = L2_types.chain_id
+
+  type output = L2_types.ex_chain_family
+
+  let input_encoding = Data_encoding.tup1 L2_types.Chain_id.encoding
+
+  let output_encoding = L2_types.Chain_family.encoding
+
+  let method_ = "tez_chainFamily"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -481,6 +521,36 @@ module Get_transaction_receipt = struct
   let output_encoding = Data_encoding.option Transaction_receipt.encoding
 
   let method_ = "eth_getTransactionReceipt"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
+type gas_info = {
+  execution_gas : Ethereum_types.quantity;
+  inclusion_gas : Ethereum_types.quantity;
+}
+
+let gas_info_encoding =
+  Data_encoding.(
+    conv
+      (fun {execution_gas; inclusion_gas} -> (execution_gas, inclusion_gas))
+      (fun (execution_gas, inclusion_gas) -> {execution_gas; inclusion_gas})
+    @@ obj2
+         (req "execution_gas" Ethereum_types.quantity_encoding)
+         (req "inclusion_gas" Ethereum_types.quantity_encoding))
+
+module Get_transaction_gas_info = struct
+  open Ethereum_types
+
+  type input = hash
+
+  type output = gas_info option
+
+  let input_encoding = Data_encoding.tup1 hash_encoding
+
+  let output_encoding = Data_encoding.option gas_info_encoding
+
+  let method_ = "tez_getTransactionGasInfo"
 
   type ('input, 'output) method_ += Method : (input, output) method_
 end
@@ -773,6 +843,20 @@ module Inject_transaction = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+module Inject_tezlink_operation = struct
+  type input = Tezos_types.Operation.t * bytes
+
+  type output = Ethereum_types.hash
+
+  let input_encoding = Data_encoding.(tup2 Tezos_types.Operation.encoding bytes)
+
+  let output_encoding = Ethereum_types.hash_encoding
+
+  let method_ = "injectTezlinkOperation"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Durable_state_value = struct
   type input =
     Durable_storage_path.path * Ethereum_types.Block_parameter.extended
@@ -890,6 +974,40 @@ module Trace_block = struct
   type ('input, 'output) method_ += Method : (input, output) method_
 end
 
+type l1_block_l2_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
+}
+
+module Get_finalized_blocks_of_l1_level = struct
+  type input = int32
+
+  type output = l1_block_l2_levels
+
+  let input_encoding = Data_encoding.int32
+
+  let output_encoding =
+    let open Data_encoding in
+    conv
+      (fun {start_l2_level; end_l2_level} -> (start_l2_level, end_l2_level))
+      (fun (start_l2_level, end_l2_level) -> {start_l2_level; end_l2_level})
+    @@ obj2
+         (req
+            "startBlockNumber"
+            ~description:
+              "Level of finalized L2 block before application of the L1 block"
+            Ethereum_types.quantity_encoding)
+         (req
+            "endBlockkNumber"
+            ~description:
+              "Level of finalized L2 block after application of the L1 block"
+            Ethereum_types.quantity_encoding)
+
+  let method_ = "tez_getFinalizedBlocksOfL1Level"
+
+  type ('input, 'output) method_ += Method : (input, output) method_
+end
+
 module Eth_fee_history = struct
   open Ethereum_types
 
@@ -965,12 +1083,19 @@ type map_result =
   | Unknown
   | Disabled
 
-let supported_methods : (module METHOD) list =
+let evm_supported_methods : (module METHOD) list =
   [
+    (* Generic rpcs *)
+    (module Generic_block_number);
     (module Kernel_version);
     (module Kernel_root_hash);
     (module Network_id);
     (module Chain_id);
+    (module Chain_family);
+    (module Durable_state_value);
+    (module Durable_state_subkeys);
+    (module Get_finalized_blocks_of_l1_level);
+    (* Etherlink rpcs *)
     (module Accounts);
     (module Get_balance);
     (module Get_storage_at);
@@ -986,6 +1111,7 @@ let supported_methods : (module METHOD) list =
     (module Get_logs);
     (module Get_uncle_count_by_block_hash);
     (module Get_uncle_count_by_block_number);
+    (module Get_transaction_gas_info);
     (module Get_transaction_receipt);
     (module Get_transaction_by_hash);
     (module Get_transaction_by_block_hash_and_index);
@@ -1001,8 +1127,6 @@ let supported_methods : (module METHOD) list =
     (module Produce_block);
     (module Produce_proposal);
     (module Inject_transaction);
-    (module Durable_state_value);
-    (module Durable_state_subkeys);
     (module Eth_max_priority_fee_per_gas);
     (module Replay_block);
     (module Trace_transaction);
@@ -1014,7 +1138,7 @@ let supported_methods : (module METHOD) list =
     (module Trace_block);
   ]
 
-let unsupported_methods : string list =
+let evm_unsupported_methods : string list =
   [
     (* net *)
     "net_listening";
@@ -1062,7 +1186,44 @@ let unsupported_methods : string list =
     "engine_newPayloadV4";
   ]
 
-let map_method_name ~restrict method_name =
+let michelson_supported_methods = evm_supported_methods
+
+let multichain_sequencer_supported_methods : (module METHOD) list =
+  [
+    (module Generic_block_number);
+    (module Send_raw_transaction);
+    (* Private RPCs *)
+    (module Produce_block);
+    (module Inject_transaction);
+    (module Inject_tezlink_operation);
+    (module Durable_state_value);
+    (module Durable_state_subkeys);
+    (module Replay_block);
+  ]
+
+let michelson_unsupported_methods = evm_unsupported_methods
+
+let multichain_sequencer_unsupported_methods =
+  let diff_methods =
+    get_diff evm_supported_methods multichain_sequencer_supported_methods
+  in
+  let diff_method_names =
+    List.map (fun (module M : METHOD) -> M.method_) diff_methods
+  in
+  evm_unsupported_methods @ diff_method_names
+
+let map_method_name (type f)
+    ~(rpc_server_family : f Rpc_types.rpc_server_family) ~restrict method_name =
+  let supported_methods, unsupported_methods =
+    match rpc_server_family with
+    | Rpc_types.Multichain_sequencer_rpc_server ->
+        ( multichain_sequencer_supported_methods,
+          multichain_sequencer_unsupported_methods )
+    | Rpc_types.Single_chain_node_rpc_server EVM ->
+        (evm_supported_methods, evm_unsupported_methods)
+    | Rpc_types.Single_chain_node_rpc_server Michelson ->
+        (michelson_supported_methods, michelson_unsupported_methods)
+  in
   let disabled =
     match restrict with
     | Configuration.Pattern {regex; _} -> Re.execp regex method_name

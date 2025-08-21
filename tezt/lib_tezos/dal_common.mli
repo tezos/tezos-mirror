@@ -34,7 +34,6 @@ module Parameters : sig
     number_of_slots : int;
     attestation_lag : int;
     attestation_threshold : int;
-    blocks_per_epoch : int;
   }
 
   val parameter_file : Protocol.t -> string Lwt.t
@@ -49,7 +48,7 @@ module Parameters : sig
      data about attested slots assuming the node supports refutations and it has
      been start sufficiently far in the past. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+     [Daemon.get_storage_period] in src/lib_dal_node/. *)
   val full_storage_period_with_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 
@@ -57,7 +56,7 @@ module Parameters : sig
      data about attested slots assuming the node supports refutations and it
      hash just been started. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_storage_period] in src/bin_dal_node/. *)
+     [Daemon.get_storage_period] in src/lib_dal_node/. *)
   val initial_storage_period_with_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 
@@ -65,7 +64,7 @@ module Parameters : sig
      data about attested slots assuming the node does not supports
      refutations. See the functions
      [Profile_manager.get_attested_data_default_store_period] and
-     [Daemon.get_proto_plugins] src/bin_dal_node/. *)
+     [Daemon.get_proto_plugins] src/lib_dal_node/. *)
   val storage_period_without_refutation_in_cycles :
     proto_parameters:JSON.t -> int
 end
@@ -101,11 +100,8 @@ module Helpers : sig
      mode. *)
   val init_prover : ?__LOC__:string -> unit -> unit Lwt.t
 
-  (** Generates a random string (with chars from 'a' to 'z') of size
-      [slot_size]. *)
-  val generate_slot : slot_size:int -> bytes
-
   val get_commitment_and_shards_with_proofs :
+    ?precomputation:Cryptobox.shards_proofs_precomputation ->
     Cryptobox.t ->
     slot:bytes ->
     Cryptobox.commitment
@@ -118,6 +114,7 @@ module Helpers : sig
     ?force:bool ->
     ?source:Account.key ->
     ?fee:int ->
+    ?gas_limit:int ->
     ?error:rex ->
     index:int ->
     commitment:Cryptobox.commitment ->
@@ -141,28 +138,13 @@ module Helpers : sig
     ?counter:int ->
     ?force:bool ->
     ?fee:int ->
+    ?gas_limit:int ->
     Client.t ->
     Dal_node.t ->
     Account.key ->
     index:int ->
     slot ->
     string Lwt.t
-
-  val pp_cryptobox_error :
-    Format.formatter ->
-    [ `Fail of string
-    | `Invalid_degree_strictly_less_than_expected of 'a
-    | `Invalid_page
-    | `Invalid_shard_length of string
-    | `Not_enough_shards of string
-    | `Page_index_out_of_range
-    | `Page_length_mismatch
-    | `Shard_index_out_of_range of string
-    | `Slot_wrong_size of string
-    | `Shard_length_mismatch
-    | `Prover_SRS_not_loaded
-    | `Invalid_shard ] ->
-    unit
 
   (* A helper function to wait for an event emitted by gs_logging.ml *)
   val wait_for_gossipsub_worker_event :
@@ -204,16 +186,16 @@ module RPC : sig
   type commitment = string
 
   (** Profiles that operate on shards/slots. *)
-  type operator_profile =
+  type controller_profile =
     | Attester of string
-    | Producer of int
+    | Operator of int
     | Observer of int
 
-  (** List of operator profiles.  *)
-  type operator_profiles = operator_profile list
+  (** List of controller profiles.  *)
+  type controller_profiles = controller_profile list
 
   (* Profiles tracked by the DAL node. *)
-  type profile = Bootstrap | Operator of operator_profiles
+  type profile = Bootstrap | Controller of controller_profiles
 
   (** Information contained in a slot header fetched from the DAL node. *)
   type slot_header = {
@@ -259,7 +241,7 @@ module RPC : sig
 
   (**  Call RPC "PATCH /profiles" to update the list of profiles tracked by
          the DAL node. *)
-  val patch_profiles : operator_profiles -> unit RPC_core.t
+  val patch_profiles : controller_profiles -> unit RPC_core.t
 
   (**  Call RPC "GET /profiles" to retrieve the list of profiles tracked by
          the DAL node. *)

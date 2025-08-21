@@ -7,7 +7,7 @@
 (*****************************************************************************)
 
 let prepare_and_forge_tx ?to_ ?data ~gas_limit ~base_fee_per_gas ~chain_id
-    ~nonce ~value ~sk () =
+    ~nonce ~value ~signer () =
   let open Efunc_core in
   let unsigned =
     Eth.
@@ -28,13 +28,13 @@ let prepare_and_forge_tx ?to_ ?data ~gas_limit ~base_fee_per_gas ~chain_id
       }
   in
   let ti_signature =
-    Some (Crypto.sign sk (Rope.to_string (Forge.transaction unsigned)))
+    Some (Signer.sign signer (Rope.to_string (Forge.transaction unsigned)))
   in
   Evm.of_rope @@ Forge.transaction {unsigned with ti_signature}
 
 let transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
   let nonce = Option.value nonce ~default:from.Account.nonce |> Z.to_int in
-  let (Ethereum_types.Chain_id chain_id) = infos.Network_info.chain_id in
+  let (L2_types.Chain_id chain_id) = infos.Network_info.chain_id in
   let txn =
     prepare_and_forge_tx
       ?to_
@@ -44,7 +44,7 @@ let transfer ?nonce ?to_ ?data ~value ~gas_limit ~infos ~from () =
       ~base_fee_per_gas:infos.base_fee_per_gas
       ~chain_id:(Z.to_int chain_id)
       ~nonce
-      ~sk:from.secret_key
+      ~signer:from.signer
       ()
   in
   Ethereum_types.Hex (txn :> string)

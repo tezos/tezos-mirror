@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -466,7 +466,6 @@ module Pipeline = struct
                     name = None;
                     auto_cancel = None;
                   };
-                Variables [("PIPELINE_TYPE", name)];
               ])
       @ [Stages (stages pipeline)]
     in
@@ -733,14 +732,12 @@ type tag =
   | Gcp_dev_arm64
   | Gcp_tezt
   | Gcp_tezt_dev
-  | Gcp_tezt_memory_3k
-  | Gcp_tezt_memory_3k_dev
-  | Gcp_tezt_memory_4k
-  | Gcp_tezt_memory_4k_dev
   | Gcp_high_cpu
   | Gcp_high_cpu_dev
   | Gcp_very_high_cpu
   | Gcp_very_high_cpu_dev
+  | Gcp_very_high_cpu_ramfs
+  | Gcp_very_high_cpu_ramfs_dev
   | Aws_specific
   | Dynamic
 
@@ -751,24 +748,21 @@ let string_of_tag = function
   | Gcp_dev_arm64 -> "gcp_dev_arm64"
   | Gcp_tezt -> "gcp_tezt"
   | Gcp_tezt_dev -> "gcp_tezt_dev"
-  | Gcp_tezt_memory_3k -> "gcp_tezt_memory_3k"
-  | Gcp_tezt_memory_3k_dev -> "gcp_tezt_memory_3k_dev"
-  | Gcp_tezt_memory_4k -> "gcp_tezt_memory_4k"
-  | Gcp_tezt_memory_4k_dev -> "gcp_tezt_memory_4k_dev"
   | Gcp_high_cpu -> "gcp_high_cpu"
   | Gcp_high_cpu_dev -> "gcp_high_cpu_dev"
   | Gcp_very_high_cpu -> "gcp_very_high_cpu"
   | Gcp_very_high_cpu_dev -> "gcp_very_high_cpu_dev"
+  | Gcp_very_high_cpu_ramfs -> "gcp_very_high_cpu_ramfs"
+  | Gcp_very_high_cpu_ramfs_dev -> "gcp_very_high_cpu_ramfs_dev"
   | Aws_specific -> "aws_specific"
   | Dynamic -> Gitlab_ci.Var.encode dynamic_tag_var
 
 (** The architecture of the runner associated to a tag . *)
 let arch_of_tag = function
   | Gcp_arm64 | Gcp_dev_arm64 -> Some Arm64
-  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_tezt_memory_3k
-  | Gcp_tezt_memory_3k_dev | Gcp_tezt_memory_4k | Gcp_tezt_memory_4k_dev
-  | Gcp_high_cpu | Gcp_high_cpu_dev | Gcp_very_high_cpu | Gcp_very_high_cpu_dev
-  | Aws_specific ->
+  | Gcp | Gcp_dev | Gcp_tezt | Gcp_tezt_dev | Gcp_high_cpu | Gcp_high_cpu_dev
+  | Gcp_very_high_cpu | Gcp_very_high_cpu_dev | Gcp_very_high_cpu_ramfs
+  | Gcp_very_high_cpu_ramfs_dev | Aws_specific ->
       Some Amd64
   | Dynamic -> None
 
@@ -830,37 +824,71 @@ type cpu =
   | High  (** Target GCP high runner pool. *)
   | Very_high  (** Target GCP very high runner pool. *)
 
+(** The list of storage profiling tags for runners. *)
+type storage =
+  | Network  (** Target default storage runner pool. *)
+  | Ramfs  (** Target ramfs storage runner pool. *)
+
 let enc_git_strategy = function
   | Fetch -> "fetch"
   | Clone -> "clone"
   | No_strategy -> "none"
 
-let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
-    ?id_tokens ?interruptible ?(dependencies = Staged [])
+let job ?arch ?after_script ?allow_failure ?artifacts ?(before_script = [])
+    ?cache ?id_tokens ?interruptible ?(dependencies = Staged [])
     ?(image_dependencies = []) ?services ?variables ?rules
-    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal) ?git_strategy
-    ?coverage ?retry ?parallel ?description ~__POS__ ?image ?template ~stage
-    ~name script : tezos_job =
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?tag ?(cpu = Normal)
+    ?(storage = Network) ?git_strategy ?coverage ?retry ?parallel ?description
+    ?(dev_infra = false) ~__POS__ ?image ?template ~stage ~name script :
+    tezos_job =
   (* The tezos/tezos CI uses singleton tags for its runners. *)
   let tag =
-    match (arch, tag, cpu) with
-    | Some _, Some _, High
-    | None, Some _, High
-    | Some _, None, High
-    | None, None, High ->
-        Gcp_high_cpu
-    | Some _, Some _, Very_high
-    | None, Some _, Very_high
-    | Some _, None, Very_high
-    | None, None, Very_high ->
-        Gcp_very_high_cpu
-    | Some arch, None, Normal -> (
-        match arch with Amd64 -> Gcp | Arm64 -> Gcp_arm64)
-    | None, Some tag, Normal -> tag
-    | None, None, Normal ->
+    match (arch, tag, cpu, storage) with
+    | Some Arm64, _, (High | Very_high), _ ->
+        failwith
+          "[job] cannot specify both [arch=Arm64] and [cpu=High] or \
+           [cpu=Very_high] in job '%s'."
+          name
+    | Some Arm64, _, _, Network ->
+        failwith
+          "[job] cannot specify both [arch=Arm64] and [storage=Network] in job \
+           '%s'."
+          name
+    | None, None, Normal, Ramfs ->
+        failwith
+          "[job] cannot specify both [cpu=Normal] and [storage=Ramfs] in job \
+           '%s'."
+          name
+    | None, _, High, Ramfs | Some _, _, High, Ramfs ->
+        failwith
+          "[job] cannot specify both [cpu=High] and [storage=Ramfs] in job \
+           '%s'."
+          name
+    | Some _, Some _, High, Network
+    | None, Some _, High, Network
+    | Some _, None, High, Network
+    | None, None, High, Network ->
+        if dev_infra then Gcp_high_cpu_dev else Gcp_high_cpu
+    | Some _, Some _, Very_high, Network
+    | None, Some _, Very_high, Network
+    | Some _, None, Very_high, Network
+    | None, None, Very_high, Network ->
+        if dev_infra then Gcp_very_high_cpu_dev else Gcp_very_high_cpu
+    | Some _, Some _, Very_high, Ramfs
+    | None, Some _, Very_high, Ramfs
+    | Some _, None, Very_high, Ramfs
+    | None, None, Very_high, Ramfs ->
+        if dev_infra then Gcp_very_high_cpu_ramfs_dev
+        else Gcp_very_high_cpu_ramfs
+    | Some arch, None, Normal, _ -> (
+        match arch with
+        | Amd64 -> if dev_infra then Gcp_dev else Gcp
+        | Arm64 -> Gcp_arm64)
+    | None, Some tag, _, _ -> tag
+    | None, None, Normal, Network ->
         (* By default, we assume Amd64 runners as given by the [gcp] tag. *)
         Gcp
-    | Some _, Some _, Normal ->
+    | Some _, Some _, Normal, _ ->
         failwith
           "[job] cannot specify both [arch] and [tags] at the same time in job \
            '%s'."
@@ -968,7 +996,9 @@ let job ?arch ?after_script ?allow_failure ?artifacts ?before_script ?cache
       after_script;
       allow_failure;
       artifacts;
-      before_script;
+      (* Sending job-level info to Datadog is done first. This step should never fail, even if [datadog-ci] is not installed in the image running the job. *)
+      before_script =
+        Some (". ./scripts/ci/datadog_send_job_info.sh" :: before_script);
       cache;
       id_tokens;
       image = Option.map Image.image image;
@@ -1023,6 +1053,7 @@ let trigger_job ?(dependencies = Staged []) ?rules ?description ~__POS__ ~stage
       ?inherit_
       ?rules
       ~stage:(Stage.name stage)
+      ~variables:[("PIPELINE_TYPE", child_pipeline_name)]
       ~name:job_name
       (Pipeline.path ~name:child_pipeline_name)
   in
@@ -1119,6 +1150,11 @@ let add_artifacts ?name ?expose_as ?reports ?expire_in ?when_ paths
               "coverage_report"
               reports1.coverage_report
               reports2.coverage_report;
+          container_scanning =
+            opt_combine_fail
+              "container_scanning"
+              reports1.container_scanning
+              reports2.container_scanning;
         }
       in
       {
@@ -1287,21 +1323,9 @@ module Stages = struct
 
   let packaging = Stage.register "packaging"
 
-  let publishing = Stage.register "publishing"
+  let publish = Stage.register "publish"
 
   let publishing_tests = Stage.register "publishing_tests"
-
-  let doc = Stage.register "doc"
-
-  let scan = Stage.register "scan"
-
-  let prepare_release = Stage.register "prepare_release"
-
-  let publish_release_gitlab = Stage.register "publish_release_gitlab"
-
-  let publish_release = Stage.register "publish_release"
-
-  let publish_package_gitlab = Stage.register "publish_package_gitlab"
 
   let manual = Stage.register "manual"
 end
@@ -1324,7 +1348,7 @@ module Images_external = struct
      This image is defined in {{:https://gitlab.com/tezos/docker-images/ci-docker}tezos/docker-images/ci-docker}. *)
   let docker =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0"
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0"
 
   (* Image used in initial pipeline job that sends to Datadog useful
      info for CI visibility.
@@ -1362,7 +1386,7 @@ module Images_external = struct
 
   let ci_release =
     Image.mk_external
-      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0"
+      ~image_path:"${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0"
 
   let hadolint = Image.mk_external ~image_path:"hadolint/hadolint:2.12.0-alpine"
 
@@ -1381,6 +1405,10 @@ module Images_external = struct
      - https://docs.gitlab.com/ee/ci/runners/hosted_runners/macos.html#supported-macos-images
      - https://gitlab-org.gitlab.io/ci-cd/shared-runners/images/macos-image-inventory/macos-14-xcode-15/ *)
   let macosx_14 = Image.mk_external ~image_path:"macos-14-xcode-15"
+
+  (* Image used in [schedule_security_scans] pipeline. Trivy scans
+     Docker images and codebase for CVEs and SBOMs. *)
+  let trivy = Image.mk_external ~image_path:"aquasec/trivy:latest"
 end
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
@@ -1400,8 +1428,8 @@ let opt_var name f = function Some value -> [(name, f value)] | None -> []
     [CI_DOCKER_AUTH] contains the appropriate credentials. *)
 let job_docker_authenticated ?(skip_docker_initialization = false)
     ?ci_docker_hub ?artifacts ?(variables = []) ?rules ?dependencies
-    ?image_dependencies ?arch ?tag ?allow_failure ?parallel ?timeout ?retry
-    ?description ~__POS__ ~stage ~name script : tezos_job =
+    ?image_dependencies ?arch ?storage ?tag ?allow_failure ?parallel ?timeout
+    ?retry ?description ?dev_infra ~__POS__ ~stage ~name script : tezos_job =
   let docker_version = "24.0.7" in
   job
     ?rules
@@ -1409,12 +1437,14 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ?image_dependencies
     ?artifacts
     ?arch
+    ?storage
     ?tag
     ?allow_failure
     ?parallel
     ?timeout
     ?retry
     ?description
+    ?dev_infra
     ~__POS__
     ~image:Images_external.docker
     ~variables:
@@ -1429,6 +1459,63 @@ let job_docker_authenticated ?(skip_docker_initialization = false)
     ~stage
     ~name
     script
+
+(** {2 Caches} *)
+
+let enable_sccache ?key ?error_log ?idle_timeout ?log
+    ?(path = "$CI_PROJECT_DIR/_sccache") ?(cache_size = "5G") job =
+  let key =
+    Option.value
+      ~default:("sccache-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  job
+  |> append_variables
+       ([("SCCACHE_DIR", path); ("SCCACHE_CACHE_SIZE", cache_size)]
+       @ opt_var "SCCACHE_ERROR_LOG" Fun.id error_log
+       @ opt_var "SCCACHE_IDLE_TIMEOUT" Fun.id idle_timeout
+       @ opt_var "SCCACHE_LOG" Fun.id log)
+  |> append_cache (cache ~key [path])
+  (* Starts sccache and sets [RUSTC_WRAPPER] *)
+  |> append_before_script [". ./scripts/ci/sccache-start.sh"]
+  |> append_after_script ["./scripts/ci/sccache-stop.sh"]
+
+let cargo_home =
+  (* Note:
+     - We want [CARGO_HOME] to be in a sub-folder of
+       {!ci_project_dir} to enable GitLab CI caching.
+     - We want [CARGO_HOME] to be hidden from dune
+       (thus the dot-prefix). *)
+  Gitlab_ci.Predefined_vars.(show ci_project_dir) // ".cargo"
+
+let enable_networked_cargo = append_variables [("CARGO_NET_OFFLINE", "false")]
+
+let enable_cargo_cache job =
+  job
+  |> append_cache
+       (cache
+          ~key:("cargo-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+          [cargo_home // "registry/cache"])
+  (* Allow Cargo to access the network *)
+  |> enable_networked_cargo
+
+let enable_cargo_target_caches ?key job =
+  let key =
+    Option.value
+      ~default:
+        ("rust-targets-" ^ Gitlab_ci.Predefined_vars.(show ci_job_name_slug))
+      key
+  in
+  let cache_dir = "$CI_PROJECT_DIR" // "_target" in
+  job
+  |> append_variables
+       [
+         ("OCTEZ_RUST_DEPS_TARGET_DIR", cache_dir // "rust_deps");
+         ("OCTEZ_RUSTZCASH_DEPS_TARGET_DIR", cache_dir // "rustzcash_deps");
+         ( "OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR",
+           cache_dir // "etherlink_wasm_runtime" );
+       ]
+  |> append_cache (cache ~key [cache_dir])
 
 (** A set of internally and externally built images.
 
@@ -1476,10 +1563,11 @@ module Images = struct
   let rust_toolchain =
     (* The job that builds the rust_toolchain image.
        This job is automatically included in any pipeline that uses this image. *)
-    let image_builder arch =
+    let image_builder arch ?storage () =
       job_docker_authenticated
         ~__POS__
         ~arch
+        ?storage
         ~skip_docker_initialization:true
         ~stage
         ~name:("oc.docker:rust-toolchain:" ^ arch_to_string_alt arch)
@@ -1496,8 +1584,43 @@ module Images = struct
       "${rust_toolchain_image_name}:${rust_toolchain_image_tag}"
     in
     Image.mk_internal
-      ~image_builder_amd64:(image_builder Amd64)
-      ~image_builder_arm64:(image_builder Arm64)
+      ~image_builder_amd64:(image_builder Amd64 ())
+      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
+      ~image_path
+      ()
+
+  (** The rust toolchain image (static tag [master]) *)
+  let rust_toolchain_master =
+    let image_path = "${rust_toolchain_image_name_protected}:master" in
+    Image.mk_external ~image_path
+
+  (** The image containing all dependencies required for Rust SDK bindings *)
+  let rust_sdk_bindings =
+    (* The job that builds the rust-sdk-bindings image.
+       This job is automatically included in any pipeline that uses this image. *)
+    let image_builder arch ?storage () =
+      job_docker_authenticated
+        ~__POS__
+        ~arch
+        ?storage
+        ~stage
+        ~name:("oc.docker:rust-sdk-bindings:" ^ arch_to_string_alt arch)
+        ~description:
+          ("Build internal rust-sdk-bindings images for "
+         ^ arch_to_string_alt arch)
+        ~ci_docker_hub:false
+        ~artifacts:
+          (artifacts
+             ~reports:(reports ~dotenv:"rust_sdk_bindings_image_tag.env" ())
+             [])
+        ["./scripts/ci/docker_rust_sdk_bindings_build.sh"]
+    in
+    let image_path =
+      "${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}"
+    in
+    Image.mk_internal
+      ~image_builder_amd64:(image_builder Amd64 ())
+      ~image_builder_arm64:(image_builder Arm64 ~storage:Ramfs ())
       ~image_path
       ()
 
@@ -1517,10 +1640,15 @@ module Images = struct
     let image_path = "${jsonnet_image_name}:${jsonnet_image_tag}" in
     Image.mk_internal ~image_builder_amd64:(image_builder Amd64) ~image_path ()
 
+  (** The jsonnet image (static tag [master]) *)
+  let jsonnet_master =
+    let image_path = "${jsonnet_image_name_protected}:master" in
+    Image.mk_external ~image_path
+
   module CI = struct
     (* The job that builds the CI images.
        This job is automatically included in any pipeline that uses any of these images. *)
-    let job_docker_ci arch =
+    let job_docker_ci arch ?storage () =
       let variables = Some [("ARCH", arch_to_string_alt arch)] in
       let retry =
         match arch with
@@ -1534,6 +1662,7 @@ module Images = struct
         ?retry
         ~__POS__
         ~arch
+        ?storage
         ~skip_docker_initialization:true
         ~stage
         ~timeout:(Minutes 90)
@@ -1546,10 +1675,15 @@ module Images = struct
 
     let mk_ci_image ~image_path =
       Image.mk_internal
-        ~image_builder_amd64:(job_docker_ci Amd64)
-        ~image_builder_arm64:(job_docker_ci Arm64)
+        ~image_builder_amd64:(job_docker_ci Amd64 ())
+        ~image_builder_arm64:(job_docker_ci Arm64 ~storage:Ramfs ())
         ~image_path
         ()
+
+    (* To use static images from the protected registry. *)
+    let mk_ci_image_master name =
+      Image.mk_external
+        ~image_path:("${ci_image_name_protected}/" ^ name ^ ":amd64--master")
 
     (* Reuse the same image_builder job [job_docker_ci] for all
        the below images, since they're all produced in that same job.
@@ -1558,6 +1692,9 @@ module Images = struct
        [job_docker_ci] is included exactly once in the pipeline. *)
     let runtime =
       mk_ci_image ~image_path:"${ci_image_name}/runtime:${ci_image_tag}"
+
+    let monitoring =
+      mk_ci_image ~image_path:"${ci_image_name}/monitoring:${ci_image_tag}"
 
     let prebuild =
       mk_ci_image ~image_path:"${ci_image_name}/prebuild:${ci_image_tag}"
@@ -1568,6 +1705,13 @@ module Images = struct
 
     let e2etest =
       mk_ci_image ~image_path:"${ci_image_name}/e2etest:${ci_image_tag}"
+
+    (* Corresponding CI images from the protected registry using the [master] tags. We only define those used in [sanity] jobs. *)
+    let prebuild_master = mk_ci_image_master "prebuild"
+
+    let build_master = mk_ci_image_master "build"
+
+    let test_master = mk_ci_image_master "test"
   end
 end
 
@@ -1582,3 +1726,24 @@ let id_tokens =
         "https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}"
     );
   ]
+
+module Hooks = struct
+  let before_merging = ref []
+
+  let master = ref []
+
+  let release_tags = ref []
+end
+
+let job_datadog_pipeline_trace : tezos_job =
+  job
+    ~__POS__
+    ~allow_failure:Yes
+    ~name:"datadog_pipeline_trace"
+    ~image:Images.datadog_ci
+    ~stage:Stages.start
+    [
+      "CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}";
+      "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
+       pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
+    ]

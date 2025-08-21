@@ -11,6 +11,9 @@ type evm_services_methods = {
   next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
   find_blueprint :
     Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
   smart_rollup_address : Address.t;
   time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
 }
@@ -18,7 +21,7 @@ type evm_services_methods = {
 type block_production = [`Single_node | `Disabled]
 
 module Resto = struct
-  let callback server Evm_directory.{dir; extra} =
+  let callback ~port server Evm_directory.{dir; extra} =
     let open Cohttp in
     let open Lwt_syntax in
     let callback_log conn req body =
@@ -31,7 +34,8 @@ module Resto = struct
           let meth = req |> Request.meth |> Code.string_of_method in
           let* body_str = body |> Cohttp_lwt.Body.to_string in
           let* () = Events.callback_log ~uri ~meth ~body:body_str in
-          Tezos_rpc_http_server.RPC_server.resto_callback
+          Octez_telemetry.HTTP_server.resto_callback
+            ~port
             server
             conn
             req
@@ -44,7 +48,7 @@ module Resto = struct
 
   let conn_closed conn = Evm_websocket.on_conn_closed conn
 
-  let start_server rpc directory =
+  let start_server config rpc directory =
     let open Lwt_result_syntax in
     let open Tezos_rpc_http_server in
     let Configuration.
@@ -67,13 +71,29 @@ module Resto = struct
         ~media_types:Supported_media_types.all
         directory.Evm_directory.dir
     in
-
+    let*? () =
+      match config.Configuration.websockets with
+      | Some
+          {rate_limit = Some {max_frames; max_messages; interval; strategy}; _}
+        ->
+          let interval = Ptime.Span.of_int_s interval in
+          let messages_limit =
+            Option.map
+              (fun max -> {Evm_websocket.max; interval; strategy})
+              max_messages
+          in
+          let frames_limit =
+            {Evm_websocket.max = max_frames; interval; strategy = `Close}
+          in
+          Evm_websocket.setup_rate_limiters ?messages_limit ~frames_limit ()
+      | _ -> Ok ()
+    in
     let*! () =
       RPC_server.launch
         ~max_active_connections
         ~host
         server
-        ~callback:(callback server directory)
+        ~callback:(callback ~port server directory)
         ~conn_closed
         node
     in
@@ -110,8 +130,8 @@ module Dream = struct
     return shutdown
 end
 
-let start_server rpc = function
-  | Evm_directory.Resto dir -> Resto.start_server rpc dir
+let start_server config rpc = function
+  | Evm_directory.Resto dir -> Resto.start_server config rpc dir
   | Evm_directory.Dream routes -> Dream.start_server rpc routes
 
 let monitor_performances ~data_dir =
@@ -124,8 +144,11 @@ let monitor_performances ~data_dir =
   in
   Lwt.dont_wait aux (Fun.const ())
 
-let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
-    (config : Configuration.t) ctxt =
+let start_public_server (type f) ~is_sequencer
+    ~(rpc_server_family : f Rpc_types.rpc_server_family) ~l2_chain_id
+    ?delegate_health_check_to ?evm_services ?data_dir validation
+    (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container) ctxt =
   let open Lwt_result_syntax in
   let*! can_start_performance_metrics =
     Octez_performance_metrics.supports_performance_metrics ()
@@ -139,40 +162,103 @@ let start_public_server ?delegate_health_check_to ?evm_services ?data_dir
     | Some impl ->
         Evm_services.register
           impl.next_blueprint_number
+          impl.find_blueprint_legacy
           impl.find_blueprint
           impl.smart_rollup_address
           impl.time_between_blocks
   in
+  let*? () = Rpc_types.check_rpc_server_config rpc_server_family config in
+  let* register_tezos_services =
+    match rpc_server_family with
+    | Rpc_types.Single_chain_node_rpc_server Michelson ->
+        let (module Backend : Services_backend_sig.S), _ = ctxt in
+        let* l2_chain_id =
+          match l2_chain_id with
+          | Some l2_chain_id -> return l2_chain_id
+          | None -> Backend.chain_id ()
+        in
+        let (Services_backend_sig.Michelson_tx_container (module Tx_container))
+            =
+          tx_container
+        in
+        return @@ Evm_directory.init_from_resto_directory
+        @@ Tezlink_directory.register_tezlink_services
+             ~l2_chain_id
+             (module Backend.Tezlink)
+             ~add_operation:(fun op raw ->
+               (* TODO: https://gitlab.com/tezos/tezos/-/issues/8007
+                  Validate the operation and use the resulting "next_nonce" *)
+               let next_nonce = Ethereum_types.Qty op.counter in
+               let* hash_res =
+                 Tx_container.add
+                   ~next_nonce
+                   op
+                   ~raw_tx:(Ethereum_types.hex_of_bytes raw)
+               in
+               let* hash =
+                 match hash_res with
+                 | Ok hash -> return hash
+                 | Error s -> failwith "%s" s
+               in
+               return hash)
+    | Single_chain_node_rpc_server EVM | Multichain_sequencer_rpc_server ->
+        return @@ Evm_directory.empty config.experimental_features.rpc_server
+  in
+  (* If spawn_rpc is defined, use it as intermediate *)
+  let rpc =
+    match config.experimental_features.spawn_rpc with
+    | Some port -> {config.public_rpc with port}
+    | _ -> config.public_rpc
+  in
+
   let directory =
-    Services.directory ?delegate_health_check_to config.public_rpc config ctxt
+    register_tezos_services
+    |> Services.directory
+         ~is_sequencer
+         ~rpc_server_family
+         ?delegate_health_check_to
+         rpc
+         validation
+         config
+         tx_container
+         ctxt
     |> register_evm_services
     |> Evm_directory.register_metrics "/metrics"
+    |> Evm_directory.register_describe
   in
-  let* finalizer = start_server config.public_rpc directory in
+  let* finalizer = start_server config rpc directory in
   let*! () =
     Events.is_ready
-      ~rpc_addr:config.public_rpc.addr
-      ~rpc_port:config.public_rpc.port
+      ~rpc_addr:rpc.addr
+      ~rpc_port:rpc.port
       ~backend:config.experimental_features.rpc_server
-      ~websockets:config.experimental_features.enable_websocket
+      ~websockets:(Option.is_some config.websockets)
   in
   return finalizer
 
-let start_private_server ?(block_production = `Disabled) config ctxt =
+let start_private_server ~(rpc_server_family : _ Rpc_types.rpc_server_family)
+    ?(block_production = `Disabled) config tx_container ctxt =
   let open Lwt_result_syntax in
   match config.Configuration.private_rpc with
   | Some private_rpc ->
       let directory =
-        Services.private_directory private_rpc ~block_production config ctxt
+        Services.private_directory
+          ~rpc_server_family
+          private_rpc
+          ~block_production
+          config
+          tx_container
+          ctxt
         |> Evm_directory.register_metrics "/metrics"
+        |> Evm_directory.register_describe
       in
-      let* finalizer = start_server private_rpc directory in
+      let* finalizer = start_server config private_rpc directory in
       let*! () =
         Events.private_server_is_ready
           ~rpc_addr:private_rpc.addr
           ~rpc_port:private_rpc.port
           ~backend:config.experimental_features.rpc_server
-          ~websockets:config.experimental_features.enable_websocket
+          ~websockets:(Option.is_some config.websockets)
       in
       return finalizer
   | None -> return (fun () -> Lwt_syntax.return_unit)

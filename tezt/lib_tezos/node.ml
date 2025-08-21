@@ -242,6 +242,13 @@ let identity_file node = Filename.concat (data_dir node) "identity.json"
 
 let runner node = node.persistent_state.runner
 
+let pid node =
+  match node.status with
+  | Running status -> Process.pid status.process |> Option.some
+  | Not_running -> None
+
+let path node = node.path
+
 let spawn_command node =
   Process.spawn
     ?runner:node.persistent_state.runner
@@ -383,48 +390,89 @@ module Config_file = struct
     in
     JSON.put ("shell", peer_validator) old_config
 
-  let sandbox_network_config =
+  let mk_genesis ~timestamp ~block ~protocol =
+    `O
+      [
+        ("timestamp", `String timestamp);
+        ("block", `String block);
+        ("protocol", `String protocol);
+      ]
+
+  let mk_genesis_parameters ~genesis_pubkey =
+    `O [("values", `O [("genesis_pubkey", `String genesis_pubkey)])]
+
+  let sandbox_network_config : JSON.u =
     `O
       [
         ( "genesis",
-          `O
-            [
-              ("timestamp", `String "2018-06-30T16:07:32Z");
-              ( "block",
-                `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" );
-              ("protocol", `String Protocol.genesis_hash);
-            ] );
+          mk_genesis
+            ~timestamp:"2018-06-30T16:07:32Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+            ~protocol:Protocol.genesis_hash );
         ( "genesis_parameters",
-          `O
-            [
-              ( "values",
-                `O [("genesis_pubkey", `String Constant.activator.public_key)]
-              );
-            ] );
+          mk_genesis_parameters ~genesis_pubkey:Constant.activator.public_key );
         ("chain_name", `String "TEZOS");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
       ]
 
-  let ghostnet_sandbox_network_config =
+  let ghostnet_sandbox_network_config : JSON.u =
     `O
       [
         ( "genesis",
-          `O
-            [
-              ("timestamp", `String "2022-01-25T15:00:00Z");
-              ( "block",
-                `String "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9" );
-              ("protocol", `String Protocol.genesis_hash);
-            ] );
+          mk_genesis
+            ~timestamp:"2022-01-25T15:00:00Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9"
+            ~protocol:Protocol.genesis_hash );
         ( "genesis_parameters",
-          `O
-            [
-              ( "values",
-                `O [("genesis_pubkey", `String Constant.activator.public_key)]
-              );
-            ] );
+          mk_genesis_parameters ~genesis_pubkey:Constant.activator.public_key );
         ("chain_name", `String "TEZOS");
         ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  (* Copied from Octez_node_config.Config_file *)
+  let ghostnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2022-01-25T15:00:00Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC" );
+        ("chain_name", `String "TEZOS_ITHACANET_2022-01-25T15:00:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  let rionet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2025-02-19T12:45:00Z"
+            ~block:"BLsnvEitopA3xXTH7sVyAXiaL7s4MjPDmRhgmek3gxjHi9gRFGZ"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ( "genesis_parameters",
+          mk_genesis_parameters
+            ~genesis_pubkey:
+              "edpktosVHk2f3Yrz9Jb6rMrk6uVy4sTxVhP2iyF39AdgzvsTWgbaLy" );
+        ("chain_name", `String "TEZOS_RIONET_2025-02-19T12:45:00Z");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
+  (* Copied from Octez_node_config.Config_file *)
+  let mainnet_network_config : JSON.u =
+    `O
+      [
+        ( "genesis",
+          mk_genesis
+            ~timestamp:"2018-06-30T16:07:32Z"
+            ~block:"BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
+            ~protocol:"Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P" );
+        ("chain_name", `String "TEZOS_MAINNET");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS_MAINNET");
       ]
 
   let put_user_activated_upgrades upgrade_points =
@@ -477,7 +525,7 @@ module Config_file = struct
     in
     JSON.put ("network", network) old_config
 
-  let set_sandbox_network_with_dal_config
+  let set_network_with_dal_config
       (dal_config : Tezos_crypto_dal.Cryptobox.Config.t) old_config =
     let dal_config_json =
       JSON.annotate
@@ -492,13 +540,19 @@ module Config_file = struct
           ])
     in
     let network =
-      sandbox_network_config
-      |> JSON.annotate ~origin:"set_sandbox_network_with_dal_config"
+      JSON.unannotate JSON.(old_config |-> "network")
+      |> JSON.annotate ~origin:"set_network_with_dal_config"
       |> JSON.put ("dal_config", dal_config_json)
     in
     JSON.put ("network", network) old_config
 
-  let set_ghostnet_sandbox_network ?user_activated_upgrades () old_config =
+  let set_sandbox_network old_config =
+    JSON.put
+      ( "network",
+        JSON.annotate ~origin:"set_sandbox_network" sandbox_network_config )
+      old_config
+
+  let set_network ?user_activated_upgrades (origin, network_config) old_config =
     let may_patch_user_activated_upgrades =
       match user_activated_upgrades with
       | None -> Fun.id
@@ -506,11 +560,29 @@ module Config_file = struct
     in
     JSON.put
       ( "network",
-        JSON.annotate
-          ~origin:"set_ghostnet_sandbox_network"
-          ghostnet_sandbox_network_config
+        JSON.annotate ~origin network_config
         |> may_patch_user_activated_upgrades )
       old_config
+
+  let set_mainnet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_mainnet_network", mainnet_network_config)
+
+  let set_ghostnet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_ghostnet_network", ghostnet_network_config)
+
+  let set_ghostnet_sandbox_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_ghostnet_sandbox_network", ghostnet_sandbox_network_config)
+
+  let set_rionet_network ?user_activated_upgrades () =
+    set_network
+      ?user_activated_upgrades
+      ("set_rionet_network", rionet_network_config)
 end
 
 type snapshot_history_mode = Rolling_history | Full_history
@@ -540,18 +612,20 @@ let spawn_snapshot_info ?(json = false) node file =
     (["snapshot"; "info"] @ (if json then ["--json"] else []) @ [file])
 
 let snapshot_info ?json node file =
-  spawn_snapshot_info ?json node file |> Process.check
+  spawn_snapshot_info ?json node file |> Process.check_and_read_stdout
 
-let spawn_snapshot_import ?(no_check = false) ?(reconstruct = false) node file =
+let spawn_snapshot_import ?(force = false) ?(no_check = false)
+    ?(reconstruct = false) node file =
   spawn_command
     node
     (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
     @ (if reconstruct then ["--reconstruct"] else [])
     @ (if no_check then ["--no-check"] else [])
+    @ (if force then ["--force"] else [])
     @ [file])
 
-let snapshot_import ?no_check ?reconstruct node file =
-  spawn_snapshot_import ?no_check ?reconstruct node file |> Process.check
+let snapshot_import ?force ?no_check ?reconstruct node file =
+  spawn_snapshot_import ?force ?no_check ?reconstruct node file |> Process.check
 
 let spawn_reconstruct node =
   spawn_command
@@ -760,6 +834,20 @@ let wait_for_disconnections node disconnections =
       | _ -> ()) ;
   let* () = wait_for_ready node in
   waiter
+
+let wait_for_branch_switch ?level ?hash node =
+  wait_for
+    node
+    "branch_switch.v0"
+    JSON.(
+      fun json ->
+        let level' = json |-> "level" |> as_int in
+        let hash' = json |-> "view" |-> "hash" |> as_string in
+        if
+          Option.fold ~none:true ~some:(Int.equal level') level
+          && Option.fold ~none:true ~some:(String.equal hash') hash
+        then Some (level', hash')
+        else None)
 
 let enable_external_rpc_process =
   match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
@@ -1004,10 +1092,10 @@ let replay ?on_terminate ?event_level ?event_sections_levels ?(strict = false)
     node
     arguments
 
-let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
-    ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external ?rpc_host
-    ?rpc_port ?rpc_tls ?event_level ?event_sections_levels ?patch_config
-    ?snapshot arguments =
+let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_addr
+    ?net_port ?advertised_net_port ?metrics_addr ?metrics_port ?rpc_external
+    ?rpc_host ?rpc_port ?rpc_tls ?event_level ?event_sections_levels
+    ?patch_config ?snapshot arguments =
   let run_arguments, config_arguments =
     List.partition should_be_runlike_argument arguments
   in
@@ -1019,6 +1107,7 @@ let init ?runner ?path ?name ?env ?color ?data_dir ?event_pipe ?net_port
       ?color
       ?data_dir
       ?event_pipe
+      ?net_addr
       ?net_port
       ?advertised_net_port
       ?metrics_addr
@@ -1101,7 +1190,7 @@ let as_rpc_endpoint ?(local = false) (t : t) =
     if local || Option.is_none t.persistent_state.runner then state.rpc_host
     else Runner.address t.persistent_state.runner
   in
-  Endpoint.{scheme; host; port = state.rpc_port}
+  Endpoint.make ~scheme ~host ~port:state.rpc_port ()
 
 module RPC = struct
   module RPC_callers : RPC_core.CALLERS with type uri_provider := t = struct

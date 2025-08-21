@@ -1,5 +1,7 @@
 .. note::
 
+  For information about how to stake, see `Staking <https://docs.tezos.com/using/staking>`__ on docs.tezos.com.
+
   For operational details about the staking mechanism and its configuration, see `a staking mechanism tutorial <https://docs.google.com/document/d/1-1WTG2Vuez9D8fROTJrs42twbIErR16xyknRRBrjr-A/edit?usp=sharing>`__.
 
 =================
@@ -22,6 +24,7 @@ Staked and delegated funds **have different weights** in the computation
 of delegates’ baking and voting powers: staked funds (both external
 stakes by stakers and the delegate’s own) count **three times** as much as
 delegated funds.
+This ratio is defined by the protocol constant ``EDGE_OF_STAKING_OVER_DELEGATION``.
 
 Unlike delegated funds, staked funds are considered to contribute to the
 security deposit associated with their chosen delegate. Thus, they are
@@ -92,7 +95,7 @@ parameters:
    the maximum portion of external stake by stakers over the
    delegate’s own staked funds. It defaults to 0 – which entails that
    delegates do not accept external stakes by default. It is moreover
-   capped by a global constant, set to 5 starting in the Paris
+   capped by a global constant, set to 9 starting in the Quebec
    protocol, which ensures the baker controls a significant part of
    the stake.
 
@@ -104,11 +107,24 @@ parameters need to be supplied. The new parameters are then applied
 
 ::
 
-   octez-client transfer 0 from <delegate> to  <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth> (Pair <edge as int value in billionth> Unit)"
+   octez-client transfer 0 from <delegate> to <delegate> --entrypoint set_delegate_parameters --arg "Pair <limit as int value in millionth> (Pair <edge as int value in billionth> Unit)"
 
 or more conveniently::
 
-   octez-client set delegate parameters for  <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+   octez-client set delegate parameters for <delegate> --limit-of-staking-over-baking <value> --edge-of-baking-over-staking <value>
+
+Once you have set your parameters, if you want to update only one parameter you
+can use::
+
+   octez-client update delegate parameters for <delegate> [--limit-of-staking-over-baking <value>] [--edge-of-baking-over-staking <value>]
+
+The command will fill the missing parameter with the value of the last pending
+parameters (or the active parameters if no set/update are pending).
+
+Please ensure to not send two updates in a row without waiting for the first
+update operation to be included (i.e. do not use --wait none) or you might end
+up with inconsistent parameters (The modification of one parameter could be
+reverted by the subsequent modification of another parameter).
 
 **On overstaking and overdelegation.** Note that if a delegate’s
 ``limit_of_staking_over_baking`` is exceeded (that is, the delegate is
@@ -130,6 +146,12 @@ Stakers (and delegates) can use the ``stake``, ``unstake``, and
 1 illustrates their effect on a staker’s funds. Note that
 while these pseudo-operations change the *state* of the involved funds,
 they remain otherwise within the staker’s account at all times.
+
+.. note::
+
+  Due to rounding that occurs at various stages of fund management,
+  stakers' staked balances may deviate by a few mutez (millionth of
+  tez) with respect to transferred amounts.
 
 .. figure:: staked_funds_transitions.png
 
@@ -185,6 +207,8 @@ entrypoint -– that is, by transferring 0 tez to their
 or more conveniently::
 
    octez-client finalize unstake for <staker>
+
+Note that starting with protocol S, not only the staker, but anyone can trigger ``finalize_unstake`` (in any case, the unfrozen funds still go to the staker).
 
 In some circumstances, unstake and finalize can be done implicitly: any call
 to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending

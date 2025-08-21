@@ -12,7 +12,8 @@
   octez-libs.crypto
   octez-l2-libs.layer2_store
   octez-libs.crypto-dal
-  yaml)
+  yaml
+  opentelemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

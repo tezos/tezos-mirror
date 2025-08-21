@@ -54,6 +54,7 @@ module Simple = struct
         "Last cemented commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
+      ~pp1:Commitment.Hash.pp_short
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -65,6 +66,7 @@ module Simple = struct
         "Last published commitment was updated to hash {hash} at inbox level \
          {level}"
       ~level:Debug
+      ~pp1:Commitment.Hash.pp_short
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -82,6 +84,7 @@ module Simple = struct
       ~name:"smart_rollup_node_new_commitment"
       ~msg:"New commitment {hash} for inbox level {level}"
       ~level:Notice
+      ~pp1:Commitment.Hash.pp_short
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -91,6 +94,7 @@ module Simple = struct
       ~name:"smart_rollup_node_commitment_publish_commitment"
       ~msg:"Publishing commitment {hash} for inbox level {level}"
       ~level:Info
+      ~pp1:Commitment.Hash.pp_short
       ("hash", Commitment.Hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -110,6 +114,7 @@ module Simple = struct
         "Publishing execute whitelist update for cemented commitment {hash}, \
          outbox level {outbox_level} and index {message_index}"
       ~level:Info
+      ~pp1:Commitment.Hash.pp_short
       ("hash", Commitment.Hash.encoding)
       ("outbox_level", Data_encoding.int32)
       ("message_index", Data_encoding.int31)

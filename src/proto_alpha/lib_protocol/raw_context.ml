@@ -60,24 +60,36 @@ type consensus_pk = {
   delegate : Signature.Public_key_hash.t;
   consensus_pk : Signature.Public_key.t;
   consensus_pkh : Signature.Public_key_hash.t;
+  companion_pk : Bls.Public_key.t option;
+  companion_pkh : Bls.Public_key_hash.t option;
 }
 
 let consensus_pk_encoding =
   let open Data_encoding in
   conv
-    (fun {delegate; consensus_pk; consensus_pkh} ->
-      if Signature.Public_key_hash.equal consensus_pkh delegate then
-        (consensus_pk, None)
-      else (consensus_pk, Some delegate))
-    (fun (consensus_pk, delegate) ->
+    (fun {
+           delegate;
+           consensus_pk;
+           consensus_pkh;
+           companion_pk;
+           companion_pkh = _;
+         } ->
+      let delegate =
+        if Signature.Public_key_hash.equal consensus_pkh delegate then None
+        else Some delegate
+      in
+      (consensus_pk, delegate, companion_pk))
+    (fun (consensus_pk, delegate, companion_pk) ->
       let consensus_pkh = Signature.Public_key.hash consensus_pk in
+      let companion_pkh = Option.map Bls.Public_key.hash companion_pk in
       let delegate =
         match delegate with None -> consensus_pkh | Some del -> del
       in
-      {delegate; consensus_pk; consensus_pkh})
-    (obj2
+      {delegate; consensus_pk; consensus_pkh; companion_pk; companion_pkh})
+    (obj3
        (req "consensus_pk" Signature.Public_key.encoding)
-       (opt "delegate" Signature.Public_key_hash.encoding))
+       (opt "delegate" Signature.Public_key_hash.encoding)
+       (opt "companion_pk" Bls.Public_key.encoding))
 
 module Raw_consensus = struct
   (** Consensus operations are indexed by their [initial slots]. Given
@@ -100,6 +112,10 @@ module Raw_consensus = struct
             consensus attestation power and DAL attestation power. This is
             [None] only in mempool mode, or in application mode when there is no
             locked round (so the block cannot contain any preattestations). *)
+    allowed_consensus :
+      (consensus_pk * int * int) Slot_repr.Map.t Level_repr.Map.t option;
+        (** In mempool mode, hold delegates minimal slots for all allowed
+            levels. [None] in all other modes. *)
     forbidden_delegates : Signature.Public_key_hash.Set.t;
         (** Delegates that are not allowed to bake or attest blocks; i.e.,
             delegates which have zero frozen deposit due to a previous
@@ -132,6 +148,7 @@ module Raw_consensus = struct
       current_attestation_power = 0;
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
+      allowed_consensus = None;
       forbidden_delegates = Signature.Public_key_hash.Set.empty;
       attestations_seen = Slot_repr.Set.empty;
       preattestations_seen = Slot_repr.Set.empty;
@@ -211,9 +228,9 @@ module Raw_consensus = struct
         t
     | None -> {t with preattestations_quorum_round = Some round}
 
-  let initialize_with_attestations_and_preattestations ~allowed_attestations
-      ~allowed_preattestations t =
-    {t with allowed_attestations; allowed_preattestations}
+  let set_allowed_operations ~allowed_attestations ~allowed_preattestations
+      ~allowed_consensus t =
+    {t with allowed_attestations; allowed_preattestations; allowed_consensus}
 
   let locked_round_evidence t = t.locked_round_evidence
 
@@ -263,6 +280,11 @@ type back = {
   non_consensus_operations_rev : Operation_hash.t list;
   dictator_proposal_seen : bool;
   sampler_state : (Seed_repr.seed * consensus_pk Sampler.t) Cycle_repr.Map.t;
+  (* [stake_info] maps cycles to a pair [(total_weight, distribution)], where
+     [total_weight] is the total active staking weight for that cycle, and [distribution]
+     is a list associating consensus keys with their respective staking weight, ordered
+     lexicographically by their delegate public key hash. *)
+  stake_info : (int64 * (consensus_pk * int64) list) Cycle_repr.Map.t;
   stake_distribution_for_current_cycle :
     Stake_repr.t Signature.Public_key_hash.Map.t option;
   reward_coeff_for_current_cycle : Q.t;
@@ -335,6 +357,8 @@ let[@inline] dictator_proposal_seen ctxt = ctxt.back.dictator_proposal_seen
 
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
+let[@inline] stake_info ctxt = ctxt.back.stake_info
+
 let[@inline] reward_coeff_for_current_cycle ctxt =
   ctxt.back.reward_coeff_for_current_cycle
 
@@ -383,6 +407,9 @@ let[@inline] update_dictator_proposal_seen ctxt dictator_proposal_seen =
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
 
+let[@inline] update_stake_info ctxt stake_info =
+  update_back ctxt {ctxt.back with stake_info}
+
 let[@inline] update_reward_coeff_for_current_cycle ctxt
     reward_coeff_for_current_cycle =
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
@@ -401,6 +428,8 @@ type error += Operation_quota_exceeded (* `Temporary *)
 type error += Stake_distribution_not_set (* `Branch *)
 
 type error += Sampler_already_set of Cycle_repr.t (* `Permanent *)
+
+type error += Stake_info_already_set of Cycle_repr.t (* `Permanent *)
 
 let () =
   let open Data_encoding in
@@ -460,7 +489,23 @@ let () =
         c)
     (obj1 (req "cycle" Cycle_repr.encoding))
     (function Sampler_already_set c -> Some c | _ -> None)
-    (fun c -> Sampler_already_set c)
+    (fun c -> Sampler_already_set c) ;
+  register_error_kind
+    `Permanent
+    ~id:"stake_info_already_set"
+    ~title:"Stake already set"
+    ~description:
+      "Internal error: Raw_context.set_stake_info_for_cycle was called twice \
+       for a given cycle"
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Internal error: stake info already set for cycle %a."
+        Cycle_repr.pp
+        c)
+    (obj1 (req "cycle" Cycle_repr.encoding))
+    (function Stake_info_already_set c -> Some c | _ -> None)
+    (fun c -> Stake_info_already_set c)
 
 let fresh_internal_nonce ctxt =
   let open Result_syntax in
@@ -876,6 +921,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
         non_consensus_operations_rev = [];
         dictator_proposal_seen = false;
         sampler_state = Cycle_repr.Map.empty;
+        stake_info = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
         reward_coeff_for_current_cycle = Q.one;
         sc_rollup_current_messages;
@@ -890,7 +936,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ~adaptive_issuance_enable
 type previous_protocol =
   | Genesis of Parameters_repr.t
   | Alpha
-  | (* Alpha predecessor *) R022 (* Alpha predecessor *)
+  | (* Alpha predecessor *) S023 (* Alpha predecessor *)
 
 let check_and_update_protocol_version ctxt =
   let open Lwt_result_syntax in
@@ -907,8 +953,8 @@ let check_and_update_protocol_version ctxt =
           let+ param, ctxt = get_proto_param ctxt in
           (Genesis param, ctxt)
         else if Compare.String.(s = "alpha_current") then return (Alpha, ctxt)
-        else if (* Alpha predecessor *) Compare.String.(s = "r022_022") then
-          return (R022, ctxt) (* Alpha predecessor *)
+        else if (* Alpha predecessor *) Compare.String.(s = "s023_023") then
+          return (S023, ctxt) (* Alpha predecessor *)
         else Lwt.return @@ storage_error (Incompatible_protocol_version s)
   in
   let*! ctxt =
@@ -936,11 +982,11 @@ let get_previous_protocol_constants ctxt =
              context."
       | Some constants -> return constants)
 
-(* Start of code to remove at r022 automatic protocol snapshot *)
+(* Start of code to remove at next automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
-(* End of code to remove at r022 automatic protocol snapshot *)
+(* End of code to remove at next automatic protocol snapshot *)
 
 (* You should ensure that if the type `Constants_parametric_repr.t` is
    different from `Constants_parametric_previous_repr.t` or the value of these
@@ -1204,8 +1250,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
-                 aggregate_attestation;
-                 allow_tz4_delegate_enable;
+                 aggregate_attestation = _;
+                 allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_level;
                }
                 : Previous.t) =
@@ -1256,8 +1302,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation;
-            allow_tz4_delegate_enable;
+            aggregate_attestation = true;
+            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
           }
         in
@@ -1268,9 +1314,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | R022 ->
+    | S023 ->
         (*
-            FIXME chain_id is used for Q to R022 migration and nomore after.
+            FIXME chain_id is used for Q to S023 migration and nomore after.
             We ignored for automatic stabilisation, should it be removed in
             Beta?
         *)
@@ -1499,8 +1545,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  zk_rollup = _;
                  adaptive_issuance = _;
                  direct_ticket_spending_enable;
-                 aggregate_attestation;
-                 allow_tz4_delegate_enable;
+                 aggregate_attestation = _;
+                 allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_level;
                }
                 : Previous.t) =
@@ -1551,8 +1597,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             zk_rollup;
             adaptive_issuance;
             direct_ticket_spending_enable;
-            aggregate_attestation;
-            allow_tz4_delegate_enable;
+            aggregate_attestation = true;
+            allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
           }
         in
@@ -1886,6 +1932,41 @@ let sampler_for_cycle ~read ctxt cycle =
       let ctxt = update_sampler_state ctxt map in
       return (ctxt, seed, state)
 
+let sort_stakes_pk_for_stake_info stakes_pk =
+  (* The stakes_pk is supposedly already sorted by decreasing stake, from
+     the call to get_selected_distribution when it was initialized.
+     We sort them here by lexicographical order on the pkh of the delegate instead.
+  *)
+  List.sort
+    (fun ((consensus_pk1 : consensus_pk), _) (consensus_pk2, _) ->
+      Signature.Public_key_hash.compare
+        consensus_pk1.delegate
+        consensus_pk2.delegate)
+    stakes_pk
+
+let init_stake_info_for_cycle ctxt cycle total_stake stakes_pk =
+  let open Result_syntax in
+  let map = stake_info ctxt in
+  if Cycle_repr.Map.mem cycle map then tzfail (Stake_info_already_set cycle)
+  else
+    let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
+    let total_stake = Stake_repr.staking_weight total_stake in
+    let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
+    let ctxt = update_stake_info ctxt map in
+    return ctxt
+
+let stake_info_for_cycle ~read ctxt cycle =
+  let open Lwt_result_syntax in
+  let map = stake_info ctxt in
+  match Cycle_repr.Map.find cycle map with
+  | Some (total_stake, stakes_pk) -> return (ctxt, total_stake, stakes_pk)
+  | None ->
+      let* total_stake, stakes_pk = read ctxt in
+      let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
+      let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
+      let ctxt = update_stake_info ctxt map in
+      return (ctxt, total_stake, stakes_pk)
+
 let find_stake_distribution_for_current_cycle ctxt =
   ctxt.back.stake_distribution_for_current_cycle
 
@@ -1928,6 +2009,8 @@ module type CONSENSUS = sig
 
   type 'value slot_map
 
+  type 'value level_map
+
   type slot_set
 
   type slot
@@ -1940,6 +2023,9 @@ module type CONSENSUS = sig
 
   val allowed_preattestations : t -> (consensus_pk * int * int) slot_map option
 
+  val allowed_consensus :
+    t -> (consensus_pk * int * int) slot_map level_map option
+
   val forbidden_delegates : t -> Signature.Public_key_hash.Set.t
 
   type error += Slot_map_not_found of {loc : string}
@@ -1950,6 +2036,7 @@ module type CONSENSUS = sig
     t ->
     allowed_attestations:(consensus_pk * int * int) slot_map option ->
     allowed_preattestations:(consensus_pk * int * int) slot_map option ->
+    allowed_consensus:(consensus_pk * int * int) slot_map level_map option ->
     t
 
   val record_attestation : t -> initial_slot:slot -> power:int -> t tzresult
@@ -1979,6 +2066,7 @@ module Consensus :
     with type t := t
      and type slot := Slot_repr.t
      and type 'a slot_map := 'a Slot_repr.Map.t
+     and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
      and type consensus_pk := consensus_pk = struct
@@ -1996,6 +2084,8 @@ module Consensus :
   let[@inline] allowed_preattestations ctxt =
     ctxt.back.consensus.allowed_preattestations
 
+  let[@inline] allowed_consensus ctxt = ctxt.back.consensus.allowed_consensus
+
   let[@inline] forbidden_delegates ctxt =
     ctxt.back.consensus.forbidden_delegates
 
@@ -2012,12 +2102,13 @@ module Consensus :
     Raw_consensus.locked_round_evidence ctxt.back.consensus
 
   let[@inline] initialize_consensus_operation ctxt ~allowed_attestations
-      ~allowed_preattestations =
+      ~allowed_preattestations ~allowed_consensus =
     update_consensus_with
       ctxt
-      (Raw_consensus.initialize_with_attestations_and_preattestations
+      (Raw_consensus.set_allowed_operations
          ~allowed_attestations
-         ~allowed_preattestations)
+         ~allowed_preattestations
+         ~allowed_consensus)
 
   let[@inline] record_preattestation ctxt ~initial_slot ~power round =
     update_consensus_with_tzresult

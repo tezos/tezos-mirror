@@ -5,17 +5,17 @@ stages:
 - start
 - images
 - build
-- prepare_release
-- publish_release_gitlab
+- publish
 
 oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -29,13 +29,14 @@ oc.docker:ci:amd64:
       dotenv: ci_image_tag.env
 
 oc.docker:ci:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
   - gcp_arm64
   dependencies: []
   timeout: 90 minutes
-  before_script: []
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./images/ci_create_ci_images.sh
   services:
@@ -84,11 +85,12 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -103,7 +105,9 @@ oc.build:static-arm64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     expire_in: 90 days
     paths:
@@ -113,7 +117,7 @@ oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
-  - gcp_very_high_cpu
+  - gcp_very_high_cpu_ramfs
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -126,11 +130,12 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  - key: rust-deps-target-$CI_JOB_NAME_SLUG
+  - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
   - . ./scripts/ci/sccache-start.sh
@@ -145,14 +150,21 @@ oc.build:static-x86_64-linux-binaries:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
-    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target
+    OCTEZ_RUST_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rust_deps
+    OCTEZ_RUSTZCASH_DEPS_TARGET_DIR: $CI_PROJECT_DIR/_target/rustzcash_deps
+    OCTEZ_ETHERLINK_WASM_RUNTIME_TARGET_DIR: $CI_PROJECT_DIR/_target/etherlink_wasm_runtime
   artifacts:
     expire_in: 90 days
     paths:
     - octez-binaries/$ARCH/*
+  retry:
+    max: 2
+    when:
+    - stuck_or_timeout_failure
+    - runner_system_failure
 
 oc.docker:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
@@ -160,6 +172,7 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -173,7 +186,7 @@ oc.docker:amd64:
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
 
 oc.docker:arm64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
@@ -181,6 +194,7 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_release.sh
@@ -194,8 +208,8 @@ oc.docker:arm64:
     EXECUTABLE_FILES: script-inputs/octez-evm-node-executable
 
 docker:merge_manifests:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.12.0
-  stage: prepare_release
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
   tags:
   - gcp
   needs:
@@ -204,6 +218,7 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   script:
   - ./scripts/ci/docker_merge_manifests.sh
@@ -214,8 +229,8 @@ docker:merge_manifests:
     CI_DOCKER_HUB: "true"
 
 gitlab:octez-evm-node-release:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.6.0
-  stage: publish_release_gitlab
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
   tags:
   - gcp
   needs:
@@ -226,5 +241,27 @@ gitlab:octez-evm-node-release:
   - oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
   interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
   script:
   - ./scripts/ci/create_gitlab_octez_evm_node_release.sh
+
+docker:promote_to_latest:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: publish
+  tags:
+  - gcp
+  needs:
+  - docker:merge_manifests
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - ./scripts/ci/docker_initialize.sh
+  script:
+  - ./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest ./scripts/ci/octez-evm-node-release.sh
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "true"

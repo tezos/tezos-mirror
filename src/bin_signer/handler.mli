@@ -37,6 +37,7 @@ val public_key :
 (** [sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth]
     signs [req] and returns a signature. *)
 val sign :
+  ?signing_version:Signature.version ->
   ?magic_bytes:int list ->
   check_high_watermark:bool ->
   require_auth:bool ->
@@ -67,3 +68,15 @@ val supports_deterministic_nonces :
   #Client_context.wallet ->
   Tezos_crypto.Signature.public_key_hash ->
   bool tzresult Lwt.t
+
+(** [known_keys cctxt] returns the list of public key hashes known to the
+    signer. *)
+val known_keys :
+  #Client_context.wallet ->
+  Tezos_crypto.Signature.public_key_hash list tzresult Lwt.t
+
+val bls_prove_possession :
+  #Client_context.wallet ->
+  ?override_pk:Tezos_crypto.Signature.Bls.Public_key.t ->
+  Signature.public_key_hash ->
+  Tezos_crypto.Signature.Bls.t tzresult Lwt.t

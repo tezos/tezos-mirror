@@ -111,10 +111,10 @@ sets it to the value provided by the protocol consensus.
 While the node is running, it is possible to
 call the following RPCs to access the values of all these variables:
 
-- the checkpoint: `GET /chains/<chain_id>/levels/checkpoint <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__
-- the savepoint `GET /chains/<chain_id>/levels/savepoint <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-savepoint>`__
-- the caboose: `GET /chains/<chain_id>/levels/caboose <https://tezos.gitlab.io/shell/rpc.html#get-chains-chain-id-levels-caboose>`__
-- the history mode: `GET /config/history_mode <https://tezos.gitlab.io/shell/rpc.html#get-config-history-mode>`__
+- the checkpoint: `GET /chains/<chain_id>/levels/checkpoint <https://octez.tezos.com/docs/shell/rpc.html#get-chains-chain-id-levels-checkpoint>`__
+- the savepoint `GET /chains/<chain_id>/levels/savepoint <https://octez.tezos.com/docs/shell/rpc.html#get-chains-chain-id-levels-savepoint>`__
+- the caboose: `GET /chains/<chain_id>/levels/caboose <https://octez.tezos.com/docs/shell/rpc.html#get-chains-chain-id-levels-caboose>`__
+- the history mode: `GET /config/history_mode <https://octez.tezos.com/docs/shell/rpc.html#get-config-history-mode>`__
 
 Files hierarchy
 ***************
@@ -179,7 +179,7 @@ block is stored in its header. When validated, a block's announced
 the two context hashes are different, the block is considered invalid.
 
 The context of a block can be accessed using the protocols' RPCs such as
-`GET ../\<block_id\> <https://tezos.gitlab.io/active/rpc.html#get-block-id>`__, and more specifically by RPCs under the path ``../<block_id>/context``.
+`GET ../\<block_id\> <https://octez.tezos.com/docs/active/rpc.html#get-block-id>`__, and more specifically by RPCs under the path ``../<block_id>/context``.
 
 The context of the blockchain is only modified by :doc:`blocks applications <../active/validation>`. Only the
 contexts resulting from the application of valid blocks is committed on disk, by the validation toolchain.

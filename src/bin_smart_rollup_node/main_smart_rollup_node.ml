@@ -43,9 +43,10 @@ let config_init_command =
     ~group
     ~desc:"Configure the smart rollup node."
     (merge_options
-       (args22
+       (args23
           force_switch
           data_dir_arg
+          config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
@@ -66,11 +67,13 @@ let config_init_command =
           no_degraded_arg
           gc_frequency_arg
           history_mode_arg)
-       (args4
+       (args6
           cors_allowed_origins_arg
           cors_allowed_headers_arg
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg
+          etherlink_switch))
     (prefix "init" @@ mode_param
     @@ prefixes ["config"; "for"]
     @@ sc_rollup_address_param
@@ -78,6 +81,7 @@ let config_init_command =
     @@ seq_of_param @@ operator_param)
     (fun ( ( force,
              data_dir,
+             config_file,
              rpc_addr,
              rpc_port,
              acl_override,
@@ -101,7 +105,9 @@ let config_init_command =
            ( allowed_origins,
              allowed_headers,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling,
+             force_etherlink ) )
          mode
          sc_rollup_address
          operators
@@ -142,12 +148,15 @@ let config_init_command =
           ~allowed_headers
           ~apply_unsafe_patches:false
           ~bail_on_disagree
+          ~profiling
+          ~force_etherlink
       in
-      let* () = Configuration.save ~force ~data_dir config in
+      let config_file = Configuration.config_filename ~data_dir config_file in
+      let* () = Configuration.save ~force ~config_file config in
       let*! () =
         cctxt#message
           "Smart rollup node configuration written in %s"
-          (Configuration.config_filename ~data_dir)
+          config_file
       in
       return_unit)
 
@@ -159,17 +168,19 @@ let legacy_run_command =
     ~group
     ~desc:"Run the rollup node daemon (deprecated)."
     (merge_options
-       (args9
+       (args11
           data_dir_arg
+          config_file_arg
           mode_arg
           sc_rollup_address_arg
+          etherlink_switch
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg)
-       (args20
+       (args21
           loser_mode_arg
           reconnection_delay_arg
           dal_node_endpoint_arg
@@ -189,11 +200,14 @@ let legacy_run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg))
     (prefixes ["run"] @@ stop)
     (fun ( ( data_dir,
+             config_file,
              mode,
              sc_rollup_address,
+             force_etherlink,
              rpc_addr,
              rpc_port,
              acl_override,
@@ -219,7 +233,8 @@ let legacy_run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling ) )
          cctxt ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
@@ -228,9 +243,10 @@ let legacy_run_command =
           "Cannot use both --enable-performance-metrics and \
            --disable-performance-metrics"
       in
+      let config_file = Configuration.config_filename ~data_dir config_file in
       let* configuration =
         Configuration.Cli.create_or_read_config
-          ~data_dir
+          ~config_file
           ~rpc_addr
           ~rpc_port
           ~acl_override
@@ -258,6 +274,8 @@ let legacy_run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~profiling
+          ~force_etherlink
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -276,11 +294,13 @@ let run_command =
       "Run the rollup node daemon. Arguments overwrite values provided in the \
        configuration file."
     (merge_options
-       (args11
+       (args13
           data_dir_arg
+          config_file_arg
           rpc_addr_arg
           rpc_port_arg
           acl_override_arg
+          etherlink_switch
           metrics_addr_arg
           enable_performance_metrics_arg
           disable_performance_metrics_arg
@@ -288,7 +308,7 @@ let run_command =
           reconnection_delay_arg
           dal_node_endpoint_arg
           pre_images_endpoint_arg)
-       (args16
+       (args17
           injector_retention_period_arg
           injector_attempts_arg
           injection_ttl_arg
@@ -304,15 +324,18 @@ let run_command =
           cors_allowed_headers_arg
           apply_unsafe_patches_switch
           bail_on_disagree_switch
-          unsafe_disable_wasm_kernel_checks_switch))
+          unsafe_disable_wasm_kernel_checks_switch
+          profiling_arg))
     (prefixes ["run"] @@ mode_param @@ prefixes ["for"]
    @@ sc_rollup_address_param
     @@ prefixes ["with"; "operators"]
     @@ seq_of_param @@ operator_param)
     (fun ( ( data_dir,
+             config_file,
              rpc_addr,
              rpc_port,
              acl_override,
+             force_etherlink,
              metrics_addr,
              enable_performance_metrics,
              disable_performance_metrics,
@@ -335,7 +358,8 @@ let run_command =
              allowed_headers,
              apply_unsafe_patches,
              bail_on_disagree,
-             unsafe_disable_wasm_kernel_checks ) )
+             unsafe_disable_wasm_kernel_checks,
+             profiling ) )
          mode
          sc_rollup_address
          operators
@@ -347,9 +371,10 @@ let run_command =
           "Cannot use both --enable-performance-metrics and \
            --disable-performance-metrics"
       in
+      let config_file = Configuration.config_filename ~data_dir config_file in
       let* configuration =
         Configuration.Cli.create_or_read_config
-          ~data_dir
+          ~config_file
           ~rpc_addr
           ~rpc_port
           ~acl_override
@@ -377,6 +402,8 @@ let run_command =
           ~allowed_headers
           ~apply_unsafe_patches
           ~bail_on_disagree
+          ~profiling
+          ~force_etherlink
       in
       Rollup_node_daemon.run
         ~data_dir
@@ -469,32 +496,6 @@ let patch_durable_storage =
           "You must add --force to your command-line to execute this command. \
            As a reminder, patching the state is an advanced and unsafe \
            procedure.")
-
-let migrate_store =
-  let open Tezos_clic in
-  command
-    ~group
-    ~desc:"Migrate the rollup node store to the latest supported version."
-    (args1 data_dir_arg)
-    (prefixes ["migrate"; "store"] @@ stop)
-    (fun data_dir _cctxt ->
-      let open Lwt_result_syntax in
-      let* metadata = Metadata.read_metadata_file ~dir:data_dir in
-      let*? metadata =
-        match metadata with
-        | None ->
-            error_with
-              "No metadata for the rollup node in %s. Is the rollup node \
-               initialized?"
-              data_dir
-        | Some m -> Ok m
-      in
-      let* _fd = Node_context_loader.lock ~data_dir in
-      let* () =
-        let open Octez_smart_rollup_node_store in
-        Store_migration.maybe_run_migration metadata Store.version ~data_dir
-      in
-      return_unit)
 
 let export_snapshot
     ( data_dir,
@@ -593,7 +594,7 @@ let import_snapshot =
        Cli.no_checks_arg
        Cli.import_force_switch
        Cli.apply_unsafe_patches_switch)
-    (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_param @@ stop)
+    (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
     (fun (data_dir, no_checks, force, apply_unsafe_patches) snapshot_file cctxt ->
       let open Lwt_result_syntax in
       let* () =
@@ -614,12 +615,12 @@ let snapshot_info =
     ~group
     ~desc:"Display information about a snapshot file."
     no_options
-    (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_param @@ stop)
+    (prefixes ["snapshot"; "info"] @@ Cli.snapshot_file_or_url_param @@ stop)
     (fun () snapshot_file cctxt ->
       let open Lwt_result_syntax in
-      let ( Snapshots.Header.
-              {version = _; history_mode; address; head_level; last_commitment},
-            compressed ) =
+      let* ( Snapshots.Header.
+               {version = _; history_mode; address; head_level; last_commitment},
+             compressed ) =
         Snapshots.info ~snapshot_file
       in
       let*! () =
@@ -669,6 +670,32 @@ let list_metrics_command =
   let*! () = ctxt#message "%s" metrics in
   return_unit
 
+let replay_block_command =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Replay a given L1 block."
+    (args2 data_dir_arg Cli.profiling_arg)
+    (prefixes ["replay"; "block"] @@ Cli.block_hash_or_level_param @@ stop)
+    (fun (data_dir, profiling) block cctxt ->
+      Rollup_node_daemon.Replay.replay_block ?profiling ~data_dir cctxt block)
+
+let replay_blocks_command =
+  let open Tezos_clic in
+  command
+    ~group
+    ~desc:"Replay a sequence of L1 blocks."
+    (args2 data_dir_arg Cli.profiling_arg)
+    (prefixes ["replay"; "blocks"; "from"]
+    @@ Cli.level_param @@ prefix "to" @@ Cli.level_param @@ stop)
+    (fun (data_dir, profiling) start_level end_level cctxt ->
+      Rollup_node_daemon.Replay.replay_blocks
+        ?profiling
+        ~data_dir
+        cctxt
+        start_level
+        end_level)
+
 let sc_rollup_commands () =
   [
     config_init_command;
@@ -678,13 +705,14 @@ let sc_rollup_commands () =
     dump_metrics;
     dump_durable_storage;
     patch_durable_storage;
-    migrate_store;
     export_snapshot_auto_name;
     export_snapshot_named;
     import_snapshot;
     snapshot_info;
     openapi_command;
     list_metrics_command;
+    replay_block_command;
+    replay_blocks_command;
   ]
   @ Repair.commands
 
@@ -740,6 +768,13 @@ module Daemon_node_config = struct
   let clic_commands ~base_dir:_ ~config_commands:_ ~builtin_commands:_
       ~other_commands ~require_auth:_ =
     other_commands
+
+  let advertise_log_levels = Some true
+
+  let version =
+    Some Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
 end
+
+let () = Tezos_layer2_store.Snapshot_utils.add_download_command ()
 
 let () = Client_main_run.run (module Daemon_node_config) ~select_commands

@@ -1,0 +1,109 @@
+name: tx-park
+
+services:
+  etherlink-image:
+    image: tx-park/etherlink:${PROJECT_USER}.${PROJECT_NAME}
+    build:
+      context: ../../..
+      dockerfile: etherlink/contrib/tx-park/etherlink.Dockerfile
+      target: builder
+      args:
+        - DOCKER_BUILDKIT=1
+        - TEZOS_IMAGE=${TEZOS_IMAGE}
+        - TEZOS_TAG=${TEZOS_TAG}
+        - RUST_IMAGE=${RUST_IMAGE}
+        - RUST_TAG=${RUST_TAG}
+        - ADMIN_SK=${ADMIN_SK}
+        - SEQUENCER_SK=${SEQUENCER_SK}
+        - SMART_ROLLUP_BATCHER1_SK=${SMART_ROLLUP_BATCHER1_SK}
+        - SMART_ROLLUP_BATCHER2_SK=${SMART_ROLLUP_BATCHER2_SK}
+        - SMART_ROLLUP_BATCHER3_SK=${SMART_ROLLUP_BATCHER3_SK}
+        - KERNEL_CONTRACT_ADMIN=${KERNEL_CONTRACT_ADMIN}
+        - KERNEL_CONTRACT_DELAYED_BRIDGE=${KERNEL_CONTRACT_DELAYED_BRIDGE}
+        - KERNEL_CONTRACT_TICKETER=${KERNEL_CONTRACT_TICKETER}
+        - KERNEL_CHAIN_ID=${KERNEL_CHAIN_ID:+--chain-id ${KERNEL_CHAIN_ID}}
+        - KERNEL_DA_FEE_PER_BYTE=${KERNEL_DA_FEE_PER_BYTE:+--da-fee-per-byte ${KERNEL_DA_FEE_PER_BYTE}}
+        - KERNEL_DAL_SLOTS=${KERNEL_DAL_SLOTS:+--dal-slots ${KERNEL_DAL_SLOTS}}
+        - KERNEL_DELAYED_INBOX_MIN_LEVELS=${KERNEL_DELAYED_INBOX_MIN_LEVELS:+--delayed-inbox-min-levels ${KERNEL_DELAYED_INBOX_MIN_LEVELS}}
+        - KERNEL_DELAYED_INBOX_TIMEOUT=${KERNEL_DELAYED_INBOX_TIMEOUT:+--delayed-inbox-timeout ${KERNEL_DELAYED_INBOX_TIMEOUT}}
+        - KERNEL_ENABLE_DAL=${KERNEL_ENABLE_DAL+--enable-dal}
+        - KERNEL_ENABLE_FA_BRIDGE=${KERNEL_ENABLE_FA_BRIDGE+--enable-fa-bridge}
+        - KERNEL_ENABLE_FAST_FA_WITHDRAWAL=${KERNEL_ENABLE_FAST_FA_WITHDRAWAL+--enable-fast-fa-withdrawal}
+        - KERNEL_ENABLE_FAST_WITHDRAWAL=${KERNEL_ENABLE_FAST_WITHDRAWAL+--enable-fast-withdrawal}
+        - KERNEL_ENABLE_MULTICHAIN=${KERNEL_ENABLE_MULTICHAIN+--enable-multichain}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT1=${KERNEL_ETH_BOOTSTRAP_ACCOUNT1:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT1}}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT2=${KERNEL_ETH_BOOTSTRAP_ACCOUNT2:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT2}}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT3=${KERNEL_ETH_BOOTSTRAP_ACCOUNT3:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT3}}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT4=${KERNEL_ETH_BOOTSTRAP_ACCOUNT4:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT4}}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT5=${KERNEL_ETH_BOOTSTRAP_ACCOUNT5:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT5}}
+        - KERNEL_ETH_BOOTSTRAP_ACCOUNT6=${KERNEL_ETH_BOOTSTRAP_ACCOUNT6:+--eth-bootstrap-account ${KERNEL_ETH_BOOTSTRAP_ACCOUNT6}}
+        - KERNEL_ETH_BOOTSTRAP_BALANCE=${KERNEL_ETH_BOOTSTRAP_BALANCE:+--eth-bootstrap-balance ${KERNEL_ETH_BOOTSTRAP_BALANCE}}
+        - KERNEL_EVM_VERSION=${KERNEL_EVM_VERSION:+--evm-version ${KERNEL_EVM_VERSION}}
+        - KERNEL_GOVERNANCE=${KERNEL_GOVERNANCE:+--kernel-governance ${KERNEL_GOVERNANCE}}
+        - KERNEL_ROOT_HASH=${KERNEL_ROOT_HASH:+--kernel-root-hash ${KERNEL_ROOT_HASH}}
+        - KERNEL_SECURITY_GOVERNANCE=${KERNEL_SECURITY_GOVERNANCE:+--kernel-security-governance ${KERNEL_SECURITY_GOVERNANCE}}
+        - KERNEL_L2_CHAIN_ID=${KERNEL_L2_CHAIN_ID:+--l2-chain-id ${KERNEL_L2_CHAIN_ID}}
+        - KERNEL_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS=${KERNEL_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS:+--max-blueprint-lookahead-in-seconds ${KERNEL_MAX_BLUEPRINT_LOOKAHEAD_IN_SECONDS}}
+        - KERNEL_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH=${KERNEL_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH:+--max-delayed-inbox-blueprint-length ${KERNEL_MAX_DELAYED_INBOX_BLUEPRINT_LENGTH}}
+        - KERNEL_MAXIMUM_ALLOWED_TICKS=${KERNEL_MAXIMUM_ALLOWED_TICKS:+--maximum-allowed-ticks ${KERNEL_MAXIMUM_ALLOWED_TICKS}}
+        - KERNEL_MAXIMUM_GAS_PER_TRANSACTION=${KERNEL_MAXIMUM_GAS_PER_TRANSACTION:+--maximum-gas-per-transaction ${KERNEL_MAXIMUM_GAS_PER_TRANSACTION}}
+        - KERNEL_MINIMUM_BASE_FEE_PER_GAS=${KERNEL_MINIMUM_BASE_FEE_PER_GAS:+--minimum-base-fee-per-gas ${KERNEL_MINIMUM_BASE_FEE_PER_GAS}}
+        - KERNEL_SEQUENCER=${KERNEL_SEQUENCER:+--sequencer ${KERNEL_SEQUENCER}}
+        - KERNEL_SEQUENCER_GOVERNANCE=${KERNEL_SEQUENCER_GOVERNANCE:+--sequencer-governance ${KERNEL_SEQUENCER_GOVERNANCE}}
+        - KERNEL_SEQUENCER_POOL_ADDRESS=${KERNEL_SEQUENCER_POOL_ADDRESS:+--sequencer-pool-address ${KERNEL_SEQUENCER_POOL_ADDRESS}}
+        - KERNEL_SET_CODE1=${KERNEL_SET_CODE1:+--set-code ${KERNEL_SET_CODE1}}
+        - KERNEL_SET_CODE2=${KERNEL_SET_CODE2:+--set-code ${KERNEL_SET_CODE2}}
+        - KERNEL_SET_CODE3=${KERNEL_SET_CODE3:+--set-code ${KERNEL_SET_CODE3}}
+        - KERNEL_SET_CODE4=${KERNEL_SET_CODE4:+--set-code ${KERNEL_SET_CODE4}}
+        - KERNEL_SET_CODE5=${KERNEL_SET_CODE5:+--set-code ${KERNEL_SET_CODE5}}
+        - KERNEL_SET_CODE6=${KERNEL_SET_CODE6:+--set-code ${KERNEL_SET_CODE6}}
+
+  smart-rollup-node-batcher-init:
+    profiles: [batcher]
+    volumes:
+      - smart-rollup-node-batcher:/home/tezos/.tezos-smart-rollup-node-batcher/
+    depends_on:
+      etherlink-image:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/smart-rollup-node.yml
+      service: smart-rollup-node-batcher-init
+
+  smart-rollup-node-batcher:
+    profiles: [batcher]
+    volumes:
+      - smart-rollup-node-batcher:/home/tezos/.tezos-smart-rollup-node-batcher/
+    depends_on:
+      smart-rollup-node-batcher-init:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/smart-rollup-node.yml
+      service: smart-rollup-node-batcher
+
+  octez-evm-node-sequencer-init:
+    profiles: [sequencer]
+    volumes:
+      - octez-evm-node-sequencer:/home/tezos/.octez-evm-node-sequencer/
+    depends_on:
+      etherlink-image:
+        condition: service_completed_successfully
+    extends:
+      file: ./services/octez-evm-node.yml
+      service: octez-evm-node-sequencer-init
+
+  octez-evm-node-sequencer:
+    profiles: [sequencer]
+    volumes:
+      - octez-evm-node-sequencer:/home/tezos/.octez-evm-node-sequencer/
+    depends_on:
+      octez-evm-node-sequencer-init:
+        condition: service_completed_successfully
+      smart-rollup-node-batcher:
+        condition: service_healthy
+    extends:
+      file: ./services/octez-evm-node.yml
+      service: octez-evm-node-sequencer
+
+volumes:
+  smart-rollup-node-batcher:
+  octez-evm-node-sequencer:

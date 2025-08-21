@@ -104,6 +104,59 @@ CAMLprim value caml_bls12_381_signature_blst_signature_keygen_stubs(
   CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
 }
 
+CAMLprim value caml_bls12_381_signature_blst_polynomial_evaluation(
+    value scalar_res, value scalars, value nscalars, value fr_x) {
+  CAMLparam4(scalar_res, scalars, nscalars, fr_x);
+  int len_c = Int_val(nscalars);
+  blst_fr scalar_i, res;
+
+  // a(X) = ((..(a_{n-1} * X + a_{n-2}) * X + ...) * X + a_1) * X + a_0
+  blst_fr_from_scalar(&res, Blst_scalar_val(Field(scalars, len_c - 1)));
+  for (int i = len_c - 2; i >= 0; i--) {
+    blst_fr_mul(&res, &res, Blst_fr_val(fr_x));
+    blst_fr_from_scalar(&scalar_i, Blst_scalar_val(Field(scalars, i)));
+    blst_fr_add(&res, &res, &scalar_i);
+  }
+  blst_scalar_from_fr(Blst_scalar_val(scalar_res), &res);
+  CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
+CAMLprim value caml_bls12_381_signature_blst_lagrange_coeff_zero(
+    value scalars_res, value scalar_ids, value len) {
+  CAMLparam3(scalars_res, scalar_ids, len);
+  int len_c = Int_val(len);
+  blst_fr prod, x_i, acc, tmp;
+
+  // prod = x_0 * x_1 * .. * x_{n-1}
+  memcpy(&prod, Blst_fr_val(Field(scalar_ids, 0)), sizeof(blst_fr));
+  for (int i = 1; i < len_c; i++) {
+    blst_fr_mul(&prod, &prod, Blst_fr_val(Field(scalar_ids, i)));
+  }
+
+  if (blst_fr_is_zero(&prod)) {
+    CAMLreturn(Val_int(BLST_BAD_SCALAR));
+  }
+
+  // acc = x_i * prod_{j = 0, j <> i}^{n-1} (x_j - x_i)
+  for (int i = 0; i < len_c; i++) {
+    memcpy(&x_i, Blst_fr_val(Field(scalar_ids, i)), sizeof(blst_fr));
+    memcpy(&acc, &x_i, sizeof(blst_fr));
+    for (int j = 0; j < len_c; j++) {
+      if (j != i) {
+        blst_fr_sub(&tmp, Blst_fr_val(Field(scalar_ids, j)), &x_i);
+        blst_fr_mul(&acc, &acc, &tmp);
+      }
+    }
+    // res_i = prod / acc
+    if (blst_fr_is_zero(&acc)) {
+      CAMLreturn(Val_int(BLST_BAD_SCALAR));
+    }
+    blst_fr_eucl_inverse(&tmp, &acc);
+    blst_fr_mul(Blst_fr_val(Field(scalars_res, i)), &prod, &tmp);
+  }
+  CAMLreturn(CAML_BLS12_381_OUTPUT_SUCCESS);
+}
+
 // Pk in G1, Signature in G2
 CAMLprim value
 caml_bls12_381_signature_blst_sk_to_pk_in_g1_stubs(value buffer, value scalar) {

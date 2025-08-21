@@ -99,8 +99,7 @@ module Agent_configuration = struct
 
   let default_max_run_duration = Some 7200
 
-  let default_gcp_binaries_path =
-    Filename.get_temp_dir_name () // "tezt-runners"
+  let default_gcp_binaries_path = Path.tmp_dir // "tezt-runners"
 
   let make ~os ~binaries_path ?max_run_duration ~machine_type ~docker_image
       ~name () =
@@ -114,3 +113,11 @@ module Agent_configuration = struct
       vm = {os; machine_type; docker_image; max_run_duration; binaries_path};
     }
 end
+
+type notifier =
+  | Notifier_null
+  | Notifier_slack of {
+      name : string;
+      slack_bot_token : string;
+      slack_channel_id : string;
+    }

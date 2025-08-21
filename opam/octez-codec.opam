@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
-  "octez-rustzcash-deps" { = version }
+  "octez-rust-deps" { = version }
   "bls12-381" { = version }
   "octez-libs" { = version }
   "octez-shell-libs" { = version }
@@ -37,6 +37,7 @@ depopts: [
   "octez-protocol-020-PsParisC-libs"
   "octez-protocol-021-PsQuebec-libs"
   "octez-protocol-022-PsRiotum-libs"
+  "octez-protocol-023-PtSeouLo-libs"
   "octez-protocol-alpha-libs"
 ]
 conflicts: [
@@ -58,6 +59,7 @@ conflicts: [
   "octez-protocol-020-PsParisC-libs" { != version }
   "octez-protocol-021-PsQuebec-libs" { != version }
   "octez-protocol-022-PsRiotum-libs" { != version }
+  "octez-protocol-023-PtSeouLo-libs" { != version }
   "octez-protocol-alpha-libs" { != version }
 ]
 build: [

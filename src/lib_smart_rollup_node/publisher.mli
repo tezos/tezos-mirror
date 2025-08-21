@@ -49,10 +49,10 @@
     compute the hash of to be included in the commitment.  *)
 val process_head :
   (module Protocol_plugin_sig.S) ->
-  Node_context.rw ->
+  _ Node_context.rw_store ->
   predecessor:Block_hash.t ->
   Layer1.header ->
-  Context.rw ->
+  _ Context.t ->
   Commitment.Hash.t option tzresult Lwt.t
 
 (** [create_commitment_if_necessary plugin node_ctxt ~predecessor level ctxt]
@@ -60,10 +60,10 @@ val process_head :
     one. [ctxt] should be the context checkouted for [level]. *)
 val create_commitment_if_necessary :
   (module Protocol_plugin_sig.S) ->
-  'a Node_context.t ->
+  _ Node_context.t ->
   predecessor:Block_hash.t ->
   int32 ->
-  'a Context.t ->
+  _ Context.t ->
   (Commitment.t option, tztrace) result Lwt.t
 
 (** [publish_single_commitment node_ctxt commitment] publishes a single

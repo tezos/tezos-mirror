@@ -48,7 +48,9 @@ let delay_encoding =
 let default_auto_delay ~blocks_per_cycle =
   let exclusion = Int32.(max 1l (div blocks_per_cycle 20l)) in
   let limit = Int32.div blocks_per_cycle 2l in
-  let delay = Int32.add (Random.int32 (Int32.sub limit exclusion)) exclusion in
+  let delay =
+    Int32.add (Random.int32 (max 1l (Int32.sub limit exclusion))) exclusion
+  in
   delay
 
 let pp_delay fmt = function

@@ -9,3 +9,13 @@
   octez-libs.cohttp-lwt-unix
   octez-evm-node-libs.websocket)
  (modules websocket_cohttp_lwt))
+
+(library
+ (name websocket_lwt_unix)
+ (public_name octez-evm-node-libs.websocket_lwt_unix)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  lwt_log
+  octez-libs.cohttp-lwt-unix
+  octez-evm-node-libs.websocket)
+ (modules websocket_lwt_unix))

@@ -19,7 +19,7 @@
 (executable
  (name gen)
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   tezos-protocol-015-PtLimaPt.parameters

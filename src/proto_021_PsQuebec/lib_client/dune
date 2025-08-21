@@ -23,9 +23,8 @@
  (inline_tests
   (flags -verbose)
   (modes native)
-  (executable
-   (link_flags -linkall -cclib -lblst -cclib -loctez_rustzcash_deps))
-  (libraries bls12-381.archive octez-rustzcash-deps))
+  (executable (link_flags -linkall -cclib -lblst -cclib -loctez_rust_deps))
+  (libraries bls12-381.archive octez-rust-deps))
  (preprocess (pps ppx_expect))
  (library_flags (:standard -linkall))
  (flags
@@ -48,4 +47,4 @@
  (action
   (write-file
    %{targets}
-   "  module Bls_aug = Tezos_crypto.Signature.Bls_aug\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V1")))
+   "  module Bls = Tezos_crypto.Signature.Bls\n  module Ed25519 = Tezos_crypto.Signature.Ed25519\n  module P256 = Tezos_crypto.Signature.P256\n  module Secp256k1 = Tezos_crypto.Signature.Secp256k1\n  include Tezos_crypto.Signature.V1")))

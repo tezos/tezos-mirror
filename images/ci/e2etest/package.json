@@ -1,0 +1,16 @@
+{
+  "name": "e2etest",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "eth-cli": "^2.0.2",
+    "solc": "^0.8.28"
+  }
+}

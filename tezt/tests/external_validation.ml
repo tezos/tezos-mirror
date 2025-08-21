@@ -36,7 +36,7 @@ let team = Tag.layer1
 
 let wait_for_external_validator_pid node =
   let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "validator_proc_started.v0" filter
+  Node.wait_for node "validator_hypervisee_initialized.v0" filter
 
 (* Typical signals that could be sent. This could be enriched but the
    effects are expected to be similar.
@@ -67,10 +67,6 @@ let pp_signal ppf signal =
     | SIGTERM -> "sigterm"
   in
   Format.fprintf ppf "%s" str
-
-let wait_for_external_validator_failure node =
-  let filter json = JSON.(json |> as_int_opt) in
-  Node.wait_for node "validator_proc_status.v0" filter
 
 let kill_process ~pid ~signal =
   Log.info
@@ -110,13 +106,11 @@ let test_kill =
   let kill_loop (level, validator_pid) signal =
     (* Starts with a running process. *)
     let wait_for_new_validator_pid = wait_for_external_validator_pid node in
-    let wait_for_failure = wait_for_external_validator_failure node in
     let () = kill_process ~pid:validator_pid ~signal in
     let* () = wait_for_killing validator_pid in
     Log.info "External validator was killed by %a" pp_signal signal ;
     Log.info "Baking a block with a dead validator" ;
     let* () = Client.bake_for_and_wait client in
-    let* (_ : int) = wait_for_failure in
     let* new_validator_pid = wait_for_new_validator_pid in
     let* level = Node.wait_for_level node (level + 1) in
     return (level, new_validator_pid)

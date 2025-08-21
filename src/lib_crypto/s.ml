@@ -435,21 +435,75 @@ module type SIGNATURE = sig
      deterministic_nonce_hash sk msg]
    *)
   val deterministic_nonce_hash : Secret_key.t -> Bytes.t -> Bytes.t
+
+  (** [pop_verify pk proof] checks if [proof] is a valid proof of possesssion
+     for [pk] (or [msg] is provided).
+     If [pk] is not a BLS key, [pop_verify pk _ = false].
+   *)
+  val pop_verify :
+    Public_key.t -> ?msg:Bls12_381_signature.MinPk.pk -> Bytes.t -> bool
 end
 
 module type AGGREGATE_SIGNATURE = sig
   include SIGNATURE
 
-  (** [agregate_check pk_msg_list signature] returns [true] if the [signature]
+  (** [aggregate_check pk_msg_list signature] returns [true] if the [signature]
       is a valid aggregate signature of the signatures produced by signing
       message [msg] (with optional [watermark]) with the secret key of [pk] for
       each element [(pk, watermark, msg)] of the list [pk_msg_list]. *)
   val aggregate_check :
     (Public_key.t * watermark option * bytes) list -> t -> bool
 
-  (** [agregate_signature_opt sig_list] creates an aggregated signature using
-      the list of signatures [sig_list]. *)
-  val aggregate_signature_opt : t list -> t option
+  (** [aggregate_signature_opt sig_list] creates an aggregated signature using
+      the list of signatures [sig_list]. If [subgroup_check] is set, the
+      function also checks if the points are in the prime subgroup. *)
+  val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
+
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in the prime subgroup. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * t) list -> t option
+
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in the prime subgroup. *)
+  val aggregate_public_key_opt :
+    ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
+
+  (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in the
+      prime subgroup. *)
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
+end
+
+module type THRESHOLD_SIGNATURE = sig
+  include SIGNATURE
+
+  (** [share_secret_key sk m n] shares a secret key [sk] between [n]
+      participants so that any [m] participants can collaboratively sign
+      messages, while fewer than [m] participants cannot produce a valid
+      signature. Each participant is assigned a unique identifier [id_i]
+      in range [1; n]. *)
+  val share_secret_key :
+    Secret_key.t -> m:int -> n:int -> (int * Secret_key.t) list
+
+  (** [generate_threshold_key sk m n] is the same as [share_secret_key
+      sk m n] but also returns a public key, a public key hash and a
+      proof of possession corresponding to a secret key [sk]. *)
+  val generate_threshold_key :
+    Secret_key.t ->
+    m:int ->
+    n:int ->
+    Public_key.t * Public_key_hash.t * Bytes.t * (int * Secret_key.t) list
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by participants [id_i] are provided. *)
+  val threshold_signature_opt : (int * t) list -> t option
 end
 
 module type SPLIT_SIGNATURE = sig

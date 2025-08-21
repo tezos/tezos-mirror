@@ -3,8 +3,6 @@ The DAL node
 
 A DAL node is an executable (called ``octez-dal-node``) whose main roles are to publish, store, and exchange data for the :doc:`DAL layer <./dal_overview>`. Interacting with a DAL node is done through the command-line interface (CLI) and through RPCs. In what follows, we describe the main components and features of a DAL node, and then present some operational aspects on configuring and running a DAL node.
 
-For system requirements for the DAL node, see `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
-
 Concepts and features
 ---------------------
 
@@ -195,6 +193,59 @@ DAL configuration of the L1 node
 All operator and observer DAL nodes should use the same initialization parameters of the cryptographic primitives used by the DAL, see section :ref:`setup_dal_crypto_params` (**NB:** just that section, not the rest of the page such as compiling sources, etc.).
 
 Also, in order for the nodes to be able to join the P2P network, a set of bootstrap nodes can be provided using the ``network.dal_config.bootstrap_peers`` configuration parameter of the L1 node (thus using the same mechanism as for L1 nodes, see :doc:`../user/multinetwork` and :ref:`configure_p2p`).
+
+.. _dal_node_specs:
+
+System requirements
+^^^^^^^^^^^^^^^^^^^
+
+The system requirements for the DAL node depend on whether the node is being run by a baker for the purpose of attesting DAL data or by a slot producer for the purpose of publishing data to the DAL.
+The following sections provide system requirements for these cases based on experimentation.
+For more information about the experimentation, see `Hardware and bandwidth requirements for the Tezos DAL <https://forum.tezosagora.org/t/hardware-and-bandwidth-requirements-for-the-tezos-dal/6230>`_.
+
+.. note::
+
+    These requirements are for DAL nodes that run independently of any other Octez binary.
+    The requirements are higher if they are running on the same system as other Octez binaries.
+
+DAL attesters
+~~~~~~~~~~~~~
+
+The amount of data that a DAL node must attest to depends on how much baking power the associated baker has.
+The larger the baking power, the more data the DAL sends to the DAL node to attest and the more system resources the DAL node needs.
+
+This table shows the system requirements for a DAL node (independent of any other Octez binary) that attests 100% of the data assigned to it.
+The specifications in this table are an estimate based on experimentation with Google Cloud Platform compute instances; you must monitor your DAL node to ensure that it attests all or nearly all of the data that it is assigned to attest.
+
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Baking power          | 0.5% of total         | 1% of total           | 2% of total           | 5% of total           |
++=======================+=======================+=======================+=======================+=======================+
+| Machine type          | e2-small (ssd)        | e2-small (ssd)        | e2-small (ssd)        | e2-medium (ssd)       |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| CPU clock             | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              | 2.25 GHz              |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| RAM                   | 2 GiB                 | 2 GiB                 | 2 GiB                 | 4 GiB                 |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Disk space            | 20 GiB                | 20 GiB                | 20 GiB                | 20 GiB                |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Bandwidth (upload)    | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             | 250 KiB/s             |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+| Bandwidth (download)  | 250 KiB/s             | 350 KiB/s             | 400 KiB/s             | 600 KiB/s             |
++-----------------------+-----------------------+-----------------------+-----------------------+-----------------------+
+
+DAL producer node
+~~~~~~~~~~~~~~~~~
+
+The system resources that a DAL producer node needs depends on how much data it needs to publish to the DAL.
+This example is an estimate based on experimentation with a DAL producer node that publishes data into one slot in each block:
+
+======================= ===============
+CPU                     n2-standard-2
+RAM                     4 GiB
+Disk space              500 GiB
+Bandwidth (upload)      2.5 MiB/s
+Bandwidth (download)    0.5 MiB/s
+======================= ===============
 
 Monitoring
 ^^^^^^^^^^

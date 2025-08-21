@@ -34,9 +34,8 @@
 (** ["flaky"]: the test is flaky.
 
     The semantics depends on other tags:
-    - if the test also has tag {!memory_3k}, {!memory_4k} or {!time_sensitive},
-      the test still runs in job [tezt-memory-3k], [tezt-memory-4k]
-      or [tezt-time-sensitive] respectively;
+    - if the test also has tag {!time_sensitive},
+      the test still runs in job [tezt-time-sensitive];
     - if the test also has tag {!slow}, the test still runs in job [tezt-slow]
       but this job is manual, so it does not run by default, except in
       scheduled pipelines;
@@ -64,12 +63,6 @@ val flaky : string
     You must provide a comment to explain why the test is disabled.
     For flaky tests, {!flaky} should be preferred to [ci_disabled]. *)
 val ci_disabled : string
-
-(** ["memory_3k"]: tag memory hungry tests ( >3 GB of memory ). *)
-val memory_3k : string
-
-(** ["memory_4k"]: tag memory hungry tests ( >4 GB of memory ). *)
-val memory_4k : string
 
 (** ["time_sensitive"]: tag for time-sensitive tests.
 
@@ -112,6 +105,30 @@ val unix : string
     This tag should be used for tests that take more than 2 minutes in the CI. *)
 val slow : string
 
-(** [cloud]: tag for tests that depends on the [tezt-cloud] library. Such a test
-  uses VMs deployed onto the cloud. *)
-val cloud : string
+(** ["extra"]: tag for tests that add extra safety but that should not always run.
+
+    This tag causes tests to no longer run in [before_merging] pipelines.
+    The tests still run in the scheduled pipeline.
+
+    A typical use case is sets of costly tests such that if one fails,
+    the others are also likely to fail.
+    One of those tests can run in [before_merging] pipelines,
+    while the others can be tagged as [extra].
+    For instance, if a test has parameters (such as which protocol to run),
+    maybe testing only one combination of parameters in [before_merging] pipelines
+    is enough, and other variations can be tagged as [extra]. *)
+val extra : string
+
+(** ["memory_hungry"]: tag for tests that we know use too much memory.
+
+    This tag means: "I know this test uses too much memory, but the test is important
+    and it would be too complicated to reduce its memory usage."
+
+    The only effect this tag has is to raise the memory usage alert threshold.
+    You should only tag tests for which such alerts have been raised.
+
+    You should also consider tagging memory-hungry tests as {!extra}
+    to lower the pressure on CI resources.
+    If you do so, tag your test with both [extra] and [memory_hungry],
+    because memory usage alerts also apply to the scheduled pipeline. *)
+val memory_hungry : string

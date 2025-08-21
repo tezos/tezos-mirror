@@ -33,6 +33,9 @@ module Parameters = struct
     public_addr : string option;
     metrics_addr : string;
     l1_node_endpoint : Endpoint.t;
+    disable_shard_validation : bool;
+    disable_amplification : bool;
+    ignore_pkhs : string list option;
     mutable pending_ready : unit option Lwt.u list;
     runner : Runner.t option;
   }
@@ -48,6 +51,24 @@ type history_mode = Full | Auto | Custom of int
 
 open Parameters
 include Daemon.Make (Parameters)
+
+let disable_shard_validation_environment_variable =
+  "TEZOS_DISABLE_SHARD_VALIDATION_I_KNOW_WHAT_I_AM_DOING"
+
+let ignore_topics_environment_variable =
+  "TEZOS_IGNORE_TOPICS_I_KNOW_WHAT_I_AM_DOING"
+
+let check_error ?exit_code ?msg dal_node =
+  match dal_node.status with
+  | Not_running ->
+      Test.fail "DAL node %s is not running, it has no stderr" (name dal_node)
+  | Running {process; _} -> Process.check_error ?exit_code ?msg process
+
+let use_baker_to_start_dal_node =
+  match Sys.getenv_opt "TZ_SCHEDULE_KIND" with
+  | Some "EXTENDED_DAL_USE_BAKER" -> Some true
+  | Some _ -> Some false
+  | _ -> None
 
 let wait dal_node =
   match dal_node.status with
@@ -96,25 +117,32 @@ let spawn_command dal_node =
     ~color:dal_node.color
     dal_node.path
 
+let mk_backup_uris_args sources =
+  if List.is_empty sources then []
+  else ["--slots-backup-uri"; String.concat "," sources]
+
+let mk_trust_slots_backup_uris flag =
+  if flag then ["--trust-slots-backup-uris"] else []
+
 let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
-    ?(attester_profiles = []) ?(producer_profiles = [])
+    ?(attester_profiles = []) ?(operator_profiles = [])
     ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
-    dal_node =
-  spawn_command dal_node
-  @@ [
-       "config";
-       "init";
-       "--data-dir";
-       data_dir dal_node;
-       "--rpc-addr";
-       Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
-       "--net-addr";
-       listen_addr dal_node;
-       "--metrics-addr";
-       metrics_addr dal_node;
-       "--expected-pow";
-       string_of_float expected_pow;
-     ]
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+  spawn_command dal_node @@ ["config"]
+  @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+  @ [
+      "init";
+      "--data-dir";
+      data_dir dal_node;
+      "--rpc-addr";
+      Format.asprintf "%s:%d" (rpc_host dal_node) (rpc_port dal_node);
+      "--net-addr";
+      listen_addr dal_node;
+      "--metrics-addr";
+      metrics_addr dal_node;
+      "--expected-pow";
+      string_of_float expected_pow;
+    ]
   @ (match public_addr dal_node with
     | None -> []
     | Some addr -> ["--public-addr"; addr])
@@ -127,13 +155,15 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
          "--observer-profiles";
          String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then []
+  @ (if operator_profiles = [] then []
      else
        [
-         "--producer-profiles";
-         String.concat "," (List.map string_of_int producer_profiles);
+         "--operator-profiles";
+         String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ mk_backup_uris_args slots_backup_uris
+  @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
   match history_mode with
   | None -> []
@@ -141,10 +171,12 @@ let spawn_config_init ?(expected_pow = 0.) ?(peers = [])
   | Some Auto -> ["--history-mode"; "auto"]
   | Some (Custom i) -> ["--history-mode"; string_of_int i]
 
-let spawn_config_update ?(peers = []) ?(attester_profiles = [])
-    ?(producer_profiles = []) ?(observer_profiles = [])
-    ?(bootstrap_profile = false) ?history_mode dal_node =
-  spawn_command dal_node @@ ["config"; "update"]
+let spawn_config_update ?(expected_pow = 0.) ?(peers = [])
+    ?(attester_profiles = []) ?(operator_profiles = [])
+    ?(observer_profiles = []) ?(bootstrap_profile = false) ?history_mode
+    ?(slots_backup_uris = []) ?(trust_slots_backup_uris = false) dal_node =
+  spawn_command dal_node
+  @@ ["config"; "update"; "--expected-pow"; string_of_float expected_pow]
   @ (if peers = [] then [] else ["--peers"; String.concat "," peers])
   @ (if attester_profiles = [] then []
      else ["--attester-profiles"; String.concat "," attester_profiles])
@@ -154,13 +186,15 @@ let spawn_config_update ?(peers = []) ?(attester_profiles = [])
          "--observer-profiles";
          String.concat "," (List.map string_of_int observer_profiles);
        ])
-  @ (if producer_profiles = [] then []
+  @ (if operator_profiles = [] then []
      else
        [
-         "--producer-profiles";
-         String.concat "," (List.map string_of_int producer_profiles);
+         "--operator-profiles";
+         String.concat "," (List.map string_of_int operator_profiles);
        ])
   @ (if bootstrap_profile then ["--bootstrap-profile"] else [])
+  @ mk_backup_uris_args slots_backup_uris
+  @ mk_trust_slots_backup_uris trust_slots_backup_uris
   @
   match history_mode with
   | None -> []
@@ -178,31 +212,38 @@ module Config_file = struct
   let update dal_node update = read dal_node |> update |> write dal_node
 end
 
-let init_config ?expected_pow ?peers ?attester_profiles ?producer_profiles
-    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+let init_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris dal_node =
   let process =
     spawn_config_init
       ?expected_pow
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
       dal_node
   in
   Process.check process
 
-let update_config ?peers ?attester_profiles ?producer_profiles
-    ?observer_profiles ?bootstrap_profile ?history_mode dal_node =
+let update_config ?expected_pow ?peers ?attester_profiles ?operator_profiles
+    ?observer_profiles ?bootstrap_profile ?history_mode ?slots_backup_uris
+    ?trust_slots_backup_uris dal_node =
   let process =
     spawn_config_update
+      ?expected_pow
       ?peers
       ?attester_profiles
-      ?producer_profiles
+      ?operator_profiles
       ?observer_profiles
       ?bootstrap_profile
       ?history_mode
+      ?slots_backup_uris
+      ?trust_slots_backup_uris
       dal_node
   in
   Process.check process
@@ -279,9 +320,10 @@ let wait_for_disconnection node ~peer_id =
 let handle_event dal_node {name; value = _; timestamp = _} =
   match name with "dal_is_ready.v0" -> set_ready dal_node | _ -> ()
 
-let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
-    ?name ?color ?data_dir ?event_pipe ?(rpc_host = Constant.default_host)
-    ?rpc_port ?listen_addr ?public_addr ?metrics_addr ~l1_node_endpoint () =
+let create_from_endpoint ?runner ?path ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ?(disable_shard_validation = false)
+    ?(disable_amplification = false) ?ignore_pkhs ~l1_node_endpoint () =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir name | Some dir -> dir
@@ -299,6 +341,14 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
     | None -> Format.sprintf "%s:%d" Constant.default_host @@ Port.fresh ()
     | Some addr -> addr
   in
+  let path =
+    Option.value
+      path
+      ~default:
+        (if use_baker_to_start_dal_node = Some true then
+           Uses.path Constant.octez_agnostic_baker
+         else Uses.path Constant.octez_dal_node)
+  in
   let dal_node =
     create
       ?runner
@@ -314,6 +364,9 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
         public_addr;
         metrics_addr;
         pending_ready = [];
+        disable_shard_validation;
+        disable_amplification;
+        ignore_pkhs;
         l1_node_endpoint;
         runner;
       }
@@ -322,12 +375,13 @@ let create_from_endpoint ?runner ?(path = Uses.path Constant.octez_dal_node)
   dal_node
 
 (* TODO: have rpc_addr here, like for others. *)
-let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
-    ?data_dir ?event_pipe ?(rpc_host = Constant.default_host) ?rpc_port
-    ?listen_addr ?public_addr ?metrics_addr ~node () =
+let create ?runner ?path ?name ?color ?data_dir ?event_pipe
+    ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
+    ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
+    ~node () =
   create_from_endpoint
     ?runner
-    ~path
+    ?path
     ?name
     ?color
     ?data_dir
@@ -337,6 +391,9 @@ let create ?runner ?(path = Uses.path Constant.octez_dal_node) ?name ?color
     ?listen_addr
     ?public_addr
     ?metrics_addr
+    ?disable_shard_validation
+    ?disable_amplification
+    ?ignore_pkhs
     ~l1_node_endpoint:(Node.as_rpc_endpoint node)
     ()
 
@@ -356,10 +413,19 @@ let make_arguments node =
     "--metrics-addr";
     metrics_addr node;
   ]
-  @
-  match public_addr node with
-  | None -> []
-  | Some addr -> ["--public-addr"; addr]
+  @ (match public_addr node with
+    | None -> []
+    | Some addr -> ["--public-addr"; addr])
+  @ (if node.persistent_state.disable_shard_validation then
+       ["--disable-shard-validation"]
+     else [])
+  @ (if node.persistent_state.disable_amplification then
+       ["--disable-amplification"]
+     else [])
+  @ Option.fold
+      ~none:[]
+      ~some:(fun pkhs -> "--ignore-topics" :: [String.concat "," pkhs])
+      node.persistent_state.ignore_pkhs
 
 let do_runlike_command ?env ?(event_level = `Debug) node arguments =
   if node.status <> Not_running then
@@ -388,7 +454,9 @@ let run ?env ?event_level node =
     ?env
     ?event_level
     node
-    ["run"; "--verbose"; "--data-dir"; node.persistent_state.data_dir]
+    (["run"]
+    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["--verbose"; "--data-dir"; node.persistent_state.data_dir])
 
 let run ?(wait_ready = true) ?env ?event_level node =
   let* () = run ?env ?event_level node in
@@ -398,7 +466,7 @@ let run ?(wait_ready = true) ?env ?event_level node =
 let as_rpc_endpoint (t : t) =
   let state = t.persistent_state in
   let scheme = "http" in
-  Endpoint.{scheme; host = state.rpc_host; port = state.rpc_port}
+  Endpoint.make ~scheme ~host:state.rpc_host ~port:state.rpc_port ()
 
 let runner (t : t) = t.persistent_state.runner
 
@@ -441,9 +509,20 @@ let load_last_finalized_processed_level dal_node =
   let* v_res = aux () in
   match v_res with Ok v -> Lwt.return_some v | Error _ -> Lwt.return_none
 
-let debug_print_store_schemas ?(path = Uses.path Constant.octez_dal_node) ?hooks
-    () =
-  let args = ["debug"; "print"; "store"; "schemas"] in
+let debug_print_store_schemas ?path ?hooks () =
+  let args =
+    ["debug"]
+    @ (if use_baker_to_start_dal_node = Some true then ["dal"] else [])
+    @ ["print"; "store"; "schemas"]
+  in
+  let path =
+    Option.value
+      path
+      ~default:
+        (if use_baker_to_start_dal_node = Some true then
+           Uses.path Constant.octez_agnostic_baker
+         else Uses.path Constant.octez_dal_node)
+  in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
@@ -539,4 +618,137 @@ module Proxy = struct
     Lwt.async start
 
   let stop t = Lwt.wakeup t.trigger_shutdown ()
+end
+
+module Mockup = struct
+  type answer = [`Response of string]
+
+  type route = {
+    path_pattern : Re.Pcre.regexp;
+    callback : path:string -> answer option Lwt.t;
+  }
+
+  type t = {
+    name : string;
+    routes : route list;
+    shutdown : unit Lwt.t;
+    trigger_shutdown : unit Lwt.u;
+  }
+
+  let make ~name ~routes =
+    let shutdown, trigger_shutdown = Lwt.task () in
+    {name; routes; shutdown; trigger_shutdown}
+
+  let route ~path_pattern ~callback =
+    {path_pattern = Re.Pcre.regexp path_pattern; callback}
+
+  let find_mocked_action t ~path =
+    List.find_opt
+      (fun act -> Re.Pcre.pmatch ~rex:act.path_pattern path)
+      t.routes
+
+  let run t ~port =
+    let callback _conn req _body =
+      let uri = Cohttp.Request.uri req in
+      let uri_str = Uri.to_string uri in
+      let path = Uri.path uri in
+      match find_mocked_action t ~path with
+      | Some action -> (
+          Log.debug "[%s] mocking request: '%s'" t.name uri_str ;
+          let* res = action.callback ~path in
+          match res with
+          | None -> Cohttp_lwt_unix.Server.respond_not_found ()
+          | Some (`Response body) ->
+              Log.debug "[%s] responding with mock: '%s'" t.name body ;
+              Cohttp_lwt_unix.Server.respond_string ~status:`OK ~body ())
+      | None ->
+          Log.warn "[%s] no mock route for: '%s', failing." t.name uri_str ;
+          Cohttp_lwt_unix.Server.respond_error
+            ~status:`Not_implemented
+            ~body:"Unmocked RPC"
+            ()
+    in
+    let start () =
+      Cohttp_lwt_unix.Server.create
+        ~mode:(`TCP (`Port port))
+        ~stop:t.shutdown
+        (Cohttp_lwt_unix.Server.make ~callback ())
+    in
+    Lwt.async start
+
+  let stop t = Lwt.wakeup t.trigger_shutdown ()
+end
+
+module Mockup_for_baker = struct
+  type t = Mockup.t
+
+  let routes ~attestation_lag ~attesters ~attestable_slots =
+    [
+      (let path_pattern =
+         Format.sprintf
+           "/profiles/(tz[1234][a-zA-Z0-9]+)/attested_levels/([1-9][0-9]*)/attestable_slots"
+       in
+       Mockup.route ~path_pattern ~callback:(fun ~path ->
+           let open Ezjsonm in
+           let re = Re.Pcre.regexp path_pattern in
+           let attester =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 1
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let attested_level =
+             match Re.exec_opt re path with
+             | Some groups -> Re.Group.get groups 2 |> int_of_string
+             | None -> Test.fail "failed to extract attested_level from %s" path
+           in
+           let published_level = attested_level - attestation_lag in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "attestable_slots_set");
+                 ( "attestable_slots_set",
+                   list bool @@ attestable_slots ~attester ~attested_level );
+                 ("published_level", int published_level);
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/profiles/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("kind", string "controller");
+                 ( "controller_profiles",
+                   dict [("attesters", list string attesters)] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+      (let path_pattern = "^/health/?$" in
+       Mockup.route ~path_pattern ~callback:(fun ~path:_ ->
+           let open Ezjsonm in
+           let mocked_json =
+             dict
+               [
+                 ("status", string "up");
+                 ( "checks",
+                   list
+                     (fun (name, status) ->
+                       dict [("name", string name); ("status", string status)])
+                     [("p2p", "up"); ("topics", "ok"); ("gossipsub", "up")] );
+               ]
+           in
+           let body = value_to_string mocked_json in
+           Lwt.return_some (`Response body)));
+    ]
+
+  let make ~name ~attestation_lag ~attesters ~attestable_slots =
+    let routes = routes ~attestation_lag ~attesters ~attestable_slots in
+    Mockup.make ~name ~routes
+
+  let run t = Mockup.run t
+
+  let stop t = Mockup.stop t
 end

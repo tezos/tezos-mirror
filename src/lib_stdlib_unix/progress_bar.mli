@@ -16,20 +16,27 @@ include module type of Progress
     outputs.  *)
 type 'a line
 
-(** [progress_bar ~message ~counter ~color total] creates a progress bar with a
-    [message] of the specified [color] to count until [total]. If counter is
-    [`Bytes], the progress bar represents bytes amounts and if [`Int], it counts
-    integer units. *)
+(** [progress_bar ~message ~counter ?update_interval ?color ?no_tty_quiet total]
+    creates a progress bar with a [message] of the specified [color] to count
+    until [total]. If counter is [`Bytes], the progress bar represents bytes
+    amounts and if [`Int], it counts integer units. When provided,
+    [update_interval = f] makes the progress bar update every [f] seconds. If
+    [no_tty_quiet] is set to false, no message is displayed when the output is
+    not a TTY (by default the [message] is displayed instead of the progress
+    bar). *)
 val progress_bar :
   message:string ->
-  counter:[`Bytes | `Int] ->
+  counter:[`Bytes | `Bytes_speed | `Int] ->
+  ?update_interval:float ->
   ?color:Terminal.Color.t ->
+  ?no_tty_quiet:bool ->
   int ->
   int line
 
-(** [spinner ~message] creates a spinner that can be used to indicate progress
-    for an unknown quantity. *)
-val spinner : message:string -> 'a line
+(** [spinner ?no_tty_quiet message] creates a spinner that can be used to
+    indicate progress for an unknown quantity. See {!progress_bar} for the
+    description of [no_tty_quiet]. *)
+val spinner : ?no_tty_quiet:bool -> string -> 'a line
 
 (** Same as {!Progress.with_reporter} but for non tty outputs, only displays the
     message without animation. *)
@@ -44,5 +51,6 @@ module Lwt : sig
   (** [with_background_spinner ~message promise] displays a spinner with
       [messages] while the [promise] is pending. This function is to be used for
       code that cannot be instrumented for progress. *)
-  val with_background_spinner : message:string -> 'a Lwt.t -> 'a Lwt.t
+  val with_background_spinner :
+    ?no_tty_quiet:bool -> message:string -> 'a Lwt.t -> 'a Lwt.t
 end

@@ -7,15 +7,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
-- Nothing.
+- Add `SecretKeySecp256k1` and `SecretKeyP256` hashes
+- Add `EncryptedSecretKeyEd25519`, `EncryptedSecretKeySecp256k1`, `EncryptedSecretKeyP256` and `EncryptedSecretKeyBls` hashes
+- Add `ScriptExprHash` hash
+- Allow the unit type `()` as field in derived implementations of `NomReader` and `BinWriter`.
+- Add a new package `tezos-protocol`, holding the Tezos protocol structures.
+- Add `Contract` defining contract address.
+- Add `Entrypoint` defining transaction entrypoint.
+- Add `OperationContent`, `ManagerOperationContent`, `RevealContent`, `TransactionContent` defining operations contents for reveal and transaction.
 
 ### Changed
 
-- Nothing.
+- Add `types::Narith`, which wraps a `BigUint`.
+- Deprecate `types::Mutez`. It is left as a type-alias to `types::Narith`.
+  *NB* The internally wrapped type is changed from `BigInt` to `BigUint` as a result.
+- Add `#[encoding]` attribute support for enum fields, in addition to struct fields.
+- `tezos_data_encoding_derive`: derivations of `NomReader` and `BinWriter` require those same constraints on their fields. If such a field doesn't meet the constraint, the implementation will not be available for use, however compilation will still succeed.
 
 ### Fixed
 
-- Nothing.
+- Fix `short_dynamic` function in `encoding` - was incorrectly using `dynamic` internally.
 
 ### Security
 

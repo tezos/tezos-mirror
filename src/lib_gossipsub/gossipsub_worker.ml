@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Profiler = (val Profiler.wrap Gossipsub_profiler.gossipsub_profiler)
+
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5165
 
    Add coverage unit tests *)
@@ -273,7 +275,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
   type worker_state = {
     stats : Introspection.stats;
     gossip_state : GS.state;
-    bootstrap_points : unit -> Point.t list;
+    persistent_points : unit -> Point.t list;
     trusted_peers : Peer.Set.t;
     connected_bootstrap_peers : Peer.Set.t;
     events_stream : event Stream.t;
@@ -560,10 +562,6 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             | `Message message ->
                 Introspection.update_count_recv_iwants state.stats `Incr ;
                 let topic = Message_id.get_topic message_id in
-                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5415
-
-                   Don't provide a topic when it can be inferred (e.g. from
-                   Message_id.t). This also applies for Message_with_header and IHave. *)
                 let message_with_header = {message; topic; message_id} in
                 let p2p_message = Message_with_header message_with_header in
                 emit_p2p_message state p2p_message (Seq.return peer)
@@ -710,14 +708,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           |> emit_p2p_output state ~mk_output:(fun trusted_peer ->
                  Connect {peer = trusted_peer; origin = Trusted}) ;
           let p2p_output_stream = state.p2p_output_stream in
-          let bootstrap_points =
-            state.bootstrap_points ()
+          let persistent_points =
+            state.persistent_points ()
             |> List.filter point_can_be_contacted
             |> Point.Set.of_list
           in
           Point.Set.iter
             (fun point -> Stream.push (Connect_point {point}) p2p_output_stream)
-            bootstrap_points) ;
+            persistent_points) ;
         let state =
           (* We reset the map every 6h. This prevents this map to contain outdated points. *)
           if Int64.(equal (rem gstate_view.heartbeat_ticks 21600L) 0L) then
@@ -749,52 +747,87 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let receive_message =
           {GS.sender = from_peer; topic; message_id; message}
         in
-        GS.handle_receive_message receive_message gossip_state
+        (GS.handle_receive_message receive_message gossip_state
         |> update_gossip_state state
-        |> handle_receive_message receive_message
+        |> handle_receive_message receive_message)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Message_with_header"]]
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
-        GS.handle_graft graft gossip_state
+        (GS.handle_graft graft gossip_state
         |> update_gossip_state state
-        |> handle_graft from_peer topic
+        |> handle_graft from_peer topic)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Graft"]]
     | Subscribe {topic} ->
         let subscribe : GS.subscribe = {peer = from_peer; topic} in
-        GS.handle_subscribe subscribe gossip_state
-        |> update_gossip_state state |> handle_subscribe
+        (GS.handle_subscribe subscribe gossip_state
+        |> update_gossip_state state |> handle_subscribe)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Subscribe"]]
     | Unsubscribe {topic} ->
         let unsubscribe : GS.unsubscribe = {peer = from_peer; topic} in
-        GS.handle_unsubscribe unsubscribe gossip_state
-        |> update_gossip_state state |> handle_unsubscribe
+        (GS.handle_unsubscribe unsubscribe gossip_state
+        |> update_gossip_state state |> handle_unsubscribe)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Unsubscribe"]]
     | IHave {topic; message_ids} ->
         (* The automaton should guarantee that the list is not empty. *)
         let ihave : GS.ihave = {peer = from_peer; topic; message_ids} in
-        GS.handle_ihave ihave gossip_state
-        |> update_gossip_state state |> handle_ihave ihave
+        (GS.handle_ihave ihave gossip_state
+        |> update_gossip_state state |> handle_ihave ihave)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "IHave"]]
     | IWant {message_ids} ->
         (* The automaton should guarantee that the list is not empty. *)
         let iwant : GS.iwant = {peer = from_peer; message_ids} in
-        GS.handle_iwant iwant gossip_state
-        |> update_gossip_state state |> handle_iwant iwant
+        (GS.handle_iwant iwant gossip_state
+        |> update_gossip_state state |> handle_iwant iwant)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "IWant"]]
     | Prune {topic; px; backoff} ->
         let prune : GS.prune = {peer = from_peer; topic; px; backoff} in
-        GS.handle_prune prune gossip_state
+        (GS.handle_prune prune gossip_state
         |> update_gossip_state state
-        |> handle_prune ~self ~from_peer px
+        |> handle_prune ~self ~from_peer px)
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Prune"]]
     | Ping ->
         (* We treat [Ping] message as a no-op and return the current [state]. *)
         state
+        [@profiler.span_f
+          {verbosity = Notice}
+            ["apply_event"; "P2P_input"; "In_message"; "Ping"]]
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~self ({gossip_state; _} as state) = function
-    | New_connection {peer; direct; trusted; bootstrap} ->
-        GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
-        |> update_gossip_state state
-        |> handle_new_connection peer ~bootstrap ~trusted
-    | Disconnection {peer} ->
-        GS.remove_peer {peer} gossip_state
-        |> update_gossip_state state |> handle_disconnection peer
+    | New_connection {peer; direct; trusted; bootstrap} -> (
+        ((GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
+         |> update_gossip_state state
+         |> handle_new_connection peer ~bootstrap ~trusted)
+         [@profiler.span_f
+           {verbosity = Notice} ["apply_event"; "P2P_input"; "New_connection"]])
+        )
+    | Disconnection {peer} -> (
+        ((GS.remove_peer {peer} gossip_state
+         |> update_gossip_state state |> handle_disconnection peer)
+         [@profiler.span_f
+           {verbosity = Notice} ["apply_event"; "P2P_input"; "Disconnection"]]))
     | In_message {from_peer; p2p_message} ->
-        apply_p2p_message ~self state from_peer p2p_message
+        apply_p2p_message
+          ~self
+          state
+          from_peer
+          p2p_message
+        [@profiler.span_f
+          {verbosity = Notice} ["apply_event"; "P2P_input"; "In_message"]]
 
   let rec check_unknown_messages_id state =
     match Bounded_message_map.remove_min state.unknown_validity_messages with
@@ -842,16 +875,30 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
-    | Heartbeat ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/5170
+    | Heartbeat -> (
+        (((* TODO: https://gitlab.com/tezos/tezos/-/issues/5170
 
-           Do we want to detect cases where two successive [Heartbeat] events
-           would be handled (e.g. because the first one is late)? *)
-        GS.heartbeat gossip_state |> update_gossip_state state
-        |> handle_heartbeat
-    | P2P_input event -> apply_p2p_event ~self state event
-    | App_input event -> apply_app_event state event
-    | Check_unknown_messages -> check_unknown_messages_id state
+             Do we want to detect cases where two successive [Heartbeat] events
+             would be handled (e.g. because the first one is late)? *)
+          GS.heartbeat gossip_state
+         |> update_gossip_state state |> handle_heartbeat)
+         [@profiler.span_f {verbosity = Notice} ["apply_event"; "Heartbeat"]]))
+    | P2P_input event ->
+        apply_p2p_event
+          ~self
+          state
+          event
+        [@profiler.span_f {verbosity = Notice} ["apply_event"; "P2P_input"]]
+    | App_input event ->
+        apply_app_event
+          state
+          event
+        [@profiler.span_f {verbosity = Notice} ["apply_event"; "App_input"]]
+    | Check_unknown_messages ->
+        check_unknown_messages_id
+          state
+        [@profiler.span_f
+          {verbosity = Notice} ["apply_event"; "Check_unknown_messages"]]
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state; self = _} = Stream.push e state.events_stream
@@ -898,7 +945,11 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
       if !shutdown then return ()
       else
         let* () = events_logging event in
-        t.state <- apply_event ~self:t.self t.state event ;
+        t.state <-
+          (apply_event
+             ~self:t.self
+             t.state
+             event [@profiler.span_f {verbosity = Notice} ["apply_event"]]) ;
         loop t
     in
     let promise = loop t in
@@ -946,13 +997,13 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(bootstrap_points = fun () -> []) ~self rng limits parameters =
+      ?(initial_points = fun () -> []) ~self rng limits parameters =
     {
       self;
       status = Starting;
       state =
         {
-          bootstrap_points;
+          persistent_points = initial_points;
           stats = Introspection.empty_stats ();
           gossip_state = GS.make rng limits parameters;
           trusted_peers = Peer.Set.empty;

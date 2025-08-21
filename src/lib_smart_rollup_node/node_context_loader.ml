@@ -64,8 +64,10 @@ let create_sync_info () =
   }
 
 let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
-    ?log_kernel_debug_file ?last_whitelist_update mode l1_ctxt genesis_info
-    ~(lcc : lcc) ~lpc kind current_protocol
+    ?log_kernel_debug_file ?last_whitelist_update
+    ~(store_access : 'store Access_mode.t)
+    ~(context_access : 'context Access_mode.t) l1_ctxt genesis_info ~(lcc : lcc)
+    ~lpc kind current_protocol
     Configuration.(
       {sc_rollup_address = rollup_address; dal_node_endpoint; _} as
       configuration) =
@@ -80,11 +82,11 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     }
   in
   let* () = update_metadata metadata ~data_dir in
-  let* store =
-    Node_context.Node_store.init_with_migration mode metadata ~data_dir
-  in
+  let* store = Node_context.Node_store.init store_access ~data_dir in
   let dal_cctxt =
-    Option.map Dal_node_client.make_unix_cctxt dal_node_endpoint
+    Option.map
+      Tezos_dal_node_lib.Dal_node_client.make_unix_cctxt
+      dal_node_endpoint
   in
   let*? (module Plugin : Protocol_plugin_sig.S) =
     Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
@@ -94,12 +96,12 @@ let init (cctxt : #Client_context.full) ~data_dir ~irmin_cache_size
     Context.load
       (module C)
       ~cache_size:irmin_cache_size
-      mode
+      context_access
       (Configuration.default_context_dir data_dir)
   in
   let* () =
     Node_context.Node_store.check_and_set_history_mode
-      mode
+      store_access
       store
       configuration.history_mode
   in
@@ -208,51 +210,46 @@ module For_snapshots = struct
         ~needed_purposes:(Configuration.purposes_of_mode mode)
         []
     in
-    let* config =
-      let config_file = Configuration.config_filename ~data_dir in
-      let*! exists_config = Lwt_unix.file_exists config_file in
-      if exists_config then
-        let* config = Configuration.load ~data_dir in
-        return {config with apply_unsafe_patches}
-      else
-        return
-        @@ Configuration.
-             {
-               sc_rollup_address = metadata.rollup_address;
-               boot_sector_file = None;
-               operators;
-               rpc_addr = Configuration.default_rpc_addr;
-               rpc_port = Configuration.default_rpc_port;
-               acl = Configuration.default_acl;
-               metrics_addr = None;
-               performance_metrics = false;
-               reconnection_delay = 1.;
-               fee_parameters = Configuration.default_fee_parameters;
-               mode;
-               loser_mode;
-               apply_unsafe_patches;
-               unsafe_pvm_patches = [];
-               unsafe_disable_wasm_kernel_checks = false;
-               execute_outbox_messages_filter =
-                 Configuration.default_execute_outbox_filter;
-               dal_node_endpoint = None;
-               batcher = Configuration.default_batcher;
-               injector = Configuration.default_injector;
-               l1_blocks_cache_size;
-               l2_blocks_cache_size;
-               index_buffer_size = Some index_buffer_size;
-               irmin_cache_size = Some irmin_cache_size;
-               prefetch_blocks = None;
-               log_kernel_debug = false;
-               no_degraded = false;
-               gc_parameters = Configuration.default_gc_parameters;
-               history_mode = None;
-               cors = Resto_cohttp.Cors.default;
-               l1_rpc_timeout;
-               loop_retry_delay = 10.;
-               pre_images_endpoint = None;
-               bail_on_disagree = false;
-             }
+    let config =
+      Configuration.
+        {
+          sc_rollup_address = metadata.rollup_address;
+          etherlink = Address.is_etherlink metadata.rollup_address;
+          boot_sector_file = None;
+          operators;
+          rpc_addr = Configuration.default_rpc_addr;
+          rpc_port = Configuration.default_rpc_port;
+          acl = Configuration.default_acl;
+          metrics_addr = None;
+          performance_metrics = false;
+          reconnection_delay = 1.;
+          fee_parameters = Configuration.default_fee_parameters;
+          mode;
+          loser_mode;
+          apply_unsafe_patches;
+          unsafe_pvm_patches = [];
+          unsafe_disable_wasm_kernel_checks = false;
+          execute_outbox_messages_filter =
+            Configuration.default_execute_outbox_filter;
+          dal_node_endpoint = None;
+          batcher = Configuration.default_batcher;
+          injector = Configuration.default_injector;
+          l1_blocks_cache_size;
+          l2_blocks_cache_size;
+          index_buffer_size = Some index_buffer_size;
+          irmin_cache_size = Some irmin_cache_size;
+          prefetch_blocks = None;
+          log_kernel_debug = false;
+          no_degraded = false;
+          gc_parameters = Configuration.default_gc_parameters;
+          history_mode = None;
+          cors = Resto_cohttp.Cors.default;
+          l1_rpc_timeout;
+          loop_retry_delay = 10.;
+          pre_images_endpoint = None;
+          bail_on_disagree = false;
+          opentelemetry = Octez_telemetry.Opentelemetry_config.default;
+        }
     in
     let*? l1_ctxt =
       Layer1.create
@@ -331,6 +328,7 @@ module Internal_for_tests = struct
       Configuration.
         {
           sc_rollup_address = rollup_address;
+          etherlink = Address.is_etherlink rollup_address;
           boot_sector_file = None;
           operators;
           rpc_addr = Configuration.default_rpc_addr;
@@ -364,22 +362,12 @@ module Internal_for_tests = struct
           history_mode = None;
           cors = Resto_cohttp.Cors.default;
           bail_on_disagree = false;
+          opentelemetry = Octez_telemetry.Opentelemetry_config.default;
         }
     in
     let* lockfile = lock ~data_dir in
     let genesis_info = {level = 0l; commitment_hash = Commitment.Hash.zero} in
-    let metadata =
-      Metadata.
-        {
-          rollup_address;
-          context_version = Context.Version.version;
-          kind;
-          genesis_info;
-        }
-    in
-    let* store =
-      Node_context.Node_store.init_with_migration Read_write metadata ~data_dir
-    in
+    let* store = Node_context.Node_store.init Read_write ~data_dir in
     let*? (module Plugin : Protocol_plugin_sig.S) =
       Protocol_plugins.proto_plugin_for_protocol current_protocol.hash
     in

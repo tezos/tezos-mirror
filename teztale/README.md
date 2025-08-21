@@ -14,7 +14,7 @@ It is splitted in 2 parts:
 ### Server
 
 First, you need to write a configuration file. It is a json file
-folowing the schema:
+following the schema:
 
 ```json
 {
@@ -26,7 +26,7 @@ folowing the schema:
                 }
                 <list_of_network_point_to_bind_to>
               ],
-"admins": [ {"login":"admin","password":"zzz"},
+"admins": [ {"login":"admin","password":"zzz"}
            <admins_allowed_to_add_remove_users>
           ],
 "users": [ {"login":"alice","password":"secret"},
@@ -38,10 +38,13 @@ folowing the schema:
 }
 ```
 
-Note: allowed archivers are actually stored in the database. The list `users`
-from the config file will automatically be added to the database at launch.
-Admins are not stored in the database, so you need to update your configuration
-and restart your server if you want to modify them.
+Notes:
+  - Allowed archivers are actually stored in the database. The list `users` from
+the config file will automatically be added to the database at launch,
+  - Admins are not stored in the database, so you need to update your
+configuration and restart your server if you want to modify them,
+  - the `db` field must be prefixed by the sqlite3 or postgres hint, such as
+    `sqlite3:path_to_the_database` or `postgres://user:password@addr:port/db`
 
 You can know the list of users allowed (but not the password) with
 
@@ -73,7 +76,12 @@ Run an octez node, with a RPC server open on localhost:8732 and do
 
 ```
 octez-teztale-archiver [--endpoint OCTEZ_NODE_URL:OCTEZ_NODE_RPC_PORT] feed ARCHIVER_LOGIN:ARCHIVER_PASSWORD@SERVER_URL:SERVER_PORT
+```
 
+For example:
+
+```
+octez-teztale-archiver --endpoint http://127.0.0.1:8732 feed http://alice:secret@127.0.0.1:8443
 ```
 
 `octez-teztale-archiver` is an octez client, it thus accepts the same global

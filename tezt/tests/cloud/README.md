@@ -14,13 +14,19 @@ first.
 Use this command to verify that everything is well-configured locally:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud simple -v --log-file /tmp/log --localhost
+dune exec tezt/tests/cloud/main.exe -- BASIC simple -v --log-file /tmp/log --localhost
 ```
 
 To check your configuration with GCP, use the following command:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud simple -v --log-file /tmp/log
+dune exec tezt/tests/cloud/main.exe -- BASIC simple -v --log-file /tmp/log
+```
+
+Now destroy the vm that was created during the previous run:
+
+```
+dune exec tezt/tests/cloud/main.exe -- CLOUD destroy -v --log-file /tmp/log
 ```
 
 ## Running a Basic Scenario
@@ -29,14 +35,14 @@ With Octez, you can run a scenario using that will start a fresh
 network (sandboxed mode) using protocol Alpha and bake some blocks:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost
 ```
 
 By default, in localhost mode, some services like Prometheus are not
 started. To enable them, run:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost --prometheus --grafana --website
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost --prometheus --grafana --website
 ```
 
 Once enabled, you can access the various services at
@@ -50,7 +56,7 @@ may currently be deactivated such as `--stake` and just need to be
 implemented.
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost --network ghostnet
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost --network ghostnet
 ```
 
 ## Running DAL Producers
@@ -59,7 +65,7 @@ The number of DAL producers can be specified using the `--producers`
 option. For example the following command will run 3 producers:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost --network ghostnet --producers 3
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost --network ghostnet --producers 3
 ```
 
 This command runs 3 producers.
@@ -72,7 +78,7 @@ following command runs 3 bakers, where the first has `1/6` of the
 stake, the second `2/6`, and the third `3/6`.
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost --stake 1,2,3
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost --stake 1,2,3
 ```
 
 ## Running a New Etherlink Instance
@@ -80,7 +86,7 @@ dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localh
 To originate a new Etherlink instance and generate operations for it, use the following command:
 
 ```
-dune exec tezt/tests/cloud/main.exe -- cloud dal -v --log-file /tmp/log --localhost --etherlink --etherlink-producers 1
+dune exec tezt/tests/cloud/main.exe -- DAL -v --log-file /tmp/log --localhost --etherlink --etherlink-producers 1
 ```
 
 ## Running Maintenance Jobs

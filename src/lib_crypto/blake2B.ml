@@ -179,6 +179,8 @@ module Make_minimal (K : Name) = struct
   end)
 end
 
+module Make_minimal_with_data (Name : Name) = Make_minimal (Name)
+
 module type Register = sig
   val register_encoding :
     prefix:string ->

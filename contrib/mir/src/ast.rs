@@ -35,7 +35,10 @@ use std::{
 pub use tezos_crypto_rs::hash::ChainId;
 use typed_arena::Arena;
 
-use crate::{bls, lexer::Prim};
+use crate::lexer::Prim;
+
+#[cfg(feature = "bls")]
+use crate::bls;
 
 pub use annotations::{Annotation, Annotations, FieldAnnotation, NO_ANNS};
 pub use big_map::BigMap;
@@ -100,8 +103,11 @@ pub enum Type {
     Lambda(Rc<(Type, Type)>),
     Ticket(Rc<Type>),
     Timestamp,
+    #[cfg(feature = "bls")]
     Bls12381Fr,
+    #[cfg(feature = "bls")]
     Bls12381G1,
+    #[cfg(feature = "bls")]
     Bls12381G2,
 }
 
@@ -112,8 +118,11 @@ impl Type {
         use Type::*;
         match self {
             Nat | Int | Bool | Mutez | String | Unit | Never | Operation | Address | ChainId
-            | Bytes | Key | Signature | KeyHash | Timestamp | Bls12381Fr | Bls12381G1
-            | Bls12381G2 => 1,
+            | Bytes | Key | Signature | KeyHash | Timestamp => 1,
+
+            #[cfg(feature = "bls")]
+            Bls12381Fr | Bls12381G1 | Bls12381G2 => 1,
+
             Pair(p) | Or(p) | Map(p) | BigMap(p) | Lambda(p) => {
                 1 + p.0.size_for_gas() + p.1.size_for_gas()
             }
@@ -224,8 +233,11 @@ impl<'a> IntoMicheline<'a> for &'_ Type {
             Timestamp => Micheline::prim0(Prim::timestamp),
             KeyHash => Micheline::prim0(Prim::key_hash),
             Never => Micheline::prim0(Prim::never),
+            #[cfg(feature = "bls")]
             Bls12381Fr => Micheline::prim0(Prim::bls12_381_fr),
+            #[cfg(feature = "bls")]
             Bls12381G1 => Micheline::prim0(Prim::bls12_381_g1),
+            #[cfg(feature = "bls")]
             Bls12381G2 => Micheline::prim0(Prim::bls12_381_g2),
 
             Option(x) => Micheline::prim1(
@@ -327,9 +339,12 @@ pub enum TypedValue<'a> {
     Operation(Box<OperationInfo<'a>>),
     Ticket(Box<Ticket<'a>>),
     Timestamp(BigInt),
+    #[cfg(feature = "bls")]
     Bls12381Fr(bls::Fr),
     // G1 and G2 are a bit too large to lug them about on-stack
+    #[cfg(feature = "bls")]
     Bls12381G1(Box<bls::G1>),
+    #[cfg(feature = "bls")]
     Bls12381G2(Box<bls::G2>),
 }
 
@@ -389,9 +404,6 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
             TV::Lambda(lam) => lam.into_micheline_optimized_legacy(arena),
             TV::KeyHash(s) => V::Bytes(s.to_bytes_vec()),
             TV::Timestamp(s) => V::Int(s),
-            TV::Bls12381Fr(x) => V::Bytes(x.to_bytes().to_vec()),
-            TV::Bls12381G1(x) => V::Bytes(x.to_bytes().to_vec()),
-            TV::Bls12381G2(x) => V::Bytes(x.to_bytes().to_vec()),
             TV::Contract(x) => go(TV::Address(x)),
             TV::Operation(operation_info) => match operation_info.operation {
                 Operation::TransferTokens(tt) => Micheline::prim3(
@@ -446,6 +458,12 @@ impl<'a> IntoMicheline<'a> for TypedValue<'a> {
                 ),
             },
             TV::Ticket(t) => go(unwrap_ticket(t.as_ref().clone())),
+            #[cfg(feature = "bls")]
+            TV::Bls12381Fr(x) => V::Bytes(x.to_bytes().to_vec()),
+            #[cfg(feature = "bls")]
+            TV::Bls12381G1(x) => V::Bytes(x.to_bytes().to_vec()),
+            #[cfg(feature = "bls")]
+            TV::Bls12381G2(x) => V::Bytes(x.to_bytes().to_vec()),
         }
     }
 }
@@ -509,11 +527,13 @@ impl<'a> TypedValue<'a> {
     }
 
     /// Convenience function to construct a new [Self::Bls12381G1]. Allocates a new [Box].
+    #[cfg(feature = "bls")]
     pub fn new_bls12381_g1(x: bls::G1) -> Self {
         Self::Bls12381G1(Box::new(x))
     }
 
     /// Convenience function to construct a new [Self::Bls12381G2]. Allocates a new [Box].
+    #[cfg(feature = "bls")]
     pub fn new_bls12381_g2(x: bls::G2) -> Self {
         Self::Bls12381G2(Box::new(x))
     }
@@ -635,6 +655,7 @@ pub enum Instruction<'a> {
     /// in concrete syntax, so we can assume that if the entrypoint is the default entrypoint, then
     /// no explicit entrypoint was specified in the instruction.
     Contract(Type, Entrypoint),
+    #[cfg(feature = "bls")]
     PairingCheck,
     Emit {
         tag: Option<FieldAnnotation<'a>>,
@@ -670,6 +691,7 @@ pub mod test_strategies {
         // TODO: https://gitlab.com/tezos/tezos/-/issues/6755
         // Produce all types.
         use Type::*;
+        #[cfg(feature = "bls")]
         let prim = prop_oneof![
             // Cases that we want to see in tests in the first place - go first
             Just(Int),
@@ -688,6 +710,23 @@ pub mod test_strategies {
             Just(Bls12381Fr),
             Just(Bls12381G1),
             Just(Bls12381G2),
+        ];
+        #[cfg(not(feature = "bls"))]
+        let prim = prop_oneof![
+            // Cases that we want to see in tests in the first place - go first
+            Just(Int),
+            Just(Nat),
+            Just(Mutez),
+            Just(Timestamp),
+            Just(String),
+            Just(Bytes),
+            Just(Unit),
+            Just(Bool),
+            Just(Address),
+            Just(ChainId),
+            Just(Key),
+            Just(Signature),
+            Just(KeyHash),
         ];
         prim.prop_recursive(5, 16, 2, |inner| {
             prop_oneof![
@@ -856,10 +895,13 @@ pub mod test_strategies {
                 Just(V::KeyHash(
                     KeyHash::from_base58_check("tz1Nw5nr152qddEjKT2dKBH8XcBMDAg72iLw").unwrap()
                 )).boxed(),
+            #[cfg(feature = "bls")]
             T::Bls12381Fr =>
                 Just(V::Bls12381Fr(bls::fr::Fr::from_big_int(&0.into()))).boxed(),
+            #[cfg(feature = "bls")]
             T::Bls12381G1 =>
                 Just(V::Bls12381G1(Box::new(bls::g1::G1::zero()))).boxed(),
+            #[cfg(feature = "bls")]
             T::Bls12381G2 =>
                 Just(V::Bls12381G2(Box::new(bls::g2::G2::zero()))).boxed(),
             T::Contract(_) => panic!("Cannot generate typed value for contract"),

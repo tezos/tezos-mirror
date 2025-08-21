@@ -29,7 +29,13 @@ local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 local rpc = import './rpc.jsonnet';
-local logs = import './logs.jsonnet';
+
+local logsrc = std.extVar('logsrc');
+local logs = if logsrc == 'gcp' then import './logs-gcp.jsonnet' else import './logs-loki.jsonnet';
+
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
 
 //Position variables
 local p2p_y = 47;
@@ -41,7 +47,8 @@ local logs_y = 131;
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Octez with logs dashboard')
+dashboard.new('Octez with logs dashboard' + if !uid then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('octez-with-logs' + uid_ext) else {})
 + dashboard.withDescription('A dashboard for Octez including logs')
 + dashboard.withTags(['tezos', 'octez', 'logs'])
 + dashboard.time.withFrom('now-3h')

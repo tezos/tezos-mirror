@@ -17,16 +17,22 @@ depends: [
   "cohttp" { >= "5.3.1" }
   "mirage-crypto-rng" { >= "1.0.0" }
   "octez-libs"
+  "lwt_log"
   "octez-l2-libs"
+  "opentelemetry-lwt"
   "crunch" { >= "3.3.0" }
   "caqti-lwt" { >= "2.0.1" }
   "re" { >= "1.10.0" }
   "octez-smart-rollup-wasm-debugger-plugin"
   "uuidm" { >= "0.9.9" }
+  "octez-protocol-022-PsRiotum-libs"
+  "tezos-protocol-022-PsRiotum"
+  "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
-  "dream" { >= "1.0.0~alpha7" }
-  "octez-version"
   "lwt-watcher" { = "0.2" }
+  "dream" { >= "1.0.0~alpha7" }
+  "octez-connpool"
+  "octez-version"
   "lwt-exit"
   "octez-smart-rollup-wasm-debugger-lib"
   "tezos-dal-node-services"

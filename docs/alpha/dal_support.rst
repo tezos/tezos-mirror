@@ -75,7 +75,7 @@ Minimal participation
 
 Any baker that can take part in consensus is eligible for rewards.
 
-Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle.
+Bakers meeting the minimum participation ratio ``MINIMAL_PARTICIPATION_RATIO`` over a cycle, set to 64%, receive rewards for that cycle, provided that they receive consensus attestation rewards for that cycle.
 
 The participation ratio of the baker is the proportion of slots the baker attested over the slots that were attestable by this baker during the cycle. Both slot numbers only count those slots that are deemed available by the protocol.
 
@@ -110,10 +110,10 @@ corresponding to the following scenario. Suppose there are five delegates with e
 DAL participation rewards
 -------------------------
 
-A fixed percentage, defined by a protocol parameter called ``DAL_REWARDS_RATIO``, set to %10, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
+A fixed percentage, defined by a protocol parameter called ``REWARDS_RATIO``, set to 10%, of the total :ref:`participation rewards<adaptive_rewards_alpha>` is allocated to the DAL.
 
 The DAL rewards per level are implicitly given by their weight, ``DAL_REWARDS_WEIGHT``, as for the other types of :ref:`participation rewards<rewards_weights_alpha>`.
-The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``DAL_REWARDS_RATIO`` of all reward weights.
+The value of ``DAL_REWARDS_WEIGHT`` is such that it represents ``REWARDS_RATIO`` of all reward weights.
 
 The rewards are distributed at the end of a cycle, and are computed in the same manner as for the other :ref:`participation rewards<adaptive_rewards_alpha>`.
 For instance, the stakers' share of these reward is proportional to the weight of their stake in relation to their baker's baking power.
@@ -138,7 +138,7 @@ The protocol parameter ``TRAPS_FRACTION`` controls the fraction of shards marked
 Bakers detect traps by retrieving shard content via their DAL node and applying the trap function. A trap invalidates the corresponding attestation: the baker should not attest a slot if one of the slot’s shards assigned to him is a trap.
 
 The ``DAL_entrapment_evidence`` accusation operation can be used to accuse a baker of wrongly attesting a slot due to an undetected trap.
-This accusation operation includes the attestation operation containing the wrongly attested slot, the slot index, and the undetected shard.
+This accusation operation includes the offending attestation operation (either individual or part of an :ref:`aggregate<consensus_operations_alpha>`), the offending baker's consensus slot, the wrongly attested DAL slot, and the undetected shard.
 
 As for double-signing accusations, any baker can include a DAL accusation in its block.
 Accusations can be included during a period of ``DENUNCIATION_PERIOD`` cycles after the misbehavior event, which is that of the corresponding attestation operation.
@@ -148,6 +148,7 @@ Penalties
 
 A baker that is correctly accused, through an accusation operation included in a block, loses their DAL rewards for the cycle containing the block.
 
+.. _dal_rollups_integration_alpha:
 
 Smart Rollups integration
 =========================
@@ -179,6 +180,6 @@ This section describes the protocol constants specific to the DAL as well as the
 - ``REDUNDANCY_FACTOR`` (8): the erasure-code factor (see :ref:`dal_slots`)
 - ``NUMBER_OF_SHARDS`` (512): the number of shards per slot (see :ref:`dal_slots`)
 - ``MINIMAL_PARTICIPATION_RATIO`` (64%): the minimum percentage of slots attested by a baker during a cycle (among all slots deemed available) that entitles them to rewards
-- ``DAL_REWARDS_RATIO`` (10%): the ratio of the DAL rewards over the total participation rewards
+- ``REWARDS_RATIO`` (10%): the ratio of the DAL rewards over the total participation rewards
 - ``DAL_REWARDS_WEIGHT`` (2275): the weight of the DAL rewards (relative to other participation rewards)
 - ``TRAPS_FRACTION`` (0.0005): the fraction of shards that are traps

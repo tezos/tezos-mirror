@@ -48,6 +48,8 @@ module Sequencer_upgrade : sig
   val of_bytes : bytes -> t option
 
   val to_bytes : t -> bytes
+
+  val encoding : t Data_encoding.t
 end
 
 module Blueprint_applied : sig
@@ -75,4 +77,8 @@ val encoding : t Data_encoding.t
 
 val of_bytes : bytes -> t option Lwt.t
 
-val of_parts : Delayed_transaction.t list -> Upgrade.t option -> t list
+val of_parts :
+  delayed_transactions:Delayed_transaction.t list ->
+  kernel_upgrade:Upgrade.t option ->
+  sequencer_upgrade:Sequencer_upgrade.t option ->
+  t list

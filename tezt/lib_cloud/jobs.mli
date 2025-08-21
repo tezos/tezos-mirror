@@ -12,6 +12,7 @@ val deploy_docker_registry : unit -> unit Lwt.t
 val docker_build :
   ?docker_image:Agent.Configuration.docker_image ->
   push:bool ->
+  ssh_public_key:string ->
   unit ->
   unit Lwt.t
 

@@ -46,4 +46,6 @@ src_dir="$(dirname "$images_dir")"
 cd "$src_dir"
 
 set -x
-docker build "images/${name}" -t "${image_name}" "$@"
+cd "images/" &&
+  tar -cvh . |
+  docker build -f "${name}/Dockerfile" -t "${image_name}" "$@" -

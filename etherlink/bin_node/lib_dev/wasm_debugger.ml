@@ -7,6 +7,10 @@
 
 type kernel = In_memory of string | On_disk of string
 
+type config = Octez_smart_rollup_wasm_debugger_lib.Config.config
+
+let config = Octez_smart_rollup_wasm_debugger_lib.Config.config
+
 module Bare_context = struct
   module Tree = Irmin_context.Tree
 
@@ -42,13 +46,16 @@ module Wasm_utils = Wasm_utils_functor.Make (Ctx) (Slow_pvm) (Slow_pvm)
 module Wasm =
   Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.Make (Wasm_utils)
 
-let read_kernel_from_file =
-  Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.read_kernel_from_file
+let read_kernel = function
+  | On_disk path ->
+      Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.read_kernel_from_file
+        path
+  | In_memory binary -> Lwt_result.return (binary, true)
 
 let check_kernel =
   Octez_smart_rollup_wasm_debugger_lib.Wasm_debugger.check_kernel
 
-let profile = Wasm.Commands.profile
+let get_function_symbols = Wasm.Commands.get_function_symbols
 
 let set_durable_value = Wasm.set_durable_value
 
@@ -62,6 +69,8 @@ let find_key_in_durable = Wasm.Commands.find_key_in_durable
 let wrap_as_durable_storage = Wasm_utils.wrap_as_durable_storage
 
 let eval = Wasm.Commands.eval
+
+let profile = Wasm.Commands.profile
 
 let encode =
   Ctx.Tree_encoding_runner.encode Tezos_scoru_wasm.Wasm_pvm.pvm_state_encoding

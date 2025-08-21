@@ -12,6 +12,15 @@ use std::collections::HashMap;
 
 use crate::ast::annotations::FieldAnnotation;
 use crate::ast::Type;
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::combinator::{map, map_res, verify};
+use nom::multi::length_data;
+use nom::number::complete::u8 as nom_u8;
+use nom::sequence::preceded;
+
+use tezos_data_encoding::enc::BinWriter;
+use tezos_data_encoding::nom::{NomReader, NomResult};
 
 use super::ByteReprError;
 
@@ -48,6 +57,117 @@ const MAX_EP_LEN: usize = 31;
 impl Default for Entrypoint {
     fn default() -> Self {
         Entrypoint(DEFAULT_EP_NAME.to_owned())
+    }
+}
+
+#[derive(Copy, Clone)]
+enum EntrypointTag {
+    Default = 0,
+    Root = 1,
+    Do = 2,
+    SetDelegate = 3,
+    RemoveDelegate = 4,
+    Deposit = 5,
+    Stake = 6,
+    Unstake = 7,
+    FinalizeUnstake = 8,
+    SetDelegateParameters = 9,
+    Custom = 255,
+}
+
+impl EntrypointTag {
+    #[allow(dead_code)]
+    fn from_str(name: &str) -> Self {
+        match name {
+            "" | DEFAULT_EP_NAME => Self::Default,
+            "root" => Self::Root,
+            "do" => Self::Do,
+            "set_delegate" => Self::SetDelegate,
+            "remove_delegate" => Self::RemoveDelegate,
+            "deposit" => Self::Deposit,
+            "stake" => Self::Stake,
+            "unstake" => Self::Unstake,
+            "finalize_unstake" => Self::FinalizeUnstake,
+            "set_delegate_parameters" => Self::SetDelegateParameters,
+            _ => Self::Custom,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn to_str(self) -> &'static str {
+        match self {
+            Self::Default => DEFAULT_EP_NAME,
+            Self::Root => "root",
+            Self::Do => "do",
+            Self::SetDelegate => "set_delegate",
+            Self::RemoveDelegate => "remove_delegate",
+            Self::Deposit => "deposit",
+            Self::Stake => "stake",
+            Self::Unstake => "unstake",
+            Self::FinalizeUnstake => "finalize_unstake",
+            Self::SetDelegateParameters => "set_delegate_parameters",
+            Self::Custom => "custom",
+        }
+    }
+}
+
+impl BinWriter for Entrypoint {
+    fn bin_write(&self, output: &mut Vec<u8>) -> tezos_data_encoding::enc::BinResult {
+        let tag = EntrypointTag::from_str(&self.0);
+        output.push(tag as u8);
+
+        if matches!(tag, EntrypointTag::Custom) {
+            let bytes = self.0.as_bytes();
+            output.push(bytes.len() as u8);
+            output.extend_from_slice(bytes);
+        }
+
+        Ok(())
+    }
+}
+
+impl NomReader<'_> for Entrypoint {
+    fn nom_read(input: &[u8]) -> NomResult<Self> {
+        alt((
+            map(tag([EntrypointTag::Default as u8]), |_| {
+                Entrypoint::default()
+            }),
+            map(tag([EntrypointTag::Root as u8]), |_| {
+                Entrypoint("root".into())
+            }),
+            map(tag([EntrypointTag::Do as u8]), |_| Entrypoint("do".into())),
+            map(tag([EntrypointTag::SetDelegate as u8]), |_| {
+                Entrypoint("set_delegate".into())
+            }),
+            map(tag([EntrypointTag::RemoveDelegate as u8]), |_| {
+                Entrypoint("remove_delegate".into())
+            }),
+            map(tag([EntrypointTag::Deposit as u8]), |_| {
+                Entrypoint("deposit".into())
+            }),
+            map(tag([EntrypointTag::Stake as u8]), |_| {
+                Entrypoint("stake".into())
+            }),
+            map(tag([EntrypointTag::Unstake as u8]), |_| {
+                Entrypoint("unstake".into())
+            }),
+            map(tag([EntrypointTag::FinalizeUnstake as u8]), |_| {
+                Entrypoint("finalize_unstake".into())
+            }),
+            map(tag([EntrypointTag::SetDelegateParameters as u8]), |_| {
+                Entrypoint("set_delegate_parameters".into())
+            }),
+            preceded(
+                tag([EntrypointTag::Custom as u8]),
+                map(
+                    verify(
+                        map_res(length_data(nom_u8), std::str::from_utf8),
+                        |s: &str| check_ep_name(s.as_bytes()).is_ok(),
+                    ),
+                    |s| Entrypoint(s.to_owned()),
+                ),
+            ),
+        ))(input)
     }
 }
 
@@ -287,5 +407,97 @@ mod tests {
             check_ep_name("नमस्ते".as_bytes()),
             Err(ByteReprError::WrongFormat(_))
         ));
+    }
+
+    #[test]
+    fn test_nom_read_known_entrypoints() {
+        let tests = [
+            (vec![EntrypointTag::Default as u8], Entrypoint::default()),
+            (vec![EntrypointTag::Root as u8], Entrypoint("root".into())),
+            (vec![EntrypointTag::Do as u8], Entrypoint("do".into())),
+            (vec![EntrypointTag::Stake as u8], Entrypoint("stake".into())),
+        ];
+
+        for (input, expected) in tests.iter() {
+            let result = Entrypoint::nom_read(input).unwrap();
+            assert_eq!(&result.1, expected);
+        }
+    }
+
+    #[test]
+    fn test_bin_write_known_entrypoints() {
+        let tests = [
+            (Entrypoint::default(), vec![EntrypointTag::Default as u8]),
+            (Entrypoint("root".into()), vec![EntrypointTag::Root as u8]),
+            (Entrypoint("do".into()), vec![EntrypointTag::Do as u8]),
+            (Entrypoint("stake".into()), vec![EntrypointTag::Stake as u8]),
+        ];
+
+        for (entrypoint, expected) in tests.iter() {
+            let mut output = vec![];
+            entrypoint.bin_write(&mut output).unwrap();
+            assert_eq!(&output, expected);
+        }
+    }
+
+    #[test]
+    fn test_nom_read_custom_entrypoint() {
+        let input = vec![EntrypointTag::Custom as u8, 5, b'h', b'e', b'l', b'l', b'o'];
+        let expected = Entrypoint("hello".into());
+
+        let result = Entrypoint::nom_read(&input).unwrap();
+        assert_eq!(result.1, expected);
+    }
+
+    #[test]
+    fn test_bin_write_custom_entrypoint() {
+        let entrypoint = Entrypoint("my_custom_ep".into());
+        let mut output = vec![];
+        entrypoint.bin_write(&mut output).unwrap();
+
+        let expected = {
+            let mut exp = vec![EntrypointTag::Custom as u8, 12]; // 12 bytes for "my_custom_ep"
+            exp.extend_from_slice(b"my_custom_ep");
+            exp
+        };
+
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_round_trip_custom_entrypoint() {
+        let original = Entrypoint("test_ep".into());
+        let mut output = vec![];
+        original.bin_write(&mut output).unwrap();
+
+        let parsed = Entrypoint::nom_read(&output).unwrap().1;
+        assert_eq!(original, parsed);
+    }
+
+    #[test]
+    fn test_round_trip_all_known_entrypoints() {
+        let entrypoints = [
+            EntrypointTag::Default,
+            EntrypointTag::Root,
+            EntrypointTag::Do,
+            EntrypointTag::SetDelegate,
+            EntrypointTag::RemoveDelegate,
+            EntrypointTag::Deposit,
+            EntrypointTag::Stake,
+            EntrypointTag::Unstake,
+            EntrypointTag::FinalizeUnstake,
+            EntrypointTag::SetDelegateParameters,
+        ];
+
+        for &ep_tag in entrypoints.iter() {
+            let ep_name = ep_tag.to_str();
+            let ep = Entrypoint(ep_name.into());
+
+            let mut output = vec![];
+            ep.bin_write(&mut output).unwrap();
+
+            let parsed = Entrypoint::nom_read(&output).unwrap().1;
+            assert_eq!(ep, parsed);
+        }
     }
 }

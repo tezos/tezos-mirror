@@ -17,7 +17,6 @@ depends: [
   "octez-rust-deps" { with-test & = version }
   "octez-shell-libs" { = version }
   "uri" { >= "3.1.0" }
-  "octez-rustzcash-deps" { with-test & = version }
   "tezt" { >= "4.1.0" & < "5.0.0" }
   "tezt-tezos" { = version }
   "qcheck-alcotest" { >= "0.20" }
@@ -27,6 +26,8 @@ depends: [
   "tezos-dal-node-services" { = version }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
+  "memtrace"
+  "octez-baker-lib" { = version }
   "octez-protocol-compiler" { = version }
   "tezos-dal-node-lib" { = version }
   "octez-injector" { = version }

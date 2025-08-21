@@ -7,7 +7,6 @@
  (libraries
   tezt.core
   bls12-381.archive
-  octez-rust-deps
   octez-libs.base
   octez-libs.stdlib-unix
   octez-libs.base-test-helpers
@@ -22,12 +21,13 @@
   -open Tezos_stdlib_unix
   -open Tezos_base_test_helpers
   -open Octez_alcotezt)
- (modules test_main test_storage))
+ (modules test_main test_backend test_storage utils))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   src_lib_riscv_pvm_test_tezt_lib
   tezt)
  (modules main))
@@ -35,6 +35,10 @@
 (rule
  (alias runtest)
  (package octez-riscv-pvm-test)
+ (deps
+  (glob_files ../../../riscv/assets/riscv-dummy.elf)
+  (glob_files ../../../riscv/assets/riscv-dummy.elf.checksum)
+  (glob_files ../../../riscv/lib/tests/expected/jstz/proof_initial))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2018-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -92,7 +74,6 @@ module type T = sig
     protocol_operation Shell_operation.operation ->
     [ `Passed_prefilter of Prevalidator_pending_operations.priority
     | Prevalidator_classification.error_classification ]
-    Lwt.t
 
   (** Contain the hash and new classification of any operations that
       had to be removed to make room for a newly added operation. *)
@@ -113,12 +94,41 @@ module type T = sig
     * Prevalidator_classification.classification
     * replacements
 
+  (** Represents either:
+      - an operation that was partially validated associated with pending
+        checks that must be ran before considering the operation as valid,
+      - an operation validation error *)
+  type partially_validated_operation =
+    (protocol_operation Shell_operation.operation
+    * (unit -> unit tzresult) list)
+    tzresult
+
+  (** Runs the protocol [partial_op_validation] but does not check the remaining
+      pending checks. This aims to be used in pair with
+      [handle_partially_validated]. *)
+  val partial_op_validation :
+    t ->
+    protocol_operation Shell_operation.operation ->
+    partially_validated_operation Lwt.t
+
+  (** An operation that passed [partial_op_validation] and the pending checks
+      resulting from this call. *)
+  type valid_operation
+
+  (** Run the pending checks associated with a partially validated operation
+      Without this call, the [partial_op_validation] is not complete. *)
+  val handle_partially_validated :
+    partially_validated_operation ->
+    (valid_operation, Prevalidator_classification.error_classification) Result.t
+
+  val add_valid_operation : t -> config -> valid_operation -> add_result
+
   (** Try and add an operation to the protocol's mempool; also ensure
       that this mempool remains bounded (in terms of both operation
       count and total byte size; the bounds are specified in the [config]).
 
       See {!add_result} for a description of the output. *)
-  val add_operation :
+  val legacy_add_operation :
     t ->
     config ->
     protocol_operation Shell_operation.operation ->

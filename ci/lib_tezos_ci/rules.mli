@@ -22,6 +22,15 @@ val push : If.t
 (** A rule that is true if [CI_PIPELINE_SOURCE] is [scheduled]. *)
 val scheduled : If.t
 
+(** A rule that is true if [CI_PIPELINE_SOURCE] is [api]. *)
+val api : If.t
+
+(** A rule that is true for created via API release page publish pipeline.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [api] and
+    [TZ_API_KIND] set to [RELEASE_PAGE]. *)
+val api_release_page : If.t
+
 (** A rule that is true if [CI_MERGE_REQUEST_EVENT_TYPE] is [detached].
 
     Merge request pipelines are {i detached} when:
@@ -64,11 +73,33 @@ val schedule_extended_rpc_tests : If.t
     [TZ_SCHEDULE_KIND] set to [EXTENDED_VALIDATION_TESTS]. *)
 val schedule_extended_validation_tests : If.t
 
+(** A rule that is true for scheduled extended baker with remote node test
+    pipelines.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_BAKER_REMOTE_MODE_TESTS]. *)
+val schedule_extended_baker_remote_mode_tests : If.t
+
+(** A rule that is true for scheduled extended baker with baker dal
+    commands.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [EXTENDED_DAL_USE_BAKER]. *)
+val schedule_extended_dal_use_baker : If.t
+
 (** A rule that is true for scheduled release tests.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [TEST_RELEASE]. *)
 val schedule_test_release : If.t
+
+(** A rule that is true for scheduled pipelines that trigger security
+    scans of various Docker images: `tezos/tezos:master`,
+    `tezos/tezos:latest`, `tezos/tezos:octez-evm-node-latest`.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [SECURITY_SCANS]. *)
+val schedule_security_scans : If.t
 
 (** A rule that is true for scheduled pipelines that scan
     `tezos/tezos:master` Docker image.
@@ -78,11 +109,18 @@ val schedule_test_release : If.t
 val schedule_container_scanning_master : If.t
 
 (** A rule that is true for scheduled pipelines that scan
-    `tezos/tezos:octez-evm-node-vX.Y` Docker image.
+    `tezos/tezos:latest` Docker image.
 
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_OCTEZ_RELEASES]. *)
 val schedule_container_scanning_octez_releases : If.t
+
+(** A rule that is true for scheduled pipelines that scan
+    `tezos/tezos:octez-vX.Y-rcN` Docker image.
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_OCTEZ_RC]. *)
+val schedule_container_scanning_octez_rc : If.t
 
 (** A rule that is true for scheduled pipelines that scan
     `tezos/tezos:octez-evm-node-vX.Y` Docker image.
@@ -90,6 +128,19 @@ val schedule_container_scanning_octez_releases : If.t
     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
     [TZ_SCHEDULE_KIND] set to [CONTAINER_SCANNING_EVM_NODE_RELEASES]. *)
 val schedule_container_scanning_evm_node_releases : If.t
+
+(** A rule that is true for scheduled documentation pipelines.
+
+     Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [DOCUMENTATION]. *)
+val schedule_documentation : If.t
+
+(** A rule that is true for scheduled pipelines that build
+    fresh Docker images (latest available Alpine packages).
+
+    Such pipelines have [CI_PIPELINE_SOURCE] set to [scheduled] and
+    [TZ_SCHEDULE_KIND] set to [DOCKER_FRESH_IMAGE_BUILD]. *)
+val schedule_docker_build : If.t
 
 (** A rule that is true if [CI_COMMIT_BRANCH] is a given branch. *)
 val on_branch : string -> If.t

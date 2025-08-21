@@ -18,16 +18,18 @@
 *)
 
 open Setup
-open Helpers
+open Test_helpers
 
-let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
-    ?preimages_dir ?maximum_allowed_ticks ?enable_fa_bridge ?rollup_history_mode
-    ?additional_uses ~title ~tags body protocols =
+let register ?genesis_timestamp ?eth_bootstrap_accounts ?tez_bootstrap_accounts
+    ?(kernels = Kernel.all) ?preimages_dir ?maximum_allowed_ticks
+    ?enable_fa_bridge ?rollup_history_mode ?additional_uses ~title ~tags body
+    protocols =
   register_test_for_kernels
     ~__FILE__
     ~time_between_blocks:Nothing
     ?genesis_timestamp
-    ?bootstrap_accounts
+    ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts
     ~kernels
     ?preimages_dir
     ?maximum_allowed_ticks
@@ -36,7 +38,7 @@ let register ?genesis_timestamp ?bootstrap_accounts ?(kernels = Kernel.all)
     ?rollup_history_mode
     ~enable_dal:false
     ~enable_multichain:false
-    ~threshold_encryption:false
+    ~enable_revm:false
     ~title
     ~tags
     body
@@ -47,13 +49,13 @@ let test_call_state_override_balance =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "balance_override"; "eth_call"]
     ~title:"Can override balance in eth_call"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows balance override.
       To do so we deploy a contract which returns the balance of the message
       sender, and call it with a non-sensical address.
   *)
-  let* constant = Solidity_contracts.state_override_tester () in
+  let* constant = Solidity_contracts.state_override_tester evm_version in
   let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
@@ -109,15 +111,15 @@ let test_call_state_override_code =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "code_override"; "eth_call"]
     ~title:"Can override code in eth_call"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows code override.
       To do so we deploy a contract without any function, and call it with an
       alternative code that does have a function.
   *)
-  let* constant = Solidity_contracts.state_override_tester () in
+  let* constant = Solidity_contracts.state_override_tester evm_version in
   let* constant_readable =
-    Solidity_contracts.state_override_tester_readable ()
+    Solidity_contracts.state_override_tester_readable evm_version
   in
   let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
   (* Deploy the contract. *)
@@ -130,9 +132,7 @@ let test_call_state_override_code =
          ~bin:constant.bin)
       sequencer
   in
-  let bytecode_accessor =
-    read_file (Option.value ~default:"" constant_readable.deployed_bin)
-  in
+  let bytecode_accessor = read_file constant_readable.deployed_bin in
   let* calldata = Cast.calldata "getCount()" in
   let call = `O [("to", `String contract); ("data", `String calldata)] in
 
@@ -176,14 +176,14 @@ let test_call_state_override_nonce =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "nonce_override"; "eth_call"]
     ~title:"Can override nonce in eth_call"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows nonce override.
       To do so we deploy a contract that creates a contract and returns the
       address of the new contract, and call it twice with different nonce.
       The addresses should be different.
       *)
-  let* factory = Solidity_contracts.state_override_tester () in
+  let* factory = Solidity_contracts.state_override_tester evm_version in
   let* () = Eth_cli.add_abi ~label:factory.label ~abi:factory.abi () in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
@@ -241,13 +241,15 @@ let test_call_state_override_state_diff =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_diff"; "eth_call"]
     ~title:"Can override part of account storage in eth_call"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state diff override.
       To do so we deploy a contract with a value in storage, and call it with an
       alternative storage that changes that value.
   *)
-  let* constant = Solidity_contracts.state_override_tester_readable () in
+  let* constant =
+    Solidity_contracts.state_override_tester_readable evm_version
+  in
   let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
@@ -342,13 +344,15 @@ let test_call_state_override_state =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_replace"; "eth_call"]
     ~title:"Can override completely account storage in eth_call"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state override.
       To do so we deploy a contract with a value in storage, and call it with an
       alternative storage that changes that value.
   *)
-  let* constant = Solidity_contracts.state_override_tester_readable () in
+  let* constant =
+    Solidity_contracts.state_override_tester_readable evm_version
+  in
   let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
   (* Deploy the contract. *)
   let* contract, _tx_hash =
@@ -451,13 +455,15 @@ let test_call_state_override_state_empty =
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "state_override"; "state_empty"; "eth_call"]
     ~title:"Can override completely account storage in eth_call by empty state"
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (*
       This test checks that the simulation allows state override.
       To do so we deploy a contract with a value in storage, and call it with an
       alternative storage that changes that value.
   *)
-  let* constant = Solidity_contracts.state_override_tester_readable () in
+  let* constant =
+    Solidity_contracts.state_override_tester_readable evm_version
+  in
   let* () = Eth_cli.add_abi ~label:constant.label ~abi:constant.abi () in
   (* Deploy the contract. *)
   let* contract, _tx_hash =

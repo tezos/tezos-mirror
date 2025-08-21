@@ -45,7 +45,7 @@ let compact_levels_slots ~slot_ids =
   (* Keep the increasing for level ordering *)
   |> List.rev
 
-let create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids =
+let create ~signer ~smart_rollup_address ~slot_ids =
   let open Lwt_result_syntax in
   let open Rlp in
   let encoded_levels_to_slots =
@@ -56,7 +56,7 @@ let create ~cctxt ~sequencer_key ~smart_rollup_address ~slot_ids =
              List [Value (encode_i32_le published_level); List slots]))
   in
   let rlp_unsigned_signal = encoded_levels_to_slots |> encode in
-  let* signature = Client_keys.sign cctxt sequencer_key rlp_unsigned_signal in
+  let* signature = Signer.sign signer rlp_unsigned_signal in
   let signature_bytes = Signature.to_bytes signature in
   (* Encode the signals fields and its signature. *)
   let rlp_sequencer_signal =

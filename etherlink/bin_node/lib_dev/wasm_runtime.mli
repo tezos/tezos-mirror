@@ -5,10 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [run ~preimages_dir ?preimages_endpoint ~native_execution_policy
-    ~entrypoint tree rollup_address blueprint] calls the WASM runtime over
-    [tree], and computing the next [tree]. *)
+(** [run ?l1_timestamp ~preimages_dir ?preimages_endpoint
+    ~native_execution_policy ~entrypoint tree rollup_address
+    blueprint] calls the WASM runtime over [tree], and computing the
+    next [tree].
+
+    When [l1_timestamp] is provided it's used in [ipl], default value
+    is `epoch`.
+*)
 val run :
+  ?l1_timestamp:Time.Protocol.t ->
   preimages_dir:string ->
   ?preimages_endpoint:Uri.t ->
   native_execution:bool ->
@@ -18,4 +24,4 @@ val run :
   string list ->
   Irmin_context.tree Lwt.t
 
-val preload_kernel : Irmin_context.tree -> unit Lwt.t
+val preload_kernel : Irmin_context.tree -> bool Lwt.t

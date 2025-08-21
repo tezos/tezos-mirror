@@ -6,6 +6,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Prerequisite:
+
+   In order to be able to run the following test successfully, you need to make
+   sure that your environment is well configured. To do so, have a look at the
+   tezt/lib_cloud/README.md documentation.
+
+   Additionally, if you are running the test you must ensure that:
+   - DAL_TRUSTED_SETUP_PATH contains the expected data -- this can be done by
+     running `./scripts/install_dal_trusted_setup.sh`; or use a custom dockerfile
+     not requiring this data
+*)
+
 open Tezos
 open Scenarios_helpers
 
@@ -14,6 +26,11 @@ type baker_account = {pk : string; pkh : string}
 
 let add_prometheus_source node cloud agent =
   Scenarios_helpers.add_prometheus_source ~node cloud agent (Agent.name agent)
+
+let get_snapshot_info_level node snapshot_path =
+  let* info = Node.snapshot_info node ~json:true snapshot_path in
+  let json = JSON.parse ~origin:"snapshot_info" info in
+  Lwt.return JSON.(json |-> "snapshot_header" |-> "level" |> as_int)
 
 module Network = struct
   include Network
@@ -25,9 +42,10 @@ module Network = struct
   let to_octez_network_options (t : t) =
     Network.to_octez_network_options (t :> Network.public)
 
-  let default_protocol (t : t) = Network.default_protocol (t :> Network.t)
-
   let block_time = function `Ghostnet -> 5 | `Mainnet -> 8
+
+  (** Next protocol for both Mainnet and Ghostnet - needs to be updated manually. *)
+  let migrate_to _network = Protocol.Alpha
 end
 
 let yes_crypto_env =
@@ -102,6 +120,32 @@ module Node = struct
          [Allow_yes_crypto; Force_history_mode_switch]
          peers
 
+  (** [add_migration_offset_to_config node snapshot ~migration_offset ~network] adds an
+      entry in the configuration file of [node] to trigger a UAU at level [~migration_offset]
+      to upgrade to the next protocol of [~network]. This entry is is parametrised by the
+      information obtained from [snapshot]. *)
+  let add_migration_offset_to_config node snapshot ~migration_offset ~network =
+    let* level = get_snapshot_info_level node snapshot in
+    match migration_offset with
+    | None -> Lwt.return_unit
+    | Some migration_offset ->
+        let network_config =
+          match network with
+          | `Mainnet -> Node.Config_file.mainnet_network_config
+          | `Ghostnet -> Node.Config_file.ghostnet_network_config
+        in
+        let migration_level = level + migration_offset in
+        toplog "Add UAU entry for level : %d" migration_level ;
+        Node.Config_file.update node (fun json ->
+            JSON.put
+              ( "network",
+                JSON.annotate
+                  ~origin:"add_migration_offset_to_config"
+                  network_config )
+              json
+            |> Node.Config_file.update_network_with_user_activated_upgrades
+                 [(migration_level, Network.migrate_to network)])
+
   (* If trying to only bootstrap the network from a snapshot, you will have
      errors about missing block metadata, which is likely (I guess?) to be
      because of data not included in the snapshot.
@@ -119,7 +163,8 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network =
+  let init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
+      migration_offset =
     let* snapshot = ensure_snapshot agent snapshot in
     let* () =
       let toplog s = toplog "/!\\ %s /!\\" s in
@@ -147,6 +192,9 @@ module Node = struct
     toplog "Reset node config for private a yes-crypto network" ;
     let config = isolated_config ~peers ~network ~delay:0 in
     let* () = Node.config_reset node config in
+    let* () =
+      add_migration_offset_to_config node snapshot ~migration_offset ~network
+    in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
     wait_for_ready node
@@ -156,10 +204,14 @@ module Node = struct
       - import the relevant snapshot
       - run it with yes-crypto enabled and allowed peer lists
   *)
-  let init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node) =
+  let init_node_from_snapshot ~delay ~peers ~snapshot ~network ~migration_offset
+      (agent, node) =
     let* snapshot = ensure_snapshot agent snapshot in
     let config = isolated_config ~peers ~network ~delay in
     let* () = Node.config_init node config in
+    let* () =
+      add_migration_offset_to_config node snapshot ~migration_offset ~network
+    in
     let* () = Node.snapshot_import ~no_check:true node snapshot in
     let arguments = isolated_args peers in
     let* () = run ~env:yes_crypto_env node arguments in
@@ -182,10 +234,16 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ~peers ~snapshot ~network (agent, node, name) =
-    toplog "Initializing a L1 node (public network): %s" name ;
+  let init_bootstrap_node ~peers ~snapshot ~network ~migration_offset
+      (agent, node, name) =
+    toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
-      init_bootstrap_node_from_snapshot ~peers (agent, node) snapshot network
+      init_bootstrap_node_from_snapshot
+        ~peers
+        (agent, node)
+        snapshot
+        network
+        migration_offset
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
@@ -207,33 +265,44 @@ module Node = struct
       create the yes-wallet.
     *)
   let init_baker_node ?(delay = 0) ~accounts ~peers ~snapshot ~network
-      (agent, node, name) =
-    toplog "Inititializing a L1 node (public network): %s" name ;
+      ~migration_offset (agent, node, name) =
+    toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
-      init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node)
+      init_node_from_snapshot
+        ~delay
+        ~peers
+        ~snapshot
+        ~network
+        ~migration_offset
+        (agent, node)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
     let* () =
       Lwt_list.iter_s
-        (fun {pkh; pk} ->
-          let alias = pkh in
-          Client.import_public_key ~alias client @@ Unencrypted pk)
+        (fun {pkh = alias; pk = public_key} ->
+          Client.import_public_key ~alias ~public_key client)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
     Lwt.return client
 
   (** Prerequisite: the chain is running (i.e. bakers are baking blocks) *)
-  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network ~tps
-      (agent, node, name) =
+  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network
+      ~migration_offset ~tps (agent, node, name) =
     let* () =
-      init_node_from_snapshot ~delay ~peers ~snapshot ~network (agent, node)
+      init_node_from_snapshot
+        ~delay
+        ~peers
+        ~snapshot
+        ~network
+        ~migration_offset
+        (agent, node)
     in
     let* client = client ~node agent in
     let* yes_wallet = yes_wallet agent in
     let* () = Client.forget_all_keys client in
-    let* () = Client.import_public_key ~alias:pkh client @@ Unencrypted pk in
+    let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
     let* accounts =
       Client.stresstest_gen_keys
@@ -244,16 +313,20 @@ module Node = struct
     Lwt.return (client, accounts)
 end
 
+(** Stresstest parameters
+    - [pkh]: public key hash of the account to use as a faucet
+    - [pk]: public key of the account to use as a faucet
+    - [tps]: targeted number of transactions per second
+    - [seed]: seed used for stresstest traffic generation
+ *)
 type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
 
-(** Parameterized version of the [configuration]. Used to make it easier to
-    re-use [--network] cli option which is common to all test scenarios, as
-    network set supported by this scenario and others is different.
+(** Scenario configuration
 
-    - [snapshot] local path or URL of the snapshot to use for the experiment.
+    - [snapshot]: local path or URL of the snapshot to use for the experiment.
       local path implies to [scp] the snapshot to all the vms.
 
-    - [stake] stake repartition between baking node, numbers are relatives.
+    - [stake]: stake repartition between baking node, numbers are relatives.
 
       e.g.: [2,1,1] runs 3 bakers, aggregate delegates from the network,
       spreading them in 3 pools representing roughly 50%, 25% and 25% of the
@@ -261,8 +334,8 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
       snapshot will result in the same delegate repartition.
 
       There is a special case using a single number instead of a list, which
-      must match the number of delegates. This scenario will launch on node
-      per delegate (i.e. more than 300 nodes if testing on mainnet)
+      must match the number of delegates. This scenario will launch one node
+      per delegate (i.e. more than 300 nodes if testing on mainnet).
 
     - [maintenance_delay]: number of level which will be multiplied by the
       position in the list of the bakers to define the store merge delay.
@@ -271,16 +344,78 @@ type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
       Default value is 1.
       Use 0 for disabling delay and have all the bakers to merge their
       store at the beginning of cycles.
+
+    - [migration_offset]: offset that dictates after how many levels a protocol
+      upgrade will be performed via a UAU.
+
+    - [stresstest]: See the description of [stresstest_conf]
   *)
-type 'network configuration0 = {
+type configuration = {
   stake : int list;
-  network : 'network;
+  network : Network.t;
   snapshot : string;
   stresstest : stresstest_conf option;
   maintenance_delay : int;
+  migration_offset : int option;
 }
 
-type configuration = Network.t configuration0
+(** A version of the [configuration] partially defined. *)
+type partial_configuration = {
+  stake : int list option;
+  network : Network.t option;
+  snapshot : string option;
+  stresstest : stresstest_conf option;
+  maintenance_delay : int option;
+  migration_offset : int option;
+}
+
+let network_encoding =
+  Data_encoding.string_enum [("Mainnet", `Mainnet); ("Ghostnet", `Ghostnet)]
+
+let stresstest_encoding =
+  let open Data_encoding in
+  conv
+    (fun {pkh; pk; tps; seed} -> (pkh, pk, tps, seed))
+    (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
+    (obj4
+       (req "pkh" string)
+       (req "pk" string)
+       (req "tps" int31)
+       (req "seed" int31))
+
+let configuration_encoding =
+  let open Data_encoding in
+  conv
+    (fun {
+           stake;
+           network;
+           snapshot;
+           stresstest;
+           maintenance_delay;
+           migration_offset;
+         } ->
+      (stake, network, snapshot, stresstest, maintenance_delay, migration_offset))
+    (fun ( stake,
+           network,
+           snapshot,
+           stresstest,
+           maintenance_delay,
+           migration_offset ) ->
+      {
+        stake;
+        network;
+        snapshot;
+        stresstest;
+        maintenance_delay;
+        migration_offset;
+      })
+    (obj6
+       (opt "stake" @@ list int31)
+       (opt "network" network_encoding)
+       (opt "snapshot" string)
+       (opt "stresstest" stresstest_encoding)
+       (opt "maintenance_delay" int31)
+       (opt "migration_offset" int31))
 
 type bootstrap = {
   agent : Agent.t;
@@ -292,7 +427,7 @@ type bootstrap = {
 type baker = {
   agent : Agent.t;
   node : Node.t;
-  baker : Baker.t;
+  baker : Agnostic_baker.t;
   accounts : string list;
 }
 
@@ -311,7 +446,7 @@ type 'network t = {
   stresstesters : stresstester list;
 }
 
-let init_baker_i i (configuration : configuration) ~peers
+let init_baker_i i (configuration : configuration) cloud ~peers
     (accounts : baker_account list) (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
@@ -323,25 +458,25 @@ let init_baker_i i (configuration : configuration) ~peers
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       (agent, node, name)
   in
   let* baker =
-    toplog "init_baker: Initialize baker" ;
-    let name = name ^ "-baker" in
-    let* baker =
-      let protocol = Network.default_protocol configuration.network in
-      Baker.Agent.init
+    toplog "init_baker: Initialize agnostic baker" ;
+    let name = name ^ "-agnostic-baker" in
+    let* agnostic_baker =
+      Agnostic_baker.Agent.init
         ~env:yes_crypto_env
         ~name
         ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
-        ~protocol
         ~client
         node
+        cloud
         agent
     in
-    let* () = Baker.wait_for_ready baker in
+    let* () = Agnostic_baker.wait_for_ready agnostic_baker in
     toplog "init_baker: %s is ready!" name ;
-    Lwt.return baker
+    Lwt.return agnostic_baker
   in
   Lwt.return
     {
@@ -357,10 +492,11 @@ let fund_stresstest_accounts ~source client =
     ~batches_per_block:50
     ~env:yes_crypto_env
     ~source_key_pkh:source
+    ~initial_amount:(Tez.of_mutez_int64 1_000_000_000L)
     client
 
-let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
-    stresstester Lwt.t =
+let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
+    (agent, node, name) tps : stresstester Lwt.t =
   let delay = i * configuration.maintenance_delay in
   let* client, accounts =
     toplog "init_stresstest: Initialize node" ;
@@ -371,13 +507,14 @@ let init_stresstest_i i configuration ~pkh ~pk ~peers (agent, node, name) tps :
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       (agent, node, name)
       ~tps
   in
   let accounts = List.map (fun a -> a.Account.public_key_hash) accounts in
   Lwt.return {agent; node; client; accounts}
 
-let init_network ~peers (configuration : configuration) teztale
+let init_network ~peers (configuration : configuration) cloud teztale
     ((agent, node, _) as resources) =
   toplog "init_network: Initializing the bootstrap node" ;
   let* client, delegates =
@@ -385,12 +522,14 @@ let init_network ~peers (configuration : configuration) teztale
       ~peers
       ~snapshot:configuration.snapshot
       ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
       resources
   in
   toplog "init_network: Add a Teztale archiver" ;
   let* () =
     Teztale.add_archiver
       teztale
+      cloud
       agent
       ~node_name:(Node.name node)
       ~node_port:(Node.rpc_port node)
@@ -401,9 +540,9 @@ let init_network ~peers (configuration : configuration) teztale
   Lwt.return (bootstrap, delegates)
 
 (** Reserves resources for later usage. *)
-let agent_and_node next_agent ~name =
+let agent_and_node next_agent cloud ~name =
   let* agent = next_agent ~name in
-  let* node = Node.Agent.create ~metadata_size_limit:false ~name agent in
+  let* node = Node.Agent.create ~metadata_size_limit:false ~name cloud agent in
   Lwt.return (agent, node, name)
 
 (** Distribute the delegate accounts according to stake specification *)
@@ -491,16 +630,16 @@ let distribute_delegates stake baker_accounts =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network agent =
+let number_of_bakers ~snapshot ~network cloud agent =
   let* node =
-    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" agent
+    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
   in
   let* snapshot = Node.ensure_snapshot agent snapshot in
   let* () =
     Node.config_init node (Node.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () = Node.snapshot_import ~no_check:true node snapshot in
-  let* () = Node.run node (Node.isolated_args []) in
+  let* () = Node.Agent.run node (Node.isolated_args []) in
   let* () = Node.wait_for_ready node in
   let* client =
     Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
@@ -511,7 +650,7 @@ let number_of_bakers ~snapshot ~network agent =
       client
     |> Lwt.map (fun json -> JSON.(json |> as_list |> List.length))
   in
-  let* () = Node.terminate node in
+  let* () = Node.Agent.terminate node in
   Lwt.return n
 
 let init ~(configuration : configuration) cloud next_agent =
@@ -519,7 +658,7 @@ let init ~(configuration : configuration) cloud next_agent =
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
   let* ((bootstrap_agent, bootstrap_node, _) as bootstrap) =
-    agent_and_node next_agent ~name:"bootstrap"
+    agent_and_node next_agent cloud ~name:"bootstrap"
   in
   let* stresstest_agents =
     match configuration.stresstest with
@@ -527,7 +666,7 @@ let init ~(configuration : configuration) cloud next_agent =
     | Some {tps; _} ->
         List.init (nb_stresstester configuration.network tps) (fun i -> i)
         |> Lwt_list.map_s @@ fun i ->
-           agent_and_node next_agent ~name:(sf "stresstest-%d" i)
+           agent_and_node next_agent cloud ~name:(sf "stresstest-%d" i)
   in
   let* baker_agents =
     let* n =
@@ -535,13 +674,14 @@ let init ~(configuration : configuration) cloud next_agent =
         number_of_bakers
           ~snapshot:configuration.snapshot
           ~network:configuration.network
+          cloud
           bootstrap_agent
       else Lwt.return (List.length configuration.stake)
     in
     let () = toplog "Preparing agents for bakers (%d)" n in
     List.init n (fun i -> i)
     |> Lwt_list.map_s @@ fun i ->
-       agent_and_node next_agent ~name:(sf "baker-%d" i)
+       agent_and_node next_agent cloud ~name:(sf "baker-%d" i)
   in
   let* teztale = init_teztale cloud bootstrap_agent in
   let* () = init_explorus cloud bootstrap_node in
@@ -551,7 +691,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (stresstest_agents @ baker_agents)
   in
   let* bootstrap, baker_accounts =
-    init_network ~peers configuration teztale bootstrap
+    init_network ~peers configuration cloud teztale bootstrap
   in
   let peers = Node.point_str bootstrap_node :: peers in
   let* bakers =
@@ -620,7 +760,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun i accounts ->
         let ((_, node, _) as agent) = List.nth baker_agents i in
         let peers = List.filter (( <> ) (Node.point_str node)) peers in
-        init_baker_i i ~peers configuration accounts agent)
+        init_baker_i i ~peers configuration cloud accounts agent)
       distribution
   in
   let* stresstesters =
@@ -807,7 +947,7 @@ let vms_conf_encoding =
     (obj3
        (opt "bootstrap" vm_conf_encoding)
        (opt "bakers" @@ list vm_conf_encoding)
-       (opt "stressteser" vm_conf_encoding))
+       (opt "stresstester" vm_conf_encoding))
 
 (** Copy/paste from teztale_server_main.ml *)
 let parse_conf encoding file =
@@ -840,46 +980,65 @@ let parse_conf encoding file =
             (Data_encoding.Json.print_error ?print_unknown:None)
             e
             Json_schema.pp
-            (Data_encoding.Json.schema vm_conf_encoding)
+            (Data_encoding.Json.schema encoding)
         in
         exit 1)
 
-let configuration =
-  let stake = Option.value ~default:[] Scenarios_cli.Layer1.stake in
-  let network : Network.t option =
-    match Scenarios_cli.network with
-    | `Mainnet -> Some `Mainnet
-    | `Ghostnet -> Some `Ghostnet
-    | _ -> None
-  in
-  let stresstest =
-    Option.map
-      (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-      Scenarios_cli.Layer1.stresstest
-  in
-  let maintenance_delay =
-    Option.value ~default:0 Scenarios_cli.Layer1.maintenance_delay
-  in
-  let snapshot = Option.value ~default:"" Scenarios_cli.Layer1.snapshot in
-  {stake; network; stresstest; maintenance_delay; snapshot}
+let yes_wallet_exe = Uses.path Constant.yes_wallet
 
-let vms_conf =
-  Option.map (parse_conf vms_conf_encoding) Scenarios_cli.Layer1.vms_config
-
-let benchmark () =
+let register (module Cli : Scenarios_cli.Layer1) =
+  let configuration0 : partial_configuration =
+    let stake = Cli.stake in
+    let network = Cli.network in
+    let stresstest =
+      Option.map
+        (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
+        Cli.stresstest
+    in
+    let maintenance_delay = Cli.maintenance_delay in
+    let snapshot = Cli.snapshot in
+    let migration_offset = Cli.migration_offset in
+    match Cli.config with
+    | Some filename ->
+        let conf = parse_conf configuration_encoding filename in
+        {
+          stake = (if stake <> None then stake else conf.stake);
+          network = (if network <> None then network else conf.network);
+          snapshot = (if snapshot <> None then snapshot else conf.snapshot);
+          stresstest =
+            (if stresstest <> None then stresstest else conf.stresstest);
+          maintenance_delay =
+            (if maintenance_delay <> None then maintenance_delay
+             else conf.maintenance_delay);
+          migration_offset =
+            (if migration_offset <> None then migration_offset
+             else conf.migration_offset);
+        }
+    | None ->
+        {
+          stake;
+          network;
+          stresstest;
+          maintenance_delay;
+          snapshot;
+          migration_offset;
+        }
+  in
+  let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =
     `Bootstrap
     ::
-    (match configuration.stake with
-    | [n] -> List.init n (fun i -> `Baker i)
-    | stake -> List.mapi (fun i _ -> `Baker i) stake)
+    (match configuration0.stake with
+    | Some [n] -> List.init n (fun i -> `Baker i)
+    | Some stake -> List.mapi (fun i _ -> `Baker i) stake
+    | None -> [])
     @
-    match configuration.stresstest with
+    match configuration0.stresstest with
     | None -> []
     | Some {tps; _} ->
         let n =
-          match configuration.network with
+          match configuration0.network with
           | Some network -> nb_stresstester network tps
           | None -> tps / stresstest_max_tps_pre_node
         in
@@ -888,7 +1047,7 @@ let benchmark () =
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
-      Scenarios_cli.octez_release
+      Cli.octez_release
   in
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image:default_docker_image ~name ()
@@ -920,7 +1079,7 @@ let benchmark () =
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
            | `Stresstest j ->
                make_vm_conf ~name:(Format.sprintf "stresstest-%d" j)
-               @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
+               @@ Option.bind vms_conf (fun {stresstester; _} -> stresstester)
            | `Baker i ->
                make_vm_conf ~name:(Format.sprintf "baker-%d" i)
                @@ Option.bind vms_conf (function
@@ -930,21 +1089,29 @@ let benchmark () =
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries
      are modified locally. This way we always use the latest ones. *)
-    ~vms
-    ~proxy_files:[Uses.path Constant.yes_wallet; configuration.snapshot]
+    ~vms:(return vms)
+    ~proxy_files:
+      ([yes_wallet_exe]
+      @
+      match configuration0.snapshot with Some snapshot -> [snapshot] | _ -> [])
     ~__FILE__
     ~title:"L1 simulation"
-    ~tags:[Tag.cloud; "l1"]
+    ~tags:[]
   @@ fun cloud ->
   let configuration : configuration =
-    (* Some checks for mandatory options defined as optional because CLI
-       argument definitions are shared amongst all other tests and we don't
-       want to force other test to define these arguments. *)
-    (* FIXME: Do better than these assert *)
-    assert (configuration.stake <> []) ;
-    assert (configuration.snapshot <> "") ;
-    let network = Option.get configuration.network in
-    {configuration with network}
+    let stake = Option.get configuration0.stake in
+    let network = Option.get configuration0.network in
+    let snapshot = Option.get configuration0.snapshot in
+    let stresstest = configuration0.stresstest in
+    let maintenance_delay =
+      Option.value
+        ~default:Cli.default_maintenance_delay
+        configuration0.maintenance_delay
+    in
+    let migration_offset = configuration0.migration_offset in
+    if stake = [] then Test.fail "stake parameter can not be empty" ;
+    if snapshot = "" then Test.fail "snapshot parameter can not be empty" ;
+    {stake; network; snapshot; stresstest; maintenance_delay; migration_offset}
   in
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
@@ -966,5 +1133,3 @@ let benchmark () =
        loop level
      in
      loop)
-
-let register () = benchmark ()

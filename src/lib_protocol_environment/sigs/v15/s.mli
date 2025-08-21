@@ -240,7 +240,16 @@ module type AGGREGATE_SIGNATURE = sig
 
   val aggregate_check : (Public_key.t * watermark option * bytes) list -> t -> bool
 
-  val aggregate_signature_opt : t list -> t option
+  val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
+
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * t) list -> t option
+
+  val aggregate_public_key_opt :
+    ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
+
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
 end
 
 module type SPLIT_SIGNATURE = sig

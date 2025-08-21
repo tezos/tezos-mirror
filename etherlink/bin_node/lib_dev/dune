@@ -10,12 +10,15 @@
   octez-libs.rpc-http
   octez-libs.rpc-http-server
   dream
+  octez-evm-node-libs.websocket_lwt_unix
   octez-evm-node-libs.websocket_cohttp_lwt
   octez-libs.tezos-workers
+  octez-connpool
   octez-libs.rpc-http-client-unix
   octez-version.value
   octez-libs.stdlib-unix
   octez-evm-node-libs.evm_node_lib_dev_encoding
+  octez-evm-node-libs.evm_node_lib_dev_tezlink
   lwt-watcher
   lwt-exit
   octez-l2-libs.sqlite
@@ -36,7 +39,9 @@
   tezos-dal-node-services
   octez-evm-node-libs.evm_node_supported_installers
   octez-evm-node-libs.evm_node_wasm_runtime
-  octez-performance-metrics)
+  octez-performance-metrics
+  opentelemetry-lwt
+  octez-libs.octez-telemetry)
  (flags
   (:standard)
   -open Tezos_base.TzPervasives
@@ -44,11 +49,11 @@
   -open Tezos_workers
   -open Tezos_stdlib_unix
   -open Evm_node_lib_dev_encoding
+  -open Evm_node_lib_dev_tezlink
   -open Octez_sqlite
   -open Tezos_client_base
   -open Evm_node_config
   -open Tezos_scoru_wasm_helpers_functor
-  -open Octez_smart_rollup_wasm_debugger_lib
   -open Tezos_layer2_store
   -open Tezos_layer2_irmin_context
   -open Octez_smart_rollup))

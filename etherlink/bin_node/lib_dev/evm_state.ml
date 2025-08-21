@@ -32,11 +32,13 @@ let event_kernel_log ~kind ~msg =
     (fun (level, msg) -> Events.event_kernel_log ~level ~kind ~msg)
     level_and_msg
 
-let execute ?(wasm_pvm_fallback = false) ?(profile = false)
+let execute ?execution_timestamp ?(wasm_pvm_fallback = false) ?profile
     ?(kind = Events.Application) ~data_dir ?(log_file = "kernel_log")
     ?(wasm_entrypoint = Tezos_scoru_wasm.Constants.wasm_entrypoint) ~config
     ~native_execution evm_state inbox =
   let open Lwt_result_syntax in
+  Octez_telemetry.Trace.with_tzresult ~service_name:"Evm_state" "execute"
+  @@ fun _ ->
   let path = Filename.concat (kernel_logs_directory ~data_dir) log_file in
   let inbox = List.map (function `Input s -> s) inbox in
   let inbox = List.to_seq [inbox] in
@@ -47,65 +49,98 @@ let execute ?(wasm_pvm_fallback = false) ?(profile = false)
         messages := msg :: !messages ;
         event_kernel_log ~kind ~msg)
   in
-  let eval evm_state =
-    if profile then
-      let* evm_state, _, _ =
-        Wasm_debugger.profile
-          ~migrate_to:Proto_alpha
-          ~collapse:false
-          ~with_time:true
-          ~no_reboot:false
-          0l
-          inbox
-          {config with flamecharts_directory = data_dir}
-          Custom_section.FuncMap.empty
-          evm_state
-      in
-      return evm_state
-    else
-      (* The [inbox] parameter is inherited from the WASM debugger, where the
-         inbox is a list of list of messages (because it supports running the
-         fast exec for several Tezos level in a raw).
+  let* evm_state =
+    match profile with
+    | Some Configuration.Minimal ->
+        let filename =
+          Filename.concat
+            (kernel_logs_directory ~data_dir)
+            (log_file ^ "_profile.csv")
+        in
+        let flags = Unix.[O_WRONLY; O_CREAT; O_TRUNC] in
+        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+        let*! () = Events.replay_csv_available filename in
+        let*! () = Lwt_io.fprintf oc "ticks_used\n" in
+        let hooks =
+          Tezos_scoru_wasm.Hooks.(
+            no_hooks
+            |> on_pvm_reboot (fun ticks ->
+                   let*! () = Lwt_io.fprintf oc "%Ld\n" ticks in
+                   Lwt_io.flush oc))
+        in
+        let* evm_state, _ticks, _inboxes, _level =
+          Wasm_debugger.eval
+            ~hooks
+            ~migrate_to:Proto_alpha
+            ~write_debug
+            ~wasm_entrypoint
+            0l
+            inbox
+            config
+            Inbox
+            evm_state
+        in
+        return evm_state
+    | Some Configuration.Flamegraph ->
+        let* function_symbols = Wasm_debugger.get_function_symbols evm_state in
+        let* evm_state, _, _ =
+          Wasm_debugger.profile
+            ~migrate_to:Proto_alpha
+            ~collapse:false
+            ~with_time:true
+            ~no_reboot:false
+            0l
+            inbox
+            {config with flamecharts_directory = data_dir}
+            function_symbols
+            evm_state
+        in
+        return evm_state
+    | None ->
+        (* The [inbox] parameter is inherited from the WASM debugger, where the
+           inbox is a list of list of messages (because it supports running the
+           fast exec for several Tezos level in a raw).
 
-         As far as the EVM node is concerned, we only “emulate” one Tezos level
-         at a time, so we only keep the first item ([inbox] is in parctise
-         always a singleton). *)
-      let*! evm_state =
-        Lwt.catch
-          (fun () ->
-            let inbox =
-              match Seq.uncons inbox with Some (x, _) -> x | _ -> []
-            in
-            Wasm_runtime.run
-              ~preimages_dir:config.preimage_directory
-              ?preimages_endpoint:config.preimage_endpoint
-              ~native_execution
-              ~entrypoint:wasm_entrypoint
-              evm_state
-              config.destination
-              inbox)
-          (fun exn ->
-            if wasm_pvm_fallback then
-              let*! () = Events.wasm_pvm_fallback () in
-              let*! res =
-                Wasm_debugger.eval
-                  ~migrate_to:Proto_alpha
-                  ~write_debug
-                  ~wasm_entrypoint
-                  0l
-                  inbox
-                  config
-                  Inbox
-                  evm_state
+           As far as the EVM node is concerned, we only “emulate” one Tezos level
+           at a time, so we only keep the first item ([inbox] is in parctise
+           always a singleton). *)
+        let*! evm_state =
+          Lwt.catch
+            (fun () ->
+              let inbox =
+                match Seq.uncons inbox with Some (x, _) -> x | _ -> []
               in
-              match res with
-              | Ok (evm_state, _, _, _) -> Lwt.return evm_state
-              | Error _err -> Stdlib.failwith "The WASM PVM raised an exception"
-            else Lwt.reraise exn)
-      in
-      return evm_state
+              Wasm_runtime.run
+                ?l1_timestamp:execution_timestamp
+                ~preimages_dir:config.preimage_directory
+                ?preimages_endpoint:config.preimage_endpoint
+                ~native_execution
+                ~entrypoint:wasm_entrypoint
+                evm_state
+                config.destination
+                inbox)
+            (fun exn ->
+              if wasm_pvm_fallback then
+                let*! () = Events.wasm_pvm_fallback () in
+                let*! res =
+                  Wasm_debugger.eval
+                    ~migrate_to:Proto_alpha
+                    ~write_debug
+                    ~wasm_entrypoint
+                    0l
+                    inbox
+                    config
+                    Inbox
+                    evm_state
+                in
+                match res with
+                | Ok (evm_state, _, _, _) -> Lwt.return evm_state
+                | Error _err ->
+                    Stdlib.failwith "The WASM PVM raised an exception"
+              else Lwt.reraise exn)
+        in
+        return evm_state
   in
-  let* evm_state = eval evm_state in
   (* The messages are accumulated during the execution and stored
      atomatically at the end to preserve their order. *)
   let*! () =
@@ -179,15 +214,20 @@ let exists evm_state key =
   let durable = Tezos_scoru_wasm.Durable.of_storage_exn durable in
   Tezos_scoru_wasm.Durable.exists durable key
 
+let read state key =
+  let open Lwt_result_syntax in
+  let*! res = inspect state key in
+  return res
+
 let kernel_version evm_state =
   let open Lwt_syntax in
   let+ version = inspect evm_state Durable_storage_path.kernel_version in
   match version with Some v -> Bytes.unsafe_to_string v | None -> "(unknown)"
 
-let current_block_height evm_state =
+let current_block_height ~root evm_state =
   let open Lwt_syntax in
   let* current_block_number =
-    inspect evm_state Durable_storage_path.Block.current_number
+    inspect evm_state (Durable_storage_path.Block.current_number ~root)
   in
   match current_block_number with
   | None ->
@@ -200,14 +240,15 @@ let current_block_height evm_state =
       let (Qty current_block_number) = decode_number_le current_block_number in
       return (Qty current_block_number)
 
-let current_block_hash evm_state =
+let current_block_hash ~chain_family evm_state =
   let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let*! current_hash =
-    inspect evm_state Durable_storage_path.Block.current_hash
+    inspect evm_state (Durable_storage_path.Block.current_hash ~root)
   in
   match current_hash with
   | Some h -> return (decode_block_hash h)
-  | None -> return genesis_parent_hash
+  | None -> return (L2_types.genesis_parent_hash ~chain_family)
 
 (* The Fast Execution engine relies on Lwt_preemptive to execute Wasmer in
    dedicated worker threads (`Lwt_preemptive.detach`), while pushing to lwt
@@ -280,19 +321,21 @@ let execute_and_inspect ?wasm_pvm_fallback ~data_dir ?wasm_entrypoint ~config
 type apply_result =
   | Apply_success of {
       evm_state : t;
-      block : Ethereum_types.legacy_transaction_object Ethereum_types.block;
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
     }
   | Apply_failure
 
-let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
-    ~native_execution_policy evm_state (blueprint : Blueprint_types.payload) =
+let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir
+    ~chain_family ~config ~native_execution_policy evm_state
+    (blueprint : Blueprint_types.payload) =
   let open Lwt_result_syntax in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let exec_inputs =
     List.map
       (function `External payload -> `Input ("\001" ^ payload))
       blueprint
   in
-  let*! (Qty before_height) = current_block_height evm_state in
+  let*! (Qty before_height) = current_block_height ~root evm_state in
   let* evm_state =
     execute
       ~native_execution:(native_execution_policy = Configuration.Always)
@@ -305,17 +348,37 @@ let apply_blueprint ?wasm_pvm_fallback ?log_file ?profile ~data_dir ~config
       evm_state
       exec_inputs
   in
-  let* block_hash = current_block_hash evm_state in
+  let* block_hash = current_block_hash ~chain_family evm_state in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
   let* block =
     let*! bytes =
-      inspect evm_state (Durable_storage_path.Block.by_hash block_hash)
+      inspect evm_state (Durable_storage_path.Block.by_hash ~root block_hash)
     in
-    return (Option.map Ethereum_types.block_from_rlp bytes)
+    return (Option.map (L2_types.block_from_bytes ~chain_family) bytes)
+  in
+  let export_gas_used (Qty gas) =
+    match (profile, log_file) with
+    | Some Configuration.Minimal, Some log_file ->
+        let filename =
+          Filename.concat
+            (kernel_logs_directory ~data_dir)
+            (log_file ^ "_profile.csv")
+        in
+        let flags = Unix.[O_WRONLY; O_CREAT; O_APPEND] in
+        Lwt_io.with_file ~mode:Lwt_io.Output ~flags filename @@ fun oc ->
+        Lwt_io.fprintf oc "gas_used\n%Ld\n" (Z.to_int64 gas)
+    | _ -> Lwt.return_unit
   in
   match block with
-  | Some ({number = Qty after_height; _} as block)
-    when Z.(equal (succ before_height) after_height) ->
-      return (Apply_success {evm_state; block})
+  | Some block ->
+      let (Qty after_height) = L2_types.block_number block in
+      let gas =
+        match block with Eth {gasUsed; _} -> gasUsed | _ -> Qty.zero
+      in
+      let*! () = export_gas_used gas in
+      if Z.(equal (succ before_height) after_height) then
+        return (Apply_success {evm_state; block})
+      else return Apply_failure
   | _ -> return Apply_failure
 
 let delete ~kind evm_state path =
@@ -330,21 +393,17 @@ let clear_delayed_inbox evm_state =
 
 let wasm_pvm_version state = Wasm_debugger.get_wasm_version state
 
-let storage_version state =
-  let open Lwt_result_syntax in
-  let read key =
-    let*! res = inspect state key in
-    return res
-  in
-  Durable_storage.storage_version read
+let storage_version state = Durable_storage.storage_version (read state)
 
 let irmin_store_path ~data_dir = Filename.Infix.(data_dir // "store")
 
 let preload_kernel evm_state =
   let open Lwt_syntax in
-  let* () = Wasm_runtime.preload_kernel evm_state in
-  let* version = kernel_version evm_state in
-  Events.preload_kernel version
+  let* loaded = Wasm_runtime.preload_kernel evm_state in
+  if loaded then
+    let* version = kernel_version evm_state in
+    Events.preload_kernel version
+  else return_unit
 
 let get_delayed_inbox_item evm_state hash =
   let open Lwt_result_syntax in
@@ -370,7 +429,7 @@ let get_delayed_inbox_item evm_state hash =
       return res
   | _ -> failwith "invalid delayed inbox item"
 
-let clear_block_storage block evm_state =
+let clear_block_storage chain_family block evm_state =
   let open Lwt_syntax in
   (* We have 2 path to clear related to block storage:
      1. The predecessor block.
@@ -380,11 +439,16 @@ let clear_block_storage block evm_state =
      necessary to produce the next block. Block production starts by reading
      the head to retrieve information such as parent block hash.
   *)
-  let (Qty number) = block.number in
+  let root = Durable_storage_path.root_of_chain_family chain_family in
+  let block_parent = L2_types.block_parent block in
+  let block_number = L2_types.block_number block in
+  let (Qty number) = block_number in
   (* Handles case (1.). *)
   let* evm_state =
     if number > Z.zero then
-      let pred_block_path = Durable_storage_path.Block.by_hash block.parent in
+      let pred_block_path =
+        Durable_storage_path.Block.by_hash ~root block_parent
+      in
       delete ~kind:Value evm_state pred_block_path
     else return evm_state
   in
@@ -398,6 +462,7 @@ let clear_block_storage block evm_state =
     if number >= to_keep then
       let index_path =
         Durable_storage_path.Indexes.block_by_number
+          ~root
           (Nth (Z.sub number to_keep))
       in
       delete ~kind:Value evm_state index_path

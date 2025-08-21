@@ -1,4 +1,4 @@
-ARG IMAGE
+ARG IMAGE=invalid
 # the image with proper version is set as ARG
 #hadolint ignore=DL3006
 FROM ${IMAGE}
@@ -13,11 +13,22 @@ ENV BLST_PORTABLE=true
 # https://gitlab.com/dannywillems/ocaml-bls12-381/-/merge_requests/135/
 ENV BLST_PORTABLE=true
 
+ARG APT_PROXY
+ENV APT_PROXY=${APT_PROXY:-false}
+COPY --chown=tezos:tezos \
+  images/scripts/install_datadog_static.sh \
+  images/scripts/install_sccache_static.sh \
+  images/scripts/install_opam_static.sh \
+  scripts/kiss-fetch.sh \
+  scripts/kiss-logs.sh \
+  /tmp/
+
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
 # the package sccache is not available on ubuntu jammy
 #hadolint ignore=DL3008,DL3009
-RUN apt-get update && \
+RUN echo "Acquire::http::Proxy \"$APT_PROXY\";" > /etc/apt/apt.conf.d/01proxy && \
+    apt-get update && \
     apt-get install --no-install-recommends -y bubblewrap \
       rsync git m4 build-essential \
       patch unzip curl wget ca-certificates \
@@ -30,12 +41,11 @@ RUN apt-get update && \
       libsqlite3-dev libpq-dev \
       lintian devscripts && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    ARCH=$(uname -m) && \
-    curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
-    tar zxvf sccache.tgz && \
-    cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache*
+    rm -rf /var/lib/apt/lists/*
+
+RUN /tmp/install_sccache_static.sh && \
+    /tmp/install_datadog_static.sh && \
+    /tmp/install_opam_static.sh
 
 COPY --link scripts/version.sh /root/tezos/scripts/
 
@@ -53,7 +63,6 @@ RUN opam init --bare --disable-sandboxing
 # the caching mechanism more efficiently
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
-COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
 COPY --link opam/virtual/stdcompat.opam.locked /root/tezos/opam/virtual/
@@ -61,15 +70,14 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
-# we download and copy the zcash params in a separate directory
-# and before the make build-deps to create a second docker layer and
-# optimize caching
-RUN DAL_TRUSTED_SETUP="/root/tezos/dal-trusted-setup" \
-    scripts/install_dal_trusted_setup.sh
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
 
 #hadolint ignore=SC2154, SC1091
 RUN . ./scripts/version.sh && \
     eval $(opam env) && \
     . "/root/.cargo/env" && \
     make build-deps && \
-    mv dal-trusted-setup _opam/share/dal-trusted-setup
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log

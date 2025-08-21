@@ -228,6 +228,10 @@ let check_balance_field ?(loc = __LOC__) src_name field amount :
   let check' field_name a =
     check field_name (Partial_tez.to_tez ~round:`Down a)
   in
+  let check_z field_name =
+    let loc = sf "%s - unexpected %s for %S" loc field_name src_name in
+    Assert.equal_z ~loc (Z.of_int64 (Tez.to_mutez amount))
+  in
   exec_unit (fun (block, state) ->
       let src = State.find_account src_name state in
       let src_balance, src_total =
@@ -264,6 +268,11 @@ let check_balance_field ?(loc = __LOC__) src_name field amount :
         | `Total ->
             let* () = check "full_balance" rpc_total in
             check "full_balance" src_total
+        | `Pseudotokens ->
+            let* () =
+              check_z "pseudotokens" rpc_balance.staking_delegator_numerator_b
+            in
+            check_z "pseudotokens" src_balance.staking_delegator_numerator_b
       in
       return_unit)
 

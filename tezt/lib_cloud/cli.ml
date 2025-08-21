@@ -22,6 +22,13 @@ let localhost =
     ~description:"If set, the test is run locally"
     false
 
+let ssh_host =
+  Clap.optional_string
+    ~section
+    ~long:"ssh-host"
+    ~description:"Whether to provision a non-gcp vm host via ssh"
+    ()
+
 let monitoring =
   Clap.flag
     ~section
@@ -217,8 +224,11 @@ let machine_type =
     ~section
     ~long:"machine-type"
     ~description:
-      "Can specify a GCP machine type (see \
-       https://cloud.google.com/compute/docs/general-purpose-machines#c3d_series)"
+      (Format.sprintf
+         "Can specify a GCP machine type (see \
+          https://cloud.google.com/compute/docs/general-purpose-machines#n2_series). \
+          Default is %s."
+         Types.Agent_configuration.default_gcp_machine_type)
     Types.Agent_configuration.default_gcp_machine_type
 
 let dockerfile_alias =
@@ -323,9 +333,10 @@ let docker_host_network =
     ~set_long:"docker-host-network"
     ~unset_long:"no-docker-host-network"
     ~description:
-      "In Localhost host mode, whether to use the host network or not. This is \
-       not available on Mac OS/X. By default [true] unless Mac OS/X is set. If \
-       not set, a dedicated docker network is created."
+      "In Local_orchestrator_local_agents mode, whether to use the host \
+       network or not. This is not available on Mac OS/X. By default [true] \
+       unless Mac OS/X is set. If not set, a dedicated docker network is \
+       created."
     (not macosx)
 
 let push_docker =
@@ -370,3 +381,32 @@ let binaries_path =
       "Where to find binaries in the docker image by default (default is: \
        '/tmp/tezt-runners')"
     Types.Agent_configuration.default_gcp_binaries_path
+
+let log_rotation =
+  Clap.default_int
+    ~section
+    ~long:"log-rotation"
+    ~description:
+      "Maximum number of log rotations before removing older log files. \
+       Default is 300 if a log-file is specified.\n\
+      \       Set to 0 to completely disable log-rotation"
+    300
+
+let section =
+  Clap.section
+    ~description:"Define report and alert managing options"
+    "Cloud reporting and alerting options"
+
+let slack_channel_id =
+  Clap.optional_string
+    ~section
+    ~long:"slack-channel-id"
+    ~description:"The Slack channel id to send reports and alerts on"
+    ()
+
+let slack_bot_token =
+  Clap.optional_string
+    ~section
+    ~long:"slack-bot-token"
+    ~description:"The Slack bot token used to send reports and alerts"
+    ()

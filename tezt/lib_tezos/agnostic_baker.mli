@@ -38,15 +38,26 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
  *)
 val wait_for_ready : t -> unit Lwt.t
 
-(** Spawn [octez-experimental-agnostic-baker run].
+(** Raw events. *)
+type event = {name : string; value : JSON.t; timestamp : float}
+
+(** See [Daemon.Make.on_event]. *)
+val on_event : t -> (event -> unit) -> unit
+
+(** Spawn [octez-baker run].
 
     The resulting promise is fulfilled as soon as the agnostic baker has been
     spawned. It continues running in the background. *)
 val run :
+  ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?extra_arguments:string list ->
   t ->
   unit Lwt.t
+
+(** Spawn [octez-baker run] similarly to {!run} but returns the process. *)
+val spawn_run : ?env:string String_map.t -> t -> Process.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -54,11 +65,23 @@ type liquidity_baking_vote = Off | On | Pass
 (** Returns the string representation of a [liquidity_baking_vote]. *)
 val liquidity_baking_vote_to_string : liquidity_baking_vote -> string
 
-(** Protocol status values. *)
-type protocol_status = Active | Frozen | Ignore
+(** Returns the [liquidity_baking_vote] corresponding to a string, or None if the
+    string is not a valid liquidity baking vote. *)
+val liquidity_baking_vote_of_string_opt : string -> liquidity_baking_vote option
 
-(** Returns the protocol status given the full protocol value. *)
-val protocol_status : Protocol.t -> protocol_status
+(** Writes a liquidity baking votefile, as read by the bakers [--votefile]
+    argument.
+
+    If [path] is set, the vote file is written there. Otherwise, it is written
+    to a temporary file.
+
+    Returns the path to the file that was written. *)
+val liquidity_baking_votefile : ?path:string -> liquidity_baking_vote -> string
+
+(** Number of extra levels to keep the old baker alive before shutting it down.
+   This extra time is used to avoid halting the chain in cases such as
+   reorganization or high round migration blocks. *)
+val extra_levels_for_old_baker : int
 
 (** Create a agnostic baker.
 
@@ -88,20 +111,19 @@ val protocol_status : Protocol.t -> protocol_status
     agnostic baker. This defaults to the empty list, which is a shortcut for "every known
     account".
 
-    [liquidity_baking_toggle_vote] is passed to the agnostic baker
-    daemon through the flags [--liquidity-baking-toggle-vote]. If
-    [--liquidity-baking-toggle-vote] is [None], then
-    [--liquidity-baking-toggle-vote] is not passed. If it is [Some x]
-    then [--liquidity-baking-toggle-vote x] is passed. The default
-    value is [Some Pass].
-
-    [use_dal_node] is passed to the agnostic baker daemon through the
-    [--without-dal] or [--dal-node <uri>] flags. If the flag is [None], the
-    former option is passed, otherwise if the flag is [Some <uri>], then the
-    latter option is passed. The default value is [None].
+    [votefile], [force_apply_from_round], [operations_pool], [state_recorder],
+    [node_version_check_bypass], [node_version_allowed] and [liquidity_baking_toggle_vote] are
+    passed to the baker daemon through the flags [--votefile], [--force-apply-from-round],
+    [--operations-pool], [--record-state], [--node-version-check-bypass], [--node-version-allowed]
+    and [--liquidity-baking-toggle-vote]. If [--liquidity-baking-toggle-vote]
+    is [None], then [--liquidity-baking-toggle-vote] is not passed. If it is [Some x] then
+    [--liquidity-baking-toggle-vote x] is passed. The default value is [Some Pass].
 
     If [remote_mode] is specified, the agnostic baker will run in RPC-only mode.
- *)
+
+    If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
+    order to determine the DAL content of the attestations it sends to the L1
+    node.  *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -109,16 +131,23 @@ val create :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
+  ?keep_alive:bool ->
   Node.t ->
   Client.t ->
   t
 
 (** Similar to {!create}, but nodes RPCs addresses, wallet base directory and L1
-    data directory are directly provided instead of a {!Client.t}, a {!Node.t}
-    and optionally a {!Dal_node.t}.
+    data directory are directly provided instead of a {!Client.t} and a {!Node.t}.
 
     The [node_data_dir] parameter provides the (local) node's data directory
     used for baking.
@@ -129,7 +158,9 @@ val create :
     The [base_dir] parameter contains needed information about the wallets used
     by the agnostic baker.
 
- *)
+    If a [dal_node_rpc_endpoint] is specified, then the baker queries it in
+    order to determine the DAL content of the attestations it sends to the L1
+    node. *)
 val create_from_uris :
   ?runner:Runner.t ->
   ?path:string ->
@@ -137,16 +168,24 @@ val create_from_uris :
   ?color:Log.Color.t ->
   ?event_pipe:string ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
   base_dir:string ->
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
+  ?keep_alive:bool ->
   unit ->
   t
 
-(** Initialize an agnositc baker.
+(** Initialize a protocol-agnostic baker.
 
     This creates agnostic baker, waits for it to be ready, and then
     returns it.
@@ -183,6 +222,7 @@ val create_from_uris :
     If [remote_mode] is specified, the agnostic baker will run in
     RPC-only mode. *)
 val init :
+  ?env:string String_map.t ->
   ?runner:Runner.t ->
   ?path:string ->
   ?name:string ->
@@ -191,9 +231,27 @@ val init :
   ?event_pipe:string ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?delegates:string list ->
-  ?remote_mode:bool ->
+  ?votefile:string ->
   ?liquidity_baking_toggle_vote:liquidity_baking_vote option ->
-  ?use_dal_node:string ->
+  ?force_apply_from_round:int ->
+  ?remote_mode:bool ->
+  ?operations_pool:string ->
+  ?dal_node_rpc_endpoint:Endpoint.t ->
+  ?dal_node_timeout_percentage:int ->
+  ?state_recorder:bool ->
+  ?node_version_check_bypass:bool ->
+  ?node_version_allowed:string ->
+  ?keep_alive:bool ->
   Node.t ->
   Client.t ->
   t Lwt.t
+
+(** Log block injection events.
+
+    Show the baker daemon name, level and round of the block, and
+    delegate for which it was injected.
+
+    This log is relatively lightweight and a good indicator of chain
+    progress during a test. It can also be useful to observe baking
+    rights at the levels and rounds featured in a test. *)
+val log_block_injection : ?color:Log.Color.t -> t -> unit

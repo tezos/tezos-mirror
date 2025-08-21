@@ -30,7 +30,7 @@
     - ["file-descriptor-path"] outputs to the file at the URI path
     - ["file-descriptor-stdout"] outputs to [stdout]
     - ["file-descriptor-stderr"] outputs to [stderr]
-    - ["file-descriptor-syslog"] ouputs to a [syslog] facility
+    - ["file-descriptor-syslog"] outputs to a [syslog] facility
 
     Available options are
 

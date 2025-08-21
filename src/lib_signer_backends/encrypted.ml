@@ -83,10 +83,8 @@ module Raw = struct
           Data_encoding.Binary.to_bytes_exn
             Signature.P256.Secret_key.encoding
             sk
-      | Decrypted_sk (Bls_aug sk) ->
-          Data_encoding.Binary.to_bytes_exn
-            Signature.Bls_aug.Secret_key.encoding
-            sk
+      | Decrypted_sk (Bls sk) ->
+          Data_encoding.Binary.to_bytes_exn Signature.Bls.Secret_key.encoding sk
     in
     Bytes.cat salt (Tezos_crypto.Crypto_box.Secretbox.secretbox key msg nonce)
 
@@ -137,15 +135,15 @@ module Raw = struct
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid P256 secret key")
-    | Some bytes, Encrypted_sk Signature.Bls_aug -> (
+    | Some bytes, Encrypted_sk Signature.Bls -> (
         match
           Data_encoding.Binary.of_bytes_opt
-            Signature.Bls_aug.Secret_key.encoding
+            Signature.Bls.Secret_key.encoding
             bytes
         with
         | Some sk ->
             return_some
-              (Decrypted_sk (Bls_aug sk : Tezos_crypto.Signature.Secret_key.t))
+              (Decrypted_sk (Bls sk : Tezos_crypto.Signature.Secret_key.t))
         | None ->
             failwith
               "Corrupted wallet, deciphered key is not a valid BLS12_381 \
@@ -305,7 +303,7 @@ let decrypt_payload cctxt ?name encrypted_sk =
     | Some (Encrypted_p256 encrypted_sk) ->
         return (Encrypted_sk Signature.P256, encrypted_sk)
     | Some (Encrypted_bls12_381 encrypted_sk) ->
-        return (Encrypted_sk Signature.Bls_aug, encrypted_sk)
+        return (Encrypted_sk Signature.Bls, encrypted_sk)
     | _ -> failwith "Not a Base58Check-encoded encrypted key"
   in
   let* o = noninteractive_decrypt_loop algo ~encrypted_sk !passwords in
@@ -371,7 +369,7 @@ let common_encrypt sk password =
     | Decrypted_sk (Ed25519 _) -> Encodings.ed25519
     | Decrypted_sk (Secp256k1 _) -> Encodings.secp256k1
     | Decrypted_sk (P256 _) -> Encodings.p256
-    | Decrypted_sk (Bls_aug _) -> Encodings.bls12_381
+    | Decrypted_sk (Bls _) -> Encodings.bls12_381
   in
   Tezos_crypto.Base58.simple_encode encoding payload
 
@@ -506,10 +504,37 @@ struct
     let*? v = Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) in
     return v
 
-  let sign ?watermark sk_uri buf =
+  let list_known_keys path = Client_keys.list_known_keys path
+
+  let sign ?version ?watermark sk_uri buf =
     let open Lwt_result_syntax in
     let* sk = decrypt C.cctxt sk_uri in
-    return (Signature.sign ?watermark sk buf)
+    match version with
+    | Some Tezos_crypto.Signature.Version_0 -> (
+        match Tezos_crypto.Signature.V0.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V0.sign ?watermark sk buf in
+            return (Signature.V_latest.Of_V0.signature s)
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 0")
+    | Some Version_1 -> (
+        match Tezos_crypto.Signature.V1.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V1.sign ?watermark sk buf in
+            return (Signature.V_latest.Of_V1.signature s)
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 1")
+    | Some Version_2 -> (
+        match Tezos_crypto.Signature.V2.Of_V_latest.secret_key sk with
+        | Some sk ->
+            let s = Tezos_crypto.Signature.V2.sign ?watermark sk buf in
+            return s
+        | None ->
+            Error_monad.failwith
+              "Failed to handle secret key in Signature version 2")
+    | None -> return (Tezos_crypto.Signature.V_latest.sign ?watermark sk buf)
 
   let deterministic_nonce sk_uri buf =
     let open Lwt_result_syntax in
@@ -522,4 +547,16 @@ struct
     return (Signature.deterministic_nonce_hash sk buf)
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
+
+  let bls_prove_possession ?override_pk sk_uri =
+    let open Lwt_result_syntax in
+    let* sk = decrypt C.cctxt sk_uri in
+    match sk with
+    | Bls sk ->
+        return
+        @@ Signature.Bls.of_bytes_exn
+             (Signature.Bls.pop_prove ?msg:override_pk sk)
+    | _ ->
+        Error_monad.failwith
+          "Proof of possession can only be requested for BLS keys."
 end

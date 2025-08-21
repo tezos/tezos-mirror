@@ -27,10 +27,6 @@ let ci_disabled = "ci_disabled"
 
 let flaky = "flaky"
 
-let memory_3k = "memory_3k"
-
-let memory_4k = "memory_4k"
-
 let time_sensitive = "time_sensitive"
 
 let infrastructure = "infrastructure"
@@ -53,4 +49,6 @@ let unix = "unix"
 
 let slow = "slow"
 
-let cloud = "cloud"
+let extra = "extra"
+
+let memory_hungry = "memory_hungry"

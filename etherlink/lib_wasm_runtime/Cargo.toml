@@ -1,8 +1,9 @@
 [package]
 name = "octez-evm-node-wasm-runtime"
 version = "0.0.0-dev"
-authors = [ "Etherlink Core Engineers <contact@tezos.com>" ]
+authors = ["Etherlink Core Engineers <contact@tezos.com>"]
 edition = "2021"
+resolver = "3"
 
 [lib]
 crate-type = ["staticlib", "cdylib", "rlib"]
@@ -10,14 +11,24 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 ocaml-build = { version = "1.*", features = ["dune"] }
 
+[dependencies.wasmer-c-api]
+package = "wasmer-c-api"
+path = "../../src/rust_deps/wasmer-3.3.0/lib/c-api"
+default-features = false
+features = ["singlepass", "cranelift", "wat", "middlewares"]
+
 [dependencies]
 hex = "*"
 ocaml = { version = "1.1.0" }
-wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = ["cranelift", "jit"] }
+wasmer = { path = "../../src/rust_deps/wasmer-3.3.0/lib/api", default-features = false, features = [
+    "cranelift",
+    "jit",
+] }
 wasmer-compiler-cranelift = { path = "../../src/rust_deps/wasmer-3.3.0/lib/compiler-cranelift" }
 tezos_crypto_rs = { version = "0.6", path = "../../sdk/rust/crypto", default-features = false }
 log = "0.4"
 env_logger = "0.11"
+octez-riscv-api = { path = "../../src/riscv/api" }
 librustzcash = { path = "../../src/rustzcash_deps" }
 tezos-smart-rollup-core = { path = "../../src/kernel_sdk/core" }
 tezos-smart-rollup-host = { path = "../../src/kernel_sdk/host" }
@@ -27,3 +38,9 @@ runtime-bifrost = { package = "tezos-evm-runtime-bifrost", path = "../kernel_bif
 # Calypso
 kernel-calypso = { package = "evm_kernel_calypso", path = "../kernel_calypso/kernel", default-features = false }
 runtime-calypso = { package = "tezos-evm-runtime-calypso", path = "../kernel_calypso/runtime", default-features = false }
+# Calypso 2
+kernel-calypso2 = { package = "evm_kernel_calypso2", path = "../kernel_calypso2/kernel", default-features = false }
+runtime-calypso2 = { package = "tezos-evm-runtime-calypso2", path = "../kernel_calypso2/runtime", default-features = false }
+# Dionysus
+kernel-dionysus = { package = "evm_kernel_dionysus", path = "../kernel_dionysus/kernel", default-features = false }
+runtime-dionysus = { package = "tezos-evm-runtime-dionysus", path = "../kernel_dionysus/runtime", default-features = false }

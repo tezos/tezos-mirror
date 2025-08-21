@@ -10,7 +10,7 @@ Octez consists of :ref:`several binaries <tezos_binaries>` (i.e., executable fil
 
 There are several options for getting the binaries, depending on how you plan to use Octez:
 
-- :ref:`installing binaries <installing_binaries>`.
+- :ref:`installing packages <installing_packages>`.
   This is the easiest way to install native binaries for the latest stable release, together with their dependencies, using a package manager.
 - :ref:`using docker images <using_docker_images>`.
   This is the easiest way to run the latest stable release of the binaries in
@@ -18,10 +18,13 @@ There are several options for getting the binaries, depending on how you plan to
 - :ref:`getting static binaries <getting_static_binaries>`.
   This is the easiest way to get native binaries for the latest stable release,
   requiring no dependencies, under Linux.
+- :ref:`using homebrew <using_homebrew>`.
+  For macOS (and also Linux) you can use our Homebrew formula to compile and
+  install octez.
 - :ref:`building the binaries via the OPAM source package manager <building_with_opam>`.
   Take this way to install the latest stable release in your native OS
   environment, automatically built from sources.
-- :ref:`setting up a complete development environment <compiling_with_make>` by
+- :doc:`Building Octez <howtobuild>` by
   compiling the sources like developers do.
   This is the way to take if you plan to contribute to the source code.
   It allows to install any version you want (typically, the current
@@ -29,9 +32,9 @@ There are several options for getting the binaries, depending on how you plan to
   sources.
 
 
-These different options are described in the following sections.
+These different options are described in the following sections, except the last one, described in its own page.
 
-Some Octez binaries also require some parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is currently described in section :ref:`compiling_with_make`, but those instructions may be used for other installation types:
+Some Octez binaries also require certain parameter files to run. Only some of the packaged distributions include such parameter files. Therefore, depending on the type of installation and your user profile, you may have to install some extra parameter files separately. Their installation is described in page :doc:`howtobuild`, but those instructions may be used for other installation types:
 
 - :ref:`setup_zcash_params`
 - :ref:`setup_dal_crypto_params`
@@ -50,31 +53,61 @@ All our installation scenarios are tested daily, including by automated means, t
 These tests are performed by applying scenarios in several standard environments, from scratch.
 However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
 
-.. _getting_static_binaries:
-
-Getting static binaries
------------------------
-
-You can get static Linux binaries of the latest release from the
-`Octez package registry <https://gitlab.com/tezos/tezos/-/packages/>`__.
-
-This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
-are static, they can be used on any Linux distribution without any additional prerequisites.
-However, note that, by embedding all dependencies, static binary executables are typically much larger than dynamically-linked executables.
-
-For upgrading to a newer release, you just have to download and run the new
-versions of the binaries.
-
 .. _installing_packages:
+
+Installing binary packages
+--------------------------
+
+When it comes to installing software, especially for critical
+applications like Tezos/Octez, it’s crucial to ensure a secure and
+stable environment. While compiling from source can provide
+customization options, it often introduces complexities and risks.
+Instead, opting for binary packages sucha as Deb or RPM packages from a trusted source simplifies
+installation and enhances security.
+
+Deb or RPM packages compiled for a specific platform should be always preferred
+over statically compiled binaries. Deb or RPM packages can also be used to
+simplify the creation of `OCI <https://opencontainers.org/>`__ images or simply
+deployed on bare metal using provisioning tools such as
+`Ansible <https://docs.ansible.com/>`__.
+
+Using the official Deb or RPM packages offers several advantages:
+
+-  **Security**: Packages are pre-compiled and thoroughly tested,
+   reducing the risk of vulnerabilities introduced during compilation.
+   All our packages are signed and our supply chain is strictly
+   monitored to make sure the packages that we deliver only use
+   components that were vetted by our engineering team.
+
+-  **Stability**: Packages from a trusted repository undergo rigorous testing,
+   ensuring stability and compatibility with the target system. We make sure to
+   compile our binaries in a clean environment and using an up-to-date software
+   distribution. We use LTS (long-term service) distributions to enhance
+   stability and reduce the attack surface.
+
+-  **Ease of Installation**: Packages can be installed using standard package
+   management tools, streamlining the process. For instance, ``apt`` is
+   ubiquitous in the Debian world. These tools allow us to sign our packages
+   that can be automatically verified by the end user during installation. We
+   provide packages that allow the end user to easily tailor their installation
+   for different use cases.
+
+-  **Reduced Downtime**: With reliable binaries and straightforward
+   installation, system downtime due to installation errors or
+   compatibility issues is minimized. We carefully test the upgrade
+   process of our packages to make sure that end users can enjoy a click and go
+   upgrade process with near to zero downtime.
+
+.. _installing_deb:
 
 Ubuntu and Debian Octez packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-If you're using Ubuntu or Debian, you can install the same packages as in the release page
-using ``apt`` directly from our APT repository, instead of going to the Octez
-release page as explained above.
+If you're using Ubuntu or Debian, you can install the Debian packages
+using ``apt`` directly from our APT repository.
 
 We support the following distribution/releases:
+
 - ``debian/bookworm``
 - ``ubuntu/noble``
 - ``ubuntu/jammy``
@@ -99,78 +132,134 @@ We also maintain a separate repository for release candidates. To install
 the last release candidate simply prepend ``RC/`` to the distribution name
 as in ``export distribution=RC/debian``
 
-Then, to install the binaries, run the following commands:
+Then, to install the binaries, run the following command to install the octez-baker and all its dependencies:
 
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [install tezos]
-   :end-before: [install octez additional packages]
+::
 
-To remove the Octez packages you can simply run the following command.
-
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [test autopurge]
-   :end-before: [check autopurge]
-
-Also there are some experimental packages:
-
-- ``octez-experimental`` - binaries that are considered experimental including
-  the Alpha baker
-- ``octez-evm-node`` - the EVM endpoint node for Etherlink
-
-The packages are set up to run under a dedicated user. The ``octez-node``,
-``octez-baker`` and ``octez-smartrollup`` packages use a user and group called
-tezos. The ``octez-signer`` package uses a user and group called tzsigner. It’s
-possible to configure the software to use a different user (even root).
-
-The documentation for these packages, originally developed by Chris Pinnock,
-can be found here: https://chrispinnock.com/tezos/packages/
-
-.. _new_packages:
-
-New set of Debian packages
-""""""""""""""""""""""""""
-
-
-We are developing a new set of Octez Debian packages. They are distributed with latest Octez releases for testing purposes only, and should be considered experimental.
-
-You can use them to test new packaging features, compatibility and integration with other software and :doc:`share your feedback with us <../developer/contributing>`.
-
-These will eventually replace the Debian packages mentioned above.
-
-The new set of packages can be installed by adding the following apt repository::
-
-  export distribution=next/debian
-  export release=bookworm
-
-.. literalinclude:: install-bin-deb.sh
-   :language: shell
-   :start-after: [add repository]
-   :end-before: [end add repository]
+  sudo apt install octez-baker
 
 Once the Octez binary packages are installed, they can be set up as services
 as explained in :doc:`./services`.
 
+To remove the Octez packages you can simply run the following command.
+
+::
+
+  sudo apt-get autopurge -y octez-baker
+
 If migrating from Serokell packages you can check out migration documentation
 :doc:`./serokell`.
 
+To upgrade packages, use ``apt-get update`` and ``apt-get upgrade``.
+If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+
 .. _installing_rpm:
 
-Fedora Octez packages
-~~~~~~~~~~~~~~~~~~~~~
+RPM Octez packages
+~~~~~~~~~~~~~~~~~~
 
-If you're using Fedora, you can install packages with Octez binaries
-from the Octez release page indicated above
-using ``rpm`` or ``dnf``. Currently it supports the latest LTS release for
-Fedora and for RockyLinux.
+If you're using Fedora or Rocky Linux, you can install RPM packages with Octez binaries from the
+Octez from our DNF repository. Currently we support the latest LTS release for
+Fedora and for RockyLinux :
 
-Upgrading to a new or more recent release requires downloading again all the ``rpm``
-packages and repeat the installation.
+- ``rockylinux/9.3``
+- ``fedora/39``
+- ``fedora/42``
 
-For example using ``yum``::
+both on ``amd64`` and ``arm64`` architectures.
 
-    yum install ./octez-client-19.1-1.x86_64.rpm
+In order to add the Tezos package repository to your machine, do:
+
+::
+
+  export distribution=rockylinux
+  export release=9.3
+
+and run:
+
+.. literalinclude:: install-bin-rpm.sh
+   :language: shell
+   :start-after: [add repository]
+   :end-before: [end add repository]
+
+For ``rockylinux`` user you also need to add the ``devel`` repository
+
+::
+
+  dnf -y config-manager --set-enabled devel
+
+To update the local dnf registry run:
+
+::
+
+  dnf update
+
+We also maintain a separate repository for release candidates. To install
+the last release candidate simply prepend ``RC/`` to the distribution name
+as in ``export distribution=RC/rockylinux``
+
+Then, to install the binaries, run the following commands:
+
+::
+
+  dnf -y install octez-node
+  dnf -y install octez-client
+  dnf -y install octez-baker
+  dnf -y install octez-dal-node
+  dnf -y install octez-smart-rollup-node
+
+To remove the Octez packages you can simply run the following command.
+
+::
+
+  dnf -y remove octez-node octez-client octez-baker \
+                octez-dal-node octez-smart-rollup-node
+
+To upgrade packages, use ``dnf update``.
+If runnning Octez as services, see also how to :ref:`restart them <services_upgrade>`.
+
+
+.. _getting_static_binaries:
+
+Getting static binaries
+-----------------------
+
+You can get static Linux binaries of the latest release from the
+`Octez package registry <https://gitlab.com/tezos/tezos/-/packages/>`__.
+
+This repository provides static binaries for x86_64 and arm64 architectures. Since these binaries
+are static, they can be used on any Linux distribution without any additional prerequisites.
+However, note that, by embedding all dependencies, static binary executables are typically much larger than dynamically-linked executables.
+
+For upgrading to a newer release, you just have to download and run the new
+versions of the binaries.
+
+.. _using_homebrew:
+
+Using Homebrew
+--------------
+
+On macOS and Linux, you can compile and install Octez using Homebrew. If
+Homebrew is not yet installed on your system, please refer to the official
+[Homebrew installation guide](https://brew.sh/) for detailed instructions.
+
+Once Homebrew is set up, follow these steps to install Octez.
+
+Download the Octez formula by executing the following command in your terminal::
+
+    curl -q "https://packages.nomadic-labs.com/homebrew/Formula/octez.rb" -O
+
+For ``RC`` versions, do rather::
+
+    curl -q "https://packages.nomadic-labs.com/homebrew/RC/Formula/octez.rb" -O
+
+Install Octez using the downloaded formula with the following command::
+
+    brew install -v ./octez.rb
+
+Depending on the speed of your system, the build can take more than 10
+minutes. We regularly test the build in our CI using macOS 14 (Sonoma) with Xcode 15 on an ARM-based Mac.
+More recent configurations should also work.
 
 .. _using_docker_images:
 
@@ -183,12 +272,7 @@ automatically generated and published on `DockerHub
 way to run an always up-to-date ``octez-node``.
 
 From version 22.0 all Octez Docker images are signed using Cosign.
-You can verify if the images are correctly signed using the Cosign utility, as explained below:
-
-.. toctree::
-   :maxdepth: 2
-
-   cosign-verify
+You can verify if the images are correctly signed, :doc:`using Cosign <./cosign-verify>`.
 
 You can use the Docker images either directly or using Docker compose files, as explained next.
 In both cases, you need to have `Docker <https://www.docker.com>`__ installed and started (`Docker Desktop <https://www.docker.com/products/docker-desktop/>`__ would suffice for the instructions below).
@@ -383,7 +467,7 @@ Building from sources via OPAM
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
 
-This is easier than :ref:`setting up a complete development environment <build_from_sources>`, like developers do.
+This is easier than setting up a complete development environment as described in :doc:`howtobuild`, like developers do.
 However, this method is recommended for expert users as it requires basic
 knowledge of the OPAM package manager and the OCaml packages
 workflow. In particular, upgrading Octez from release to
@@ -533,239 +617,6 @@ Identified situations where it will be more tricky are:
   The solution will be defined when delivering the first release with Rust
   dependencies.
 
-.. _build_from_sources:
-.. _compiling_with_make:
-
-Setting up the development environment from scratch
----------------------------------------------------
-
-If you plan to contribute to the Octez codebase, the way to go is to set up a
-complete development environment, by cloning the repository and compiling the
-sources using the provided makefile.
-You may either build all the executables, as illustrated below, or only a subset of the executables, as detailed in section :ref:`compile_sources`.
-
-**TL;DR**: From a fresh Debian Bookworm x86_64, you typically want to select a source branch in the Octez repository, e.g.:
-
-.. literalinclude:: compile-sources.sh
-  :language: shell
-  :start-after: [select branch]
-  :end-before: [end]
-
-and then do:
-
-.. literalinclude:: compile-sources.sh
-  :language: shell
-  :start-after: [install packages]
-  :end-before: [test executables]
-
-.. warning::
-
-   If you are updating to :doc:`Octez v14<../releases/version-14>`
-   using a development environment which had been used to build Octez
-   versions up to v13.x, and also you have previously exported the
-   ``tezos`` directory to the ``$PATH`` environment variable, the
-   following stanza is necessary to avoid potential issues with opam
-   in the ``make build-deps`` step::
-
-     PATH=${PATH##"$HOME"/tezos/:}
-
-   Otherwise, it is possible for ``make build-deps`` to fail with the
-   following (or a similar) error::
-
-     make: opam: Permission denied
-     Makefile:53: *** Unexpected opam version (found: , expected: 2.*).  Stop.
-
-The following sections describe the individual steps above in more detail.
-
-.. note::
-
-  Besides compiling the sources, it is recommended to also :ref:`install Python and some related tools <install_python>`, which are needed, among others, to build the documentation and to use the Git :doc:`pre-commit hook <../developer/pre_commit_hook>`.
-
-.. _setup_rust:
-
-Install Rust
-~~~~~~~~~~~~
-
-Compiling Octez requires the Rust compiler (see recommended version in variable
-``$recommended_rust_version`` in file ``scripts/version.sh``) and the
-Cargo package manager to be installed. If you have `rustup
-<https://rustup.rs/>`_ installed, it should work without any
-additional steps on your side. You can use `rustup
-<https://rustup.rs/>`_ to install both. If you do not have ``rustup``,
-please avoid installing it from Snapcraft; you can rather follow the
-simple installation process shown below:
-
-.. literalinclude:: compile-sources.sh
-  :language: shell
-  :start-after: [install rust]
-  :end-before: [source cargo]
-
-Once Rust is installed, note that your ``PATH`` environment variable
-(in ``.profile``) may be updated and you will need to restart your session
-so that changes can be taken into account. Alternatively, you can do it
-manually without restarting your session:
-
-.. literalinclude:: compile-sources.sh
-  :language: shell
-  :start-after: [source cargo]
-  :end-before: [get sources]
-
-Note that the command line above assumes that rustup
-installed Cargo in ``$HOME/.cargo``, but this may change depending on how
-you installed rustup. See the documentation of your rustup distribution
-if file ``.cargo`` does not exist in your home directory.
-
-.. _setup_zcash_params:
-
-Install Zcash Parameters
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Octez binaries require the Zcash parameter files to run.
-Docker images come with those files, and the source distribution also
-includes those files. But if you compile from source and move Octez to
-another location (such as ``/usr/local/bin``), the Octez binaries may
-prompt you to install the Zcash parameter files. The easiest way is to
-download and run this script::
-
-   wget https://raw.githubusercontent.com/zcash/zcash/713fc761dd9cf4c9087c37b078bdeab98697bad2/zcutil/fetch-params.sh
-   chmod +x fetch-params.sh
-   ./fetch-params.sh
-
-The node will try to find Zcash parameters in the following directories,
-in this order:
-
-#. ``$XDG_DATA_HOME/.local/share/zcash-params``
-#. ``$XDG_DATA_DIRS/zcash-params`` (if ``$XDG_DATA_DIRS`` contains
-   several paths separated by colons ``:``, each path is considered)
-#. ``$OPAM_SWITCH_PREFIX/share/zcash-params``
-#. ``./_opam/share/zcash-params``
-#. ``~/.zcash-params``
-#. ``~/.local/share/zcash-params``
-#. ``/usr/local/share/zcash-params``
-#. ``/usr/share/zcash-params``
-
-If the node complains that it cannot find Zcash parameters, check that
-at least one of those directories contains both files ``sapling-spend.params``
-and ``sapling-output.params``. Here is where you should expect to find those files:
-
-* if you are compiling from source, parameters should be in
-  ``_opam/share/zcash-params`` (you may need to run ``eval $(opam env)``
-  before running the node);
-
-* if you used ``fetch-params.sh``, parameters should be in ``~/.zcash-params``.
-
-.. note::
-
-   Some operating systems may not be covered by the list of directories above.
-   If Zcash is located elsewhere on your system (typically, on MacOS X), you may try creating a symbolic link such as: ``ln -s ~/Library/Application\ Support/ZcashParams ~/.zcash-params``.
-
-Note that the script ``fetch-params.sh`` downloads a third file containing parameters for Sprout (currently called ``sprout-groth16.params``), which is not loaded by Sapling and can be deleted to save a significant amount of space (this file is *much* bigger than the two other files).
-
-.. _setup_dal_crypto_params:
-
-Install DAL trusted setup
-~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Users running :doc:`DAL<../shell/dal>` in **operator or observer** :ref:`profiles<dal_profiles>`
-need to have a set of cryptographic parameters (known as an SRS) installed in
-order to run their :doc:`DAL node<../shell/dal_node>`.
-In particular, these are needed when executing the Octez test suite, which involves DAL nodes running in various profiles.
-However, for simplicity, on some test networks the initialization parameters are mocked-up and built-in.
-
-The cryptographic parameters can be retrieved via the following script::
-
-  scripts/install_dal_trusted_setup.sh
-
-Get the sources
-~~~~~~~~~~~~~~~
-
-Octez ``git`` repository is hosted at `GitLab
-<https://gitlab.com/tezos/tezos/>`_. All development happens here. Do
-**not** use our `GitHub mirror <https://github.com/tezos/tezos>`_
-which we don't use anymore and only mirrors what happens on GitLab.
-
-Checkout the ``latest-release`` branch to use the latest release.
-Alternatively, you can checkout a specific version based on its tag.
-
-Install Octez dependencies
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Install the OCaml compiler and the libraries that Octez depends on::
-
-   make build-deps
-
-Alternatively, if you want to install extra
-development packages such as ``merlin``, you may use the following
-command instead:
-
-::
-
-   make build-dev-deps
-
-.. note::
-
-   * These commands create a local OPAM switch (``_opam`` folder at the root
-     of the repository) where the required version of OCaml and OCaml Octez
-     dependencies are compiled and installed (this takes a while but it's
-     only done once).
-
-   * Be sure to ``eval $(scripts/env.sh)`` when you ``cd``
-     into the repository in order to be sure to load this local
-     environment.
-
-   * As the opam hook would overwrite the effects of ``eval $(scripts/env.sh)``
-     the script will disable the opam hook temporarily.
-
-   * OPAM is meant to handle correctly the OCaml libraries but it is
-     not always able to handle all external C libraries we depend
-     on. On most systems, it is able to suggest a call to the system
-     package manager but it currently does not handle version checking.
-
-   * As a last resort, removing the ``_opam`` folder (as part of a ``git
-     clean -dxf`` for example) allows to restart in a fresh environment.
-
-.. _compile_sources:
-
-Compile
-~~~~~~~
-
-Once the dependencies are installed we can update OPAM's environment to
-refer to the new switch and compile the project to build all the executables:
-
-.. literalinclude:: compile-sources.sh
-  :language: shell
-  :start-after: [compile sources]
-  :end-before: [optional setup]
-
-.. note::
-
-  Instead of the simple ``make`` command above, you may use more restrictive targets in :src:`the makefile <Makefile>` to build only some subset of the executables.
-  For instance, you may exclude experimental executables using ``make release``; furthermore exclude executables such as the EVM node using ``make octez``; or even restrict to Layer 1 executables using ``make octez-layer1``.
-
-Lastly, you can also add the Octez binaries to your ``PATH`` variable,
-and after reading the Disclaimer a few
-hundred times you are allowed to disable it with
-``TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y``.
-
-You may also activate Bash autocompletion by executing::
-
-  source ./src/bin_client/bash-completion.sh
-
-.. warning::
-
-  Note that if your shell is ``zsh``, you may need extra configuration to customize shell
-  completion (refer to the ``zsh`` documentation).
-
-.. _update_from_sources:
-
-Update
-~~~~~~
-
-For updating to a new version, you typically have to
-update the sources by doing ``git pull`` in the ``tezos/`` directory and replay
-the compilation scenario starting from ``make build-deps``.
-You may also use ``make clean`` (and ``rm -Rf _opam/`` if needed) before that, for restarting compilation in a
-fresh state.
 
 Appendix
 --------
@@ -773,4 +624,6 @@ Appendix
 .. toctree::
    :maxdepth: 2
 
+   howtobuild
+   cosign-verify
    get_troubleshooting

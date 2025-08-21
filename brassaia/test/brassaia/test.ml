@@ -28,7 +28,8 @@ let () =
   Logs.set_level (Some Info);
   Logs.set_reporter (Brassaia_test_helpers.Brassaia_test.reporter ());
   Random.self_init ();
-  Lwt_main.run (Alcotest_lwt.run ~__FILE__ "brassaia" suite_lwt)
+  Lwt_main.run
+    (Alcotest_lwt.run ~__FILE__ ~tags:[ "ci_disabled" ] "brassaia" suite_lwt)
 
 let suite = [ ("lru", Test_lru.suite); ("node", Test_node.suite) ]
 
@@ -36,4 +37,4 @@ let () =
   Logs.set_level (Some Info);
   Logs.set_reporter (Brassaia_test_helpers.Brassaia_test.reporter ());
   Random.self_init ();
-  Alcotest.run ~__FILE__ "brassaia" suite
+  Alcotest.run ~__FILE__ ~tags:[ "ci_disabled" ] "brassaia" suite

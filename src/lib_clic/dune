@@ -10,7 +10,8 @@
   lwt
   re
   octez-libs.error-monad
-  octez-libs.lwt-result-stdlib)
+  octez-libs.lwt-result-stdlib
+  terminal)
  (flags
   (:standard)
   -open Tezos_stdlib

@@ -72,13 +72,7 @@ let disputed_commit = "Attempted to cement a disputed commitment"
 let register_test ?kind ?supports ?(regression = false) ~__FILE__ ~tags ?uses
     ~title f =
   let kind_tags =
-    match kind with
-    | Some "riscv" ->
-        (* TODO: At the moment, the memory consumption of the RISC-V PVM when
-           executed by the rollup node is prohibitive for regular CI jobs. *)
-        ["riscv"; Tag.memory_4k]
-    | Some k -> [k]
-    | _ -> []
+    match kind with Some "riscv" -> ["riscv"] | Some k -> [k] | _ -> []
   in
   let tags = Tag.etherlink :: "sc_rollup" :: (kind_tags @ tags) in
   if regression then
@@ -180,16 +174,21 @@ let test_l1_scenario ?supports ?regression ?hooks ~kind ?boot_sector
 
 let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
     ?commitment_period ?(parameters_ty = "string") ?challenge_window ?timeout
-    ?rollup_node_name ?whitelist_enable ?whitelist ?operator ?operators
-    ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
-    ?kernel_debug_log {variant; tags; description} scenario =
+    ?timestamp ?rollup_node_name ?whitelist_enable ?whitelist ?operator
+    ?operators ?(uses = fun _protocol -> []) ?rpc_external ?allow_degraded
+    ?kernel_debug_log ?preimages_dir {variant; tags; description} scenario =
+  let uses protocol =
+    (Constant.octez_smart_rollup_node :: Option.to_list preimages_dir)
+    @ uses protocol
+    @ Sc_rollup_helpers.default_boot_sector_uses_of ~kind
+  in
   register_test
     ~kind
     ?supports
     ?regression
     ~__FILE__
     ~tags
-    ~uses:(fun protocol -> Constant.octez_smart_rollup_node :: uses protocol)
+    ~uses
     ~title:(format_title_scenario kind {variant; tags; description})
   @@ fun protocol ->
   let riscv_pvm_enable = kind = "riscv" in
@@ -199,6 +198,7 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
       ?commitment_period
       ?challenge_window
       ?timeout
+      ?timestamp
       ?whitelist_enable
       ~riscv_pvm_enable
       protocol
@@ -231,6 +231,16 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
         if name = "kernel_debug.v0" then
           Regression.capture
             (Tezos_regression.replace_variables (JSON.as_string value))) ;
+  let* () =
+    match preimages_dir with
+    | None -> Lwt.return_unit
+    | Some src_dir ->
+        let data_dir = Sc_rollup_node.data_dir rollup_node in
+        let dest_dir = Filename.concat data_dir kind in
+        (* Copying used here instead of softlink to avoid tampering of artefact
+           when debugging from the temp test directory *)
+        Process.run "cp" ["-R"; Uses.path src_dir; dest_dir]
+  in
   scenario protocol rollup_node sc_rollup tezos_node tezos_client
 
 (*
@@ -245,10 +255,11 @@ let test_full_scenario ?supports ?regression ?hooks ~kind ?mode ?boot_sector
 
    - Rollup addresses are fully determined by operation hashes and origination nonce.
 *)
-let test_origination ~kind =
+let test_origination ~kind ?boot_sector =
   test_l1_scenario
     ~regression:true
     ~hooks
+    ?boot_sector
     {
       variant = None;
       tags = ["origination"];
@@ -270,11 +281,19 @@ let test_rollup_node_configuration ~kind =
       description = "configuration of a smart rollup node is robust";
     }
     ~kind
-  @@ fun _protocol rollup_node sc_rollup tezos_node tezos_client ->
+  @@ fun _protocol _rollup_node sc_rollup tezos_node tezos_client ->
+  let config_file = Temp.file "smart-rollup-config.json" in
+  let rollup_node =
+    Sc_rollup_node.create
+      Operator
+      ~default_operator:Constant.bootstrap2.alias
+      tezos_node
+      ~base_dir:(Client.base_dir tezos_client)
+      ~config_file
+  in
   let* _filename = Sc_rollup_node.config_init rollup_node sc_rollup in
   let config = Sc_rollup_node.Config_file.read rollup_node in
   let _rpc_port = JSON.(config |-> "rpc-port" |> as_int) in
-  let data_dir = Sc_rollup_node.data_dir rollup_node in
   Log.info "Check that config cannot be overwritten" ;
   let p = Sc_rollup_node.spawn_config_init rollup_node sc_rollup in
   let* () =
@@ -304,11 +323,15 @@ let test_rollup_node_configuration ~kind =
   let* () = Sc_rollup_node.run rollup_node sc_rollup [] in
   let* () = Sc_rollup_node.terminate rollup_node in
   (* Run a rollup node in the same data_dir, but for a different rollup *)
-  let* other_rollup_node, other_sc_rollup =
-    setup_rollup ~alias:"rollup2" ~kind tezos_node tezos_client ~data_dir
+  let* other_sc_rollup =
+    originate_sc_rollup
+      ~kind
+      ~alias:"rollup2"
+      ~src:Constant.bootstrap1.alias
+      tezos_client
   in
   let expect_failure () =
-    match Sc_rollup_node.process other_rollup_node with
+    match Sc_rollup_node.process rollup_node with
     | None -> unit
     | Some p ->
         Process.check_error
@@ -317,7 +340,7 @@ let test_rollup_node_configuration ~kind =
           p
   in
   let run_promise =
-    let* () = Sc_rollup_node.run other_rollup_node other_sc_rollup [] in
+    let* () = Sc_rollup_node.run rollup_node other_sc_rollup [] in
     Test.fail "Node for other rollup in same dir run without errors"
   in
   Lwt.choose [run_promise; expect_failure ()]
@@ -499,14 +522,7 @@ let test_store_schema_regression =
     ~regression:true
     {
       variant = None;
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7760
-
-            sqlite3 has been removed from the e2e image in
-            https://gitlab.com/tezos/tezos/-/merge_requests/16769, breaking this test.
-
-            It is therefore disabled in CI
-      *)
-      tags = [Tag.ci_disabled; "store"; "schema"];
+      tags = ["store"; "schema"];
       description = "Rollup node: regression on store schema";
     }
     ~kind:"wasm_2_0_0"
@@ -844,7 +860,7 @@ let bake_until_execute_outbox_message ?at_least ?timeout client rollup_node =
     executes an output message (whitelist_update) *)
 let send_messages_then_bake_until_rollup_node_execute_output_message
     ~commitment_period ~challenge_window client rollup_node msg_list =
-  let* () = send_text_messages ~hooks ~format:`Hex client msg_list in
+  let* () = send_text_messages ~hooks ~input_format:`Hex client msg_list in
   let* () =
     bake_until_execute_outbox_message
       ~timeout:5.0
@@ -1562,19 +1578,20 @@ let test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages =
 
 (* `inbox_file` is expected to be in the format produced by the `inbox_bench` tool
  * in `src/riscv/jstz` *)
-let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
+let read_jstz_inbox inbox_file =
   let inbox =
     JSON.(
       Uses.path inbox_file |> parse_file |> as_list |> List.map as_list
       |> List.concat)
   in
-  let messages =
-    List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
-  in
+  List.map (fun m -> JSON.(m |-> "external" |> as_string)) inbox
+
+let test_advances_state_with_inbox ~title ~boot_sector ~kind ~inbox_file =
+  let messages = read_jstz_inbox inbox_file in
   test_advances_state_with_kernel ~title ~boot_sector ~kind ~messages
 
 let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
-    ?boot_sector ~internal ~kind =
+    ?boot_sector ~internal ~kind ?preimages_dir =
   test_full_scenario
     ?regression
     ?kernel_debug_log
@@ -1587,6 +1604,7 @@ let test_rollup_node_advances_pvm_state ?regression ?kernel_debug_log ~title
     ?boot_sector
     ~parameters_ty:"bytes"
     ~kind
+    ?preimages_dir
   @@ fun protocol sc_rollup_node sc_rollup _tezos_node client ->
   let* () = Sc_rollup_node.run sc_rollup_node sc_rollup [] in
   let* _ = Sc_rollup_node.wait_sync ~timeout:30. sc_rollup_node in
@@ -1708,7 +1726,7 @@ let test_rollup_node_run_with_kernel ~kind ~kernel_name ~internal =
    After each a PVM kind-specific test is run, asserting the validity of the new state.
 *)
 let test_rollup_node_advances_pvm_state ~kind ?boot_sector ?kernel_debug_log
-    ~internal =
+    ~internal ?preimages_dir =
   test_rollup_node_advances_pvm_state
     ~regression:true
     ?kernel_debug_log
@@ -1716,7 +1734,7 @@ let test_rollup_node_advances_pvm_state ~kind ?boot_sector ?kernel_debug_log
     ?boot_sector
     ~internal
     ~kind
-
+    ?preimages_dir
 (* Ensure that commitments are stored and published properly.
    ----------------------------------------------------------
 
@@ -3159,7 +3177,8 @@ let test_can_stake ~kind =
   unit
 
 let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
-    ~kind ({allow_degraded; _} as scenario) =
+    ~kind ?(ci_disabled = false) ?uses ?(timeout = 60) ?timestamp ?boot_sector
+    ({allow_degraded; _} as scenario) =
   let regression =
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/5313
        Disabled dissection regressions for parallel games, as it introduces
@@ -3169,14 +3188,18 @@ let test_refutation_scenario ?commitment_period ?challenge_window ~variant ~mode
   let tags =
     ["refutation"] @ if mode = Sc_rollup_node.Accuser then ["accuser"] else []
   in
+  let tags = if ci_disabled then Tag.ci_disabled :: tags else tags in
   let variant = variant ^ if mode = Accuser then "+accuser" else "" in
   test_full_scenario
     ~regression
     ?hooks:None (* We only want to capture dissections manually *)
     ?commitment_period
     ~kind
+    ?uses
     ~mode
-    ~timeout:60
+    ~timeout
+    ?timestamp
+    ?boot_sector
     ?challenge_window
     ~rollup_node_name:"honest"
     ~allow_degraded
@@ -3285,7 +3308,7 @@ let test_refutation protocols ~kind =
               (inputs_for 10)
               ~final_level:80
               ~reset_honest_on:
-                [("smart_rollup_node_conflict_detected.v0", 2, None)]
+                [("smart_rollup_node_conflict_detected.v0", 3, None)]
               ~priority:`Priority_honest );
           ( "degraded_new",
             refutation_scenario_parameters
@@ -3428,7 +3451,7 @@ let test_bailout_refutation protocols =
        (inputs_for 10)
        ~final_level:80
        ~reset_honest_on:
-         [("smart_rollup_node_conflict_detected.v0", 2, Some Bailout)]
+         [("smart_rollup_node_conflict_detected.v0", 3, Some Bailout)]
        ~priority:`Priority_honest)
     protocols
 
@@ -4477,7 +4500,11 @@ let test_outbox_message_generic ?supports ?regression ?expected_error
         match payload with
         | `External payload ->
             let extra = List.init extra_empty_messages (fun _ -> "") in
-            send_text_messages ~hooks ~format:`Hex client (extra @ [payload])
+            send_text_messages
+              ~hooks
+              ~input_format:`Hex
+              client
+              (extra @ [payload])
         | `Internal payload ->
             let payload = "0x" ^ payload in
             let* () =
@@ -4829,7 +4856,7 @@ let test_outbox_message_reorg_disappear ~kind =
         (Sc_rollup_helpers.json_of_output_tx_batch [transaction])
     in
     let payload = String.trim answer in
-    send_text_messages ~format:`Hex client [payload]
+    send_text_messages ~input_format:`Hex client [payload]
   in
   let* divergence, trigger_reorg = setup_reorg node client in
   let* () =
@@ -4922,14 +4949,16 @@ let test_outbox_message protocols ~kind =
 
 let test_rpcs ~kind
     ?(boot_sector = Sc_rollup_helpers.default_boot_sector_of ~kind)
-    ?kernel_debug_log =
+    ?kernel_debug_log ?preimages_dir =
   test_full_scenario
+    ~uses:(fun _protocol -> default_boot_sector_uses_of ~kind)
     ~regression:true
     ?kernel_debug_log
     ~hooks
     ~kind
     ~boot_sector
     ~whitelist_enable:true
+    ?preimages_dir
     {
       tags = ["rpc"; "api"];
       variant = None;
@@ -7128,14 +7157,6 @@ let test_patch_durable_storage_on_commitment =
   in
   unit
 
-(* TODO: https://linear.app/tezos/issue/RV-109/port-kernel-installer-to-risc-v
- * Originate RISC-V kernels using installer kernel instead *)
-let read_riscv_kernel (kernel_path : Uses.t) (checksum_path : Uses.t) : string =
-  let checksum =
-    String.split_on_char ' ' (read_file (Uses.path checksum_path))
-  in
-  "kernel:" ^ Uses.path kernel_path ^ ":" ^ List.hd checksum
-
 let register_riscv ~protocols =
   let kind = "riscv" in
   let boot_sector =
@@ -7146,8 +7167,11 @@ let register_riscv ~protocols =
          ~path:"src/riscv/assets/riscv-dummy.elf.checksum"
          ())
   in
-  test_origination ~kind protocols ;
-  test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ;
+  let preimages_dir =
+    Uses.make ~tag:kind ~path:"src/riscv/assets/preimages" ()
+  in
+  test_origination ~kind ~boot_sector protocols ;
+  test_rpcs ~kind ~boot_sector protocols ~kernel_debug_log:true ~preimages_dir ;
   test_rollup_node_boots_into_initial_state protocols ~kind ;
   test_rollup_node_advances_pvm_state
     protocols
@@ -7155,6 +7179,7 @@ let register_riscv ~protocols =
     ~boot_sector
     ~internal:false
     ~kernel_debug_log:true
+    ~preimages_dir
 
 let register_riscv_jstz ~protocols =
   let kind = "riscv" in
@@ -7163,13 +7188,35 @@ let register_riscv_jstz ~protocols =
       (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz" ())
       (Uses.make ~tag:"riscv" ~path:"src/riscv/assets/jstz.checksum" ())
   in
+  (* The jstz inbox is generated using
+   * `./jstz/inbox-bench generate --inbox-file jstz-inbox.json --transfers 1 --address sr1N6iTfzhj2iGYfxACdy5kgHX5qzuW6xubY` *)
+  let jstz_inbox_path = "tezt/tests/riscv-tests/jstz-inbox.json" in
+  let inbox_file_uses = Uses.make ~tag:"riscv" ~path:jstz_inbox_path () in
   test_advances_state_with_inbox
     protocols
     ~kind
     ~title:"node advances PVM state with jstz kernel"
     ~boot_sector
-    ~inbox_file:
-      (Uses.make ~tag:"riscv" ~path:"tezt/tests/riscv-tests/jstz-inbox.json" ())
+    ~inbox_file:inbox_file_uses ;
+  test_refutation_scenario
+    ~kind
+    ~ci_disabled:true
+    ~mode:Operator
+    ~challenge_window:400
+    ~timeout:400
+    ~timestamp:(Ago (Client.Time.Span.of_seconds_exn 200.))
+      (* Setting the timestamp results in blocks being produced more slowly *)
+    ~commitment_period:10
+    ~variant:"pvm_proof_0"
+    ~uses:(fun _protocol -> [inbox_file_uses])
+    ~boot_sector
+    (refutation_scenario_parameters
+       ~loser_modes:["5 0 1000"]
+       (List.map (fun x -> [x]) (read_jstz_inbox inbox_file_uses))
+       ~input_format:`Hex
+       ~final_level:500
+       ~priority:`No_priority)
+    protocols
 
 let register ~kind ~protocols =
   test_origination ~kind protocols ;
@@ -7420,14 +7467,19 @@ let register_protocol_independent () =
     ~history_mode:Archive
     ~compact:false
     protocols ;
-  test_snapshots
-    ~unsafe_pvm_patches:true
-    ~kind
-    ~challenge_window:10
-    ~commitment_period:10
-    ~history_mode:Archive
-    ~compact:false
-    protocols ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7835
+        Re-enable when unsafe patches are properly part of
+        snapshot.
+
+     test_snapshots
+       ~unsafe_pvm_patches:true
+       ~kind
+       ~challenge_window:10
+       ~commitment_period:10
+       ~history_mode:Archive
+       ~compact:false
+       protocols ;
+  *)
   custom_mode_empty_operation_kinds ~kind protocols ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/4373
      Uncomment this test as soon as the issue done.

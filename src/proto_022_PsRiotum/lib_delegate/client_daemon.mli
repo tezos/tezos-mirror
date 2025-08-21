@@ -61,6 +61,7 @@ end
 
 module VDF : sig
   val run :
+    ?recommend_agnostic_baker:bool ->
     Protocol_client_context.full ->
     chain:Chain_services.chain ->
     keep_alive:bool ->

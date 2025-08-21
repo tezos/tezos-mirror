@@ -317,7 +317,7 @@ where
     Arg0: NomReader<'a> + Debug + PartialEq + Eq,
     Arg1: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         map(
             MichelinePrim2ArgsNoAnnots::<_, _, { prim::PAIR_TAG }>::nom_read,
             Into::into,
@@ -645,7 +645,7 @@ where
     Arg0: NomReader<'a> + Debug + PartialEq + Eq,
     Arg1: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         alt((
             map(
                 MichelinePrim1ArgNoAnnots::<_, { prim::LEFT_TAG }>::nom_read,
@@ -663,7 +663,7 @@ impl<'a, Arg> NomReader<'a> for MichelsonOption<Arg>
 where
     Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         alt((
             map(
                 MichelinePrimNoArgsNoAnnots::<{ prim::NONE_TAG }>::nom_read,

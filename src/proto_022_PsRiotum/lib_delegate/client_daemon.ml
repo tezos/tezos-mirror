@@ -57,11 +57,14 @@ let await_protocol_start (cctxt : #Protocol_client_context.full) ~chain =
   Node_rpc.await_protocol_activation cctxt ~chain ()
 
 let[@warning "-32"] may_start_profiler baking_dir =
-  match Tezos_profiler_unix.Profiler_instance.selected_backend () with
-  | Some {instance_maker; _} ->
-      let profiler_maker = instance_maker ~directory:baking_dir in
-      Baking_profiler.activate_all ~profiler_maker ;
-      RPC_profiler.init profiler_maker
+  match Tezos_profiler_unix.Profiler_instance.selected_backends () with
+  | Some backends ->
+      List.iter
+        (fun Tezos_profiler_unix.Profiler_instance.{instance_maker; _} ->
+          let profiler_maker = instance_maker ~directory:baking_dir in
+          Baking_profiler.activate_all ~profiler_maker ;
+          RPC_profiler.init profiler_maker)
+        backends
   | None -> ()
 
 module Baker = struct
@@ -178,11 +181,7 @@ module Accuser = struct
           Protocol.hash
       in
       let* valid_blocks_stream, _ =
-        Client_baking_blocks.monitor_applied_blocks
-          ~next_protocols:(Some [Protocol.hash])
-          cctxt
-          ~chains:[chain]
-          ()
+        Client_baking_blocks.monitor_applied_blocks cctxt ~chains:[chain] ()
       in
       let canceler = Lwt_canceler.create () in
       let _ =
@@ -207,9 +206,18 @@ module Accuser = struct
 end
 
 module VDF = struct
-  let run (cctxt : Protocol_client_context.full) ~chain ~keep_alive =
+  let run ?(recommend_agnostic_baker = true)
+      (cctxt : Protocol_client_context.full) ~chain ~keep_alive =
     let open Lwt_result_syntax in
     let process () =
+      let*! () =
+        if recommend_agnostic_baker then
+          cctxt#warning
+            "The `octez-baker` binary is now available. We recommend using it \
+             instead of `octez-baker-<protocol>`, as it automatically handles \
+             protocol switches."
+        else Lwt.return_unit
+      in
       let*! () =
         cctxt#message
           "VDF daemon %a (%s) for %a started."

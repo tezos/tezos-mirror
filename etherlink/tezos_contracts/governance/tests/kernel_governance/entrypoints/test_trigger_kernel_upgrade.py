@@ -13,6 +13,7 @@ import re
 class KernelGovernanceTriggerKernelUpgradeTestCase(BaseTestCase):
     def prepare_last_winner(self, payload):
         baker = self.bootstrap_baker()
+        delegated_contract = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
@@ -20,6 +21,7 @@ class KernelGovernanceTriggerKernelUpgradeTestCase(BaseTestCase):
             'proposal_quorum': 20,
             'promotion_quorum': 20,
             'promotion_supermajority': 20,
+            'delegation_contract': delegated_contract.address
         })
 
         # Period index: 0. Block: 2 of 2

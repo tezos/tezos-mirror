@@ -94,7 +94,6 @@ let generate_durable_storage ~(plugin : (module Protocol_plugin_sig.S)) tree =
 let dump_durable_storage ~block ~data_dir ~file =
   let open Lwt_result_syntax in
   let* store = Store.init Read_only ~data_dir in
-  let store = Store.Normal store in
   let get name load =
     let* value = load () in
     match value with
@@ -143,10 +142,33 @@ let dump_durable_storage ~block ~data_dir ~file =
     | None -> tzfail Rollup_node_errors.Cannot_checkout_l2_header
     | Some c -> return c
   in
-  let* context = load_context ~data_dir plugin Store_sigs.Read_only in
+  let* context = load_context ~data_dir plugin Access_mode.Read_only in
   let* state = get_wasm_pvm_state context block_hash context_hash in
   let* instrs = generate_durable_storage ~plugin state in
   let* () = Installer_config.to_file instrs ~output:file in
+  return_unit
+
+let preload_kernel (node_ctxt : _ Node_context.t) header =
+  let open Lwt_result_syntax in
+  let* pvm_state =
+    get_wasm_pvm_state
+      node_ctxt.context
+      header.Sc_rollup_block.block_hash
+      header.context
+  in
+  let* (module Plugin) =
+    Protocol_plugins.proto_plugin_for_level node_ctxt header.level
+  in
+  let*! durable =
+    Plugin.Pvm.Wasm_2_0_0.decode_durable_state
+      Tezos_scoru_wasm.Wasm_pvm.durable_storage_encoding
+      pvm_state
+  in
+  let*! () =
+    Tezos_scoru_wasm_fast.Exec.preload_kernel
+      ~hooks:Tezos_scoru_wasm.Hooks.no_hooks
+      durable
+  in
   return_unit
 
 let patch_durable_storage ~data_dir ~key ~value =
@@ -154,7 +176,6 @@ let patch_durable_storage ~data_dir ~key ~value =
   (* Loads the state of the head. *)
   let* _lock = Node_context_loader.lock ~data_dir in
   let* store = Store.init Read_write ~data_dir in
-  let store = Store.Normal store in
   let* ({header = {block_hash; level = block_level; _}; _} as l2_block) =
     let* r = Store.L2_blocks.find_head store in
     match r with
@@ -170,7 +191,7 @@ let patch_durable_storage ~data_dir ~key ~value =
       (Option.is_some l2_block.header.commitment_hash)
       (Rollup_node_errors.Patch_durable_storage_on_commitment block_level)
   in
-  let* context = load_context ~data_dir plugin Store_sigs.Read_write in
+  let* context = load_context ~data_dir plugin Access_mode.Read_write in
   let* state = get_wasm_pvm_state context block_hash l2_block.header.context in
 
   (* Patches the state via an unsafe patch. *)

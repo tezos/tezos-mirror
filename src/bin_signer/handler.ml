@@ -67,18 +67,26 @@ module High_watermark = struct
         "Failed to retrieve level and round of a Tenderbake block: %s"
         (Printexc.to_string exn)
 
-  let get_level_and_round_for_tenderbake_endorsement bytes =
+  let get_level_and_round_for_tenderbake_attestation
+      (pkh : Signature.public_key_hash) bytes =
     (* <watermark(1)><chain_id(4)><branch(32)><kind(1)><slot(2)><level(4)><round(4)>... *)
     let open Lwt_result_syntax in
     try
-      let level_offset = 1 + 4 + 32 + 1 + 2 in
+      let level_offset =
+        match pkh with
+        | Bls _ ->
+            (* Slot is not part of the signed payload when
+               signing with a tz4 address *)
+            1 + 4 + 32 + 1
+        | Ed25519 _ | Secp256k1 _ | P256 _ -> 1 + 4 + 32 + 1 + 2
+      in
       let level = Bytes.get_int32_be bytes level_offset in
       let round = Bytes.get_int32_be bytes (level_offset + 4) in
       return (level, Some round)
     with exn ->
       failwith
-        "Failed to retrieve level and round of an endorsement or \
-         preendorsement (%s)"
+        "Failed to retrieve level and round of an attestation or \
+         preattestation (%s)"
         (Printexc.to_string exn)
 
   let check_mark name
@@ -153,7 +161,7 @@ module High_watermark = struct
           else return_none
         else return_none
 
-  let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes
+  let mark_if_block_or_attestation (cctxt : #Client_context.wallet) pkh bytes
       sign =
     let open Lwt_result_syntax in
     let mark art name get_level_and_round =
@@ -213,13 +221,13 @@ module High_watermark = struct
               (* tenderbake block *)
               get_level_and_round_for_tenderbake_block bytes)
       | 0x12 ->
-          (* tenderbake preendorsement *)
-          mark "a" "preendorsement" (fun () ->
-              get_level_and_round_for_tenderbake_endorsement bytes)
+          (* tenderbake preattestation *)
+          mark "a" "preattestation" (fun () ->
+              get_level_and_round_for_tenderbake_attestation pkh bytes)
       | 0x13 ->
-          (* tenderbake endorsement *)
-          mark "a" "endorsement" (fun () ->
-              get_level_and_round_for_tenderbake_endorsement bytes)
+          (* tenderbake attestation *)
+          mark "an" "attestation" (fun () ->
+              get_level_and_round_for_tenderbake_attestation pkh bytes)
       | _ -> sign bytes
 end
 
@@ -264,10 +272,19 @@ let check_authorization cctxt pkh data require_auth signature =
       then return_unit
       else failwith "invalid authentication signature"
 
-let sign ?magic_bytes ~check_high_watermark ~require_auth
+let sign ?signing_version ?magic_bytes ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{pkh; data; signature} =
   let open Lwt_result_syntax in
+  let pkh, version =
+    match pkh with
+    | Pkh pkh -> (pkh, signing_version)
+    | Pkh_with_version (pkh, req_version) ->
+        ( pkh,
+          match signing_version with
+          | Some _v -> signing_version
+          | None -> Some req_version )
+  in
   let*! () =
     Events.(emit request_for_signing)
       (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
@@ -276,9 +293,19 @@ let sign ?magic_bytes ~check_high_watermark ~require_auth
   let* () = check_magic_byte name magic_bytes data in
   let* () = check_authorization cctxt pkh data require_auth signature in
   let*! () = Events.(emit signing_data) name in
-  let sign = Client_keys.sign cctxt sk_uri in
+  let sign bytes =
+    match version with
+    | Some Version_0 ->
+        let* s = Client_keys.V0.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V0.signature s)
+    | Some Version_1 ->
+        let* s = Client_keys.V1.sign cctxt sk_uri bytes in
+        return (Signature.V_latest.Of_V1.signature s)
+    | Some Version_2 -> Client_keys.V2.sign cctxt sk_uri bytes
+    | None -> Client_keys.V_latest.sign cctxt sk_uri bytes
+  in
   if check_high_watermark then
-    High_watermark.mark_if_block_or_endorsement cctxt pkh data sign
+    High_watermark.mark_if_block_or_attestation cctxt pkh data sign
   else sign data
 
 let deterministic_nonce (cctxt : #Client_context.wallet)
@@ -327,3 +354,15 @@ let public_key (cctxt : #Client_context.wallet) pkh =
   | Some (name, _, Some pk, _) ->
       let*! () = Events.(emit found_public_key) (pkh, name) in
       return pk
+
+let known_keys (cctxt : #Client_context.wallet) =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_known_keys ()) in
+  let+ all_keys = Client_keys.list_keys cctxt in
+  List.map (fun (_, pkh, _, _) -> pkh) all_keys
+
+let bls_prove_possession (cctxt : #Client_context.wallet) ?override_pk pkh =
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_proof_of_possession pkh) in
+  let* _name, _pkh, sk_uri = Client_keys.get_key cctxt pkh in
+  Client_keys.bls_prove_possession cctxt ?override_pk sk_uri

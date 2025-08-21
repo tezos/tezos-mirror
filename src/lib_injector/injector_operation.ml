@@ -38,6 +38,7 @@ module Make (O : PARAM_OPERATION) :
     order : Z.t option;
     counter : Z.t;
     operation : O.t;
+    scope : Opentelemetry.Scope.t option;
     mutable errors : errors;
   }
 
@@ -52,12 +53,14 @@ module Make (O : PARAM_OPERATION) :
 
   let no_errors = {count = 0; last_error = None}
 
-  let make ?order operation =
+  let make ?order ?scope operation =
     let nonce_for_hash_id =
       if not @@ O.unique operation then Some !counter else None
     in
     let id = hash_inner_operation nonce_for_hash_id operation in
-    let op = {id; order; counter = !counter; operation; errors = no_errors} in
+    let op =
+      {id; order; counter = !counter; operation; scope; errors = no_errors}
+    in
     counter := Z.succ !counter ;
     op
 
@@ -68,21 +71,38 @@ module Make (O : PARAM_OPERATION) :
       (fun (count, last_error) -> {count; last_error})
     @@ obj2 (req "count" int31) (opt "last_error" trace_encoding)
 
+  let scope_encoding =
+    let open Data_encoding in
+    conv_with_guard
+      (fun ({trace_id; span_id; _} : Opentelemetry.Scope.t) ->
+        Opentelemetry.Trace_context.Traceparent.to_value
+          ~trace_id
+          ~parent_id:span_id
+          ())
+      (fun s ->
+        let open Result_syntax in
+        let+ trace_id, span_id =
+          Opentelemetry.Trace_context.Traceparent.of_value s
+        in
+        Opentelemetry.Scope.make ~trace_id ~span_id ())
+      string
+
   let encoding =
     let open Data_encoding in
     conv
-      (fun {id; order; counter; operation; errors} ->
-        (id, order, counter, operation, errors))
-      (fun (id, order, counter, operation, errors) ->
-        {id; order; counter; operation; errors})
-    @@ obj5
+      (fun {id; order; counter; operation; scope; errors} ->
+        (id, order, counter, operation, scope, errors))
+      (fun (id, order, counter, operation, scope, errors) ->
+        {id; order; counter; operation; scope; errors})
+    @@ obj6
          (req "id" Id.encoding)
          (opt "order" n)
          (req "counter" n)
          (req "operation" O.encoding)
+         (opt "traceparent" scope_encoding)
          (dft "errors" errors_encoding no_errors)
 
-  let pp ppf {id; order; counter = _; operation; errors} =
+  let pp ppf {id; order; operation; errors; _} =
     let pp_errors ppf errors =
       if errors.count = 0 then ()
       else Format.fprintf ppf " [%d errors]" errors.count

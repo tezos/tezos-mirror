@@ -122,11 +122,11 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let* ctxt = Adaptive_issuance_storage.set_adaptive_issuance_enable ctxt in
   Storage.Pending_migration.remove ctxt
 
-(* Start of code to remove at r022 automatic protocol snapshot *)
+(* Start of code to remove at next automatic protocol snapshot *)
 
-(* Please add here any code that should be removed at the r022 automatic protocol snapshot *)
+(* Please add here any code that should be removed at the next automatic protocol snapshot *)
 
-(* End of code to remove at r022 automatic protocol snapshot *)
+(* End of code to remove at next automatic protocol snapshot *)
 
 let prepare_first_block chain_id ctxt ~typecheck_smart_contract
     ~typecheck_smart_rollup ~level ~timestamp ~predecessor =
@@ -224,14 +224,10 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-           When the predecessor will be R, then delete the code in validate.ml
-           dealing with the accusations around migration (the same todo can be
-           found there). *)
         return (ctxt, [])
         (* End of Alpha stitching. Comment used for automatic snapshot *)
         (* Start of alpha predecessor stitching. Comment used for automatic snapshot *)
-    | R022 ->
+    | S023 ->
         let* ctxt =
           Storage.Tenderbake.First_level_of_protocol.update ctxt level
         in
@@ -239,10 +235,6 @@ let prepare_first_block chain_id ctxt ~typecheck_smart_contract
         let* ctxt =
           Sc_rollup_refutation_storage.migrate_clean_refutation_games ctxt
         in
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/7686
-           When the predecessor will be R, then delete the code in validate.ml
-           dealing with the accusations around migration (the same todo can be
-           found there). *)
         return (ctxt, [])
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in

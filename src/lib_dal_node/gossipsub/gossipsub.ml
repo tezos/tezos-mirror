@@ -24,14 +24,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Gs_interface
-
 module Worker = struct
   module Config = Gs_interface.Worker_config
   module Default_parameters = Gs_default_parameters
   module Logging = Gs_logging
   include Gs_interface.Worker_instance
-  module Validate_message_hook = Validate_message_hook
+  module Validate_message_hook = Gs_interface.Validate_message_hook
 end
 
 module Transport_layer = struct
@@ -126,7 +124,7 @@ module Transport_layer = struct
         | Some conn -> P2p_conn.disconnect ?wait ~reason:Explicit_RPC conn)
 
   let get_points ?(connected = true) p2p =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -137,7 +135,7 @@ module Transport_layer = struct
         folder ~init:[] ~f:(fun point _info acc -> point :: acc) pool |> return
 
   let get_points_info ?(connected = true) p2p =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -154,7 +152,7 @@ module Transport_layer = struct
         |> return
 
   let get_point_info p2p point =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -164,7 +162,7 @@ module Transport_layer = struct
         |> return
 
   let get_peers ?(connected = true) p2p =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -175,7 +173,7 @@ module Transport_layer = struct
         folder ~init:[] ~f:(fun peer _info acc -> peer :: acc) pool |> return
 
   let get_peers_info ?(connected = true) p2p =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -192,7 +190,7 @@ module Transport_layer = struct
         |> return
 
   let get_peer_info p2p peer =
-    let open Lwt_result_syntax in
+    let open Result_syntax in
     match P2p.pool p2p with
     | None -> tzfail P2p_errors.P2p_layer_disabled
     | Some pool ->
@@ -232,3 +230,5 @@ end
 module Transport_layer_hooks = Gs_transport_connection
 
 let version = Transport_layer_interface.version
+
+module Profiler = Tezos_gossipsub.Profiler

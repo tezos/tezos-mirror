@@ -8,6 +8,7 @@
  (libraries
   octez-libs.base
   octez-smart-rollup-wasm-debugger-plugin
+  octez-evm-node-libs.websocket
   re
   uuidm)
  (flags

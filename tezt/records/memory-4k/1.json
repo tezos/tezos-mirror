@@ -16,33 +16,35 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "85046911",
+      "total_time": "64670717",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 2399783000
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Quebeca: bootstrap: many nodes bootstrap",
+    "title": "R022-: bootstrap: many nodes bootstrap",
     "tags": [
       "admin_client",
-      "baker_psquebec",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "layer1",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "synchronisation_threshold",
       "threshold"
     ],
     "successful_runs": {
-      "total_time": "54745134",
+      "total_time": "52292024",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4901393000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL L1 integration (Use all available slots)",
+    "title": "Quebec: Testing DAL L1 integration (Use all available slots)",
     "tags": [
       "regression",
       "admin_client",
@@ -50,13 +52,14 @@
       "dal",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "39899896",
+      "total_time": "25418955",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 3969996000
   },
   {
     "file": "tezt/tests/dal.ml",
@@ -72,13 +75,14 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "38686781",
+      "total_time": "25997844",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4237951000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Quebeca: Testing DAL node (banned attesters receive their shards thanks to amplification)",
+    "title": "R022-: Testing DAL node (banned attesters receive their shards thanks to amplification)",
     "tags": [
       "admin_client",
       "amplification",
@@ -87,17 +91,18 @@
       "dal_node",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "43810706",
+      "total_time": "37163609",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 5658632000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (observer triggers amplification (without lost shards))",
+    "title": "Quebec: Testing DAL node (observer triggers amplification (without lost shards))",
     "tags": [
       "admin_client",
       "amplification",
@@ -106,14 +111,15 @@
       "dal_node",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "simple",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "45260672",
+      "total_time": "37509315",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 5229918000
   },
   {
     "file": "tezt/tests/dal.ml",
@@ -131,8 +137,9 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "35640083",
+      "total_time": "31508368",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 5916513000
   }
 ]

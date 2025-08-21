@@ -25,6 +25,8 @@ module Configuration : sig
 
   type t = {name : string; vm : vm}
 
+  val pp : Format.formatter -> t -> unit
+
   val uri_of_docker_image : docker_image -> string Lwt.t
 
   (** [make ?machine_type ()] is a smart-constructor to make a VM
@@ -48,10 +50,10 @@ module Configuration : sig
     t
 end
 
-(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name ()]
+(** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name ()]
     creates an [agent] from the given parameters. [~next_available_port] should
     always provide an available port or raise [Not_found] otherwise.
-    [~name] is the name of the agent. [?ssh_id] and [?point] are used to potentially
+    [~vm_name] is the name of the VM. [?ssh_id] and [?point] are used to potentially
     create a [runner] for the [agent]. *)
 val make :
   ?zone:string ->
@@ -59,7 +61,7 @@ val make :
   ?point:string * int ->
   configuration:Configuration.t ->
   next_available_port:(unit -> int) ->
-  name:string ->
+  vm_name:string option ->
   process_monitor:Process_monitor.t option ->
   unit ->
   t
@@ -67,9 +69,11 @@ val make :
 (** Encode an agent configuration. *)
 val encoding : t Data_encoding.t
 
-(** [name agent] returns the name of the agent. This is the same as
-    the name provided in the agent configuration. *)
+(** [name agent] returns the name provided in the agent configuration. *)
 val name : t -> string
+
+(** [vm_name agent] returns the name of the VM. *)
+val vm_name : t -> string option
 
 (** [point agent] returns the point asociated with the agent. *)
 val point : t -> (string * int) option
@@ -92,6 +96,9 @@ val host_run_command : t -> string -> string list -> Process.t
 
 (** Returns the process monitor if any *)
 val process_monitor : t -> Process_monitor.t option
+
+(** Returns the service manager if any *)
+val service_manager : t -> Service_manager.t option
 
 (** Run a command on the docker image run by the agent.
 

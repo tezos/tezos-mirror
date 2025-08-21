@@ -5,6 +5,7 @@
 # Reads the following environment variables:
 #  - 'client_libs_dependencies_image_name'
 #  - 'client_libs_dependencies_image_tag' (optional)
+#  - 'DOCKER_FORCE_BUILD': set by the operator
 #  - 'CI_COMMIT_REF_NAME': set by GitLab CI
 #  - 'CI_DEFAULT_BRANCH': set by GitLab CI
 #  - 'CI_PIPELINE_ID': set by GitLab CI
@@ -60,12 +61,21 @@ echo "client_libs_dependencies_image_tag=$image_tag" > client_libs_dependencies_
 ./scripts/ci/docker_initialize.sh
 
 # Build image unless it already exists in the registry.
-if docker manifest inspect "${image_name}" > /dev/null; then
-  echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${docker_image_ref_tag}."
-  regctl image copy "${image_name}" "${image_base}:${docker_image_ref_tag}"
-  exit 0
-fi
+#
+# Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
+# for security updates purposes)
+skip_registry_cache_check=${DOCKER_FORCE_BUILD:-"false"}
 
+if [ "$skip_registry_cache_check" != "true" ]; then
+  if docker manifest inspect "${image_name}" > /dev/null; then
+    echo "Image ${image_name} already exists in the registry, update tag ${image_base}:${docker_image_ref_tag}."
+    regctl image copy "${image_name}" "${image_base}:${docker_image_ref_tag}"
+    exit 0
+  fi
+fi
+if [ "$skip_registry_cache_check" = "true" ]; then
+  echo "Force rebuild of CI images, using no cached layers"
+fi
 echo "Build ${image_name}"
 
 ./images/create_client_libs_dependencies_image.sh \

@@ -50,6 +50,8 @@
 #TYPE octez_evm_node_performance_virtual gauge
 #HELP octez_evm_node_performance_wasm Disk usage: wasm_2_0_0
 #TYPE octez_evm_node_performance_wasm gauge
+#HELP octez_evm_node_pruning_history 1.0 if the EVM node is currently pruning data past its retention period
+#TYPE octez_evm_node_pruning_history gauge
 #HELP octez_evm_node_queue_size Size of the execution queue of simulations
 #TYPE octez_evm_node_queue_size gauge
 #HELP octez_evm_node_signals_sent Number of DAL import signals sent on the inbox

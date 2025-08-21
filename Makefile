@@ -30,11 +30,17 @@ DEV_EXECUTABLES := $(shell cat script-inputs/dev-executables)
 
 ALL_EXECUTABLES := $(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES) $(DEV_EXECUTABLES)
 
-#Define octez only executables by excluding the EVM-node and teztale tools.
-OCTEZ_ONLY_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch,${ALL_EXECUTABLES})
+#Define octez only executables.
+OCTEZ_ONLY_RELEASED_EXECUTABLES := $(shell cat script-inputs/octez-released-executables)
+OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES := $(shell cat script-inputs/octez-experimental-executables)
+OCTEZ_ONLY_EXECUTABLES := $(OCTEZ_ONLY_RELEASED_EXECUTABLES) $(OCTEZ_ONLY_EXPERIMENTAL_EXECUTABLES)
 
 #Define octez layer1 only executables by excluding the EVM-node and teztale tools.
 OCTEZ_ONLY_LAYER1_EXECUTABLES := $(filter-out etherlink-governance-observer octez-evm-node octez-teztale-archiver octez-teztale-server octez-teztale-snitch octez-smart-rollup-wasm-debugger octez-smart-rollup-node octez-dal-node,$(RELEASED_EXECUTABLES) $(EXPERIMENTAL_EXECUTABLES))
+
+TEZTALE_EXECUTABLES := $(shell cat script-inputs/teztale-experimental-executables)
+
+EVM_EXECUTABLES := $(shell cat script-inputs/etherlink-experimental-executables)
 
 # Set of Dune targets to build, in addition to OCTEZ_EXECUTABLES, in
 # the `build` target's Dune invocation. This is used in the CI to
@@ -108,7 +114,7 @@ octez-layer1:
 
 .PHONY: teztale
 teztale:
-	@$(MAKE) build OCTEZ_EXECUTABLES?="octez-teztale-archiver octez-teztale-server octez-teztale-snitch"
+	@$(MAKE) build OCTEZ_EXECUTABLES?="${TEZTALE_EXECUTABLES}"
 
 .PHONY: experimental-release
 experimental-release:
@@ -499,6 +505,16 @@ build-floodgate:
 	@dune build ./etherlink/bin_floodgate
 	@cp -f ./_build/default/etherlink/bin_floodgate/main.exe floodgate
 
+.PHONY: etherlink-outbox-monitor
+etherlink-outbox-monitor:
+	@dune build ./etherlink/bin_outbox_monitor
+	@cp -f ./_build/default/etherlink/bin_outbox_monitor/main.exe $@
+
+.PHONY: fa-bridge-watchtower
+fa-bridge-watchtower:
+	@dune build ./etherlink/fa-bridge-watchtower
+	@cp -f ./_build/default/etherlink/fa-bridge-watchtower/main.exe $@
+
 .PHONY: build-unreleased
 build-unreleased: all
 	@echo 'Note: "make build-unreleased" is deprecated. Just use "make".'
@@ -596,3 +612,6 @@ wasm_runtime_gen_files::
 	@cd etherlink/lib_wasm_runtime; cargo build 2> /dev/null
 
 octez-evm-node: wasm_runtime_gen_files
+
+evm-node-static:
+	@$(MAKE) PROFILE=static build OCTEZ_EXECUTABLES?="$(EVM_EXECUTABLES)"

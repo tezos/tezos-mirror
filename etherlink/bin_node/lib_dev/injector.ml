@@ -52,6 +52,12 @@ let inject_transaction_request tx_object raw_tx =
     ~input_encoding:Inject_transaction.input_encoding
     (tx_object, raw_tx)
 
+let inject_tezlink_operation_request op raw_op =
+  construct_rpc_call
+    ~method_:Inject_tezlink_operation.method_
+    ~input_encoding:Inject_tezlink_operation.input_encoding
+    (op, raw_op)
+
 let send_raw_transaction ~keep_alive ~base ~raw_tx =
   call_rpc_service
     ~keep_alive
@@ -67,3 +73,39 @@ let inject_transaction ~keep_alive ~base ~tx_object ~raw_tx =
     ~path:Resto.Path.(root / "private")
     (inject_transaction_request tx_object raw_tx)
     Inject_transaction.output_encoding
+
+let inject_tezlink_operation ~keep_alive ~base ~op ~raw_op =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.(root / "private")
+    (inject_tezlink_operation_request op raw_op)
+    Inject_tezlink_operation.output_encoding
+
+let get_transaction_count_request address block_param =
+  construct_rpc_call
+    ~method_:Get_transaction_count.method_
+    ~input_encoding:Get_transaction_count.input_encoding
+    (address, block_param)
+
+let get_transaction_count ~keep_alive ~base address block_param =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.root
+    (get_transaction_count_request address block_param)
+    Get_transaction_count.output_encoding
+
+let get_transaction_by_hash_request tx_hash =
+  construct_rpc_call
+    ~method_:Get_transaction_by_hash.method_
+    ~input_encoding:Get_transaction_by_hash.input_encoding
+    tx_hash
+
+let get_transaction_by_hash ~keep_alive ~base tx_hash =
+  call_rpc_service
+    ~keep_alive
+    ~base
+    ~path:Resto.Path.root
+    (get_transaction_by_hash_request tx_hash)
+    Get_transaction_by_hash.output_encoding

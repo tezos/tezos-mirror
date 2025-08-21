@@ -188,126 +188,14 @@ let gc_test_reorg node_ctxt ~genesis =
   in
   return_unit
 
-let rec wait_migration (store : _ Store.t) =
-  let open Lwt_syntax in
-  match store with
-  | Normal _ | Hybrid {migration_done = {contents = true}; _} -> Lwt.return_unit
-  | Hybrid {migration_done = {contents = false}; _} ->
-      let* () = Lwt_unix.sleep 0.1 in
-      wait_migration store
-
-let test_store_migration_head node_ctxt chain =
-  let open Lwt_result_syntax in
-  let additional_chain_size = 10 in
-  let* extra_chain =
-    Helpers.append_dummy_l2_chain node_ctxt ~length:additional_chain_size
-  in
-  let store = Node_context.Internal_for_tests.unsafe_get_store node_ctxt in
-  let*! () = wait_migration store in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
-  let* () =
-    match head with
-    | None -> Assert.fail_msg "No head after migration"
-    | Some head ->
-        let last =
-          List.last_opt extra_chain |> WithExceptions.Option.get ~loc:__LOC__
-        in
-        Assert.equal
-          ~loc:__LOC__
-          ~pp:(fun fmt -> Format.fprintf fmt "%ld")
-          ~msg:"L2 head is correct after migration"
-          head.header.level
-          last.header.level ;
-        return_unit
-  in
-  check_chain_ok ~gc_level:0l node_ctxt store (chain @ extra_chain)
-
-let test_store_migration_stream (node_ctxt : _ Node_context.t) chain =
-  let open Lwt_result_syntax in
-  let additional_chain_size1 = 500 in
-  let additional_chain_size2 = 100 in
-  let block_stream, stopper =
-    Lwt_watcher.create_stream node_ctxt.global_block_watcher
-  in
-  let extra_chain1 =
-    Helpers.append_dummy_l2_chain node_ctxt ~length:additional_chain_size1
-  in
-  let prev = ref 0l in
-  let stream_check =
-    Lwt_stream.iter
-      (fun (block : Sc_rollup_block.t) ->
-        Assert.lt
-          ~loc:__LOC__
-          ~pp:(fun fmt -> Format.fprintf fmt "%ld")
-          ~msg:"L2 blocks streamed in order"
-          !prev
-          block.header.level ;
-        prev := block.header.level)
-      block_stream
-  in
-  let* extra_chain1 in
-  let store = Node_context.Internal_for_tests.unsafe_get_store node_ctxt in
-  let*! () = wait_migration store in
-  let* extra_chain2 =
-    Helpers.append_dummy_l2_chain node_ctxt ~length:additional_chain_size2
-  in
-  Lwt_watcher.shutdown stopper ;
-  let*! () = stream_check in
-  let* head = Node_context.last_processed_head_opt node_ctxt in
-  let* () =
-    match head with
-    | None -> Assert.fail_msg "No head after migration"
-    | Some head ->
-        let last =
-          List.last_opt extra_chain2 |> WithExceptions.Option.get ~loc:__LOC__
-        in
-        Assert.equal
-          ~loc:__LOC__
-          ~pp:(fun fmt -> Format.fprintf fmt "%ld")
-          ~msg:"L2 head is correct after migration"
-          head.header.level
-          last.header.level ;
-        Assert.equal
-          ~loc:__LOC__
-          ~pp:(fun fmt -> Format.fprintf fmt "%ld")
-          ~msg:"Last streamed block is correct"
-          !prev
-          last.header.level ;
-        return_unit
-  in
-  check_chain_ok
-    ~gc_level:0l
-    node_ctxt
-    store
-    (chain @ extra_chain1 @ extra_chain2)
-
 let mk_tests t =
   List.map
     (fun proto -> Helpers.alcotest `Quick Wasm_2_0_0 proto ~boot_sector:"" t)
-    (Protocol_plugins.registered_protocols ())
-
-let mk_store_migration_tests t =
-  List.map
-    (fun proto ->
-      Helpers.store_migration_alcotest
-        `Quick
-        Wasm_2_0_0
-        proto
-        ~boot_sector:""
-        ~chain_size:100
-        t)
     (Protocol_plugins.registered_protocols ())
 
 let () =
   Alcotest_lwt.run
     ~__FILE__
     "lib_smart_rollup_node"
-    [
-      ("store_gc", mk_tests gc_test);
-      ("store_gc_reorg", mk_tests gc_test_reorg);
-      ( "store_migration_head",
-        mk_store_migration_tests test_store_migration_head );
-      ( "store_migration_stream",
-        mk_store_migration_tests test_store_migration_stream );
-    ]
+    [("store_gc", mk_tests gc_test); ("store_gc_reorg", mk_tests gc_test_reorg)]
   |> Lwt_main.run

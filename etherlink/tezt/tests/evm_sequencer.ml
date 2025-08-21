@@ -42,7 +42,7 @@ module Sequencer_rpc = struct
     return (JSON.as_string res)
 end
 
-open Helpers
+open Test_helpers
 open Setup
 
 module Delayed_inbox = struct
@@ -164,7 +164,7 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
            "Pair %S (Pair (Right (Right %s%s)) 0)"
            sc_rollup_address
            receiver
-           (Helpers.remove_0x proxy))
+           (remove_0x proxy))
       ~amount:Tez.zero
       ~giver:depositor.Account.public_key_hash
       ~receiver:l1_contracts.ticket_router_tester
@@ -185,35 +185,9 @@ let send_fa_deposit_to_delayed_inbox ?(proxy = "") ~amount ~l1_contracts
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   unit
 
-(* For each feature (threshold encryption, DAL, FA Bridge), tests may
-   registered with the feature enabled, with the feature disabled, or both. *)
-type feature_test_registration =
-  | Register_with_feature
-  | Register_without_feature
-  | Register_both of {
-      extra_tags_with : string list;
-      extra_tags_without : string list;
-    }
-    (* We want at most one variant of the test in the CI, the
-       [extra_tags_with] and [extra_tags_without] fields allow to select
-       which one by passing [Tag.ci_disabled] or [Tag.slow] to the case
-       which should not run in CI. *)
-[@@warning "-unused-constructor"]
-
-let default_threshold_encryption_registration =
-  Register_both {extra_tags_with = [Tag.ci_disabled]; extra_tags_without = []}
-
-let default_dal_registration =
-  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
-
-let ci_enabled_dal_registration =
-  Register_both {extra_tags_with = []; extra_tags_without = []}
-
-let default_multichain_registration =
-  Register_both {extra_tags_with = [Tag.slow]; extra_tags_without = []}
-
 let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
-    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config body =
+    ?da_fee_per_byte ?minimum_base_fee_per_gas ~tags ?patch_config ?websockets
+    body =
   Test.register
     ~__FILE__
     ~title
@@ -229,103 +203,16 @@ let register_sandbox ?tx_pool_tx_per_addr_limit ~title ?set_account_code
       ]
   @@ fun () ->
   let* sequencer =
-    Helpers.init_sequencer_sandbox
+    init_sequencer_sandbox
       ?tx_pool_tx_per_addr_limit
       ?set_account_code
       ?da_fee_per_byte
       ?minimum_base_fee_per_gas
       ?patch_config
+      ?websockets
       ()
   in
   body sequencer
-
-(* Register all variants of a test. *)
-let register_all ?max_delayed_inbox_blueprint_length ?sequencer_rpc_port
-    ?sequencer_private_rpc_port ?genesis_timestamp ?time_between_blocks
-    ?max_blueprints_lag ?max_blueprints_ahead ?max_blueprints_catchup
-    ?catchup_cooldown ?delayed_inbox_timeout ?delayed_inbox_min_levels
-    ?max_number_of_chunks ?bootstrap_accounts ?sequencer ?sequencer_pool_address
-    ?(kernels = Kernel.all) ?da_fee ?minimum_base_fee_per_gas ?preimages_dir
-    ?maximum_allowed_ticks ?maximum_gas_per_transaction
-    ?max_blueprint_lookahead_in_seconds ?enable_fa_bridge ?rollup_history_mode
-    ?commitment_period ?challenge_window ?additional_uses ?rpc_server
-    ?websockets ?enable_fast_withdrawal ?history_mode
-    ?(use_threshold_encryption = default_threshold_encryption_registration)
-    ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration) ~title ~tags body
-    protocols =
-  let dal_cases =
-    match use_dal with
-    | Register_both {extra_tags_with; extra_tags_without} ->
-        [(false, extra_tags_without); (true, extra_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  let threshold_encryption_cases =
-    match use_threshold_encryption with
-    | Register_both {extra_tags_with; extra_tags_without} ->
-        [(false, extra_tags_without); (true, extra_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  let multichain_cases =
-    match use_multichain with
-    | Register_both {extra_tags_with; extra_tags_without} ->
-        [(false, extra_tags_without); (true, extra_tags_with)]
-    | Register_with_feature -> [(true, [])]
-    | Register_without_feature -> [(false, [])]
-  in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7367
-     Also register the tests with and without FA bridge feature flag. *)
-  List.iter
-    (fun (threshold_encryption, te_tags) ->
-      List.iter
-        (fun (enable_dal, dal_tags) ->
-          List.iter
-            (fun (enable_multichain, multichain_tags) ->
-              register_test_for_kernels
-                ~__FILE__
-                ?max_delayed_inbox_blueprint_length
-                ?sequencer_rpc_port
-                ?sequencer_private_rpc_port
-                ?commitment_period
-                ?challenge_window
-                ?genesis_timestamp
-                ?time_between_blocks
-                ?max_blueprints_lag
-                ?max_blueprints_ahead
-                ?max_blueprints_catchup
-                ?catchup_cooldown
-                ?delayed_inbox_timeout
-                ?delayed_inbox_min_levels
-                ?max_number_of_chunks
-                ?bootstrap_accounts
-                ?sequencer
-                ?sequencer_pool_address
-                ~kernels
-                ?da_fee
-                ?minimum_base_fee_per_gas
-                ?preimages_dir
-                ?maximum_allowed_ticks
-                ?maximum_gas_per_transaction
-                ?max_blueprint_lookahead_in_seconds
-                ?enable_fa_bridge
-                ?enable_fast_withdrawal
-                ?additional_uses
-                ?rpc_server
-                ?websockets
-                ?history_mode
-                ~threshold_encryption
-                ?rollup_history_mode
-                ~enable_dal
-                ~enable_multichain
-                ~title
-                ~tags:(te_tags @ dal_tags @ multichain_tags @ tags)
-                body
-                protocols)
-            multichain_cases)
-        dal_cases)
-    threshold_encryption_cases
 
 let register_upgrade_all ~title ~tags ~genesis_timestamp
     ?(time_between_blocks = Evm_node.Nothing) ?(kernels = Kernel.all)
@@ -337,6 +224,7 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
       let to_ = upgrade_to from in
       let to_tag, to_use = Kernel.to_uses_and_tags to_ in
       register_all
+        ~__FILE__
         ~kernels:[from]
         ~genesis_timestamp
         ~time_between_blocks
@@ -347,7 +235,185 @@ let register_upgrade_all ~title ~tags ~genesis_timestamp
         protocols)
     kernels
 
-(* The test uses a very specific setup, so it doesn't use general helpers. *)
+let test_make_l2_kernel_installer_config chain_family =
+  Protocol.register_test
+    ~__FILE__
+    ~title:
+      (Printf.sprintf
+         "Test that the command make_l2_kernel_installer setup bootstrap \
+          account at the right path with %s family"
+         chain_family)
+    ~tags:["evm"; "multichain"; "installer"]
+    ~uses_admin_client:true
+    ~uses_client:true
+    ~uses_node:true
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_evm_node;
+        Constant.octez_smart_rollup_node;
+        Constant.WASM.evm_kernel;
+        Constant.smart_rollup_installer;
+      ])
+  @@ fun protocol ->
+  let* node, client = setup_l1 protocol in
+
+  (* Random chain id, let's not take one that could have been set by default (1, 42, 1337) *)
+  let chain_id_1 = 2988 in
+  let chain_id_2 = 4571 in
+
+  (* Configuration files for the two l2 chains and for the rollup *)
+  let l2_config_1 = Temp.file "l2-chain-1-config.yaml" in
+  let l2_config_2 = Temp.file "l2-chain-2-config.yaml" in
+  let rollup_config = Temp.file "rollup-chain-config.yaml" in
+
+  (* Argument for the l2 chain, a bootstrap account and a new world_state_path *)
+  let world_state_path = "/test/chain/" in
+  let address = Eth_account.bootstrap_accounts.(0).address in
+  let*! () =
+    Evm_node.make_l2_kernel_installer_config
+      ~chain_id:chain_id_1
+      ~chain_family
+      ~world_state_path
+      ~eth_bootstrap_accounts:[address]
+      ~output:l2_config_1
+      ()
+  in
+  let*! () =
+    Evm_node.make_l2_kernel_installer_config
+      ~chain_id:chain_id_2
+      ~chain_family
+      ~eth_bootstrap_accounts:[address]
+      ~output:l2_config_2
+      ()
+  in
+  let*! () =
+    Evm_node.make_kernel_installer_config
+    (* No need for a real sequencer governance *)
+      ~sequencer_governance:"KT1"
+      ~l2_chain_ids:[chain_id_1; chain_id_2]
+      ~output:rollup_config
+      ()
+  in
+
+  (* Setup the rollup (Origination and Start a rollup node) *)
+  let sc_rollup_node =
+    Sc_rollup_node.create
+      ~default_operator:Constant.bootstrap1.public_key_hash
+      Batcher
+      node
+      ~base_dir:(Client.base_dir client)
+  in
+
+  let preimages_dir = Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0" in
+  let kernel = Constant.WASM.evm_kernel in
+  let* {output = kernel; _} =
+    prepare_installer_kernel_with_multiple_setup_file
+      ~output:(Temp.file "kernel.hex")
+      ~preimages_dir
+      ~configs:[rollup_config; l2_config_1; l2_config_2]
+      (Uses.path kernel)
+  in
+  let* sc_rollup_address =
+    originate_sc_rollup
+      ~keys:[]
+      ~kind:"wasm_2_0_0"
+      ~boot_sector:("file:" ^ kernel)
+      ~parameters_ty:evm_type
+      client
+  in
+  let* () =
+    Sc_rollup_node.run sc_rollup_node sc_rollup_address [Log_kernel_debug]
+  in
+
+  (* Setup a sequencer with a private rpc port to verify the durable storage. *)
+  let sequencer =
+    Evm_node.Sequencer
+      {
+        initial_kernel = kernel;
+        preimage_dir = Some preimages_dir;
+        private_rpc_port = Some (Port.fresh ());
+        time_between_blocks = Some Nothing;
+        sequencer = Constant.bootstrap1.alias;
+        genesis_timestamp = None;
+        max_blueprints_lag = None;
+        max_blueprints_ahead = None;
+        max_blueprints_catchup = None;
+        catchup_cooldown = None;
+        max_number_of_chunks = None;
+        wallet_dir = Some (Client.base_dir client);
+        tx_pool_timeout_limit = None;
+        tx_pool_addr_limit = None;
+        tx_pool_tx_per_addr_limit = None;
+        dal_slots = None;
+      }
+  in
+  let* sequencer =
+    Evm_node.init ~mode:sequencer (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+
+  (* Verify the chain_family is properly set *)
+  let*@ family_value = Rpc.get_chain_family sequencer chain_id_1 in
+  Check.((family_value = chain_family) string)
+    ~error_msg:"Expected chain_family to be %R, got %L" ;
+
+  (* Verify the chain_family is properly set *)
+  let*@ family_value = Rpc.get_chain_family sequencer chain_id_2 in
+  Check.((family_value = chain_family) string)
+    ~error_msg:"Expected chain_family to be %R, got %L" ;
+
+  (* Verify that the balance of the bootstrap account is set by the command
+     `make_l2_kernel_installer_config` *)
+  let address_in_durable = remove_0x (String.lowercase_ascii address) in
+  let address_balance =
+    world_state_path ^ "eth_accounts/" ^ address_in_durable ^ "/balance"
+  in
+  let*@ rpc_balance = Rpc.state_value sequencer address_balance in
+  let* _balance =
+    match rpc_balance with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "There should be a value at %s setup by the \
+           make_l2_kernel_installer_config"
+          address_balance
+    | Some balance -> return balance
+  in
+  let chain_ids = "/evm/chain_ids" in
+  let*@ rpc_chain_ids = Rpc.state_value sequencer chain_ids in
+  let* chain_ids =
+    match rpc_chain_ids with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "There should be a value at %s setup by the \
+           make_kernel_installer_config"
+          chain_ids
+    | Some chain_ids -> return chain_ids
+  in
+  let chain_ids_bytes = Hex.to_bytes (`Hex chain_ids) in
+
+  match Evm_node_lib_dev_encoding.Rlp.decode chain_ids_bytes with
+  | Ok
+      Evm_node_lib_dev_encoding.Rlp.(
+        List [Value rlp_chain_id_1; Value rlp_chain_id_2]) ->
+      let str_chain_1 = Bytes.to_string rlp_chain_id_1 in
+      Check.(string_of_int chain_id_1 = str_chain_1)
+        Check.string
+        ~error_msg:
+          "Unexpected chain id from durable storage, expected: %L, got %R." ;
+      let str_chain_2 = Bytes.to_string rlp_chain_id_2 in
+      Check.(string_of_int chain_id_2 = str_chain_2)
+        Check.string
+        ~error_msg:
+          "Unexpected chain id from durable storage, expected: %L, got %R." ;
+      return ()
+  | _ ->
+      Test.fail
+        ~__LOC__
+        "Unexpected value decoded at path %s in durable storage"
+        chain_ids
+
+(* The test uses a very specific setup, so it doesn't use general  *)
 let test_observer_reset =
   Protocol.register_test
     ~__FILE__
@@ -420,7 +486,7 @@ let test_observer_reset =
       ~keys:[]
       ~kind:"wasm_2_0_0"
       ~boot_sector:("file:" ^ valid_kernel)
-      ~parameters_ty:Helpers.evm_type
+      ~parameters_ty:evm_type
       client
   in
   let* () =
@@ -582,11 +648,8 @@ let test_observer_reset =
   let* () = Evm_node.terminate observer_victim2 in
   let* () = Evm_node.run observer_victim2
   and* () = Evm_node.wait_for_reset observer_victim2 in
-  (* It will also refuse blocks. *)
-  let* _ =
-    let*@ _ = Rpc.produce_block invalid_sequencer in
-    unit
-  and* () = Evm_node.wait_for_blueprint_invalid_applied observer_victim2 in
+  (* It will also refuse blocks provided by the invalid sequencer. *)
+  let* _ = Evm_node.wait_for_diverged observer_victim2 in
 
   unit
 
@@ -615,6 +678,7 @@ end
 
 let test_remove_sequencer =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "admin"]
     ~title:"Remove sequencer via sequencer admin contract"
@@ -677,6 +741,7 @@ let test_patch_state =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
+    ~enable_revm:false
     ~tags:["evm"; "patch"; "state"]
     ~title:"Patch state via command"
     ~time_between_blocks:Nothing
@@ -724,6 +789,7 @@ let test_patch_state =
 
 let test_persistent_state =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"]
     ~title:"Sequencer state is persistent across runs"
     ~time_between_blocks:Nothing
@@ -796,6 +862,7 @@ let snapshots_setup {sequencer; observer; _} =
 
 let test_snapshots_lock =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Sequencer snapshots export require lock"
     ~time_between_blocks:Nothing
@@ -811,20 +878,36 @@ let test_snapshots_lock =
 
 let test_snapshots_import_empty =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in empty data dir"
     ~time_between_blocks:Nothing
     ~history_mode:(Rolling 1)
-  @@ fun ({sequencer; sc_rollup_node; _} as setup) _protocol ->
+  @@ fun ({sequencer; sc_rollup_node; l2_chains; enable_multichain; _} as setup)
+             _protocol ->
   let* _snapshot_file_before, snapshot_file, block_number =
     snapshots_setup setup
   in
   Log.info "Create new sequencer from snapshot." ;
+  (* patch sequencer config if multichain *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ~mode ?spawn_rpc (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let*! () = Evm_node.import_snapshot new_sequencer ~snapshot_file in
   Log.info "Start new sequencer." ;
   let* () = Evm_node.run new_sequencer in
@@ -846,6 +929,7 @@ let test_snapshots_import_empty =
 
 let test_snapshots_import_populated =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot in populated data dir"
     ~time_between_blocks:Nothing
@@ -870,6 +954,7 @@ let test_snapshots_import_populated =
 
 let test_snapshots_import_outdated =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import outdated sequencer snapshot"
     ~time_between_blocks:Nothing
@@ -893,6 +978,7 @@ let test_snapshots_import_outdated =
    https://gitlab.com/tezos/tezos/-/merge_requests/14794. *)
 let test_snapshots_reexport =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "snapshots"]
     ~title:"Import sequencer snapshot and re-export"
     ~time_between_blocks:Nothing
@@ -920,6 +1006,7 @@ let test_snapshots protocols =
 
 let test_publish_blueprints =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer publishes the blueprints to L1"
@@ -949,6 +1036,7 @@ let test_publish_blueprints =
 let test_sequencer_too_ahead =
   let max_blueprints_ahead = 5 in
   register_all
+    ~__FILE__
     ~max_blueprints_ahead
     ~time_between_blocks:Nothing
     ~tags:["evm"; "max_blueprint_ahead"]
@@ -964,12 +1052,14 @@ let test_sequencer_too_ahead =
         unit)
   in
   let* () =
-    let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+    (* Failing as the block_producer is locked. *)
+    let*@? _ = produce_block sequencer in
     unit
   and* () = Evm_node.wait_for_block_producer_locked sequencer in
   let* () =
+    (* Repeating won't make the production magically successful. *)
     repeat max_blueprints_ahead (fun () ->
-        let*@ _ = produce_block ~wait_on_blueprint_applied:false sequencer in
+        let*@? _ = produce_block sequencer in
         unit)
   in
   let*@ block_number = Rpc.block_number sequencer in
@@ -1010,6 +1100,7 @@ let test_resilient_to_rollup_node_disconnect =
   let catchup_cooldown = 10 in
   let first_batch_blueprints_count = 5 in
   register_all
+    ~__FILE__
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -1148,6 +1239,7 @@ let test_resilient_to_rollup_node_disconnect =
 
 let test_can_fetch_blueprint =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "data"]
     ~title:"Sequencer can provide blueprints on demand"
@@ -1183,6 +1275,7 @@ let test_can_fetch_blueprint =
 
 let test_can_fetch_smart_rollup_address =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "rpc"]
     ~title:"Sequencer can return the smart rollup address on demand"
@@ -1196,9 +1289,11 @@ let test_can_fetch_smart_rollup_address =
 
 let test_send_transaction_to_delayed_inbox =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"]
     ~title:"Send a transaction to the delayed inbox"
+    ~use_revm:activate_revm_registration
   @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocol
     ->
   let* raw_transfer =
@@ -1239,6 +1334,7 @@ let test_send_transaction_to_delayed_inbox =
 
 let test_send_deposit_to_delayed_inbox =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "deposit"]
     ~title:"Send a deposit to the delayed inbox"
@@ -1295,6 +1391,7 @@ let test_send_deposit_to_delayed_inbox =
 
 let test_rpc_produceBlock =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "produce_block"]
     ~title:"RPC method produceBlock"
@@ -1349,10 +1446,12 @@ let wait_for_delayed_inbox_add_tx_and_injected ~sequencer ~sc_rollup_node
 
 let test_delayed_transfer_is_included =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Delayed transaction is included"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -1411,11 +1510,13 @@ let test_delayed_transfer_is_included =
 
 let test_largest_delayed_transfer_is_included =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"]
     ~title:"Largest possible delayed transaction is included"
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -1491,6 +1592,7 @@ let test_largest_delayed_transfer_is_included =
 
 let test_delayed_deposit_is_included =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "inclusion"; "deposit"]
@@ -1605,6 +1707,7 @@ let ticket_balance ~ticket_hash ~account endpoint =
 
 let test_delayed_fa_deposit_is_included =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:
       [
@@ -1673,6 +1776,7 @@ let test_delayed_fa_deposit_is_included =
 
 let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:
       [
@@ -1741,6 +1845,7 @@ let test_delayed_fa_deposit_is_ignored_if_feature_disabled =
 
 let test_delayed_transaction_peeked =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "failure"]
     ~title:"Delayed deposit is removed only when it is applied"
@@ -1805,12 +1910,14 @@ let test_delayed_transaction_peeked =
 
 let test_invalid_delayed_transaction =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "invalid"]
     ~title:"Delayed transaction is removed even when invalid"
     ~enable_fa_bridge:false
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -1862,18 +1969,19 @@ let test_invalid_delayed_transaction =
   (* The transaction has been cleared from the delayed inbox. *)
   Delayed_inbox.assert_empty (Sc_rollup_node sc_rollup_node)
 
-let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
-    ~routing_info ~amount ~ticketer ~content () =
+let call_fa_withdraw ?timestamp ?expect_failure ~sender ~endpoint ~evm_node
+    ~ticket_owner ~routing_info ~amount ~ticketer ~content () =
   let* () =
     Eth_cli.add_abi ~label:"fa_withdrawal" ~abi:(fa_withdrawal_abi_path ()) ()
   in
   send_transaction_to_sequencer
+    ?timestamp
     (Eth_cli.contract_send
        ?expect_failure
        ~source_private_key:sender.Eth_account.private_key
        ~endpoint
        ~abi_label:"fa_withdrawal"
-       ~address:"0xff00000000000000000000000000000000000002"
+       ~address:Solidity_contracts.Precompile.fa_withdrawal
        ~method_call:
          (sf
             {|withdraw("%s", "0x%s", %d, "0x%s", "0x%s")|}
@@ -1884,8 +1992,47 @@ let call_fa_withdraw ?expect_failure ~sender ~endpoint ~evm_node ~ticket_owner
             content))
     evm_node
 
+let call_fa_fast_withdraw ?expect_failure ?timestamp ~sender ~sequencer
+    ~ticket_owner ~receiver ~amount ~ticketer ~content
+    ~fast_withdrawal_contract_address () =
+  let endpoint = Evm_node.endpoint sequencer in
+  let produce_block () = produce_block sequencer in
+  let* receiver = ticket_creator receiver in
+  let routing_info =
+    String.concat "" [receiver |> Hex.of_bytes |> Hex.show; ticketer]
+  in
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fa_fast_withdraw"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  let call_fast_withdraw () =
+    send_transaction_to_sequencer
+      ?timestamp
+      (Eth_cli.contract_send
+         ?expect_failure
+         ~source_private_key:sender.Eth_account.private_key
+         ~endpoint
+         ~abi_label:"fa_fast_withdraw"
+         ~address:Solidity_contracts.Precompile.fa_withdrawal
+         ~method_call:
+           (sf
+              {|fa_fast_withdraw("%s", "0x%s", %d, "0x%s", "0x%s", "%s", "%s")|}
+              ticket_owner
+              routing_info
+              amount
+              ticketer
+              content
+              fast_withdrawal_contract_address
+              "0x0000000000000000000000000000000000000000000000000000000000000001"))
+      sequencer
+  in
+  wait_for_application ~produce_block call_fast_withdraw
+
 let test_fa_withdrawal_is_included =
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~tags:
       [
@@ -1903,6 +2050,7 @@ let test_fa_withdrawal_is_included =
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~additional_uses:[Constant.octez_codec]
+    ~use_revm:activate_revm_registration
   @@ fun {
            client;
            l1_contracts;
@@ -2038,6 +2186,7 @@ let test_fa_withdrawal_is_included =
 
 let test_fa_reentrant_deposit_reverts =
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~tags:
       [
@@ -2060,10 +2209,11 @@ let test_fa_reentrant_deposit_reverts =
            sc_rollup_node;
            sequencer;
            proxy;
+           evm_version;
            _;
          }
              _protocol ->
-  let* reentrancy = Solidity_contracts.reentrancy_test () in
+  let* reentrancy = Solidity_contracts.reentrancy_test evm_version in
   let* () = Eth_cli.add_abi ~label:reentrancy.label ~abi:reentrancy.abi () in
 
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -2072,7 +2222,8 @@ let test_fa_reentrant_deposit_reverts =
       (Eth_cli.deploy
          ~args:
            (sf
-              {|["0xff00000000000000000000000000000000000001", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|})
+              {|["%s", "0x", 0, "0x00000000000000000000000000000000000000000000", "0x", 5]|}
+              Solidity_contracts.Precompile.withdrawal)
          ~source_private_key:sender.private_key
          ~endpoint:(Evm_node.endpoint sequencer)
          ~abi:reentrancy.label
@@ -2104,6 +2255,20 @@ let test_fa_reentrant_deposit_reverts =
   in
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
 
+  let* () =
+    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+  in
+  let claim =
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} 0)
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let* _res = wait_for_application ~produce_block claim in
+
   (* If the call to the proxy fails, the owner of the ticket is the receiver,
      not the proxy.
 
@@ -2132,6 +2297,7 @@ let test_fa_reentrant_deposit_reverts =
 
 let test_delayed_deposit_from_init_rollup_node =
   register_all
+    ~__FILE__
     ~da_fee:arb_da_fee_for_delayed_inbox
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "init"]
@@ -2143,6 +2309,8 @@ let test_delayed_deposit_from_init_rollup_node =
            sc_rollup_node;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2173,11 +2341,24 @@ let test_delayed_deposit_from_init_rollup_node =
 
   (* Run a new sequencer that is initialized from a rollup node that has the
      delayed deposit in its state. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     let mode = Evm_node.mode sequencer |> Evm_node.mode_with_new_private_rpc in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
   in
@@ -2206,9 +2387,10 @@ let test_delayed_deposit_from_init_rollup_node =
 (** test to initialise a sequencer data dir based on a rollup node data dir *)
 let test_init_from_rollup_node_data_dir =
   register_all
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
-     Replace by [Any] after the next upgrade
-  *)
+    ~__FILE__
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7285
+         Replace by [Any] after the next upgrade
+      *)
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~tags:["evm"; "rollup_node"; "init"; "reconstruct"]
@@ -2220,7 +2402,17 @@ let test_init_from_rollup_node_data_dir =
          fixed. Enable DAL once it is done. *)
     ~use_dal:Register_without_feature
     ~rollup_history_mode:Archive
-  @@ fun {sc_rollup_node; sequencer; observer; proxy; client; _} _protocol ->
+  @@ fun {
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           client;
+           l2_chains;
+           enable_multichain;
+           _;
+         }
+             _protocol ->
   (* a sequencer is needed to produce an initial block *)
   let* () =
     repeat 5 (fun () ->
@@ -2230,12 +2422,26 @@ let test_init_from_rollup_node_data_dir =
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
   let* () = Evm_node.terminate sequencer
   and* () = Evm_node.terminate observer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let evm_node' =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config evm_node' in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update evm_node' patch_config
+    | false -> unit
+  in
   let* () =
     (* bake 2 blocks so rollup context is for the finalized l1 level
        and can't be reorged. *)
@@ -2259,6 +2465,7 @@ let test_init_from_rollup_node_data_dir =
 
 let test_init_from_rollup_node_with_delayed_inbox =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "rollup_node"; "init"; "delayed_inbox"; "omit"]
@@ -2273,6 +2480,8 @@ let test_init_from_rollup_node_with_delayed_inbox =
            client;
            l1_contracts;
            sc_rollup_address;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -2297,12 +2506,26 @@ let test_init_from_rollup_node_with_delayed_inbox =
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
 
   (* Start a new sequencer, the previous sequencer is doomed. *)
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let sequencer =
     Evm_node.create
+      ?spawn_rpc
       ~mode:(Evm_node.mode sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer patch_config
+    | false -> unit
+  in
   let* () = Evm_node.init_from_rollup_node_data_dir sequencer sc_rollup_node in
   let* () = Evm_node.run sequencer in
   (* The sequencer should have items in its delayed inbox. *)
@@ -2314,6 +2537,15 @@ let test_init_from_rollup_node_with_delayed_inbox =
     Evm_node.create ~mode:(Evm_node.mode observer) (Evm_node.endpoint sequencer)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
       ~omit_delayed_tx_events:true
@@ -2358,6 +2590,7 @@ let test_observer_applies_blueprint =
   let levels_to_wait = 3 in
   let timeout = 30. in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can start an Observer node"
@@ -2382,6 +2615,7 @@ let test_observer_applies_blueprint =
 
 let test_observer_applies_blueprint_dont_track_rollup_node =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "dont_track_rollup_node"]
     ~title:"Can start an Observer node without a rollup node"
@@ -2433,6 +2667,7 @@ let test_observer_applies_blueprint_dont_track_rollup_node =
 
 let test_observer_applies_blueprint_from_rpc_node =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"; "rpc_mode"]
     ~title:"Can start an Observer node tracking a RPC node"
@@ -2498,6 +2733,7 @@ let test_observer_applies_blueprint_from_rpc_node =
 
 let test_observer_applies_blueprint_when_restarted =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart an Observer node"
@@ -2518,10 +2754,21 @@ let test_observer_applies_blueprint_when_restarted =
 
 let test_get_balance_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "get_balance"; "block_param"]
     ~title:"RPC method getBalance uses block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; sc_rollup_node; proxy; client; _} _protocol ->
+    ~use_revm:activate_revm_registration
+  @@ fun {
+           sequencer;
+           sc_rollup_node;
+           proxy;
+           client;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
+             _protocol ->
   (* Transfer funds to a random address. *)
   let address = "0xB7A97043983f24991398E5a82f63F4C58a417185" in
   let* _tx_hash =
@@ -2570,6 +2817,15 @@ let test_get_balance_block_param =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
   in
   let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer_partial_history patch_config
+    | false -> unit
+  in
+  let* () =
     Evm_node.init_from_rollup_node_data_dir
       observer_partial_history
       sc_rollup_node
@@ -2609,10 +2865,21 @@ let test_get_balance_block_param =
 
 let test_get_block_by_number_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "get_block_by_number"; "block_param"]
     ~title:"RPC method getBlockByNumber uses block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; observer; sc_rollup_node; proxy; client; _} _protocols ->
+  @@ fun {
+           sequencer;
+           observer;
+           sc_rollup_node;
+           proxy;
+           client;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
+             _protocols ->
   let observer_offset = 3l in
   let* () =
     repeat Int32.(to_int observer_offset) @@ fun () ->
@@ -2641,6 +2908,15 @@ let test_get_block_by_number_block_param =
   in
   let* () =
     Process.check @@ Evm_node.spawn_init_config observer_partial_history
+  in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer_partial_history patch_config
+    | false -> unit
   in
   let* () =
     Evm_node.init_from_rollup_node_data_dir
@@ -2679,10 +2955,12 @@ let test_get_block_by_number_block_param =
 
 let test_extended_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "sequencer"; "rpc"; "block_param"; "counter"]
     ~title:"Supports extended block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocols ->
+    ~use_revm:activate_revm_registration
+  @@ fun {sequencer; evm_version; _} _protocols ->
   (*
      In this test we will deploy a counter contract, increments its counter
      at multiple consecutives blocks, and check the counter using block
@@ -2691,7 +2969,7 @@ let test_extended_block_param =
      both for read only RPCs such as [eth_getStorageAt] and simulation
      such as [eth_call].
   *)
-  let* counter_resolved = Solidity_contracts.counter () in
+  let* counter_resolved = Solidity_contracts.counter evm_version in
   let* () =
     Eth_cli.add_abi ~label:counter_resolved.label ~abi:counter_resolved.abi ()
   in
@@ -2778,6 +3056,7 @@ let test_extended_block_param =
 
 let test_observer_applies_blueprint_when_sequencer_restarted =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
     ~title:"Can restart the sequencer node"
@@ -2808,7 +3087,11 @@ let test_observer_forwards_transaction =
   let tags = ["evm"; "observer"; "transaction"] in
   let title = "Observer forwards transaction" in
   let tbb = 1. in
-  register_all ~time_between_blocks:(Time_between_blocks tbb) ~tags ~title
+  register_all
+    ~__FILE__
+    ~time_between_blocks:(Time_between_blocks tbb)
+    ~tags
+    ~title
   @@ fun {sequencer = sequencer_node; observer = observer_node; _} _protocol ->
   (* Ensure the sequencer has produced the block. *)
   let* () =
@@ -2843,6 +3126,7 @@ let test_observer_forwards_transaction =
 
 let test_observer_timeout_when_necessary =
   register_all
+    ~__FILE__
     ~time_between_blocks:(Time_between_blocks 3.)
     ~tags:["evm"; "observer"; "timeout"]
     ~title:"Observer timeouts when blocks do not arrive quickly enough"
@@ -2873,11 +3157,13 @@ let test_sequencer_is_reimbursed =
      verify its balance increases. *)
   let sequencer_pool_address = "0xb7a97043983f24991398e5a82f63f4c58a417185" in
   register_all
+    ~__FILE__
     ~da_fee:Wei.one
     ~time_between_blocks:(Time_between_blocks tbb)
     ~sequencer_pool_address
-    ~tags:["evm"; "sequencer"; "transaction"]
+    ~tags:["evm"; "sequencer"; "transaction"; "reimbursed"]
     ~title:"Sequencer is reimbursed for DA fees"
+    ~use_revm:activate_revm_registration
   @@ fun {sequencer = sequencer_node; _} _protocol ->
   let* balance =
     Eth_cli.balance
@@ -2942,6 +3228,7 @@ let test_self_upgrade_kernel =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
@@ -3016,6 +3303,7 @@ let test_self_upgrade_kernel =
 
 let test_empty_block_on_upgrade =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "empty"]
     ~title:"Sequencer produces an empty block in case of upgrade."
@@ -3092,7 +3380,7 @@ let test_upgrade_kernel_auto_sync =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_upgrade_all
-    ~kernels:[Mainnet; Ghostnet]
+    ~kernels:[Mainnet]
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "auto"; "sync"]
@@ -3210,7 +3498,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
   in
   let activation_timestamp = "2020-01-01T00:00:01Z" in
   register_upgrade_all
-    ~kernels:[Mainnet; Ghostnet]
+    ~kernels:[Mainnet]
     ~upgrade_to:(fun _ -> Latest)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
@@ -3318,6 +3606,7 @@ let test_legacy_deposits_dispatched_after_kernel_upgrade =
 let test_clean_bps =
   let sequencer_account = Constant.bootstrap1 in
   register_all
+    ~__FILE__
     ~sequencer:sequencer_account
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
@@ -3325,10 +3614,20 @@ let test_clean_bps =
     ~title:"All blueprints are cleared on flush"
     ~tags:["evm"; "flush"; "clean"]
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
-  @@ fun {client; l1_contracts; sc_rollup_address; sc_rollup_node; _} _protocols
-    ->
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           proxy;
+           sequencer;
+           _;
+         }
+             _protocols ->
+  let* () =
+    bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
+  in
   (* This is a transfer from Eth_account.bootstrap_accounts.(0) to
      Eth_account.bootstrap_accounts.(1). *)
   let* raw_transfer =
@@ -3413,6 +3712,7 @@ let test_clean_bps =
 
 let test_delayed_inbox_flushing_event =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3420,7 +3720,6 @@ let test_delayed_inbox_flushing_event =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"]
     ~title:"Flush delayed inbox event"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~use_multichain:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
@@ -3480,6 +3779,7 @@ let test_delayed_inbox_flushing_event =
 
 let test_flushed_blueprint_reorg =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3487,7 +3787,9 @@ let test_flushed_blueprint_reorg =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
     ~title:"Flush delayed inbox event leads to reorg"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -3605,6 +3907,7 @@ let test_flushed_blueprint_reorg =
 
 let test_multiple_flushed_blueprints =
   register_all
+    ~__FILE__
     ~max_delayed_inbox_blueprint_length:1
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
@@ -3622,7 +3925,6 @@ let test_multiple_flushed_blueprints =
       ]
     ~title:"Multiple flushed blueprints"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -3746,6 +4048,7 @@ let test_multiple_flushed_blueprints =
 
 let test_observer_reorg_on_blueprint_stream =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3754,7 +4057,9 @@ let test_observer_reorg_on_blueprint_stream =
     ~title:
       "Observer tracking a rollup node reorganizes after blueprint on stream"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -3859,6 +4164,7 @@ let test_observer_reorg_on_blueprint_stream =
 
 let test_observer_reorg_on_blueprint_catchup =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3866,7 +4172,6 @@ let test_observer_reorg_on_blueprint_catchup =
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"]
     ~title:"Observer reorganizes after blueprint on catchup"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -3983,6 +4288,7 @@ let test_observer_reorg_on_blueprint_catchup =
    L2 level as the flush event. *)
 let test_flushed_blueprint_reorg_late =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -3991,7 +4297,9 @@ let test_flushed_blueprint_reorg_late =
       ["evm"; "sequencer"; "delayed_inbox"; "timeout"; "flush"; "reorg"; "late"]
     ~title:"Flush delayed inbox event leads to reorg, including late delayed tx"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4050,7 +4358,7 @@ let test_flushed_blueprint_reorg_late =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
-  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* Produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -4102,6 +4410,7 @@ let test_flushed_blueprint_reorg_late =
    L2 level as the flush event, and transactions were included but too late. *)
 let test_flushed_blueprint_reorg_done_late =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~delayed_inbox_timeout:0
     ~delayed_inbox_min_levels:1
@@ -4121,7 +4430,9 @@ let test_flushed_blueprint_reorg_done_late =
       "Flush delayed inbox event leads to reorg, including delayed tx included \
        too late"
     ~use_dal:Register_without_feature
-    ~use_threshold_encryption:Register_without_feature
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
     ~kernels:[Latest]
   @@ fun {
            client;
@@ -4180,7 +4491,7 @@ let test_flushed_blueprint_reorg_done_late =
     Evm_node.wait_for_processed_l1_level ~level:add_delayed_tx_level sequencer
   in
 
-  (* Produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* Produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -4241,6 +4552,7 @@ let test_upgrade_injected_before_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4368,6 +4680,7 @@ let test_upgrade_activated_after_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4387,6 +4700,9 @@ let test_upgrade_activated_after_flush_level =
       ]
     ~title:
       "Upgrade injected and activated after flushed level (on invalid branch)"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -4518,6 +4834,7 @@ let test_upgrade_injected_after_flush_level =
   let activation_timestamp = "2020-01-01T00:01:00Z" in
   let after_timestamp = "2020-01-01T00:02:00Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
@@ -4535,6 +4852,9 @@ let test_upgrade_injected_after_flush_level =
         "after";
       ]
     ~title:"Upgrade injected after flushed level (on invalid branch)"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -4665,6 +4985,7 @@ let test_flushed_blueprint_reorg_upgrade =
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   let after_timestamp = "2020-01-01T00:00:15Z" in
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp
@@ -4682,6 +5003,9 @@ let test_flushed_blueprint_reorg_upgrade =
         "at";
       ]
     ~title:"Flush delayed inbox event leads to reorg, including upgrade"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {
            client;
            l1_contracts;
@@ -4746,7 +5070,7 @@ let test_flushed_blueprint_reorg_upgrade =
   (* We mark at which level the delayed inbox was flushed. *)
   let* flushed_delayed_inbox_level = Client.level client in
 
-  (* produce a few l2 blocks (speculative execution) after seing delayed tx *)
+  (* produce a few l2 blocks (speculative execution) after seeing delayed tx *)
   let* () =
     repeat 4 (fun _ ->
         let*@ _ =
@@ -4810,6 +5134,7 @@ let test_flushed_blueprint_reorg_upgrade =
 
 let test_delayed_transfer_timeout =
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:1
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -4878,6 +5203,7 @@ let test_delayed_transfer_timeout =
 
 let test_forced_blueprint_takes_pred_timestamp =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
@@ -4938,6 +5264,7 @@ let test_forced_blueprint_takes_pred_timestamp =
 
 let test_forced_blueprint_takes_l1_timestamp =
   register_all
+    ~__FILE__
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
@@ -4992,6 +5319,7 @@ let test_forced_blueprint_takes_l1_timestamp =
 
 let test_delayed_transfer_timeout_fails_l1_levels =
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:3
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5076,7 +5404,7 @@ let test_force_kernel_upgrade_too_early =
   in
   register_upgrade_all
     ~kernels:[Latest]
-    ~upgrade_to:(fun _ -> Ghostnet)
+    ~upgrade_to:(fun _ -> Mainnet)
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "upgrade"; "force"]
@@ -5090,13 +5418,23 @@ let test_force_kernel_upgrade_too_early =
                client;
                sequencer;
                proxy;
+               l2_chains;
+               enable_multichain;
                _;
              }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
+      ()
+  in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:Proxy
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -5128,7 +5466,7 @@ let test_force_kernel_upgrade_too_early =
   let*@ sequencer_kernelVersion = Rpc.tez_kernelVersion sequencer in
   let*@ new_proxy_kernelVersion = Rpc.tez_kernelVersion proxy in
   Check.((sequencer_kernelVersion = new_proxy_kernelVersion) string)
-    ~error_msg:"The force kernel ugprade should have failed" ;
+    ~error_msg:"The force kernel upgrade should have failed" ;
   unit
 
 (** This tests the situation where the kernel does not produce blocks but
@@ -5138,9 +5476,10 @@ let test_force_kernel_upgrade =
     Client.(At (Time.of_notation_exn "2020-01-10T00:00:00Z"))
   in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
-    ~tags:[Tag.ci_disabled; "evm"; "sequencer"; "upgrade"; "force"]
+    ~tags:["evm"; "sequencer"; "upgrade"; "force"]
     ~genesis_timestamp
     ~title:"Force kernel upgrade"
     ~additional_uses:[Constant.WASM.debug_kernel]
@@ -5151,13 +5490,23 @@ let test_force_kernel_upgrade =
            client;
            sequencer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
   (* Wait for the sequencer to publish its genesis block. *)
   let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let patch_config =
+    Evm_node.patch_config_with_experimental_feature
+      ?l2_chains:(if enable_multichain then Some l2_chains else None)
+      ()
+  in
   let* proxy =
-    Evm_node.init ~mode:Proxy (Sc_rollup_node.endpoint sc_rollup_node)
+    Evm_node.init
+      ~patch_config
+      ~mode:Proxy
+      (Sc_rollup_node.endpoint sc_rollup_node)
   in
 
   (* Assert the kernel version is the same at start up. *)
@@ -5167,7 +5516,7 @@ let test_force_kernel_upgrade =
     ~error_msg:"Kernel versions should be the same at start up" ;
 
   (* Activation timestamp is 1 day before the genesis. Therefore, it can
-     be forced immediatly. *)
+     be forced immediately. *)
   let activation_timestamp = "2020-01-09T00:00:00Z" in
   (* Sends the upgrade to L1 and sequencer. *)
   let* _root_hash =
@@ -5224,9 +5573,10 @@ let test_external_transaction_to_delayed_inbox_fails =
      Since we want to test what happens when the tx is actually submitted, we
      bypass the da fee check here. *)
   register_all
+    ~__FILE__
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "delayed_inbox"; "external"]
     ~title:"Sending an external transaction to the delayed inbox fails"
   @@ fun {client; sequencer; proxy; sc_rollup_node; _} _protocol ->
@@ -5252,9 +5602,10 @@ let test_external_transaction_to_delayed_inbox_fails =
 
 let test_proxy_node_can_forward_to_evm_endpoint =
   register_all
+    ~__FILE__
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["proxy"; "evm_node_endpoint"]
     ~title:"Proxy node can forward transactions to another EVM node"
   @@ fun {sequencer; proxy; sc_rollup_node; client; _} _protocol ->
@@ -5309,6 +5660,7 @@ let test_delayed_inbox_flushing =
      timed out yet.
   *)
   register_all
+    ~__FILE__
     ~delayed_inbox_timeout:1
     ~delayed_inbox_min_levels:20
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -5404,6 +5756,7 @@ let test_delayed_inbox_flushing =
 
 let test_no_automatic_block_production =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "block"]
     ~title:"No automatic block production"
@@ -5440,6 +5793,7 @@ let test_no_automatic_block_production =
 
 let test_non_increasing_timestamp =
   register_all
+    ~__FILE__
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~kernels:[Kernel.Latest]
     ~time_between_blocks:Nothing
@@ -5455,12 +5809,6 @@ let test_non_increasing_timestamp =
           Rpc.produce_block ~timestamp:"2020-01-01T00:00:00Z" sequencer
         in
         unit
-    | Threshold_encryption_sequencer _ ->
-        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
-        let* _ntx =
-          Rpc.produce_proposal ~timestamp:"2020-01-01T00:00:00Z" sequencer
-        and* () = wait_for_invalid in
-        unit
     | _ -> assert false (* impossible case as it's a sequencer. *)
   in
   (* However the same timestamp is accepted. *)
@@ -5469,6 +5817,7 @@ let test_non_increasing_timestamp =
 
 let test_timestamp_from_the_future =
   register_all
+    ~__FILE__
     ~max_blueprint_lookahead_in_seconds:300L
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~kernels:[Kernel.Latest]
@@ -5491,7 +5840,7 @@ let test_timestamp_from_the_future =
   let*@ (_ : int) = produce_block ~timestamp:accepted_timestamp sequencer in
   let* () = bake_until_sync ~sc_rollup_node ~client ~proxy ~sequencer () in
 
-  (* Producing a block 5:30 minutes after the L1 timetamp will be accepted by
+  (* Producing a block 5:30 minutes after the L1 timestamp will be accepted by
      the sequencer and not the rollup node. *)
   let* current_l1_timestamp = l1_timestamp client in
   let refused_timestamp =
@@ -5528,14 +5877,43 @@ let test_timestamp_from_the_future =
   unit
 
 (** This tests the situation where the kernel has an upgrade and the
-    sequencer upgrade by following the event of the kernel. *)
+    sequencer upgrade by following the event of the kernel. Observer
+    must upgrade as well, even the one that is not connected to a
+    rollup node. *)
 let test_sequencer_upgrade =
+  let check_sequencer ~evm_node ~expected_sequencer =
+    let*@! current_sequencer =
+      Rpc.state_value evm_node Durable_storage_path.sequencer
+    in
+    Check.(
+      (Hex.to_string (`Hex current_sequencer) = expected_sequencer)
+        ~__LOC__
+        string
+        ~error_msg:"Sequencer in state is %L but expected %R") ;
+    return ()
+  in
+
+  let genesis_timestamp =
+    "2020-01-01T00:00:00Z"
+    (* timestamp used for the genesis of the l1 and the l2 *)
+  in
+  (* 30 sec later. *)
+  let activation_timestamp = "2020-01-01T00:00:30Z" in
+
+  let sequencer_key = Constant.bootstrap1 in
+  let new_sequencer_key = Constant.bootstrap2 in
+
   register_all
-    ~sequencer:Constant.bootstrap1
+    ~__FILE__
+    ~sequencer:sequencer_key
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"; Tag.flaky]
+    ~tags:["evm"; "sequencer"; "sequencer_upgrade"; "auto"; "sync"]
     ~title:
       "Rollup-node sequencer upgrade is applied to the sequencer local state."
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
+    ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
   @@ fun {
            sc_rollup_node;
            l1_contracts;
@@ -5544,46 +5922,95 @@ let test_sequencer_upgrade =
            sequencer;
            proxy;
            observer;
-           enable_dal;
            _;
          }
              _protocol ->
-  (* produce an initial block *)
-  let*@ _lvl = produce_block sequencer in
+  let* observer_dont_track_rollup =
+    match Evm_node.mode observer with
+    | Observer mode ->
+        Evm_node.init
+          ~extra_arguments:["--dont-track-rollup-node"]
+          ~mode:
+            (Observer
+               {
+                 mode with
+                 private_rpc_port = Some (Port.fresh ());
+                 rollup_node_endpoint = "";
+               })
+          (Evm_node.endpoint sequencer)
+    | _ -> Test.fail "impossible, it's an observer"
+  in
+
+  let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
   let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+
   let* () =
     check_head_consistency
       ~left:proxy
       ~right:sequencer
       ~error_msg:
-        "The head should be the same before the upgrade: sequencer is %%L \
-         while proxy is %%R"
+        "The head should be the same before the upgrade: sequencer is %R while \
+         proxy is %L"
       ()
   in
-  let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  (* Sends the upgrade to L1. *)
+
+  (* dummy check, upgrade is not submitted yet *)
+  let* () =
+    check_sequencer
+      ~evm_node:sequencer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+  let* () =
+    check_sequencer
+      ~evm_node:observer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+
   Log.info "Sending the sequencer upgrade to the L1 contract" ;
-  let new_sequencer_key = Constant.bootstrap2.alias in
-  let* _upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
-  and* _upgrade_info_observer =
+
+  let* () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:Constant.bootstrap2.alias
+      ~sequencer_governance_contract:l1_contracts.sequencer_governance
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:new_sequencer_key.alias
+      ~activation_timestamp
+  in
+
+  Log.info
+    "Baking 2 block to make the event final in the l1 so the upgrade is seen \
+     by EVM node following a rollup node." ;
+  let upgrade_info = Evm_node.wait_for_evm_event Sequencer_upgrade sequencer
+  and upgrade_info_observer =
     Evm_node.wait_for_evm_event Sequencer_upgrade observer
-  and* () =
-    let* () =
-      sequencer_upgrade
-        ~sc_rollup_address
-        ~sequencer_admin:Constant.bootstrap2.alias
-        ~sequencer_governance_contract:l1_contracts.sequencer_governance
-        ~pool_address:Eth_account.bootstrap_accounts.(0).address
-        ~client
-        ~upgrade_to:new_sequencer_key
-        ~activation_timestamp:"0"
-    in
-    (* 2 block so the sequencer sees the event from the rollup
-       node. *)
+  in
+  let* () =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~client ~sc_rollup_node in
         unit)
+  and* _upgrade_info = upgrade_info
+  and* _upgrade_info_observer = upgrade_info_observer in
+
+  Log.info
+    "Producing a block from the current sequencer so the event is propagated \
+     to observer not following a rollup node." ;
+  let upgrade_info_observer_no_rollup_node =
+    Evm_node.wait_for_evm_event Sequencer_upgrade observer_dont_track_rollup
   in
+  let* () =
+    let*@ _ = produce_block ~timestamp:genesis_timestamp sequencer in
+    unit
+  and* _upgrade_info_observer_no_rollup_node =
+    upgrade_info_observer_no_rollup_node
+  in
+
+  let* () = bake_until_sync ~proxy ~sequencer ~sc_rollup_node ~client () in
+
+  Log.info
+    "The upgrade is not yet triggered, head should be equivalent with the \
+     block just produced" ;
   let* () =
     check_head_consistency
       ~left:proxy
@@ -5593,32 +6020,59 @@ let test_sequencer_upgrade =
          proxy is %%R"
       ()
   in
-  let nb_block = 4l in
-  (* apply the upgrade in the kernel  *)
-  let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-  (* produce_block fails because sequencer changed *)
-  let* () =
-    match Evm_node.mode sequencer with
-    | Sequencer _ ->
-        let*@? _err = Rpc.produce_block sequencer in
-        unit
-    | Threshold_encryption_sequencer _ ->
-        let wait_for_invalid = Evm_node.wait_for_blueprint_invalid sequencer in
-        let* _ntx = Rpc.produce_proposal sequencer and* () = wait_for_invalid in
-        unit
-    | _ -> assert false (* impossible case as it's a sequencer. *)
+
+  let*@ previous_proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+
+  Log.info "Baking until the sequencer upgrade is triggered in the l1" ;
+  let has_sequencer_changed () =
+    let* current_sequencer_in_rollup_hex =
+      Sc_rollup_node.RPC.call
+        sc_rollup_node
+        ~rpc_hooks:Tezos_regression.rpc_hooks
+      @@ Sc_rollup_rpc.get_global_block_durable_state_value
+           ~pvm_kind:"wasm_2_0_0"
+           ~operation:Sc_rollup_rpc.Value
+           ~key:Durable_storage_path.sequencer
+           ()
+    in
+    let current_sequencer_in_rollup =
+      match current_sequencer_in_rollup_hex with
+      | Some s -> Hex.to_string (`Hex s)
+      | None -> Test.fail "missing sequencer"
+    in
+    if String.equal current_sequencer_in_rollup new_sequencer_key.public_key
+    then return (Some ())
+    else return None
   in
   let* () =
-    repeat 5 (fun () ->
-        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-        unit)
+    bake_until
+      ~__LOC__
+      ~timeout_in_blocks:100
+      ~timeout:60.
+      ~bake:(fun () -> next_rollup_node_level ~client ~sc_rollup_node)
+      ~result_f:has_sequencer_changed
+      ()
   in
-  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-  Check.((previous_proxy_head.hash = proxy_head.hash) string)
-    ~error_msg:
-      "The proxy should not have progessed because no block have been produced \
-       by the current sequencer." ;
-  (* Check that even the evm-node sequencer itself refuses the blocks as they do
+
+  (* upgrade is not triggered until a blueprint with a superior
+     timestamp is applied *)
+  let* () =
+    check_sequencer
+      ~evm_node:sequencer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+  let* () =
+    check_sequencer
+      ~evm_node:observer
+      ~expected_sequencer:sequencer_key.public_key
+  in
+
+  Log.info
+    "Sequencer fails to produce a block because blueprint timestamp is above \
+     the activation timestamp." ;
+  let*@? _ = produce_block ~timestamp:activation_timestamp sequencer in
+
+  (* Check that the evm-node sequencer refuses the blocks as they do
      not respect the sequencer's signature. *)
   let* () =
     check_head_consistency
@@ -5629,64 +6083,161 @@ let test_sequencer_upgrade =
          blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
       ()
   in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:observer
+      ~error_msg:
+        "The head should be the same after the sequencer tried to produce \
+         blocks, they are are disregarded: sequencer is %%R while proxy is %%L"
+      ()
+  in
+
+  Log.info
+    "Baking couple of blocks to check the block is not propagated nor accepted \
+     by the rollup node." ;
+  (* maybe unnecessary check here, we already not the block production failed. *)
+  let* () =
+    repeat 5 (fun () ->
+        let* _ = next_rollup_node_level ~client ~sc_rollup_node in
+        unit)
+  in
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  Check.((previous_proxy_head.hash = proxy_head.hash) string)
+    ~error_msg:
+      "The proxy should not have progressed because no block have been \
+       produced by the current sequencer." ;
+
   Log.info
     "Stopping current sequencer and starting a new one with new sequencer key" ;
-  let new_sequencer =
+  let* () = Evm_node.terminate sequencer
+  and* () = Evm_node.wait_termination sequencer in
+  let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+
+  let* new_sequencer =
     let mode =
       match Evm_node.mode sequencer with
       | Sequencer config ->
           Evm_node.Sequencer
             {
               config with
-              sequencer = new_sequencer_key;
-              private_rpc_port = Some (Port.fresh ());
-            }
-      | Threshold_encryption_sequencer config ->
-          Evm_node.Threshold_encryption_sequencer
-            {
-              config with
-              sequencer = new_sequencer_key;
+              sequencer = new_sequencer_key.alias;
               private_rpc_port = Some (Port.fresh ());
             }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
-  in
-  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
-
-  let* _ = Evm_node.wait_for_shutdown_event sequencer
-  and* () =
+    let new_sequencer =
+      Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    in
+    let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
     let* () =
-      Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+      Runnable.run @@ Evm_node.import_snapshot new_sequencer ~snapshot_file
     in
     let* () = Evm_node.run new_sequencer in
-    let* () =
-      repeat (Int32.to_int nb_block) (fun () ->
-          let* _ = produce_block new_sequencer in
-          unit)
-    in
-    let* () =
-      let number_of_blocks = if enable_dal then 20 else 5 in
-      repeat number_of_blocks (fun () ->
-          let* _ = next_rollup_node_level ~client ~sc_rollup_node in
-          unit)
-    in
-    let previous_proxy_head = proxy_head in
-    let* () =
-      check_head_consistency
-        ~left:proxy
-        ~right:new_sequencer
-        ~error_msg:
-          "The head should be the same after blocks produced by the new \
-           sequencer: sequencer is %%R while proxy is %%L"
-        ()
-    in
-    let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
-    Check.(
-      (Int32.add previous_proxy_head.number nb_block = proxy_head.number) int32)
+    return new_sequencer
+  in
+
+  Log.info "Producing a block with the new sequencer." ;
+  let*@ _ = produce_block ~timestamp:activation_timestamp new_sequencer in
+  Log.info "Baking to check the block is accepted by the rollup node." ;
+  let* () =
+    bake_until_sync ~sequencer:new_sequencer ~proxy ~sc_rollup_node ~client ()
+  in
+  let* () =
+    check_head_consistency
+      ~left:proxy
+      ~right:new_sequencer
       ~error_msg:
-        "The block number should have incremented (previous: %L, current: %R)" ;
-    unit
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %R while proxy is %L"
+      ()
+  in
+  let*@ proxy_head = Rpc.get_block_by_number ~block:"latest" proxy in
+  let current_head_number = proxy_head.number in
+  Check.((Int32.add previous_proxy_head.number 1l = current_head_number) int32)
+    ~error_msg:
+      "The block number should have incremented (previous: %L, current: %R)" ;
+
+  Log.info
+    "Transforming the old sequencer to a observer so it should receive and \
+     apply the blueprint. The connected observers should also receive it." ;
+  let* observer_sequencer =
+    let observer_sequencer =
+      Evm_node.switch_sequencer_to_observer
+        ~old_sequencer:sequencer
+        ~new_sequencer
+    in
+    let* () =
+      Process.check
+      @@ Evm_node.spawn_init_config
+           ~extra_arguments:["--force"]
+           observer_sequencer
+    in
+    let* () = Evm_node.run observer_sequencer in
+    return observer_sequencer
+  in
+  let current_head_number = Int32.to_int proxy_head.number in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer_sequencer current_head_number
+  in
+  let* () = Evm_node.wait_for_blueprint_applied observer current_head_number in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_sequencer
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer_sequencer is %R"
+      ()
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer is %R"
+      ()
+  in
+
+  let* () =
+    Evm_node.wait_for_blueprint_applied
+      observer_dont_track_rollup
+      current_head_number
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_dont_track_rollup
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer is %R"
+      ()
+  in
+
+  Log.info
+    "Bootstrapping an observer to make sure it applied the sequencer upgrade \
+     as well." ;
+  let* observer_bootstrap =
+    match Evm_node.mode observer with
+    | Observer mode ->
+        Evm_node.init
+          ~mode:(Observer {mode with private_rpc_port = Some (Port.fresh ())})
+          (Evm_node.endpoint sequencer)
+    | _ -> Test.fail "impossible, it's an observer"
+  in
+  let* _ = Evm_node.wait_for_evm_event Sequencer_upgrade observer_bootstrap in
+  let* () =
+    Evm_node.wait_for_blueprint_applied observer_bootstrap current_head_number
+  in
+  let* () =
+    check_head_consistency
+      ~left:new_sequencer
+      ~right:observer_bootstrap
+      ~error_msg:
+        "The head should be the same after blocks produced by the new \
+         sequencer: new_sequencer is %L while observer_bootstrap is %R"
+      ()
   in
   unit
 
@@ -5695,12 +6246,23 @@ let test_sequencer_upgrade =
     diverged from the other. *)
 let test_sequencer_diverge =
   register_all
+    ~__FILE__
     ~genesis_timestamp:Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "diverge"]
     ~title:"Runs two sequencers, one diverge and stop"
-  @@ fun {sc_rollup_node; client; sequencer; observer; proxy; enable_dal; _}
+  @@ fun {
+           sc_rollup_node;
+           client;
+           sequencer;
+           observer;
+           proxy;
+           enable_dal;
+           enable_multichain;
+           l2_chains;
+           _;
+         }
              _protocol ->
   let* () =
     repeat 4 (fun () ->
@@ -5719,6 +6281,7 @@ let test_sequencer_diverge =
   (* We duplicate the sequencer by creating a snapshot and importing it *)
   let* _ = Evm_node.terminate sequencer in
   let* snapshot_file = Runnable.run @@ Evm_node.export_snapshot sequencer in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let* sequencer_bis =
     let* mode =
       match Evm_node.mode sequencer with
@@ -5726,22 +6289,24 @@ let test_sequencer_diverge =
           return
           @@ Evm_node.Sequencer
                {config with private_rpc_port = Some (Port.fresh ())}
-      | Threshold_encryption_sequencer config ->
-          let sequencer_sidecar = Dsn_node.sequencer () in
-          let* () = Dsn_node.start sequencer_sidecar in
-          return
-          @@ Evm_node.Threshold_encryption_sequencer
-               {
-                 config with
-                 private_rpc_port = Some (Port.fresh ());
-                 sequencer_sidecar_endpoint =
-                   Dsn_node.endpoint sequencer_sidecar;
-               }
       | _ -> Test.fail "impossible case, it's a sequencer"
     in
-    return @@ Evm_node.create ~mode (Sc_rollup_node.endpoint sc_rollup_node)
+    return
+    @@ Evm_node.create ?spawn_rpc ~mode (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config sequencer_bis in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update sequencer_bis patch_config
+    | false -> unit
+  in
   let* () =
     Runnable.run @@ Evm_node.import_snapshot sequencer_bis ~snapshot_file
   in
@@ -5789,6 +6354,7 @@ let test_sequencer_diverge =
     rollup node. *)
 let test_sequencer_can_catch_up_on_event =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"]
@@ -5852,6 +6418,7 @@ let test_sequencer_can_catch_up_on_event =
 
 let test_sequencer_dont_read_level_twice =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "event"; Tag.slow]
@@ -5878,7 +6445,7 @@ let test_sequencer_dont_read_level_twice =
       client
   in
 
-  (* We bake two blocks, so thet the EVM node can process the deposit and
+  (* We bake two blocks, so that the EVM node can process the deposit and
      create a blueprint with it. *)
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
   let* _ = next_rollup_node_level ~sc_rollup_node ~client in
@@ -5917,6 +6484,7 @@ let test_outbox_size_limit_resilience ~slow =
   let commitment_period = 5 and challenge_window = 5 in
   let slow_str = if slow then "slow" else "fast" in
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:
@@ -5931,6 +6499,7 @@ let test_outbox_size_limit_resilience ~slow =
            sc_rollup_node;
            sequencer;
            proxy;
+           evm_version;
            _;
          }
              _protocol ->
@@ -5975,7 +6544,7 @@ let test_outbox_size_limit_resilience ~slow =
     ~error_msg:"Expected a bigger balance" ;
 
   (* Deploy and top up batch withdrawal contract *)
-  let* spammer_resolved = Solidity_contracts.spam_withdrawal () in
+  let* spammer_resolved = Solidity_contracts.spam_withdrawal evm_version in
   let* () =
     Eth_cli.add_abi ~label:spammer_resolved.label ~abi:spammer_resolved.abi ()
   in
@@ -6089,6 +6658,7 @@ let test_outbox_size_limit_resilience ~slow =
 
 let test_stage_one_reboot =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~maximum_allowed_ticks:9_000_000_000L
@@ -6096,6 +6666,9 @@ let test_stage_one_reboot =
     ~title:
       "Checks the stage one reboots when reading too much chunks in a single \
        L1 level"
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sc_rollup_node; client; sc_rollup_address; _} _protocol ->
   let* chunks =
     Lwt_list.map_s (fun i ->
@@ -6164,11 +6737,12 @@ let test_stage_one_reboot =
 
 let test_blueprint_is_limited_in_size =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~tags:["evm"; "sequencer"; "blueprint"; "limit"]
     ~title:
       "Checks the sequencer doesn't produce blueprint bigger than the given \
@@ -6176,9 +6750,7 @@ let test_blueprint_is_limited_in_size =
     ~use_dal:ci_enabled_dal_registration
   @@ fun {sc_rollup_node; client; sequencer; _} _protocol ->
   let txs = read_tx_from_file () |> List.map (fun (tx, _hash) -> tx) in
-  let* requests, hashes =
-    Helpers.batch_n_transactions ~evm_node:sequencer txs
-  in
+  let* requests, hashes = batch_n_transactions ~evm_node:sequencer txs in
   (* Each transaction is about 114 bytes, hence 100 * 114 = 11400 bytes, which
      will fit in two blueprints of two chunks each. *)
   let* () = next_evm_level ~evm_node:sequencer ~sc_rollup_node ~client in
@@ -6213,7 +6785,7 @@ let test_blueprint_is_limited_in_size =
      blueprint or the second, as it depends how the tx_pool sorts the
      transactions (by caller address). We need to check that either the previous
      block or the next block contains transactions, which puts in evidence that
-     the batch has been splitted into two consecutive blueprints.
+     the batch has been split into two consecutive blueprints.
   *)
   let check_block_size block_number =
     let*@ block =
@@ -6246,7 +6818,8 @@ let test_blueprint_is_limited_in_size =
 
 let test_blueprint_limit_with_delayed_inbox =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~__FILE__
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~max_number_of_chunks:2
@@ -6286,7 +6859,7 @@ let test_blueprint_limit_with_delayed_inbox =
         unit)
   in
   let* _requests, _hashes =
-    Helpers.batch_n_transactions ~evm_node:sequencer direct_txs
+    batch_n_transactions ~evm_node:sequencer direct_txs
   in
   (* Due to the overapproximation of 4096 bytes per delayed transactions, there
      should be only a single delayed transaction per blueprints with 2 chunks. *)
@@ -6327,6 +6900,7 @@ let test_blueprint_limit_with_delayed_inbox =
 
 let test_reset =
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "reset"]
@@ -6381,7 +6955,9 @@ let test_reset =
     Evm_node.create
       ~mode:(Evm_node.mode sequencer)
       ~data_dir:(Evm_node.data_dir sequencer)
+      ?config_file:(Evm_node.config_file sequencer)
       ~rpc_port:(Evm_node.rpc_port sequencer)
+      ?spawn_rpc:(Evm_node.spawn_rpc sequencer)
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Evm_node.run sequencer in
@@ -6389,6 +6965,7 @@ let test_reset =
     Evm_node.create
       ~mode:(Evm_node.mode observer)
       ~data_dir:(Evm_node.data_dir observer)
+      ?config_file:(Evm_node.config_file observer)
       ~rpc_port:(Evm_node.rpc_port observer)
       (Evm_node.endpoint sequencer)
   in
@@ -6427,12 +7004,13 @@ let test_preimages_endpoint =
   in
   let activation_timestamp = "2020-01-01T00:00:10Z" in
   register_all
+    ~__FILE__
     ~sequencer:Constant.bootstrap1
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "preimages_endpoint"]
     ~title:"Sequencer use remote server to get preimages"
     ~kernels:[Latest]
-    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
     ~genesis_timestamp
   @@ fun {
            sc_rollup_node;
@@ -6442,6 +7020,8 @@ let test_preimages_endpoint =
            sequencer;
            observer;
            proxy;
+           l2_chains;
+           enable_multichain;
            _;
          }
              _protocol ->
@@ -6453,16 +7033,28 @@ let test_preimages_endpoint =
     match Evm_node.mode sequencer with
     | Evm_node.Sequencer mode ->
         Evm_node.Sequencer {mode with preimage_dir = None}
-    | Evm_node.Threshold_encryption_sequencer mode ->
-        Evm_node.Threshold_encryption_sequencer {mode with preimage_dir = None}
     | _ -> assert false
   in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
   let new_sequencer =
     Evm_node.create
       ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
       (Sc_rollup_node.endpoint sc_rollup_node)
   in
   let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
   (* Prepares the observer without [preimages-dir], to force the use of
      preimages endpoint. *)
   let observer_mode_without_preimages_dir () =
@@ -6491,6 +7083,18 @@ let test_preimages_endpoint =
   let* () = Process.check @@ Evm_node.spawn_init_config new_observer2 in
 
   let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        let* () = Evm_node.Config_file.update new_observer patch_config in
+        let* () = Evm_node.Config_file.update new_observer2 patch_config in
+        Lwt.return_unit
+    | false -> Lwt.return_unit
+  in
+
+  let* () =
     repeat 2 (fun () ->
         let* _ = next_rollup_node_level ~sc_rollup_node ~client in
         unit)
@@ -6508,7 +7112,7 @@ let test_preimages_endpoint =
       ~admin:Constant.bootstrap2.public_key_hash
       ~admin_contract:l1_contracts.admin
       ~client
-      ~upgrade_to:Constant.WASM.ghostnet_evm_kernel
+      ~upgrade_to:Constant.WASM.mainnet_kernel
       ~activation_timestamp
   in
   let* _ =
@@ -6562,8 +7166,118 @@ let test_preimages_endpoint =
     ~error_msg:"The sequencer should have used the file server" ;
   unit
 
+let test_preimages_endpoint_retry =
+  (* Add a delay between first block and activation timestamp. *)
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2020-01-01T00:00:10Z" in
+  register_all
+    ~__FILE__
+    ~sequencer:Constant.bootstrap1
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "sequencer"; "preimages_endpoint"; "retry"; Tag.slow]
+    ~title:"Sequencer use remote server to get preimages with retries"
+    ~kernels:[Latest]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
+    ~genesis_timestamp
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
+  @@ fun {
+           sc_rollup_node;
+           l1_contracts;
+           sc_rollup_address;
+           client;
+           sequencer;
+           proxy;
+           l2_chains;
+           enable_multichain;
+           _;
+         }
+             _protocol ->
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+  let* () = Evm_node.terminate sequencer in
+  let finalizeL1 () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Prepares the sequencer without [preimages-dir], to force the use of
+     preimages endpoint. *)
+  let sequencer_mode_without_preimages_dir =
+    match Evm_node.mode sequencer with
+    | Evm_node.Sequencer mode ->
+        Evm_node.Sequencer {mode with preimage_dir = None}
+    | _ -> assert false
+  in
+  let spawn_rpc = if enable_multichain then Some (Port.fresh ()) else None in
+  let new_sequencer =
+    Evm_node.create
+      ~mode:sequencer_mode_without_preimages_dir
+      ?spawn_rpc
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature
+            ~l2_chains
+            ?spawn_rpc
+            ()
+        in
+        Evm_node.Config_file.update new_sequencer patch_config
+    | false -> unit
+  in
+  let* () = finalizeL1 () in
+  let* () =
+    Evm_node.init_from_rollup_node_data_dir new_sequencer sc_rollup_node
+  in
+  (* Sends an upgrade with new preimages. *)
+  let* root_hash =
+    upgrade
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~admin:Constant.bootstrap2.public_key_hash
+      ~admin_contract:l1_contracts.admin
+      ~client
+      ~upgrade_to:Constant.WASM.mainnet_kernel
+      ~activation_timestamp
+  in
+  let* () = finalizeL1 () in
+  let provider_port = Port.fresh () in
+  let preimages_endpoint =
+    sf "http://%s:%d" Constant.default_host provider_port
+  in
+  let* () =
+    Evm_node.run
+      ~extra_arguments:["--preimages-endpoint"; preimages_endpoint]
+      new_sequencer
+  in
+  let* () =
+    Evm_node.wait_for_predownload_kernel_failed new_sequencer ~root_hash
+  in
+  (* Create a file server that serves the preimages. *)
+  let served = ref false in
+  Sc_rollup_helpers.serve_files
+    ~name:"preimages_server"
+    ~port:provider_port
+    ~root:(Sc_rollup_node.data_dir sc_rollup_node // "wasm_2_0_0")
+    ~on_request:(fun _ -> served := true)
+  @@ fun () ->
+  let* _ =
+    Evm_node.wait_for_predownload_kernel ~timeout:90. new_sequencer ~root_hash
+  in
+  Check.is_true
+    !served
+    ~error_msg:"The sequencer should have used the file server" ;
+  unit
+
 let test_store_smart_rollup_address =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "store"]
     ~title:"Sequencer checks the smart rollup address"
@@ -6573,7 +7287,13 @@ let test_store_smart_rollup_address =
   let* () = Evm_node.terminate sequencer in
   (* Originate another rollup. *)
   let* other_rollup_address =
-    originate_sc_rollup ~keys:[] ~kind:"wasm_2_0_0" ~alias:"vbot" client
+    originate_sc_rollup
+      ~keys:[]
+      ~kind:"wasm_2_0_0"
+      ~alias:"vbot"
+      ~src:"bootstrap2"
+        (* We cannot use bootstrap1 because it already has an operation in the mempool. *)
+      client
   in
   let other_rollup_node =
     Sc_rollup_node.create Observer node ~base_dir:(Client.base_dir client)
@@ -6595,6 +7315,7 @@ let test_store_smart_rollup_address =
 
 let test_replay_rpc =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "replay"]
     ~title:"Sequencer can replay a block"
     ~time_between_blocks:Nothing
@@ -6650,7 +7371,8 @@ let test_trace_transaction =
     | _, Error _ -> Test.fail "Trace transaction shouldn't have failed (rpc)"
   in
   register_all
-    ~kernels:Kernel.[Latest; Ghostnet]
+    ~__FILE__
+    ~kernels:Kernel.[Latest]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "run"; "trace"]
     ~title:"Sequencer can run debug_traceTransaction"
@@ -6726,91 +7448,9 @@ let test_trace_transaction =
   check_trace_result ~sequencer:trace_result ~rpc:trace_result_rpc ;
   unit
 
-let test_overwrite_simulation_tick_limit =
-  register_all
-    ~kernels:Kernel.all
-    ~tags:["evm"; "rpc"; "overwrite_tick_limit"; "eth_call"]
-    ~title:"Can overwrite tick limit in eth_call with the experimental feature"
-    ~time_between_blocks:Nothing
-    ~maximum_allowed_ticks:
-      (* We set a smaller tick limit to make it easier to trigger the
-         OutOfTick error *)
-      500_000_000L
-  @@ fun {sequencer; sc_rollup_node; _} _protocol ->
-  let* observer =
-    run_new_observer_node
-      ~sc_rollup_node
-      ~patch_config:
-        JSON.(
-          update
-            "experimental_features"
-            (put
-               ( "overwrite_simulation_tick_limit",
-                 annotate ~origin:"" (`Bool true) )))
-      sequencer
-  in
-
-  let* recursive = Solidity_contracts.recursive () in
-  let* () = Eth_cli.add_abi ~label:recursive.label ~abi:recursive.abi () in
-  (* Deploy the contract. *)
-  let* recursive_address, _tx_hash =
-    send_transaction_to_sequencer
-      (Eth_cli.deploy
-         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
-         ~endpoint:(Evm_node.endpoint sequencer)
-         ~abi:recursive.abi
-         ~bin:recursive.bin)
-      sequencer
-  in
-
-  let* has_failed =
-    Lwt.catch
-      (fun () ->
-        let* _ =
-          Eth_cli.contract_call
-            ~endpoint:Evm_node.(endpoint sequencer)
-            ~abi_label:recursive.label
-            ~address:recursive_address
-            ~method_call:"call(200)"
-            ()
-        in
-        return false)
-      (fun _ -> return true)
-  in
-
-  if not has_failed then
-    Test.fail "The sequencer should have refused the `eth_call`" ;
-
-  let* has_failed =
-    Lwt.catch
-      (fun () ->
-        let* _ =
-          Eth_cli.contract_call
-            ~endpoint:Evm_node.(endpoint observer)
-            ~abi_label:recursive.label
-            ~address:recursive_address
-            ~method_call:"call(200)"
-            ()
-        in
-        return false)
-      (fun _ -> return true)
-  in
-
-  if has_failed then
-    Test.fail "The observer shouldn’t have refused the `eth_call`" ;
-
-  (* `eth_call` is supposed to work, but not gas estimation. *)
-  let* data = Cast.calldata ~args:["200"] "call(uint256)" in
-  let*@? (_ : Rpc.error) =
-    Rpc.estimate_gas
-      [("to", `String recursive_address); ("data", `String data)]
-      observer
-  in
-
-  unit
-
 let test_trace_transaction_on_invalid_transaction =
   register_all
+    ~__FILE__
     ~kernels:Kernel.all
     ~tags:["evm"; "rpc"; "trace"; "fail"]
     ~title:"debug_traceTransaction fails on invalid transactions"
@@ -6876,7 +7516,7 @@ let check_trace expect_null expected_returned_value receipt trace =
      it is encoded into a H256. *)
   (match expected_returned_value with
   | Some value ->
-      let expected_value = Helpers.hex_256_of_int value in
+      let expected_value = hex_256_of_int value in
       Check.(
         (returned_value = expected_value)
           string
@@ -6898,17 +7538,20 @@ let check_trace expect_null expected_returned_value receipt trace =
 
 let test_trace_transaction_call =
   register_all
-    ~kernels:Kernel.[Latest; Ghostnet]
+    ~__FILE__
+    ~kernels:Kernel.[Latest; Mainnet]
       (* Re-enable on [Mainnet] when the next upgrade happens. *)
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceTransaction and return a valid log"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
 
   (* deploy contract *)
   let* () =
@@ -6961,7 +7604,7 @@ let test_trace_transaction_call =
     | Ok trace -> check_trace false None transaction_receipt trace
     | Error _ -> Test.fail "Trace transaction shouldn't have failed"
   in
-  (* The second test will disable every tracing options and call `get`, thats
+  (* The second test will disable every tracing options and call `get`, which
      returns a value, so that we can check that it returns the correct value in
      the end. *)
   let* transaction_hash =
@@ -6993,16 +7636,19 @@ let test_trace_transaction_call =
 
 let test_trace_transaction_call_trace =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"]
     ~title:"Sequencer can run debug_traceTransaction with calltracer"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
   (* deploy contract *)
   let* () =
     Eth_cli.add_abi
@@ -7096,6 +7742,7 @@ let test_trace_transaction_call_trace =
 
 let test_trace_transaction_calltracer_failed_create =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "fail"]
     ~title:
@@ -7103,10 +7750,10 @@ let test_trace_transaction_calltracer_failed_create =
        creation reverts but is included"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* _contract_address, create_tx =
     send_transaction_to_sequencer
@@ -7152,16 +7799,17 @@ let test_trace_transaction_calltracer_failed_create =
 
 let test_trace_delegate_call =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "delegate_call"]
     ~title:"calltracer correctly display delegate call infos"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* delegated = Solidity_contracts.delegatecall_delegated () in
-  let* delegator = Solidity_contracts.delegatecall_delegator () in
+  let* delegated = Solidity_contracts.delegatecall_delegated evm_version in
+  let* delegator = Solidity_contracts.delegatecall_delegator evm_version in
   let* () = Eth_cli.add_abi ~label:delegated.label ~abi:delegated.abi () in
   let* () = Eth_cli.add_abi ~label:delegator.label ~abi:delegator.abi () in
   let* delegated_address, _ =
@@ -7230,16 +7878,17 @@ let test_trace_delegate_call =
 
 let test_trace_transaction_calltracer_all_types =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "types"]
     ~title:
       "debug_traceTransaction with calltracer can produce all the call types"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -7320,15 +7969,16 @@ let test_trace_transaction_calltracer_all_types =
 
 let test_trace_transaction_call_tracer_with_logs =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "with_logs"]
     ~title:"debug_traceTransaction with calltracer can produce a call with logs"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_logger = Solidity_contracts.simple_logger () in
+  let* simple_logger = Solidity_contracts.simple_logger evm_version in
   let* () =
     Eth_cli.add_abi ~label:simple_logger.label ~abi:simple_logger.abi ()
   in
@@ -7379,15 +8029,16 @@ let test_trace_transaction_call_tracer_with_logs =
 
 let test_trace_transaction_call_trace_certain_depth =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "depth"]
     ~title:"debug_traceTransaction with calltracer to see diffuclt depth"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_tracer_depth = Solidity_contracts.call_tracer_depth () in
+  let* call_tracer_depth = Solidity_contracts.call_tracer_depth evm_version in
   let* () =
     Eth_cli.add_abi ~label:call_tracer_depth.label ~abi:call_tracer_depth.abi ()
   in
@@ -7455,6 +8106,7 @@ let test_trace_transaction_call_trace_certain_depth =
 
 let test_trace_transaction_call_revert =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"; "propagate"]
     ~title:
@@ -7462,10 +8114,10 @@ let test_trace_transaction_call_revert =
        handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_revert = Solidity_contracts.call_revert () in
+  let* call_revert = Solidity_contracts.call_revert evm_version in
   let* () = Eth_cli.add_abi ~label:call_revert.label ~abi:call_revert.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -7511,15 +8163,16 @@ let test_trace_transaction_call_revert =
 
 let test_trace_transaction_call_trace_revert =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "revert"]
     ~title:"debug_traceTransaction with calltracer to see how revert is handled"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* call_tracer_revert = Solidity_contracts.call_tracer_revert () in
+  let* call_tracer_revert = Solidity_contracts.call_tracer_revert evm_version in
   let* () =
     Eth_cli.add_abi
       ~label:call_tracer_revert.label
@@ -7606,17 +8259,18 @@ let test_trace_transaction_call_trace_revert =
    having multiple top calls. *)
 let test_trace_transaction_calltracer_multiple_txs =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "multi_txs"]
     ~title:
       "debug_traceTransaction handles blocks containing several transactions"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* address, _ =
     send_transaction_to_sequencer
@@ -7680,6 +8334,7 @@ let test_trace_transaction_calltracer_multiple_txs =
 
 let test_trace_transaction_calltracer_on_simple_transfer =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "simple_transfer"]
     ~title:"debug_traceTransaction can trace a simple transfer"
@@ -7710,16 +8365,17 @@ let test_trace_transaction_calltracer_on_simple_transfer =
 
 let test_trace_transaction_calltracer_precompiles =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call_trace"; "precompiles"]
     ~title:"debug_traceTransaction with calltracer can trace precompiles"
     ~da_fee:Wei.zero
     ~maximum_allowed_ticks:100_000_000_000_000L
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* precompiles = Solidity_contracts.precompiles () in
+  let* precompiles = Solidity_contracts.precompiles evm_version in
   let* () = Eth_cli.add_abi ~label:precompiles.label ~abi:precompiles.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -7822,6 +8478,7 @@ let test_trace_transaction_calltracer_precompiles =
 
 let test_trace_transaction_calltracer_deposit =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~time_between_blocks:Nothing
     ~da_fee:arb_da_fee_for_delayed_inbox
@@ -7895,17 +8552,18 @@ let test_miner =
     String.lowercase_ascii "0x8aaD6553Cf769Aa7b89174bE824ED0e53768ed70"
   in
   register_all
+    ~__FILE__
     ~tags:["evm"; "miner"; "coinbase"]
     ~title:"Sequencer pool address is the block's miner"
     ~sequencer_pool_address
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let*@ block = Rpc.get_block_by_number ~block:"latest" sequencer in
   Check.((String.lowercase_ascii block.miner = sequencer_pool_address) string)
     ~error_msg:
       "Block miner should be the sequencer pool address, expected %R got %L" ;
   (* We deploy a contract that stores the block coinbase in its storage, and
      also has a view to get the block coinbase. *)
-  let* coinbase_resolved = Solidity_contracts.coinbase () in
+  let* coinbase_resolved = Solidity_contracts.coinbase evm_version in
   let* () =
     Eth_cli.add_abi ~label:coinbase_resolved.label ~abi:coinbase_resolved.abi ()
   in
@@ -7968,12 +8626,13 @@ let test_miner =
   let r2 = JSON.(r2 |-> "result" |> as_string) in
   Check.is_true
     (r1 = r2 && r2 = rpc_coinbase)
-    ~error_msg:"Expected all coinbase adresses to be equal" ;
+    ~error_msg:"Expected all coinbase addresses to be equal" ;
 
   unit
 
 let test_fa_bridge_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["fa_bridge"; "feature_flag"]
     ~title:"FA bridge feature is set in storage"
     ~enable_fa_bridge:true
@@ -7992,6 +8651,7 @@ let test_fa_bridge_feature_flag =
 
 let test_multichain_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["multichain"; "feature_flag"]
     ~title:"Check the multichain feature value in storage"
   @@ fun {sequencer; enable_multichain; _} _protocol ->
@@ -8006,6 +8666,7 @@ let test_multichain_feature_flag =
 
 let test_fast_withdrawal_feature_flag =
   register_all
+    ~__FILE__
     ~tags:["fast_withdrawal"; "feature_flag"]
     ~title:"Fast withdrawal feature is set in storage"
     ~enable_fast_withdrawal:true
@@ -8022,20 +8683,751 @@ let test_fast_withdrawal_feature_flag =
          Durable_storage_path.enable_fast_withdrawal) ;
   unit
 
+let fast_withdrawal ?(expect_failure = false) ~sender ~endpoint ~amount_wei
+    ~produce_block ~receiver ~fast_withdrawal_contract_address () =
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fast_withdraw_base58"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  (* Call the withdrawal precompiled contract. *)
+  let call_fast_withdrawal =
+    Eth_cli.contract_send
+      ~expect_failure
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:"fast_withdraw_base58"
+      ~address:Solidity_contracts.Precompile.withdrawal
+        (* NB: the third parameter is unused for now, could be used later for
+           maximum fees to pay, whitelist of service providers etc. *)
+      ~method_call:
+        (sf
+           {|fast_withdraw_base58("%s","%s","%s")|}
+           receiver
+           fast_withdrawal_contract_address
+           "0x0000000000000000000000000000000000000000000000000000000000000001")
+      ~value:amount_wei
+      ~gas:16_000_000
+  in
+  wait_for_application ~produce_block call_fast_withdrawal
+
+let test_fast_withdraw_feature_flag_deactivated =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~__FILE__
+    ~tags:["evm"; "feature_flag"; "fast_withdrawal"]
+    ~title:"Check fast withdraw tez is deactivated with feature flag"
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:false
+    ~kernels:[Kernel.Latest]
+  @@ fun {client; sc_rollup_address; l1_contracts; sc_rollup_node; sequencer; _}
+             _protocol ->
+  let admin = Constant.bootstrap5 in
+
+  let produce_block () = Rpc.produce_block sequencer in
+  let {exchanger; _} = l1_contracts in
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~l1_contracts
+      ~amount:deposit_amount
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~depositor:admin
+      ~receiver:receiver.address
+      client
+  in
+
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* We create a L2 block to include the deposit *)
+  let* _ = produce_block () in
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  (* Perform the fast withdrawal from the rollup, transferring 50 tez to the L1 withdrawal contract. *)
+  let* err =
+    fast_withdrawal
+      ~expect_failure:true
+      ~amount_wei:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~produce_block
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ()
+  in
+  if not (err =~ rex "Error") then Test.fail "Test should fail with error" ;
+  unit
+
+type fast_withdrawal_event =
+  | Tez of {
+      target : string;
+      withdrawal_id : string;
+      amount : Tez.t;
+      timestamp : string;
+      payload : string;
+      l2_caller : string;
+    }
+  | FA of {
+      sender : string; (* Holds the L2 caller *)
+      ticket_owner : string;
+      receiver : string;
+      proxy : string;
+      amount : Tez.t;
+          (* The amount of an FA token is denominated in the underlying asset's unit.
+             Since we're testing wrapped Tez, the unit in this case is Tez. *)
+      withdrawal_id : string;
+      timestamp : string;
+      payload : string;
+    }
+
+let fast_withdrawal_tez_event_signature =
+  "FastWithdrawal(bytes22,uint256,uint256,uint256,bytes,address)"
+
+let fast_withdrawal_fa_token_event_signature =
+  "FastFaWithdrawal(address,address,bytes22,bytes22,uint256,uint256,uint256,bytes)"
+
+let fast_withdrawal_event_topic ~event_signature =
+  Tezos_crypto.Hacl.Hash.Keccak_256.digest (Bytes.of_string event_signature)
+  |> Hex.of_bytes |> Hex.show |> add_0x
+
+let fast_withdrawal_tez_event_topic =
+  fast_withdrawal_event_topic
+    ~event_signature:fast_withdrawal_tez_event_signature
+
+let fast_withdrawal_fa_token_event_topic =
+  fast_withdrawal_event_topic
+    ~event_signature:fast_withdrawal_fa_token_event_signature
+
+let find_and_decode_fast_withdrawal_event ?(fa_tokens = false) receipt :
+    fast_withdrawal_event Lwt.t =
+  (* Define the fast withdrawal event log topic, which will be searched for in the EVM logs.
+     This topic is a hashed identifier that corresponds to the fast withdrawal transaction event. *)
+  let fast_withdrawal_event_signature, fast_withdrawal_event_topic =
+    if fa_tokens then
+      ( fast_withdrawal_fa_token_event_signature,
+        fast_withdrawal_fa_token_event_topic )
+    else (fast_withdrawal_tez_event_signature, fast_withdrawal_tez_event_topic)
+  in
+
+  (* Extract the event data from the EVM logs based on the provided topic.
+     This searches the transaction logs for the specified topic and returns the corresponding data. *)
+  let log =
+    let tx_log =
+      List.find_opt
+        (fun tx ->
+          List.exists
+            (String.equal fast_withdrawal_event_topic)
+            tx.Transaction.topics)
+        receipt.Transaction.logs
+      |> Option.get
+    in
+    tx_log.Transaction.data
+  in
+
+  let* res =
+    Eth_cli.decode_method
+      ~abi_label:fast_withdrawal_event_signature
+      ~method_:(String.sub fast_withdrawal_event_topic 2 8 ^ log)
+      ()
+  in
+  return
+  @@
+  match JSON.parse ~origin:"tx_log" res |> JSON.unannotate with
+  | `A
+      [
+        `String target;
+        `String withdrawal_id;
+        `String amount;
+        `String timestamp;
+        `String payload;
+        `String l2_caller;
+      ]
+    when not fa_tokens ->
+      Tez
+        {
+          target;
+          withdrawal_id;
+          amount = Wei.of_string amount |> Wei.to_tez;
+          timestamp;
+          payload;
+          l2_caller;
+        }
+  | `A
+      [
+        `String sender;
+        `String ticket_owner;
+        `String receiver;
+        `String proxy;
+        `String amount;
+        `String withdrawal_id;
+        `String timestamp;
+        `String payload;
+      ]
+    when fa_tokens ->
+      FA
+        {
+          sender;
+          ticket_owner;
+          receiver;
+          proxy;
+          amount = Tez.of_int @@ int_of_string amount;
+          withdrawal_id;
+          timestamp;
+          payload;
+        }
+  | _ -> failwith "Failed to decode fast withdrawal's event"
+
+let execute_payout ~service_provider_pkh ~exchanger
+    ~fast_withdrawal_contract_address ~service_provider_proxy
+    ?(fa_tokens = false) client receipt =
+  let* fast_withdrawal_event =
+    find_and_decode_fast_withdrawal_event ~fa_tokens receipt
+  in
+  let withdraw_amount, withdrawal_id, target, timestamp, payload, l2_caller =
+    match fast_withdrawal_event with
+    | Tez {amount; withdrawal_id; target; timestamp; payload; l2_caller; _} ->
+        (amount, withdrawal_id, target, timestamp, payload, l2_caller)
+    | FA {amount; withdrawal_id; receiver; timestamp; payload; sender; _} ->
+        (amount, withdrawal_id, receiver, timestamp, payload, sender)
+  in
+  Client.transfer
+    ~fee:(Tez.of_int 1) (* Small fee for the transaction *)
+    ~fee_cap:(Tez.of_int 1)
+    ~gas_limit:100_000_000
+    ~storage_limit:Int.max_int
+    ~burn_cap:(Tez.of_int 100)
+    ~amount:withdraw_amount
+    ~giver:Constant.bootstrap1.public_key_hash
+    ~receiver:service_provider_proxy
+    ~entrypoint:(if fa_tokens then "payout_proxy_fa" else "payout_proxy_tez")
+    ~arg:
+      (Printf.sprintf
+         "(Pair %S %S %s%s %s %s %S %s %s)"
+         fast_withdrawal_contract_address
+         exchanger
+         (if fa_tokens then Tez.to_string withdraw_amount ^ " " else "")
+         withdrawal_id
+         target
+         timestamp
+         service_provider_pkh
+         payload
+         l2_caller)
+    client
+
+let test_fast_withdrawal_l2_caller =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~__FILE__
+    ~tags:["fast_withdrawal"; "deposit"]
+    ~title:"Deposit and fast withdraw tez with forwarding contract"
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:true
+    ~time_between_blocks:Nothing
+    ~kernels:[Kernel.Mainnet; Kernel.Latest]
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let fast_withdrawal_contract_address =
+    "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let endpoint = Evm_node.endpoint sequencer in
+  let* withdrawal_forwarder_contract =
+    Solidity_contracts.call_fast_withdrawal evm_version
+  in
+  let sender = Eth_account.bootstrap_accounts.(0) in
+  (* deploy the contract *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:withdrawal_forwarder_contract.label
+      ~abi:withdrawal_forwarder_contract.abi
+      ()
+  in
+  let* withdrawal_forwarder_contract_address, _tx =
+    Eth_cli.deploy
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi:withdrawal_forwarder_contract.label
+      ~bin:withdrawal_forwarder_contract.bin
+    |> wait_for_application ~produce_block
+  in
+
+  let withdraw_amount = Tez.of_int 50 in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  let* tx_hash =
+    Eth_cli.contract_send
+      ~source_private_key:sender.Eth_account.private_key
+      ~endpoint
+      ~abi_label:withdrawal_forwarder_contract.label
+      ~address:withdrawal_forwarder_contract_address
+      ~method_call:
+        (sf
+           "forwardWithdrawal(\"%s\", \"%s\")"
+           withdraw_receiver
+           fast_withdrawal_contract_address)
+      ~value:withdraw_amount_wei
+      ~gas:16_000_000
+    |> wait_for_application ~produce_block
+  in
+
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let receipt = Option.get receipt in
+
+  let* fast_withdrawal_event = find_and_decode_fast_withdrawal_event receipt in
+  let l2_caller =
+    match fast_withdrawal_event with
+    | Tez {l2_caller; _} -> l2_caller
+    | _ -> failwith "Tez case of the fast withdrawal event expected"
+  in
+  Check.((withdrawal_forwarder_contract_address = l2_caller) string)
+    ~error_msg:"Expected %L as L2 caller instead of %R" ;
+  unit
+
+let test_deposit_and_fast_withdraw =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~__FILE__
+    ~tags:["fast_withdrawal"; "deposit"]
+    ~title:"Deposit and fast withdraw tez"
+    ~commitment_period
+    ~challenge_window
+    ~enable_fast_withdrawal:true
+    ~time_between_blocks:Nothing
+    ~kernels:[Kernel.Mainnet; Kernel.Latest]
+  @@ fun {
+           sequencer;
+           sc_rollup_address;
+           client;
+           l1_contracts;
+           proxy;
+           sc_rollup_node;
+           _;
+         }
+             _protocol ->
+  let {exchanger; _} = l1_contracts in
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  let* service_provider_proxy =
+    Client.originate_contract
+      ~alias:"service_provider"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:
+        "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
+         \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00 0x00"
+      ~prg:(service_provider_path ())
+      ~burn_cap:(Tez.of_int 890)
+      client
+  in
+  let admin = Constant.bootstrap5 in
+  let produce_block () = Rpc.produce_block sequencer in
+
+  let withdraw_amount = Tez.of_int 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = Tez.of_int 100 in
+  let service_provider_pkh = "tz1TGKSrZrBpND3PELJ43nVdyadoeiM1WMzb" in
+  let* initial_service_provider_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  let receiver =
+    Eth_account.
+      {
+        address = "0x1074Fd1EC02cbeaa5A90450505cF3B48D834f3EB";
+        private_key =
+          "0xb7c548b5442f5b28236f0dcd619f65aaaafd952240908adcf9642d8e616587ee";
+      }
+  in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Check the initial balance of the L1 withdraw receiver. It should be 0 before the fast withdrawal occurs. *)
+  let* balance_withdraw_receiver =
+    Client.get_balance_for ~account:withdraw_receiver client
+  in
+  Check.((balance_withdraw_receiver = Tez.of_int 0) Tez.typ)
+    ~error_msg:"Expected %R as initial balance instead of %L" ;
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~l1_contracts
+      ~amount:deposit_amount
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~depositor:admin
+      ~receiver:receiver.address
+      client
+  in
+
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* We create a L2 block to include the deposit *)
+  let* _ = produce_block () in
+  (* We make sure the L2 block is posted on the L1 and processed by the rollup
+     node *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* Check that the receiver's balance in the rollup matches the deposited amount. *)
+  let check_balance ~receiver ~endpoint expected_balance =
+    let* balance = Eth_cli.balance ~account:receiver ~endpoint () in
+    let balance = Wei.truncate_to_mutez balance in
+    Check.((balance = Tez.to_mutez expected_balance) int)
+      ~error_msg:
+        (sf "Expected balance of %s should be %%R, but got %%L" receiver) ;
+    unit
+  in
+  let* () =
+    check_balance
+      ~receiver:receiver.address
+      ~endpoint:(Evm_node.endpoint sequencer)
+      deposit_amount
+  in
+
+  (* Define the amount for fast withdrawal as 50 tez (half of the deposited amount). *)
+  let withdraw_amount_wei = Wei.of_tez withdraw_amount in
+
+  let* withdrawal_level = Client.level client in
+  let* tx_hash =
+    fast_withdrawal
+      ~produce_block
+      ~amount_wei:withdraw_amount_wei
+      ~sender:receiver
+      ~receiver:withdraw_receiver
+      ~fast_withdrawal_contract_address
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ()
+  in
+
+  let*@ receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+  let receipt = Option.get receipt in
+
+  let* () =
+    execute_payout
+      ~exchanger
+      ~service_provider_pkh
+      ~fast_withdrawal_contract_address
+      ~service_provider_proxy
+      client
+      receipt
+  in
+
+  let* _ =
+    find_and_execute_withdrawal
+      ~outbox_lookup_depth:100
+      ~withdrawal_level
+      ~commitment_period
+      ~challenge_window
+      ~evm_node:proxy
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+      ()
+  in
+
+  let* balance = Client.get_balance_for ~account:withdraw_receiver client in
+  let* final_withdraw_receiver_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  (* Check that the destination address of the withdrawal has a balance of
+     50 tez after the fast withdrawal is complete. *)
+  Check.((balance = withdraw_amount) Tez.typ)
+    ~error_msg:"Expected %R amount instead of %L after withdrawal" ;
+
+  (* Verify that the service provider's balance increased by 50 tez after the
+     fast withdrawal payout. *)
+  Check.(
+    (Tez.(initial_service_provider_balance + withdraw_amount)
+    = final_withdraw_receiver_balance)
+      Tez.typ)
+    ~error_msg:
+      "Expected %R amount instead of %L after outbox message was executed" ;
+
+  return ()
+
+let test_deposit_and_fa_fast_withdraw =
+  let commitment_period = 5 and challenge_window = 5 in
+  register_all
+    ~__FILE__
+    ~tags:["fast_withdrawal"; "fa_tokens"; "deposit"]
+    ~title:"Deposit and fast withdraw FA tokens"
+    ~commitment_period
+    ~challenge_window
+    ~time_between_blocks:Nothing
+    ~kernels:[Kernel.Latest]
+    ~additional_uses:[Constant.octez_codec]
+    ~enable_fa_bridge:true
+    ~enable_fast_fa_withdrawal:true
+  @@ fun {
+           sequencer;
+           sc_rollup_address;
+           client;
+           l1_contracts;
+           proxy;
+           sc_rollup_node;
+           _;
+         }
+             _protocol ->
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" l1_contracts.exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+
+  let* service_provider_proxy =
+    Client.originate_contract
+      ~alias:"service_provider"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap1.public_key_hash
+      ~init:
+        "Pair \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" \
+         \"KT1CeFqjJRJPNVvhvznQrWfHad2jCiDZ6Lyj\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0 \
+         \"tz1etHLky7fuVumvBDi92ogXQZZPESiFimWR\" 0x00 0x00"
+      ~prg:(service_provider_path ())
+      ~burn_cap:(Tez.of_int 890)
+      client
+  in
+  let depositor = Constant.bootstrap5 in
+  let produce_block () = Rpc.produce_block sequencer in
+
+  let withdraw_amount = 50 in
+  (* Define the amount to deposit in tez (100 tez), and specify the Ethereum-based receiver for the rollup. *)
+  let deposit_amount = 100 in
+  let service_provider_pkh = "tz1TGKSrZrBpND3PELJ43nVdyadoeiM1WMzb" in
+  let* initial_service_provider_balance =
+    Client.get_balance_for ~account:service_provider_pkh client
+  in
+
+  let receiver = Eth_account.bootstrap_accounts.(0) in
+
+  (* Define the Tezos address that will receive the fast withdrawal on L1. *)
+  let withdraw_receiver = "tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX" in
+
+  (* Switch ticket tester contract to proxy mode *)
+  let* () =
+    Client.transfer
+      ~entrypoint:"set"
+      ~arg:(sf "Pair %S (Pair (Left Unit) 0)" depositor.public_key_hash)
+      ~amount:Tez.zero
+      ~giver:depositor.Account.public_key_hash
+      ~receiver:l1_contracts.ticket_router_tester
+      ~burn_cap:Tez.one
+      client
+  in
+
+  (* Check the initial balance of the L1 withdraw receiver. It should be 0 before the fast withdrawal occurs. *)
+  let* receiver_balance =
+    Client.ticket_balance
+      ~contract:withdraw_receiver
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+
+  Check.((int_of_string @@ String.trim receiver_balance = 0) int)
+    ~error_msg:"Expected %R as initial balance instead of %L" ;
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Execute the deposit of 100 tez to the rollup. The depositor is the admin account, and the receiver is the Ethereum address. *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~l1_contracts
+      ~amount:deposit_amount
+      ~sc_rollup_address
+      ~sc_rollup_node
+      ~depositor
+      ~receiver:receiver.address
+      client
+  in
+
+  (* We bake enough blocks for the sequencer to realize there's a deposit. *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* We create a L2 block to include the deposit *)
+  let*@ _ = produce_block () in
+  (* We make sure the L2 block is posted on the L1 and processed by the rollup
+     node *)
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  (* Check that the receiver's balance in the rollup matches the deposited amount. *)
+  let* zero_ticket_hash = ticket_hash l1_contracts.ticket_router_tester 0 in
+
+  let* ticket_balance_after_deposit =
+    ticket_balance
+      ~ticket_hash:zero_ticket_hash
+      ~account:receiver.address
+      (Either.Right sequencer)
+  in
+  Check.((deposit_amount = ticket_balance_after_deposit) int)
+    ~error_msg:
+      "After deposit we expect %L ticket balance in the sequencer, got %R" ;
+
+  let* withdrawal_level = Client.level client in
+  let* content = ticket_content 0 in
+  let* tx_hash =
+    call_fa_fast_withdraw
+      ~sender:receiver
+      ~sequencer
+      ~ticket_owner:receiver.address
+      ~receiver:withdraw_receiver
+      ~amount:withdraw_amount
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ~fast_withdrawal_contract_address
+      ()
+  in
+
+  let*@! receipt = Rpc.get_transaction_receipt ~tx_hash sequencer in
+
+  let* () =
+    execute_payout
+      ~exchanger:l1_contracts.ticket_router_tester
+      ~service_provider_pkh
+      ~fast_withdrawal_contract_address
+      ~service_provider_proxy
+      ~fa_tokens:true
+      client
+      receipt
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  let* receiver_balance =
+    Client.ticket_balance
+      ~contract:withdraw_receiver
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+
+  (* Check that the destination address of the withdrawal has a balance of
+     50 tez after the fast withdrawal is complete, i.e. the payout is applied. *)
+  Check.((int_of_string @@ String.trim receiver_balance = withdraw_amount) int)
+    ~error_msg:"Expected %R amount instead of %L after withdrawal" ;
+
+  let* _ =
+    find_and_execute_withdrawal
+      ~outbox_lookup_depth:100
+      ~withdrawal_level
+      ~commitment_period
+      ~challenge_window
+      ~evm_node:proxy
+      ~sc_rollup_node
+      ~sc_rollup_address
+      ~client
+      ()
+  in
+
+  (* Verify that the service provider's balance increased by 50 tez after the
+     fast withdrawal payout. *)
+  let* final_service_provider_balance =
+    Client.ticket_balance
+      ~contract:service_provider_pkh
+      ~ticketer:l1_contracts.ticket_router_tester
+      ~content_type:"pair nat (option bytes)"
+      ~content:"Pair 0 None"
+      client
+  in
+  Check.(
+    (Tez.(initial_service_provider_balance + of_int withdraw_amount)
+    = Tez.of_int (int_of_string (String.trim final_service_provider_balance)))
+      Tez.typ)
+    ~error_msg:
+      "After outbox message execution we expect %L ticket balance for the \
+       receiver, got %R" ;
+  Lwt.return_unit
+
 let test_trace_call =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "trace"; "call"]
     ~title:"Sequencer can run debug_traceCall and return a valid log"
     ~da_fee:Wei.zero
-  @@ fun {sc_rollup_node; sequencer; client; proxy = _; _} _protocol ->
+  @@ fun {sc_rollup_node; sequencer; client; proxy = _; evm_version; _}
+             _protocol ->
   (* Start a RPC node as well, since we will want to check it returns the
      same result as the sequencer *)
   let* rpc_node = run_new_rpc_endpoint sequencer in
   (* Transfer funds to a random address. *)
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* simple_storage_resolved = Solidity_contracts.simple_storage () in
+  let* simple_storage_resolved =
+    Solidity_contracts.simple_storage evm_version
+  in
 
   (* deploy contract *)
   let* () =
@@ -8134,23 +9526,22 @@ let test_trace_call =
 
 let test_patch_kernel =
   register_all
+    ~__FILE__
     ~kernels:[Mainnet]
     ~tags:["evm"; "patch_kernel"; "experimental"]
     ~title:"Can patch the kernel of an existing node"
-    ~additional_uses:[Constant.WASM.ghostnet_evm_kernel]
+    ~additional_uses:[Constant.WASM.mainnet_kernel]
     ~da_fee:Wei.zero
   @@ fun {sequencer; _} _protocol ->
   let* _ =
     check_kernel_version
       ~evm_node:sequencer
       ~equal:true
-      Constant.WASM.mainnet_evm_commit
+      Constant.WASM.mainnet_commit
   in
   let* () = Evm_node.terminate sequencer in
   let* () =
-    Evm_node.patch_kernel
-      sequencer
-      Uses.(path Constant.WASM.ghostnet_evm_kernel)
+    Evm_node.patch_kernel sequencer Uses.(path Constant.WASM.mainnet_kernel)
   in
   let* () = Evm_node.run sequencer in
   (* Produce a block so that the migration code is executed *)
@@ -8159,12 +9550,61 @@ let test_patch_kernel =
     check_kernel_version
       ~evm_node:sequencer
       ~equal:true
-      Constant.WASM.ghostnet_evm_commit
+      Constant.WASM.mainnet_commit
+  in
+  unit
+
+let test_observer_finalized_view =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "observer"; "finalized"; "dont_track_rollup_node"]
+    ~title:
+      "observer has finalized block parameter without tracking the rollup node"
+    ~time_between_blocks:Nothing
+    ~use_dal:
+      (* The logic tested here is orthogonal with the DAL, and the test itself is written with constants
+         for the case DAL is not enabled. *)
+      Register_without_feature
+  @@ fun {sc_rollup_node; observer; client; sequencer; proxy; _} _protocol ->
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+  (* Create blueprints for level 1 and 2 *)
+  let* _ = produce_block sequencer in
+  let* _ = produce_block sequencer in
+
+  let* () = bake_until_sync ~sc_rollup_node ~client ~sequencer ~proxy () in
+
+  let target_finalized = 2l in
+
+  (* Ensure blueprints are finalized by baking two more blocks *)
+  let* _l1_lvl =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+
+  (* Check the finalized blueprint is indeed the expected one *)
+  let*@ sequencer_finalized_head =
+    Rpc.get_block_by_number ~block:"finalized" sequencer
+  in
+  Check.(
+    (sequencer_finalized_head.number = target_finalized)
+      int32
+      ~error_msg:"Expected sequencer finalized level %R, got %L") ;
+
+  (* Check the finalized blueprint is the same for the observer and
+     the sequencer. *)
+  let* () =
+    check_block_consistency ~block:`Finalized ~left:sequencer ~right:observer ()
   in
   unit
 
 let test_finalized_persistent =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "finalized"]
     ~title:"Persistent finalized block parameter"
@@ -8227,6 +9667,7 @@ let test_finalized_persistent =
 
 let test_finalized_view =
   register_all
+    ~__FILE__
     ~kernels:
       [
         Latest
@@ -8258,12 +9699,13 @@ let test_finalized_view =
   let* finalized_observer =
     run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
   in
+  let p = Evm_node.wait_for_blueprint_applied finalized_observer 4 in
   (* Produce a few EVM blocks *)
   let* _ =
     repeat 4 @@ fun () ->
     let* _ = produce_block sequencer in
     unit
-  in
+  and* () = p in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
   let* () =
     bake_until_sync ~__LOC__ ~sc_rollup_node ~proxy ~sequencer ~client ()
@@ -8326,6 +9768,7 @@ let test_finalized_view_forward_txn =
   in
   let nb_transactions = 3 in
   register_all
+    ~__FILE__
     ~kernels:
       [
         Latest
@@ -8349,10 +9792,12 @@ let test_finalized_view_forward_txn =
   let* finalized_observer =
     run_new_observer_node ~finalized_view:true ~sc_rollup_node sequencer
   in
+  let* () = Evm_node.wait_for_blueprint_applied finalized_observer 0 in
+
   (* Produce a few EVM blocks *)
   let* _ =
     repeat 4 @@ fun () ->
-    let* _ = produce_block sequencer in
+    let*@ _ = produce_block sequencer in
     unit
   in
   (* Produces two L1 blocks to ensure the L2 blocks are posted onchain by the sequencer *)
@@ -8373,28 +9818,35 @@ let test_finalized_view_forward_txn =
         let* tx = raw_transfer i in
         return (tx :: txns))
   in
+  let txns = (* respect transaction order *) List.rev txns in
 
-  (* Inject the transactions. *)
-  let* _ = batch_n_transactions ~evm_node:finalized_observer txns in
-
-  (* Create as many blocks as we have created transactions, check they all
-     contain one transaction. This should not be flaky because the
-     `eth_sendRawTransaction` implementation of the observer (in finalized
-     view) is blocked until the sequencer accepts the transaction. *)
   let* _ =
-    repeat nb_transactions @@ fun () ->
-    let*@ txns_in_block = produce_block sequencer in
-    Check.(
-      (txns_in_block = 1)
-        int
-        ~error_msg:"Expected one transaction even without producing L1 blocks") ;
-    unit
+    Lwt_list.map_s
+      (fun txn ->
+        let add_txn = Evm_node.wait_for_tx_queue_add_transaction sequencer in
+        let* _ = batch_n_transactions ~evm_node:finalized_observer [txn]
+        and* _ = add_txn in
+        unit)
+      txns
   in
+
+  (* Create a block as we have created transactions, check they all
+     contain one transaction. This
+     should not be flaky because the `eth_sendRawTransaction`
+     implementation of the observer (in finalized view) is blocked
+     until the sequencer accepts the transaction. *)
+  let*@ txns_in_block = produce_block sequencer in
+  Check.(
+    (txns_in_block = nb_transactions)
+      int
+      ~error_msg:
+        "Expected %R transactions even without producing L1 blocks, found %L") ;
 
   unit
 
 let test_finalized_block_param =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:
       [
@@ -8468,17 +9920,18 @@ let test_regression_block_hash_gen =
      This test checks regression for the fix *)
   let timestamp = "2020-01-01T00:00:05Z" in
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "l2_call"; "block_hash"; "timestamp"]
     ~title:"Random generation based on block hash and timestamp"
     ~genesis_timestamp:Client.(At (Time.of_notation_exn timestamp))
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let* () =
     repeat 3 (fun _ ->
         let*@ _ = produce_block sequencer ~timestamp in
         unit)
   in
-  let* {abi; bin; _} = Solidity_contracts.block_hash_gen () in
+  let* {abi; bin; _} = Solidity_contracts.block_hash_gen evm_version in
   let* _contract, _tx_hash =
     send_transaction_to_sequencer
       (Eth_cli.deploy
@@ -8522,6 +9975,7 @@ let test_sequencer_sandbox () =
 
 let test_rpc_mode_while_block_are_produced =
   register_all
+    ~__FILE__
     ~title:"rpc node can respond to rpcs without disturbing the sequencer."
     ~tags:["rpc_mode"; Tag.ci_disabled]
     ~time_between_blocks:Nothing
@@ -8588,11 +10042,14 @@ let test_rpc_mode_while_block_are_produced =
 
 let test_batch_limit_size_rpc =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~__FILE__
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~title:"Test batch size limit"
     ~tags:["rpc"; "batch_limit"]
     ~time_between_blocks:Nothing
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   (* We restart the sequencer to impose a batch limit on the sequencer. *)
   let* () = Evm_node.terminate sequencer in
@@ -8600,7 +10057,7 @@ let test_batch_limit_size_rpc =
     Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "5"] sequencer
   in
   let all_txs = read_tx_from_file () in
-  (* Considering the choosen limit (5), we prepare two batches of transactions.
+  (* Considering the chosen limit (5), we prepare two batches of transactions.
      The first one with the first three transactions of our tx file, the second
      one with the 10 ones that comes after.*)
   let below_limit_txs =
@@ -8611,15 +10068,13 @@ let test_batch_limit_size_rpc =
   in
 
   (* We first check that we can inject the first batch. *)
-  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer below_limit_txs in
+  let* _ = batch_n_transactions ~evm_node:sequencer below_limit_txs in
 
   (* We then demonstrate that we cannot inject the second batch. *)
   let* has_failed =
     Lwt.catch
       (fun () ->
-        let* _ =
-          Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs
-        in
+        let* _ = batch_n_transactions ~evm_node:sequencer above_limit_txs in
         return false)
       (fun _ -> return true)
   in
@@ -8627,14 +10082,14 @@ let test_batch_limit_size_rpc =
   if not has_failed then
     Test.fail "Large batch exceeding the limit should have failed." ;
 
-  (* We restart the sequencer, and explicitely lift the limit. *)
+  (* We restart the sequencer, and explicitly lift the limit. *)
   let* () = Evm_node.terminate sequencer in
   let* () =
     Evm_node.run ~extra_arguments:["--rpc-batch-limit"; "unlimited"] sequencer
   in
 
   (* We demonstrate it is now possible to inject the batch. *)
-  let* _ = Helpers.batch_n_transactions ~evm_node:sequencer above_limit_txs in
+  let* _ = batch_n_transactions ~evm_node:sequencer above_limit_txs in
 
   unit
 
@@ -8679,13 +10134,16 @@ let test_describe_config () =
 
 let test_relay_restricted_rpcs =
   register_all
-    ~bootstrap_accounts:Eth_account.lots_of_address
+    ~__FILE__
+    ~eth_bootstrap_accounts:Eth_account.lots_of_address
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
     ~tags:["evm"; "rpc"; "relay"]
     ~title:"Relay restricted RPC only accept eth_sendRawTransaction"
     ~da_fee:Wei.zero
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   let* () = Evm_node.terminate sequencer in
   let* () =
@@ -8701,10 +10159,16 @@ let test_relay_restricted_rpcs =
 
 let test_tx_pool_replacing_transactions =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~kernels:[Latest] (* Not a kernel specific test. *)
     ~tags:["evm"; "tx_pool"]
+    ~enable_tx_queue:(Evm_node.Enable false)
+      (* Test tx_pool specific property that does not exists in
+         tx_queue *)
     ~title:"Transactions can be replaced"
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
   @@ fun {sequencer; _} _protocol ->
   let* gas_price = Rpc.get_gas_price sequencer in
   let gas_price = Int32.to_int gas_price in
@@ -8753,6 +10217,12 @@ let test_tx_pool_replacing_transactions_on_limit () =
   register_sandbox
     ~tags:["evm"; "tx_pool"]
     ~title:"Transactions can be replaced even when limit is reached"
+    ~patch_config:
+      (Evm_node.patch_config_with_experimental_feature
+         ~enable_tx_queue:(Enable false)
+         ())
+      (* Test tx_pool specific property that does not exists in
+         tx_queue *)
     ~tx_pool_tx_per_addr_limit:3
   @@ fun sequencer ->
   let sender = Eth_account.bootstrap_accounts.(0) in
@@ -8864,8 +10334,15 @@ let test_tx_pool_pending_nonce () =
 
 let test_da_fees_after_execution =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
-    ~tags:["evm"; "da_fees"]
+    ~tags:
+      [
+        "evm";
+        "da_fees";
+        (* Those tests take about 13 minutes in the CI. *)
+        Tag.slow;
+      ]
     ~da_fee:(Wei.of_string "4_000_000_000_000")
     ~title:"da fees test"
   @@ fun {sequencer; _} _protocol ->
@@ -8927,6 +10404,7 @@ let test_configuration_service =
       ~mainnet_compat:false
       ~enable_dal:false
       ~enable_multichain:false
+      ~enable_revm:false
       protocol
   in
   let* proxy_config = Rpc.configuration proxy in
@@ -8955,6 +10433,7 @@ let test_configuration_service =
 
 let test_produce_block_with_no_delayed_transactions =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "delayed_transaction"]
     ~title:"Produce block with no delayed transactions"
@@ -8998,10 +10477,11 @@ let test_produce_block_with_no_delayed_transactions =
 
 let test_websocket_rpcs =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"]
     ~title:"RPC methods over websocket"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -9017,7 +10497,7 @@ let test_websocket_rpcs =
       ~address:Eth_account.bootstrap_accounts.(0).address
       sequencer
   in
-  Check.((balance = Helpers.default_bootstrap_account_balance) Wei.typ)
+  Check.((balance = default_bootstrap_account_balance) Wei.typ)
     ~error_msg:
       (sf
          "Expected balance of %s should be %%R, but got %%L"
@@ -9071,11 +10551,12 @@ let test_websocket_rpcs =
 
 let test_websocket_subscription_rpcs_cant_be_called_via_http_requests =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "http"]
     ~title:
       "Check that subscriptions rpcs can't be called via regular http requests"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -9131,15 +10612,19 @@ let check_unsubscription ~websocket ~id ~sequencer evm_node =
 
 let test_websocket_newHeads_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "new_heads"]
     ~title:"Check that websocket event `newHeads` is behaving correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sequencer; observer; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
@@ -9167,10 +10652,11 @@ let test_websocket_newHeads_event =
    connections closed by the client. *)
 let test_websocket_cleanup =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "cleanup"]
     ~title:"Check that websocket subscriptions are cleaned up on close"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
@@ -9197,18 +10683,19 @@ let test_websocket_cleanup =
   unit
 
 let test_websocket_max_message_length () =
-  let max_websocket_message_length = 512 in
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* The limit is not implemented for Dream *)
-      ~enable_websocket:true
-      ~max_websocket_message_length
-      ()
+  let max_message_length = 512 in
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled ~max_message_length
   in
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "max"]
     ~title:"Websocket server does not accept messages larger than maximum"
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let* websocket = Evm_node.open_websocket sequencer in
   let shutdown =
@@ -9221,9 +10708,7 @@ let test_websocket_max_message_length () =
       ]
   in
   let* () =
-    Websocket.send_raw
-      websocket
-      (String.make (max_websocket_message_length + 1) '\000')
+    Websocket.send_raw websocket (String.make (max_message_length + 1) '\000')
   in
   let* reason = shutdown in
   Log.info "Websocket shutdown reason: %S." reason ;
@@ -9239,17 +10724,189 @@ let test_websocket_max_message_length () =
           unit
       | e -> Lwt.reraise e)
 
+let test_websocket_rate_limit strategy =
+  let max_messages = 5 in
+  let interval = 3 in
+  let strategy_str =
+    match strategy with
+    | `Wait -> "wait"
+    | `Error -> "error"
+    | `Close -> "close"
+  in
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled
+         ~monitor_heartbeat:false (* To not count ping/pong frames *)
+         ~rate_limit:
+           (`O
+             [
+               ("max_messages", `Float (float_of_int max_messages));
+               ("interval", `Float (float_of_int interval));
+               ("strategy", `String strategy_str);
+             ])
+  in
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; strategy_str]
+    ~title:(sf "Websocket server limits rate of messages (%s)" strategy_str)
+    ~patch_config
+    ~websockets:true
+  @@ fun sequencer ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let*@ _ = produce_block sequencer in
+  Log.info "Send messages below limit" ;
+  let send_requests n =
+    List.init n Fun.id
+    |> Lwt_list.map_s (fun _ ->
+           Lwt.catch
+             (fun () ->
+               Rpc.block_number ~websocket sequencer
+               |> Lwt_result.map_error (fun e -> `Rpc_error e))
+             (fun e -> Lwt.return_error (`Exn e)))
+  in
+  let* responses = send_requests max_messages in
+  List.iteri
+    (fun i -> function
+      | Ok _ -> ()
+      | Error (`Rpc_error ({code; message; _} : Rpc.error)) ->
+          Test.fail
+            ~__LOC__
+            "Websocket message %i resulted in error %d: %s"
+            i
+            code
+            message
+      | Error (`Exn e) -> raise e)
+    responses ;
+  Log.info "Wait for rate limit interval" ;
+  let* () = Lwt_unix.sleep (float_of_int interval) in
+  let ws_server_shutdown =
+    Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+    Some JSON.(json |-> "reason" |> as_string)
+  in
+  let t1 = Unix.gettimeofday () in
+  Log.info "Sending messages above limit" ;
+  let* responses = send_requests (max_messages + 1) in
+  let t2 = Unix.gettimeofday () in
+  let handle_time = t2 -. t1 in
+  let errors =
+    List.filter_map (function Ok _ -> None | Error e -> Some e) responses
+  in
+  match (strategy, errors) with
+  | `Error, [] ->
+      Test.fail ~__LOC__ "Websocket server should have rate limited a message"
+  | `Error, _ :: _ :: _ ->
+      Test.fail
+        ~__LOC__
+        "Websocket server should have rate limited only one message"
+  | `Error, [`Rpc_error {code; message; _}] ->
+      Check.((code = -32005) int)
+        ~error_msg:"Rate limit error should have code %R but was %L" ;
+      Check.(message =~ rex "Rate limited by messages on websocket")
+        ~error_msg:"Expected message to match %R, got %L" ;
+      unit
+  | `Wait, _ :: _ ->
+      Test.fail
+        ~__LOC__
+        "Websocket server should have blocked in rate limit instead of error"
+  | `Wait, [] ->
+      Check.((handle_time > float_of_int interval) float)
+        ~error_msg:"Rate limit blocked for %L but should block for %R" ;
+      unit
+  | `Close, _ ->
+      let* reason =
+        Lwt.pick
+          [
+            ws_server_shutdown;
+            (let* () = Lwt_unix.sleep 5. in
+             Test.fail
+               ~__LOC__
+               "Websocket worker should have closed on rate limit.");
+          ]
+      in
+      Check.(reason =~ rex "Rate limited by messages on websocket")
+        ~error_msg:"Expected close reason to match %R, got %L" ;
+      unit
+  | _, [`Exn e] -> raise e
+
+let test_websocket_frames_rate_limit () =
+  let max_frames = 100 in
+  let interval = 3 in
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* The limit is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled
+         ~monitor_heartbeat:false (* To not count ping/pong frames *)
+         ~rate_limit:
+           (`O
+             [
+               ("max_frames", `Float (float_of_int max_frames));
+               ("interval", `Float (float_of_int interval));
+             ])
+  in
+
+  register_sandbox
+    ~tags:["evm"; "rpc"; "websocket"; "rate_limit"; "frames"]
+    ~title:"Websocket server limits rate of frames"
+    ~patch_config
+    ~websockets:true
+  @@ fun sequencer ->
+  let* websocket = Evm_node.open_websocket sequencer in
+  let*@ _ = produce_block sequencer in
+  let send_frames n =
+    List.init n Fun.id
+    |> Lwt_list.iter_p (fun _ -> Websocket.send_raw websocket "")
+  in
+  let ws_server_shutdown =
+    Evm_node.wait_for sequencer "websocket_shutdown.v0" @@ fun json ->
+    Some JSON.(json |-> "reason" |> as_string)
+  in
+  Log.info "Send frames below limit" ;
+  let* () = send_frames max_frames in
+  let* () =
+    Lwt.choose
+      [
+        (let* reason = ws_server_shutdown in
+         Test.fail ~__LOC__ "Websocket connection closed because %s." reason);
+        Lwt_unix.sleep 1.;
+      ]
+  in
+  Log.info "Wait for rate limit interval" ;
+  let* () = Lwt_unix.sleep (float_of_int interval) in
+  let* () =
+    Lwt.catch
+      (fun () -> send_frames (max_frames + 1))
+      (function Websocket.Connection_closed -> unit | e -> raise e)
+  in
+  let* reason =
+    Lwt.pick
+      [
+        ws_server_shutdown;
+        (let* () = Lwt_unix.sleep 5. in
+         Test.fail ~__LOC__ "Websocket worker did not close.");
+      ]
+  in
+  Log.info "Websocket shutdown reason: %S." reason ;
+  Check.(reason =~ rex "Rate limited by frames on websocket")
+    ~error_msg:"Expected close reason to match %R, got %L" ;
+  unit
+
 let test_websocket_heartbeat_monitoring () =
-  let patch_config =
-    Evm_node.patch_config_with_experimental_feature
-      ~rpc_server:Resto (* Monitoring is not implemented for Dream *)
-      ~enable_websocket:true
-      ()
+  let patch_config json =
+    json
+    |> Evm_node.patch_config_with_experimental_feature
+         ~rpc_server:Resto (* Monitoring is not implemented for Dream *)
+         ()
+    |> Evm_node.patch_config_websockets_if_enabled ~monitor_heartbeat:true
   in
   register_sandbox
     ~tags:["evm"; "rpc"; "websocket"; "monitoring"]
     ~title:"Websocket server closes connection when client unresponsive"
     ~patch_config
+    ~websockets:true
   @@ fun sequencer ->
   let ws_connection_established =
     Evm_node.wait_for sequencer "websocket_starting.v0" @@ fun _json -> Some ()
@@ -9277,17 +10934,21 @@ let test_websocket_heartbeat_monitoring () =
 
 let test_websocket_newPendingTransactions_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "new_pending_transactions"]
     ~title:
       "Check that websocket event `newPendingTransactions` is behaving \
        correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
   @@ fun {sequencer; sc_rollup_node; _} _protocol ->
   let* observer =
     run_new_observer_node
@@ -9300,50 +10961,61 @@ let test_websocket_newPendingTransactions_event =
   let scenario evm_node transaction_hash =
     let* websocket = Evm_node.open_websocket evm_node in
     let* id = Rpc.subscribe ~websocket ~kind:NewPendingTransactions evm_node in
-    Lwt.async (fun () ->
-        (* In observer mode, the transaction will never be mined which will cause
-           the following line to be blocking. *)
-        let* _ =
-          Eth_cli.transaction_send
-            ~source_private_key:sender.private_key
-            ~to_public_key:sender.address
-            ~value:(Wei.of_eth_int 10)
-            ~endpoint:(Evm_node.endpoint evm_node)
-            ()
-        in
-        unit) ;
+    (* In observer mode, the transaction will never be mined which will cause
+       the following lines of code to be blocking hence the [Background.register]. *)
+    Background.register
+      (Lwt.catch
+         (fun () ->
+           let* _ =
+             Eth_cli.transaction_send
+               ~source_private_key:sender.private_key
+               ~to_public_key:sender.address
+               ~value:(Wei.of_eth_int 10)
+               ~endpoint:(Evm_node.endpoint evm_node)
+               ()
+           in
+           unit)
+         (fun exn ->
+           Log.debug "TX send failed because %s" (Printexc.to_string exn) ;
+           unit)) ;
     let* tx = Websocket.recv websocket in
     let tx_hash = JSON.(tx |-> "params" |-> "result" |> as_string) in
     Check.((transaction_hash = tx_hash) string)
       ~error_msg:"Received tx_hash was %R, expected %L" ;
     check_unsubscription ~websocket ~id ~sequencer evm_node
   in
+  Log.info "Scenario with sequencer" ;
   let* () =
     scenario
       sequencer
       "0x1b5678a27af55582f2bd6fa07223ff59ee93e16c228e40a948d09ee593560d36"
   in
+  Log.info "Scenario with observer" ;
   scenario
     observer
     "0xf5e6dcb59cbf260cfe04d89d07a0f270c11e489a6de4df319916c7ddb19f3a34"
 
 let test_websocket_logs_event =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "websocket"; "logs"]
     ~title:"Check that websocket event `logs` is behaving correctly"
     ~time_between_blocks:Nothing
-    ~bootstrap_accounts:
+    ~eth_bootstrap_accounts:
       ((Array.to_list Eth_account.bootstrap_accounts
        |> List.map (fun a -> a.Eth_account.address))
       @ Eth_account.lots_of_address)
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~websockets:true
-  @@ fun {sequencer; observer; _} _protocol ->
+    ~use_multichain:
+      (* TODO #7843: Adapt this test to multichain context *)
+      Register_without_feature
+  @@ fun {sequencer; observer; evm_version; _} _protocol ->
   let scenario evm_node =
     let* websocket = Evm_node.open_websocket evm_node in
     let endpoint = Evm_node.endpoint evm_node in
     let sender = Eth_account.bootstrap_accounts.(0) in
-    let* erc20 = Solidity_contracts.erc20 () in
+    let* erc20 = Solidity_contracts.erc20 evm_version in
     let* () = Eth_cli.add_abi ~label:erc20.label ~abi:erc20.abi () in
     let* address, _tx =
       send_transaction_to_sequencer
@@ -9429,7 +11101,7 @@ let test_websocket_logs_event =
     in
     Check.((address = logs.address) string)
       ~error_msg:"Received logs address was %R, expected %L" ;
-    Check.(("0x" ^ Helpers.hex_256_of_int value = logs.data) string)
+    Check.(("0x" ^ hex_256_of_int value = logs.data) string)
       ~error_msg:"Received logs data was %R, expected %L" ;
     Check.(
       (sender_burn_logs.topics
@@ -9450,6 +11122,7 @@ let test_node_correctly_uses_batcher_heap =
     ~kernel:Kernel.Latest
     ~enable_dal:false
     ~enable_multichain:false
+    ~enable_revm:false
     ~max_blueprints_lag
     ~max_blueprints_catchup
     ~catchup_cooldown
@@ -9610,6 +11283,7 @@ let test_node_correctly_uses_batcher_heap =
 
 let test_trace_empty_block =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"]
     ~title:"debug_traceBlockByNumber succeeds on empty block"
@@ -9625,6 +11299,7 @@ let test_trace_empty_block =
 
 let test_trace_block_struct_logger =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"; "empty"; "struct_logger"]
     ~title:"debug_traceBlockByNumber not implemented for struct logger"
@@ -9646,16 +11321,17 @@ let test_trace_block_struct_logger =
 
 let test_trace_block =
   register_all
+    ~__FILE__
     ~time_between_blocks:Nothing
     ~tags:["evm"; "sequencer"; "trace"; "block"]
     ~title:"debug_traceBlockByNumber succeeds on non empty block"
     ~kernels:Kernel.all
-  @@ fun {client; sc_rollup_node; sequencer; proxy; _} _protocol ->
+  @@ fun {client; sc_rollup_node; sequencer; proxy; evm_version; _} _protocol ->
   let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
   let endpoint = Evm_node.endpoint sequencer in
   let sender_0 = Eth_account.bootstrap_accounts.(0) in
   let sender_1 = Eth_account.bootstrap_accounts.(1) in
-  let* call_types = Solidity_contracts.call_types () in
+  let* call_types = Solidity_contracts.call_types evm_version in
   let* () = Eth_cli.add_abi ~label:call_types.label ~abi:call_types.abi () in
   let* address, _ =
     send_transaction_to_sequencer
@@ -9749,6 +11425,7 @@ let test_init_config_mainnet network =
 
 let test_filling_max_slots_cant_lead_to_out_of_memory =
   register_all
+    ~__FILE__
     ~kernels:[Latest]
     ~tags:["evm"; "slots"; "out_of_memory"]
     ~title:
@@ -9756,10 +11433,10 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
        OutOfGas not an out of memory error"
     ~da_fee:Wei.zero
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* slot_filler = Solidity_contracts.slot_filler () in
+  let* slot_filler = Solidity_contracts.slot_filler evm_version in
   let* () = Eth_cli.add_abi ~label:slot_filler.label ~abi:slot_filler.abi () in
   let* contract_address, _ =
     send_transaction_to_sequencer
@@ -9794,13 +11471,15 @@ let test_filling_max_slots_cant_lead_to_out_of_memory =
 
 let test_rpc_getLogs_with_earliest_fail =
   register_all
+    ~__FILE__
     ~tags:["evm"; "rpc"; "get_logs"; "earliest"]
     ~title:"RPC method getLogs with earliest block"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
-  @@ fun {sequencer; _} _protocol ->
+    ~use_revm:activate_revm_registration
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let endpoint = Evm_node.endpoint sequencer in
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* erc20_resolved = Solidity_contracts.erc20 () in
+  let* erc20_resolved = Solidity_contracts.erc20 evm_version in
   let* () =
     Eth_cli.add_abi ~label:erc20_resolved.label ~abi:erc20_resolved.abi ()
   in
@@ -9850,12 +11529,13 @@ let test_rpc_getLogs_with_earliest_fail =
 
 let test_estimate_gas_with_block_param =
   register_all
+    ~__FILE__
     ~tags:["evm"; "eth_estimategas"; "simulate"; "estimate_gas"; "earliest"]
     ~title:"eth_estimateGas with block parameter"
     ~time_between_blocks:Nothing
-  @@ fun {sequencer; _} _protocol ->
+  @@ fun {sequencer; evm_version; _} _protocol ->
   let sender = Eth_account.bootstrap_accounts.(0) in
-  let* gas_consumer = Solidity_contracts.even_block_gas_consumer () in
+  let* gas_consumer = Solidity_contracts.even_block_gas_consumer evm_version in
   let* () =
     Eth_cli.add_abi ~label:gas_consumer.label ~abi:gas_consumer.abi ()
   in
@@ -9907,10 +11587,10 @@ let test_estimate_gas_with_block_param =
 
 let test_transaction_object expected_type_ name make_transaction =
   register_all
+    ~__FILE__
     ~tags:[name; "transaction_object"]
     ~time_between_blocks:Nothing
     ~kernels:[Latest]
-    ~use_threshold_encryption:Register_without_feature
     ~use_dal:Register_without_feature
     ~title:
       (sf "RPC returns the correct transaction object for %s transactions" name)
@@ -9934,12 +11614,12 @@ let test_transaction_object expected_type_ name make_transaction =
     (type_ = expected_type_)
       string
       ~error_msg:
-        ("Type was expected to be %L (" ^ name ^ "), but the RPC returned %R")) ;
+        ("Type was expected to be %R (" ^ name ^ "), but the RPC returned %L")) ;
   unit
 
 let test_eip2930_transaction_object =
   test_transaction_object
-    "0x01"
+    "0x1"
     "eip2930"
     (Cast.craft_tx
        ~legacy:true
@@ -9958,7 +11638,7 @@ let test_eip2930_transaction_object =
 
 let test_eip1559_transaction_object =
   test_transaction_object
-    "0x02"
+    "0x2"
     "eip1559"
     (Cast.craft_tx
        ~legacy:false
@@ -9971,14 +11651,8 @@ let test_eip1559_transaction_object =
        ~address:Eth_account.bootstrap_accounts.(1).address)
 
 let test_apply_from_full_history_mode =
-  let genesis_time = Client.Time.of_notation_exn "2020-01-01T00:00:00Z" in
-  let genesis_timestamp = Client.At genesis_time in
-  let days n = Ptime.Span.of_int_s (n * 86400) in
-  let get_timestamp i =
-    Ptime.add_span genesis_time (days (i + 1))
-    |> Option.get |> Client.Time.to_notation
-  in
   register_all
+    ~__FILE__
     ~genesis_timestamp
     ~time_between_blocks:Nothing
     ~tags:["evm"; "observer"]
@@ -10012,6 +11686,1461 @@ let test_apply_from_full_history_mode =
 
   Log.info "first block in observer after the catchup is accessible" ;
   let*@ _ = Rpc.get_block_by_number ~block:"1" observer in
+  unit
+
+let test_tx_queue =
+  register_all
+    ~__FILE__
+    ~tags:["observer"; "tx_queue"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
+    ~title:"Submits a transaction to an observer with a tx queue."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let check_tx_is_found ~__LOC__ ~hash ~node =
+    let*@ tx = Rpc.get_transaction_by_hash ~transaction_hash:hash node in
+    Check.(
+      is_true
+        (Option.is_some tx)
+        ~__LOC__
+        ~error_msg:"Expected to find the transaction but it was not found.") ;
+    unit
+  in
+  (* helper to craft a tx with given nonce. *)
+  let raw_tx ~nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+
+  (* number of transactions that we are going to process (submit,
+      inject, ...) *)
+  let nb_txs = 10 in
+
+  let wait_for_all_tx_process_p ~hashes ~name ~waiter =
+    let* () = Lwt_list.iter_p (fun hash -> waiter ~hash) hashes in
+    Log.info "All (%d) txs processed: \"%s\"." (List.length hashes) name ;
+    unit
+  in
+
+  (* Promises that checks that [nb_txs] txs have been seen with different
+     events. *)
+
+  (* Test start here *)
+  Log.info
+    "Sending %d transactions to the observer and check after each submission \
+     that the tx can be retrieved"
+    nb_txs ;
+  let* hashes =
+    fold nb_txs [] @@ fun i hashes ->
+    let* raw_tx = raw_tx ~nonce:i in
+    let* hash =
+      let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
+      return hash
+    and* _ = Evm_node.wait_for_tx_queue_add_transaction observer
+    and* _ = Evm_node.wait_for_tx_queue_add_transaction sequencer
+    and* _ = Evm_node.wait_for_tx_queue_injecting_transaction observer in
+    let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer
+    and* () = check_tx_is_found ~__LOC__ ~hash ~node:sequencer in
+    return (hash :: hashes)
+  in
+
+  Log.info
+    "Produce enough block to include all txs and make sure they are confirmed \
+     by the observer" ;
+  (* Checks that all txs were confirmed in the observer *)
+  let observer_wait_tx_confirmed =
+    let waiter ~hash =
+      let* _ =
+        Evm_node.wait_for_tx_queue_transaction_confirmed observer ~hash
+      in
+      unit
+    in
+    wait_for_all_tx_process_p ~hashes ~name:"tx confirmed in observer" ~waiter
+  in
+
+  (* Checks that all txs were included in a unique block by the sequencer *)
+  let* () =
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = nb_txs)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
+  and* _ = observer_wait_tx_confirmed in
+
+  Log.info
+    "Verifying that all transactions can be retrieved both in the observer and \
+     in the sequencer" ;
+  let* () =
+    Lwt_list.iter_p
+      (fun hash ->
+        let* () = check_tx_is_found ~__LOC__ ~hash ~node:observer
+        and* () = check_tx_is_found ~__LOC__ ~hash ~node:sequencer in
+        unit)
+      hashes
+  in
+  unit
+
+let test_tx_queue_clear =
+  register_all
+    ~__FILE__
+    ~title:"Tx_queue clears after delayed inbox flush"
+    ~tags:["evm"; "tx_queue"; "clear"; "delayed_inbox"; "flush"]
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
+    ~time_between_blocks:Nothing
+    ~delayed_inbox_timeout:0
+    ~delayed_inbox_min_levels:1
+    ~kernels:[Latest]
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
+  @@ fun {
+           client;
+           l1_contracts;
+           sc_rollup_address;
+           sc_rollup_node;
+           sequencer;
+           observer;
+           proxy;
+           _;
+         }
+             _protocol ->
+  let* () = Evm_node.terminate observer in
+  let* () =
+    Evm_node.run ~extra_arguments:["--dont-track-rollup-node"] observer
+  in
+
+  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~client ~sequencer () in
+
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:23_300
+      ~value:(Wei.of_eth_int 1)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* _ =
+    send_raw_transaction_to_delayed_inbox
+      ~sc_rollup_node
+      ~client
+      ~l1_contracts
+      ~sc_rollup_address
+      ~sender:Constant.bootstrap3
+      raw_tx
+  in
+
+  let wait_for_tx_queue_injected =
+    Evm_node.wait_for_tx_queue_injecting_transaction observer
+  in
+  let* _ = Rpc.send_raw_transaction ~raw_tx observer
+  and* _ = wait_for_tx_queue_injected in
+  let*@ pending, queued = Rpc.txpool_content observer in
+  Check.((List.length pending = 1) int)
+    ~error_msg:"Amount of 'Pending' tx should be 1" ;
+  Check.((List.length queued = 0) int)
+    ~error_msg:"Amount of 'Queued' tx should be 0" ;
+
+  (* Mark at which level the delayed inbox item was added. *)
+  let* add_level = Client.level client in
+  let wait_for_processed_l1_level_add =
+    Evm_node.wait_for_processed_l1_level ~level:add_level sequencer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+
+  (* Mark at which level the delayed inbox was flushed. *)
+  let* flushed_level = Client.level client in
+  let wait_for_processed_l1_level_flushed =
+    Evm_node.wait_for_processed_l1_level ~level:flushed_level sequencer
+  in
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ = wait_for_processed_l1_level_add in
+
+  (* Produce one L2 block. The sequencer is aware of the delayed inbox
+     item but refuses to include it. *)
+  let wait_for_flush = Evm_node.wait_for_flush_delayed_inbox sequencer in
+  let wait_for_clear = Evm_node.wait_for_tx_queue_cleared observer in
+  let*@ _ = Rpc.produce_block ~with_delayed_transactions:false sequencer in
+
+  let* _ = next_rollup_node_level ~sc_rollup_node ~client
+  and* _ = wait_for_flush
+  and* _ = wait_for_processed_l1_level_flushed
+  and* () = wait_for_clear in
+
+  let*@ pending, queued = Rpc.txpool_content observer in
+  Check.((List.length pending + List.length queued = 0) int)
+    ~error_msg:"'Pending' and 'Queued' tx should be empty" ;
+
+  unit
+
+let test_tx_queue_nonce =
+  register_all
+    ~__FILE__
+    ~tags:["observer"; "tx_queue"; "nonce"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 100000;
+         })
+    ~title:
+      "Submits transactions to an observer with a tx queue and make sure it \
+       can respond to getTransactionCount."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  let check_nonce ~__LOC__ ~evm_node ~block ~expected =
+    let*@ nonce =
+      Rpc.get_transaction_count
+        evm_node
+        ~block
+        ~address:Eth_account.bootstrap_accounts.(0).address
+    in
+    Check.(
+      (Int64.to_int nonce = expected)
+        int
+        ~__LOC__
+        ~error_msg:"Expected nonce %R found %L") ;
+    unit
+  in
+
+  let check_nonce ~__LOC__ ?(check_observer = false) ?(check_sequencer = false)
+      ~block ~expected () =
+    let* () =
+      if check_observer then
+        check_nonce ~__LOC__ ~evm_node:observer ~block ~expected
+      else unit
+    in
+    if check_sequencer then
+      check_nonce ~__LOC__ ~evm_node:sequencer ~block ~expected
+    else unit
+  in
+
+  (* helper to craft a tx with given nonce. *)
+  let send_raw_tx ~nonce =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas_price:1_000_000_000
+        ~gas:23_300
+        ~value:Wei.one
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        ()
+    in
+    Rpc.send_raw_transaction ~raw_tx observer
+  in
+
+  let send_and_wait_sequencer_receive ~nonce =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
+    in
+    let* hash =
+      let*@ hash = send_raw_tx ~nonce in
+      return hash
+    and* _ = wait_sequencer_see_tx in
+    return hash
+  in
+
+  let wait_for_all_tx_process_p ~hashes ~name ~waiter =
+    let* () = Lwt_list.iter_p (fun hash -> waiter ~hash) hashes in
+    Log.info "All (%d) txs processed: \"%s\"." (List.length hashes) name ;
+    unit
+  in
+
+  (* Test start here *)
+  let* () =
+    check_nonce ~__LOC__ ~check_observer:true ~block:"pending" ~expected:0 ()
+  in
+
+  (* number of transactions that we are going to process (submit,
+      inject, ...) *)
+  let nb_txs = 5 in
+  Log.info
+    "Sending %d transactions to the observer and check after each that the \
+     nonce in pending is correct"
+    nb_txs ;
+  let* hashes =
+    fold nb_txs [] @@ fun i hashes ->
+    let* hash = send_and_wait_sequencer_receive ~nonce:i in
+    let* () =
+      check_nonce
+        ~__LOC__
+        ~check_observer:true
+        ~check_sequencer:true
+        ~block:"pending"
+        ~expected:(i + 1)
+        ()
+    in
+    return (hash :: hashes)
+  in
+
+  Log.info
+    "Send another txs to create a gap and check that the nonce in pending is \
+     still the same" ;
+  let* _lost_hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:nb_txs
+      ()
+  in
+
+  Log.info
+    "Send missing nonce to fill the gap and check that the nonce in pending is \
+     now correct" ;
+  let* hash = send_and_wait_sequencer_receive ~nonce:nb_txs in
+
+  Log.info
+    "produce enough block to include all txs and make sure the nonce of latest \
+     and pending is equal." ;
+  (* Checks that all txs were confirmed in the observer *)
+  let observer_wait_tx_confirmed () =
+    let waiter ~hash =
+      let* _ =
+        Evm_node.wait_for_tx_queue_transaction_confirmed ~hash observer
+      in
+      unit
+    in
+    let hashes = hash :: hashes in
+    wait_for_all_tx_process_p ~hashes ~name:"tx confirmed in observer" ~waiter
+  in
+
+  (* Checks that all txs were included in a unique block by the sequencer *)
+  let* () =
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = nb_txs + 1)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
+  and* _ = observer_wait_tx_confirmed () in
+
+  let* () =
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:true
+      ~block:"latest"
+      ~expected:(nb_txs + 1)
+        (* latest two transaction were submitted in the wrong order,
+           only the second one is correctly applied. The other still
+           lives in the pending state of the observer tx_queue for
+           now, it's reason for "pending" still it. *)
+      ()
+  in
+  let* () =
+    (* In the observer the wrong ordered tx is still in pending *)
+    check_nonce
+      ~__LOC__
+      ~check_observer:true
+      ~check_sequencer:false
+      ~block:"pending"
+      ~expected:(nb_txs + 2)
+      ()
+  in
+  let* () =
+    (* In the sequencer the wrong ordered tx is dropped when creating
+       the block *)
+    check_nonce
+      ~__LOC__
+      ~check_observer:false
+      ~check_sequencer:true
+      ~block:"pending"
+      ~expected:(nb_txs + 1)
+      ()
+  in
+
+  Log.info "Try to send a transaction with a nonce in the past." ;
+  let*@? _hash = send_raw_tx ~nonce:nb_txs in
+
+  (* still true with a valid tx in pending. *)
+  let* _hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+  let*@? _hash = send_raw_tx ~nonce:nb_txs in
+
+  Log.info "Try to send a transaction with an nonce already pending, is valid." ;
+  let* _hash = send_and_wait_sequencer_receive ~nonce:(nb_txs + 1) in
+  unit
+
+let test_spawn_rpc =
+  let fresh_port = Port.fresh () in
+  register_all
+    ~__FILE__
+    ~spawn_rpc:fresh_port
+    ~tags:["sequencer"; "spawn"; "rpc"; Tag.flaky]
+    ~title:
+      "The spawned RPC successfully functions as an intermediate node for \
+       public requests"
+  @@ fun {sequencer; observer; _} _protocol ->
+  Log.info "experimental_features.spawn_rpc = %d" fresh_port ;
+  let* raw_tx =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1_000_000_000
+      ~gas:300_000
+      ~value:Wei.zero
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let*@ transaction_hash = Rpc.send_raw_transaction ~raw_tx sequencer in
+  let*@ size = Rpc.produce_block sequencer in
+  Check.((size = 1) int) ~error_msg:"block size should be 1" ;
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let*@ _seq_block = Rpc.get_block_by_number ~block:"1" sequencer in
+  let*@ _obs_block = Rpc.get_block_by_number ~block:"1" observer in
+  let*@ tx_obj = Rpc.get_transaction_by_hash ~transaction_hash sequencer in
+  Check.is_true (Option.is_some tx_obj) ~error_msg:"tx is missing" ;
+  unit
+
+let test_observer_init_from_snapshot =
+  register_all
+    ~__FILE__
+    ~tags:["observer"; "init"; "from"; "snapshot"]
+    ~title:"Observer successfully inits from a rolling snapshot"
+  @@ fun {sequencer; sc_rollup_node; l2_chains; enable_multichain; _} _protocol
+    ->
+  (* Restart the sequencer in rolling:3 *)
+  let* () = Evm_node.terminate sequencer in
+  let*! () = Evm_node.switch_history_mode sequencer (Rolling 2) in
+  let* () = Evm_node.run sequencer
+  and* _ =
+    Evm_node.wait_for_start_history_mode ~history_mode:"rolling:2" sequencer
+  in
+
+  (* Produce 1 block, stop, export the snapshot, start *)
+  let*@ _size = Rpc.produce_block sequencer in
+  let* () = Evm_node.wait_for_blueprint_applied sequencer 1 in
+  let* () = Evm_node.terminate sequencer in
+  let*! snapshot_file = Evm_node.export_snapshot sequencer in
+  let* () = Evm_node.run sequencer in
+
+  (* Init observer from snapshot but with history mode set to rolling:5 *)
+  let name = "observer_init_from_snapshot" in
+  let observer =
+    Evm_node.create
+      ~name
+      ~mode:
+        (Observer
+           {
+             initial_kernel = "evm_kernel.wasm";
+             preimages_dir = Some "/tmp";
+             private_rpc_port = None;
+             rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+           })
+      ~data_dir:(Temp.dir name)
+      (Evm_node.endpoint sequencer)
+  in
+  let* () = Process.check @@ Evm_node.spawn_init_config observer in
+  let* () =
+    match enable_multichain with
+    | true ->
+        let patch_config =
+          Evm_node.patch_config_with_experimental_feature ~l2_chains ()
+        in
+        Evm_node.Config_file.update observer patch_config
+    | false -> unit
+  in
+  let extra_arguments =
+    ["--init-from-snapshot"; snapshot_file; "--history"; "rolling:5"]
+  in
+  let* () = Evm_node.run observer ~extra_arguments
+  and* _ =
+    Evm_node.wait_for_start_history_mode ~history_mode:"rolling:5" observer
+  and* _ = Evm_node.wait_for_import_finished observer in
+
+  (* Retrieve first block *)
+  let*@ _block = Rpc.get_block_by_number ~block:"1" observer in
+  unit
+
+let test_tx_queue_limit =
+  let max_number_of_txs = 10 in
+  register_all
+    ~__FILE__
+    ~tags:["observer"; "tx_queue"; "limit"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = max_number_of_txs;
+         })
+    ~title:
+      "Submits transactions to an observer with a tx queue and make sure its \
+       limit are respected."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+
+  (* helper to craft a tx with given nonce. *)
+  let send_raw_tx ~nonce =
+    let* raw_tx =
+      Cast.craft_tx
+        ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+        ~chain_id:1337
+        ~nonce
+        ~gas_price:1_000_000_000
+        ~gas:23_300
+        ~value:Wei.one
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        ()
+    in
+    Rpc.send_raw_transaction ~raw_tx observer
+  in
+
+  let send_and_wait_sequencer_receive ~nonce =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
+    in
+    let* hash =
+      let*@ hash = send_raw_tx ~nonce in
+      return hash
+    and* _ = wait_sequencer_see_tx in
+    return hash
+  in
+
+  Log.info
+    "send %d txs, all are successfully added to the queue"
+    max_number_of_txs ;
+  let* hashes =
+    fold max_number_of_txs [] (fun i hashes ->
+        let* hash = send_and_wait_sequencer_receive ~nonce:i in
+        return (hash :: hashes))
+  in
+
+  Log.info "Then send an additional txs, that fails" ;
+  let*@? _error = send_raw_tx ~nonce:max_number_of_txs in
+
+  Log.info "Produce a block, all transaction are confirmed" ;
+  let observer_wait_tx_confirmed () =
+    let* () =
+      Lwt_list.iter_p
+        (fun hash ->
+          let* _ =
+            Evm_node.wait_for_tx_queue_transaction_confirmed ~hash observer
+          in
+          Log.debug "tx %s confirmed" hash ;
+          unit)
+        hashes
+    in
+    Log.info "All (%d) txs confirmed in observer" max_number_of_txs ;
+    unit
+  in
+
+  (* Checks that all txs were included in a unique block by the sequencer *)
+  let* () =
+    let*@ included_nb_txs = produce_block sequencer in
+    Check.(
+      (included_nb_txs = max_number_of_txs)
+        int
+        ~__LOC__
+        ~error_msg:"Produce block included %L transaction expected %R") ;
+    unit
+  and* _ = observer_wait_tx_confirmed () in
+
+  Log.info
+    "Resend %d txs, all are successfully added to the queue"
+    max_number_of_txs ;
+  let* () =
+    Lwt_list.iter_s
+      (fun i ->
+        let* _ = send_and_wait_sequencer_receive ~nonce:i in
+        unit)
+      (range max_number_of_txs ((2 * max_number_of_txs) - 1))
+  in
+  unit
+
+let test_observer_periodic_snapshot =
+  let gc = 2 in
+  register_all
+    ~__FILE__
+    ~periodic_snapshot_path:"periodic_snapshot/evm-%h-snapshot-%r-%l"
+    ~history_mode:(Rolling gc)
+    ~genesis_timestamp
+    ~time_between_blocks:Nothing
+    ~tags:["evm"; "observer"; "periodic"; "snapshot"]
+    ~title:"Can export periodic snapshots"
+    ~use_dal:Register_without_feature
+    ~use_multichain:Register_without_feature
+    ~websockets:false
+    ~kernels:[Latest]
+  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
+  let* () = Evm_node.wait_for_blueprint_applied observer 0 in
+  let* snapshot_file =
+    let res = ref None in
+    let _ =
+      let* _ = Evm_node.wait_for_gc_finished observer in
+      let* file = Evm_node.wait_for_finished_exporting_snapshot observer in
+      res := Some file ;
+      unit
+    in
+    let result_f () = return !res in
+    Log.info "Next block will trigger gc and periodic snapshot export." ;
+    let*@ _ = Rpc.produce_block ~timestamp:(get_timestamp gc) sequencer in
+    let* () = Evm_node.wait_for_blueprint_applied observer 1 in
+    Log.info "Produce blocks while snapshot is exporting." ;
+    bake_until
+      ~__LOC__
+      ~bake:(fun () ->
+        let*@ _ = produce_block sequencer in
+        unit)
+      ~result_f
+      ()
+  in
+
+  let* () = Evm_node.terminate sequencer in
+  let new_sequencer =
+    Evm_node.create
+      ~mode:(Evm_node.mode sequencer)
+      (Sc_rollup_node.endpoint sc_rollup_node)
+  in
+  let*? import_process =
+    Evm_node.import_snapshot new_sequencer ~snapshot_file
+  in
+  let* () = Process.check @@ import_process in
+  let* () = Process.check @@ Evm_node.spawn_init_config new_sequencer in
+  let* () = Evm_node.run new_sequencer in
+  let*@ _ = produce_block new_sequencer in
+  unit
+
+let get_one_receipt_from_latest_or_fail evm_node =
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:false ~block:"latest" evm_node
+  in
+  match block.transactions with
+  | Hash [tx_hash] -> (
+      let*@ rpc_res = Rpc.get_transaction_receipt ~tx_hash evm_node in
+      match rpc_res with
+      | Some receipt -> return receipt
+      | None -> Test.fail "Could not fetch the transaction receipt")
+  | Hash _ | Empty ->
+      Test.fail
+        "Received a block with a transaction count different than the one \
+         expected"
+  | Full _ ->
+      Test.fail
+        "The EVM node returned the full transaction objects while it was \
+         expected to return only the hashes"
+
+let capture_logs ~header logs =
+  Regression.capture (sf "# %s" header) ;
+  List.iteri
+    (fun i tx_log ->
+      Regression.capture (sf "## Log %d" i) ;
+      Regression.capture (sf "Address: %s" tx_log.Transaction.address) ;
+      Regression.capture (sf "Topics:") ;
+      List.iter (fun t -> Regression.capture (sf "- %s" t)) tx_log.topics ;
+      Regression.capture (sf "Data: %s" tx_log.data))
+    logs
+
+(* {Note timestamp}
+
+   Some events emitted by Etherlink contains timestamp. In order for the
+   regression test to always generate the same trace, we control the timestamp
+   of each L2 blocks using the {!timestamp_generator} helper. *)
+
+let timestamp_generator () =
+  let block_count = ref 0 in
+  fun () ->
+    let res =
+      sf "2020-01-01T00:%02d:%02dZ" (!block_count / 60) (!block_count mod 60)
+    in
+    incr block_count ;
+    res
+
+let test_deposit_event =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "deposit"; "event"]
+    ~title:"Regression test for the deposit event"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let genesis_timestamp = next_timestamp () in
+  let* {sequencer; l1_contracts; sc_rollup_node; sc_rollup_address; client; _} =
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
+      ~enable_multichain:false
+      protocol
+  in
+  (* Send a deposit to the delayed inbox *)
+  let* () =
+    send_deposit_to_delayed_inbox
+      ~amount:Tez.one
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(0).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Bake two blocks to let the sequencer see the deposit *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Produce an Etherlink block *)
+  let*@ nb_txns = produce_block ~timestamp:(next_timestamp ()) sequencer in
+  Check.(
+    (nb_txns = 1)
+      int
+      ~error_msg:
+        "Expecting the block to contain %R transaction (the deposit), got %L") ;
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Deposit" receipt.logs ;
+
+  unit
+
+let test_withdrawal_events =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "withdrawal"; "event"]
+    ~title:"Regression test for the withdrawal events"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let genesis_timestamp = next_timestamp () in
+  let* {sequencer; _} =
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
+      ~enable_fast_withdrawal:true
+      protocol
+  in
+
+  (* Make a regular withdrawal *)
+  let* () =
+    Eth_cli.add_abi ~label:"withdraw" ~abi:(withdrawal_abi_path ()) ()
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      ~timestamp:(next_timestamp ())
+      (Eth_cli.contract_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi_label:"withdraw"
+         ~address:Solidity_contracts.Precompile.withdrawal
+         ~method_call:
+           (sf {|withdraw_base58("%s")|} Constant.bootstrap5.public_key_hash)
+         ~value:Wei.one_eth
+         ~gas:16_000_000)
+      sequencer
+  in
+
+  (* Fetch the withdrawal event *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Withdrawal" receipt.logs ;
+
+  (* Do the same thing for fast withdrawal *)
+  let* () =
+    Eth_cli.add_abi
+      ~label:"fast_withdraw_base58"
+      ~abi:(fast_withdrawal_abi_path ())
+      ()
+  in
+  let* _ =
+    send_transaction_to_sequencer
+      ~timestamp:(next_timestamp ())
+      (Eth_cli.contract_send
+         ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi_label:"fast_withdraw_base58"
+         ~address:Solidity_contracts.Precompile.withdrawal
+         ~method_call:
+           (sf
+              {|fast_withdraw_base58("%s","%s","%s")|}
+              Constant.bootstrap5.public_key_hash
+              "KT1TczPwz5KjAuuJKvkTmttS7bBioT5gjQ4Y"
+              "0x0000000000000000000000000000000000000000000000000000000000000001")
+         ~value:Wei.one_eth
+         ~gas:16_000_000)
+      sequencer
+  in
+
+  (* Fetch the fast withdrawal event *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"XTZ Fast Withdrawal" receipt.logs ;
+
+  unit
+
+let test_fa_deposit_and_withdrawals_events =
+  Protocol.register_regression_test
+    ~__FILE__
+    ~tags:["evm"; "fa_bridge"; "event"]
+    ~title:"Regression test for the FA deposit and withdrawal events"
+    ~uses:(fun _protocol ->
+      [
+        Constant.octez_smart_rollup_node;
+        Constant.octez_evm_node;
+        Constant.smart_rollup_installer;
+        Constant.WASM.evm_kernel;
+        Constant.octez_codec;
+      ])
+  @@ fun protocol ->
+  (* See {Note timestamp} *)
+  let next_timestamp = timestamp_generator () in
+  let* {sequencer; l1_contracts; sc_rollup_node; sc_rollup_address; client; _} =
+    let genesis_timestamp = next_timestamp () in
+    Setup.setup_sequencer
+      ~genesis_timestamp:Client.(At (Time.of_notation_exn genesis_timestamp))
+      ~time_between_blocks:Nothing
+      ~mainnet_compat:false
+      ~enable_dal:false
+      ~enable_multichain:false
+        (* TODO: temporary, needs migration to set custom precompile's
+           bytecode. *)
+      ~enable_revm:false
+      ~enable_fa_bridge:true
+      ~enable_fast_fa_withdrawal:true
+      protocol
+  in
+  (* Send a FA deposit to the delayed inbox *)
+  let* () =
+    send_fa_deposit_to_delayed_inbox
+      ~amount:42
+      ~l1_contracts
+      ~depositor:Constant.bootstrap5
+      ~receiver:Eth_account.bootstrap_accounts.(0).address
+      ~sc_rollup_node
+      ~sc_rollup_address
+      client
+  in
+  (* Bake two blocks to let the sequencer see the FA deposit *)
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  (* Produce an Etherlink block *)
+  let*@ nb_txns = produce_block ~timestamp:(next_timestamp ()) sequencer in
+  Check.(
+    (nb_txns = 1)
+      int
+      ~error_msg:
+        "Expecting the block to contain %R transaction (the deposit), got %L") ;
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Deposit" receipt.logs ;
+
+  (* Now, we can do a withdrawal *)
+  let* ticketer = ticket_creator l1_contracts.ticket_router_tester in
+  let* content = ticket_content 0 in
+  (* Withdrawing to the zero implicit account *)
+  let routing_info =
+    String.concat
+      ""
+      [
+        "00000000000000000000000000000000000000000000";
+        ticketer |> Hex.of_bytes |> Hex.show;
+      ]
+  in
+  let* _ =
+    call_fa_withdraw
+      ~timestamp:(next_timestamp ())
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~ticket_owner:Eth_account.bootstrap_accounts.(0).address
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~evm_node:sequencer
+      ~routing_info
+      ~amount:40
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ()
+  in
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Withdrawal" receipt.logs ;
+
+  let* fast_withdrawal_contract_address =
+    Client.originate_contract
+      ~alias:"fast_withdrawal_contract_address"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap5.public_key_hash
+      ~init:(sf "Pair %S {}" l1_contracts.exchanger)
+      ~prg:(fast_withdrawal_path ())
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait ~keys:[] client in
+
+  (* Withdrawing to the zero implicit account *)
+  let* _ =
+    call_fa_fast_withdraw
+      ~timestamp:(next_timestamp ())
+      ~sender:Eth_account.bootstrap_accounts.(0)
+      ~sequencer
+      ~ticket_owner:Eth_account.bootstrap_accounts.(0).address
+      ~amount:2
+      ~ticketer:(ticketer |> Hex.of_bytes |> Hex.show)
+      ~content:(content |> Hex.of_bytes |> Hex.show)
+      ~receiver:Constant.bootstrap5.public_key_hash
+      ~fast_withdrawal_contract_address
+      ()
+  in
+
+  (* Fetch the deposit events *)
+  let* receipt = get_one_receipt_from_latest_or_fail sequencer in
+
+  (* Capture the log *)
+  capture_logs ~header:"FA Fast Withdrawal" receipt.logs ;
+  unit
+
+let test_block_producer_validation =
+  register_all
+    ~__FILE__
+    ~tags:["observer"; "tx_queue"; "validation"]
+    ~time_between_blocks:Nothing
+    ~kernels:[Latest] (* node only test *)
+    ~use_dal:Register_without_feature
+    ~websockets:false
+    ~enable_tx_queue:
+      (Config
+         {
+           max_size = 1000;
+           max_lifespan = 100000 (* absurd value so no TX are dropped *);
+           tx_per_addr_limit = 1000000 (* absurd value so no TX are limited *);
+         })
+    ~title:"Test part of the validation is done when producing blocks."
+    ~use_multichain:Register_without_feature
+  (* TODO #7843: Adapt this test to multichain context *)
+  @@ fun {sequencer; observer; _} _protocol ->
+  let* () =
+    let*@ _ = produce_block sequencer in
+    unit
+  and* () = Evm_node.wait_for_blueprint_applied observer 1 in
+  let send_and_wait_sequencer_receive ~raw_tx =
+    let wait_sequencer_see_tx =
+      Evm_node.wait_for_tx_queue_add_transaction sequencer
+    in
+    let* hash =
+      let*@ hash = Rpc.send_raw_transaction ~raw_tx observer in
+      return hash
+    and* _ = wait_sequencer_see_tx in
+    return hash
+  in
+
+  (* helper to craft a tx with given nonce. *)
+  let gas_price = 1_000_000_000 in
+  let gas = 23_000 in
+  let gas_cost = Wei.of_eth_int (1 * 23) in
+  let*@ balance_b0 =
+    Rpc.get_balance ~address:Eth_account.bootstrap_accounts.(0).address observer
+  in
+  let*@ balance_b1 =
+    Rpc.get_balance ~address:Eth_account.bootstrap_accounts.(1).address observer
+  in
+
+  let* raw_tx_empty_account_bO =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas
+      ~value:Wei.(balance_b0 - gas_cost)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* raw_tx_empty_account_b1 =
+    let*@ _ =
+      Rpc.get_balance
+        ~address:Eth_account.bootstrap_accounts.(1).address
+        observer
+    in
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas
+      ~value:Wei.(balance_b0 + balance_b1 - (gas_cost * Z.of_int 2))
+      ~address:Eth_account.bootstrap_accounts.(2).address
+      ()
+  in
+  let* raw_tx_invalid_value =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~chain_id:1337
+      ~nonce:1
+      ~gas_price
+      ~gas
+      ~value:(Wei.of_eth_int 100)
+      ~address:Eth_account.bootstrap_accounts.(1).address
+      ()
+  in
+  let* raw_tx_invalid_nonce =
+    Cast.craft_tx
+      ~source_private_key:Eth_account.bootstrap_accounts.(1).private_key
+      ~chain_id:1337
+      ~nonce:10
+      ~gas_price
+      ~gas
+      ~value:Wei.one
+      ~address:Eth_account.bootstrap_accounts.(2).address
+      ()
+  in
+  let* _hash =
+    (* tx included *)
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_empty_account_bO
+  in
+  let* invalid_balance_hash1 =
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_invalid_value
+  in
+  let* _hash =
+    (* The transaction is included because the balance of b1 is
+       covered by the preceding transaction,
+       `raw_tx_empty_account_b0`. *)
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_empty_account_b1
+  in
+  let* invalid_nonce_hash2 =
+    send_and_wait_sequencer_receive ~raw_tx:raw_tx_invalid_nonce
+  in
+  let* txs =
+    let*@ txs = produce_block sequencer in
+    return txs
+  and* reason1 =
+    Evm_node.wait_for_block_producer_rejected_transaction
+      ~hash:invalid_balance_hash1
+      sequencer
+  and* reason2 =
+    Evm_node.wait_for_block_producer_rejected_transaction
+      ~hash:invalid_nonce_hash2
+      sequencer
+  in
+  Check.(reason1 =~ rex "Not enough funds")
+    ~error_msg:"transaction rejected for invalid reason, found %L, expected %R" ;
+  Check.(reason2 =~ rex "Transaction nonce is not the expected nonce")
+    ~error_msg:"transaction rejected for invalid reason, found %L, expected %R" ;
+  Check.((txs = 2) int ~error_msg:"block has %L, but expected %R") ;
+  unit
+
+(* Test that everyone agrees on what the storage version of the rollup
+   is. *)
+let test_durable_storage_consistency =
+  register_all
+    ~__FILE__
+    ~tags:["durable_storage"; "consistency"]
+    ~time_between_blocks:Nothing
+    ~title:"Everyone agrees on L1 level"
+  @@ fun {sequencer; observer; sc_rollup_node; _} _protocol ->
+  let key = Durable_storage_path.storage_version in
+  let* val_from_rollup_node_opt =
+    Sc_rollup_node.RPC.call sc_rollup_node ~rpc_hooks:Tezos_regression.rpc_hooks
+    @@ Sc_rollup_rpc.get_global_block_durable_state_value
+         ~pvm_kind:"wasm_2_0_0"
+         ~operation:Sc_rollup_rpc.Value
+         ~key
+         ()
+  in
+  let val_from_rollup_node =
+    match val_from_rollup_node_opt with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "No value found in durable storage from rollup node at path %S"
+          key
+    | Some v -> v
+  in
+  let () =
+    Log.info
+      "Value at path %S according to rollup node: %S"
+      key
+      val_from_rollup_node
+  in
+
+  (* Rpc.state_value calls a private RPC so we can only test the EVM
+     nodes for which a private RPC server exists and
+     [Evm_node.endpoint ~private_:true] succeeds so neither proxy nor
+     RPC EVM nodes. *)
+  let evm_nodes_with_private_servers = [sequencer; observer] in
+
+  let* () =
+    Lwt_list.iter_s
+      (fun evm_node ->
+        let*@ val_from_evm_node_opt = Rpc.state_value evm_node key in
+        match val_from_evm_node_opt with
+        | Some v when v = val_from_rollup_node -> unit
+        | Some val_from_evm_node ->
+            let () =
+              Log.info
+                "Value at path %S according to EVM node %s: %S (value \
+                 according to rollup node: %S)"
+                key
+                (Evm_node.name evm_node)
+                val_from_evm_node
+                val_from_rollup_node
+            in
+            unit
+        | None ->
+            Test.fail
+              ~__LOC__
+              "No value found in durable storage from EVM node %s at path %S"
+              (Evm_node.name evm_node)
+              key)
+      evm_nodes_with_private_servers
+  in
+  unit
+
+let get_deposit_nonce_from_latest_block evm_node =
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" evm_node
+  in
+
+  let*@ json =
+    match block.transactions with
+    | Block.Full (tx :: _) ->
+        Rpc.trace_transaction
+          ~transaction_hash:tx.Transaction.hash
+          ~tracer:"callTracer"
+          evm_node
+    | _ -> Test.fail "Inconsistent result"
+  in
+
+  let data =
+    JSON.(json |-> "logs" |> as_list |> List.hd |-> "data" |> as_string)
+  in
+  let cleaned = String.sub data 2 (String.length data - 2) in
+  let nonce_string = String.sub cleaned 0 32 in
+  let nonce = Z.of_string_base 16 nonce_string in
+  return nonce
+
+let expect_failure msg k =
+  Lwt.catch
+    (fun () ->
+      let* _ = k () in
+      Test.fail msg)
+    (fun _ -> unit)
+
+let test_fa_deposit_can_be_claimed =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "fa_deposit"; "claim"]
+    ~time_between_blocks:Nothing
+    ~use_dal:Register_without_feature
+    ~enable_fa_bridge:true
+    ~use_multichain:Register_without_feature
+    ~maximum_allowed_ticks:2_000_000_000L
+    ~title:"Claims are operational"
+  @@ fun {
+           client;
+           sequencer;
+           sc_rollup_address;
+           proxy;
+           sc_rollup_node;
+           evm_version;
+           _;
+         }
+             _protocol ->
+  let* l1_contract =
+    Client.originate_contract
+      ~alias:"l1_contract"
+      ~amount:Tez.zero
+      ~src:Constant.bootstrap4.public_key_hash
+      ~prg:"etherlink/tezos_contracts/fa_deposit.tz"
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () = bake_until_sync ~sc_rollup_node ~proxy ~sequencer ~client () in
+
+  Log.info "%s originated" l1_contract ;
+
+  let* incrementor = Solidity_contracts.incrementor evm_version in
+
+  let* incrementor, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:incrementor.abi
+         ~bin:incrementor.bin)
+      sequencer
+  in
+
+  Log.info "Incrementor: %s" incrementor ;
+
+  let* proxy = Solidity_contracts.incrementor_proxy evm_version in
+
+  let* proxy, _tx_hash =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~args:(sf {|["%s"]|} incrementor)
+         ~abi:proxy.abi
+         ~bin:proxy.bin)
+      sequencer
+  in
+
+  Log.info "Proxy: %s" proxy ;
+
+  let proxy_without_0x = String.sub proxy 2 (String.length proxy - 2) in
+
+  let* () =
+    Client.transfer
+      ~giver:Constant.bootstrap4.public_key_hash
+      ~receiver:l1_contract
+      ~arg:
+        (sf
+           {|Pair 50 (Pair 0x%s%s "%s")|}
+           proxy_without_0x
+           proxy_without_0x
+           sc_rollup_address)
+      ~amount:Tez.zero
+      ~burn_cap:Tez.one
+      client
+  in
+  let* () = Client.bake_for_and_wait client in
+
+  let* () = repeat 5 (fun () -> Client.bake_for_and_wait client) in
+
+  let*@ _ = produce_block sequencer in
+
+  let* nonce = get_deposit_nonce_from_latest_block sequencer in
+
+  let* () =
+    Eth_cli.add_abi ~label:"claim" ~abi:(fa_withdrawal_abi_path ()) ()
+  in
+
+  let claim =
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
+      ~value:Wei.zero
+  in
+  let produce_block () = Rpc.produce_block sequencer in
+  let* _res = wait_for_application ~produce_block claim in
+
+  let*@ block =
+    Rpc.get_block_by_number ~full_tx_objects:true ~block:"latest" sequencer
+  in
+
+  let*@ _json =
+    match block.transactions with
+    | Block.Full (tx :: _) ->
+        Rpc.trace_transaction
+          ~transaction_hash:tx.Transaction.hash
+          ~tracer:"callTracer"
+          sequencer
+    | _ -> Test.fail "Inconsistent result"
+  in
+
+  let* () =
+    expect_failure "Claiming the same deposit twice should fail" @@ fun () ->
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(%d)|} (Z.to_int nonce))
+      ~value:Wei.zero
+      ()
+  in
+
+  let* () =
+    expect_failure "Invalid claim should fail" @@ fun () ->
+    Eth_cli.contract_send
+      ~source_private_key:Eth_account.bootstrap_accounts.(0).private_key
+      ~endpoint:(Evm_node.endpoint sequencer)
+      ~abi_label:"claim"
+      ~address:Solidity_contracts.Precompile.fa_withdrawal
+      ~method_call:(sf {|claim(42)|})
+      ~value:Wei.zero
+      ()
+  in
+
+  unit
+
+let test_eip2930_storage_access =
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "eip2930"]
+    ~title:"Check EIP-2930's semantic correctness"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+  @@ fun {sequencer; evm_version; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let* eip2930_storage_access =
+    Solidity_contracts.eip2930_storage_access evm_version
+  in
+  let* eip2930_contract, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:eip2930_storage_access.abi
+         ~bin:eip2930_storage_access.bin)
+      sequencer
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let base_tx ~nonce ~access_list ~arg =
+    Cast.craft_tx
+      ~signature:"setValue(uint256)"
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~access_list
+      ~address:eip2930_contract
+      ~arguments:[arg]
+      ~legacy:false
+      ()
+  in
+  let* raw_tx_with_storage_slot_access_list =
+    base_tx
+      ~nonce:1
+      ~access_list:
+        [
+          ( eip2930_contract,
+            (* slot 0 =  [uint256 public value] in [eip2930_storage_access.sol] *)
+            [
+              "0x0000000000000000000000000000000000000000000000000000000000000000";
+            ] );
+        ]
+      ~arg:"42"
+  in
+  let* raw_tx_without_storage_slot_access_list =
+    base_tx ~nonce:2 ~access_list:[(eip2930_contract, [])] ~arg:"43"
+  in
+  let*@ tx_with_storage_slot_access_list_hash =
+    Rpc.send_raw_transaction
+      ~raw_tx:raw_tx_with_storage_slot_access_list
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@ tx_without_storage_slot_access_list_hash =
+    Rpc.send_raw_transaction
+      ~raw_tx:raw_tx_without_storage_slot_access_list
+      sequencer
+  in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{gasUsed = gas_with_storage_slot_access_list; _} =
+    Rpc.get_transaction_receipt
+      ~tx_hash:tx_with_storage_slot_access_list_hash
+      sequencer
+  in
+  let*@! Transaction.{gasUsed = gas_without_storage_slot_access_list; _} =
+    Rpc.get_transaction_receipt
+      ~tx_hash:tx_without_storage_slot_access_list_hash
+      sequencer
+  in
+  Check.(
+    Int64.(
+      sub gas_without_storage_slot_access_list gas_with_storage_slot_access_list
+      = of_int 200)
+      int64)
+    ~error_msg:
+      "The gas consumption with the preheated slot should have saved exactly \
+       %R but got %L" ;
   unit
 
 let protocols = Protocol.all
@@ -10087,6 +13216,7 @@ let () =
   test_blueprint_limit_with_delayed_inbox protocols ;
   test_reset protocols ;
   test_preimages_endpoint protocols ;
+  test_preimages_endpoint_retry protocols ;
   test_store_smart_rollup_address protocols ;
   test_replay_rpc protocols ;
   test_trace_transaction protocols ;
@@ -10095,12 +13225,19 @@ let () =
   test_miner protocols ;
   test_fa_bridge_feature_flag protocols ;
   test_multichain_feature_flag protocols ;
+  test_make_l2_kernel_installer_config "EVM" protocols ;
+  test_make_l2_kernel_installer_config "Michelson" protocols ;
   test_fast_withdrawal_feature_flag protocols ;
+  test_deposit_and_fast_withdraw protocols ;
+  test_deposit_and_fa_fast_withdraw protocols ;
+  test_fast_withdraw_feature_flag_deactivated protocols ;
+  test_fast_withdrawal_l2_caller protocols ;
   test_trace_call protocols ;
   test_trace_empty_block protocols ;
   test_trace_block protocols ;
   test_trace_block_struct_logger protocols ;
   test_patch_kernel protocols ;
+  test_observer_finalized_view protocols ;
   test_finalized_persistent protocols ;
   test_finalized_view protocols ;
   test_finalized_view_forward_txn protocols ;
@@ -10133,7 +13270,6 @@ let () =
   test_da_fees_after_execution protocols ;
   test_trace_transaction_calltracer_failed_create protocols ;
   test_configuration_service [Protocol.Alpha] ;
-  test_overwrite_simulation_tick_limit protocols ;
   test_clean_bps protocols ;
   test_produce_block_with_no_delayed_transactions protocols ;
   test_observer_reset [Protocol.Alpha] ;
@@ -10143,6 +13279,10 @@ let () =
   test_websocket_newHeads_event [Protocol.Alpha] ;
   test_websocket_cleanup [Protocol.Alpha] ;
   test_websocket_max_message_length () ;
+  test_websocket_rate_limit `Close ;
+  test_websocket_rate_limit `Error ;
+  test_websocket_rate_limit `Wait ;
+  test_websocket_frames_rate_limit () ;
   test_websocket_heartbeat_monitoring () ;
   test_websocket_newPendingTransactions_event [Protocol.Alpha] ;
   test_websocket_logs_event [Protocol.Alpha] ;
@@ -10154,4 +13294,18 @@ let () =
   test_rpc_getLogs_with_earliest_fail protocols ;
   test_eip2930_transaction_object [Alpha] ;
   test_eip1559_transaction_object [Alpha] ;
-  test_apply_from_full_history_mode protocols
+  test_apply_from_full_history_mode protocols ;
+  test_tx_queue [Alpha] ;
+  test_tx_queue_clear [Alpha] ;
+  test_spawn_rpc protocols ;
+  test_observer_init_from_snapshot protocols ;
+  test_tx_queue_nonce [Alpha] ;
+  test_tx_queue_limit [Alpha] ;
+  test_observer_periodic_snapshot [Alpha] ;
+  test_deposit_event [Alpha] ;
+  test_withdrawal_events [Alpha] ;
+  test_fa_deposit_and_withdrawals_events [Alpha] ;
+  test_block_producer_validation [Alpha] ;
+  test_durable_storage_consistency [Alpha] ;
+  test_fa_deposit_can_be_claimed [Alpha] ;
+  test_eip2930_storage_access [Alpha]

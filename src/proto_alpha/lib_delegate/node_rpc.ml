@@ -27,6 +27,7 @@ open Protocol
 open Alpha_context
 open Baking_cache
 open Baking_state
+open Baking_state_types
 module Block_services = Block_services.Make (Protocol) (Protocol)
 module Events = Baking_events.Node_rpc
 
@@ -86,7 +87,8 @@ let extract_prequorum preattestations =
         }
   | _ -> None
 
-let info_of_header_and_ops ~in_protocol block_hash block_header operations =
+let info_of_header_and_ops ~in_protocol ~grandparent block_hash block_header
+    operations =
   let open Result_syntax in
   let shell = block_header.Tezos_base.Block_header.shell in
   let dummy_payload_hash = Block_payload_hash.zero in
@@ -131,10 +133,11 @@ let info_of_header_and_ops ~in_protocol block_hash block_header operations =
       prequorum;
       quorum;
       payload;
+      grandparent;
     }
 
 let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
-    block_header =
+    ~grandparent block_header =
   let open Lwt_result_syntax in
   (let* operations =
      match operations with
@@ -188,7 +191,12 @@ let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
               operations)
    in
    let*? block_info =
-     info_of_header_and_ops ~in_protocol block_hash block_header operations
+     info_of_header_and_ops
+       ~in_protocol
+       ~grandparent
+       block_hash
+       block_header
+       operations
    in
    return block_info)
   [@profiler.record_s
@@ -253,10 +261,28 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
                raw_header_b
              [@profiler.record_f {verbosity = Info} "parse pred block header"])
           in
+          let* grandparent =
+            let* raw_header =
+              Shell_services.Blocks.raw_header
+                cctxt
+                ~chain
+                ~block:(`Hash (predecessor_header.shell.predecessor, 0))
+                ()
+            in
+            let header =
+              (Data_encoding.Binary.of_bytes_exn
+                 Tezos_base.Block_header.encoding
+                 raw_header
+               [@profiler.record_f
+                 {verbosity = Info} "parse grandparent block header"])
+            in
+            return header.shell.predecessor
+          in
           compute_block_info
             cctxt
             ~in_protocol
             ~chain
+            ~grandparent
             predecessor_hash
             predecessor_header
         in
@@ -295,6 +321,7 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
             ~in_protocol:is_proposal_in_protocol
             ?operations
             ~chain
+            ~grandparent:predecessor.shell.predecessor
             block_hash
             block_header
         in
@@ -380,7 +407,7 @@ let get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level =
   Tezos_rpc.Context.make_call
     Tezos_dal_node_services.Services.get_attestable_slots
     dal_node_rpc_ctxt
-    (((), Tezos_crypto.Signature.Of_V1.public_key_hash pkh), attested_level)
+    (((), Tezos_crypto.Signature.Of_V2.public_key_hash pkh), attested_level)
     ()
     ()
 
@@ -389,7 +416,9 @@ let dal_attestable_slots (dal_node_rpc_ctxt : Tezos_rpc.Context.generic)
   let attested_level = Int32.succ attestation_level in
   List.map
     (fun (delegate_slot : delegate_slot) ->
-      let delegate_id = delegate_slot.delegate.delegate_id in
+      let delegate_id =
+        Baking_state_types.Delegate.delegate_id delegate_slot.delegate
+      in
       ( delegate_id,
         get_attestable_slots dal_node_rpc_ctxt delegate_id ~attested_level ))
     delegate_slots
@@ -404,10 +433,10 @@ let get_dal_profiles dal_node_rpc_ctxt =
 
 let register_dal_profiles dal_node_rpc_ctxt delegates =
   let profiles =
-    Tezos_dal_node_services.Operator_profile.make
+    Tezos_dal_node_services.Controller_profiles.make
       ~attesters:
         (List.map
-           (fun pkh -> Tezos_crypto.Signature.Of_V1.public_key_hash pkh)
+           (fun pkh -> Tezos_crypto.Signature.Of_V2.public_key_hash pkh)
            delegates)
       ()
   in

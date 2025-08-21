@@ -31,6 +31,10 @@ type endpoint = Node of Node.t | Foreign_endpoint of Endpoint.t
 
 type media_type = Json | Binary | Any
 
+let rpc_path = function
+  | Node _ -> ""
+  | Foreign_endpoint fe -> Endpoint.rpc_path fe
+
 let rpc_port = function
   | Node n -> Node.rpc_port n
   | Foreign_endpoint fe -> Endpoint.rpc_port fe
@@ -188,7 +192,7 @@ let mode_to_endpoint = function
       Some endpoint
 
 let string_of_endpoint ?hostname e =
-  sf "%s://%s:%d" (scheme e) (address ?hostname e) (rpc_port e)
+  sf "%s://%s:%d%s" (scheme e) (address ?hostname e) (rpc_port e) (rpc_path e)
 
 (* [?endpoint] can be used to override the default node stored in the client.
    Mockup nodes do not use [--endpoint] at all: RPCs are mocked up.
@@ -397,11 +401,11 @@ let rpc ?log_command ?log_status_on_exit ?log_output ?better_errors ?endpoint
   in
   return res
 
-let spawn_rpc_list ?endpoint ?hooks client =
-  spawn_command ?endpoint ?hooks client ["rpc"; "list"]
+let spawn_rpc_list ?endpoint ?hooks ?url client =
+  spawn_command ?endpoint ?hooks client (["rpc"; "list"] @ Option.to_list url)
 
-let rpc_list ?endpoint ?hooks client =
-  spawn_rpc_list ?endpoint ?hooks client |> Process.check_and_read_stdout
+let rpc_list ?endpoint ?hooks ?url client =
+  spawn_rpc_list ?endpoint ?hooks ?url client |> Process.check_and_read_stdout
 
 let spawn_rpc_schema ?log_command ?log_status_on_exit ?log_output
     ?(better_errors = false) ?endpoint ?hooks ?env ?protocol_hash meth path
@@ -504,6 +508,24 @@ module Admin = struct
   let connect_address ?endpoint ~peer client =
     spawn_connect_address ?endpoint ~peer client |> Process.check
 
+  let spawn_connect_p2p_node_address ?endpoint ~(peer : P2p_node.t) client =
+    spawn_command
+      ?endpoint
+      client
+      [
+        "connect";
+        "address";
+        Printf.sprintf
+          "%s:%d"
+          (address
+             ?from:endpoint
+             (Foreign_endpoint (P2p_node.as_rpc_endpoint peer)))
+          (P2p_node.net_port peer);
+      ]
+
+  let connect_p2p_node_address ?endpoint ~peer client =
+    spawn_connect_p2p_node_address ?endpoint ~peer client |> Process.check
+
   let spawn_kick_peer ?endpoint ~peer client =
     spawn_command ?endpoint client ["kick"; "peer"; peer]
 
@@ -595,11 +617,9 @@ let import_encrypted_secret_key ?hooks ?force ?endpoint client
   let* () = Lwt_io.close output_channel in
   Process.check process
 
-let spawn_import_public_key ?(force = false) ?endpoint client
-    (public_key : Account.secret_key) ~alias =
-  let pk_uri =
-    "unencrypted:" ^ Account.require_unencrypted_secret_key ~__LOC__ public_key
-  in
+let spawn_import_public_key ?(force = false) ?endpoint client public_key ~alias
+    =
+  let pk_uri = "unencrypted:" ^ public_key in
   let force = if force then ["--force"] else [] in
   spawn_command
     ?endpoint
@@ -621,8 +641,12 @@ let spawn_import_signer_key ?endpoint ?(force = false) ?signer ~public_key_hash
     ~alias client =
   let key =
     match signer with
-    | Some signer_uri ->
-        Uri.with_path signer_uri public_key_hash |> Uri.to_string
+    | Some signer_uri -> (
+        match Uri.scheme signer_uri with
+        | Some "unix" ->
+            Uri.add_query_param signer_uri ("pkh", [public_key_hash])
+            |> Uri.to_string
+        | _ -> Uri.with_path signer_uri public_key_hash |> Uri.to_string)
     | None -> "remote:" ^ public_key_hash
   in
   spawn_command
@@ -640,7 +664,7 @@ let import_signer_key ?endpoint ?force ?signer ~public_key_hash ~alias client =
     client
   |> Process.check
 
-let import_public_key ?force ?endpoint client public_key ~alias =
+let import_public_key ?force ?endpoint client ~public_key ~alias =
   spawn_import_public_key ?force ?endpoint client public_key ~alias
   |> Process.check
 
@@ -693,7 +717,8 @@ let forget_all_keys ?endpoint client =
 
 module Time = Tezos_base.Time.System
 
-let default_delay = Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
+let default_protocol_activation_delay =
+  Time.Span.of_seconds_exn (3600. *. 24. *. 365.)
 
 type timestamp = Now | Ago of Time.Span.t | At of Time.t
 
@@ -708,7 +733,8 @@ let time_of_timestamp timestamp =
 
 let spawn_activate_protocol ?endpoint ?block ?protocol ?protocol_hash
     ?(fitness = 1) ?(key = Constant.activator.alias)
-    ?(timestamp = Ago default_delay) ?parameter_file client =
+    ?(timestamp = Ago default_protocol_activation_delay) ?parameter_file client
+    =
   let timestamp = time_of_timestamp timestamp in
   let protocol_hash, parameter_file =
     match (protocol, protocol_hash, parameter_file) with
@@ -900,7 +926,8 @@ let bake_for_and_wait_level ?env ?endpoint ?protocol ?keys ?minimal_fees
       ?state_recorder
       client
   in
-  Node.wait_for_level node (actual_level_before + 1)
+  let levels_to_bake = Option.value ~default:1 count in
+  Node.wait_for_level node (actual_level_before + levels_to_bake)
 
 let bake_for_and_wait ?env ?endpoint ?protocol ?keys ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
@@ -952,16 +979,17 @@ let bake_until_level ~target_level ?keys ?node client =
   unit
 
 (* Handle attesting and preattesting similarly *)
-type tenderbake_action = Preattest | Attest | Propose
+type tenderbake_action = Preattest | Attest | Propose | Repropose
 
 let tenderbake_action_to_string = function
   | Preattest -> "preattest"
   | Attest -> "attest"
   | Propose -> "propose"
+  | Repropose -> "repropose"
 
 let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     ?(key = [Constant.bootstrap1.alias]) ?(minimal_timestamp = false)
-    ?(force = false) client =
+    ?(force = false) ?force_round ?(force_reproposal = false) client =
   spawn_command
     ?endpoint
     client
@@ -969,7 +997,11 @@ let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     @ [tenderbake_action_to_string tenderbake_action; "for"]
     @ key
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
-    @ if force then ["--force"] else [])
+    @ (if force_reproposal then ["--force-reproposal"] else [])
+    @
+    match force_round with
+    | Some r -> ["--force-round"; string_of_int r]
+    | None -> [] @ if force then ["--force"] else [])
 
 let spawn_attest_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for
@@ -1002,6 +1034,19 @@ let spawn_propose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force client
     ?force
     client
 
+let spawn_repropose_for ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  spawn_tenderbake_action_for
+    ~tenderbake_action:Repropose
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    ?force_round
+    ?minimal_timestamp
+    ?force_reproposal
+    client
+
 let attest_for ?endpoint ?protocol ?key ?force client =
   spawn_attest_for ?endpoint ?protocol ?key ?force client |> Process.check
 
@@ -1011,6 +1056,19 @@ let preattest_for ?endpoint ?protocol ?key ?force client =
 let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
     client =
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
+  |> Process.check
+
+let repropose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  spawn_repropose_for
+    ?endpoint
+    ?protocol
+    ?key
+    ?force
+    ~minimal_timestamp
+    ?force_round
+    ?force_reproposal
+    client
   |> Process.check
 
 let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
@@ -1027,9 +1085,37 @@ let propose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
   let* _level = Node.wait_for_level node (actual_level_before + 1) in
   unit
 
+let repropose_for_and_wait ?endpoint ?minimal_timestamp ?protocol ?key ?force
+    ?force_round ?force_reproposal client =
+  let node =
+    match node_of_client_mode client.mode with
+    | Some n -> n
+    | None -> Test.fail "No node found for repropose_for_and_wait"
+  in
+  let waiter = Node.wait_for_branch_switch node in
+  let* () =
+    repropose_for
+      ?endpoint
+      ?minimal_timestamp
+      ?protocol
+      ?key
+      ?force
+      ?force_round
+      ?force_reproposal
+      client
+  in
+  let* _ = waiter in
+  unit
+
 let id = ref 0
 
-let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
+type key_encryption =
+  | Encrypted of string
+  | Forced_encrypted of string
+  | Forced_unencrypted
+
+let spawn_gen_keys ?(force = false) ?alias ?sig_alg ?(force_unencrypted = false)
+    client =
   let alias =
     match alias with
     | None ->
@@ -1039,11 +1125,55 @@ let spawn_gen_keys ?(force = false) ?alias ?sig_alg client =
   in
   let force = if force then ["--force"] else [] in
   ( spawn_command client @@ ["gen"; "keys"; alias] @ force
-    @ optional_arg "sig" Fun.id sig_alg,
+    @ optional_arg "sig" Fun.id sig_alg
+    @ optional_switch "unencrypted" force_unencrypted,
     alias )
 
-let gen_keys ?force ?alias ?sig_alg client =
-  let p, alias = spawn_gen_keys ?force ?alias ?sig_alg client in
+let spawn_gen_keys_with_stdin ?(force = false) ?alias ?sig_alg
+    ?(force_encrypted = false) client =
+  let alias =
+    match alias with
+    | None ->
+        incr id ;
+        sf "tezt_%d" !id
+    | Some alias -> alias
+  in
+  let force = if force then ["--force"] else [] in
+  ( spawn_command_with_stdin client
+    @@ ["gen"; "keys"; alias] @ force
+    @ optional_arg "sig" Fun.id sig_alg
+    @ optional_switch "encrypted" force_encrypted,
+    alias )
+
+let gen_keys ?force ?alias ?sig_alg ?key_encryption client =
+  let* p, alias =
+    match key_encryption with
+    | None -> return @@ spawn_gen_keys ?force ?alias ?sig_alg client
+    | Some (Encrypted password) ->
+        let (process, output_channel), alias =
+          spawn_gen_keys_with_stdin ?force ?alias ?sig_alg client
+        in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.close output_channel in
+        return (process, alias)
+    | Some (Forced_encrypted password) ->
+        let (process, output_channel), alias =
+          spawn_gen_keys_with_stdin
+            ~force_encrypted:true
+            ?force
+            ?alias
+            ?sig_alg
+            client
+        in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.write_line output_channel password in
+        let* () = Lwt_io.close output_channel in
+        return (process, alias)
+    | Some Forced_unencrypted ->
+        return
+        @@ spawn_gen_keys ~force_unencrypted:true ?force ?alias ?sig_alg client
+  in
   let* () = Process.check p in
   return alias
 
@@ -1083,6 +1213,27 @@ let list_known_addresses client =
              client_output
   in
   return addresses
+
+let spawn_list_known_remote_keys client uri =
+  spawn_command client ["list"; "known"; "remote"; "keys"; Uri.to_string uri]
+
+let list_known_remote_keys client uri =
+  let* client_output =
+    spawn_list_known_remote_keys client uri |> Process.check_and_read_stdout
+  in
+  let addresses =
+    client_output |> String.trim |> String.split_on_char '\n'
+    |> List.filter_map @@ fun line ->
+       match line =~** rex "(.*):(.*)" with
+       | Some _ -> None
+       | None -> Some (String.trim line)
+  in
+  return addresses
+
+let spawn_set_consensus_key ?(wait = "none") client ~account ~key =
+  spawn_command
+    client
+    ["--wait"; wait; "set"; "consensus"; "key"; "for"; account; "to"; key]
 
 let gen_and_show_keys ?alias ?sig_alg client =
   let* alias = gen_keys ?alias ?sig_alg client in
@@ -1217,21 +1368,34 @@ let get_delegate ?endpoint ~src client =
   in
   Lwt.return (output =~* rex "(tz[a-zA-Z0-9]+) \\(.*\\)")
 
-let set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
-    ?(force_low_fee = false) ?expect_failure ?(simulation = false) ~src
-    ~delegate client =
-  let value =
-    spawn_command
-      ?endpoint
-      client
-      (["--wait"; wait]
-      @ ["set"; "delegate"; "for"; src; "to"; delegate]
-      @ optional_arg "fee" Tez.to_string fee
-      @ optional_arg "fee-cap" Tez.to_string fee_cap
-      @ (if simulation then ["--simulation"] else [])
-      @ if force_low_fee then ["--force-low-fee"] else [])
-  in
-  {value; run = Process.check ?expect_failure}
+let spawn_set_delegate ?endpoint ?(wait = "none") ?fee ?fee_cap
+    ?(force_low_fee = false) ?(simulation = false) ?amount ~src ~delegate client
+    =
+  spawn_command
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "delegate"; "for"; src; "to"; delegate]
+    @ optional_arg "fee" Tez.to_string fee
+    @ optional_arg "fee-cap" Tez.to_string fee_cap
+    @ optional_arg "initial-stake" Tez.to_string amount
+    @ (if simulation then ["--simulation"] else [])
+    @ if force_low_fee then ["--force-low-fee"] else [])
+
+let set_delegate ?endpoint ?wait ?fee ?fee_cap ?force_low_fee ?expect_failure
+    ?simulation ?amount ~src ~delegate client =
+  spawn_set_delegate
+    ?endpoint
+    ?wait
+    ?fee
+    ?fee_cap
+    ?force_low_fee
+    ?simulation
+    ?amount
+    ~src
+    ~delegate
+    client
+  |> Process.check ?expect_failure
 
 let spawn_call_contract ?hooks ?endpoint ?burn_cap ~src ~destination ?entrypoint
     ?arg client =
@@ -1451,15 +1615,60 @@ let paid_storage_space ?hooks ?endpoint ?(wait = "none") ~contract client =
   |> Process.check_and_read_stdout
 
 let update_consensus_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
-    ?expect_failure ~src ~pk client =
+    ?consensus_key_pop ?expect_failure ~src ~pk client =
   spawn_command
     ?hooks
     ?endpoint
     client
     (["--wait"; wait]
     @ ["set"; "consensus"; "key"; "for"; src; "to"; pk]
-    @ optional_arg "burn-cap" Tez.to_string burn_cap)
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "consensus-key-pop" Fun.id consensus_key_pop)
   |> Process.check ?expect_failure
+
+let update_fresh_consensus_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
+    ?expect_failure (delegate : Account.key) client =
+  let* key = gen_and_show_keys ?alias ?sig_alg:algo client in
+  let* () =
+    update_consensus_key
+      ?hooks
+      ?endpoint
+      ?wait
+      ?burn_cap
+      ?expect_failure
+      ~src:delegate.alias
+      ~pk:key.alias
+      client
+  in
+  return key
+
+let update_companion_key ?hooks ?endpoint ?(wait = "none") ?burn_cap
+    ?companion_key_pop ?expect_failure ~src ~pk client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait]
+    @ ["set"; "companion"; "key"; "for"; src; "to"; pk]
+    @ optional_arg "burn-cap" Tez.to_string burn_cap
+    @ optional_arg "companion-key-pop" Fun.id companion_key_pop)
+  |> Process.check ?expect_failure
+
+let update_fresh_companion_key ?alias ?algo ?hooks ?endpoint ?wait ?burn_cap
+    ?expect_failure (delegate : Account.key) client =
+  let* key = gen_and_show_keys ?alias ?sig_alg:algo client in
+  let* () =
+    update_companion_key
+      ?hooks
+      ?endpoint
+      ?wait
+      ?burn_cap
+      ?expect_failure
+      ~src:delegate.alias
+      ~pk:key.alias
+      client
+  in
+  return key
 
 let drain_delegate ?hooks ?endpoint ?(wait = "none") ?expect_failure ~delegate
     ~consensus_key ?destination client =
@@ -2942,13 +3151,14 @@ let init_light ?path ?admin_path ?name ?color ?base_dir ?(min_agreement = 0.66)
   in
   return (client, node1, node2)
 
-let stresstest_gen_keys ?endpoint ?alias_prefix n client =
+let stresstest_gen_keys ?endpoint ?alias_prefix ?sig_algo n client =
   let* output =
     spawn_command
       ?endpoint
       client
       (["stresstest"; "gen"; "keys"; Int.to_string n]
-      @ optional_arg "alias-prefix" Fun.id alias_prefix)
+      @ optional_arg "alias-prefix" Fun.id alias_prefix
+      @ optional_arg "sig" Fun.id sig_algo)
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"stresstest_gen_keys" output in
@@ -3102,23 +3312,39 @@ let init_with_protocol ?path ?admin_path ?name ?node_name ?color ?base_dir
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let spawn_register_key ?hooks ?consensus owner client =
+let spawn_register_key ?hooks ?consensus ?consensus_pop ?companion
+    ?companion_pop ?amount owner client =
   spawn_command
     ?hooks
     client
     (["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
+    @ optional_arg "initial-stake" Tez.to_string amount
+    @ optional_arg "consensus-key-pop" Fun.id consensus_pop
+    @ optional_arg "companion-key-pop" Fun.id companion_pop
     @
-    match consensus with
-    | None -> []
-    | Some pk -> ["with"; "consensus"; "key"; pk])
+    match (consensus, companion) with
+    | None, None -> []
+    | Some pk, None -> ["with"; "consensus"; "key"; pk]
+    | None, Some pk -> ["--companion-key"; pk]
+    | Some pk1, Some pk2 -> ["--consensus-key"; pk1; "--companion-key"; pk2])
 
-let register_key ?hooks ?expect_failure ?consensus owner client =
-  spawn_register_key ?hooks ?consensus owner client
+let register_key ?hooks ?expect_failure ?consensus ?consensus_pop ?companion
+    ?companion_pop ?amount owner client =
+  spawn_register_key
+    ?hooks
+    ?consensus
+    ?consensus_pop
+    ?companion
+    ?companion_pop
+    ?amount
+    owner
+    client
   |> Process.check ?expect_failure
 
-let contract_storage ?hooks ?unparsing_mode address client =
+let contract_storage ?hooks ?unparsing_mode ?endpoint address client =
   spawn_command
     client
+    ?endpoint
     ?hooks
     (["get"; "contract"; "storage"; "for"; address]
     @ optional_arg "unparsing-mode" normalize_mode_to_string unparsing_mode)
@@ -4380,6 +4606,22 @@ let set_delegate_parameters ?wait ~delegate ~limit ~edge client =
   spawn_set_delegate_parameters ?wait ~delegate ~limit ~edge client
   |> Process.check
 
+let spawn_update_delegate_parameters ?(wait = "none") ~delegate ?limit ?edge
+    client =
+  spawn_command client
+  @@ ["--wait"; wait; "update"; "delegate"; "parameters"; "for"; delegate]
+  @ (match limit with
+    | None -> []
+    | Some limit -> ["--limit-of-staking-over-baking"; limit])
+  @
+  match edge with
+  | None -> []
+  | Some edge -> ["--edge-of-baking-over-staking"; edge]
+
+let update_delegate_parameters ?wait ~delegate ?limit ?edge client =
+  spawn_update_delegate_parameters ?wait ~delegate ?limit ?edge client
+  |> Process.check
+
 (* Keep an alias to external RPC module to allow RPC calls *)
 module R = RPC
 
@@ -4438,6 +4680,12 @@ module RPC = struct
     in
     return (rpc.decode json)
 
+  let call_via_endpoint client =
+    match mode_to_endpoint client.mode with
+    | Some (Node node) -> Node.RPC.call node
+    | Some (Foreign_endpoint endpoint) -> RPC_core.call endpoint
+    | _ -> call client
+
   let schema ?log_command ?log_status_on_exit ?log_output ?better_errors
       ?endpoint ?hooks ?env ?protocol_hash client RPC_core.{verb; path; _} =
     rpc_schema
@@ -4487,3 +4735,144 @@ let bake_until_cycle_end ~target_cycle ?keys ?node client =
   Log.info "Bake until cycle end %d (level %d)" target_cycle target_level ;
 
   bake_until_level ~target_level ?keys ?node client
+
+let spawn_aggregate_bls_signatures ~pk ~msg client signatures =
+  let signatures = List.map (fun signature -> `String signature) signatures in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A signatures);
+    ]
+  in
+  let json_batch = `O pk_msg_sig |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "signatures"; json_batch]
+
+let aggregate_bls_signatures ~pk ~msg client signatures =
+  let* s =
+    spawn_aggregate_bls_signatures ~pk ~msg client signatures
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
+
+let spawn_create_bls_proof ?override_pk ~signer client =
+  let override_pk =
+    match override_pk with
+    | Some override_pk -> ["--override-public-key"; override_pk]
+    | None -> []
+  in
+  spawn_command client
+  @@ ["create"; "bls"; "proof"; "for"; signer]
+  @ override_pk
+
+let create_bls_proof ?override_pk ~signer client =
+  let* s =
+    spawn_create_bls_proof ?override_pk ~signer client
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
+
+let spawn_check_bls_proof ?override_pk ~pk ~proof client =
+  let override_pk =
+    match override_pk with
+    | Some override_pk -> ["--override-public-key"; override_pk]
+    | None -> []
+  in
+  spawn_command client
+  @@ ["check"; "bls"; "proof"; proof; "for"; pk]
+  @ override_pk
+
+let check_bls_proof ?override_pk ~pk ~proof client =
+  spawn_check_bls_proof ?override_pk ~pk ~proof client |> Process.check
+
+let spawn_aggregate_bls_public_keys client pks_with_proofs =
+  let pks_with_proofs =
+    List.map
+      (fun (pk, proof) ->
+        `O [("public_key", `String pk); ("proof", `String proof)])
+      pks_with_proofs
+  in
+  let json_batch = `A pks_with_proofs |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "public"; "keys"; json_batch]
+
+let aggregate_bls_public_keys client pks_with_proofs =
+  let* client_output =
+    spawn_aggregate_bls_public_keys client pks_with_proofs
+    |> Process.check_and_read_stdout
+  in
+  let output = JSON.parse ~origin:"aggregate_bls_public_key" client_output in
+  let group_pk = JSON.(output |-> "public_key" |> as_string) in
+  let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
+  return (group_pk, group_pkh)
+
+let spawn_aggregate_bls_proofs ~pk client (proofs : string list) =
+  let proofs = List.map (fun proof -> `String proof) proofs in
+  let pk_with_proofs = [("public_key", `String pk); ("proofs", `A proofs)] in
+  let json_batch = `O pk_with_proofs |> JSON.encode_u in
+  spawn_command client @@ ["aggregate"; "bls"; "proofs"; json_batch]
+
+let aggregate_bls_proofs ~pk client proofs =
+  let* s =
+    spawn_aggregate_bls_proofs ~pk client proofs
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)
+
+let spawn_share_bls_secret_key ~sk ~n ~m client =
+  spawn_command client
+  @@ [
+       "share";
+       "bls";
+       "secret";
+       "key";
+       sk;
+       "between";
+       string_of_int n;
+       "shares";
+       "with";
+       "threshold";
+       string_of_int m;
+     ]
+
+let share_bls_secret_key ~sk ~n ~m client =
+  let* client_output =
+    spawn_share_bls_secret_key ~sk ~n ~m client |> Process.check_and_read_stdout
+  in
+  let output = JSON.parse ~origin:"share_bls_secret_key" client_output in
+  let group_pk = JSON.(output |-> "public_key" |> as_string) in
+  let group_pkh = JSON.(output |-> "public_key_hash" |> as_string) in
+  let proof = JSON.(output |-> "proof" |> as_string) in
+  let secret_shares_list = JSON.(output |-> "secret_shares" |> as_list) in
+  let secret_shares =
+    List.map
+      (fun s ->
+        let id = JSON.(s |-> "id" |> as_int) in
+        let sk = JSON.(s |-> "secret_key" |> as_string) in
+        (id, sk))
+      secret_shares_list
+  in
+  return (group_pk, group_pkh, proof, secret_shares)
+
+let spawn_threshold_bls_signatures ~pk ~msg client id_signatures =
+  let id_signatures =
+    List.map
+      (fun (id, signature) ->
+        `O [("id", `Float (float_of_int id)); ("signature", `String signature)])
+      id_signatures
+  in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A id_signatures);
+    ]
+  in
+  let json_batch = `O pk_msg_sig |> JSON.encode_u in
+  spawn_command client @@ ["threshold"; "bls"; "signatures"; json_batch]
+
+let threshold_bls_signatures ~pk ~msg client id_signatures =
+  let* s =
+    spawn_threshold_bls_signatures ~pk ~msg client id_signatures
+    |> Process.check_and_read_stdout
+  in
+  return (String.trim s)

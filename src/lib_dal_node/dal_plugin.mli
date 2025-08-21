@@ -51,14 +51,17 @@ module type T = sig
 
   type attestation_operation
 
-  (** [block_info ?chain ?block ~metadata ctxt] returns the information of the
-      [block] in [ctxt] for the given [chain]. Block's metadata are included or
-      skipped depending on the value of [metadata]. This is a wrapper on top of
+  type tb_slot
+
+  (** [block_info ?chain ?block ~operations_metadata ctxt] returns the
+      information of the [block] in [ctxt] for the given [chain]. Operations'
+      metadata are included or skipped depending on the value of
+      [operations_metadata]. This is a wrapper on top of
       {!Protocol_client_context.Alpha_block_services.info}.  *)
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
-    metadata:[`Always | `Never] ->
+    operations_metadata:[`Always | `Never] ->
     Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
@@ -69,8 +72,9 @@ module type T = sig
     Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    block_info ->
-    (slot_header * operation_application_result) list tzresult Lwt.t
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    slot_header list tzresult Lwt.t
 
   (** For a given block, returns for each included attestation, as a
       list, its Tenderbake slot, its attester if available in the
@@ -78,12 +82,15 @@ module type T = sig
       exists, its [dal_attestation] to be passed to the [is_attested]
       function. *)
   val get_attestations :
-    block_info ->
-    (int
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    (tb_slot
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
+    tzresult
+    Lwt.t
 
   (** [get_committee ctxt ~level] retrieves the DAL committee at [level] from L1 as a
       map that associates to the public key hash [pkh] of the member of
@@ -124,6 +131,7 @@ module type T = sig
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
+    tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
   val is_delegate :
@@ -148,29 +156,20 @@ module type T = sig
 
     val cell_hash : cell -> hash
 
-    (*
-      This function mimics what the protocol does in
-      {!Dal_slot_storage.finalize_pending_slot_headers}. Given a block_info at
-      some level L, an RPC context, the DAL constants for level L, and for level
-      L - attestation_lag - 1, the this function computes the cells produced by the
-      DAL skip list during the level L using:
-
-       - The information telling which slot headers were waiting for attestation
-       at level [L - attestation_lag];
-
-       - The bitset of attested slots at level [L] in the block's metadata.
-
-      It is assumed that at level L the DAL is enabled.
-
-      The ordering of the elements in the returned list is not relevant.
-    *)
+    (* Returns the DAL skip list cells produced at the given attested level.
+       Each cell is associated with its hash and slot index. There are
+       [number_of_slots] cells per level. *)
     val cells_of_level :
-      block_info ->
+      attested_level:int32 ->
       Tezos_rpc.Context.generic ->
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
-      (hash * cell) list tzresult Lwt.t
+      (hash * cell * slot_index) list tzresult Lwt.t
+
+    (** Extracts and returns the slot header of the given cell if it was
+        published to L1. *)
+    val slot_header_of_cell : cell -> slot_header option
   end
 
   module RPC : sig

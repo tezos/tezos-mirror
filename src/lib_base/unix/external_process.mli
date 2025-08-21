@@ -13,12 +13,19 @@ module Make (P : External_process_parameters.S) : sig
   (** The type of external processes. *)
   type t
 
+  (** [restart_hypervisee p] asks the hypervisor to restart the hypervisee
+      process. *)
+  val restart_hypervisee : t -> unit tzresult Lwt.t
+
   (** [init params ~process_path] launches an external process using
       [process_path] as the path for the executable. It also performs the
       handshake and sends the initialization parameters [params] to the
       process. At the end of the [init] function, the external process is ready
       to receive and answer requests. *)
   val init : P.parameters -> process_path:string -> t tzresult Lwt.t
+
+  (** [pid p] returns the PID of the hypervisee process. *)
+  val pid : t -> int
 
   (** [send_request p req] sends the request [req] to the external process [p],
       waits for the answer from the process and returns the result.  *)

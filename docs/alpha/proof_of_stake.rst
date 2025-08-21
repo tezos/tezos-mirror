@@ -31,8 +31,7 @@ Delegation and Staking
 A *delegate* is any :ref:`user account <def_user_account_alpha>` registered as
 such. This is done by *self-delegating*, that is, emitting a delegation
 operation (see below) in which the specified delegate is the same as the
-operation emitter (its signer). Note that ``tz4`` accounts cannot be registered
-as delegates.
+operation emitter (its signer).
 
 Any :ref:`account <def_account_alpha>` (user account or smart contract) can specify a delegate
 through a delegation operation.  Any non-delegate account can change or revoke its delegate
@@ -57,6 +56,8 @@ to their *baking power* and *voting power* respectively.
 Moreover, to participate in consensus and governance, the delegate
 needs to be :ref:`active<active_delegate_alpha>` and to meet
 :ref:`minimal balance requirements<minimal_baking_power_alpha>`.
+
+.. _security_deposit_alpha:
 
 Delegates and delegators may :doc:`stake<staking>` their tez. Staked
 tez are security deposits that may be forfeited in case the baker does
@@ -95,15 +96,9 @@ takes precedence for determining which key to activate at the start of
 cycle ``n + CONSENSUS_KEY_ACTIVATION_DELAY + 1``.
 
 Note that both the manager key and the consensus key give total
-control over the delegate's spendable balance: indeed, the consensus
-key may sign a ``Drain_delegate`` operation to transfer the delegate's
-spendable balance to an arbitrary account. In :doc:`relevant
-RPCs<../api/openapi>` like
-``/chains/main/blocks/head/helpers/baking_rights``, both the
-delegate's manager and consensus keys are listed.
-
-See :ref:`this page<consensus_key>` for further important details,
-notably client commands that are helpful for handling consensus keys.
+control over the delegate's spendable balance.
+See :ref:`this page<consensus_key_details>` for further important details,
+including client commands that are helpful for handling consensus keys.
 
 
 Active and passive delegates

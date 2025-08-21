@@ -195,8 +195,13 @@ let establish_server ?read_buf ?write_buf ?timeout ?stop
       set_tcp_nodelay flow;
       Lwt.catch
         (fun () ->
+           let endp : Conduit.endp =
+             match Conduit_lwt_unix.endp_of_flow flow with
+             | #Conduit.endp as endp -> endp
+             | _ -> failwith "Unsupported tls tunnel"
+          in
           server_fun ?read_buf ?write_buf check_request
-            (Conduit_lwt_unix.endp_of_flow flow)
+            endp
             ic oc react)
         (function
           | End_of_file -> Lwt.return_unit

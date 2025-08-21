@@ -30,7 +30,7 @@
 (** This module manages incoming [accept] and outgoing connections [connect].
 
     [connect] and [accept] try to authenticate the remote point, and agree
-    on protocol version. They ultimately returns a [P2p_conn.t] which provides
+    on protocol version. They ultimately return a [P2p_conn.t] which provides
     the highest-level view of a connection in [lib_p2p].
 
     Functions of this module can trigger two types of events. They can *log*
@@ -229,5 +229,5 @@ module Internal_for_tests : sig
     [< `Pool of ('msg, 'peer, 'conn) P2p_pool.t | `Make_default_pool of 'peer] ->
     [< `Dependencies of ('msg, 'peer, 'conn) dependencies
     | `Make_default_dependencies of 'conn ] ->
-    ('msg, 'peer, 'conn) t
+    ('msg, 'peer, 'conn) t tzresult Lwt.t
 end

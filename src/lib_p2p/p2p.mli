@@ -150,6 +150,7 @@ val faked_network :
     ['msg] is broadcasted.
     *)
 val create :
+  ?fd_pool:P2p_fd.fd_pool ->
   config:config ->
   limits:Tezos_p2p_services.P2p_limits.t ->
   ?received_msg_hook:(('msg, 'peer_meta, 'conn_meta) connection -> 'msg -> unit) ->

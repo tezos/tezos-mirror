@@ -1,0 +1,5 @@
+[source.crates-io]
+replace-with = "crates-io-mirror"
+
+[registries.crates-io-mirror]
+index = "sparse+http://crates-io-proxy.crates-io-proxy.svc.cluster.local:3080/index/"

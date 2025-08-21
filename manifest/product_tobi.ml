@@ -20,6 +20,6 @@ let _ci_bin_main =
     ~internal_name:"main"
     ~synopsis:"CLI for Tobi, which allows to install components"
     ~path:"tobi/src"
-    ~deps:[unix; clap]
+    ~deps:[unix; clap; opam_file_format]
     ~release_status:Unreleased
     ~bisect_ppx:No

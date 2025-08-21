@@ -1,6 +1,7 @@
 #!/bin/sh
 
 distribution=$1
+distroname=$1
 release=$2
 
 # check if it's a real or a fake release or we are testing
@@ -67,46 +68,48 @@ apt-get install -y sudo gpg curl apt-utils debconf-utils jq
 echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selections
 
 # [add current repository]
-sudo curl "https://$bucket.storage.googleapis.com/old/$distribution/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+curl "https://packages.nomadic-labs.com/$distroname/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
 
-REPO="deb https://$bucket.storage.googleapis.com/old/$distribution $release main"
+REPO="deb [signed-by=/etc/apt/keyrings/octez.gpg] https://packages.nomadic-labs.com/$distroname $release main"
 echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez-current.list
 sudo apt-get update
 
+# [ preeseed octez ]
+# preseed octez-node for debconf. Notice we set purge_warning to yes,
+# to make the `autopurge` pass and remove all the node data at the end of this
+# script.
+cat << EOF > preseed.cfg
+octez-node octez-node/configure boolean true
+octez-node octez-node/history-mode string full
+octez-node octez-node/network string mainnet
+octez-node octez-node/purge_warning boolean true
+octez-node octez-node/snapshot-import boolean false
+octez-node octez-node/snapshot-no-check boolean true
+debconf debconf/frontend select Noninteractive
+EOF
+# preseed the package
+sudo debconf-set-selections preseed.cfg
+
+# check the package configuration
+sudo debconf-get-selections | grep octez
+
 # [install tezos]
-sudo apt-get install -y octez-client
-sudo apt-get install -y octez-node
 sudo apt-get install -y octez-baker
-dpkg -l octez-\*
-
-# [setup Octez node]
-sudo su tezos -c "octez-node config init --network=mainnet --history-mode=rolling --net-addr=\"[::]:9732\" --rpc-addr=\"127.0.0.1:8732\""
-sudo systemctl enable octez-node
-sudo systemctl enable octez-baker
-
-# [setup baker]
-PROTOCOL=$(octez-client --protocol PtParisBxoLz list understood protocols | tee | head -1)
-sudo su tezos -c "octez-client -p $PROTOCOL gen keys baker"
-BAKER_KEY=$(sudo su tezos -c "octez-client -p $PROTOCOL show address baker" | head -1 | awk '{print $2}')
-echo "baking_key=$BAKER_KEY" >> /etc/octez/baker.conf
-echo "lq_vote=yes" >> /etc/octez/baker.conf
 
 # [add next repository]
-REPO="deb https://$bucket.storage.googleapis.com/$distribution $release main"
+REPO="deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] https://$bucket.storage.googleapis.com/$distribution $release main"
+curl "https://$bucket.storage.googleapis.com/$distroname/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
 echo "$REPO" | sudo tee /etc/apt/sources.list.d/octez-next.list
 sudo apt-get update
 
 # [upgrade octez]
-# --force-overwrite is necessary because legacy package shipped the zcash
-# parameters as part of the octez-node package.
-sudo apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-node
+sudo apt-get upgrade -y octez-node
 sudo apt-get upgrade -y octez-client octez-baker
 
 # [ check configuration after the upgrade ]
 # we check the debconf parameters
 sudo debconf-get-selections | grep octez
 # we check if the configuration of octez did not change
-sudo su tezos -c "octez-client -p $PROTOCOL show address baker"
 sudo su tezos -c "octez-node config show"
 
 # [check executables version]

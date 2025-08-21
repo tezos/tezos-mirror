@@ -24,6 +24,11 @@ let build_debian_packages_image =
    we delcare it once, but we use it in two different contexts *)
 let systemd_test_debian_packages_image = build_debian_packages_image
 
+let tag_amd64 ~ramfs =
+  if ramfs then "gcp_very_high_cpu_ramfs" else "gcp_very_high_cpu"
+
+let tag_arm64 = "gcp_arm64"
+
 (** These are the set of Debian release-architecture combinations for
     which we build deb packages in the job
     [job_build_debian_package]. A dependency image will be built once
@@ -31,10 +36,15 @@ let systemd_test_debian_packages_image = build_debian_packages_image
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let debian_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", ["gcp"])]]
+let debian_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["bookworm"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["unstable"; "bookworm"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [
+        [
+          ("RELEASE", ["unstable"; "bookworm"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+        ];
+      ]
 
 (** These are the set of Ubuntu release-architecture combinations for
     which we build deb packages in the job
@@ -43,10 +53,15 @@ let debian_package_release_matrix = function
 
     If [release_pipeline] is false, we only tests a subset of the matrix,
     one release, and one architecture. *)
-let ubuntu_package_release_matrix = function
-  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", ["gcp"])]]
+let ubuntu_package_release_matrix ?(ramfs = false) = function
+  | Partial -> [[("RELEASE", ["jammy"]); ("TAGS", [tag_amd64 ~ramfs])]]
   | Full | Release ->
-      [[("RELEASE", ["noble"; "jammy"]); ("TAGS", ["gcp"; "gcp_arm64"])]]
+      [
+        [
+          ("RELEASE", ["noble"; "jammy"]);
+          ("TAGS", [tag_amd64 ~ramfs; tag_arm64]);
+        ];
+      ]
 
 let archs_variables pipeline =
   let amd64 = List.map Tezos_ci.arch_to_string_alt [Amd64] in
@@ -56,7 +71,7 @@ let archs_variables pipeline =
   | Full | Release -> [("ARCHITECTURES", String.concat " " all)]
 
 (* Push .deb artifacts to storagecloud apt repository. *)
-let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publishing)
+let make_job_apt_repo ?rules ~__POS__ ~name ?(stage = Stages.publish)
     ?dependencies ~prefix ~variables ~image script : tezos_job =
   let variables =
     variables @ [("GNUPGHOME", "$CI_PROJECT_DIR/.gnupg")] @ [("PREFIX", prefix)]
@@ -195,54 +210,6 @@ let jobs pipeline_type =
     |> enable_sccache ~idle_timeout:"0"
   in
 
-  (* These jobs build the old packages in a matrix using the
-     build dependencies images *)
-  let job_build_debian_package_old_a : tezos_job =
-    make_job_build_debian_packages
-      ~__POS__
-      ~name:"oc.build-debian-old_a"
-      ~distribution:"debian"
-      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_old.sh A"
-      ~matrix:(debian_package_release_matrix pipeline_type)
-      ~timeout:(Minutes 90)
-      ()
-  in
-  let job_build_ubuntu_package_old_a : tezos_job =
-    make_job_build_debian_packages
-      ~__POS__
-      ~name:"oc.build-ubuntu-old_a"
-      ~distribution:"ubuntu"
-      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_old.sh A"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
-      ~timeout:(Minutes 90)
-      ()
-  in
-
-  let job_build_debian_package_old_b : tezos_job =
-    make_job_build_debian_packages
-      ~__POS__
-      ~name:"oc.build-debian-old_b"
-      ~distribution:"debian"
-      ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_old.sh B"
-      ~matrix:(debian_package_release_matrix pipeline_type)
-      ~timeout:(Minutes 90)
-      ()
-  in
-  let job_build_ubuntu_package_old_b : tezos_job =
-    make_job_build_debian_packages
-      ~__POS__
-      ~name:"oc.build-ubuntu-old_b"
-      ~distribution:"ubuntu"
-      ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
-      ~script:"./scripts/ci/build-debian-packages_old.sh B"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
-      ~timeout:(Minutes 90)
-      ()
-  in
-
   (* data packages. we build them once *)
   let job_build_data_packages : tezos_job =
     job
@@ -272,7 +239,7 @@ let jobs pipeline_type =
       ~distribution:"debian"
       ~dependencies:(Dependent [Job job_docker_build_debian_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(debian_package_release_matrix pipeline_type)
+      ~matrix:(debian_package_release_matrix ~ramfs:true pipeline_type)
       ()
   in
   let job_build_ubuntu_package : tezos_job =
@@ -282,41 +249,10 @@ let jobs pipeline_type =
       ~distribution:"ubuntu"
       ~dependencies:(Dependent [Job job_docker_build_ubuntu_dependencies])
       ~script:"./scripts/ci/build-debian-packages.sh binaries"
-      ~matrix:(ubuntu_package_release_matrix pipeline_type)
+      ~matrix:(ubuntu_package_release_matrix ~ramfs:true pipeline_type)
       ()
   in
 
-  (* These jobs create the apt repository for the old packages *)
-  let job_apt_repo_debian_old =
-    make_job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_debian_old"
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts job_build_debian_package_old_a;
-             Artifacts job_build_debian_package_old_b;
-           ])
-      ~prefix:"old"
-      ~variables:(archs_variables pipeline_type)
-      ~image:Images.debian_bookworm
-      ["./scripts/ci/create_debian_repo.sh debian bookworm"]
-  in
-  let job_apt_repo_ubuntu_old =
-    make_job_apt_repo
-      ~__POS__
-      ~name:"apt_repo_ubuntu_old"
-      ~dependencies:
-        (Dependent
-           [
-             Artifacts job_build_ubuntu_package_old_a;
-             Artifacts job_build_ubuntu_package_old_b;
-           ])
-      ~prefix:"old"
-      ~variables:(archs_variables pipeline_type)
-      ~image:Images.ubuntu_noble
-      ["./scripts/ci/create_debian_repo.sh ubuntu noble jammy"]
-  in
   (* These jobs create the apt repository for the packages *)
   let job_apt_repo_debian =
     make_job_apt_repo
@@ -372,6 +308,8 @@ let jobs pipeline_type =
       ~name
       ~dependencies
       ~variables
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~stage:Stages.publishing_tests
       script
   in
@@ -392,11 +330,11 @@ let jobs pipeline_type =
            [
              "export DEBIAN_FRONTEND=noninteractive";
              "apt-get update";
-             "apt-get install lintian -y";
+             "apt-get install lintian parallel -y";
            ])
       script
   in
-  (* These test the upgrade from the old packages *)
+  (* These test the upgrade from previous released version *)
   let job_upgrade_bin ~__POS__ ~name ~dependencies ~image ?allow_failure script
       =
     job
@@ -410,7 +348,7 @@ let jobs pipeline_type =
   in
   let test_ubuntu_packages_jobs =
     (* in merge pipelines we tests only debian. ubuntu packages
-       are built and tested in the sheduled pipelines*)
+       are built and tested in the scheduled pipelines*)
     [
       job_lintian
         ~__POS__
@@ -435,13 +373,13 @@ let jobs pipeline_type =
       job_upgrade_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_jammy"
-        ~dependencies:
-          (Dependent [Job job_apt_repo_ubuntu_old; Job job_apt_repo_ubuntu])
+        ~dependencies:(Dependent [Job job_apt_repo_ubuntu])
         ~image:Images.ubuntu_jammy
         ["./docs/introduction/upgrade-bin-deb.sh ubuntu jammy"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_ubuntu_noble_systemd"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -460,12 +398,12 @@ let jobs pipeline_type =
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.upgrade_bin_ubuntu_noble_systemd_test"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
                Job job_docker_systemd_test_ubuntu_dependencies;
                Job job_apt_repo_ubuntu;
-               Job job_apt_repo_ubuntu_old;
              ])
         ~variables:
           (variables
@@ -496,13 +434,13 @@ let jobs pipeline_type =
       job_upgrade_bin
         ~__POS__
         ~name:"oc.upgrade_bin_debian_bookworm"
-        ~dependencies:
-          (Dependent [Job job_apt_repo_debian_old; Job job_apt_repo_debian])
+        ~dependencies:(Dependent [Job job_apt_repo_debian])
         ~image:Images.debian_bookworm
         ["./docs/introduction/upgrade-bin-deb.sh debian bookworm"];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_test"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -519,12 +457,13 @@ let jobs pipeline_type =
              ])
         [
           "./scripts/ci/systemd-packages-test.sh \
-           docs/introduction/install-bin-deb.sh \
+           scripts/packaging/tests/deb/install-bin-deb.sh \
            images/packages/debian-systemd-tests.Dockerfile";
         ];
       job_install_systemd_bin
         ~__POS__
         ~name:"oc.install_bin_debian_bookworm_systemd_custom_datadir"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
@@ -547,13 +486,37 @@ let jobs pipeline_type =
         ];
       job_install_systemd_bin
         ~__POS__
-        ~name:"oc.upgrade_bin_debian_bookworm-systemd"
+        ~name:"oc.install_bin_debian_bookworm_systemd_agnostic_baker"
+        ~allow_failure:Yes
         ~dependencies:
           (Dependent
              [
                Job job_docker_systemd_test_debian_dependencies;
                Job job_apt_repo_debian;
-               Job job_apt_repo_debian_old;
+             ])
+        ~variables:
+          (variables
+             ~kind:"systemd-tests"
+             [
+               ("PREFIX", "");
+               ("DISTRIBUTION", "debian");
+               ("RELEASE", "bookworm");
+               ("AGNOSTIC_BAKER", "true");
+             ])
+        [
+          "./scripts/ci/systemd-packages-test.sh \
+           scripts/packaging/tests/deb/install-bin-deb.sh \
+           images/packages/debian-systemd-tests.Dockerfile";
+        ];
+      job_install_systemd_bin
+        ~__POS__
+        ~name:"oc.upgrade_bin_debian_bookworm-systemd"
+        ~allow_failure:Yes
+        ~dependencies:
+          (Dependent
+             [
+               Job job_docker_systemd_test_debian_dependencies;
+               Job job_apt_repo_debian;
              ])
         ~variables:
           (variables
@@ -574,10 +537,7 @@ let jobs pipeline_type =
     [
       job_docker_build_debian_dependencies;
       job_build_debian_package;
-      job_build_debian_package_old_a;
-      job_build_debian_package_old_b;
       job_build_data_packages;
-      job_apt_repo_debian_old;
       job_apt_repo_debian;
     ]
   in
@@ -585,34 +545,18 @@ let jobs pipeline_type =
     [
       job_docker_build_ubuntu_dependencies;
       job_build_ubuntu_package;
-      job_build_ubuntu_package_old_a;
-      job_build_ubuntu_package_old_b;
-      job_apt_repo_ubuntu_old;
       job_apt_repo_ubuntu;
     ]
   in
   match pipeline_type with
   | Partial ->
-      ( (job_docker_systemd_test_debian_dependencies :: debian_jobs)
-        @ test_debian_packages_jobs,
-        job_build_ubuntu_package_old_a,
-        job_build_debian_package_old_a,
-        job_build_ubuntu_package_old_b,
-        job_build_debian_package_old_b )
+      (job_docker_systemd_test_debian_dependencies :: debian_jobs)
+      @ test_debian_packages_jobs
   | Full ->
-      ( job_docker_systemd_test_debian_dependencies
-        :: job_docker_systemd_test_ubuntu_dependencies :: debian_jobs
-        @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs,
-        job_build_ubuntu_package_old_a,
-        job_build_debian_package_old_a,
-        job_build_ubuntu_package_old_b,
-        job_build_debian_package_old_b )
-  | Release ->
-      ( debian_jobs @ ubuntu_jobs,
-        job_build_ubuntu_package_old_a,
-        job_build_debian_package_old_a,
-        job_build_ubuntu_package_old_b,
-        job_build_debian_package_old_b )
+      job_docker_systemd_test_debian_dependencies
+      :: job_docker_systemd_test_ubuntu_dependencies :: debian_jobs
+      @ ubuntu_jobs @ test_debian_packages_jobs @ test_ubuntu_packages_jobs
+  | Release -> debian_jobs @ ubuntu_jobs
 
 let register ~auto ~description pipeline_type =
   let pipeline_name =
@@ -622,7 +566,7 @@ let register ~auto ~description pipeline_type =
     | Full, _ -> "debian_repository_full"
     | Release, _ -> "debian_repository_release"
   in
-  let jobs, _, _, _, _ = jobs pipeline_type in
+  let jobs = jobs pipeline_type in
   Pipeline.register_child
     pipeline_name
     ~description

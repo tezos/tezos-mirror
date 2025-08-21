@@ -73,7 +73,10 @@ type ('msg, 'peer, 'conn) t = {
   triggers : P2p_trigger.t;
   log : P2p_connection.P2p_event.t -> unit;
   acl : P2p_acl.t;
+  fd_pool : P2p_fd.fd_pool option;
 }
+
+let get_fd_pool t = t.fd_pool
 
 module Gc_point_set = Bounded_heap.Make (struct
   type t = Time.System.t * P2p_point.Id.t
@@ -551,7 +554,7 @@ let score {peer_meta_config = {score; _}; _} meta = score meta
 
 let active_connections pool = P2p_peer.Table.length pool.connected_peer_ids
 
-let create config peer_meta_config triggers ~log =
+let create ?fd_pool config peer_meta_config triggers ~log =
   let open Lwt_syntax in
   let pool =
     {
@@ -569,6 +572,7 @@ let create config peer_meta_config triggers ~log =
           ~ip_size:config.ip_greylist_size_in_kilobytes
           ~ip_cleanup_delay:config.ip_greylist_cleanup_delay;
       log;
+      fd_pool;
     }
   in
   List.iter (Points.set_trusted pool) config.trusted_points ;
@@ -743,7 +747,7 @@ module Internal_for_tests = struct
       ip_greylist_cleanup_delay;
     }
 
-  let create peer_meta_encoding initial_peer =
+  let create ?fd_pool peer_meta_encoding initial_peer =
     let triggers = P2p_trigger.create () in
     let config = dumb_config in
     let peer_meta_config : 'peer P2p_params.peer_meta_config =
@@ -770,5 +774,6 @@ module Internal_for_tests = struct
           ~ip_size:config.ip_greylist_size_in_kilobytes
           ~ip_cleanup_delay:config.ip_greylist_cleanup_delay;
       log;
+      fd_pool;
     }
 end

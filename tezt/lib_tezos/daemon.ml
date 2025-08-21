@@ -104,6 +104,13 @@ module Make (X : PARAMETERS) = struct
 
   let name daemon = daemon.name
 
+  let pid daemon =
+    match daemon.status with
+    | Running status -> Process.pid status.process |> Option.some
+    | Not_running -> None
+
+  let path daemon = daemon.path
+
   (* Having to wait more that 3 seconds after hitting Ctrl+C is already unreasonable.
      We choose a timeout one order of magnitude larger to reduce flakiness in case
      the CPU happens to be slower etc. *)

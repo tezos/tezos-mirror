@@ -10,14 +10,18 @@ obtain similar pages using shell commands such as:
 
    octez-admin-client man -verbosity 3
 
-The rest of this page documents the protocol-independent tools.
-The protocol-dependent tools are documented :doc:`here <../active/cli-commands>`.
+.. note::
+
+	The rest of this page documents the protocol-independent tools, whose features do not vary with each protocol.
+	The protocol-dependent tools are documented :doc:`here <../active/cli-commands>`.
 
 
 .. _admin_client_manual:
 
 Admin-client manual
 ===================
+
+This is the manual page of the command line tool ``octez-admin-client``. See :ref:`octez-admin-client` for a general description of this tool.
 
 .. raw:: html
          :file: ../api/octez-admin-client.html
@@ -28,6 +32,8 @@ Admin-client manual
 Signer manual
 =============
 
+This is the manual page of the command line tool ``octez-signer``. See :ref:`signer` for a general description of this tool.
+
 .. raw:: html
          :file: ../api/octez-signer.html
 
@@ -37,6 +43,8 @@ Signer manual
 Benchmark tool manual
 =====================
 
+This is the manual page of the command line tool ``octez-snoop``. See :doc:`../developer/snoop` for a general description of this tool.
+
 .. raw:: html
          :file: ../api/octez-snoop.html
 
@@ -45,6 +53,8 @@ Benchmark tool manual
 
 Codec manual
 ============
+
+This is the manual page of the command line tool ``octez-codec``. See :ref:`octez-codec` for a general description of this tool.
 
 .. raw:: html
          :file: ../api/octez-codec.html
@@ -68,7 +78,7 @@ For more details on the node invocation and configuration, see :doc:`../user/nod
 DAL node manual
 ===============
 
-The command line of the Octez DAL node is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-dal-node --help``.
+The command line of the :doc:`Octez DAL node <../shell/dal_node>` is documented in Unix ``man`` format, as shown below. You can also obtain this manual by running ``octez-dal-node --help``.
 
 The manual briefly shows the available DAL node commands.
 Each command accepts its own set of options and arguments, that you can discover by running ``octez-dal-node <command> --help``.
@@ -80,5 +90,12 @@ Each command accepts its own set of options and arguments, that you can discover
 Smart rollup node manual
 ========================
 
+This is the manual page of the :doc:`../shell/smart_rollup_node`.
+
 .. raw:: html
          :file: ../api/octez-smart-rollup-node.html
+
+Protocol-dependent tools
+========================
+
+For manuals of the tools that may vary with each protocol, see :doc:`here <../active/cli-commands>`.

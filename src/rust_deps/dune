@@ -10,7 +10,7 @@
 (dirs :standard .cargo (not target))
 
 (rule
- (targets liboctez_rust_deps.a dlloctez_rust_deps.so wasmer.h wasm.h)
+ (targets liboctez_rust_deps.a dlloctez_rust_deps.so)
  (deps
   (file build.sh)
   (file Cargo.toml)
@@ -19,6 +19,7 @@
   (source_tree .cargo)
   (source_tree ../rustzcash_deps)
   (source_tree wasmer-3.3.0)
+  (source_tree rust_igd_next)
   (source_tree src)
   (source_tree ../riscv)
   (source_tree ../kernel_sdk)

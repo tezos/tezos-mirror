@@ -1,0 +1,63 @@
+# runtime + build + test dependencies
+#
+# This image builds upon the `build` image, see
+# its header for details on its content.
+#
+# It adds upon the contents of `build`:
+# - shellcheck
+# - a python environment for building the octez documentation
+# - nvm for javascript backend testing
+#
+# This image is intended for
+# - running certain tests in the tezos/tezos repo (unit tests, shellcheck)
+# - building the documentation
+# - building images on top of it in the image stack (see README.md)
+
+# hadolint ignore=DL3006
+FROM build as test
+
+LABEL org.opencontainers.image.title="test"
+
+# SHELL already set in runtime
+
+USER root
+
+WORKDIR /tmp
+
+# hadolint ignore=DL3018,SC2046
+RUN apk --no-cache add \
+        python3-dev \
+        poetry \
+        shellcheck
+
+USER tezos
+WORKDIR /home/tezos
+
+### Javascript env setup as tezos user
+
+# TODO: https://gitlab.com/tezos/tezos/-/issues/5026
+# The js dependencies could be downloaded from tezos/tezos and installed
+# here.
+
+COPY --chown=tezos:tezos scripts/install-nvm.sh /tmp/install-nvm.sh
+RUN /tmp/install-nvm.sh \
+ && rm -rf /tmp/*
+
+### Python setup
+
+# Required to have poetry in the path in the CI
+ENV PATH="/home/tezos/.local/bin:${PATH}"
+
+# Copy poetry files to install the dependencies in the docker image
+COPY --chown=tezos:tezos ./poetry.lock ./pyproject.toml ./
+
+# Poetry will create the virtual environment in $(pwd)/.venv.
+# The containers running this image can load the virtualenv with
+# $(pwd)/.venv/bin/activate and do not require to run `poetry install`
+# It speeds up the Tezos CI and simplifies the .gitlab-ci.yml file
+# by avoiding duplicated poetry setup checks.
+RUN poetry config virtualenvs.in-project true \
+ && poetry install \
+ && rm -rf /tmp/* /home/tezos/.cache/pip /home/tezos/.cache/pypoetry
+
+# ENTRYPOINT and CMD already set in prebuild

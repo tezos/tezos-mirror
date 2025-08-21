@@ -9,6 +9,8 @@ The Octez rollup node is used by a rollup operator to deploy a
 rollup. The rollup node is responsible for making the rollup progress
 by publishing commitments and by playing refutation games.
 
+A complete manual page of the rollup node is available :ref:`here <smart_rollup_node_manual>`.
+
 Just like the Octez node, the Octez rollup node provides an :doc:`RPC
 interface<../api/openapi>`. The services of this interface can be
 called directly with HTTP requests.
@@ -296,7 +298,7 @@ batching:${OPERATOR_ADDR2}``.  Where the rollup node will use
 ``${OPERATOR_ADDR1}`` for everything else.
 
 The L1 chain has a limitation of one manager operation per key per
-block (see :doc:`../active/precheck`). In the case of a high
+block (see :ref:`one_manager_op_per_manager_per_block`). In the case of a high
 throughput rollup, this limitation could slow down the rollup by
 capping the number of L2 messages that the rollup node's batcher
 purpose can inject per block to the maximum size of one L1 operation's
@@ -1525,7 +1527,7 @@ Define these functions in the ``lib.rs`` as follows:
 
    mod host;
    use crate::host::read_input;
-   use crate::host:ReadInputMessageInfo;
+   use crate::host::ReadInputMessageInfo;
 
    pub const MAX_MESSAGE_SIZE: u32 = 4096u32;
 

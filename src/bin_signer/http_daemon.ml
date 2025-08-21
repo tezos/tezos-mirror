@@ -25,7 +25,8 @@
 
 module Events = Signer_events.Http_daemon
 
-let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
+let run (cctxt : #Client_context.wallet) ~hosts ?signing_version ?magic_bytes
+    ?(allow_list_known_keys = false) ?(allow_to_prove_possession = false)
     ~check_high_watermark ~require_auth mode =
   let open Lwt_result_syntax in
   let dir = Tezos_rpc.Directory.empty in
@@ -33,8 +34,14 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     Tezos_rpc.Directory.register1
       dir
       Signer_services.sign
-      (fun pkh signature data ->
+      (fun pkh (signature, req_version) data ->
+        let pkh =
+          match req_version with
+          | Some version -> Signer_messages.Pkh_with_version (pkh, version)
+          | None -> Signer_messages.Pkh pkh
+        in
         Handler.sign
+          ?signing_version
           ?magic_bytes
           ~check_high_watermark
           ~require_auth
@@ -46,6 +53,20 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
       dir
       Signer_services.public_key
       (fun pkh () () -> Handler.public_key cctxt pkh)
+  in
+  let dir =
+    if allow_to_prove_possession then
+      Tezos_rpc.Directory.register1
+        dir
+        Signer_services.bls_prove_possession
+        (fun pkh override_pk () ->
+          Handler.bls_prove_possession cctxt ?override_pk pkh)
+    else
+      Tezos_rpc.Directory.register1
+        dir
+        Signer_services.bls_prove_possession
+        (fun _pkh _override_pk () ->
+          failwith "Request to prove possession is not allowed.")
   in
   let dir =
     Tezos_rpc.Directory.register0
@@ -61,6 +82,14 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           in
           return_some hashes
         else return_none)
+  in
+  let dir =
+    if allow_list_known_keys then
+      Tezos_rpc.Directory.register0 dir Signer_services.known_keys (fun () () ->
+          Handler.known_keys cctxt)
+    else
+      Tezos_rpc.Directory.register0 dir Signer_services.known_keys (fun () () ->
+          failwith "List known keys request not allowed.")
   in
   let server =
     RPC_server.init_server ~media_types:Media_type.all_media_types dir
@@ -85,7 +114,8 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
           failwith "Port already in use."
       | exn -> fail_with_exn exn)
 
-let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
+let run_https ~host ~port ~cert ~key ?signing_version ?magic_bytes
+    ?allow_list_known_keys ?allow_to_prove_possession ~check_high_watermark
     ~require_auth (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
@@ -105,12 +135,16 @@ let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
       run
         (cctxt : #Client_context.wallet)
         ~hosts
+        ?signing_version
         ?magic_bytes
+        ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         mode
 
-let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
+let run_http ~host ~port ?signing_version ?magic_bytes ?allow_list_known_keys
+    ?allow_to_prove_possession ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet) =
   let open Lwt_syntax in
   let* points =
@@ -128,7 +162,10 @@ let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
       run
         (cctxt : #Client_context.wallet)
         ~hosts
+        ?signing_version
         ?magic_bytes
+        ?allow_list_known_keys
+        ?allow_to_prove_possession
         ~check_high_watermark
         ~require_auth
         mode

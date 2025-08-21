@@ -11,7 +11,7 @@ module Remote = struct
 
   type t = {agents : Agent.t list}
 
-  let wait_docker_running ~vm_name () =
+  let rec wait_docker_running ~vm_name () =
     let ssh_private_key_filename = Env.ssh_private_key_filename () in
     let* zone = Env.zone () in
     let is_ready _output = true in
@@ -38,13 +38,23 @@ module Remote = struct
         "docker"
         ["inspect"; "--format"; "{{.State.Running}}"; image_name]
     in
-    let* _ =
-      images_name
-      |> List.map (fun image_name ->
-             Env.wait_process ~is_ready ~run:(run image_name) ())
-      |> Lwt.all
-    in
-    Lwt.return_unit
+    Lwt.catch
+      (fun () ->
+        let* (_ : string list) =
+          images_name
+          |> Lwt_list.map_p (fun image_name ->
+                 Env.wait_process
+                   ~is_ready
+                   ~run:(run image_name)
+                   ~propagate_error:true
+                   ())
+        in
+        unit)
+      (fun _ ->
+        (* If [Env.wait_process] failed, this is presumably because the docker image
+           we are trying to inspect does not exist anymore.
+           Hence, we relaunch the function from the start to perform [docker ps] again. *)
+        wait_docker_running ~vm_name ())
 
   let workspace_deploy ~workspace_name ~number_of_vms ~vm_configuration
       ~configurations =
@@ -111,7 +121,7 @@ module Remote = struct
         ~point
         ~configuration
         ~next_available_port
-        ~name:configuration.name
+        ~vm_name:(Some vm_name)
         ~process_monitor
         ()
       |> Lwt.return
@@ -177,7 +187,7 @@ module Remote = struct
         let () =
           Log.report
             ~color:Log.Color.FG.green
-            "DNS registrered successfully: '%s'"
+            "DNS registered successfully: '%s'"
             domain
         in
         Lwt.return_unit
@@ -202,6 +212,7 @@ module Remote = struct
                (vm_configuration, List.of_seq seq, Seq.length seq) ))
     in
     let* () = Terraform.Docker_registry.init () in
+    let* () = Terraform.VM.Workspace.select "default" in
     let* () = Terraform.VM.init () in
     let workspaces_names = workspaces_info |> Seq.map fst |> List.of_seq in
     let tezt_cloud = Env.tezt_cloud in
@@ -212,10 +223,12 @@ module Remote = struct
            (fun
              (workspace_name, (vm_configuration, configurations, number_of_vms))
            ->
+             let* ssh_public_key = Ssh.public_key () in
              let* () =
                Jobs.docker_build
                  ~docker_image:vm_configuration.Agent.Configuration.docker_image
                  ~push:Env.push_docker
+                 ~ssh_public_key
                  ()
              in
              let* () = Terraform.VM.Workspace.select workspace_name in
@@ -234,7 +247,10 @@ module Remote = struct
                     Hashtbl.add
                       agents_info
                       address
-                      {workspace_name; gcp_name = Agent.name agent}) ;
+                      {
+                        workspace_name;
+                        gcp_name = Option.get (Agent.vm_name agent);
+                      }) ;
              Lwt.return agents)
     in
     let agents =
@@ -281,6 +297,329 @@ module Remote = struct
       Lwt.return_unit)
 end
 
+(* Deployment on a SSH reachable host. At this moment, it is expected to be a
+   debian bookworm, and apt must be executable by the user connecting with sudo.
+   At this moment, this deployment launches a proxy mode docker. *)
+module Ssh_host = struct
+  type t = {point : string * string * int; agents : Agent.t list}
+
+  (* This function allows to setup the prerequisites to run the deployment
+     of containers on a vm which can be connected to via ssh.
+     Multiple hosts are currently supported:
+       - a gcp debian vm
+       - a qemu vm
+       - a physical machine.
+     All that is required is that the host can be contacted either via root
+     account or a sudo enabled account. *)
+  let initial_host_provisionning user host ?ssh_id port =
+    let ssh_id =
+      Option.value ~default:(Env.ssh_private_key_filename ()) ssh_id
+    in
+    let runner =
+      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ~ssh_id ()
+    in
+    let* () =
+      (* Allows direct connections as root on debian, using key authentication.
+         This is not unsecure (as key logging is secure) as long as users
+         logging in as root are careful. This allows to not be embarrassed with sudo *)
+      if user = "root" then Lwt.return_unit
+      else
+        let* _ =
+          Process.spawn
+            ~runner
+            "sudo"
+            [
+              "sed";
+              "-i";
+              "s/PermitRootLogin no/PermitRootLogin prohibit-password/";
+              "/etc/ssh/sshd_config";
+            ]
+          |> Process.wait
+        in
+        with_open_in (Env.ssh_public_key_filename ()) @@ fun fd ->
+        let ssh_public_key_content = input_line fd in
+        let* () =
+          Process.spawn ~runner "sudo" ["mkdir"; "-p"; "/root/.ssh"]
+          |> Process.check
+        in
+        let* () =
+          Process.spawn
+            ~runner
+            "sh"
+            [
+              "-c";
+              Format.asprintf
+                "echo %s | sudo tee -a /root/.ssh/authorized_keys"
+                ssh_public_key_content;
+            ]
+          |> Process.check
+        in
+        Process.spawn ~runner "sudo" ["systemctl"; "restart"; "ssh.service"]
+        |> Process.check
+    in
+    (* Setup a new runner for root connections *)
+    let runner =
+      Runner.create
+        ~ssh_user:"root"
+        ~ssh_port:port
+        ~address:host
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ()
+    in
+    let user = "root" in
+    (* Installs docker *)
+    Log.report "Installing docker" ;
+    let* () = Process.spawn ~runner "apt-get" ["update"] |> Process.check in
+    let* () =
+      Process.spawn ~runner "apt-get" ["install"; "-y"; "docker.io"; "libev4"]
+      |> Process.check
+    in
+    let* project = Env.project_id () in
+    (* Generate locally an access token to access to gcp docker registry *)
+    let* iam_key_filename =
+      let service_account_name = Format.asprintf "%s-id" Env.tezt_cloud in
+      let* service_account =
+        (* FIXME: service_account_fullname is strictly bound to dal team and should
+           be configured and stored in a tezt-cloud ~/.config directory.
+           Here, preserving backward compatibility with terraform naming *)
+        let service_account_fullname =
+          Format.asprintf "%s-id@nl-dal.iam.gserviceaccount.com" Env.tezt_cloud
+        in
+        (* Delete service account if exists. Do not fail if it does not *)
+        let* _ =
+          Process.spawn
+            "gcloud"
+            ["iam"; "service-accounts"; "delete"; service_account_fullname]
+          |> Process.wait
+        in
+        let* () =
+          Process.spawn
+            "gcloud"
+            [
+              "iam";
+              "service-accounts";
+              "create";
+              "--project";
+              project;
+              service_account_name;
+              "--display-name";
+              service_account_name;
+            ]
+          |> Process.check
+        in
+        Lwt.return service_account_fullname
+      in
+      Log.report "waiting for the iam account to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let iam_key_filename = "/tmp/iam-keys" in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "iam";
+            "service-accounts";
+            "keys";
+            "create";
+            iam_key_filename;
+            "--iam-account";
+            service_account;
+            "--project";
+            project;
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      let* () =
+        Process.spawn
+          "gcloud"
+          [
+            "artifacts";
+            "repositories";
+            "add-iam-policy-binding";
+            Format.asprintf "%s-docker-registry" Env.tezt_cloud;
+            "--location";
+            "europe-west1";
+            "--member";
+            Format.asprintf "serviceAccount:%s" service_account;
+            "--role";
+            "roles/artifactregistry.reader";
+          ]
+        |> Process.check
+      in
+      Log.report "waiting for the iam key binding to become valid" ;
+      let* () = Lwt_unix.sleep 3.0 in
+      Lwt.return iam_key_filename
+    in
+    (* Upload the key to the host via ssh *)
+    let* () =
+      Process.run
+        "scp"
+        (["-i"; Env.ssh_private_key_filename (); iam_key_filename]
+        @ (if port <> 22 then ["-p"; string_of_int port] else [])
+        @ [Format.asprintf "%s@%s:%s" user host iam_key_filename])
+    in
+    let* () =
+      let rec retry () =
+        let* status =
+          Process.spawn
+            ~runner
+            "sh"
+            [
+              "-c";
+              Format.asprintf
+                "cat %s | docker login -u _json_key --password-stdin  \
+                 https://europe-west1-docker.pkg.dev"
+                iam_key_filename;
+            ]
+          |> Process.wait
+        in
+        match status with WEXITED 0 -> Lwt.return_unit | _ -> retry ()
+      in
+      retry ()
+    in
+    Lwt.return_unit
+
+  let deploy_proxy runner =
+    let configuration = Proxy.make_config () in
+    let next_available_port =
+      let cpt = ref 30_000 in
+      fun () ->
+        incr cpt ;
+        !cpt
+    in
+    let name = configuration.name in
+    let* docker_image =
+      Agent.Configuration.uri_of_docker_image configuration.vm.docker_image
+    in
+    (* Remove any existing proxy first *)
+    let* () = Docker.rm ~runner ~force:true name |> Process.check in
+    (* Prepare the arguments for docker run *)
+    let ssh_listening_port = next_available_port () in
+    let guest_port = string_of_int ssh_listening_port in
+    let publish_ports = (guest_port, guest_port, guest_port, guest_port) in
+    let volumes =
+      [
+        ("/var/run/docker.sock", "/var/run/docker.sock");
+        ("/tmp/prometheus", "/tmp/prometheus");
+        ("/tmp/website", "/tmp/website");
+        ("/tmp/grafana", "/tmp/grafana");
+        ("/tmp/alert_manager", "/tmp/alert_manager");
+        ("/tmp/otel", "/tmp/otel");
+      ]
+    in
+    let* () =
+      Docker.run
+        ~runner
+        ~rm:true
+        ~detach:true
+        ~network:"host"
+        ~volumes
+        ~publish_ports
+        ~name
+        docker_image
+        ["-D"; "-p"; guest_port]
+      |> Process.check
+    in
+    let agent =
+      Agent.make
+        ~vm_name:None
+        ~configuration
+        ~next_available_port
+        ~point:(Runner.address (Some runner), ssh_listening_port)
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ~process_monitor:None
+        ()
+    in
+    Lwt.return agent
+
+  let deploy ~user ?ssh_id ~host ~port
+      ~(configurations : Agent.Configuration.t list) () =
+    let* () = initial_host_provisionning user ?ssh_id host port in
+    (* At this time, we only support deploying with root user.
+       The initial provisionning provide ssh root access by keypair.
+       TODO: support deploying using sudo and remove the "root" user requirement *)
+    let user = "root" in
+    let proxy_runner =
+      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+    in
+    (* Deploys the proxy *)
+    let* proxy = deploy_proxy proxy_runner in
+    (* Deploys all agents *)
+    let* agents =
+      Lwt_list.mapi_p
+        (fun i (configuration : Agent.Configuration.t) ->
+          let* docker_image =
+            Agent.Configuration.uri_of_docker_image
+              configuration.vm.docker_image
+          in
+          let ssh_port = Agent.next_available_port proxy in
+          (* FIXME move this constants elsewhere *)
+          let base_port = 30_050 in
+          let range = 50 in
+          let runner =
+            Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+          in
+          let publish_ports =
+            ( string_of_int (base_port + (i * range)),
+              string_of_int (base_port + ((i + 1) * range) - 1),
+              string_of_int (base_port + (i * range)),
+              string_of_int (base_port + ((i + 1) * range) - 1) )
+          in
+          let* () =
+            Docker.run
+              ~runner
+              ~detach:true
+              ~publish_ports
+              ~network:"host"
+              ~name:configuration.name
+              docker_image
+              ["-D"; "-p"; string_of_int ssh_port]
+            |> Process.check
+          in
+          let () =
+            Log.warn
+              "Deployed agent: %s on (%s, %d)"
+              configuration.name
+              host
+              ssh_port
+          in
+          let agent =
+            Agent.make
+              ~vm_name:None
+              ~configuration
+              ~next_available_port:
+                (let cpt = ref (base_port + (i * range)) in
+                 fun () ->
+                   incr cpt ;
+                   !cpt)
+              ~process_monitor:None
+              ~point:(host, ssh_port)
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
+          in
+          Lwt.return agent)
+        configurations
+    in
+    let agents = proxy :: agents in
+    Lwt.return {point = (user, host, port); agents}
+
+  let agents t = t.agents
+
+  let terminate {point; agents} =
+    let _user, host, port = point in
+    let* () =
+      Lwt_list.iter_p
+        (fun agent ->
+          let name = Agent.name agent in
+          let runner = Runner.create ~ssh_port:port ~address:host () in
+          let* _ = Docker.rm ~runner name |> Process.check in
+          Lwt.return_unit)
+        agents
+    in
+    Lwt.return_unit
+end
+
 (* Infrastructure to deploy locally using Docker *)
 module Localhost = struct
   type t = {
@@ -311,6 +650,7 @@ module Localhost = struct
         in
         Lwt.return docker_network
     in
+    let* ssh_public_key = Ssh.public_key () in
     let* processes =
       List.to_seq configurations
       |> Seq.mapi (fun i configuration ->
@@ -323,6 +663,7 @@ module Localhost = struct
                Jobs.docker_build
                  ~docker_image:configuration.Agent.Configuration.vm.docker_image
                  ~push:false
+                 ~ssh_public_key
                  ()
              in
              let* docker_image =
@@ -397,7 +738,7 @@ module Localhost = struct
                ~point
                ~configuration
                ~next_available_port:(fun () -> next_port point)
-               ~name:configuration.Agent.Configuration.name
+               ~vm_name:None
                ~process_monitor
                ())
     in
@@ -431,29 +772,37 @@ module Localhost = struct
     else Lwt.return_unit
 end
 
-type t = Remote of Remote.t | Localhost of Localhost.t
+type t =
+  | Remote of Remote.t
+  | Ssh_host of Ssh_host.t
+  | Localhost of Localhost.t
 
 let deploy ~configurations =
   match Env.mode with
-  | `Localhost ->
+  | `Local_orchestrator_local_agents ->
       let* localhost = Localhost.deploy ~configurations () in
       Lwt.return (Localhost localhost)
-  | `Cloud ->
+  | `Local_orchestrator_remote_agents ->
       let* remote = Remote.deploy ~proxy:false ~configurations in
       Lwt.return (Remote remote)
-  | `Host ->
+  | `Remote_orchestrator_remote_agents ->
       let* remote = Remote.deploy ~proxy:true ~configurations in
       Lwt.return (Remote remote)
-  | `Orchestrator -> assert false
+  | `Remote_orchestrator_local_agents -> assert false
+  | `Ssh_host (user, host, port) ->
+      let* host = Ssh_host.deploy ~user ~host ~port ~configurations () in
+      Lwt.return (Ssh_host host)
 
 let agents t =
   match t with
   | Remote remote -> Remote.agents remote
   | Localhost localhost -> Localhost.agents localhost
+  | Ssh_host remote -> Ssh_host.agents remote
 
 let terminate ?exn t =
   match t with
   | Remote remote -> Remote.terminate ?exn remote
   | Localhost localhost -> Localhost.terminate ?exn localhost
+  | Ssh_host remote -> Ssh_host.terminate remote
 
 let of_agents agents = Remote {agents}

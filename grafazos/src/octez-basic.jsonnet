@@ -30,6 +30,10 @@ local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 local rpc = import './rpc.jsonnet';
 
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
+
 //Position variables
 local p2p_y = 39;
 local worker_y = 72;
@@ -39,7 +43,8 @@ local misc_y = 114;
 //###
 // Grafana main stuffs
 //##
-dashboard.new('Octez basic dashboard')
+dashboard.new('Octez basic dashboard' + if !uid then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('octez-basic' + uid_ext) else {})
 + dashboard.withDescription('A basic dashboard for Octez')
 + dashboard.withTags(['tezos', 'octez'])
 + dashboard.time.withFrom('now-3h')

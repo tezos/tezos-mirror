@@ -61,7 +61,9 @@ type t
 
 type operation := t
 
-type consensus_kind = Attestation of {with_dal : bool} | Preattestation
+type consensus_kind =
+  | Attestation of {with_dal : bool; companion_key : Account.key option}
+  | Preattestation
 
 (** The kind is necessary because it determines the watermark of an
    operation which is necessary for signing an operation. This type
@@ -284,7 +286,7 @@ module Consensus : sig
   val operation :
     ?branch:string ->
     ?chain_id:string ->
-    ?with_dal:bool ->
+    ?signer_companion:Account.key ->
     signer:Account.key ->
     t ->
     Client.t ->
@@ -301,25 +303,64 @@ module Consensus : sig
     ?chain_id:string ->
     ?error:rex ->
     protocol:Protocol.t ->
+    ?signer_companion:Account.key ->
     signer:Account.key ->
     t ->
     Client.t ->
     [`OpHash of string] Lwt.t
 
-  (** Retrieves the attestation slots at [level] by calling the [GET
-      /chains/<chain>/blocks/<block>/helpers/validators] RPC. *)
-  val get_slots : level:int -> Client.t -> JSON.t Lwt.t
+  (** Retrieves the attestation slots at [level] by calling the
+      [GET /chains/<chain>/blocks/<block>/helpers/validators] RPC.
+      Returns an association list that maps a public key hash to
+      the owned slot list *)
+  val get_slots : level:int -> Client.t -> (string * int list) list Lwt.t
 
-  (** Returns the first slot of the provided delegate in the
-      [slots_json] that describes all attestation rights at some
-      level.
+  (** Same as [get_slots] but maps a consensus key to the owned slot list. *)
+  val get_slots_by_consensus_key :
+    level:int -> Client.t -> (string * int list) list Lwt.t
+
+  (** Returns the first slot of the provided delegate in the [slots]
+      association list that describes all attestation rights at some level.
 
       Causes the test to fail if the delegate is not found. *)
-  val first_slot : slots_json:JSON.t -> Account.key -> int
+  val first_slot : slots:(string * int list) list -> Account.key -> int
 
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)
   val get_block_payload_hash : ?block:string -> Client.t -> string Lwt.t
+
+  (** Calls the [GET /chains/main/blocks/<block>/hash] RPC with
+      <block> = [attested_level] - 2. The returned block hash can be used as the
+      branch field of a consensus operation for [attested_level]. *)
+  val get_branch : attested_level:int -> Client.t -> string Lwt.t
+
+  (** Forge and inject a preattestation for the given account. *)
+  val preattest_for :
+    ?error:rex ->
+    protocol:Protocol.t ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    ?branch:string ->
+    Account.key ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
+
+  (** Forge and inject an attestation for the given account. *)
+  val attest_for :
+    ?error:rex ->
+    protocol:Protocol.t ->
+    slot:int ->
+    level:int ->
+    round:int ->
+    block_payload_hash:string ->
+    ?branch:string ->
+    ?dal_attestation:bool array ->
+    ?companion_key:Account.key ->
+    Account.key ->
+    Client.t ->
+    [`OpHash of string] Lwt.t
 end
 
 module Anonymous : sig
@@ -357,7 +398,8 @@ module Anonymous : sig
     t
 
   (** [dal_entrapment_evidence] crafts a DAL entrapment evidence operation. *)
-  val dal_entrapment_evidence :
+  val dal_entrapment_evidence_standalone_attestation :
+    protocol:Protocol.t ->
     attestation:operation * Tezos_crypto.Signature.t ->
     slot_index:int ->
     Tezos_crypto_dal.Cryptobox.shard ->
@@ -468,8 +510,9 @@ module Manager : sig
   (** Build a public key revelation.
 
      The [Account.key] argument has no default value because it will
-     typically be a fresh account. *)
-  val reveal : Account.key -> payload
+     typically be a fresh account. [proof] is required only for tz4
+     public keys. *)
+  val reveal : Account.key -> ?proof:string -> unit -> payload
 
   (** [transfer ?(dest=Constant.bootstrap2) ~amount:1_000_000 ()]
      builds a transfer operation. Note that the amount is expressed in
@@ -491,6 +534,17 @@ module Manager : sig
     ?arg:JSON.u ->
     unit ->
     payload
+
+  (** [create_proof_of_possession] generates a proof of possession
+      (aka PoP) for the secret key of the [signer]. For now, this is
+      required only for BLS (tz4) keys. *)
+  val create_proof_of_possession : signer:Account.key -> string option
+
+  (** [update_consensus_key ~public_key ~proof ()] builds an
+      update_consenus_key operation. [proof] is required only for tz4
+      public keys. *)
+  val update_consensus_key :
+    public_key:string -> ?proof:string -> unit -> payload
 
   (** [dal_publish_commitment ~level ~index ~header] builds an
      operation for the data-availability layer that publishes a

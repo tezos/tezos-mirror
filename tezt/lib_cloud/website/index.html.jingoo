@@ -83,6 +83,12 @@
             <li><em>NetData monitoring disabled. Use <code>--monitoring</code> to activate it.</em></li>
             {%- endif %}
 
+            {%- if opentelemetry.activated %}
+            <li><a href="{{ opentelemetry.uri }}">Jaeger (Opentelemetry trace observer)</a></li>
+            {%- else %}
+            <li><em>Opentelemetry disabled. Use <code>--open-telemetry</code> to activate it.</em></li>
+            {%- endif %}
+
             {%- for service in services %}
             <li><a href="{{ service.uri }}">{{ service.title }}</a></li>
             {%- endfor %}

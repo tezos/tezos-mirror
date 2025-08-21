@@ -1,7 +1,7 @@
-ARG IMAGE
+ARG IMAGE=invalid
 # The image with proper version is set as ARG
 #hadolint ignore=DL3006
-FROM ${IMAGE}
+FROM $IMAGE
 
 ENV TZ=Etc/UTC
 # Build blst used by ocaml-bls12-381 without ADX to support old CPU
@@ -18,20 +18,22 @@ RUN dnf -y update &&\
 
 WORKDIR /root/tezos
 COPY ./scripts/version.sh ./scripts/version.sh
-COPY ./scripts/pkg-common/install_opam.sh ./scripts/pkg-common/install_opam.sh
 COPY scripts/ci/bin_packages_rpm_dependencies.sh \
   ./scripts/ci/bin_packages_rpm_dependencies.sh
+COPY images/scripts/install_sccache_static.sh \
+     images/scripts/install_datadog_static.sh \
+     images/scripts/install_opam_static.sh \
+     scripts/kiss-fetch.sh \
+     scripts/kiss-logs.sh \
+     /tmp/
+
 RUN scripts/ci/bin_packages_rpm_dependencies.sh
 
 # we trust sw distributors
 # We install sccache as a static binary because at the moment of writing
-# the package sccache is not available on ubuntu jammy
-#hadolint ignore=DL3008,DL3009
-RUN ARCH=$(uname -m) && \
-    curl  -L --output sccache.tgz "https://github.com/mozilla/sccache/releases/download/v0.8.1/sccache-v0.8.1-$ARCH-unknown-linux-musl.tar.gz" && \
-    tar zxvf sccache.tgz && \
-    cp "sccache-v0.8.1-$ARCH-unknown-linux-musl/sccache" /usr/local/bin/sccache && \
-    rm -Rf sccache*
+RUN /tmp/install_sccache_static.sh && \
+    /tmp/install_datadog_static.sh && \
+    /tmp/install_opam_static.sh
 
 #hadolint ignore=SC2154
 RUN . ./scripts/version.sh && \
@@ -47,7 +49,6 @@ RUN opam init --bare --disable-sandboxing
 # the caching mechanism more efficiently
 COPY --link scripts/install_build_deps.sh /root/tezos/scripts/
 COPY --link scripts/install_build_deps.rust.sh /root/tezos/scripts/
-COPY --link scripts/install_dal_trusted_setup.sh /root/tezos/scripts/
 COPY --link scripts/version.sh /root/tezos/scripts/
 COPY --link Makefile /root/tezos/
 COPY --link opam/virtual/octez-deps.opam.locked /root/tezos/opam/virtual/
@@ -55,14 +56,13 @@ COPY --link opam /root/tezos/
 
 WORKDIR /root/tezos
 
-# We download and copy the zcash params in a separate directory
-# and before the make build-deps to create a second docker layer and
-# optimize caching
-RUN DAL_TRUSTED_SETUP="/root/tezos/dal-trusted-setup" \
-    scripts/install_dal_trusted_setup.sh
+ENV KISSCACHE="http://kisscache.kisscache.svc.cluster.local"
+ENV OPAMFETCH="/tmp/kiss-fetch.sh"
 
 #hadolint ignore=SC2154, SC1091
 RUN eval $(opam env) && \
     . "/root/.cargo/env" && \
     make build-deps && \
-    mv dal-trusted-setup _opam/share/dal-trusted-setup
+# print kisscache stats
+    /tmp/kiss-logs.sh /tmp/kiss.log \
+    && rm -f /tmp/kiss.log

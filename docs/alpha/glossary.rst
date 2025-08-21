@@ -193,8 +193,6 @@ _`Delegate`
     A user account becomes a delegate by registering as such.
     Through delegation_, other accounts can delegate their rights to a delegate account.
 
-    Note that ``tz4`` accounts cannot be delegates.
-
 _`Delegation`
     An operation_ in which an account_ designates a
     delegate_. The delegating account's balance increases the delegate_'s `baking power`_ and consequently
@@ -353,6 +351,8 @@ _`Smart Rollup`
     Smart rollups constitute a `Layer 2`_ solution that can be used to deploy either a general-purpose polyvalent Layer 2 blockchain
     (e.g., an EVM-compatible one), or an application-specific DApp.
     See :doc:`smart_rollups`.
+
+.. _def_staker_alpha:
 
 _`Staker`
     A `user account`_ that made a security deposit.

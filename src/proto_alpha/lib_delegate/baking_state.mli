@@ -25,71 +25,7 @@
 
 open Protocol
 open Alpha_context
-
-(** {2 Consensus key type and functions} *)
-module Consensus_key_id : sig
-  type t
-
-  (** Only use at library frontiers *)
-  val to_pkh : t -> Signature.public_key_hash
-
-  val compare : t -> t -> int
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  module Table : sig
-    include Hashtbl.SeededS with type key = t
-
-    val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
-  end
-end
-
-module Consensus_key : sig
-  type t = private {
-    alias : string option;
-    id : Consensus_key_id.t;
-    public_key : Signature.public_key;
-    secret_key_uri : Client_keys.sk_uri;
-  }
-
-  val make :
-    alias:string option ->
-    public_key:Signature.public_key ->
-    public_key_hash:Signature.public_key_hash ->
-    secret_key_uri:Client_keys.sk_uri ->
-    t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
-
-(** {2 Delegates slots type and functions} *)
-module Delegate_id : sig
-  type t
-
-  (** Only use at library frontiers *)
-  val of_pkh : Signature.public_key_hash -> t
-
-  (** Only use at library frontiers *)
-  val to_pkh : t -> Signature.public_key_hash
-
-  val equal : t -> t -> bool
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
-
-module Delegate : sig
-  type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-end
+open Baking_state_types
 
 (** A delegate slot consists of the delegate's consensus key, its public key
     hash, its first slot, and its attesting power at some level. *)
@@ -113,6 +49,11 @@ module Delegate_slots : sig
       first attesting slot) that owns the given slot, if any (even if the
       given slot is not the delegate's first slot). *)
   val own_slot_owner : t -> slot:Slot.t -> delegate_slot option
+
+  (** Returns, among our *own* delegates, the delegate (together with its
+      first attesting slot) that owns the given round, if any. *)
+  val own_round_owner :
+    t -> committee_size:int -> round:Round.t -> delegate_slot option tzresult
 
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
@@ -140,7 +81,7 @@ val compute_delegate_slots :
   ?block:Block_services.block ->
   level:int32 ->
   chain:Shell_services.chain ->
-  Consensus_key.t list ->
+  Key.t list ->
   delegate_slots tzresult Lwt.t
 
 (** {2 Consensus operations types functions} *)
@@ -270,6 +211,7 @@ type block_info = {
   prequorum : prequorum option;
   quorum : Kind.attestation operation list;
   payload : Operation_pool.payload;
+  grandparent : Block_hash.t;
 }
 
 val block_info_encoding : block_info Data_encoding.t
@@ -348,8 +290,8 @@ type level_state = {
       (** Delegate slots for the baker delegates at the current level *)
   next_level_delegate_slots : delegate_slots;
       (** Delegate slots for the baker delegates at the next level *)
-  next_level_proposed_round : Round.t option;
-      (** Some if a proposal has been injected for the next level on the given
+  next_level_latest_forge_request : Round.t option;
+      (** Some if a forge request has been sent for the next level on the given
           round *)
   dal_attestable_slots : dal_attestable_slots;
       (** For each (own) delegate having a DAL slot at the current level, store
@@ -458,9 +400,14 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
-val forge_event_encoding : forge_event Data_encoding.t
+(** Partial encoding for {!forge_event} that omits secret keys to
+    avoid leaking them in event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
 
-val pp_forge_event : Format.formatter -> forge_event -> unit
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val forge_event_encoding_for_logging__cannot_decode :
+  forge_event Data_encoding.t
 
 (** [forge_worker_hooks] type that allows interactions with the forge worker.
     Hooks are needed in order to break a circular dependency. *)
@@ -497,7 +444,7 @@ type global_state = {
   operation_worker : Operation_worker.t;
   mutable forge_worker_hooks : forge_worker_hooks;
   validation_mode : validation_mode;
-  delegates : Consensus_key.t list;
+  delegates : Key.t list;
   cache : cache;
   dal_node_rpc_ctxt : Tezos_rpc.Context.generic option;
 }
@@ -595,8 +542,12 @@ type event =
   | New_forge_event of forge_event
   | Timeout of timeout_kind
 
-val event_encoding : event Data_encoding.t
+(** Partial encoding for {!event} that omits secret keys to avoid
+    leaking them in event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
 
-val pp_event : Format.formatter -> event -> unit
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val event_encoding_for_logging__cannot_decode : event Data_encoding.t
 
 val pp_short_event : Format.formatter -> event -> unit

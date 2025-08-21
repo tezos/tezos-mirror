@@ -18,8 +18,30 @@ let rollup_address network =
   | Configuration.Mainnet -> "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf"
   | Testnet -> "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg"
 
-let latest_snapshot_url = function
-  | Configuration.Mainnet ->
-      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-mainnet/evm-snapshot-sr1Ghq66tYK9y-latest.gz"
-  | Testnet ->
-      "https://snapshotter-sandbox.nomadic-labs.eu/etherlink-ghostnet/evm-snapshot-sr18wx6ezkeRj-latest.gz"
+let network_of_address addr =
+  match Tezos_crypto.Hashed.Smart_rollup_address.to_b58check addr with
+  | "sr1Ghq66tYK9y3r8CC1Tf8i8m5nxh8nTvZEf" -> Some Configuration.Mainnet
+  | "sr18wx6ezkeRjt1SZSeZ2UQzQN3Uc3YLMLqg" -> Some Testnet
+  | _ -> None
+
+type kernel = Bifrost | Calypso | Calypso2 | Dionysus | DionysusR1
+
+let kernel_from_string = function
+  | "bifrost" -> Some Bifrost
+  | "calypso" -> Some Calypso
+  | "calypso2" -> Some Calypso2
+  | "dionysus" -> Some Dionysus
+  | "dionysus-r1" -> Some DionysusR1
+  | _ -> None
+
+let root_hash_from_kernel = function
+  | Bifrost ->
+      `Hex "00fda6968ec17ed11dee02dc91d15606e6f02c8d7e00d8baeaee24fc0188898261"
+  | Calypso ->
+      `Hex "00224058a50dbf4c0b5f6d5e4ee672cd63d0911959b335e587b4112a7eea7b2323"
+  | Calypso2 ->
+      `Hex "008ce0e105f0f1446d78430badcc83aa5672c66bf0bc4fb51962cb765c80e8a60e"
+  | Dionysus ->
+      `Hex "0008105ea6fb0e4331d7bbc93f0e8843ae91eeb235741054cb2b345ac2d19b9ec9"
+  | DionysusR1 ->
+      `Hex "0001010d789e7cccc25c785cf73a658574ed0995ef36b8416a46ab0ddc6b058b39"

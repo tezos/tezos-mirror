@@ -5,9 +5,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let patch_kernel ~kernel_path evm_state =
+let patch_da_fees evm_state =
+  Evm_state.modify
+    ~key:"/evm/world_state/fees/da_fee_per_byte"
+    ~value:(Int.to_string 0)
+    evm_state
+
+let patch_kernel ~kernel evm_state =
   let open Lwt_result_syntax in
-  let* content, binary = Wasm_debugger.read_kernel_from_file kernel_path in
+  let* content, binary = Wasm_debugger.read_kernel kernel in
   let*! kernel =
     if binary then Lwt.return content else Wasm_utils_functor.wat2wasm content
   in
@@ -16,55 +22,71 @@ let patch_kernel ~kernel_path evm_state =
   in
   return evm_state
 
-let level_verbosity = function
-  | Events.Debug -> 3
-  | Info -> 2
-  | Error -> 1
-  | Fatal -> 0
-
 let patch_verbosity ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
-  let value = Bytes.make 1 '\000' in
-  Bytes.set_uint8 value 0 (level_verbosity kernel_verbosity) ;
   let*! evm_state =
     Evm_state.modify
-      ~key:"/evm/logging_verbosity"
-      ~value:(Bytes.to_string value)
+      ~key:Durable_storage_path.kernel_verbosity
+      ~value:(Events.string_from_kernel_log_level kernel_verbosity)
       evm_state
   in
   return evm_state
 
-let alter_evm_state ~kernel_path ~kernel_verbosity evm_state =
+let alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity evm_state =
   let open Lwt_result_syntax in
+  let*! evm_state =
+    if disable_da_fees then patch_da_fees evm_state else Lwt.return evm_state
+  in
   let* evm_state =
-    match kernel_path with
+    match kernel with
     | None -> return evm_state
-    | Some kernel_path -> patch_kernel ~kernel_path evm_state
+    | Some kernel -> patch_kernel ~kernel evm_state
   in
   match kernel_verbosity with
   | None -> return evm_state
   | Some kernel_verbosity -> patch_verbosity ~kernel_verbosity evm_state
 
-let main ?profile ?kernel_path ?kernel_verbosity ~data_dir config number =
+let main ~disable_da_fees ?kernel ?kernel_verbosity ~data_dir ~number ?profile
+    ?upto config =
   let open Lwt_result_syntax in
+  let* up_to_level =
+    match upto with
+    | None -> return number
+    | Some v ->
+        if v < number then
+          failwith
+            "'upto' must be a level succeeding the initial replayed level"
+        else return v
+  in
   let* ro_ctxt = Evm_ro_context.load ~data_dir config in
   let* legacy_block_storage =
     Evm_store.(use ro_ctxt.store Block_storage_mode.legacy)
   in
   if not legacy_block_storage then
     Block_storage_setup.enable ~keep_alive:config.keep_alive ro_ctxt.store ;
-  let alter_evm_state = alter_evm_state ~kernel_path ~kernel_verbosity in
-  let* apply_result =
-    Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state number
+  let alter_evm_state =
+    alter_evm_state ~disable_da_fees ~kernel ~kernel_verbosity
   in
-  match apply_result with
-  | Apply_success {block; _} ->
-      Format.printf
-        "Replaying blueprint %a led to block %a\n%!"
-        Ethereum_types.pp_quantity
-        number
-        Ethereum_types.pp_block_hash
-        block.hash ;
-      return_unit
-  | Apply_failure ->
-      failwith "Could not replay blueprint %a" Ethereum_types.pp_quantity number
+  let rec replay_upto current =
+    if current > up_to_level then return_unit
+    else
+      let* apply_result =
+        Evm_ro_context.replay ro_ctxt ?profile ~alter_evm_state current
+      in
+      match apply_result with
+      | Replay_success {diverged; process_time; execution_gas; _} ->
+          let*! () =
+            Blueprint_events.blueprint_replayed
+              ~execution_gas
+              ~process_time
+              ~diverged
+              current
+          in
+          replay_upto Ethereum_types.Qty.(next current)
+      | Replay_failure ->
+          failwith
+            "Could not replay blueprint %a"
+            Ethereum_types.pp_quantity
+            current
+  in
+  replay_upto number

@@ -46,6 +46,9 @@ whose verbosity can be increased with ``-v``, for example::
 
     octez-client man -v 3
 
+Note that the result of this command is also available online at :ref:`client_manual`,
+and this is true for the other binaries.
+
 It is also possible to get information on a specific command in the manual with ``man <command>``::
 
    octez-client man set
@@ -238,21 +241,23 @@ Besides listening to requests from the client,
 the node listens to connections from peers, by default on port ``9732`` (this can be changed using option ``--net-addr``), so it's advisable to
 open incoming connections to that port.
 
-Summing up
-~~~~~~~~~~
+.. _quickstart_node:
 
-Putting together all the above instructions, you may want to run a node as follows:
+Quickstart Octez node
+~~~~~~~~~~~~~~~~~~~~~
+
+Putting together all the above instructions, you may want to quickly start a node on a testnet as follows:
 
 .. code-block:: shell
 
-    # Download a snapshot for your target network, e.g. <test-net>:
-    wget <snapshot-url> -O <snapshot-file>
-    # Configure the node for running on <test-net>:
-    octez-node config init --data-dir ~/.tezos-node-<test-net> --network <test-net>
-    # Import the snapshot into the node data directory:
-    octez-node snapshot import --data-dir ~/.tezos-node-<test-net> --block <block-hash> <snapshot-file>
+    # Download a snapshot for your target network, e.g. ghostnet:
+    wget https://snapshots.tzinit.org/ghostnet/rolling -O rolling
+    # Configure the node for running on your testnet, e.g. ghostnet:
+    octez-node config init --network ghostnet --rpc-addr 127.0.0.1
+    # Import the snapshot file into the node:
+    octez-node snapshot import rolling
     # Run the node:
-    octez-node run --data-dir ~/.tezos-node-<test-net> --rpc-addr 127.0.0.1
+    octez-node run
 
 .. _howtouse_tezos_client:
 
@@ -261,6 +266,7 @@ Client
 
 Octez client can be used to interact with the node, it can query its
 status or ask the node to perform some actions.
+A complete manual page of octez-client is available :ref:`here <client_manual>` (for the currently active protocol).
 
 .. note::
 
@@ -309,9 +315,11 @@ using a hardware wallet (see :ref:`ledger`).
 An additional file ``contracts`` contains the addresses of smart
 contracts, which have the form *KT1…*.
 
+Secret keys are stored by default unencrypted on testnets (as can be seen here).
+On mainnet, the default is to store keys encrypted, because this is the recommended practice for most use cases, except when
+using a hardware wallet (see :ref:`ledger`).
 
-Notice that by default, the keys were stored unencrypted, which is fine in our test example.
-In more realistic scenarios, you should supply the option ``--encrypted`` when generating a new account::
+If you want to force using encryption on a testnet, you must supply the option ``--encrypted`` when generating a new account::
 
       $ octez-client gen keys bob --encrypted
 
@@ -660,6 +668,8 @@ to:
 - force connections to known peers
 - ban/unban peers
 
+A complete manual page of admin client is available :ref:`here <admin_client_manual>`.
+
 A useful command to debug a node that is not syncing is:
 
 ::
@@ -667,6 +677,8 @@ A useful command to debug a node that is not syncing is:
    octez-admin-client p2p stat
 
 The admin client uses the same format of configuration file as the client (see :ref:`client_conf_file`).
+
+.. _octez-codec:
 
 Codec
 ~~~~~

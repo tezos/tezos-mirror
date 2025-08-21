@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2021-2023 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2022-2023 Trili Tech <contact@trili.tech>                   *)
+(* Copyright (c) 2022-2025 TriliTech <contact@trili.tech>                    *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2024 Functori <contact@functori.com>                        *)
 (*                                                                           *)
@@ -40,25 +40,6 @@ let tezt_etherlink =
       ]
     ~release_status:Unreleased
 
-let _tezt_tests_cloud =
-  private_exe
-    "main"
-    ~path:"tezt/tests/cloud"
-    ~opam:"tezt-tests-cloud"
-    ~synopsis:"Tezt tests using Tezt cloud"
-    ~bisect_ppx:No
-    ~deps:
-      [
-        bls12_381_archive;
-        octez_test_helpers |> open_;
-        tezt_wrapper |> open_ |> open_ ~m:"Base";
-        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
-        tezt_cloud |> open_;
-        tezt_etherlink;
-      ]
-    ~release_status:Unreleased
-    ~with_macos_security_framework:true
-
 (* Container of the registered sublibraries of [octez-evm-node] *)
 let registered_octez_evm_node_libs = Sub_lib.make_container ()
 
@@ -69,50 +50,62 @@ let octez_evm_node_lib =
     ~container:registered_octez_evm_node_libs
     ~package:"octez-evm-node-libs"
 
-let evm_node_rust_deps =
-  octez_evm_node_lib
-    "evm_node_rust_deps"
-    ~path:"etherlink/lib_wasm_runtime"
-    ~synopsis:"WASM runtime foreign archive"
-    ~foreign_archives:["octez_evm_node_rust_deps"]
-    ~dune:
-      Dune.
-        [
-          [
-            S "dirs";
-            S ":standard";
-            (* We need this stanza to ensure .cargo can be used as a
-               dependency via source_tree. *)
-            S ".cargo";
-            (* Do not track Cargo output directory. *)
-            [S "not"; S "target"];
-          ];
-          [
-            S "rule";
-            [
-              S "targets";
-              S "liboctez_evm_node_rust_deps.a";
-              S "dlloctez_evm_node_rust_deps.so";
-            ];
-            [
-              S "deps";
-              [S "file"; S "build.sh"];
-              [S "file"; S "Cargo.toml"];
-              [S "file"; S "Cargo.lock"];
-              [S "file"; S "../../rust-toolchain"];
-              [S "source_tree"; S ".cargo"];
-              [S "source_tree"; S "../sputnikvm"];
-              [S "source_tree"; S "../kernel_bifrost"];
-              [S "source_tree"; S "../kernel_calypso"];
-              [S "source_tree"; S "../../src/rustzcash_deps"];
-              [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
-              [S "source_tree"; S "../../src/kernel_sdk"];
-              [S "source_tree"; S "../../sdk/rust"];
-              [S "source_tree"; S "src"];
-            ];
-            [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
-          ];
-        ]
+let lib_etherlink_wasm_runtime =
+  rust_archive
+    Manifest_link_deps.LinkTypes.
+      [
+        RustDep Rustzcash;
+        RustDep Riscv_pvm;
+        RustDep Wasmer;
+        RustDep Etherlink_wasm_runtime;
+      ]
+    ~inline_tests_link_flags:["-cclib"; "-levm_node_rust_deps.a"]
+    (octez_evm_node_lib
+       "evm_node_rust_deps"
+       ~path:"etherlink/lib_wasm_runtime"
+       ~synopsis:"WASM runtime foreign archive"
+       ~foreign_archives:["octez_evm_node_rust_deps"]
+       ~dune:
+         Dune.
+           [
+             [
+               S "dirs";
+               S ":standard";
+               (* We need this stanza to ensure .cargo can be used as a
+                  dependency via source_tree. *)
+               S ".cargo";
+               (* Do not track Cargo output directory. *)
+               [S "not"; S "target"];
+             ];
+             [
+               S "rule";
+               [
+                 S "targets";
+                 S "liboctez_evm_node_rust_deps.a";
+                 S "dlloctez_evm_node_rust_deps.so";
+               ];
+               [
+                 S "deps";
+                 [S "file"; S "build.sh"];
+                 [S "file"; S "Cargo.toml"];
+                 [S "file"; S "Cargo.lock"];
+                 [S "file"; S "../../rust-toolchain"];
+                 [S "source_tree"; S ".cargo"];
+                 [S "source_tree"; S "../sputnikvm"];
+                 [S "source_tree"; S "../kernel_bifrost"];
+                 [S "source_tree"; S "../kernel_calypso"];
+                 [S "source_tree"; S "../kernel_calypso2"];
+                 [S "source_tree"; S "../kernel_dionysus"];
+                 [S "source_tree"; S "../../src/rustzcash_deps"];
+                 [S "source_tree"; S "../../src/rust_deps/wasmer-3.3.0"];
+                 [S "source_tree"; S "../../src/riscv"];
+                 [S "source_tree"; S "../../src/kernel_sdk"];
+                 [S "source_tree"; S "../../sdk/rust"];
+                 [S "source_tree"; S "src"];
+               ];
+               [S "action"; [S "no-infer"; [S "bash"; S "./build.sh"]]];
+             ];
+           ])
 
 let tezt ?(deps = []) = tezt ~deps:(bls12_381_archive :: deps)
 
@@ -129,6 +122,7 @@ let wasm_runtime_callbacks =
         octez_base_unix;
         octez_layer2_irmin_context |> open_;
         Product_cohttp.cohttp_lwt_unix;
+        opentelemetry_lwt;
       ]
 
 let _wasm_runtime_callbacks_tests =
@@ -157,6 +151,7 @@ let wasm_runtime =
     "evm_node_wasm_runtime"
     ~path:"etherlink/lib_wasm_runtime/ocaml-api"
     ~synopsis:"WASM runtime compatible with the WASM PVM"
+    ~link_deps:lib_etherlink_wasm_runtime
     ~deps:[octez_layer2_irmin_context |> open_; wasm_runtime_callbacks]
     ~flags:
       (Flags.standard
@@ -200,7 +195,14 @@ let evm_node_migrations =
     "evm_node_migrations"
     ~path:"etherlink/bin_node/migrations"
     ~synopsis:"SQL migrations for the EVM node store"
-    ~deps:[octez_base |> open_ ~m:"TzPervasives"; caqti_lwt; crunch; re]
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+      ]
     ~dune:
       Dune.
         [
@@ -237,8 +239,48 @@ let evm_node_lib_dev_encoding =
       [
         octez_base |> open_ ~m:"TzPervasives";
         octez_scoru_wasm_debugger_plugin;
+        websocket;
         re;
         uuidm;
+      ]
+
+let evm_node_lib_dev_tezlink =
+  let tezlink_target_proto =
+    List.find (fun proto -> Protocol.short_hash proto = "PsRiotum") Protocol.all
+  in
+  let tezlink_protocol_plugin =
+    match Protocol.plugin tezlink_target_proto with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
+  let tezlink_protocol_parameters =
+    match Protocol.parameters tezlink_target_proto with
+    | Some target -> target
+    | None -> (* unreachable *) assert false
+  in
+  let tezlink_genesis_proto =
+    List.find (fun proto -> Protocol.short_hash proto = "Ps9mPmXa") Protocol.all
+  in
+  let tezlink_genesis_protocol_plugin =
+    match Protocol.client tezlink_genesis_proto with
+    | Some genesis -> genesis
+    | None -> (* unreachable *) assert false
+  in
+
+  octez_evm_node_lib
+    "evm_node_lib_dev_tezlink"
+    ~path:"etherlink/bin_node/lib_dev/tezlink"
+    ~synopsis:"Tezlink dependencies for the EVM node"
+    ~deps:
+      [
+        evm_node_lib_dev_encoding |> open_;
+        tezlink_protocol_plugin;
+        tezlink_protocol_parameters;
+        tezlink_genesis_protocol_plugin;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_shell_services;
+        octez_version;
+        lwt_watcher;
       ]
 
 let evm_node_config =
@@ -255,6 +297,7 @@ let evm_node_config =
         octez_rpc_http_server;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
+        octez_telemetry;
       ]
 
 let evm_node_lib_dev =
@@ -270,12 +313,15 @@ let evm_node_lib_dev =
         octez_rpc_http |> open_;
         octez_rpc_http_server;
         dream;
+        websocket_lwt_unix;
         websocket_cohttp_lwt;
         octez_workers |> open_;
+        octez_connpool;
         octez_rpc_http_client_unix;
         octez_version_value;
         octez_stdlib_unix |> open_;
         evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev_tezlink |> open_;
         lwt_watcher;
         lwt_exit;
         octez_sqlite |> open_;
@@ -286,7 +332,7 @@ let evm_node_lib_dev =
         octez_context_encoding;
         octez_scoru_wasm;
         octez_scoru_wasm_helpers_functor |> open_;
-        octez_scoru_wasm_debugger_lib |> open_;
+        octez_scoru_wasm_debugger_lib;
         octez_layer2_store |> open_;
         octez_layer2_irmin_context |> open_;
         octez_smart_rollup_lib |> open_;
@@ -297,6 +343,8 @@ let evm_node_lib_dev =
         supported_installers;
         wasm_runtime;
         performance_metrics;
+        opentelemetry_lwt;
+        octez_telemetry;
       ]
 
 let _octez_evm_node_tests =
@@ -307,6 +355,7 @@ let _octez_evm_node_tests =
       "test_call_tracer_algo";
       "test_wasm_runtime";
       "test_blueprint_roundtrip";
+      "test_bitset_nonce";
     ]
     ~path:"etherlink/bin_node/test"
     ~opam:"octez-evm-node-tests"
@@ -320,12 +369,11 @@ let _octez_evm_node_tests =
       [
         "rlptest.json";
         "invalidRLPTest.json";
-        "../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm";
+        "../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm";
       ]
     ~deps:
       [
         bls12_381_archive;
-        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         octez_base_test_helpers |> open_;
@@ -352,6 +400,7 @@ let _tezt_etherlink =
       "dal_sequencer";
       "eth_call";
       "gc";
+      "tezlink";
     ]
     ~path:"etherlink/tezt/tests"
     ~opam:"tezt-etherlink"
@@ -363,13 +412,12 @@ let _tezt_etherlink =
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
         evm_node_lib_dev_encoding;
-        octez_rustzcash_deps;
         Protocol.(main alpha);
       ]
     ~with_macos_security_framework:true
     ~dep_globs:
       ["evm_kernel_inputs/*"; "../../tezos_contracts/*"; "../../config/*"]
-    ~dep_globs_rec:["../../kernel_evm/*"]
+    ~dep_globs_rec:["../../kernel_latest/*"]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
 let _evm_node =
@@ -389,7 +437,6 @@ let _evm_node =
       [[S ":include"; S "%{workspace_root}/link-flags-evm-node.sexp"]]
     ~deps:
       [
-        evm_node_rust_deps;
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
@@ -421,6 +468,24 @@ let _tezt_testnet_scenarios =
         tezt_wrapper |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
         tezt_etherlink |> open_;
+      ]
+
+let _tezt_etherlink_benchmark_producer =
+  public_exe
+    "etherlink-benchmark-producer"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_benchmark_producer"
+    ~synopsis:"Produce benchmark data to test etherlink primitives"
+    ~bisect_ppx:No
+    ~static:false
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_test_helpers |> open_;
+        tezt_wrapper |> open_ |> open_ ~m:"Base";
+        tezt_tezos |> open_ |> open_ ~m:"Runnable.Syntax";
+        tezt_etherlink |> open_;
+        octez_base |> open_ ~m:"TzPervasives";
       ]
 
 let _etherlink_governance_observer =
@@ -459,6 +524,7 @@ let _floodgate_bin =
   public_exe
     "floodgate"
     ~path:"etherlink/bin_floodgate"
+    ~with_macos_security_framework:true
     ~internal_name:"main"
     ~release_status:Unreleased
     ~opam:"floodgate"
@@ -466,7 +532,6 @@ let _floodgate_bin =
     ~deps:
       [
         bls12_381_archive;
-        evm_node_rust_deps;
         octez_base |> open_ ~m:"TzPervasives";
         octez_base_unix;
         efunc_core;
@@ -477,3 +542,109 @@ let _floodgate_bin =
         evm_node_config |> open_;
         octez_workers;
       ]
+
+let _outbox_monitor =
+  public_exe
+    "etherlink-outbox-monitor"
+    ~internal_name:"main"
+    ~path:"etherlink/bin_outbox_monitor"
+    ~opam:"etherlink-outbox-monitor"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~synopsis:
+      "A binary to monitor withdrawals in the outbox and their execution"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_version_value;
+        octez_clic;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev |> open_;
+        octez_smart_rollup_lib;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]
+
+let _fa_bridge_watchtower =
+  public_exe
+    "fa-bridge-watchtower"
+    ~internal_name:"main"
+    ~path:"etherlink/fa-bridge-watchtower"
+    ~opam:"fa-bridge-watchtower"
+    ~release_status:Unreleased
+    ~with_macos_security_framework:true
+    ~synopsis:"A binary to claim FA deposits sent by the bridge"
+    ~deps:
+      [
+        bls12_381_archive;
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        octez_version_value;
+        octez_clic;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_stdlib_unix |> open_;
+        caqti_lwt;
+        crunch;
+        re;
+        octez_sqlite |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_lib_dev |> open_;
+        efunc_core;
+        dream;
+        octez_openapi;
+      ]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "target"; S "migrations.ml"];
+            [S "deps"; [S "glob_files"; S "migrations/*.sql"]];
+            [
+              S "action";
+              [
+                S "run";
+                S "ocaml-crunch";
+                S "-e";
+                S "sql";
+                S "-m";
+                S "plain";
+                S "-o";
+                S "%{target}";
+                S "-s";
+                S ".";
+              ];
+            ];
+          ];
+        ]

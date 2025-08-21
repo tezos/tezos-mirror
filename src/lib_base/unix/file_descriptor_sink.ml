@@ -205,7 +205,7 @@ let make_with_pp_short ?cols ~color ~tag_color ~advertise_levels ~level pp
       | _ -> assert false
       (* `tm` is built locally, so it should contain invalid month code *)
     in
-    let ms = mod_float (time *. 1000.) 1000. in
+    let ms = (time -. floor time) *. 1000. |> floor in
     Format.sprintf
       "%s %02d %02d:%02d:%02d.%03.0f"
       month_string
@@ -713,7 +713,9 @@ end) : Internal_event.SINK with type t = t = struct
         match
           List.find
             (fun (prefix, _) ->
-              Internal_event.Section.is_prefix ~prefix section)
+              Internal_event.Section.is_prefix
+                ~prefix
+                (Internal_event.Section.append section M.simple_name))
             kvl
         with
         | None ->

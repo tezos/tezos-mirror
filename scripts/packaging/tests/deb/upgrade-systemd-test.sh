@@ -4,7 +4,7 @@ set -eu
 set -x
 
 REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
-REPOOLD="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/old/$CI_COMMIT_REF_NAME"
+REPOOLD="https://packages.nomadic-labs.com"
 DISTRO=$1
 RELEASE=$2
 
@@ -21,25 +21,35 @@ apt-get install -y sudo gpg curl apt-utils debconf-utils procps jq
 echo "debconf debconf/frontend select Noninteractive" | sudo debconf-set-selections
 
 # [add current repository]
-sudo curl "$REPOOLD/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/octez.gpg
+sudo curl "$REPOOLD/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez.gpg
 
-reposityory="deb $REPOOLD/$DISTRO $RELEASE main"
+reposityory="deb [signed-by=/etc/apt/keyrings/octez.gpg] $REPOOLD/$DISTRO $RELEASE main"
 echo "$reposityory" | sudo tee /etc/apt/sources.list.d/octez-current.list
 apt-get update
 
+# [ preeseed octez ]
+# preseed octez-node for debconf. Notice we set purge_warning to yes,
+# to make the `autopurge` pass and remove all the node data at the end of this
+# script.
+cat << EOF > preseed.cfg
+octez-node octez-node/configure boolean true
+octez-node octez-node/history-mode string rolling
+octez-node octez-node/network string ghostnet
+octez-node octez-node/purge_warning boolean true
+octez-node octez-node/snapshot-import boolean true
+octez-node octez-node/snapshot-no-check boolean true
+octez-baker octez-baker/liquidity-vote select on
+debconf debconf/frontend select Noninteractive
+EOF
+# preseed the package
+sudo debconf-set-selections preseed.cfg
+# check the package configuration
+sudo debconf-get-selections | grep octez
+
 # [install octez]
-apt-get install -y octez-client
-apt-get install -y octez-node
 apt-get install -y octez-baker
-dpkg -l octez-\*
 
-# [setup Octez node]
-sudo su tezos -c "octez-node config init --data-dir=/var/tezos/.tezos-node --network=ghostnet --history-mode=rolling --net-addr=\"[::]:9732\" --rpc-addr=\"127.0.0.1:8732\""
-
-curl https://snapshots.tzinit.org/ghostnet/rolling -o /tmp/rolling
-sudo su tezos -c "octez-node snapshot import --data-dir=/var/tezos/.tezos-node --no-check /tmp/rolling"
-
-sudo /etc/init.d/octez-node start
+systemctl start octez-node
 
 #shellcheck disable=SC2009
 ps aux | grep octez
@@ -48,12 +58,11 @@ ps aux | grep octez
 PROTOCOL=$(octez-client --protocol PtParisBxoLz list understood protocols | tee | head -1)
 sudo su tezos -c "octez-client -p $PROTOCOL gen keys baker"
 BAKER_KEY=$(sudo su tezos -c "octez-client -p $PROTOCOL show address baker" | head -1 | awk '{print $2}')
-echo "baking_key=$BAKER_KEY" >> /etc/octez/baker.conf
-echo "lq_vote=on" >> /etc/octez/baker.conf
+echo "BAKER_KEY=$BAKER_KEY" >> /etc/default/octez-baker
 
 # ideally we should also start the baker, but it will timeout
 # waiting for the node to sync
-#sudo /etc/init.d/octez-baker start
+systemctl start octez-baker
 
 #shellcheck disable=SC2009
 ps aux | grep baker
@@ -61,14 +70,13 @@ ps aux | grep baker
 sudo su tezos -c "octez-node config show"
 
 # [add next repository]
-repository="deb $REPO/$DISTRO $RELEASE main"
+sudo curl "$REPO/$DISTRO/octez.asc" | sudo gpg --dearmor -o /etc/apt/keyrings/octez-dev.gpg
+repository="deb [signed-by=/etc/apt/keyrings/octez-dev.gpg] $REPO/$DISTRO $RELEASE main"
 echo "$repository" | sudo tee /etc/apt/sources.list.d/octez-next.list
 apt-get update
 
 # [upgrade octez]
-# --force-overwrite is necessary because legacy package shipped the zcash
-# parameters as part of the octez-node package.
-apt-get upgrade -y -o DPkg::options::="--force-overwrite" octez-baker
+apt-get upgrade -y octez-baker
 
 cat /etc/default/octez-node
 cat /etc/default/octez-baker

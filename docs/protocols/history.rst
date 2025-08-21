@@ -6,6 +6,11 @@ The following pages describe the former Tezos protocols (i.e., which have been u
 .. toctree::
    :maxdepth: 1
 
+   021_quebec
+
+.. toctree::
+   :maxdepth: 1
+
    020_paris
 
 .. toctree::

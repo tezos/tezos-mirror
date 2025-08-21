@@ -8,6 +8,10 @@ It contains the following libraries:
 - {{!module-Bls12_381_hash}Bls12_381_hash}
 - {{!module-Bls12_381_signature}Bls12_381_signature}
 - {{!module-Brassaia}Brassaia}
+- {{!module-Brassaia_eio}Brassaia_eio}
+- {{!module-Brassaia_eio_pack}Brassaia_eio_pack}
+- {{!module-Brassaia_eio_test_helpers}Brassaia_eio_test_helpers}
+- {{!module-Brassaia_eio_tezos}Brassaia_eio_tezos}
 - {{!module-Brassaia_pack}Brassaia_pack}
 - {{!module-Brassaia_test_helpers}Brassaia_test_helpers}
 - {{!module-Brassaia_tezos}Brassaia_tezos}
@@ -17,14 +21,17 @@ It contains the following libraries:
 - {{!module-Mec}Mec}
 - {{!module-Octez_bls12_381_polynomial}Octez_bls12_381_polynomial}: Polynomials over BLS12-381 finite field - Temporary vendored version of Octez
 - {{!module-Octez_srs_extraction}Octez_srs_extraction}
+- {{!module-Octez_telemetry}Octez_telemetry}: Convenient wrappers to trace Octez libraries with Opentelemetry
 - {{!module-Plompiler}Plompiler}
 - {{!module-Plonk}Plonk}: Plonk zero-knowledge proving system
 - {{!module-Polynomial}Polynomial}: Polynomials over finite fields
 - {{!module-Ppx_brassaia}Ppx_brassaia}
+- {{!module-Ppx_brassaia_eio}Ppx_brassaia_eio}
 - {{!module-Ppx_profiler}Ppx_profiler}
 - {{!module-Qcheck_tezt}Qcheck_tezt}: Wrapper to register QCheck tests as Tezt tests
 - {{!module-Tezos_base}Tezos_base}: Meta-package and pervasive type definitions for Tezos
 - {{!module-Tezos_base_test_helpers}Tezos_base_test_helpers}: Octez base test helpers
+- {{!module-Tezos_bees}Tezos_bees}: Parallel worker library
 - {{!module-Tezos_clic}Tezos_clic}
 - {{!module-Tezos_context}Tezos_context}: On-disk context abstraction for [octez-node]
 - {{!module-Tezos_context_brassaia}Tezos_context_brassaia}: On-disk context abstraction for [octez-node] (brassaia)

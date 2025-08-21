@@ -9,14 +9,159 @@
 open Filename.Infix
 include Sqlite
 
-type levels = {
-  l1_level : int32;
-  current_number : Ethereum_types.quantity;
-  finalized : Ethereum_types.quantity;
+module Legacy_encodings = struct
+  open Ethereum_types
+
+  let block_encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             number;
+             hash;
+             parent;
+             nonce;
+             sha3Uncles;
+             logsBloom;
+             transactionRoot;
+             stateRoot;
+             receiptRoot;
+             miner;
+             difficulty;
+             totalDifficulty;
+             extraData;
+             size;
+             gasLimit;
+             gasUsed;
+             timestamp;
+             transactions;
+             uncles;
+             baseFeePerGas;
+             prevRandao;
+             withdrawals = _;
+             withdrawalsRoot = _;
+             blobGasUsed = _;
+             excessBlobGas = _;
+             parentBeaconBlockRoot = _;
+           } ->
+        ( ( ( number,
+              hash,
+              parent,
+              nonce,
+              sha3Uncles,
+              logsBloom,
+              transactionRoot,
+              stateRoot,
+              receiptRoot,
+              miner ),
+            ( difficulty,
+              totalDifficulty,
+              extraData,
+              size,
+              gasLimit,
+              gasUsed,
+              timestamp,
+              transactions,
+              uncles,
+              baseFeePerGas ) ),
+          prevRandao ))
+      (fun ( ( ( number,
+                 hash,
+                 parent,
+                 nonce,
+                 sha3Uncles,
+                 logsBloom,
+                 transactionRoot,
+                 stateRoot,
+                 receiptRoot,
+                 miner ),
+               ( difficulty,
+                 totalDifficulty,
+                 extraData,
+                 size,
+                 gasLimit,
+                 gasUsed,
+                 timestamp,
+                 transactions,
+                 uncles,
+                 baseFeePerGas ) ),
+             prevRandao ) ->
+        {
+          number;
+          hash;
+          parent;
+          nonce;
+          sha3Uncles;
+          logsBloom;
+          transactionRoot;
+          stateRoot;
+          receiptRoot;
+          miner;
+          difficulty;
+          totalDifficulty;
+          extraData;
+          size;
+          gasLimit;
+          gasUsed;
+          baseFeePerGas;
+          timestamp;
+          transactions;
+          uncles;
+          prevRandao;
+          withdrawals = None;
+          withdrawalsRoot = None;
+          blobGasUsed = None;
+          excessBlobGas = None;
+          parentBeaconBlockRoot = None;
+        })
+      (merge_objs
+         (merge_objs
+            (obj10
+               (req "number" quantity_encoding)
+               (req "hash" block_hash_encoding)
+               (req "parentHash" block_hash_encoding)
+               (req "nonce" hex_encoding)
+               (req "sha3Uncles" hash_encoding)
+               (req "logsBloom" hex_encoding)
+               (req "transactionsRoot" hash_encoding)
+               (req "stateRoot" hash_encoding)
+               (req "receiptsRoot" hash_encoding)
+               (req "miner" hex_encoding))
+            (obj10
+               (req "difficulty" quantity_encoding)
+               (req "totalDifficulty" quantity_encoding)
+               (req "extraData" hex_encoding)
+               (req "size" quantity_encoding)
+               (req "gasLimit" quantity_encoding)
+               (req "gasUsed" quantity_encoding)
+               (req "timestamp" quantity_encoding)
+               (req
+                  "transactions"
+                  (block_transactions_encoding
+                     legacy_transaction_object_encoding))
+               (req "uncles" (list hash_encoding))
+               (opt "baseFeePerGas" quantity_encoding)))
+         (obj1
+            (* [mixHash] has been replaced by [prevRandao] internally in the
+               Paris EVM version, but every public RPC endpoints we have been
+               testing keep using [mixHash] in their JSON encoding (probably for
+               backward compatibility). *)
+            (opt "mixHash" block_hash_encoding)))
+end
+
+type levels = {l1_level : int32; current_number : Ethereum_types.quantity}
+
+type finalized_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
 }
 
 type pending_kernel_upgrade = {
   kernel_upgrade : Evm_events.Upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
+type pending_sequencer_upgrade = {
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t;
   injected_before : Ethereum_types.quantity;
 }
 
@@ -26,7 +171,7 @@ type metadata = {
 }
 
 module Q = struct
-  open Caqti_request.Infix
+  open Sqlite.Request
   open Caqti_type.Std
   open Ethereum_types
 
@@ -96,6 +241,15 @@ module Q = struct
         Ok (Address (Hex address)))
       string
 
+  let public_key =
+    custom
+      ~encode:(fun public_key ->
+        Ok (Signature.Public_key.to_b58check public_key))
+      ~decode:(fun b58 ->
+        let public_key = Signature.Public_key.of_b58check_exn b58 in
+        Ok public_key)
+      string
+
   let block_hash =
     let open Ethereum_types in
     custom
@@ -114,10 +268,31 @@ module Q = struct
              Ethereum_types.(block_encoding legacy_transaction_object_encoding)
              payload))
       ~decode:(fun bytes ->
-        Option.to_result ~none:"Not a valid block payload"
-        @@ Data_encoding.Binary.of_string_opt
-             Ethereum_types.(block_encoding legacy_transaction_object_encoding)
-             bytes)
+        Result.map_error
+          (Format.asprintf
+             "Not a valid block payload: %a"
+             Data_encoding.Binary.pp_read_error)
+          (* The block encoding in Ethereum_types was modified in a patch
+             without taking into account backward compatibility.
+
+             As a consequence, it is possible for a block to be serialized
+             with the previous encoding. We fallback to this legacy encoding
+             just in case. *)
+          (Result.bind_error
+             (Data_encoding.Binary.of_string
+                Ethereum_types.(
+                  block_encoding legacy_transaction_object_encoding)
+                bytes)
+             (fun _ ->
+               Data_encoding.Binary.of_string
+                 Legacy_encodings.block_encoding
+                 bytes)))
+      string
+
+  let tezos_block =
+    custom
+      ~encode:L2_types.Tezos_block.encode_block
+      ~decode:L2_types.Tezos_block.decode_block
       string
 
   let timestamp =
@@ -133,6 +308,15 @@ module Q = struct
       ~encode:(fun Evm_events.Upgrade.{hash; timestamp} -> Ok (hash, timestamp))
       ~decode:(fun (hash, timestamp) -> Ok Evm_events.Upgrade.{hash; timestamp})
       (t2 root_hash timestamp)
+
+  let sequencer_upgrade =
+    custom
+      ~encode:(fun
+          Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp} ->
+        Ok (sequencer, pool_address, timestamp))
+      ~decode:(fun (sequencer, pool_address, timestamp) ->
+        Ok Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp})
+      (t3 public_key address timestamp)
 
   let delayed_transaction =
     custom
@@ -170,18 +354,37 @@ module Q = struct
 
   let levels =
     custom
-      ~encode:(fun {current_number; l1_level; finalized} ->
-        Ok (current_number, l1_level, finalized))
-      ~decode:(fun (current_number, l1_level, finalized) ->
-        Ok {current_number; l1_level; finalized})
-      (t3 level l1_level level)
+      ~encode:(fun {current_number; l1_level} -> Ok (current_number, l1_level))
+      ~decode:(fun (current_number, l1_level) -> Ok {current_number; l1_level})
+      (t2 level l1_level)
+
+  let finalized_levels =
+    custom
+      ~encode:(fun {start_l2_level; end_l2_level} ->
+        Ok (start_l2_level, end_l2_level))
+      ~decode:(fun (start_l2_level, end_l2_level) ->
+        Ok {start_l2_level; end_l2_level})
+      (t2 level level)
 
   let pending_kernel_upgrade =
     product (fun injected_before hash timestamp ->
         {injected_before; kernel_upgrade = Evm_events.Upgrade.{hash; timestamp}})
-    @@ proj level (fun k -> k.injected_before)
+    @@ proj level (fun (k : pending_kernel_upgrade) -> k.injected_before)
     @@ proj root_hash (fun k -> k.kernel_upgrade.hash)
     @@ proj timestamp (fun k -> k.kernel_upgrade.timestamp)
+    @@ proj_end
+
+  let pending_sequencer_upgrade =
+    product (fun injected_before sequencer pool_address timestamp ->
+        {
+          injected_before;
+          sequencer_upgrade =
+            Evm_events.Sequencer_upgrade.{sequencer; pool_address; timestamp};
+        })
+    @@ proj level (fun (k : pending_sequencer_upgrade) -> k.injected_before)
+    @@ proj public_key (fun k -> k.sequencer_upgrade.sequencer)
+    @@ proj address (fun k -> k.sequencer_upgrade.pool_address)
+    @@ proj timestamp (fun k -> k.sequencer_upgrade.timestamp)
     @@ proj_end
 
   let table_exists =
@@ -234,66 +437,76 @@ module Q = struct
       You can review the result at
       [etherlink/tezt/tests/expected/evm_sequencer.ml/EVM Node- debug print store schemas.out].
     *)
-    let version = 19
+    let version = 21
 
     let all : Evm_node_migrations.migration list =
       Evm_node_migrations.migrations version
   end
 
   module Blueprints = struct
+    let table = "blueprints" (* For opentelemetry *)
+
     let insert =
-      (t3 level timestamp payload ->. unit)
+      (t3 level timestamp payload ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blueprints (id, timestamp, payload) VALUES (?, ?, ?)|eos}
 
     let select =
-      (level ->? t2 payload timestamp)
+      (level ->? t2 payload timestamp) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT payload, timestamp FROM blueprints WHERE id = ?|eos}
 
     let select_range =
-      (t2 level level ->* t2 level payload)
+      (t2 level level ->* t2 level payload) ~name:__FUNCTION__ ~table
       @@ {|SELECT id, payload FROM blueprints
            WHERE ? <= id AND id <= ?
            ORDER BY id ASC|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blueprints WHERE id > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM blueprints WHERE id < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blueprints WHERE id < ?|}
   end
 
   module Context_hashes = struct
+    let table = "context_hash" (* For opentelemetry *)
+
     let insert =
-      (t2 level context_hash ->. unit)
+      (t2 level context_hash ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|REPLACE INTO context_hashes (id, context_hash) VALUES (?, ?)|eos}
 
     let select =
-      (level ->? context_hash)
+      (level ->? context_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT (context_hash) FROM context_hashes WHERE id = ?|eos}
 
     let get_latest =
-      (unit ->? t2 level context_hash)
+      (unit ->? t2 level context_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT id, context_hash FROM context_hashes ORDER BY id DESC LIMIT 1|eos}
 
     let get_earliest =
-      (unit ->? t2 level context_hash)
+      (unit ->? t2 level context_hash) ~name:__FUNCTION__ ~table
       @@ {|SELECT id, context_hash FROM context_hashes
            WHERE id >= 0 ORDER BY id ASC LIMIT 1|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM context_hashes WHERE id > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM context_hashes WHERE id < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM context_hashes WHERE id < ?|}
   end
 
   module Kernel_upgrades = struct
+    let table = "kernel_updates" (* For opentelemetry *)
+
     let insert =
-      (t3 level root_hash timestamp ->. unit)
+      (t3 level root_hash timestamp ->. unit) ~name:__FUNCTION__ ~table
       @@ {|REPLACE INTO kernel_upgrades (injected_before, root_hash, activation_timestamp) VALUES (?, ?, ?)|}
 
     let activation_levels =
-      (unit ->* level)
+      (unit ->* level) ~name:__FUNCTION__ ~table
       @@ {|SELECT applied_before
            FROM kernel_upgrades
            WHERE applied_before IS NOT NULL
@@ -301,7 +514,7 @@ module Q = struct
     |}
 
     let get_latest_unapplied =
-      (unit ->? pending_kernel_upgrade)
+      (unit ->? pending_kernel_upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT injected_before, root_hash, activation_timestamp
            FROM kernel_upgrades WHERE applied_before IS NULL
            ORDER BY injected_before DESC
@@ -309,79 +522,202 @@ module Q = struct
     |}
 
     let find_injected_before =
-      (level ->? upgrade)
+      (level ->? upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before = ?|}
 
     let find_latest_injected_after =
-      (level ->? upgrade)
+      (level ->? upgrade) ~name:__FUNCTION__ ~table
       @@ {|SELECT root_hash, activation_timestamp
            FROM kernel_upgrades WHERE injected_before > ?
            ORDER BY injected_before DESC
            LIMIT 1|}
 
     let record_apply =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
       UPDATE kernel_upgrades SET applied_before = ? WHERE applied_before IS NULL
     |}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before > ?|}
 
     let nullify_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|UPDATE kernel_upgrades SET applied_before = NULL WHERE applied_before > ?|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM kernel_upgrades WHERE injected_before < ?|}
   end
 
-  module Delayed_transactions = struct
+  module Sequencer_upgrades = struct
     let insert =
-      (t3 level root_hash delayed_transaction ->. unit)
-      @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
+      (t4 level public_key address timestamp ->. unit)
+      @@ {|REPLACE INTO sequencer_upgrades (injected_before, sequencer, pool_address, activation_timestamp) VALUES (?, ?, ?, ?)|}
 
-    let select_at_level =
-      (level ->* delayed_transaction)
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+    let activation_levels =
+      (unit ->* level)
+      @@ {|SELECT applied_before
+           FROM sequencer_upgrades
+           WHERE applied_before IS NOT NULL
+           ORDER BY applied_before DESC
+    |}
 
-    let select_at_hash =
-      (root_hash ->? delayed_transaction)
-      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+    let get_latest_unapplied =
+      (unit ->? pending_sequencer_upgrade)
+      @@ {|SELECT injected_before, sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE applied_before IS NULL
+           ORDER BY injected_before DESC
+           LIMIT 1
+    |}
+
+    let find_injected_before =
+      (level ->? sequencer_upgrade)
+      @@ {|SELECT sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE injected_before = ?|}
+
+    let find_latest_injected_after =
+      (level ->? sequencer_upgrade)
+      @@ {|SELECT sequencer, pool_address, activation_timestamp
+           FROM sequencer_upgrades WHERE injected_before > ?
+           ORDER BY injected_before DESC
+           LIMIT 1|}
+
+    let record_apply =
+      (level ->. unit)
+      @@ {|
+      UPDATE sequencer_upgrades SET applied_before = ? WHERE applied_before IS NULL
+    |}
 
     let clear_after =
       (level ->. unit)
-      @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
+      @@ {|DELETE FROM sequencer_upgrades WHERE injected_before > ?|}
+
+    let nullify_after =
+      (level ->. unit)
+      @@ {|UPDATE sequencer_upgrades SET applied_before = NULL WHERE applied_before > ?|}
 
     let clear_before =
       (level ->. unit)
+      @@ {|DELETE FROM sequencer_upgrades WHERE injected_before < ?|}
+  end
+
+  module Delayed_transactions = struct
+    let table = "delayed_transactions" (* For opentelemetry *)
+
+    let insert =
+      (t3 level root_hash delayed_transaction ->. unit)
+        ~name:__FUNCTION__
+        ~table
+      @@ {|INSERT INTO delayed_transactions (injected_before, hash, payload) VALUES (?, ?, ?)|}
+
+    let select_at_level =
+      (level ->* delayed_transaction) ~name:__FUNCTION__ ~table
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = injected_before|}
+
+    let select_at_hash =
+      (root_hash ->? delayed_transaction) ~name:__FUNCTION__ ~table
+      @@ {|SELECT payload FROM delayed_transactions WHERE ? = hash|}
+
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM delayed_transactions WHERE injected_before > ?|}
+
+    let clear_before =
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM delayed_transactions WHERE injected_before < ?|}
   end
 
   module L1_l2_levels_relationships = struct
+    let table = "l1_l2_levels_relationships" (* For opentelemetry *)
+
     let insert =
-      (t3 level l1_level level ->. unit)
-      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level, finalized_l2_level) VALUES (?, ?, ?)|}
+      (t2 level l1_level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|INSERT INTO l1_l2_levels_relationships (latest_l2_level, l1_level) VALUES (?, ?)|}
 
     let get =
-      (unit ->! levels)
-      @@ {|SELECT latest_l2_level, l1_level, finalized_l2_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
+      (unit ->! levels) ~name:__FUNCTION__ ~table
+      @@ {|SELECT latest_l2_level, l1_level FROM l1_l2_levels_relationships ORDER BY latest_l2_level DESC LIMIT 1|}
 
     let clear_after =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level > ?|}
 
     let clear_before =
-      (level ->. unit)
+      (level ->. unit) ~name:__FUNCTION__ ~table
       @@ {|DELETE FROM l1_l2_levels_relationships WHERE latest_l2_level < ?|}
   end
 
+  module L1_l2_finalized_levels = struct
+    let table = "l1_l2_finalized_levels" (* For opentelemetry *)
+
+    let insert =
+      (t2 l1_level finalized_levels ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|REPLACE INTO l1_l2_finalized_levels
+           (l1_level, start_l2_level, end_l2_level)
+           VALUES (?, ?, ?)|}
+
+    let get =
+      (l1_level ->? finalized_levels) ~name:__FUNCTION__ ~table
+      @@ {|SELECT start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE l1_level = ?|}
+
+    let last_l2_level =
+      (unit ->? level) ~name:__FUNCTION__ ~table
+      @@ {|SELECT MAX(end_l2_level) FROM l1_l2_finalized_levels|}
+
+    let last =
+      (unit ->? t2 l1_level finalized_levels) ~name:__FUNCTION__ ~table
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           ORDER BY l1_level DESC LIMIT 1|}
+
+    let find_l1_level =
+      (level ->? l1_level) ~name:__FUNCTION__ ~table
+      @@ {|SELECT l1_level
+           FROM l1_l2_finalized_levels
+           WHERE $1 > start_l2_level
+             AND $1 <= end_l2_level
+           ORDER BY l1_level DESC LIMIT 1|}
+
+    let list_by_l2_levels =
+      (t2 level level ->* t2 l1_level finalized_levels)
+        ~name:__FUNCTION__
+        ~table
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE start_l2_level >= ?
+           AND end_l2_level <= ?
+           ORDER BY l1_level ASC|}
+
+    let list_by_l1_levels =
+      (t2 l1_level l1_level ->* t2 l1_level finalized_levels)
+        ~name:__FUNCTION__
+        ~table
+      @@ {|SELECT l1_level, start_l2_level, end_l2_level
+           FROM l1_l2_finalized_levels
+           WHERE l1_level BETWEEN ? AND ?
+           ORDER BY l1_level ASC|}
+
+    let clear_before =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM l1_l2_finalized_levels
+           WHERE start_l2_level < ?|}
+
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM l1_l2_finalized_levels
+           WHERE end_l2_level > ?|}
+  end
+
   module Metadata = struct
+    let table = "metadata" (* For opentelemetry *)
+
     let insert_smart_rollup_address =
-      (smart_rollup_address ->. unit)
+      (smart_rollup_address ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
 INSERT INTO metadata (key, value) VALUES ('smart_rollup_address', ?)
 ON CONFLICT(key)
@@ -389,11 +725,11 @@ DO UPDATE SET value = excluded.value
 |}
 
     let get_smart_rollup_address =
-      (unit ->! smart_rollup_address)
+      (unit ->! smart_rollup_address) ~name:__FUNCTION__ ~table
       @@ {|SELECT value from metadata WHERE key = 'smart_rollup_address'|}
 
     let insert_history_mode =
-      (history_mode ->. unit)
+      (history_mode ->. unit) ~name:__FUNCTION__ ~table
       @@ {|
 INSERT INTO metadata (key, value) VALUES ('history_mode', ?)
 ON CONFLICT(key)
@@ -401,11 +737,13 @@ DO UPDATE SET value = excluded.value
 |}
 
     let get_history_mode =
-      (unit ->! history_mode)
+      (unit ->! history_mode) ~name:__FUNCTION__ ~table
       @@ {|SELECT value from metadata WHERE key = 'history_mode'|}
   end
 
   module Transactions = struct
+    let table = "transactions" (* For opentelemetry *)
+
     let receipt_fields =
       custom
         ~encode:(fun payload ->
@@ -435,20 +773,24 @@ DO UPDATE SET value = excluded.value
         string
 
     let insert =
-      t8
-        block_hash
-        level
-        quantity
-        root_hash
-        address
-        (option address)
-        receipt_fields
-        object_fields
-      ->. unit
+      (t8
+         block_hash
+         level
+         quantity
+         root_hash
+         address
+         (option address)
+         receipt_fields
+         object_fields
+      ->. unit)
+        ~name:__FUNCTION__
+        ~table
+        ~attrs:(fun (_, _, _, hash, _, _, _, _) ->
+          [Telemetry.Attributes.Transaction.hash hash])
       @@ {eos|INSERT INTO transactions (block_hash, block_number, index_, hash, from_, to_, receipt_fields, object_fields) VALUES (?, ?, ?, ?, ?, ?, ?, ?)|eos}
 
     let select_receipt =
-      root_hash
+      (root_hash
       ->? t7
             block_hash
             level
@@ -456,22 +798,26 @@ DO UPDATE SET value = excluded.value
             root_hash
             address
             (option address)
-            receipt_fields
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, receipt_fields FROM transactions WHERE hash = ?|eos}
 
     let select_receipts_from_block_number =
-      level
+      (level
       ->* t6
             block_hash
             quantity
             root_hash
             address
             (option address)
-            receipt_fields
+            receipt_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, index_, hash, from_, to_, receipt_fields FROM transactions WHERE block_number = ?|eos}
 
     let select_object =
-      root_hash
+      (root_hash
       ->? t7
             block_hash
             level
@@ -479,97 +825,131 @@ DO UPDATE SET value = excluded.value
             root_hash
             address
             (option address)
-            object_fields
+            object_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT block_hash, block_number, index_, hash, from_, to_, object_fields FROM transactions WHERE hash = ?|eos}
 
     let select_objects_from_block_number =
       (level ->* t5 quantity root_hash address (option address) object_fields)
+        ~name:__FUNCTION__
+        ~table
       @@ {eos|SELECT index_, hash, from_, to_, object_fields FROM transactions WHERE block_number = ?|eos}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM transactions WHERE block_number > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM transactions WHERE block_number < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM transactions WHERE block_number < ?|}
   end
 
   module Block_storage_mode = struct
+    let table = "block_storage_mode" (* For opentelemetry *)
+
     let legacy =
-      (unit ->! Caqti_type.Std.bool)
+      (unit ->! Caqti_type.Std.bool) ~name:__FUNCTION__ ~table
       @@ {|SELECT legacy FROM block_storage_mode|}
 
     let force_legacy =
-      (unit ->. unit) @@ {|UPDATE block_storage_mode SET legacy = 1|}
+      (unit ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|UPDATE block_storage_mode SET legacy = 1|}
   end
 
   module Blocks = struct
+    let table = "blocks" (* For opentelemetry *)
+
     let insert =
-      (t3 level block_hash block ->. unit)
+      (t3 level block_hash block ->. unit) ~name:__FUNCTION__ ~table
+      @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
+
+    let tez_insert =
+      (t3 level block_hash tezos_block ->. unit) ~name:__FUNCTION__ ~table
       @@ {eos|INSERT INTO blocks (level, hash, block) VALUES (?, ?, ?)|eos}
 
     let select_with_level =
-      (level ->? block) @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+      (level ->? block) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
+
+    let tez_select_with_level =
+      (level ->? tezos_block) ~name:__FUNCTION__ ~table
+      @@ {eos|SELECT block FROM blocks WHERE level = ?|eos}
 
     let select_with_hash =
-      (block_hash ->? block)
+      (block_hash ->? block) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT block FROM blocks WHERE hash = ?|eos}
 
     let select_hash_of_number =
-      (level ->? block_hash)
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT hash FROM blocks WHERE level = ?|eos}
 
     let select_number_of_hash =
-      (block_hash ->? level)
+      (block_hash ->? level) ~name:__FUNCTION__ ~table
       @@ {eos|SELECT level FROM blocks WHERE hash = ?|eos}
 
-    let clear_after = (level ->. unit) @@ {|DELETE FROM blocks WHERE level > ?|}
+    let clear_after =
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blocks WHERE level > ?|}
 
     let clear_before =
-      (level ->. unit) @@ {|DELETE FROM blocks WHERE level < ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM blocks WHERE level < ?|}
   end
 
   let context_hash_of_block_hash =
-    (block_hash ->? context_hash)
+    (block_hash ->? context_hash) ~name:__FUNCTION__ ~table:"context_hashes"
     @@ {eos|SELECT c.context_hash from Context_hashes c JOIN Blocks b on c.id = b.level WHERE hash = ?|eos}
 
   module Irmin_chunks = struct
+    let table = "irmin_chunks" (* For opentelemetry *)
+
     let insert =
-      (t2 level timestamp ->. unit)
+      (t2 level timestamp ->. unit) ~name:__FUNCTION__ ~table
       @@ {|INSERT INTO irmin_chunks (level, timestamp) VALUES (?, ?)|}
 
     let nth =
-      (int ->? t2 level timestamp)
+      (int ->? t2 level timestamp) ~name:__FUNCTION__ ~table
       @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1 OFFSET ?|}
 
     let latest =
-      (unit ->? t2 level timestamp)
+      (unit ->? t2 level timestamp) ~name:__FUNCTION__ ~table
       @@ {|SELECT level, timestamp from irmin_chunks ORDER BY level DESC LIMIT 1|}
 
-    let clear = (unit ->. unit) @@ {|DELETE FROM irmin_chunks|}
+    let clear =
+      (unit ->. unit) ~name:__FUNCTION__ ~table @@ {|DELETE FROM irmin_chunks|}
 
     let clear_after =
-      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM irmin_chunks WHERE level > ?|}
 
     let clear_before_included =
-      (level ->. unit) @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM irmin_chunks WHERE level <= ?|}
   end
 
   module Pending_confirmations = struct
+    let table = "pending_confirmations" (* For opentelemetry *)
+
     let insert =
-      (t2 level block_hash ->. unit)
+      (t2 level block_hash ->. unit) ~name:__FUNCTION__ ~table
       @@ {|INSERT INTO pending_confirmations (level, hash) VALUES (?, ?)|}
 
     let select_with_level =
-      (level ->? block_hash)
+      (level ->? block_hash) ~name:__FUNCTION__ ~table
       @@ {|SELECT hash FROM pending_confirmations WHERE level = ?|}
 
     let delete_with_level =
-      (level ->. unit) @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
+      (level ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations WHERE level = ?|}
 
-    let clear = (unit ->. unit) @@ {|DELETE FROM pending_confirmations|}
+    let clear =
+      (unit ->. unit) ~name:__FUNCTION__ ~table
+      @@ {|DELETE FROM pending_confirmations|}
 
     let count =
-      (unit ->! level) @@ {|SELECT COUNT(*) FROM pending_confirmations|}
+      (unit ->! level) ~name:__FUNCTION__ ~table
+      @@ {|SELECT COUNT(*) FROM pending_confirmations|}
   end
 end
 
@@ -618,7 +998,7 @@ end
 
 let sqlite_file_name = "store.sqlite"
 
-let init ~data_dir ~perm () =
+let init ?max_conn_reuse_count ~data_dir ~perm () =
   let open Lwt_result_syntax in
   let path = data_dir // sqlite_file_name in
   let*! exists = Lwt_unix.file_exists path in
@@ -640,7 +1020,7 @@ let init ~data_dir ~perm () =
     let* migrations = Migrations.missing_migrations conn in
     let*? () =
       match (perm, migrations) with
-      | `Read_only, _ :: _ ->
+      | Read_only _, _ :: _ ->
           error_with
             "The store has %d missing migrations but was opened in read-only \
              mode."
@@ -650,14 +1030,17 @@ let init ~data_dir ~perm () =
     let* () =
       List.iter_es
         (fun (i, ((module M : Evm_node_migrations.S) as mig)) ->
+          let start_t = Time.System.now () in
           let* () = Migrations.apply_migration conn i mig in
-          let*! () = Evm_store_events.applied_migration M.name in
+          let end_t = Time.System.now () in
+          let migration_time = Ptime.diff end_t start_t in
+          let*! () = Evm_store_events.applied_migration M.name migration_time in
           return_unit)
         migrations
     in
     return_unit
   in
-  Sqlite.init ~path ~perm migration
+  Sqlite.init ?max_conn_reuse_count ~path ~perm migration
 
 module Context_hashes = struct
   let store store number hash =
@@ -693,11 +1076,13 @@ module Context_hashes = struct
   let find_finalized store =
     let open Lwt_result_syntax in
     with_connection store @@ fun conn ->
-    let* l1_l2_levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
-    match l1_l2_levels with
-    | None -> return_none
-    | Some {current_number = Qty current_number; finalized = Qty finalized; _}
-      ->
+    let* levels = Db.find_opt conn Q.L1_l2_levels_relationships.get () in
+    let* finalized =
+      Db.find_opt conn Q.L1_l2_finalized_levels.last_l2_level ()
+    in
+    match (levels, finalized) with
+    | None, _ | _, None -> return_none
+    | Some {current_number = Qty current_number; _}, Some (Qty finalized) ->
         let min = Ethereum_types.Qty (Z.min current_number finalized) in
         let+ hash = Db.find_opt conn Q.Context_hashes.select min in
         Option.map (fun hash -> (min, hash)) hash
@@ -750,6 +1135,49 @@ module Kernel_upgrades = struct
     Db.collect_list conn Q.Kernel_upgrades.activation_levels ()
 end
 
+module Sequencer_upgrades = struct
+  let store store next_blueprint_number (event : Evm_events.Sequencer_upgrade.t)
+      =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Sequencer_upgrades.insert
+      ( next_blueprint_number,
+        event.sequencer,
+        event.pool_address,
+        event.timestamp )
+
+  let find_latest_pending store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.get_latest_unapplied ()
+
+  let find_injected_before store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.find_injected_before level
+
+  let find_latest_injected_after store level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.Sequencer_upgrades.find_latest_injected_after level
+
+  let record_apply store level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Sequencer_upgrades.record_apply level
+
+  let clear_after store l2_level =
+    let open Lwt_result_syntax in
+    with_connection store @@ fun conn ->
+    let* () = Db.exec conn Q.Sequencer_upgrades.clear_after l2_level in
+    Db.exec conn Q.Sequencer_upgrades.nullify_after l2_level
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.Sequencer_upgrades.clear_before l2_level
+
+  let activation_levels store =
+    with_connection store @@ fun conn ->
+    Db.collect_list conn Q.Sequencer_upgrades.activation_levels ()
+end
+
 module Delayed_transactions = struct
   let store store next_blueprint_number
       (delayed_transaction : Evm_events.Delayed_transaction.t) =
@@ -793,16 +1221,32 @@ module Blueprints = struct
         Some Blueprint_types.{payload; timestamp; number}
     | None -> None
 
-  let find_with_events conn level =
+  let find_with_events_legacy conn level =
     let open Lwt_result_syntax in
     let* blueprint = find conn level in
-    let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
     match blueprint with
     | None -> return None
     | Some blueprint ->
+        let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
         let* delayed_transactions = Delayed_transactions.at_level conn level in
         return_some
-          Blueprint_types.{delayed_transactions; kernel_upgrade; blueprint}
+          Blueprint_types.Legacy.
+            {delayed_transactions; kernel_upgrade; blueprint}
+
+  let find_with_events conn level =
+    let open Lwt_result_syntax in
+    let* blueprint = find conn level in
+    match blueprint with
+    | None -> return None
+    | Some blueprint ->
+        let* kernel_upgrade = Kernel_upgrades.find_injected_before conn level in
+        let* sequencer_upgrade =
+          Sequencer_upgrades.find_injected_before conn level
+        in
+        let* delayed_transactions = Delayed_transactions.at_level conn level in
+        return_some
+          Blueprint_types.
+            {delayed_transactions; sequencer_upgrade; kernel_upgrade; blueprint}
 
   let get_with_events conn level =
     let open Lwt_result_syntax in
@@ -829,18 +1273,11 @@ module Blueprints = struct
 end
 
 module L1_l2_levels_relationships = struct
-  type t = levels = {
-    l1_level : int32;
-    current_number : Ethereum_types.quantity;
-    finalized : Ethereum_types.quantity;
-  }
+  type t = levels = {l1_level : int32; current_number : Ethereum_types.quantity}
 
-  let store store ~l1_level ~latest_l2_level ~finalized_l2_level =
+  let store store ~l1_level ~latest_l2_level =
     with_connection store @@ fun conn ->
-    Db.exec
-      conn
-      Q.L1_l2_levels_relationships.insert
-      (latest_l2_level, l1_level, finalized_l2_level)
+    Db.exec conn Q.L1_l2_levels_relationships.insert (latest_l2_level, l1_level)
 
   let find store =
     with_connection store @@ fun conn ->
@@ -853,6 +1290,92 @@ module L1_l2_levels_relationships = struct
   let clear_before store l2_level =
     with_connection store @@ fun conn ->
     Db.exec conn Q.L1_l2_levels_relationships.clear_before l2_level
+end
+
+module L1_l2_finalized_levels = struct
+  type t = finalized_levels = {
+    start_l2_level : Ethereum_types.quantity;
+    end_l2_level : Ethereum_types.quantity;
+  }
+
+  let store store ~l1_level ~start_l2_level ~end_l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.L1_l2_finalized_levels.insert
+      (l1_level, {start_l2_level; end_l2_level})
+
+  let find store ~l1_level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.get l1_level
+
+  let last store =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.last ()
+
+  let find_l1_level store ~l2_level =
+    with_connection store @@ fun conn ->
+    Db.find_opt conn Q.L1_l2_finalized_levels.find_l1_level l2_level
+
+  let list_by_l2_levels store ~start_l2_level ~end_l2_level =
+    with_connection store @@ fun conn ->
+    Db.collect_list
+      conn
+      Q.L1_l2_finalized_levels.list_by_l2_levels
+      (start_l2_level, end_l2_level)
+
+  let list_by_l1_levels store ~start_l1_level ~end_l1_level =
+    with_connection store @@ fun conn ->
+    Db.collect_list
+      conn
+      Q.L1_l2_finalized_levels.list_by_l1_levels
+      (start_l1_level, end_l1_level)
+
+  let max_blocks = 10_000
+
+  let make_l1_bounds x y =
+    let max = Int32.of_int (max_blocks - 1) in
+    let rec aux acc x y =
+      let prev_x = Int32.sub y max in
+      if prev_x <= x then (x, y) :: acc
+      else aux ((prev_x, y) :: acc) x (Int32.pred prev_x)
+    in
+    aux [] x y
+
+  let make_l2_bounds x y =
+    let max = Z.of_int (max_blocks - 1) in
+    let rec aux acc x y =
+      let prev_x = Z.sub y max in
+      if Z.Compare.(prev_x <= x) then (x, y) :: acc
+      else aux ((prev_x, y) :: acc) x (Z.pred prev_x)
+    in
+    aux [] x y
+
+  (* Paginated version of list_by_l2_levels *)
+  let list_by_l2_levels store
+      ~start_l2_level:(Ethereum_types.Qty start_l2_level)
+      ~end_l2_level:(Ethereum_types.Qty end_l2_level) =
+    let levels = make_l2_bounds start_l2_level end_l2_level in
+    List.concat_map_es
+      (fun (x, y) ->
+        list_by_l2_levels store ~start_l2_level:(Qty x) ~end_l2_level:(Qty y))
+      levels
+
+  (* Paginated version of list_by_l1_levels *)
+  let list_by_l1_levels store ~start_l1_level ~end_l1_level =
+    let levels = make_l1_bounds start_l1_level end_l1_level in
+    List.concat_map_es
+      (fun (start_l1_level, end_l1_level) ->
+        list_by_l1_levels store ~start_l1_level ~end_l1_level)
+      levels
+
+  let clear_before store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_finalized_levels.clear_before l2_level
+
+  let clear_after store l2_level =
+    with_connection store @@ fun conn ->
+    Db.exec conn Q.L1_l2_finalized_levels.clear_after l2_level
 end
 
 module Metadata = struct
@@ -1100,6 +1623,13 @@ module Blocks = struct
     with_connection store @@ fun conn ->
     Db.exec conn Q.Blocks.insert (block.number, block.hash, block)
 
+  let tez_store store (block : L2_types.Tezos_block.t) =
+    with_connection store @@ fun conn ->
+    Db.exec
+      conn
+      Q.Blocks.tez_insert
+      (Qty (Z.of_int32 block.level), block.hash, block)
+
   let block_with_objects store block =
     let open Lwt_result_syntax in
     let* rows =
@@ -1155,6 +1685,23 @@ module Blocks = struct
     if full_transaction_object then
       Option.map_es (block_with_objects store) block_opt
     else return (Option.map Transaction_object.block_from_legacy block_opt)
+
+  let get_with_level ~full_transaction_object store (Ethereum_types.Qty level) =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      find_with_level ~full_transaction_object store (Qty level)
+    in
+    match block_opt with
+    | Some block -> return block
+    | None -> failwith "Could not find block %a" Z.pp_print level
+
+  let tez_find_with_level store level =
+    let open Lwt_result_syntax in
+    let* block_opt =
+      with_connection store @@ fun conn ->
+      Db.find_opt conn Q.Blocks.tez_select_with_level level
+    in
+    return block_opt
 
   let find_with_hash ~full_transaction_object store hash =
     let open Lwt_result_syntax in
@@ -1225,7 +1772,9 @@ let reset_after store ~l2_level =
   let* () = Blueprints.clear_after store l2_level in
   let* () = Context_hashes.clear_after store l2_level in
   let* () = L1_l2_levels_relationships.clear_after store l2_level in
+  let* () = L1_l2_finalized_levels.clear_after store l2_level in
   let* () = Kernel_upgrades.clear_after store l2_level in
+  let* () = Sequencer_upgrades.clear_after store l2_level in
   let* () = Delayed_transactions.clear_after store l2_level in
   let* () = Blocks.clear_after store l2_level in
   let* () = Transactions.clear_after store l2_level in
@@ -1240,6 +1789,7 @@ let reset_before store ~l2_level ~history_mode =
   let open Lwt_result_syntax in
   let* () = Context_hashes.clear_before store l2_level in
   let* () = L1_l2_levels_relationships.clear_before store l2_level in
+  let* () = L1_l2_finalized_levels.clear_before store l2_level in
   let* () =
     match history_mode with
     | Configuration.Rolling _ ->
@@ -1247,6 +1797,7 @@ let reset_before store ~l2_level ~history_mode =
         let* () = Blocks.clear_before store l2_level in
         let* () = Transactions.clear_before store l2_level in
         let* () = Kernel_upgrades.clear_before store l2_level in
+        let* () = Sequencer_upgrades.clear_before store l2_level in
         let* () = Delayed_transactions.clear_before store l2_level in
         return_unit
     | _ -> return_unit

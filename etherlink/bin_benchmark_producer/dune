@@ -1,0 +1,23 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name main)
+ (public_name etherlink-benchmark-producer)
+ (package etherlink-benchmark-producer)
+ (libraries
+  bls12-381.archive
+  octez-libs.test-helpers
+  octez-libs.tezt-wrapper
+  tezt-tezos
+  tezt_etherlink
+  octez-libs.base)
+ (flags
+  (:standard)
+  -open Tezos_test_helpers
+  -open Tezt_wrapper
+  -open Tezt_wrapper.Base
+  -open Tezt_tezos
+  -open Tezt_tezos.Runnable.Syntax
+  -open Tezt_etherlink
+  -open Tezos_base.TzPervasives))

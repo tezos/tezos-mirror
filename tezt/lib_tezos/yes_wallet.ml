@@ -9,6 +9,13 @@ type alias = {alias : string; address : string; public_key : string}
 
 type aliases = File of string | List of alias list
 
+type consensus_key_mapping = {
+  name : string;
+  public_key_hash : string;
+  consensus_public_key_hash : string;
+  consensus_public_key : string;
+}
+
 type t = {path : string; runner : Runner.t option; name : string option}
 
 let dump_aliases ?runner aliases =
@@ -41,6 +48,17 @@ let dump_aliases ?runner aliases =
   in
   Lwt.return filename
 
+let read_consensus_key_mapping ?runner client =
+  match runner with
+  | None -> assert false
+  | Some runner ->
+      let cmd =
+        Runner.Shell.(
+          cmd [] "cat" [Client.base_dir client // "consensus_keys_mapping"])
+      in
+      let cmd, args = Runner.wrap_with_ssh runner cmd in
+      Process.spawn cmd args |> Process.check_and_read_stdout
+
 let create ?runner ?(path = Uses.path Constant.yes_wallet) ?name () =
   {path; runner; name}
 
@@ -69,6 +87,7 @@ let create_from_context ?(aliases = List []) ~node ~client ~network t =
         aliases_filename;
         "--force";
         "--active-bakers-only";
+        "--consensus-key-override";
       ]
     |> Process.check
   in
@@ -80,3 +99,22 @@ let convert_wallet_inplace ~client t =
     ["convert"; "wallet"; Client.base_dir client; "inplace"; "--force"]
   in
   Process.spawn ?runner ?name path args |> Process.check
+
+let load_consensus_key_mapping t ~client =
+  let* content = read_consensus_key_mapping ?runner:t.runner client in
+  let j =
+    JSON.parse ~origin:"consensus_key_mapping_file" content |> JSON.as_list
+  in
+  List.map
+    (fun e ->
+      let name = JSON.(e |-> "name" |> as_string) in
+      let public_key_hash = JSON.(e |-> "public_key_hash" |> as_string) in
+      let consensus_public_key_hash =
+        JSON.(e |-> "consensus_public_key_hash" |> as_string)
+      in
+      let consensus_public_key =
+        JSON.(e |-> "consensus_public_key" |> as_string)
+      in
+      {name; public_key_hash; consensus_public_key_hash; consensus_public_key})
+    j
+  |> return

@@ -33,15 +33,15 @@ let create_reset_block_section =
 
 let all_profilers =
   [
-    ("mempool", mempool_profiler);
-    ("store", store_profiler);
     ("chain_validator", chain_validator_profiler);
     ("block_validator", block_validator_profiler);
-    ("peer_validator", peer_validator_profiler);
+    ("mempool", mempool_profiler);
     ("merge", merge_profiler);
     ("p2p_reader", p2p_reader_profiler);
+    ("peer_validator", peer_validator_profiler);
     ("requester", requester_profiler);
     ("rpc_server", rpc_server_profiler);
+    ("store", store_profiler);
   ]
 
 let activate_all ~profiler_maker =

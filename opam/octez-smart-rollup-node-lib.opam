@@ -19,6 +19,7 @@ depends: [
   "octez-version" { = version }
   "octez-l2-libs" { = version }
   "octez-crawler" { = version }
+  "opentelemetry-lwt"
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]

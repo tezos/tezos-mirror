@@ -498,7 +498,7 @@ let test_mega_slash =
         (fun acc name ->
           acc --> unstake name (Amount (Tez.of_mutez 190_000_000_000L)))
         Empty
-        ("__bootstrap__" :: delegates)
+        delegates
   --> set_baker "baker"
   (* Activate staking for delegate *)
   --> set_delegate_params

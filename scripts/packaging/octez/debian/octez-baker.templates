@@ -18,7 +18,7 @@ Type: string
 Template: octez-baker/dal-node
 Type: boolean
 Default: true
-Description: Connect to the Octez DAL node ?
+Description: Connect to the Octez DAL node?
  By default, the octez-dal-node package is installed alongside the octez-baker
  package to participate to the DAL network.
  .
@@ -28,7 +28,7 @@ Template: octez-baker/dal-node-url
 Type: string
 Default: http://127.0.0.1:10732
 Description: Specify the url of the RPC server of the Octez DAL node:
- By default the octez-dal-node package is installed along side the octez-baker.
+ By default the octez-dal-node package is installed alongside the octez-baker.
 
 Template: octez-baker/upgrade_note_current
 Type: note
@@ -39,3 +39,8 @@ Description: Important upgrade information
  the configuration of the octez-baker
  .
  Please review the release notes for more information.
+
+Template: octez-baker/agnostic-baker
+Type: boolean
+Default: false
+Description: Use the octez-baker instead of protocol's baker dedicated binaries?

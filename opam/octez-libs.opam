@@ -63,8 +63,11 @@ depends: [
   "conf-libev"
   "progress" { >= "0.1.0" }
   "camlp-streams" { >= "5.0.1" }
-  "uutf"
   "terminal"
+  "uutf"
+  "eio"
+  "eio_main"
+  "lwt_eio"
   "ppxlib" { >= "0.34.0" }
   "ambient-context-lwt" { = "0.1.0" }
   "bheap" { >= "2.0.0" }
@@ -82,9 +85,9 @@ depends: [
   "integers"
   "ctypes" { >= "0.18.0" }
   "tezos-sapling-parameters" { >= "1.1.0" }
+  "opentelemetry-lwt"
   "octez-rustzcash-deps" { with-test & = version }
   "bigstring" {with-test}
-  "bam-ppx" { with-test & >= "0.3" }
   "tezt-bam" { with-test & >= "0.3" }
 ]
 x-opam-monorepo-opam-provided: [

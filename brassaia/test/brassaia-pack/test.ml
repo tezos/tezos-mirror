@@ -14,12 +14,13 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *)
 
-let () =
-  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7182
-     These tests are known flaky at this time *)
-  ()
+(* let () = *)
+(*   (\* FIXME: https://gitlab.com/tezos/tezos/-/issues/7182 *)
+(*      These tests are known flaky at this time *\) *)
+(*   () *)
 
-(* Lwt_main.run *)
-(* @@ Brassaia_test_helpers.Brassaia_test.Store.run ~__FILE__ "brassaia-pack" *)
-(*      ~misc:Test_pack.misc ~sleep:Lwt_unix.sleep *)
-(*      (List.map (fun s -> (`Quick, s)) Test_pack.suite) *)
+let () =
+  Lwt_main.run
+  @@ Brassaia_test_helpers.Brassaia_test.Store.run ~__FILE__ "brassaia-pack"
+       ~misc:Test_pack.misc ~sleep:Lwt_unix.sleep
+       (List.map (fun s -> (`Quick, s)) Test_pack.suite)

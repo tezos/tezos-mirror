@@ -61,7 +61,13 @@ module Consensus_key : sig
     secret_key_uri:Client_keys.sk_uri ->
     t
 
-  val encoding : t Data_encoding.t
+  (** Partial encoding for {!t} that omits the secret key to avoid
+      leaking it in event logs (because {!Client_keys.sk_uri} contains
+      the plain secret key when the key is unencrypted).
+
+      Warning: As a consequence, decoding from this encoding will
+      always fail. *)
+  val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
 end
@@ -86,7 +92,13 @@ end
 module Delegate : sig
   type t = {consensus_key : Consensus_key.t; delegate_id : Delegate_id.t}
 
-  val encoding : t Data_encoding.t
+  (** Partial encoding for {!t} that omits secret keys to avoid
+      leaking them in event logs; see
+      {!Key.encoding_for_logging__cannot_decode}.
+
+      Warning: As a consequence, decoding from this encoding will
+      always fail. *)
+  val encoding_for_logging__cannot_decode : t Data_encoding.t
 
   val pp : Format.formatter -> t -> unit
 end
@@ -458,7 +470,14 @@ type forge_event =
   | Preattestation_ready of signed_consensus_vote
   | Attestation_ready of signed_consensus_vote
 
-val forge_event_encoding : forge_event Data_encoding.t
+(** Partial encoding for {!forge_event} that omits secret keys to
+    avoid leaking them in event logs; see
+    {!Baking_state_types.Key.encoding_for_logging__cannot_decode}.
+
+    Warning: As a consequence, decoding from this encoding will always
+    fail. *)
+val forge_event_encoding_for_logging__cannot_decode :
+  forge_event Data_encoding.t
 
 val pp_forge_event : Format.formatter -> forge_event -> unit
 

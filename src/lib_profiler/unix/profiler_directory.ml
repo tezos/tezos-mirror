@@ -10,9 +10,12 @@ let build_rpc_directory () =
   let dir = Tezos_rpc.Directory.empty in
   let dir =
     Tezos_rpc.Directory.register0 dir Registered.S.registered (fun () () ->
-        let registered_backend =
-          match Profiler_instance.selected_backend () with
-          | Some backend_info -> [backend_info.Profiler_instance.view]
+        let registered_backends =
+          match Profiler_instance.selected_backends () with
+          | Some backends ->
+              List.map
+                (fun backend_info -> backend_info.Profiler_instance.view)
+                backends
           | None -> []
         in
         let backends =
@@ -21,6 +24,6 @@ let build_rpc_directory () =
           |> List.map (fun (env_var, infos) ->
                  (env_var, infos.Profiler_instance.view))
         in
-        Lwt.return_ok Registered.{registered_backend; backends})
+        Lwt.return_ok Registered.{registered_backends; backends})
   in
   dir

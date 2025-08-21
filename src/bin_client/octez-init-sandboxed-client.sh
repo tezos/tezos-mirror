@@ -11,6 +11,7 @@ init_sandboxed_client() {
   shift 1
 
   rpc=$((18730 + id))
+  dal_node_rpc_port=$((28730 + id))
   client_dir="$(mktemp -d -t tezos-tmp-client.XXXXXXXX)"
   client_dirs+=("$client_dir")
 
@@ -28,8 +29,8 @@ init_sandboxed_client() {
 
   # Binaries
   signer="$local_signer -d $client_dir"
-  client="$local_client -base-dir $client_dir -endpoint $endpoint"
-  admin_client="$local_admin_client -base-dir $client_dir -endpoint $endpoint"
+  client="$local_client --base-dir $client_dir --endpoint $endpoint"
+  admin_client="$local_admin_client --base-dir $client_dir --endpoint $endpoint"
   compiler="$local_compiler"
 }
 
@@ -131,6 +132,8 @@ main() {
     protocol_underscore=$(echo "$protocol" | tr -- - _)
     protocol_without_number=$(echo "$protocol" | tr -d "\-[0-9]")
     local_baker="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_baker/main_baker_$protocol_underscore.exe"
+    local_agnostic_baker="$bin_dir/../../_build/default/src/bin_agnostic_baker/main_agnostic_baker.exe"
+    local_agnostic_accuser="$bin_dir/../../_build/default/src/bin_agnostic_accuser/main_agnostic_accuser.exe"
     local_accuser="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_accuser/main_accuser_$protocol_underscore.exe"
     local_sc_rollup_node="$bin_dir/../../_build/default/src/proto_$protocol_underscore/bin_sc_rollup_node/main_sc_rollup_node_$protocol_underscore.exe"
     parameters_file="$bin_dir/../../_build/default/src/proto_$protocol_underscore/lib_parameters/sandbox-parameters.json"
@@ -142,16 +145,26 @@ main() {
       endpoint="http://$host:$rpc"
     fi
 
-    baker="$local_baker -base-dir $client_dir -endpoint $endpoint"
-    accuser="$local_accuser -base-dir $client_dir -endpoint $endpoint"
-    sc_rollup_node="$local_sc_rollup_node -base-dir $client_dir -endpoint $endpoint"
+    baker="$local_baker --base-dir $client_dir --endpoint $endpoint"
+    agnostic_baker="$local_agnostic_baker --base-dir $client_dir --endpoint $endpoint"
+    agnostic_accuser="$local_agnostic_accuser --base-dir $client_dir --endpoint $endpoint"
+    accuser="$local_accuser --base-dir $client_dir --endpoint $endpoint"
+    sc_rollup_node="$local_sc_rollup_node --base-dir $client_dir --endpoint $endpoint"
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-baker-"$protocol_without_number"
     echo "exec $baker \"\$@\"" >> "$client_dir"/bin/octez-baker-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-baker-"$protocol_without_number"
 
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-baker
+    echo "exec $agnostic_baker \"\$@\"" >> "$client_dir"/bin/octez-baker
+    chmod +x "$client_dir"/bin/octez-baker
+
+    echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser
+    echo "exec $agnostic_accuser \"\$@\"" >> "$client_dir"/bin/octez-accuser
+    chmod +x "$client_dir"/bin/octez-accuser
+
     echo '#!/bin/sh' > "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
-    echo "exec $sc_rollup_node \"\$@\" -data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
+    echo "exec $sc_rollup_node \"\$@\" --data-dir $rollup_node_dir" >> "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
     chmod +x "$client_dir"/bin/octez-smart-rollup-node-"$protocol_without_number"
 
     echo '#!/bin/sh' > "$client_dir"/bin/octez-accuser-"$protocol_without_number"
@@ -182,6 +195,7 @@ PATH="$client_dir/bin:\$PATH" ; export PATH ;
 alias octez-autocomplete="if [ \$ZSH_NAME ] ; then autoload bashcompinit ; bashcompinit ; fi ; source \"$bin_dir/bash-completion.sh\"" ;
 alias octez-client-reset="rm -rf \"$client_dir\"; unalias \$(alias | sed 's/alias //g' | grep -o '^octez-[^=]*' | tr '\n' ' '); unalias octez-client-reset" ;
 trap octez-client-reset EXIT ;
+DAL_NODE_RPC_PORT="$dal_node_rpc_port" ; export DAL_NODE_RPC_PORT ;
 
 EOF
 
@@ -204,6 +218,8 @@ or if you run this command a second time.
 Activate tab completion by running:
 
   octez-autocomplete
+
+You may reach the DAL node at the port given by the DAL_NODE_RPC_PORT variable.
 
 EOF
 

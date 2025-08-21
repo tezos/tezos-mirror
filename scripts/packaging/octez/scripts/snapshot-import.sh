@@ -59,6 +59,9 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# Set up a trap to remove the file on error (non-zero exit status)
+trap 'rm -f /tmp/$HISTORY_MODE' EXIT
+
 # We need access to the config.json as the tezos user.
 # We simply check if the config file exist. But we don't
 # try to update the octez node configuration. Trying to
@@ -74,13 +77,39 @@ fi
 
 # Commands execution
 echo "Downloading snapshot for network: $NETWORK, history mode: $HISTORY_MODE..."
-curl -s -o "/tmp/$HISTORY_MODE" "https://snapshots.tzinit.org/$NETWORK/$HISTORY_MODE"
+
+URL="https://snapshots.tzinit.org/$NETWORK/$HISTORY_MODE"
+OUTPUT_FILE="/tmp/$HISTORY_MODE"
+OUTPUT_DIR="/tmp"
+
+rm -f "$OUTPUT_FILE"
+
+# Get remote file size in bytes
+FILE_SIZE=$(curl -sIL "$URL" | awk 'BEGIN{IGNORECASE=1}/^content-length:/ {print $2}' | tail -1 | tr -d '\r')
+
+if [ -z "$FILE_SIZE" ]; then
+  echo "Could not determine file size of $URL, the site may be down."
+  exit 1
+fi
+
+AVAILABLE_SPACE=$(df -k "$OUTPUT_DIR" | awk 'NR==2 {print $4}')
+AVAILABLE_SPACE_BYTES=$((AVAILABLE_SPACE * 1024))
+
+if [ "$FILE_SIZE" -gt "$AVAILABLE_SPACE_BYTES" ]; then
+  REQUIRED_MB=$((FILE_SIZE / 1024 / 1024))
+  AVAILABLE_MB=$((AVAILABLE_SPACE_BYTES / 1024 / 1024))
+  echo "Not enough space in $OUTPUT_DIR to download the file."
+  echo "Required: ${REQUIRED_MB}MB, Available: ${AVAILABLE_MB}MB"
+  exit 1
+fi
+
+curl -s -o "$OUTPUT_FILE" "$URL"
 
 echo "Importing snapshot with option: $SNAPSHOT_NO_CHECK..."
 # shellcheck disable=SC2086
-octez-node snapshot import $SNAPSHOT_NO_CHECK "/tmp/$HISTORY_MODE"
+octez-node snapshot import $SNAPSHOT_NO_CHECK "$OUTPUT_FILE"
 
 echo "Cleaning up temporary files..."
-rm "/tmp/$HISTORY_MODE"
+rm "$OUTPUT_FILE"
 
 echo "Snapshot import completed!"

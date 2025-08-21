@@ -83,7 +83,7 @@ let validate_range log_filter_config
       tzfail Incompatible_block_params
   | {block_hash = Some block_hash; _} ->
       let* block =
-        Rollup_node_rpc.Block_storage.block_by_hash
+        Rollup_node_rpc.Etherlink_block_storage.block_by_hash
           ~full_transaction_object:false
           block_hash
       in
@@ -91,6 +91,7 @@ let validate_range log_filter_config
   | {from_block; to_block; _} ->
       let get_block_number block_param =
         Rollup_node_rpc.block_param_to_block_number
+          ~chain_family:L2_types.EVM
           (Block_parameter
              (Option.value ~default:Block_parameter.Latest block_param))
       in
@@ -102,20 +103,23 @@ let validate_range log_filter_config
       else
         tzfail (Block_range_too_large {limit = log_filter_config.max_nb_blocks})
 
-(* Constructs the bloom filter *)
-let make_bloom (filter : Filter.t) =
+let make_bloom_address_topics address topics =
   let bloom = Ethbloom.make () in
   Option.iter
     (function
       | Filter.Single (Address address) -> Ethbloom.accrue ~input:address bloom
       | _ -> ())
-    filter.address ;
+    address ;
   Option.iter
     (List.iter (function
         | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
         | _ -> ()))
-    filter.topics ;
+    topics ;
   bloom
+
+(* Constructs the bloom filter *)
+let make_bloom (filter : Filter.t) =
+  make_bloom_address_topics filter.address filter.topics
 
 let validate_topics (filter : Filter.t) =
   let open Lwt_result_syntax in
@@ -210,7 +214,9 @@ let filter_one_tx (module Rollup_node_rpc : Services_backend_sig.S) :
     bloom_filter -> hash -> Filter.changes list option tzresult Lwt.t =
  fun filter tx_hash ->
   let open Lwt_result_syntax in
-  let* receipt = Rollup_node_rpc.Block_storage.transaction_receipt tx_hash in
+  let* receipt =
+    Rollup_node_rpc.Etherlink_block_storage.transaction_receipt tx_hash
+  in
   match receipt with
   | Some receipt -> return @@ filter_receipt filter receipt
   | None -> tzfail (Receipt_not_found tx_hash)
@@ -221,7 +227,7 @@ let filter_one_block (module Rollup_node_rpc : Services_backend_sig.S) :
  fun filter block_number ->
   let open Lwt_result_syntax in
   let* block =
-    Rollup_node_rpc.Block_storage.nth_block
+    Rollup_node_rpc.Etherlink_block_storage.nth_block
       ~full_transaction_object:false
       block_number
   in

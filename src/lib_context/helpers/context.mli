@@ -29,6 +29,10 @@ module Env = Env
 
 module type DB = Irmin.Generic_key.S with module Schema = Schema
 
+type raw = [`Value of bytes | `Tree of raw String.Map.t]
+
+val raw_encoding : raw Data_encoding.t
+
 module Make_tree (Conf : Conf) (DB : DB) : sig
   include
     Tezos_context_sigs.Context.TREE

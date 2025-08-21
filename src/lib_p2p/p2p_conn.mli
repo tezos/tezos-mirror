@@ -57,7 +57,17 @@ val create :
   callback:'msg P2p_answerer.t ->
   disable_peer_discovery:bool ->
   Network_version.t ->
-  ('msg, 'peer, 'conn) t
+  ('msg, 'peer, 'conn) t tzresult Lwt.t
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/4615
+   Properly document disconnect/close. Check they are properly used
+   and if we really need both. *)
+
+val disconnect :
+  ?wait:bool ->
+  reason:P2p_disconnection_reason.t ->
+  ('msg, 'peer, 'conn) t ->
+  unit Lwt.t
 
 val peer_id : ('msg, 'peer, 'conn) t -> P2p_peer.Id.t
 
@@ -126,16 +136,6 @@ val write_encoded_now :
   bool tzresult
 
 val equal_sock : ('msg, 'peer, 'conn) t -> ('msg, 'peer, 'conn) t -> bool
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/4615
-   Properly document disconnect/close. Check they are properly used
-   and if we really need both. *)
-
-val disconnect :
-  ?wait:bool ->
-  reason:P2p_disconnection_reason.t ->
-  ('msg, 'peer, 'conn) t ->
-  unit Lwt.t
 
 val disconnect_reason :
   ('msg, 'peer, 'conn) t -> P2p_disconnection_reason.t option

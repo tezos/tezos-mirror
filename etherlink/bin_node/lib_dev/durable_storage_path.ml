@@ -16,6 +16,12 @@ let reboot_counter = "/readonly/kernel/env/reboot_counter"
 
 let evm_node_flag = "/__evm_node"
 
+module Tezlink = struct
+  let root = "/tezlink"
+end
+
+let tezlink_root = Tezlink.root
+
 module EVM = struct
   let root = "/evm"
 
@@ -28,13 +34,24 @@ module World_state = struct
   let make s = EVM.make (root ^ s)
 end
 
+let etherlink_root = World_state.make ""
+
+let root_of_chain_family (type f) (chain_family : f L2_types.chain_family) =
+  match chain_family with
+  | L2_types.EVM -> etherlink_root
+  | L2_types.Michelson -> tezlink_root
+
 let chain_id = EVM.make "/chain_id"
 
 let minimum_base_fee_per_gas = World_state.make "/fees/minimum_base_fee_per_gas"
 
+let backlog = World_state.make "/fees/backlog"
+
 let da_fee_per_byte = World_state.make "/fees/da_fee_per_byte"
 
 let kernel_version = EVM.make "/kernel_version"
+
+let kernel_verbosity = EVM.make "/logging_verbosity"
 
 let storage_version = EVM.make "/storage_version"
 
@@ -138,29 +155,30 @@ end
 module Block = struct
   type number = Current | Nth of Z.t
 
-  let blocks = World_state.make "/blocks"
+  let blocks ~root = root ^ "/blocks"
 
   let number = "/number"
 
-  let by_hash (Block_hash (Hex hash)) = blocks ^ "/" ^ hash
+  let by_hash ~root (Block_hash (Hex hash)) = blocks ~root ^ "/" ^ hash
 
-  let current_number = blocks ^ "/current" ^ number
+  let current_number ~root = blocks ~root ^ "/current" ^ number
 
-  let current_hash = blocks ^ "/current/hash"
+  let current_hash ~root = blocks ~root ^ "/current/hash"
 end
 
 module Indexes = struct
-  let indexes = World_state.make "/indexes"
+  let indexes ~root = root ^ "/indexes"
 
   let blocks = "/blocks"
 
-  let blocks = indexes ^ blocks
+  let blocks ~root = indexes ~root ^ blocks
 
   let number_to_string = function
     | Block.Current -> "current"
     | Nth i -> Z.to_string i
 
-  let block_by_number number = blocks ^ "/" ^ number_to_string number
+  let block_by_number ~root number =
+    blocks ~root ^ "/" ^ number_to_string number
 end
 
 module Transaction_receipt = struct
@@ -224,4 +242,29 @@ module Trace = struct
 
   let call_trace ~transaction_hash i =
     call_trace_root ~transaction_hash ^ "/" ^ string_of_int i
+end
+
+module Chain_configuration = struct
+  open L2_types
+
+  let root chain_id =
+    EVM.make "/chain_configurations/" ^ Chain_id.to_string chain_id
+
+  let minimum_base_fee_per_gas chain_id =
+    root chain_id ^ "/minimum_base_fee_per_gas"
+
+  let da_fee_per_byte chain_id = root chain_id ^ "/da_fee_per_byte"
+
+  let maximum_gas_per_transaction chain_id =
+    root chain_id ^ "/maximum_gas_per_transaction"
+
+  let chain_family chain_id = root chain_id ^ "/chain_family"
+
+  let world_state chain_id = root chain_id ^ "/world_state"
+end
+
+module Feature_flags = struct
+  let root = EVM.make "/feature_flags"
+
+  let multichain = root ^ "/enable_multichain"
 end

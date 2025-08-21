@@ -121,15 +121,15 @@ let main commands =
     ignore
       Tezos_clic.(
         setup_formatter
+          ~isatty:(Unix.isatty Unix.stdout)
           Format.std_formatter
-          (if Unix.isatty Unix.stdout then Ansi else Plain)
           Short) ;
     warn_if_argv0_name_not_octez () ;
     ignore
       Tezos_clic.(
         setup_formatter
+          ~isatty:(Unix.isatty Unix.stderr)
           Format.err_formatter
-          (if Unix.isatty Unix.stderr then Ansi else Plain)
           Short) ;
     let*! () = Tezos_base_unix.Internal_event_unix.init () in
     let* base_dir, argv = parse_config_args argv in

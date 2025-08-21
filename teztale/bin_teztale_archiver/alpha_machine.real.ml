@@ -46,7 +46,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                Consensus_ops.
                  {
                    address =
-                     Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
+                     Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    first_slot = slot_to_int first_slot;
                    power = attestation_power;
                  })
@@ -127,7 +127,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       | Some x -> return x
       | None ->
           let* constants =
-            Protocol.Alpha_services.Constants.parametric cctxt ref_block
+            Plugin.Alpha_services.Constants.parametric cctxt ref_block
           in
           let out =
             constants
@@ -160,7 +160,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       cycle_info metadata cctxt (cctxt#chain, `Hash (hash, 0))
     in
     return
-      ( Tezos_crypto.Signature.Of_V1.public_key_hash
+      ( Tezos_crypto.Signature.Of_V2.public_key_hash
           metadata.protocol_data.baker.delegate,
         cycle_info )
 
@@ -177,7 +177,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
       List.rev_map
         (fun ({delegate; round; _} : RPC.Baking_rights.t) ->
           {
-            Data.delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
+            Data.delegate = Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
             round = Protocol.Alpha_context.Round.to_int32 round;
           })
         baking_rights
@@ -206,6 +206,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         match contents with
         | Single (Attestation {consensus_content = {round; _}; _}) ->
             Protocol.Alpha_context.Round.to_int32 round
+        | Single
+            (Attestations_aggregate
+              {consensus_content = {round; _}; committee = _}) ->
+            Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
 
   let get_preattestation_round protocol_data =
@@ -214,7 +218,33 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         match contents with
         | Single (Preattestation {round; _}) ->
             Protocol.Alpha_context.Round.to_int32 round
+        | Single
+            (Preattestations_aggregate
+              {consensus_content = {round; _}; committee = _}) ->
+            Protocol.Alpha_context.Round.to_int32 round
         | _ -> assert false)
+
+  let get_consensus_round protocol_data = function
+    | Consensus_ops.Preattestation -> get_preattestation_round protocol_data
+    | Attestation -> get_attestation_round protocol_data
+
+  let consensus_ops_from_aggregate acc hash protocol_data committee kind =
+    List.fold_left
+      (fun acc ((ck : Protocol.Alpha_context.Consensus_key.t), power) ->
+        Consensus_ops.
+          {
+            op =
+              {
+                hash;
+                round = Some (get_consensus_round protocol_data kind);
+                kind;
+              };
+            delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
+            power;
+          }
+        :: acc)
+      acc
+      committee
 
   let consensus_ops_info_of_block cctxt hash =
     let* ops =
@@ -224,7 +254,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         ~block:(`Hash (hash, 0))
         0
     in
-    List.fold_left
+    List.fold_left_es
       (fun acc Block_services.{hash; receipt; protocol_data; _} ->
         match receipt with
         | Receipt
@@ -235,18 +265,20 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     (Protocol.Apply_results.Preattestation_result
                       {delegate; consensus_power; _});
               }) ->
-            Consensus_ops.
-              {
-                op =
-                  {
-                    hash;
-                    round = Some (get_preattestation_round protocol_data);
-                    kind = Consensus_ops.Preattestation;
-                  };
-                delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
-                power = consensus_power;
-              }
-            :: acc
+            return
+            @@ Consensus_ops.
+                 {
+                   op =
+                     {
+                       hash;
+                       round = Some (get_preattestation_round protocol_data);
+                       kind = Consensus_ops.Preattestation;
+                     };
+                   delegate =
+                     Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
+                   power = consensus_power;
+                 }
+               :: acc
         | Receipt
             (Protocol.Apply_results.Operation_metadata
               {
@@ -255,22 +287,61 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                     (Protocol.Apply_results.Attestation_result
                       {delegate; consensus_power; _});
               }) ->
-            Consensus_ops.
+            return
+            @@ Consensus_ops.
+                 {
+                   op =
+                     {
+                       hash;
+                       round = Some (get_attestation_round protocol_data);
+                       kind = Consensus_ops.Attestation;
+                     };
+                   delegate =
+                     Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
+                   power = consensus_power;
+                 }
+               :: acc
+        | Receipt
+            (Protocol.Apply_results.Operation_metadata
               {
-                op =
-                  {
-                    hash;
-                    round = Some (get_attestation_round protocol_data);
-                    kind = Consensus_ops.Attestation;
-                  };
-                delegate = Tezos_crypto.Signature.Of_V1.public_key_hash delegate;
-                power = consensus_power;
-              }
-            :: acc
-        | _ -> acc)
+                contents =
+                  Single_result
+                    (Protocol.Apply_results.Attestations_aggregate_result
+                      {
+                        committee;
+                        total_consensus_power = _;
+                        balance_updates = _;
+                      });
+              }) ->
+            return
+            @@ consensus_ops_from_aggregate
+                 acc
+                 hash
+                 protocol_data
+                 committee
+                 Consensus_ops.Attestation
+        | Receipt
+            (Protocol.Apply_results.Operation_metadata
+              {
+                contents =
+                  Single_result
+                    (Protocol.Apply_results.Preattestations_aggregate_result
+                      {
+                        committee;
+                        total_consensus_power = _;
+                        balance_updates = _;
+                      });
+              }) ->
+            return
+            @@ consensus_ops_from_aggregate
+                 acc
+                 hash
+                 protocol_data
+                 committee
+                 Consensus_ops.Preattestation
+        | _ -> return acc)
       []
       ops
-    |> return
 
   let get_block_info cctxt level =
     let* header =
@@ -282,7 +353,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
     let*? round = raw_block_round header.shell in
     let* cycle_info = cycle_info metadata cctxt (cctxt#chain, `Level level) in
     return
-      ( ( Tezos_crypto.Signature.Of_V1.public_key_hash
+      ( ( Tezos_crypto.Signature.Of_V2.public_key_hash
             metadata.protocol_data.baker.delegate,
           header.shell.timestamp,
           round,

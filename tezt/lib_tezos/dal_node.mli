@@ -34,8 +34,11 @@ type t
     [Custom (i)] : keeps the shards during [i] blocks *)
 type history_mode = Full | Auto | Custom of int
 
-(** Creates a DAL node *)
+val disable_shard_validation_environment_variable : string
 
+val ignore_topics_environment_variable : string
+
+(** Creates a DAL node *)
 val create :
   ?runner:Runner.t ->
   ?path:string ->
@@ -48,6 +51,9 @@ val create :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
+  ?disable_shard_validation:bool ->
+  ?disable_amplification:bool ->
+  ?ignore_pkhs:string list ->
   node:Node.t ->
   unit ->
   t
@@ -64,6 +70,9 @@ val create_from_endpoint :
   ?listen_addr:string ->
   ?public_addr:string ->
   ?metrics_addr:string ->
+  ?disable_shard_validation:bool ->
+  ?disable_amplification:bool ->
+  ?ignore_pkhs:string list ->
   l1_node_endpoint:Endpoint.t ->
   unit ->
   t
@@ -94,6 +103,9 @@ val metrics_port : t -> int
 (** Get the data-dir of an dal node. *)
 val data_dir : t -> string
 
+(** Get the identity file of a dal node. *)
+val identity_file : t -> string
+
 (** [run ?wait_ready ?env ?event_level node] launches the given dal
     node where env is a map of environment variable.
 
@@ -101,18 +113,19 @@ val data_dir : t -> string
     [true] by default.
 
     [event_level] allows to determine the printed levels. By default,
-    it is set to [`Debug] by default.
-*)
-
-(** Get the identity file of a dal node. *)
-val identity_file : t -> string
-
+    it is set to [`Debug]. *)
 val run :
   ?wait_ready:bool ->
   ?env:string String_map.t ->
   ?event_level:Daemon.Level.default_level ->
   t ->
   unit Lwt.t
+
+(** Return pid of the process if running. *)
+val pid : t -> int option
+
+(** Return the path of the daemon. *)
+val path : t -> string
 
 (** Send SIGTERM and wait for the process to terminate.
 
@@ -135,6 +148,12 @@ val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
     running but its status is not ready *)
 val is_running_not_ready : t -> bool
 
+(** Wait until a DAL node terminates and check its status.
+
+    If the DAL node is not running,
+    or if the [Process.check_error] function fails, fail the test. *)
+val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
+
 (** Wait until a node terminates and return its status. If the node is not
     running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
@@ -147,20 +166,25 @@ val init_config :
   ?expected_pow:float ->
   ?peers:string list ->
   ?attester_profiles:string list ->
-  ?producer_profiles:int list ->
+  ?operator_profiles:int list ->
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
   t ->
   unit Lwt.t
 
 val update_config :
+  ?expected_pow:float ->
   ?peers:string list ->
   ?attester_profiles:string list ->
-  ?producer_profiles:int list ->
+  ?operator_profiles:int list ->
   ?observer_profiles:int list ->
   ?bootstrap_profile:bool ->
   ?history_mode:history_mode ->
+  ?slots_backup_uris:string list ->
+  ?trust_slots_backup_uris:bool ->
   t ->
   unit Lwt.t
 
@@ -258,4 +282,67 @@ module Proxy : sig
 
   (** Stops the proxy server. *)
   val stop : proxy -> unit
+end
+
+(** This module provides a mock HTTP server for selected RPCs.
+    It responds to registered routes with mock data and fails all other requests.
+    It is similar with the {!Proxy} module. *)
+module Mockup : sig
+  (** An instance of the mockup server. *)
+  type t
+
+  (** Represents a possible response from a mocked-up route. *)
+  type answer = [`Response of string]
+
+  (** A route definition. *)
+  type route
+
+  (** Creates a route for the mockup, containing a [path_pattern] pattern and a
+      [callback].
+      The [callback] is provided with the [path] actually matched and is used to
+      retrieve the DAL node answer for the given [path]. *)
+  val route :
+    path_pattern:string ->
+    callback:(path:string -> answer option Lwt.t) ->
+    route
+
+  (** Creates a new mockup instance. *)
+  val make : name:string -> routes:route list -> t
+
+  (** Starts the mockup server. *)
+  val run : t -> port:int -> unit
+
+  (** Stops the mockup server. *)
+  val stop : t -> unit
+end
+
+(** This module provides a mock server for the RPCs needed by the baker. It is
+    based on the {!Mockup} module. *)
+module Mockup_for_baker : sig
+  type t
+
+  (** [make ~name ~attestation_lag ~attesters ~attestable_slots] creates a new
+      instance of the mockup server with name [name].
+
+      It responds to the 'GET /profiles' RPC with an attester profile based
+      on the provided [attesters].
+
+      It responds to the 'GET
+      /profiles/<attester>/attested_levels/<attested_level>/attestable_slots'
+      with the list of attestable slots provided by [attestable_slots ~attester
+      ~attested_level]. The parameter [attestation_lag] is needed to compute the
+      corresponding [published_level = attested_level - attestation_lag] in the
+      RPC's response. *)
+  val make :
+    name:string ->
+    attestation_lag:int ->
+    attesters:string list ->
+    attestable_slots:(attester:string -> attested_level:int -> bool list) ->
+    t
+
+  (** Starts running the mockup server at the given port. *)
+  val run : t -> port:int -> unit
+
+  (** Stops the proxy server. *)
+  val stop : t -> unit
 end

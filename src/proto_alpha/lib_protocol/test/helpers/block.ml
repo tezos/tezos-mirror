@@ -41,6 +41,8 @@ type t = {
 
 type block = t
 
+type full_metadata = block_header_metadata * operation_receipt list
+
 let get_alpha_ctxt b =
   let open Lwt_result_wrap_syntax in
   let*@ ctxt, _migration_balance_updates, _migration_operation_results =
@@ -303,9 +305,9 @@ module Forge = struct
     let t = Array.map List.rev t in
     Array.to_list t
 
-  let forge_header ?(locked_round = None) ?(payload_round = None)
-      ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_toggle_vote ?adaptive_issuance_vote pred =
+  let forge_header ?locked_round ?payload_round ?(policy = By_round 0)
+      ?timestamp ?(operations = []) ?liquidity_baking_toggle_vote
+      ?adaptive_issuance_vote pred =
     let open Lwt_result_wrap_syntax in
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
@@ -1165,15 +1167,18 @@ let balance_updates_of_single_content :
     type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
-  | Proposals_result | Ballot_result -> []
+  | Proposals_result | Ballot_result
+  | Double_consensus_operation_evidence_result
+      {punished_delegate = _; rewarded_delegate = _; misbehaviour = _}
+  | Double_baking_evidence_result
+      {punished_delegate = _; rewarded_delegate = _; misbehaviour = _} ->
+      []
   | Preattestation_result {balance_updates; _}
   | Attestation_result {balance_updates; _}
+  | Preattestations_aggregate_result {balance_updates; _}
   | Attestations_aggregate_result {balance_updates; _}
   | Seed_nonce_revelation_result balance_updates
   | Vdf_revelation_result balance_updates
-  | Double_attestation_evidence_result {balance_updates; _}
-  | Double_preattestation_evidence_result {balance_updates; _}
-  | Double_baking_evidence_result {balance_updates; _}
   | Dal_entrapment_evidence_result {balance_updates; _}
   | Activate_account_result balance_updates
   | Drain_delegate_result {balance_updates; _} ->
@@ -1310,6 +1315,11 @@ let current_level b = b.header.shell.level
 let current_cycle b =
   let blocks_per_cycle = b.constants.blocks_per_cycle in
   let current_level = b.header.shell.level in
+  current_cycle_of_level ~blocks_per_cycle ~current_level
+
+let cycle_of_next_block b =
+  let blocks_per_cycle = b.constants.blocks_per_cycle in
+  let current_level = Int32.succ b.header.shell.level in
   current_cycle_of_level ~blocks_per_cycle ~current_level
 
 let cycle_position b =

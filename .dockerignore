@@ -39,7 +39,8 @@ octez-injector-server
 octogram
 octez-teztale-archiver
 octez-teztale-server
-octez-experimental-agnostic-baker
+octez-accuser
+octez-baker
 
 scripts/opam-test-all.sh.DONE
 scripts/create_genesis/src
@@ -88,6 +89,7 @@ floodgate
 evm_kernel.wasm
 evm_installer.wasm
 evm_kernel_unstripped.wasm
+evm_kernel_debug.wasm
 evm-evaluation-assessor
 smart-rollup-installer
 _evm_installer_preimages/
@@ -143,4 +145,3 @@ terraform.rc
 # RISC-V
 /src/riscv/riscv-sandbox
 /src/riscv/riscv-dummy.elf
-/src/riscv/riscv-dummy-sdk.elf

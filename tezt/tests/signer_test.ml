@@ -32,10 +32,34 @@
 
 let team = Tag.layer1
 
+let register_signer_test ~__FILE__ ~title ~tags ~uses ?supports f protocols =
+  let supported_launch_mode = Signer.[Http; Socket; Local] in
+  let mk_title = function
+    | Signer.Http -> title ^ "(http)"
+    | Socket -> title ^ "(tcp socket)"
+    | Local -> title ^ "(unix socket)"
+  in
+  let mk_tags = function
+    | Signer.Http -> "http" :: tags
+    | Socket -> "tcp" :: tags
+    | Local -> "unix" :: tags
+  in
+  List.iter
+    (fun launch_mode ->
+      Protocol.register_test
+        ~__FILE__
+        ~title:(mk_title launch_mode)
+        ~tags:(mk_tags launch_mode)
+        ~uses
+        ?supports
+        (f launch_mode)
+        protocols)
+    supported_launch_mode
+
 (* same as `baker_test`, `baker_test.ml` but using the signer *)
-let signer_test protocol ~keys =
+let signer_test protocol launch_mode ~keys =
   (* init the signer and import all the bootstrap_keys *)
-  let* signer = Signer.init ~keys () in
+  let* signer = Signer.init ~launch_mode ~keys () in
   let* parameter_file =
     Protocol.write_parameter_file
       ~bootstrap_accounts:(List.map (fun k -> (k, None)) keys)
@@ -62,7 +86,7 @@ let signer_test protocol ~keys =
   in
   let level_2_promise = Node.wait_for_level node 2 in
   let level_3_promise = Node.wait_for_level node 3 in
-  let* _baker = Baker.init ~protocol node client in
+  let* _baker = Agnostic_baker.init node client in
   let* _ = level_2_promise in
   Log.info "New head arrive level 2" ;
   let* _ = level_3_promise in
@@ -70,27 +94,31 @@ let signer_test protocol ~keys =
   return client
 
 let signer_simple_test =
-  Protocol.register_test
+  register_signer_test
     ~__FILE__
     ~title:"signer test"
     ~tags:[team; "node"; "baker"; "tz1"]
-    ~uses:(fun protocol -> [Constant.octez_signer; Protocol.baker protocol])
-  @@ fun protocol ->
+    ~uses:(fun _protocol ->
+      [Constant.octez_signer; Constant.octez_agnostic_baker])
+  @@ fun launch_mode protocol ->
   let* _ =
-    signer_test protocol ~keys:(Account.Bootstrap.keys |> Array.to_list)
+    signer_test
+      protocol
+      launch_mode
+      ~keys:(Account.Bootstrap.keys |> Array.to_list)
   in
   unit
 
 let signer_magic_bytes_test =
-  Protocol.register_test
+  register_signer_test
     ~__FILE__
     ~title:"signer magic-bytes test"
     ~tags:[team; "signer"; "magicbytes"]
     ~uses:(fun _ -> [Constant.octez_signer])
-  @@ fun protocol ->
+  @@ fun launch_mode protocol ->
   let* _node, client = Client.init_with_protocol ~protocol `Client () in
   let* signer =
-    Signer.init ~keys:[Constant.tz4_account] ~magic_byte:"0x03" ()
+    Signer.init ~launch_mode ~keys:[Constant.tz4_account] ~magic_byte:"0x03" ()
   in
   let* () =
     let Account.{alias; public_key_hash; _} = Constant.tz4_account in
@@ -115,14 +143,20 @@ let signer_magic_bytes_test =
   unit
 
 let signer_bls_test =
-  Protocol.register_test
+  register_signer_test
     ~__FILE__
     ~title:"BLS signer test"
     ~tags:[team; "node"; "baker"; "bls"]
     ~uses:(fun _ -> [Constant.octez_signer])
-  @@ fun protocol ->
+  @@ fun launch_mode protocol ->
   let* _node, client = Client.init_with_protocol `Client ~protocol () in
-  let* signer = Signer.init ~keys:[Constant.tz4_account] () in
+  let* signer =
+    Signer.init
+      ~launch_mode
+      ~keys:[Constant.tz4_account]
+      ~allow_to_prove_possession:true
+      ()
+  in
   let* () =
     let Account.{alias; public_key_hash; _} = Constant.tz4_account in
     Client.import_signer_key
@@ -160,7 +194,88 @@ let signer_bls_test =
     ~error_msg:"Tz4 sender %s has decreased balance after transfer" ;
   unit
 
+let signer_known_remote_keys_test =
+  register_signer_test
+    ~__FILE__
+    ~title:"Known remote keys signer test"
+    ~tags:[team; "signer"; "remote"; "keys"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun launch_mode protocol ->
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let keys = [Constant.tz4_account; Constant.bootstrap1; Constant.bootstrap2] in
+  let* signer = Signer.init ~launch_mode ~keys () in
+  let process =
+    Client.spawn_list_known_remote_keys client (Signer.uri signer)
+  in
+  let* () =
+    Process.check_error ~msg:(rex "List known keys request not allowed") process
+  in
+  let* signer = Signer.init ~launch_mode ~keys ~allow_list_known_keys:true () in
+  let* pkhs = Client.list_known_remote_keys client (Signer.uri signer) in
+  let expected =
+    keys
+    |> List.map (fun Account.{public_key_hash; _} -> public_key_hash)
+    |> List.sort String.compare
+  in
+  let found = List.sort String.compare pkhs in
+  if List.equal String.equal expected found then unit
+  else
+    let pp = Format.(pp_print_list pp_print_string) in
+    Test.fail "@[<v 2>expected:@,%a@]@,@[<v 2>found:@,%a@]" pp expected pp found
+
+let signer_prove_possession_test =
+  register_signer_test
+    ~__FILE__
+    ~title:"Prove possession of tz4 test"
+    ~tags:[team; "signer"; "prove"; "possession"; "keys"]
+    ~uses:(fun _ -> [Constant.octez_signer])
+  @@ fun launch_mode protocol ->
+  let* _node, client = Client.init_with_protocol `Client ~protocol () in
+  let keys = [Constant.tz4_account] in
+  let alias = "alias_ko" in
+  let* signer = Signer.init ~launch_mode ~keys () in
+  let* () =
+    Client.import_signer_key
+      ~alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:Constant.tz4_account.public_key_hash
+  in
+  let process =
+    Client.spawn_set_consensus_key
+      client
+      ~account:Constant.bootstrap1.alias
+      ~key:alias
+  in
+  let* () =
+    Process.check_error
+      ~msg:(rex "Request to prove possession is not allowed")
+      process
+  in
+  let alias = "alias_ok" in
+  let* signer =
+    Signer.init ~launch_mode ~keys ~allow_to_prove_possession:true ()
+  in
+  let* () =
+    Client.import_signer_key
+      ~force:true
+      ~alias
+      client
+      ~signer:(Signer.uri signer)
+      ~public_key_hash:Constant.tz4_account.public_key_hash
+  in
+  let process =
+    Client.spawn_set_consensus_key
+      client
+      ~account:Constant.bootstrap2.alias
+      ~key:alias
+  in
+  Process.check process
+
 let register ~protocols =
   signer_simple_test protocols ;
   signer_magic_bytes_test protocols ;
-  signer_bls_test protocols
+  signer_bls_test protocols ;
+  signer_known_remote_keys_test protocols ;
+  signer_prove_possession_test
+    (List.filter (fun p -> Protocol.number p > 022) protocols)

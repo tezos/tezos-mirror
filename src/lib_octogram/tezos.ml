@@ -39,11 +39,11 @@ let positive_int_of_string level =
 let parse_endpoint str =
   match str =~*** rex {|^(https?)://(.*):(\d+)|} with
   | Some (scheme, host, port_str) ->
-      Endpoint.{host; scheme; port = int_of_string port_str}
+      Endpoint.make ~host ~scheme ~port:(int_of_string port_str) ()
   | None -> (
       match str =~** rex {|^(.*):(\d+)|} with
       | Some (host, port_str) ->
-          {host; scheme = "http"; port = int_of_string port_str}
+          Endpoint.make ~host ~scheme:"http" ~port:(int_of_string port_str) ()
       | None -> raise (Invalid_argument "parse_endpoint"))
 
 type _ key += Octez_node_k : string -> Node.t key
@@ -62,12 +62,12 @@ end
 
 let () = Agent_state.register_key (module Octez_node_key)
 
-type _ key += Octez_baker_k : string -> Baker.t key
+type _ key += Octez_baker_k : string -> Agnostic_baker.t key
 
 module Octez_baker_key = struct
   type t = string
 
-  type r = Baker.t
+  type r = Agnostic_baker.t
 
   let proj : type a. a key -> (t * (a, r) eq) option = function
     | Octez_baker_k name -> Some (name, Eq)
@@ -433,7 +433,7 @@ module Start_octez_node = struct
     in
     Node.Config_file.update
       node
-      (Node.Config_file.set_sandbox_network_with_dal_config config)
+      (Node.Config_file.set_network_with_dal_config config)
 
   let setup_octez_node ~network ~sync_threshold ~path_node ~metrics_port
       ~rpc_port ~net_port ~peers ?name ?snapshot ?dal_cryptobox_parameters () =
@@ -551,7 +551,6 @@ type dal_parameters = {
   attestation_lag : string;
   attestation_threshold : string;
   number_of_slots : string;
-  blocks_per_epoch : string;
 }
 
 (* This encoding should be compatible with the protocol parameters. *)
@@ -564,19 +563,14 @@ let dal_parameters_encoding =
            attestation_lag;
            attestation_threshold;
            number_of_slots;
-           blocks_per_epoch;
          } ->
       ( cryptobox,
-        ( attestation_lag,
-          attestation_threshold,
-          number_of_slots,
-          blocks_per_epoch,
-          feature_enable ) ))
+        (attestation_lag, attestation_threshold, number_of_slots, feature_enable)
+      ))
     (fun ( cryptobox,
            ( attestation_lag,
              attestation_threshold,
              number_of_slots,
-             blocks_per_epoch,
              feature_enable ) ) ->
       {
         feature_enable;
@@ -584,15 +578,13 @@ let dal_parameters_encoding =
         attestation_lag;
         attestation_threshold;
         number_of_slots;
-        blocks_per_epoch;
       })
     (merge_objs
        dal_cryptobox_parameters_encoding
-       (obj5
+       (obj4
           (req "attestation_lag" string)
           (req "attestation_threshold" string)
           (req "number_of_slots" string)
-          (req "blocks_per_epoch" string)
           (req "feature_enable" string)))
 
 type 'uri generate_protocol_parameters_file = {
@@ -727,7 +719,6 @@ module Generate_protocol_parameters_file = struct
         attestation_lag = run base.dal.attestation_lag;
         attestation_threshold = run base.dal.attestation_threshold;
         number_of_slots = run base.dal.number_of_slots;
-        blocks_per_epoch = run base.dal.blocks_per_epoch;
       }
     in
     let minimal_block_delay = Option.map run base.minimal_block_delay in
@@ -2366,7 +2357,7 @@ module Start_octez_dal_node = struct
       | None -> Port.fresh ()
     in
     let mk_addr port = Format.sprintf "0.0.0.0:%d" port in
-    let producer_profiles = List.map positive_int_of_string producer_profiles in
+    let operator_profiles = List.map positive_int_of_string producer_profiles in
     let* client_opt =
       match (path_client, base_dir) with
       | Some path_client, Some base_dir ->
@@ -2423,7 +2414,7 @@ module Start_octez_dal_node = struct
         ~expected_pow:0.
         ~peers
         ~attester_profiles
-        ~producer_profiles
+        ~operator_profiles
         ~bootstrap_profile
         dal_node
     in
@@ -2592,13 +2583,13 @@ module Start_octez_baker = struct
   let run state
       {
         name;
-        protocol;
         base_dir;
         node_uri;
         node_data_dir;
         delegates;
         dal_node_uri;
         baker_path;
+        _;
       } =
     let client = Agent_state.http_client state in
     (* Get the L1 node's data-dir and RPC endpoint. *)
@@ -2636,10 +2627,9 @@ module Start_octez_baker = struct
     in
     (* Create a baker state. *)
     let octez_baker =
-      Baker.create_from_uris
+      Agnostic_baker.create_from_uris
         ?name
         ?path:baker_path
-        ~protocol
         ~base_dir
         ~node_data_dir
         ~node_rpc_endpoint
@@ -2648,10 +2638,10 @@ module Start_octez_baker = struct
         ()
     in
     (* Register the baker state. *)
-    let name = Baker.name octez_baker in
+    let name = Agnostic_baker.name octez_baker in
     Agent_state.add (Octez_baker_k name) octez_baker state ;
     (* Start the baker. *)
-    let* () = Baker.run octez_baker in
+    let* () = Agnostic_baker.run octez_baker in
     return {name}
 
   let on_completion ~on_new_service:_ ~on_new_metrics_source:_ (_ : r) = ()

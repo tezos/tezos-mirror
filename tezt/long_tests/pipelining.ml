@@ -242,7 +242,7 @@ let forging_operation ?contract_hash manager_kind ~source ~branch ~counter
     match manager_kind with
     | `Reveal ->
         Operation.Manager.make ~source ~counter
-        @@ Operation.Manager.reveal source
+        @@ Operation.Manager.reveal source ()
     | `Transfer ->
         Operation.Manager.make ~source ~counter
         @@ Operation.Manager.transfer

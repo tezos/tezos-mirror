@@ -12,9 +12,10 @@
       "p2p"
     ],
     "successful_runs": {
-      "total_time": "10429641",
+      "total_time": "11534833",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4632190000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -34,9 +35,10 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "91805050",
+      "total_time": "47587280",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 3243443000
   },
   {
     "file": "tezt/tests/sc_rollup.ml",
@@ -54,13 +56,14 @@
       "smart_rollup_node"
     ],
     "successful_runs": {
-      "total_time": "7730377",
+      "total_time": "7747874",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1459057000
   },
   {
     "file": "tezt/tests/storage_snapshots.ml",
-    "title": "Parisc: storage snapshot export and import",
+    "title": "Quebec: storage snapshot export and import",
     "tags": [
       "admin_client",
       "client",
@@ -69,18 +72,19 @@
       "layer1",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "snapshot",
       "storage"
     ],
     "successful_runs": {
-      "total_time": "73073299",
+      "total_time": "74677245",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1919059000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Quebeca: Testing DAL node (garbage collection of shards for producer and attester)",
+    "title": "R022-: Testing DAL node (garbage collection of shards for producer and attester)",
     "tags": [
       "admin_client",
       "attester",
@@ -90,17 +94,18 @@
       "gc",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "41269798",
+      "total_time": "187520524",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 3358654000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (garbage collection of shards for all profiles)",
+    "title": "Quebec: Testing DAL node (garbage collection of shards for all profiles)",
     "tags": [
       "admin_client",
       "client",
@@ -110,13 +115,14 @@
       "memory_4k",
       "multi",
       "node",
-      "parisc",
+      "quebec",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "48098109",
+      "total_time": "200734206",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4685895000
   },
   {
     "file": "tezt/tests/dal.ml",
@@ -134,8 +140,9 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "48364906",
+      "total_time": "203396585",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 5353091000
   }
 ]

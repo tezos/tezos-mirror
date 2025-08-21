@@ -72,6 +72,7 @@ type config = {
 }
 
 val create :
+  ?fd_pool:P2p_fd.fd_pool ->
   config ->
   'peer P2p_params.peer_meta_config ->
   P2p_trigger.t ->
@@ -429,10 +430,19 @@ val add_to_id_points : ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> unit
 val set_expected_peer_id :
   ('msg, 'peer, 'conn) t -> P2p_point.Id.t -> P2p_peer.Id.t -> unit Lwt.t
 
+(** [get_fd_pool t] returns the file descriptors pool contained in [t], if any.*)
+val get_fd_pool : ('msg, 'peer, 'conn) t -> P2p_fd.fd_pool option
+
 (**/**)
 
 module Internal_for_tests : sig
-  (** [create peer_encoding peer] returns a pool. [peer_encoding] and [peer] are needed as some functions of [P2p_pool]
-      return it. *)
-  val create : 'peer Data_encoding.t -> 'peer -> ('msg, 'peer, 'conn) t
+  (** [create ?fd_pool peer_encoding peer] returns a pool.
+     [peer_encoding] and [peer] are needed as some functions of [P2p_pool]
+     return it.
+     [fd_pool] is the field containing the file descriptors pool of the constructed pool.*)
+  val create :
+    ?fd_pool:P2p_fd.fd_pool ->
+    'peer Data_encoding.t ->
+    'peer ->
+    ('msg, 'peer, 'conn) t
 end

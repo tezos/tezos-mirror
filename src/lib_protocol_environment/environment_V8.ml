@@ -75,9 +75,9 @@ module type T = sig
        and type P256.Public_key_hash.t = Signature.P256.Public_key_hash.t
        and type P256.Public_key.t = Signature.P256.Public_key.t
        and type P256.t = Signature.P256.t
-       and type Bls.Public_key_hash.t = Signature.Bls_aug.Public_key_hash.t
-       and type Bls.Public_key.t = Signature.Bls_aug.Public_key.t
-       and type Bls.t = Signature.Bls_aug.t
+       and type Bls.Public_key_hash.t = Signature.Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Signature.Bls.Public_key.t
+       and type Bls.t = Signature.Bls.t
        and type Signature.public_key_hash = Signature.V1.public_key_hash
        and type Signature.public_key = Signature.V1.public_key
        and type Signature.signature = Signature.V1.signature
@@ -308,7 +308,13 @@ struct
   module Ed25519 = Signature.Ed25519
   module Secp256k1 = Signature.Secp256k1
   module P256 = Signature.P256
-  module Bls = Signature.Bls_aug
+
+  module Bls = struct
+    include Tezos_crypto.Signature.Bls
+
+    let aggregate_signature_opt = aggregate_signature_opt ~subgroup_check:true
+  end
+
   module Signature = Signature.V1
   module Timelock = Tezos_crypto.Timelock_legacy
   module Vdf = Class_group_vdf.Vdf_self_contained
@@ -1292,6 +1298,20 @@ struct
       type add_error =
         | Validation_error of Error_monad.shell_tztrace
         | Add_conflict of operation_conflict
+
+      let unsupported_feature name =
+        let msg =
+          Printf.sprintf
+            "The current protocol does not support the '%s' feature."
+            name
+        in
+        [Exn (Failure msg)]
+
+      let partial_op_validation ?check_signature:_ _ _ =
+        Lwt.return_error (unsupported_feature "partial_op_validation")
+
+      let add_valid_operation ?conflict_handler:_ _ _ =
+        Error (Validation_error (unsupported_feature "add_valid_operation"))
 
       let add_operation ?check_signature ?conflict_handler info mempool op :
           (t * add_result, add_error) result Lwt.t =

@@ -39,7 +39,6 @@
 *)
 
 open Error_monad
-open Store_sigs
 open Indexed_store
 
 let default_index_buffer_size = 10_000
@@ -510,7 +509,7 @@ let () =
   let module Singleton_for_test = struct
     module S = Make_singleton (Value)
 
-    type t = rw S.t
+    type t = Access_mode.rw S.t
 
     let load = S.load Read_write
 
@@ -543,7 +542,7 @@ module Indexable_for_test = struct
       (SKey)
       (Make_index_value (Make_fixed_encodable (FixedValue)))
 
-  type t = rw S.t
+  type t = Access_mode.rw S.t
 
   let load = S.load ~index_buffer_size:default_index_buffer_size Read_write
 
@@ -592,7 +591,7 @@ module Indexable_removable_for_test = struct
       (SKey)
       (Make_index_value (Make_fixed_encodable (FixedValue)))
 
-  type t = rw S.t
+  type t = Access_mode.rw S.t
 
   let load = S.load ~index_buffer_size:default_index_buffer_size Read_write
 
@@ -663,7 +662,7 @@ module Indexed_file_for_test = struct
       end))
       (Value_with_size_header)
 
-  type t = rw S.t
+  type t = Access_mode.rw S.t
 
   let load ~path =
     S.load
@@ -698,7 +697,7 @@ module Indexed_file_integers = struct
       (Make_index_key (Int32Key))
       (Value_with_size_header)
 
-  type t = rw S.t
+  type t = Access_mode.rw S.t
 
   let load ~path =
     S.load

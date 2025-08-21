@@ -10,9 +10,21 @@ module Parameter = struct
   let endpoint =
     Tezos_clic.parameter (fun _ uri -> Lwt.return_ok (Uri.of_string uri))
 
-  let secret_key =
+  let signer =
     Tezos_clic.parameter (fun _ value ->
-        Lwt.return (Account.Secret_key.from_hex_string value))
+        let open Lwt_result_syntax in
+        let* value =
+          try
+            match String.remove_prefix ~prefix:"0x" value with
+            | Some value ->
+                let _ = Hex.show (`Hex value) in
+                return (`Hex value)
+            | None -> raise (Invalid_argument "not prefixed by 0x")
+          with _ ->
+            failwith "%s value is not a valid hexadecimal string" value
+        in
+        let*? secret_key = Signer.secret_key_from_hex value in
+        return (Signer.from_secret_key secret_key))
 
   let int =
     Tezos_clic.parameter (fun _ n ->
@@ -87,13 +99,8 @@ module Arg = struct
       ~long:"rpc-endpoint"
       ~doc:"Endpoint used to fetch the state of the chain"
 
-  let secret_key ~long ~short ~doc =
-    Tezos_clic.arg
-      ~doc
-      ~long
-      ~short
-      ~placeholder:"SECRET_KEY"
-      Parameter.secret_key
+  let signer ~long ~short ~doc =
+    Tezos_clic.arg ~doc ~long ~short ~placeholder:"SIGNER" Parameter.signer
 
   let max_active_eoa =
     let default = "1" in
@@ -167,7 +174,7 @@ module Arg = struct
       Parameter.tez
 
   let controller =
-    secret_key
+    signer
       ~long:"controller"
       ~short:'c'
       ~doc:
@@ -183,6 +190,27 @@ module Arg = struct
       ~doc:
         "Specifies the transfer mode: ERC20 transfers or native XTZ transfers."
       Parameter.scenario
+
+  let elapsed_time_between_report =
+    let default = "60." in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"report"
+      ~short:'r'
+      ~placeholder:"SECONDS"
+      ~doc:"The elapsed time between two reports of measured TPS."
+      Parameter.float
+
+  let txs_salvo_eoa =
+    let default = "1" in
+    Tezos_clic.default_arg
+      ~default
+      ~long:"txs-per-salvo"
+      ~placeholder:""
+      ~doc:
+        "The number of transactions an EOA inject before waiting for their \
+         confirmation."
+      Parameter.int
 end
 
 let log_config ~verbose () =
@@ -201,7 +229,7 @@ let run_command =
   command
     ~desc:"Start Floodgate to spam an EVM-compatible network"
     Arg.(
-      args11
+      args13
         verbose
         relay_endpoint
         rpc_endpoint
@@ -212,7 +240,9 @@ let run_command =
         tick_interval
         base_fee_factor
         initial_balance
-        scenario)
+        scenario
+        txs_salvo_eoa
+        elapsed_time_between_report)
     (prefixes ["run"] @@ stop)
     (fun ( verbose,
            relay_endpoint,
@@ -224,7 +254,9 @@ let run_command =
            tick_interval,
            base_fee_factor,
            initial_balance,
-           scenario )
+           scenario,
+           txs_per_salvo,
+           elapsed_time_between_report )
          () ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
@@ -241,6 +273,8 @@ let run_command =
         ~tick_interval
         ~base_fee_factor
         ~initial_balance
+        ~txs_per_salvo
+        ~elapsed_time_between_report
         ~scenario)
 
 let commands = [run_command]
@@ -289,14 +323,14 @@ let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 
 let () =
   Random.self_init () ;
-  let _ =
+  ignore
     Tezos_clic.(
       setup_formatter
-        Format.err_formatter
-        (if Unix.isatty Unix.stderr then Ansi else Plain)
-        Short)
-  in
+        ~isatty:(Unix.isatty Unix.stdout)
+        Format.std_formatter
+        Short) ;
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
   Tezos_base_unix.Event_loop.main_run
-    (Lwt_exit.wrap_and_exit (dispatch (argv ())))
+    ~process_name:"etherlink floodgate"
+    (fun () -> Lwt_exit.wrap_and_exit (dispatch (argv ())))
   |> handle_error

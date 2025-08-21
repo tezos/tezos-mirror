@@ -48,7 +48,7 @@ let timestamp_to_padded_little_endian_bytes
 let assert_kernel_root_hash_has_correct_length
         (kernel_root_hash : bytes)
         : unit =
-    assert_with_error ((Bytes.length kernel_root_hash) = 33n) Errors.incorrect_kernel_root_hash_length
+    Assert.Error.assert ((Bytes.length kernel_root_hash) = 33n) Errors.incorrect_kernel_root_hash_length
 
 
 let get_kernel_upgrade_payload
@@ -64,8 +64,8 @@ let assert_sequencer_upgrade_payload_is_correct
         (pool_address : bytes)
         : unit =
     let sequencer_pk_length = String.length sequencer_pk in
-    let _ = assert_with_error ((sequencer_pk_length = 54n) || (sequencer_pk_length = 55n)) Errors.incorrect_sequencer_pk_length in
-    assert_with_error ((Bytes.length pool_address) = 20n) Errors.incorrect_pool_address_length
+    let _ = Assert.Error.assert ((sequencer_pk_length = 54n) || (sequencer_pk_length = 55n)) Errors.incorrect_sequencer_pk_length in
+    Assert.Error.assert ((Bytes.length pool_address) = 20n) Errors.incorrect_pool_address_length
 
 
 let public_key_to_bytes

@@ -23,14 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [check_consistency store_dir genesis] checks that
+(** [check_consistency chain_dir genesis] checks that
     the store is in a consistent state. *)
 val check_consistency :
   [`Chain_dir] Naming.directory -> Genesis.t -> unit tzresult Lwt.t
 
-(** [fix_consistency ?history_mode store_dir context_index genesis]
-    aims to fix a store if it is in an inconsistent state. To do so, it
-    will inspect the stored data and try infer all the missing or
+(** [fix_consistency ?history_mode chain_dir context_index genesis]
+    aims to fix a store if it is in an inconsistent state. To do so,
+    it will inspect the stored data and try infer all the missing or
     corrupted parts. *)
 val fix_consistency :
   ?history_mode:History_mode.t ->

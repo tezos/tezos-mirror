@@ -27,9 +27,6 @@ pub const SBI_FIRMWARE_TEZOS: u64 = 0x0A000000;
 /// Function ID for `sbi_tezos_inbox_next`
 pub const SBI_TEZOS_INBOX_NEXT: u64 = 0x01;
 
-/// Function ID for `sbi_tezos_metadata_reveal`
-pub const SBI_TEZOS_METADATA_REVEAL: u64 = 0x08;
-
 /// Function ID for `sbi_tezos_ed25519_verify`
 pub const SBI_TEZOS_ED25519_VERIFY: u64 = 0x05;
 

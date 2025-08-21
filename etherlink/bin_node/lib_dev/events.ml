@@ -37,6 +37,18 @@ let pending_upgrade =
     ("root_hash", Ethereum_types.hash_encoding)
     ("timestamp", Time.Protocol.encoding)
 
+let pending_sequencer_upgrade =
+  declare_3
+    ~section
+    ~name:"pending_sequencer_upgrade"
+    ~msg:
+      "pending sequencer upgrade to sequencer {sequencer} and pool address \
+       {pool_address} expected to activate at {timestamp}"
+    ~level:Notice
+    ("sequencer", Signature.Public_key.encoding)
+    ("pool_address", Ethereum_types.address_encoding)
+    ("timestamp", Time.Protocol.encoding)
+
 let applied_upgrade =
   declare_2
     ~section
@@ -55,6 +67,28 @@ let failed_upgrade =
     ("root_hash", Ethereum_types.hash_encoding)
     ("level", Data_encoding.n)
 
+let applied_sequencer_upgrade =
+  declare_2
+    ~section
+    ~name:"applied_sequencer_upgrade"
+    ~msg:
+      "sequencer successfully upgraded to {sequencer} before blueprint {level}"
+    ~level:Notice
+    ("sequencer", Signature.Public_key.encoding)
+    ("level", Data_encoding.n)
+
+let failed_sequencer_upgrade =
+  declare_3
+    ~section
+    ~name:"failed_sequencer_upgrade"
+    ~msg:
+      "sequencer failed to upgrade to {new_sequencer} before blueprint \
+       {level}. Current sequencer is {current_sequencer}"
+    ~level:Warning
+    ("new_sequencer", Signature.Public_key.encoding)
+    ("current_sequencer", Data_encoding.option Signature.Public_key.encoding)
+    ("level", Data_encoding.n)
+
 let ignored_kernel_arg =
   declare_0
     ~section
@@ -62,6 +96,16 @@ let ignored_kernel_arg =
     ~msg:
       "ignored the kernel command-line argument since the EVM state was \
        already initialized"
+    ~level:Warning
+    ()
+
+let ignored_periodic_snapshot =
+  declare_0
+    ~section
+    ~name:"ignored_periodic_snapshot_arg"
+    ~msg:
+      "ignored the periodic snapshot feature since the EVM node is running in \
+       Archive mode"
     ~level:Warning
     ()
 
@@ -97,6 +141,24 @@ let legacy_mode =
     ~msg:
       "node is using the (deprecated) legacy block storage, import a recent \
        snapshot to start using the new block storage"
+    ()
+
+let importing_legacy_snapshot =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"importing_legacy_snapshot"
+    ~level:Warning
+    ~msg:
+      "Importing a legacy snapshot. Consider using a snapshot generated from a \
+       more recent node."
+    ()
+
+let spawn_rpc_is_ready =
+  Internal_event.Simple.declare_0
+    ~section
+    ~name:"spawn_rpc_is_ready"
+    ~level:Notice
+    ~msg:"the rpc process is ready"
     ()
 
 let event_private_server_is_ready =
@@ -166,9 +228,36 @@ let event_deprecation_note =
     ~level:Warning
     ("msg", Data_encoding.string)
 
+let replay_csv_available =
+  Internal_event.Simple.declare_1
+    ~section
+    ~name:"replay_csv_available"
+    ~msg:"Replay data will be streamlined to {path}."
+    ~level:Notice
+    ("path", Data_encoding.string)
+
+let replicate_transaction_dropped =
+  Internal_event.Simple.declare_2
+    ~section
+    ~name:"replicate_transaction_dropped"
+    ~msg:"transaction {hash} was dropped because it is now invalid ({reason})"
+    ~level:Warning
+    ~pp1:Ethereum_types.pp_hash
+    ("hash", Ethereum_types.hash_encoding)
+    ("reason", Data_encoding.string)
+
 type kernel_log_kind = Application | Simulation
 
 type kernel_log_level = Debug | Info | Error | Fatal
+
+let string_from_kernel_log_level level =
+  let level_verbosity =
+    match level with Debug -> 3 | Info -> 2 | Error -> 1 | Fatal -> 0
+  in
+  let value = Bytes.make 1 '\000' in
+  Bytes.set_uint8 value 0 level_verbosity ;
+  (* Safe because the initial pointer to the bytes is lost *)
+  Bytes.unsafe_to_string value
 
 let kernel_log_kind_to_string = function
   | Application -> "application"
@@ -192,119 +281,108 @@ let missing_chain_id =
     ~msg:"missing chain id: skipping consistency check with selected network"
     ()
 
-let pp_file_size fmt size =
-  let pp unit power =
-    Format.fprintf
-      fmt
-      "%d.%d%s"
-      (size / power)
-      (size / (power / 10) mod 10)
-      unit
-  in
-  if size / 1_000_000_000 > 0 then pp "GB" 1_000_000_000
-  else if size / 1_000_000 > 0 then pp "MB" 1_000_000
-  else if size / 1_000 > 0 then pp "kB" 1_000
-  else Format.fprintf fmt "%dB" size
-
-let downloading_file =
-  Internal_event.Simple.declare_2
-    ~level:Notice
+let missing_block =
+  Internal_event.Simple.declare_1
+    ~level:Warning
     ~section
-    ~name:"downloading_snapshot"
-    ~msg:"downloading {url}{size}"
-    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
-    ~pp2:
-      Format.(
-        pp_print_option (fun fmt size -> fprintf fmt " (%a)" pp_file_size size))
-    ("url", Data_encoding.string)
-    ("size", Data_encoding.(option int31))
-
-let download_in_progress =
-  Internal_event.Simple.declare_3
-    ~level:Notice
-    ~section
-    ~name:"snapshot_download_in_progress"
-    ~msg:"still downloading {url} after {elapsed_time}{progress}"
-    ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
-    ~pp2:(fun fmt elapsed_time ->
-      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
-    ~pp3:
-      Format.(
-        pp_print_option (fun fmt (remaining, percentage) ->
-            fprintf
-              fmt
-              " (%.1f%%, %a remaining)"
-              percentage
-              pp_file_size
-              remaining))
-    ("url", Data_encoding.string)
-    ("elapsed_time", Time.System.Span.encoding)
-    ( "progress",
-      Data_encoding.(
-        option (obj2 (req "remaining_bytes" int31) (req "percentage" float))) )
+    ~name:"missing_block"
+    ~msg:
+      "missing block: received event saying the block for {level} would be \
+       available, but reading it from storage failed"
+    ("level", Data_encoding.int32)
 
 let importing_snapshot =
-  Internal_event.Simple.declare_0
+  Internal_event.Simple.declare_1
     ~level:Notice
     ~section
     ~name:"importing_snapshot"
-    ~msg:"importing snapshot"
+    ~msg:"importing snapshot {filename}"
+    ("filename", Data_encoding.string)
+    ~pp1:Format.pp_print_string
+
+let exporting_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"exporting_snapshot"
+    ~msg:"exporting snapshot {filename}"
+    ("filename", Data_encoding.string)
+
+let still_exporting_snapshot =
+  Internal_event.Simple.declare_3
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ~pp3:(fun fmt p -> Format.fprintf fmt "%.1f" p)
+    ~name:"still_exporting_snapshot"
+    ~msg:
+      "still exporting snapshot {filename} after {elapsed_time} ({progress}% \
+       done)"
+    ("filename", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+    ("progress", Data_encoding.float)
+
+let finished_exporting_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"finished_exporting_snapshot"
+    ~msg:"finished exporting snapshot {filename}"
+    ("filename", Data_encoding.string)
+
+let compressing_snapshot =
+  Internal_event.Simple.declare_1
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~name:"compressing_snapshot"
+    ~msg:"compressing snapshot {filename}"
+    ("filename", Data_encoding.string)
+
+let still_compressing_snapshot =
+  Internal_event.Simple.declare_3
+    ~level:Notice
+    ~section
+    ~pp1:(fun fmt filename ->
+      Format.pp_print_string fmt (Filename.basename filename))
+    ~pp2:(fun fmt elapsed_time ->
+      Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
+    ~pp3:(fun fmt p -> Format.fprintf fmt "%.1f" p)
+    ~name:"still_compressing_snapshot"
+    ~msg:
+      "still compressing snapshot {filename} after {elapsed_time} ({progress}% \
+       done)"
+    ("filename", Data_encoding.string)
+    ("elapsed_time", Time.System.Span.encoding)
+    ("progress", Data_encoding.float)
+
+let import_finished =
+  Internal_event.Simple.declare_0
+    ~level:Notice
+    ~section
+    ~name:"import_finished"
+    ~msg:"snapshot import is finished"
     ()
 
-let extract_snapshot_archive_in_progress =
+let import_snapshot_archive_in_progress =
   Internal_event.Simple.declare_2
     ~level:Notice
     ~section
-    ~name:"extract_snapshot_archive_in_progress"
-    ~msg:"still extracting archive {name} after {elapsed_time}"
+    ~name:"import_snapshot_archive_in_progress"
+    ~msg:"still importing archive {name} after {elapsed_time}"
     ~pp1:(fun fmt url -> Format.fprintf fmt "%s" (Filename.basename url))
     ~pp2:(fun fmt elapsed_time ->
       Format.fprintf fmt "%a" Ptime.Span.pp elapsed_time)
     ("name", Data_encoding.string)
     ("elapsed_time", Time.System.Span.encoding)
-
-type download_error = Http_error of Cohttp.Code.status_code | Exn of exn
-
-let download_error_encoding =
-  let open Data_encoding in
-  let status_code_encoding =
-    conv Cohttp.Code.code_of_status Cohttp.Code.status_of_code int31
-  in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"http_error"
-        (obj2
-           (req "kind" (constant "http_error"))
-           (req "status_code" status_code_encoding))
-        (function Http_error code -> Some ((), code) | _ -> None)
-        (fun ((), code) -> Http_error code);
-      case
-        (Tag 1)
-        ~title:"exn"
-        (obj2 (req "kind" (constant "exception")) (req "description" string))
-        (function Exn exn -> Some ((), Printexc.to_string exn) | _ -> None)
-        (fun ((), _) -> Stdlib.failwith "encoding should not be used to decode");
-    ]
-
-let pp_download_error fmt =
-  let open Format in
-  function
-  | Http_error code ->
-      fprintf fmt "HTTP status code '%s'" (Cohttp.Code.string_of_status code)
-  | Exn exn -> fprintf fmt "'%s'" (Printexc.to_string exn)
-
-let download_failed =
-  Internal_event.Simple.declare_2
-    ~level:Error
-    ~section
-    ~name:"download_failed"
-    ~msg:"downloading {url} failed with {error}"
-    ~pp1:Format.pp_print_string (* No elapsing too long URLs. *)
-    ~pp2:pp_download_error
-    ("url", Data_encoding.string)
-    ("error", download_error_encoding)
 
 let event_kernel_log_application_debug = event_kernel_log Application Debug
 
@@ -346,6 +424,16 @@ let predownload_kernel =
     ~name:"predownload_kernel"
     ~msg:"kernel {version} successfully predownloaded"
     ("version", Data_encoding.string)
+
+let predownload_kernel_failed =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"predownload_kernel_failed"
+    ~msg:"failed to predownload kernel {version} due to: {error}"
+    ~pp2:Error_monad.pp_print_trace
+    ("version", Data_encoding.string)
+    ("error", trace_encoding)
 
 let sandbox_started =
   Internal_event.Simple.declare_1
@@ -393,10 +481,39 @@ let wasm_pvm_fallback =
     ~msg:"the node needs to fallback to the WASM PVM to execute a block"
     ()
 
+let rpc_call_fallback =
+  Internal_event.Simple.declare_2
+    ~level:Warning
+    ~section
+    ~name:"rpc_call_fallback"
+    ~msg:"using fallback for unavailable RPC service {service} because {error}"
+    ("service", Data_encoding.string)
+    ("error", trace_encoding)
+    ~pp1:Format.pp_print_string
+    ~pp2:pp_print_trace
+
+let multichain_node_singlechain_kernel =
+  Internal_event.Simple.declare_0
+    ~level:Warning
+    ~section
+    ~name:"multichain_node_singlechain_kernel"
+    ~msg:
+      "the configuration for the `l2_chains` experimental feature was ignored \
+       because the multichain feature is not yet enabled in the rollup"
+    ()
+
 let received_upgrade payload = emit received_upgrade payload
 
 let pending_upgrade (upgrade : Evm_events.Upgrade.t) =
   emit pending_upgrade (upgrade.hash, upgrade.timestamp)
+
+let pending_sequencer_upgrade
+    (sequencer_upgrade : Evm_events.Sequencer_upgrade.t) =
+  emit
+    pending_sequencer_upgrade
+    ( sequencer_upgrade.sequencer,
+      sequencer_upgrade.pool_address,
+      sequencer_upgrade.timestamp )
 
 let applied_upgrade root_hash Ethereum_types.(Qty level) =
   emit applied_upgrade (root_hash, level)
@@ -404,7 +521,16 @@ let applied_upgrade root_hash Ethereum_types.(Qty level) =
 let failed_upgrade root_hash Ethereum_types.(Qty level) =
   emit failed_upgrade (root_hash, level)
 
+let applied_sequencer_upgrade sequencer Ethereum_types.(Qty level) =
+  emit applied_sequencer_upgrade (sequencer, level)
+
+let failed_sequencer_upgrade ~new_sequencer ~found_sequencer
+    Ethereum_types.(Qty level) =
+  emit failed_sequencer_upgrade (new_sequencer, found_sequencer, level)
+
 let ignored_kernel_arg () = emit ignored_kernel_arg ()
+
+let ignored_periodic_snapshot () = emit ignored_periodic_snapshot ()
 
 let catching_up_evm_event ~from ~to_ = emit catching_up_evm_event (from, to_)
 
@@ -412,6 +538,8 @@ let is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_is_ready (rpc_addr, rpc_port, backend, websockets)
 
 let legacy_mode () = emit legacy_mode ()
+
+let spawn_rpc_is_ready () = emit spawn_rpc_is_ready ()
 
 let private_server_is_ready ~rpc_addr ~rpc_port ~websockets ~backend =
   emit event_private_server_is_ready (rpc_addr, rpc_port, backend, websockets)
@@ -444,6 +572,9 @@ let preload_kernel commit = emit preload_kernel commit
 
 let patched_state key level = emit patched_state (key, level)
 
+let predownload_kernel_failed root_hash error =
+  emit predownload_kernel_failed (Hex.show root_hash, error)
+
 let predownload_kernel root_hash = emit predownload_kernel (Hex.show root_hash)
 
 let sandbox_started level = emit sandbox_started level
@@ -456,27 +587,44 @@ let invalid_node_da_fees ~node_da_fees ~kernel_da_fees ~block_number ~call =
 
 let deprecation_note msg = emit event_deprecation_note msg
 
+let replay_csv_available msg = emit replay_csv_available msg
+
 let wasm_pvm_fallback () = emit wasm_pvm_fallback ()
+
+let rpc_call_fallback name error = emit rpc_call_fallback (name, error)
 
 let missing_chain_id () = emit missing_chain_id ()
 
-let downloading_file ?size url = emit downloading_file (url, size)
+let missing_block level = emit missing_block level
 
-let download_in_progress ~size ~remaining_size ~elapsed_time url =
-  let progress =
-    match (size, remaining_size) with
-    | Some size, Some remain ->
-        let percent =
-          float_of_int (size - remain) *. 100. /. float_of_int size
-        in
-        Some (remain, percent)
-    | _ -> None
-  in
-  emit download_in_progress (url, elapsed_time, progress)
+let multichain_node_singlechain_kernel () =
+  emit multichain_node_singlechain_kernel ()
 
-let download_failed url reason = emit download_failed (url, reason)
+let importing_snapshot f = emit importing_snapshot f
 
-let importing_snapshot () = emit importing_snapshot ()
+let importing_legacy_snapshot () = emit importing_legacy_snapshot ()
 
-let extract_snapshot_archive_in_progress ~archive_name ~elapsed_time =
-  emit extract_snapshot_archive_in_progress (archive_name, elapsed_time)
+let exporting_snapshot snapshot = emit exporting_snapshot snapshot
+
+let still_exporting_snapshot ~total ~progress snapshot elapsed_time =
+  emit
+    still_exporting_snapshot
+    (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
+
+let finished_exporting_snapshot snapshot =
+  emit finished_exporting_snapshot snapshot
+
+let compressing_snapshot snapshot = emit compressing_snapshot snapshot
+
+let still_compressing_snapshot ~total ~progress snapshot elapsed_time =
+  emit
+    still_compressing_snapshot
+    (snapshot, elapsed_time, 100. *. float_of_int progress /. float_of_int total)
+
+let import_finished () = emit import_finished ()
+
+let import_snapshot_archive_in_progress ~archive_name ~elapsed_time =
+  emit import_snapshot_archive_in_progress (archive_name, elapsed_time)
+
+let replicate_transaction_dropped hash reason =
+  emit replicate_transaction_dropped (hash, reason)

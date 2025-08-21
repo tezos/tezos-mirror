@@ -1,0 +1,26 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_lib_upnp)
+ (public_name octez-lib-upnp)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-igd-next
+  octez-libs.stdlib
+  octez-libs.error-monad
+  octez-libs.lwt-result-stdlib
+  octez-libs.base
+  octez-libs.base.unix
+  octez-libs.stdlib-unix)
+ (flags
+  (:standard)
+  -open Octez_igd_next
+  -open Tezos_stdlib
+  -open Tezos_error_monad
+  -open Tezos_error_monad.TzLwtreslib
+  -open Tezos_lwt_result_stdlib
+  -open Tezos_base.TzPervasives
+  -open Tezos_base
+  -open Tezos_base_unix
+  -open Tezos_stdlib_unix))

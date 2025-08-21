@@ -9,10 +9,10 @@
 type 'a t
 
 (** Read/write store {!t}. *)
-type rw = Store_sigs.rw t
+type rw = Access_mode.rw t
 
 (** Read only store {!t}. *)
-type ro = Store_sigs.ro t
+type ro = Access_mode.ro t
 
 (** Name of SQLite file in data directory. *)
 val sqlite_file_name : string
@@ -21,7 +21,7 @@ val sqlite_file_name : string
 val extra_sqlite_files : string list
 
 (** [init mode ~data_dir] initializes the store and returns it. *)
-val init : 'a Store_sigs.mode -> data_dir:string -> 'a t tzresult Lwt.t
+val init : 'a Access_mode.t -> data_dir:string -> 'a t tzresult Lwt.t
 
 (** Close the store by freeing all resources and closing database
     connections. *)
@@ -222,6 +222,11 @@ module Protocols : sig
   (** Returns the last protocol by activation level. *)
   val last : ?conn:Sqlite.conn -> _ t -> proto_info option tzresult Lwt.t
 end
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/7952
+
+   Remove Dal_slots_headers and Dal_slots_statuses tables.
+*)
 
 (** Published slot headers per block hash, stored as a list of bindings from
     [Dal_slot_index.t] to [Dal.Slot.t]. The encoding function converts this list

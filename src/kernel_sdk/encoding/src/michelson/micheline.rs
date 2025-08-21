@@ -468,7 +468,7 @@ impl<'a, Arg, const PRIM_TAG: u8> NomReader<'a>
 where
     Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_1_ARG_NO_ANNOTS_TAG, PRIM_TAG]),
             Arg::nom_read,
@@ -483,7 +483,7 @@ impl<'a, Arg, const PRIM_TAG: u8> NomReader<'a>
 where
     Arg: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_1_ARG_SOME_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg::nom_read, Annotations::nom_read),
@@ -502,7 +502,7 @@ where
     Arg1: NomReader<'a> + Debug + PartialEq + Eq,
     Arg2: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_2_ARGS_NO_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg1::nom_read, Arg2::nom_read),
@@ -521,7 +521,7 @@ where
     Arg1: NomReader<'a> + Debug + PartialEq + Eq,
     Arg2: NomReader<'a> + Debug + PartialEq + Eq,
 {
-    fn nom_read(input: &'a [u8]) -> NomResult<Self> {
+    fn nom_read(input: &'a [u8]) -> NomResult<'a, Self> {
         let parse = preceded(
             tag([MICHELINE_PRIM_2_ARGS_SOME_ANNOTS_TAG, PRIM_TAG]),
             pair(Arg1::nom_read, pair(Arg2::nom_read, Annotations::nom_read)),
@@ -541,9 +541,9 @@ where
 // primitive application.
 fn nom_read_app_aux<'a, T>(
     micheline_prim_tag: u8,
-    next: impl FnMut(NomInput<'a>) -> NomResult<T>,
+    next: impl FnMut(NomInput<'a>) -> NomResult<'a, T>,
     into: impl Fn((u8, T)) -> Node,
-) -> impl FnMut(NomInput<'a>) -> NomResult<Node> {
+) -> impl FnMut(NomInput<'a>) -> NomResult<'a, Node> {
     use nom::number::complete::u8;
 
     preceded(tag([micheline_prim_tag]), map(pair(u8, next), into))
@@ -777,7 +777,7 @@ fn nom_read_tagged_micheline<'a, T: Clone, const TAG: u8>(
 
 /// Read dynamically-sized bytes with a prefix of [MICHELINE_BYTES_TAG] into `parser`.
 pub(crate) fn nom_read_micheline_bytes<'a, T: Clone>(
-    parser: impl FnMut(NomInput<'a>) -> NomResult<T>,
+    parser: impl FnMut(NomInput<'a>) -> NomResult<'a, T>,
 ) -> impl FnMut(NomInput<'a>) -> NomResult<'a, T> {
     nom_read_tagged_micheline::<_, { MICHELINE_BYTES_TAG }>(nom_read::dynamic(parser))
 }

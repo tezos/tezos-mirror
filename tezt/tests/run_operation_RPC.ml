@@ -353,7 +353,7 @@ let test_bad_revelations =
   let* () =
     let* op =
       let transaction_payload = Operation.Manager.transfer () in
-      let reveal_payload = Operation.Manager.reveal fresh_account in
+      let reveal_payload = Operation.Manager.reveal fresh_account () in
       Operation.Manager.(
         operation
           (make_batch
@@ -383,7 +383,7 @@ let test_bad_revelations =
   let* () =
     let reveal_manager_op =
       Operation.Manager.(
-        make ~source:fresh_account (reveal Constant.bootstrap1))
+        make ~source:fresh_account (reveal Constant.bootstrap1 ()))
     in
     let* op = Operation.Manager.operation [reveal_manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
@@ -406,7 +406,7 @@ let test_bad_revelations =
     previously_revealed_error ;
   let* () =
     let source = Constant.bootstrap1 (* this source is already revealed *) in
-    let manager_op = Operation.Manager.(make ~source (reveal source)) in
+    let manager_op = Operation.Manager.(make ~source (reveal source ())) in
     let* op = Operation.Manager.operation [manager_op] client in
     let* op_json = Operation.make_run_operation_input op client in
     let* output =
@@ -536,7 +536,7 @@ let test_misc_manager_ops_from_fresh_account =
      [run_operation] RPC on it." ;
   let* reveal_op =
     let manager_op =
-      Operation.Manager.(make ~source:fresh_account (reveal fresh_account))
+      Operation.Manager.(make ~source:fresh_account (reveal fresh_account ()))
     in
     Operation.Manager.operation [manager_op] client
   in

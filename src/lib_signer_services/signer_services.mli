@@ -27,7 +27,7 @@ val sign :
   ( [`POST],
     unit,
     unit * Tezos_crypto.Signature.Public_key_hash.t,
-    Tezos_crypto.Signature.t option,
+    Tezos_crypto.Signature.t option * Signature.version option,
     Bytes.t,
     Tezos_crypto.Signature.t )
   Tezos_rpc.Service.t
@@ -75,4 +75,22 @@ val authorized_keys :
     unit,
     unit,
     Tezos_crypto.Signature.Public_key_hash.t list option )
+  Tezos_rpc.Service.t
+
+val known_keys :
+  ( [`GET],
+    unit,
+    unit,
+    unit,
+    unit,
+    Tezos_crypto.Signature.Public_key_hash.t list )
+  Tezos_rpc.Service.t
+
+val bls_prove_possession :
+  ( [`GET],
+    unit,
+    unit * Tezos_crypto.Signature.Public_key_hash.t,
+    Tezos_crypto.Signature.Bls.Public_key.t option,
+    unit,
+    Tezos_crypto.Signature.Bls.t )
   Tezos_rpc.Service.t

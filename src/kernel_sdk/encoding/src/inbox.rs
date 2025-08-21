@@ -56,7 +56,7 @@ impl<'a, Expr: Michelson> InboxMessage<'a, Expr> {
     /// the input.
     ///
     /// In our case, we want to avoid copies if possible - which require additional ticks.
-    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<Self> {
+    pub fn parse(input: &'a [u8]) -> tezos_data_encoding::nom::NomResult<'a, Self> {
         let (remaining, repr): (&'a [u8], _) = InboxMessageRepr::nom_read(input)?;
 
         match repr {
@@ -181,7 +181,9 @@ impl<'a> ExternalMessageFrame<&'a [u8]> {
     /// the input.
     ///
     /// In our case, we want to avoid copies if possible - which require additional ticks.
-    pub fn parse(input: &'a [u8]) -> Result<Self, tezos_data_encoding::nom::NomError> {
+    pub fn parse(
+        input: &'a [u8],
+    ) -> Result<Self, tezos_data_encoding::nom::NomError<'a>> {
         let (_remaining, message) = map(
             preceded(
                 tag([Self::TARGETTED_TAG]),

@@ -18,12 +18,14 @@ let init_store =
     ()
 
 let applied_migration =
-  declare_1
+  declare_2
     ~section
     ~name:"store_applied_migration"
-    ~msg:"applied migration {name} to the store"
+    ~msg:"applied migration {name} to the store in {time}"
     ~level:Notice
     ("name", Data_encoding.string)
+    ("time", Time.System.Span.encoding)
+    ~pp2:Time.System.Span.pp_hum
 
 let migrations_from_the_future =
   declare_2
@@ -46,7 +48,7 @@ let no_l1_latest_level_to_catch_up =
 
 let init_store () = emit init_store ()
 
-let applied_migration name = emit applied_migration name
+let applied_migration name time = emit applied_migration (name, time)
 
 let migrations_from_the_future ~applied ~known =
   emit migrations_from_the_future (applied, known)

@@ -1315,8 +1315,8 @@ let test_pvm_reboot_counter ~version ~pvm_max_reboots () =
 
   check_counter tree 0l
 
-let test_kernel_reboot_gen ~version ~reboots ~expected_reboots ~pvm_max_reboots
-    =
+let test_kernel_reboot_gen ?hooks ~version ~reboots ~expected_reboots
+    ~pvm_max_reboots () =
   let open Lwt_result_syntax in
   (* Extracted from the kernel, these are the constant values used to build the
      initial memory and the addresses where values are stored. *)
@@ -1472,7 +1472,7 @@ let test_kernel_reboot_gen ~version ~reboots ~expected_reboots ~pvm_max_reboots
       reboot_module
   in
   let*! tree = set_empty_inbox_step 0l tree in
-  let*! tree = eval_until_input_or_reveal_requested tree in
+  let*! tree = eval_until_input_or_reveal_requested tree ?hooks in
   let*! durable = wrap_as_durable_storage tree in
   let durable = Durable.of_storage_exn durable in
   let*! too_many_reboot =
@@ -1508,6 +1508,7 @@ let test_kernel_reboot ~version () =
     ~reboots:5l
     ~expected_reboots:5l
     ~pvm_max_reboots:10l
+    ()
 
 let test_kernel_reboot_failing ~version () =
   (* The kernel doesn't accept more than 10 reboots between two inputs, it will
@@ -1517,6 +1518,30 @@ let test_kernel_reboot_failing ~version () =
     ~reboots:15l
     ~expected_reboots:10l
     ~pvm_max_reboots:10l
+    ()
+
+let test_kernel_reboot_hook ~version () =
+  let ctr = ref 0l in
+  let hooks =
+    Hooks.(
+      no_hooks
+      |> on_pvm_reboot (fun _ticks ->
+             ctr := Int32.succ !ctr ;
+             Lwt.return_unit))
+  in
+  let reboots = 5l in
+  let res =
+    test_kernel_reboot_gen
+      ~version
+      ~reboots
+      ~expected_reboots:reboots
+      ~pvm_max_reboots:10l
+      ~hooks
+      ()
+  in
+  (* 5 reboots and 1 yield for 6 hook calls *)
+  assert (!ctr = Int32.succ reboots) ;
+  res
 
 (* Set a certain number `n` of dummy inputs and check the scheduling is
    consistent:
@@ -1859,6 +1884,7 @@ let tests =
         test_pvm_reboot_counter ~pvm_max_reboots:10l );
       ("Test reboot", `Quick, test_kernel_reboot);
       ("Test reboot takes too many reboots", `Quick, test_kernel_reboot_failing);
+      ("Test reboot hook", `Quick, test_kernel_reboot_hook);
       ("Test kernel upgrade ok", `Quick, test_reveal_upgrade_kernel_ok);
       ( "Test kernel upgrade fallsback on decoding error",
         `Quick,

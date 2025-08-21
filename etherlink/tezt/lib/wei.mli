@@ -58,6 +58,9 @@ val of_wei_z : t -> Z.t
 (** Converts a tez value to the equivalent wei. **)
 val of_tez : Tez.t -> t
 
+(** Converts a wei value to the equivalent tez. *)
+val to_tez : t -> Tez.t
+
 (** Convert an [int] amount of eth to a wei one.
     This doesn't perform any bounds checks. *)
 val of_eth_int : int -> t

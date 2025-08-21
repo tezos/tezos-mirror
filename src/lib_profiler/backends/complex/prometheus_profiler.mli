@@ -7,7 +7,7 @@
 
 (** Driver registering its report in a promotheus collector whenever a
     toplevel section ends.
-    Enable it using [PROFILING_BACKEND=prometheus] environment variable.
+    Enable it using [PROFILING_BACKENDS=prometheus] environment variable.
 
     This backend relies on the presence of a "prometheus" attribute
     in the metadata field of profiler calls. If this attribute is set to

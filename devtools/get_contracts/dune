@@ -7,10 +7,10 @@
   octez-libs.micheline
   octez-libs.base
   octez-shell-libs.store
-  tezos-protocol-021-PsQuebec.protocol
-  octez-protocol-021-PsQuebec-libs.client
   tezos-protocol-022-PsRiotum.protocol
   octez-protocol-022-PsRiotum-libs.client
+  tezos-protocol-023-PtSeouLo.protocol
+  octez-protocol-023-PtSeouLo-libs.client
   tezos-protocol-alpha.protocol
   octez-protocol-alpha-libs.client)
  (library_flags (:standard -linkall))
@@ -23,7 +23,7 @@
 (executable
  (name get_contracts)
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
   octez-libs.micheline
   octez-libs.base

@@ -12,8 +12,6 @@
     Subject:      Test garbage collection for the smart rollup node context
 *)
 
-open Store_sigs
-
 let commit_new_state context key =
   let open Lwt_syntax in
   let* state =

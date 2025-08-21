@@ -37,9 +37,9 @@ type 'a store = 'a Store.t constraint 'a = [< `Read | `Write > `Read]
 module Node_store = struct
   let close (s : 'a store) = Store.close s
 
-  let init_with_migration = Store.init_with_migration
+  let init = Store.init
 
-  let check_and_set_history_mode (type a) (mode : a Store_sigs.mode)
+  let check_and_set_history_mode (type a) (mode : a Access_mode.t)
       (store : a Store.t) (history_mode : Configuration.history_mode option) =
     let open Lwt_result_syntax in
     let* stored_history_mode =
@@ -91,8 +91,8 @@ type sync_info = {
 type 'a t = {
   config : Configuration.t;
   cctxt : Client_context.full;
-  degraded : ('a, bool) Reference.t;
-  dal_cctxt : Dal_node_client.cctxt option;
+  degraded : bool Reference.rw;
+  dal_cctxt : Tezos_dal_node_lib.Dal_node_client.cctxt option;
   data_dir : string;
   l1_ctxt : Layer1.t;
   genesis_info : genesis_info;
@@ -101,21 +101,26 @@ type 'a t = {
   kind : Kind.t;
   unsafe_patches : Pvm_patches.t;
   lockfile : Lwt_unix.file_descr;
-  store : 'a store;
-  context : 'a Context.t;
-  lcc : ('a, lcc) Reference.t;
-  lpc : ('a, Commitment.t option) Reference.t;
-  private_info : ('a, private_info option) Reference.t;
+  store : 'store store;
+  context : 'context Context.t;
+  lcc : lcc Reference.rw;
+  lpc : Commitment.t option Reference.rw;
+  private_info : private_info option Reference.rw;
   kernel_debug_logger : debug_logger;
   finaliser : unit -> unit Lwt.t;
   current_protocol : current_protocol Reference.rw;
   global_block_watcher : Sc_rollup_block.t Lwt_watcher.input;
   sync : sync_info;
 }
+  constraint 'a = < store : 'store ; context : 'context >
 
-type rw = [`Read | `Write] t
+type rw = < store : [`Read | `Write] ; context : [`Read | `Write] > t
 
-type ro = [`Read] t
+type ro = < store : [`Read] ; context : [`Read] > t
+
+type 'a rw_store = < store : [`Read | `Write] ; context : 'a > t
+
+type 'a rw_context = < store : 'a ; context : [`Read | `Write] > t
 
 let get_operator node_ctxt purpose =
   Purpose.find_operator purpose node_ctxt.config.operators
@@ -198,16 +203,18 @@ let dal_supported node_ctxt =
   node_ctxt.dal_cctxt <> None
   && (Reference.get node_ctxt.current_protocol).constants.dal.feature_enable
 
-let readonly (node_ctxt : _ t) =
+let readonly (node_ctxt : _ t) : ro =
   {
     node_ctxt with
-    degraded = Reference.readonly node_ctxt.degraded;
-    store = Store.readonly node_ctxt.store;
     context = Context.readonly node_ctxt.context;
-    lcc = Reference.readonly node_ctxt.lcc;
-    lpc = Reference.readonly node_ctxt.lpc;
-    private_info = Reference.readonly node_ctxt.private_info;
+    store = Store.readonly node_ctxt.store;
   }
+
+let readonly_store (node_ctxt : _ t) =
+  {node_ctxt with store = Store.readonly node_ctxt.store}
+
+let readonly_context (node_ctxt : _ t) =
+  {node_ctxt with context = Context.readonly node_ctxt.context}
 
 (** Abstraction over store  *)
 
@@ -638,6 +645,11 @@ let get_inbox_by_block_hash node_ctxt hash =
   let* level = level_of_hash node_ctxt hash in
   inbox_of_head node_ctxt {hash; level}
 
+let get_inbox_by_level node_ctxt level =
+  let open Lwt_result_syntax in
+  let* hash = hash_of_level node_ctxt level in
+  inbox_of_head node_ctxt {hash; level}
+
 let find_messages {store; _} payload_hash =
   Store.Messages.find store payload_hash
 
@@ -674,7 +686,9 @@ let register_outbox_messages {store; _} ~outbox_level ~indexes =
     let*? indexes = Bitset.from_list indexes in
     Store.Outbox_messages.register_outbox_messages store ~outbox_level ~indexes
 
-let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
+let get_executable_pending_outbox_messages ?outbox_level
+    {store; lcc; current_protocol; _} =
+  let open Lwt_result_syntax in
   let max_level = (Reference.get lcc).level in
   let constants = (Reference.get current_protocol).constants.sc_rollup in
   let min_level =
@@ -683,9 +697,19 @@ let get_executable_pending_outbox_messages {store; lcc; current_protocol; _} =
     (* Protocol uses strict inequality, see function [validate_outbox_level] in
        src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
   in
-  Store.Outbox_messages.pending store ~min_level ~max_level
+  match outbox_level with
+  | None -> Store.Outbox_messages.pending store ~min_level ~max_level
+  | Some outbox_level when outbox_level > max_level || outbox_level < min_level
+    ->
+      return_nil
+  | Some outbox_level ->
+      Store.Outbox_messages.pending
+        store
+        ~min_level:outbox_level
+        ~max_level:outbox_level
 
-let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
+let get_unexecutable_pending_outbox_messages ?outbox_level
+    ({store; lcc; _} as node_ctxt) =
   let open Lwt_result_syntax in
   let* head = last_processed_head_opt node_ctxt in
   let*? max_level =
@@ -694,7 +718,55 @@ let get_unexecutable_pending_outbox_messages ({store; lcc; _} as node_ctxt) =
     | Some h -> Ok h.header.level
   in
   let min_level = Int32.succ (Reference.get lcc).level in
-  Store.Outbox_messages.pending store ~min_level ~max_level
+  match outbox_level with
+  | None -> Store.Outbox_messages.pending store ~min_level ~max_level
+  | Some outbox_level when outbox_level > max_level || outbox_level < min_level
+    ->
+      return_nil
+  | Some outbox_level ->
+      Store.Outbox_messages.pending
+        store
+        ~min_level:outbox_level
+        ~max_level:outbox_level
+
+let get_pending_outbox_messages ?outbox_level
+    ({store; lcc; current_protocol; _} as node_ctxt) =
+  let open Lwt_result_syntax in
+  let* head = last_processed_head_opt node_ctxt in
+  let*? max_level =
+    match head with
+    | None -> error_with "No L2 head"
+    | Some h -> Ok h.header.level
+  in
+  let lcc = (Reference.get lcc).level in
+  let constants = (Reference.get current_protocol).constants.sc_rollup in
+  (* Messages below, and including, this level are lost because protocol uses
+     strict inequality. See function [validate_outbox_level] in
+     src/proto_alpha/lib_protocol/sc_rollup_operations.ml. *)
+  let lost_level =
+    Int32.sub lcc (Int32.of_int constants.max_active_outbox_levels)
+  in
+
+  let+ messages =
+    match outbox_level with
+    | None -> Store.Outbox_messages.pending store ~min_level:0l ~max_level
+    | Some outbox_level when outbox_level > max_level -> return_nil
+    | Some outbox_level ->
+        Store.Outbox_messages.pending
+          store
+          ~min_level:outbox_level
+          ~max_level:outbox_level
+  in
+  List.rev_map
+    (fun ((outbox_level, _) as msg) ->
+      let status =
+        if outbox_level <= lost_level then `Lost
+        else if outbox_level <= lcc then `Executable
+        else `Pending
+      in
+      (msg, status))
+    messages
+  |> List.rev
 
 let get_full_l2_block ?get_outbox_messages node_ctxt block_hash =
   let open Lwt_result_syntax in

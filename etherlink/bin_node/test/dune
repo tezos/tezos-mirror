@@ -7,10 +7,11 @@
   test_ethbloom
   test_call_tracer_algo
   test_wasm_runtime
-  test_blueprint_roundtrip)
+  test_blueprint_roundtrip
+  test_bitset_nonce)
  (libraries
-  bls12-381.archive
   octez-evm-node-libs.evm_node_rust_deps
+  bls12-381.archive
   octez-libs.base
   octez-libs.base.unix
   octez-libs.base-test-helpers
@@ -51,7 +52,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_rlp.exe})))
 
 (rule
@@ -60,7 +61,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_ethbloom.exe})))
 
 (rule
@@ -69,7 +70,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_call_tracer_algo.exe})))
 
 (rule
@@ -78,7 +79,7 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_wasm_runtime.exe})))
 
 (rule
@@ -87,5 +88,14 @@
  (deps
   rlptest.json
   invalidRLPTest.json
-  ../../kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm)
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
  (action (run %{dep:./test_blueprint_roundtrip.exe})))
+
+(rule
+ (alias runtest)
+ (package octez-evm-node-tests)
+ (deps
+  rlptest.json
+  invalidRLPTest.json
+  ../../kernel_latest/kernel/tests/resources/mainnet_kernel.wasm)
+ (action (run %{dep:./test_bitset_nonce.exe})))

@@ -16,9 +16,6 @@ pub struct Target {
 
     /// Generated `pvm_kind` configuration value
     pvm_kind: &'static str,
-
-    /// Generated `pvm_flavour` configuration value
-    pvm_flavour: &'static str,
 }
 
 impl Target {
@@ -26,20 +23,11 @@ impl Target {
     // Cargo manifests can't make use of the target descriptions below. Therefore you must ensure
     // that Cargo manifests are amended inline with any modification to the PVM targets.
 
-    /// RISC-V PVM with HermitOS
-    pub const RISCV_HERMIT: Self = Self {
-        target_arch: "riscv64",
-        target_os: "hermit",
-        pvm_kind: "riscv",
-        pvm_flavour: "hermit",
-    };
-
-    /// RISC-V PVM without a bundled OS
-    pub const RISCV_SUPERVISING: Self = Self {
+    /// RISC-V PVM
+    pub const RISCV: Self = Self {
         target_arch: "riscv64",
         target_os: "linux",
         pvm_kind: "riscv",
-        pvm_flavour: "supervising",
     };
 
     /// WASM PVM
@@ -47,11 +35,10 @@ impl Target {
         target_arch: "wasm32",
         target_os: "unknown",
         pvm_kind: "wasm",
-        pvm_flavour: "none",
     };
 
     /// All PVM targets
-    pub const ALL: [Self; 3] = [Self::RISCV_HERMIT, Self::RISCV_SUPERVISING, Self::WASM];
+    pub const ALL: [Self; 2] = [Self::RISCV, Self::WASM];
 
     /// Generate a meta item (i.e. body of a `#[cfg()]` annotation) that matches the given target
     /// description.
@@ -87,11 +74,9 @@ pub(crate) fn generate_cfg_aliases() {
         >= rustc_version::Version::parse("1.80.0").unwrap()
     {
         let mut kinds = HashSet::from(["none"]);
-        let mut flavours = HashSet::from(["none"]);
 
         for target in Target::ALL {
             kinds.insert(target.pvm_kind);
-            flavours.insert(target.pvm_flavour);
         }
 
         let kinds = kinds
@@ -100,26 +85,16 @@ pub(crate) fn generate_cfg_aliases() {
             .collect::<Vec<_>>()
             .join(",");
 
-        let flavours = flavours
-            .into_iter()
-            .map(|flavour| format!("{flavour:?}"))
-            .collect::<Vec<_>>()
-            .join(",");
-
         println!(r#"cargo:rustc-check-cfg=cfg(pvm_kind, values({kinds}))"#);
-        println!(r#"cargo:rustc-check-cfg=cfg(pvm_flavour, values({flavours}))"#);
     }
 
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
 
-    let (kind, flavour) = Target::ALL
+    let kind = Target::ALL
         .into_iter()
         .find(|target| target.target_arch == target_arch && target.target_os == target_os)
-        .map_or(("none", "none"), |target| {
-            (target.pvm_kind, target.pvm_flavour)
-        });
+        .map_or("none", |target| target.pvm_kind);
 
     println!("cargo:rustc-cfg=pvm_kind={kind:?}");
-    println!("cargo:rustc-cfg=pvm_flavour={flavour:?}");
 }

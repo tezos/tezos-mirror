@@ -18,13 +18,8 @@ pub mod smart_rollup_core;
 // `write_debug`.
 pub mod target_impl;
 
-#[cfg(all(pvm_kind = "riscv", pvm_flavour = "hermit"))]
-#[path = "riscv_hermit_target.rs"]
-#[doc(hidden)]
-mod target_impl;
-
-#[cfg(all(pvm_kind = "riscv", pvm_flavour = "supervising"))]
-#[path = "riscv_supervising_target.rs"]
+#[cfg(pvm_kind = "riscv")]
+#[path = "riscv_target.rs"]
 #[doc(hidden)]
 mod target_impl;
 

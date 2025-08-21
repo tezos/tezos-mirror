@@ -137,7 +137,12 @@ module Kernel_root_hash :
 module Network_id : METHOD with type input = unit and type output = string
 
 module Chain_id :
-  METHOD with type input = unit and type output = Ethereum_types.chain_id
+  METHOD with type input = unit and type output = L2_types.chain_id
+
+module Chain_family :
+  METHOD
+    with type input = L2_types.chain_id
+     and type output = L2_types.ex_chain_family
 
 module Accounts :
   METHOD with type input = unit and type output = Ethereum_types.address list
@@ -155,6 +160,9 @@ module Get_storage_at :
       * Ethereum_types.quantity
       * Ethereum_types.Block_parameter.extended
      and type output = Ethereum_types.hex
+
+module Generic_block_number :
+  METHOD with type input = unit and type output = Ethereum_types.quantity
 
 module Block_number :
   METHOD with type input = unit and type output = Ethereum_types.quantity
@@ -213,6 +221,14 @@ module Get_transaction_receipt :
   METHOD
     with type input = Ethereum_types.hash
      and type output = Transaction_receipt.t option
+
+type gas_info = {
+  execution_gas : Ethereum_types.quantity;
+  inclusion_gas : Ethereum_types.quantity;
+}
+
+module Get_transaction_gas_info :
+  METHOD with type input = Ethereum_types.hash and type output = gas_info option
 
 module Get_transaction_by_hash :
   METHOD
@@ -291,6 +307,11 @@ module Inject_transaction :
     with type input = Ethereum_types.legacy_transaction_object * string
      and type output = Ethereum_types.hash
 
+module Inject_tezlink_operation :
+  METHOD
+    with type input = Tezos_types.Operation.t * bytes
+     and type output = Ethereum_types.hash
+
 module Durable_state_value :
   METHOD
     with type input =
@@ -344,6 +365,14 @@ module Subscribe :
 module Unsubscribe :
   METHOD with type input = Ethereum_types.Subscription.id and type output = bool
 
+type l1_block_l2_levels = {
+  start_l2_level : Ethereum_types.quantity;
+  end_l2_level : Ethereum_types.quantity;
+}
+
+module Get_finalized_blocks_of_l1_level :
+  METHOD with type input = int32 and type output = l1_block_l2_levels
+
 type map_result =
   | Method :
       ('input, 'output) method_
@@ -354,7 +383,10 @@ type map_result =
   | Disabled
 
 val map_method_name :
-  restrict:Configuration.restricted_rpcs -> string -> map_result
+  rpc_server_family:_ Rpc_types.rpc_server_family ->
+  restrict:Configuration.restricted_rpcs ->
+  string ->
+  map_result
 
 type websocket_subscription = {
   id : Ethereum_types.Subscription.id;

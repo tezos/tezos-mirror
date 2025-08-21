@@ -65,6 +65,33 @@ module Make_config (Conf : Conf) = struct
       ~inode_child_order:Conf.inode_child_order
 end
 
+type raw = [`Value of bytes | `Tree of raw String.Map.t]
+
+let raw_encoding : raw Data_encoding.t =
+  let open Data_encoding in
+  mu "Tree.raw" (fun encoding ->
+      let map_encoding =
+        conv
+          String.Map.bindings
+          (fun bindings -> String.Map.of_seq (List.to_seq bindings))
+          (list (tup2 string encoding))
+      in
+      union
+        [
+          case
+            ~title:"tree"
+            (Tag 0)
+            map_encoding
+            (function `Tree t -> Some t | `Value _ -> None)
+            (fun t -> `Tree t);
+          case
+            ~title:"value"
+            (Tag 1)
+            bytes
+            (function `Value v -> Some v | `Tree _ -> None)
+            (fun v -> `Value v);
+        ])
+
 module Make_tree (Conf : Conf) (Store : DB) = struct
   include Store.Tree
   include Make_config (Conf)
@@ -156,30 +183,7 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
 
   let of_raw = concrete_of_raw Store.Tree.of_concrete
 
-  let raw_encoding : raw Data_encoding.t =
-    let open Data_encoding in
-    mu "Tree.raw" (fun encoding ->
-        let map_encoding =
-          conv
-            String.Map.bindings
-            (fun bindings -> String.Map.of_seq (List.to_seq bindings))
-            (list (tup2 string encoding))
-        in
-        union
-          [
-            case
-              ~title:"tree"
-              (Tag 0)
-              map_encoding
-              (function `Tree t -> Some t | `Value _ -> None)
-              (fun t -> `Tree t);
-            case
-              ~title:"value"
-              (Tag 1)
-              bytes
-              (function `Value v -> Some v | `Tree _ -> None)
-              (fun v -> `Value v);
-          ])
+  let raw_encoding = raw_encoding
 
   (** [unshallow t] is the tree equivalent to [t] but with all subtrees evaluated,
     i.e. without "reference" nodes.

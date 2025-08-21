@@ -1,0 +1,18 @@
+parameter unit;
+storage nat;
+code
+  {
+    DROP;
+    SENDER;
+    IS_IMPLICIT_ACCOUNT;
+    IF_NONE
+      {
+        # Smart rollups and smart contracts have no voting power
+        PUSH nat 0
+      }
+      {
+        VOTING_POWER
+      };
+    NIL operation;
+    PAIR
+  }

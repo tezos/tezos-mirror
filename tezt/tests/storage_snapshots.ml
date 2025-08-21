@@ -123,8 +123,13 @@ let check_consistency_after_import node ~expected_head ~expected_checkpoint
 let check_blocks_availability node ~history_mode ~head ~savepoint ~caboose =
   (* The metadata of genesis is available anyway *)
   Log.info "Checking blocks availability for %s" (Node.name node) ;
-  let* (_ : RPC.block_metadata) =
-    Node.RPC.call node @@ RPC.get_chain_block_metadata ~block:"0" ()
+  let* () =
+    if caboose > 0 then unit
+    else
+      let* (_ : RPC.block_metadata) =
+        Node.RPC.call node @@ RPC.get_chain_block_metadata ~block:"0" ()
+      in
+      unit
   in
   let iter_block_range_s a b f =
     Lwt_list.iter_s f (range a b |> List.rev |> List.map string_of_int)
@@ -221,11 +226,17 @@ let export_import_and_check node ~export_level ~history_mode ~export_format
             node_arguments
         in
         let* () = Node.wait_for_ready fresh_node in
+        (* As the savepoint and checkpoint are targeting the predecessor of the
+           snapshot's target, we rely on the target's predecessor. *)
+        let export_level_predecessor = export_level - 1 in
         let expected_checkpoint, expected_savepoint, expected_caboose =
           match history_mode with
-          | Node.Full_history -> (export_level, export_level, 0)
+          | Node.Full_history ->
+              (export_level_predecessor, export_level_predecessor, 0)
           | Node.Rolling_history ->
-              (export_level, export_level, max 0 (export_level - max_op_ttl))
+              ( export_level_predecessor,
+                export_level_predecessor,
+                max 0 (export_level_predecessor - max_op_ttl) )
         in
         let* () =
           check_consistency_after_import
@@ -277,7 +288,7 @@ let test_export_import_snapshots =
   Protocol.register_test
     ~__FILE__
     ~title:"storage snapshot export and import"
-    ~tags:[team; "storage"; "snapshot"; "export"; "import"; Tag.memory_4k]
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"]
   @@ fun protocol ->
   let archive_node =
     Node.create
@@ -418,8 +429,13 @@ let test_drag_after_rolling_import =
   let blocks_to_bake =
     ((blocks_preservation_cycles + additional_cycles) * blocks_per_cycle) - 1
   in
+  (* As the savepoint and checkpoint are targeting the predecessor of the
+     snapshot's target, we rely on the target's predecessor. *)
+  let export_level_predecessor = export_level - 1 in
   let expected_checkpoint, expected_savepoint, expected_caboose =
-    (export_level, export_level, max 0 (export_level - max_op_ttl))
+    ( export_level_predecessor,
+      export_level_predecessor,
+      max 0 (export_level_predecessor - max_op_ttl) )
   in
   let* () =
     check_consistency_after_import
@@ -546,7 +562,7 @@ let test_info_command =
   (* This is expected to be updated as soon as a new snapshot version
      is released (referring to the Snapshot.Version.current_version
      from `lib_store/unix/snapshots`)*)
-  let expected_version = 8 in
+  let expected_version = 9 in
   Log.info "Checks the human formatted output" ;
   (* Get the info line, which is the second line. *)
   let* () =
@@ -596,7 +612,37 @@ let test_info_command =
   in
   unit
 
+let test_import_snapshot_force =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"snapshot import --force"
+    ~tags:[team; "storage"; "snapshot"; "export"; "import"; "force"]
+  @@ fun protocol ->
+  let* node = Node.init [] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () = Client.activate_protocol_and_wait ~protocol client in
+  (* Bake a few blocks to have non-empty storage. *)
+  let* () = bake_blocks node client ~blocks_to_bake:5 in
+  let* () = Node.terminate node in
+  (* Export a snapshot. *)
+  let snapshot_file = Temp.file "snapshot" in
+  let* () =
+    Node.snapshot_export ~history_mode:Node.Rolling_history node snapshot_file
+  in
+  (* Import the snapshot without [--force], it will fail because the directory
+     is not clean.. *)
+  let process = Node.spawn_snapshot_import ~no_check:true node snapshot_file in
+  let* () =
+    Process.check_error ~msg:(rex "Please provide a clean directory") process
+  in
+  (* Force the import, works fine as it cleans the directory before importing. *)
+  let* () =
+    Node.snapshot_import ~no_check:true ~force:true node snapshot_file
+  in
+  unit
+
 let register ~protocols =
   test_export_import_snapshots protocols ;
   test_drag_after_rolling_import protocols ;
-  test_info_command protocols
+  test_info_command protocols ;
+  test_import_snapshot_force protocols

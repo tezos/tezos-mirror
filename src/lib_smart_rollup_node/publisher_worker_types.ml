@@ -54,4 +54,8 @@ module Request = struct
     match r with
     | Publish -> Format.pp_print_string ppf "publish"
     | Cement -> Format.pp_print_string ppf "cement"
+
+  let name : type a b. (a, b) t -> string = function
+    | Publish -> "Publish"
+    | Cement -> "Cement"
 end

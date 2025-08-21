@@ -14,7 +14,7 @@ depends: [
   "tezos-micheline-rewriting" { = version }
   "tezos-protocol-022-PsRiotum" { = version }
   "hashcons"
-  "octez-rustzcash-deps" { with-test & = version }
+  "octez-rust-deps" { with-test & = version }
   "bls12-381" { with-test & = version }
   "octez-protocol-022-PsRiotum-libs" { with-test & = version }
 ]

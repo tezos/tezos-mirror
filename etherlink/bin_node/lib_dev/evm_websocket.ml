@@ -8,6 +8,13 @@
 
 open Rpc_encodings
 
+type 'strategy rate_limit = {
+  max : int;
+  interval : Time.System.Span.t;
+  strategy : 'strategy;
+}
+  constraint 'strategy = [< `Wait | `Error | `Close]
+
 type parameters = {
   push_frame : Websocket.Frame.t option -> unit;
   http_request : Cohttp.Request.t;
@@ -18,19 +25,37 @@ type parameters = {
   monitor : Configuration.monitor_websocket_heartbeat option;
 }
 
-type close_status = Normal_closure | Going_away | Message_too_big
+type ip_rate_limiter = {mutable count : int; mutable last : Time.System.t}
 
-(* https://datatracker.ietf.org/doc/html/rfc6455#section-7.4.1 *)
-let code_of_close_status = function
-  | Normal_closure -> 1000
-  | Going_away -> 1001
-  | Message_too_big -> 1009
+module Ip_table = Hashtbl.Make (struct
+  type t = Ipaddr.t
+
+  let equal ip1 ip2 = Ipaddr.compare ip1 ip2 = 0
+
+  let hash ip = Hashtbl.hash ip
+end)
+
+type 'a rate_limiter = {
+  kind : string;
+  mutable limit : 'a rate_limit option;
+  table : ip_rate_limiter Ip_table.t;
+}
+
+type messages_rate_limiter = [`Wait | `Error | `Close] rate_limiter
+
+type frames_rate_limiter = [`Close] rate_limiter
+
+let messages_rate_limiter : messages_rate_limiter =
+  {kind = "messages"; limit = None; table = Ip_table.create 31}
+
+let frames_rate_limiter : frames_rate_limiter =
+  {kind = "frames"; limit = None; table = Ip_table.create 31}
 
 module Types = struct
   type subscriptions_table =
     (Ethereum_types.Subscription.id, unit -> unit) Stdlib.Hashtbl.t
 
-  type close_info = {reason : string; status : close_status}
+  type close_info = {reason : string; status : Websocket_encodings.close_status}
 
   type monitor_state = {
     params : Configuration.monitor_websocket_heartbeat;
@@ -48,6 +73,7 @@ module Types = struct
     subscriptions : subscriptions_table;
     mutable close_info : close_info option;
     monitor : monitor_state option;
+    rate_limited_ip : Ipaddr.t option;
   }
 
   type nonrec parameters = parameters
@@ -67,7 +93,7 @@ end
 
 module Request = struct
   type ('a, 'b) t =
-    | Frame : Websocket.Frame.t -> (unit, error trace) t
+    | Frame : Websocket.Frame.t * Time.System.t -> (unit, error trace) t
         (** The only possible request is receiving a new frame on the
             websocket. *)
 
@@ -75,80 +101,17 @@ module Request = struct
 
   let view (req : _ t) = View req
 
-  let opcode_encoding : Websocket.Frame.Opcode.t Data_encoding.t =
-    let open Data_encoding in
-    let open Websocket.Frame.Opcode in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"continuation"
-          (constant "continuation")
-          (function Continuation -> Some () | _ -> None)
-          (fun () -> Continuation);
-        case
-          (Tag 1)
-          ~title:"text"
-          (constant "text")
-          (function Text -> Some () | _ -> None)
-          (fun () -> Text);
-        case
-          (Tag 2)
-          ~title:"binary"
-          (constant "binary")
-          (function Binary -> Some () | _ -> None)
-          (fun () -> Binary);
-        case
-          (Tag 8)
-          ~title:"close"
-          (constant "close")
-          (function Close -> Some () | _ -> None)
-          (fun () -> Close);
-        case
-          (Tag 9)
-          ~title:"ping"
-          (constant "ping")
-          (function Ping -> Some () | _ -> None)
-          (fun () -> Ping);
-        case
-          (Tag 10)
-          ~title:"pong"
-          (constant "pong")
-          (function Pong -> Some () | _ -> None)
-          (fun () -> Pong);
-        case
-          (Tag 15)
-          ~title:"ctrl"
-          (obj1 (req "ctrl" int31))
-          (function Ctrl i -> Some i | _ -> None)
-          (fun i -> Ctrl i);
-        case
-          (Tag 255)
-          ~title:"nonctrl"
-          (obj1 (req "nonctrl" int31))
-          (function Nonctrl i -> Some i | _ -> None)
-          (fun i -> Nonctrl i);
-      ]
-
-  let frame_encoding : Websocket.Frame.t Data_encoding.t =
-    let open Data_encoding in
-    let open Websocket.Frame in
-    conv
-      (fun {opcode; extension; final; content} ->
-        (opcode, extension, final, content))
-      (fun (opcode, extension, final, content) ->
-        {opcode; extension; final; content})
-    @@ obj4
-         (req "opcode" opcode_encoding)
-         (req "extension" int31)
-         (req "final" bool)
-         (req "content" string)
-
   let encoding =
     let open Data_encoding in
-    conv (fun (View (Frame r)) -> r) (fun r -> View (Frame r)) frame_encoding
+    conv
+      (fun (View (Frame (r, ts))) -> (r, ts))
+      (fun (r, ts) -> View (Frame (r, ts)))
+    @@ obj2
+         (req "frame" Websocket_encodings.frame_encoding)
+         (req "timestamp" Time.System.rfc_encoding)
 
-  let pp ppf (View (Frame r)) = Websocket.Frame.pp ppf r
+  let pp ppf (View (Frame (r, ts))) =
+    Format.fprintf ppf "%a: %a" Time.System.pp_hum ts Websocket.Frame.pp r
 end
 
 module Event = struct
@@ -251,12 +214,11 @@ let shutdown_worker ~reason ?(status = default_close_info.status) w =
   (match st.close_info with
   | Some _ -> ()
   | None -> st.close_info <- Some {status; reason}) ;
-  Worker.shutdown w
+  Worker.trigger_shutdown w
 
 let shutdown ~reason ?status conn =
-  let open Lwt_syntax in
   match Worker.find_opt table conn with
-  | None -> return_unit
+  | None -> ()
   | Some w -> shutdown_worker ~reason ?status w
 
 let handle_subscription
@@ -309,7 +271,120 @@ let opcode_of_media media =
   | "application/octet-stream" -> Websocket.Frame.Opcode.Binary
   | _ -> Websocket.Frame.Opcode.Text
 
-let on_frame worker fr =
+let mk_error_response (output_media_type : Media_type.t) id error =
+  output_media_type.construct
+    JSONRPC.response_encoding
+    {value = Error error; id}
+
+let rate_limit_reason rate_limiter =
+  match rate_limiter.limit with
+  | None -> assert false
+  | Some limit ->
+      Format.asprintf
+        "Rate limited by %s on websocket: %d/%a"
+        rate_limiter.kind
+        limit.max
+        Ptime.Span.pp
+        limit.interval
+
+let rate_limit worker frame_ts (rate_limiter : 'a rate_limiter) =
+  let state = Worker.state worker in
+  let {Types.rate_limited_ip; _} = state in
+  match (rate_limiter.limit, rate_limited_ip) with
+  | None, _ | _, None -> `Ok
+  | Some limit, Some ip -> (
+      match Ip_table.find rate_limiter.table ip with
+      | None | Some {count = 0; _} ->
+          Ip_table.replace rate_limiter.table ip {count = 1; last = frame_ts} ;
+          `Ok
+      | Some l ->
+          if Ptime.Span.compare (Ptime.diff frame_ts l.last) limit.interval >= 0
+          then (
+            (* More than [interval] time has passed since last first call, reset
+               timer and counter. *)
+            l.count <- 1 ;
+            l.last <- frame_ts ;
+            `Ok)
+          else if l.count < limit.max then (
+            (* Still below limit but within rate interval, increment counter
+               only. *)
+            l.count <- l.count + 1 ;
+            `Ok)
+          else (* We have exceeded the limit *)
+            `Limit_reached (limit, l))
+
+let rate_limit_messages worker frame_ts
+    (decode_message : unit -> (JSONRPC.request, string) result) f =
+  let open Lwt_syntax in
+  let state = Worker.state worker in
+  let {Types.push_frame; output_media_type; _} = state in
+  match rate_limit worker frame_ts messages_rate_limiter with
+  | `Ok -> f ()
+  | `Limit_reached (limit, l) -> (
+      match limit.strategy with
+      | `Wait ->
+          let time_until_limit_lifted =
+            Ptime.Span.sub limit.interval (Ptime.diff frame_ts l.last)
+            |> Ptime.Span.to_float_s
+          in
+          let* () = Lwt_unix.sleep time_until_limit_lifted in
+          l.count <- 1 ;
+          l.last <- frame_ts ;
+          f ()
+      | `Error ->
+          let id =
+            match decode_message () with Error _ -> None | Ok {id; _} -> id
+          in
+          let content =
+            mk_error_response output_media_type id
+            @@ Rpc_errors.limit_exceeded
+                 (rate_limit_reason messages_rate_limiter)
+                 None
+          in
+          let opcode = opcode_of_media output_media_type in
+          (* Instead of handling the message, we respond with a JSONRPC error on
+             the websocket indicating that the call was rate limited. *)
+          push_frame (Some (Websocket.Frame.create ~opcode ~content ())) ;
+          (* Ignore frame *)
+          return_unit
+      | `Close ->
+          let reason = rate_limit_reason messages_rate_limiter in
+          shutdown_worker ~reason ~status:Policy worker ;
+          return_unit)
+
+let rate_limit_frame worker frame_ts f =
+  match rate_limit worker frame_ts frames_rate_limiter with
+  | `Ok -> f ()
+  | `Limit_reached ({strategy = `Close; _}, _) ->
+      let reason = rate_limit_reason frames_rate_limiter in
+      shutdown_worker ~reason ~status:Policy worker
+
+let cleanup_rate_limiters_on_close worker =
+  let state = Worker.state worker in
+  match state.rate_limited_ip with
+  | None ->
+      (* Not rate limited *)
+      ()
+  | Some ip ->
+      (* Find if there are other connections/workers for the same IP *)
+      let ip_has_other_workers =
+        List.exists
+          (fun (_conn, w) ->
+            w != worker
+            &&
+            let state = Worker.state w in
+            match state.rate_limited_ip with
+            | None -> false
+            | Some ip' -> Ipaddr.compare ip ip' = 0)
+          (Worker.list table)
+      in
+      if not ip_has_other_workers then (
+        (* [worker] is being closed and is the last connection for [ip], we can
+           safely remove the rate limiters for it. *)
+        Ip_table.remove messages_rate_limiter.table ip ;
+        Ip_table.remove frames_rate_limiter.table ip)
+
+let on_frame worker fr frame_ts =
   let open Lwt_syntax in
   let state = Worker.state worker in
   let {
@@ -327,12 +402,16 @@ let on_frame worker fr =
   let handle_message message =
     (* We clear the current message buffer for future frames *)
     Buffer.clear state.message_buffer ;
+    let decode_message () =
+      input_media_type.destruct JSONRPC.request_encoding message
+    in
+    rate_limit_messages worker frame_ts decode_message @@ fun () ->
     let* response_content, subscription =
-      match input_media_type.destruct JSONRPC.request_encoding message with
+      match decode_message () with
       | Error err ->
           let response =
-            Rpc_errors.parse_error err
-            |> output_media_type.construct JSONRPC.error_encoding
+            mk_error_response output_media_type None
+            @@ Rpc_errors.parse_error err
           in
           Lwt.return (response, None)
       | Ok request ->
@@ -368,11 +447,13 @@ let on_frame worker fr =
   | {opcode = Close; _} ->
       (* Client has sent a close frame, we shut everything down for this
          worker *)
-      shutdown_worker ~reason:"Received close frame" worker
+      shutdown_worker ~reason:"Received close frame" worker ;
+      return_unit
   | {opcode = Text | Binary; content; _}
     when String.length content > max_message_length ->
       (* We are receiving a message too big for the server *)
-      shutdown_worker ~reason:"Message too big" ~status:Message_too_big worker
+      shutdown_worker ~reason:"Message too big" ~status:Message_too_big worker ;
+      return_unit
   | {opcode = Continuation; content; _}
     when Buffer.length state.message_buffer + String.length content
          > max_message_length ->
@@ -380,7 +461,8 @@ let on_frame worker fr =
       shutdown_worker
         ~reason:"Fragmented message too big"
         ~status:Message_too_big
-        worker
+        worker ;
+      return_unit
   | {opcode = Text | Binary; content; final = false; _} ->
       (* New fragmented message *)
       Buffer.clear state.message_buffer ;
@@ -434,7 +516,8 @@ let monitor_websocket_aux worker
         shutdown_worker
           worker
           ~status:Going_away
-          ~reason:"Timeout in ping/pong heartbeat"
+          ~reason:"Timeout in ping/pong heartbeat" ;
+        return_unit
   in
   loop ~push:true 0
 
@@ -456,10 +539,13 @@ module Handlers = struct
       =
    fun worker request ->
     match request with
-    | Request.Frame fr ->
-        protect @@ fun () -> on_frame worker fr |> Lwt_result.ok
+    | Request.Frame (fr, ts) ->
+        protect @@ fun () -> on_frame worker fr ts |> Lwt_result.ok
 
-  type launch_error = [`Not_acceptable | `Unsupported_media_type of string]
+  type launch_error =
+    [ `Not_acceptable
+    | `Unsupported_media_type of string
+    | `Rate_limit_on_non_tcp ]
 
   let on_launch _w _name
       ({
@@ -486,8 +572,8 @@ module Handlers = struct
         ~headers
         medias
     in
+    let endp, conn = conn in
     let conn_descr =
-      let endp, conn = conn in
       Format.sprintf
         "%s[%s]"
         Conduit_lwt_unix.(
@@ -499,6 +585,14 @@ module Handlers = struct
       Option.map
         (fun params -> {Types.mbox = Lwt_mvar.create_empty (); params})
         monitor
+    in
+    let*? rate_limited_ip =
+      match (messages_rate_limiter.limit, frames_rate_limiter.limit) with
+      | None, None -> Ok None
+      | _ -> (
+          match endp with
+          | Conduit_lwt_unix.TCP {ip; _} -> Ok (Some ip)
+          | _ -> Error `Rate_limit_on_non_tcp)
     in
     let state =
       Types.
@@ -513,6 +607,7 @@ module Handlers = struct
           subscriptions = Stdlib.Hashtbl.create 3;
           close_info = None;
           monitor;
+          rate_limited_ip;
         }
     in
     return state
@@ -546,12 +641,16 @@ module Handlers = struct
     let* () = Event.(emit shutdown) (conn_descr, reason, nb_sub) in
     let () =
       try
-        push_frame (Some (Websocket.Frame.close (code_of_close_status status))) ;
+        push_frame
+          (Some
+             (Websocket.Frame.close
+                (Websocket_encodings.code_of_close_status status))) ;
         push_frame None
       with _ -> (* Websocket already closed *) ()
     in
     Stdlib.Hashtbl.iter (fun _id stopper -> stopper ()) subscriptions ;
     Stdlib.Hashtbl.clear subscriptions ;
+    cleanup_rate_limiters_on_close w ;
     return_unit
 end
 
@@ -578,13 +677,15 @@ let start (conn : Cohttp_lwt_unix.Server.conn) (http_request : Cohttp.Request.t)
   return_unit
 
 let new_frame conn fr =
+  let frame_ts = Time.System.now () in
   match Worker.find_opt table conn with
   | None -> Event.(emit__dont_wait__use_with_care missing_worker) conn
   | Some w ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/7660
          The worker can still be alive but its queue closed in some degenerated
          cases. In this case we could lose frames. *)
-      Worker.Queue.push_request_now w (Request.Frame fr)
+      rate_limit_frame w frame_ts @@ fun () ->
+      Worker.Queue.push_request_now w (Request.Frame (fr, frame_ts))
 
 let cohttp_callback ?monitor ~max_message_length handler
     (conn : Cohttp_lwt_unix.Server.conn) req _body =
@@ -600,7 +701,8 @@ let cohttp_callback ?monitor ~max_message_length handler
         let reason =
           "Websocket asynchronous IO exception: " ^ Printexc.to_string io_exn
         in
-        shutdown ~reason conn_name)
+        shutdown ~reason conn_name ;
+        return_unit)
   in
   let+ res =
     start ?monitor conn req media_types ~max_message_length handler push_frame
@@ -616,6 +718,11 @@ let cohttp_callback ?monitor ~max_message_length handler
         | `Not_acceptable ->
             (* HTTP error 406 *)
             (`Not_acceptable, "")
+        | `Rate_limit_on_non_tcp ->
+            (* HTTP error 503 *)
+            ( `Service_unavailable,
+              ": Can only start rate limited websocket connection on TCP \
+               connection" )
       in
       let body =
         Cohttp_lwt.Body.of_string ("Cannot accept websocket connection" ^ expl)
@@ -623,8 +730,23 @@ let cohttp_callback ?monitor ~max_message_length handler
       `Response (Cohttp.Response.make ~status (), body)
 
 let on_conn_closed (conn : Cohttp_lwt_unix.Server.conn) =
-  Lwt.dont_wait
-    (fun () ->
-      let conn_str = Cohttp.Connection.to_string (snd conn) in
-      shutdown ~reason:"Connection closed" conn_str)
-    ignore
+  let conn_str = Cohttp.Connection.to_string (snd conn) in
+  shutdown ~reason:"Connection closed" conn_str
+
+let setup_rate_limiter rate_limiter limit =
+  let open Result_syntax in
+  let+ () =
+    if limit.max <= 0 then
+      error_with
+        "Max %s in websocket rate limiter must be strictly positive"
+        rate_limiter.kind
+    else return_unit
+  in
+  rate_limiter.limit <- Some limit
+
+let setup_rate_limiters ?messages_limit ?frames_limit () =
+  let open Result_syntax in
+  let* () =
+    Option.iter_e (setup_rate_limiter messages_rate_limiter) messages_limit
+  in
+  Option.iter_e (setup_rate_limiter frames_rate_limiter) frames_limit

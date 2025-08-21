@@ -49,6 +49,7 @@ type error +=
   | LedgerError of Ledgerwallet.Transport.error
   | Ledger_signing_hash_mismatch of string * string
   | Ledger_msg_chunk_too_long of string
+  | Ledger_BLS_and_proof_of_possession_not_supported
 
 let error_encoding =
   let open Data_encoding in
@@ -112,6 +113,19 @@ let () =
     (function
       | Ledger_signing_hash_mismatch (lh, ch) -> Some (lh, ch) | _ -> None)
     (fun (lh, ch) -> Ledger_signing_hash_mismatch (lh, ch))
+
+let () =
+  let description = "Ledger does not support BLS and proof of possession." in
+  register_error_kind
+    `Permanent
+    ~id:"signer.ledger.BLS_and_proof_of_possession_not_supported"
+    ~title:description
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function
+      | Ledger_BLS_and_proof_of_possession_not_supported -> Some () | _ -> None)
+    (fun () -> Ledger_BLS_and_proof_of_possession_not_supported)
 
 let pp_round_opt fmt = function
   | None -> ()
@@ -832,7 +846,12 @@ module Signer_implementation : Client_keys.SIGNER = struct
   let import_secret_key ~io pk_uri =
     public_key_hash_maybe_prompt ~first_import:io pk_uri
 
-  let sign ?watermark (sk_uri : sk_uri) msg =
+  let list_known_keys _ =
+    failwith "List known keys request not allowed for Ledger."
+
+  let sign ?version:_ ?watermark (sk_uri : sk_uri) msg =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7812
+       handle version *)
     let open Lwt_result_syntax in
     let* ledger_uri = Ledger_uri.parse (sk_uri :> Uri.t) in
     let* {curve; path; _} = Ledger_uri.full_account ledger_uri in
@@ -863,6 +882,9 @@ module Signer_implementation : Client_keys.SIGNER = struct
       (Tezos_crypto.Blake2B.to_bytes (Tezos_crypto.Blake2B.hash_bytes [nonce]))
 
   let supports_deterministic_nonces _ = Lwt_result_syntax.return_true
+
+  let bls_prove_possession ?override_pk:_ _sk_uri =
+    Lwt_result_syntax.tzfail Ledger_BLS_and_proof_of_possession_not_supported
 end
 
 (* The Ledger uses a special value 0x00000000 for the “any” chain-id: *)

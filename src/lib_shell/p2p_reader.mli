@@ -172,15 +172,17 @@ type chain_db = {
 val read_block_header :
   t -> Block_hash.t -> (Chain_id.t * Block_header.t) option Lwt.t
 
+type worker
+
 (** [run ~register ~unregister p2p state protocol_db active_chains peer_id conn]
     runs an answering worker on a p2p connection [connection]. [peer_id] is
     the peer id of the remote peer. [register] is called once the worker is
     created, and [unregister] when the worker stops.
 
     [active_chains] is the table of active chains (i.e. test chain,
-     main chain...) *)
-val run :
-  register:(t -> unit) ->
+    main chain...) *)
+val run_worker :
+  register:(worker -> unit) ->
   unregister:(unit -> unit) ->
   p2p ->
   Store.t ->
@@ -188,6 +190,6 @@ val run :
   chain_db Chain_id.Table.t ->
   P2p_peer.Id.t ->
   connection ->
-  unit
+  unit tzresult Lwt.t
 
-val shutdown : t -> unit Lwt.t
+val shutdown_worker : worker -> unit Lwt.t

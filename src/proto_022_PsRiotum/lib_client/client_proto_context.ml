@@ -105,6 +105,59 @@ let ticket_balances_encoding = Plugin.RPC.Contract.ticket_balances_encoding
 let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
   Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
 
+let get_pending_staking_parameters (cctxt : #full) ?chain ?block delegate =
+  let chain = match chain with None -> cctxt#chain | Some chain -> chain in
+  let block = match block with None -> cctxt#block | Some block -> block in
+  Alpha_services.Delegate.pending_staking_parameters
+    cctxt
+    (chain, block)
+    delegate
+
+let get_active_staking_parameters (cctxt : #full) ?chain ?block delegate =
+  let chain = match chain with None -> cctxt#chain | Some chain -> chain in
+  let block = match block with None -> cctxt#block | Some block -> block in
+  Alpha_services.Delegate.active_staking_parameters
+    cctxt
+    (chain, block)
+    delegate
+
+let get_latest_staking_parameters (cctxt : #full) ?chain ?block delegate =
+  let chain = match chain with None -> cctxt#chain | Some chain -> chain in
+  let block = match block with None -> cctxt#block | Some block -> block in
+  let open Lwt_result_syntax in
+  let* pending_parameters =
+    get_pending_staking_parameters
+      cctxt
+      ~chain:cctxt#chain
+      ~block:cctxt#block
+      delegate
+  in
+  match pending_parameters with
+  | [] -> get_active_staking_parameters cctxt ~chain ~block delegate
+  | h :: t ->
+      return @@ snd
+      @@ List.fold_left
+           (fun (last_cycle, last_param) (cycle, param) ->
+             if Cycle.(last_cycle <= cycle) then (cycle, param)
+             else (last_cycle, last_param))
+           h
+           t
+
+let is_delegate (cctxt : #full) ?chain ?block pkh =
+  let chain = match chain with None -> cctxt#chain | Some chain -> chain in
+  let block = match block with None -> cctxt#block | Some block -> block in
+  let open Lwt_result_syntax in
+  let* delegate_opt =
+    Plugin.Alpha_services.Contract.delegate_opt
+      cctxt
+      (chain, block)
+      (Contract.Implicit pkh)
+  in
+  match delegate_opt with
+  | Some address when Signature.Public_key_hash.(equal address pkh) ->
+      return true
+  | _ -> return false
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error

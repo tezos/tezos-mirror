@@ -3,6 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -152,6 +153,7 @@ module Opam = struct
            Therefore, a retry was added. This should be removed once the
            underlying tests have been fixed. *)
       ~retry:{max = 2; when_ = []}
+      ~timeout:(Minutes 90)
       ~rules:
         (opam_rules
            pipeline_type
@@ -335,7 +337,6 @@ let jobs pipeline_type =
             ~__POS__
             ~image:Images.datadog_ci
             ~stage:Stages.start
-            ~before_script:(before_script ~datadog_job_info:true [])
             ~rules:
               [
                 job_rule
@@ -365,8 +366,8 @@ let jobs pipeline_type =
     let stage = Stages.sanity in
     let dependencies =
       make_dependencies
-        ~before_merging:(fun job_start -> Dependent [Job job_start])
-        ~schedule_extended_test:(fun () -> Staged [])
+        ~before_merging:(fun _ -> Dependent [])
+        ~schedule_extended_test:(fun () -> Dependent [])
     in
     let job_sanity_ci : tezos_job =
       (* Quick, CI-related sanity checks.
@@ -375,7 +376,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"sanity_ci"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~before_script:(before_script ~take_ownership:true ~eval_opam:true [])
@@ -422,7 +423,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build
+        ~image:Images.CI.build_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
@@ -458,7 +459,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.misc_checks"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_lint_files ())
@@ -474,7 +475,7 @@ let jobs pipeline_type =
            "scripts/check_wasm_pvm_regressions.sh check";
            "etherlink/scripts/check_evm_store_migrations.sh check";
            "./scripts/check_rollup_node_sql_migrations.sh check";
-           "./src/bin_dal_node/scripts/check_dal_store_migrations.sh check";
+           "./src/lib_dal_node/scripts/check_dal_store_migrations.sh check";
          ]
         @
         (* The license check only applies to new files (in the sense
@@ -489,7 +490,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_jsonnet"
-        ~image:Images.jsonnet
+        ~image:Images.jsonnet_master
         ~stage
         ~dependencies
         ~rules:
@@ -512,7 +513,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"check_rust_fmt"
-        ~image:Images.rust_toolchain
+        ~image:Images.rust_toolchain_master
         ~stage
         ~dependencies
         ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
@@ -522,7 +523,8 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"documentation:rst-check"
-        ~image:Images.CI.test
+        ~image:Images.CI.test_master
+        ~dependencies
         ~stage
         ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
         ~before_script:(before_script ~init_python_venv:true [])
@@ -535,7 +537,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"commit_titles"
-        ~image:Images.CI.prebuild
+        ~image:Images.CI.prebuild_master
         ~stage
         ~dependencies
         (* ./scripts/ci/check_commit_messages.sh exits with code 65 when a git history contains
@@ -576,9 +578,17 @@ let jobs pipeline_type =
      we make these dependencies optional. *)
   let dependencies_needs_start =
     make_dependencies
-      ~before_merging:(fun job_start ->
-        Dependent ([Job job_start] @ List.map (fun job -> Optional job) sanity))
+      ~before_merging:(fun job_start -> Dependent [Job job_start])
       ~schedule_extended_test:(fun () -> Staged [])
+  in
+  (* Job [documentation:manuals] requires the build jobs, because it needs
+     to run Octez executables to generate the man pages.
+     So the build jobs need to be included if the documentation changes. *)
+  let changeset_octez_or_doc =
+    Changeset.(changeset_octez @ changeset_octez_docs)
+  in
+  let changeset_octez_or_kernels_or_doc =
+    Changeset.(changeset_octez_or_kernels @ changeset_octez_docs)
   in
   (* The build_x86_64 jobs are split in two to keep the artifact size
      under the 1GB hard limit set by GitLab. *)
@@ -587,12 +597,14 @@ let jobs pipeline_type =
     job_build_dynamic_binaries
       ~__POS__
       ~arch:Amd64
-      ~cpu:High
+      ~cpu:Very_high
+      ~storage:Ramfs
       ~retry:
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:true
-      ~rules:(make_rules ~changes:changeset_octez ())
+      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
+      ~sccache_size:"2G"
       ()
   in
   (* 'oc.build_x86_64-exp-dev-extra' builds the developer and experimental
@@ -610,7 +622,7 @@ let jobs pipeline_type =
         {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~dependencies:dependencies_needs_start
       ~release:false
-      ~rules:(make_rules ~changes:changeset_octez ())
+      ~rules:(make_rules ~changes:changeset_octez_or_doc ())
       ()
     |> enable_dune_cache ~key:build_cache_key ~policy:Push
   in
@@ -624,12 +636,20 @@ let jobs pipeline_type =
   in
   let job_build_kernels =
     job_build_kernels
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      ~rules:
+        (make_rules
+           ~changes:changeset_octez_or_kernels_or_doc
+           ~dependent:true
+           ())
       ()
   in
   let job_build_dsn_node =
     job_build_dsn_node
-      ~rules:(make_rules ~changes:changeset_octez_or_kernels ~dependent:true ())
+      ~rules:
+        (make_rules
+           ~changes:changeset_octez_or_kernels_or_doc
+           ~dependent:true
+           ())
       ()
   in
   let job_tezt_fetch_records =
@@ -647,11 +667,15 @@ let jobs pipeline_type =
              ())
     | Schedule_extended_test -> None
   in
+  (* Octez static binaries *)
   let job_static_x86_64_experimental =
     job_build_static_binaries
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
+      ~storage:Ramfs
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         (* Even though not many tests depend on static executables, some
            of those that do are limiting factors in the total duration
            of pipelines. So we start this job as early as possible,
@@ -659,6 +683,70 @@ let jobs pipeline_type =
       ~dependencies:dependencies_needs_start
       ~rules:(make_rules ~changes:changeset_octez ())
       ()
+  in
+  let job_static_arm64_experimental =
+    job_build_static_binaries
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      ~dependencies:dependencies_needs_start (* See rationale above *)
+      ~rules:(make_rules ~manual:(On_changes changeset_octez) ())
+      ()
+  in
+
+  (* EVM static binaires *)
+  let job_evm_static_x86_64_experimental =
+    job
+      ~__POS__
+      ~arch:Amd64
+      ~name:("etherlink.build:static-" ^ arch_to_string Amd64)
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
+      ~artifacts:
+        (artifacts
+           ~name:"evm-binaries"
+           ~when_:On_success
+           ["octez-evm-*"; "etherlink-*"])
+      ~cpu:Very_high
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+      ~before_script:
+        [
+          "./scripts/ci/take_ownership.sh";
+          ". ./scripts/version.sh";
+          "eval $(opam env)";
+        ]
+      ["make evm-node-static"]
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:"2G"
+    |> enable_cargo_target_caches
+  in
+
+  let job_evm_static_arm64_experimental =
+    job
+      ~__POS__
+      ~arch:Arm64
+      ~storage:Ramfs
+      ~name:("etherlink.build:static-" ^ arch_to_string Arm64)
+      ~image:Images.CI.build
+      ~stage:Stages.build
+      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
+      ~artifacts:
+        (artifacts
+           ~name:"evm-binaries"
+           ~when_:On_success
+           ["octez-evm-*"; "etherlink-*"])
+      ~before_script:
+        [
+          "./scripts/ci/take_ownership.sh";
+          ". ./scripts/version.sh";
+          "eval $(opam env)";
+        ]
+      ["make evm-node-static"]
+    |> enable_cargo_cache
+    |> enable_sccache ~cache_size:"2G"
+    |> enable_cargo_target_caches
   in
 
   (* Build jobs *)
@@ -690,29 +778,6 @@ let jobs pipeline_type =
         ["etherlink/lib_wasm_runtime/lint.sh"]
       |> enable_cargo_cache |> enable_sccache
     in
-    let job_ocaml_check : tezos_job =
-      job
-        ~__POS__
-        ~name:"ocaml-check"
-        ~cpu:High
-        ~image:Images.CI.build
-        ~stage
-        ~retry:
-          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
-        ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
-        ~before_script:
-          (before_script
-             ~take_ownership:true
-             ~source_version:true
-             ~eval_opam:true
-             [])
-        (* Stops on first error for easier detection of problems in
-           the log and to reduce time to merge of other MRs further
-           down the merge train. *)
-        ["dune build @check --stop-on-first-error"]
-      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
-    in
     let build_octez_source =
       (* We check compilation of the octez tarball on scheduled
          pipelines because it's not worth testing it for every merge
@@ -722,6 +787,8 @@ let jobs pipeline_type =
         ~__POS__
         ~stage
         ~image:Images.CI.build
+        ~cpu:Very_high
+        ~storage:Ramfs
         ~rules:(make_rules ~manual:Yes ())
         ~before_script:
           (before_script
@@ -740,47 +807,59 @@ let jobs pipeline_type =
           "eval $(opam env)";
           "make octez";
         ]
-      |> enable_cargo_cache |> enable_sccache
+      |> enable_cargo_cache
+      |> enable_sccache ~cache_size:"2G"
     in
     let job_build_grafazos =
       match pipeline_type with
       | Merge_train | Before_merging ->
-          Grafazos_ci.job_build_grafazos
+          Grafazos.Common.job_build
             ~rules:
               [
                 job_rule
                   ~when_:Always
-                  ~changes:(Changeset.encode Grafazos_ci.changeset_grafazos)
+                  ~changes:(Changeset.encode Grafazos.Common.changeset_grafazos)
                   ();
                 job_rule ~when_:Manual ();
               ]
             ()
       | Schedule_extended_test ->
-          Grafazos_ci.job_build_grafazos ~rules:[job_rule ~when_:Always ()] ()
+          Grafazos.Common.job_build ~rules:[job_rule ~when_:Always ()] ()
     in
-    let job_build_teztale ~arch =
-      Teztale.job_build
+    let job_build_teztale ?cpu ~arch ?storage ?(sccache_size = "5G") () =
+      Teztale.Common.job_build
         ~arch
-        ~rules:(make_rules ~manual:Yes ~changes:Teztale.changeset ())
+        ?cpu
+        ?storage
+        ~rules:(make_rules ~manual:Yes ~changes:Teztale.Common.changeset ())
+        ?sccache_size:(Some sccache_size)
         ()
-      |> enable_cargo_cache |> enable_sccache
     in
     [
       job_build_arm64_release;
       job_build_arm64_exp_dev_extra;
       job_static_x86_64_experimental;
+      job_static_arm64_experimental;
       job_build_x86_64_release;
       job_build_x86_64_exp_dev_extra;
       wasm_runtime_check;
-      job_ocaml_check;
       job_build_kernels;
       job_build_dsn_node;
       job_tezt_fetch_records;
       build_octez_source;
       job_build_grafazos;
-      job_build_teztale ~arch:Amd64;
-      job_build_teztale ~arch:Arm64;
-      job_build_layer1_profiling ();
+      job_build_teztale
+        ~arch:Amd64
+        ~cpu:Very_high
+        ~storage:Ramfs
+        ~sccache_size:"2G"
+        ();
+      job_build_teztale ~arch:Arm64 ~storage:Ramfs ();
+      job_evm_static_x86_64_experimental;
+      job_evm_static_arm64_experimental;
+      job_build_layer1_profiling
+        ~rules:(make_rules ~changes:changeset_octez ())
+        ();
     ]
     @ Option.to_list job_select_tezts
     @ bin_packages_jobs
@@ -788,7 +867,12 @@ let jobs pipeline_type =
 
   (* Packaging jobs *)
   let packaging =
-    Opam.jobs_opam_packages ~dependencies:dependencies_needs_start pipeline_type
+    match pipeline_type with
+    | Merge_train | Before_merging -> []
+    | Schedule_extended_test ->
+        Opam.jobs_opam_packages
+          ~dependencies:dependencies_needs_start
+          pipeline_type
   in
   (* Dependencies for jobs that should run immediately after jobs
      [job_build_x86_64] in [Before_merging] if they are present
@@ -809,6 +893,29 @@ let jobs pipeline_type =
 
   (* Test jobs*)
   let test =
+    let job_ocaml_check : tezos_job =
+      job
+        ~__POS__
+        ~name:"ocaml-check"
+        ~cpu:Very_high
+        ~image:Images.CI.build
+        ~stage:Stages.test
+        ~retry:
+          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
+        ~dependencies:dependencies_needs_start
+        ~rules:(make_rules ~changes:changeset_ocaml_check_files ())
+        ~before_script:
+          (before_script
+             ~take_ownership:true
+             ~source_version:true
+             ~eval_opam:true
+             [])
+        (* Stops on first error for easier detection of problems in
+           the log and to reduce time to merge of other MRs further
+           down the merge train. *)
+        ["dune build @check --stop-on-first-error"]
+      |> enable_cargo_cache |> enable_sccache |> enable_dune_cache
+    in
     (* This job triggers the debian child pipeline automatically if any
        files in the changeset is modified. It's the same as
        job_debian_repository_trigger that can be run manually.
@@ -866,9 +973,19 @@ let jobs pipeline_type =
         ~__POS__
         ~rules:(make_rules ~manual:No ~changes:changeset_homebrew ())
         ~stage:Stages.test
-        ~dependencies:dependencies_needs_start
+        ~dependencies:(Dependent [])
         Homebrew.child_pipeline_full
     in
+
+    let job_base_images_trigger =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:No ~changes:changeset_base_images ())
+        ~stage:Stages.images
+        ~dependencies:(Dependent [])
+        Base_images.child_pipeline
+    in
+
     (* check that ksy files are still up-to-date with octez *)
     let job_kaitai_checks : tezos_job =
       job
@@ -906,7 +1023,7 @@ let jobs pipeline_type =
              ~source_version:true
                (* TODO: https://gitlab.com/tezos/tezos/-/issues/5026
                   As observed for the `unit:js_components` running `npm i`
-                  everytime we run a job is inefficient.
+                  every time we run a job is inefficient.
 
                   The benefit of this approach is that we specify node version
                   and npm dependencies (package.json) in one place, and that the local
@@ -975,7 +1092,7 @@ let jobs pipeline_type =
         make_rules ~changes:changeset_octez ~dependent:true ()
       in
       let job_unit_test ~__POS__ ?(image = Images.CI.build) ?timeout
-          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ~name
+          ?parallel_vector ?(rules = rules) ~arch ?(cpu = Normal) ?storage ~name
           ~make_targets () : tezos_job =
         let arch_string = arch_to_string arch in
         let script = ["make $MAKE_TARGETS"] in
@@ -1010,6 +1127,7 @@ let jobs pipeline_type =
             ~image
             ~arch
             ~cpu
+            ?storage
             ~dependencies
             ~rules
             ~variables
@@ -1077,6 +1195,7 @@ let jobs pipeline_type =
         job_unit_test
           ~__POS__
           ~name:"oc.unit:non-proto-arm64"
+          ~storage:Ramfs
           ~parallel_vector:2
           ~arch:Arm64 (* The [lib_benchmark] unit tests require Python *)
           ~image:Images.CI.test
@@ -1119,11 +1238,12 @@ let jobs pipeline_type =
       in
       (* "de" stands for data-encoding, since data-encoding is considered
          to be a separate product. *)
-      let de_unit arch =
+      let de_unit arch ?storage () =
         job
           ~__POS__
           ~name:("de.unit:" ^ arch_to_string arch)
           ~arch
+          ?storage
           ~image:Images.CI.test
           ~stage:Stages.test
           ~rules:
@@ -1137,13 +1257,15 @@ let jobs pipeline_type =
           ~before_script:(before_script ~eval_opam:true [])
           ["dune runtest data-encoding"]
       in
-      let resto_unit arch =
+      let resto_unit arch ?storage () =
         job
           ~__POS__
           ~name:("resto.unit:" ^ arch_to_string arch)
           ~arch
+          ?storage
           ~image:Images.CI.test
           ~stage:Stages.test
+          ~timeout:(Minutes 10)
           ~rules:
             (make_rules
                ~changes:
@@ -1154,6 +1276,7 @@ let jobs pipeline_type =
           ["dune runtest resto"]
       in
       [
+        job_ocaml_check;
         oc_unit_non_proto_x86_64;
         oc_unit_etherlink_x86_64;
         oc_unit_other_x86_64;
@@ -1161,10 +1284,10 @@ let jobs pipeline_type =
         oc_unit_non_proto_arm64;
         oc_unit_webassembly_x86_64;
         oc_unit_protocol_compiles;
-        de_unit Amd64;
-        de_unit Arm64;
-        resto_unit Amd64;
-        resto_unit Arm64;
+        de_unit Amd64 ();
+        de_unit Arm64 ~storage:Ramfs ();
+        resto_unit Amd64 ();
+        resto_unit Arm64 ~storage:Ramfs ();
       ]
     in
     let job_oc_integration_compiler_rejections : tezos_job =
@@ -1200,6 +1323,8 @@ let jobs pipeline_type =
         ~stage:Stages.test
         ~image:Images.CI.build
         ~cpu:Very_high
+        ~retry:
+          {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
         ~dependencies:order_after_build
           (* Since the above dependencies are only for ordering, we do not set [dependent] *)
         ~rules:(make_rules ~changes:changeset_script_snapshot_alpha_and_link ())
@@ -1306,11 +1431,14 @@ let jobs pipeline_type =
           ~timeout:(Hours 2)
           ["./docs/introduction/install-opam.sh"]
       in
-      let job_compile_sources ~__POS__ ~name ~image ~project ~branch =
+      let job_compile_sources ~__POS__ ~name ~image ~project ~branch ?cpu ?retry
+          () =
         job
           ~__POS__
           ~name
           ~image
+          ?cpu
+          ?retry
           ~dependencies:dependencies_needs_start
           ~rules:compile_octez_rules
           ~stage:Stages.test
@@ -1333,13 +1461,21 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_bookworm"
               ~image:Images.opam_debian_bookworm
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"latest-release"
+              ~cpu:Very_high
+              ~retry:
+                {
+                  max = 2;
+                  when_ = [Stuck_or_timeout_failure; Runner_system_failure];
+                }
+              ();
             job_compile_sources
               ~__POS__
               ~name:"oc.compile_sources_doc_oracular"
               ~image:Images.opam_ubuntu_oracular
               ~project:"tezos/tezos"
-              ~branch:"latest-release";
+              ~branch:"latest-release"
+              ();
           ]
       (* Test compiling the [master] branch on Bookworm, to make sure
          that the compilation instructions in this branch are still
@@ -1352,37 +1488,44 @@ let jobs pipeline_type =
               ~name:"oc.compile_sources_doc_bookworm"
               ~image:Images.opam_debian_bookworm
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
+              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}"
+              ~cpu:Very_high
+              ~retry:
+                {
+                  max = 2;
+                  when_ = [Stuck_or_timeout_failure; Runner_system_failure];
+                }
+              ();
           ]
     in
     (* Tezt jobs.
 
-       The Tezt jobs are split into a set of special-purpose jobs running the
-       tests of the corresponding tag:
-       - [tezt-memory-3k]: runs the jobs with tag [memory_3k],
-       - [tezt-memory-4k]: runs the jobs with tag [memory_4k],
-       - [tezt-time_sensitive]: runs the jobs with tag [time-sensitive],
-       - [tezt-slow]: runs the jobs with tag [slow].
-       - [tezt-flaky]: runs the jobs with tag [flaky] and
-          none of the tags above.
+              The Tezt jobs are split into a set of special-purpose jobs running the
+              tests of the corresponding tag:
+              - [tezt-time_sensitive]: runs the jobs with tag [time_sensitive];
+              - [tezt-slow]: runs the jobs with tag [slow];
+              - [tezt-extra]: runs the jobs with tag [extra] not tagged
+                 as [flaky].
+              - [tezt-flaky]: runs the jobs with tag [flaky] and
+                 none of the tags above;
 
-       and a job [tezt] that runs all remaining tests (excepting those
-       that are tagged [ci_disabled], that are disabled in the CI.)
+              and a job [tezt] that runs all remaining tests (excepting those
+              that are tagged [ci_disabled], that are disabled in the CI.)
 
-       There is an implicit rule that the Tezt tags [memory_3k],
-       [memory_4k], [time_sensitive], [slow] and [cloud] are mutually
-       exclusive. The [flaky] tag is not exclusive to these tags. If
-       e.g. a test has both tags [slow] and [flaky], it will run in
-       [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
-       job if they also have another special tag. Tests tagged [cloud] are
-       meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
-       do not run in the CI.
+              There is an implicit rule that the Tezt tags [time_sensitive],
+              [slow], [extra] and [cloud] are mutually exclusive.
+              The [flaky] tag is not exclusive to these tags.
+              If e.g. a test has both tags [slow] and [flaky], it will run in
+              [tezt-slow], to prevent flaky tests to run in the [tezt-flaky]
+              job if they also have another special tag. Tests tagged [cloud] are
+              meant to be used with Tezt cloud (see [tezt/lib_cloud/README.md]) and
+              do not run in the CI.
 
-       For more information on tags, see [src/lib_test/tag.mli].
+              For more information on tags, see [src/lib_test/tag.mli].
 
-       Important: the [Custom_test_extended_pipeline.jobs] function
-       declares a set of jobs that must match the ones defined
-       below. Please update the jobs accordingly.
+              Important: the [Custom_test_extended_pipeline.jobs] function
+              declares a set of jobs that must match the ones defined
+              below. Please update the jobs accordingly.
     *)
     let jobs_tezt =
       let dependencies =
@@ -1409,6 +1552,9 @@ let jobs pipeline_type =
         make_rules ~dependent:true ~manual:(On_changes changeset_octez) ()
       in
       let coverage_expiry = Duration (Days 3) in
+      let keep_going =
+        match pipeline_type with Schedule_extended_test -> true | _ -> false
+      in
       let tezt : tezos_job =
         Tezt.job
           ~__POS__
@@ -1416,40 +1562,13 @@ let jobs pipeline_type =
             (* Exclude all tests with tags in [tezt_tags_always_disable] or
                [tezt_tags_exclusive_tags]. *)
           ~tezt_tests:(Tezt.tests_tag_selector [Not (Has_tag "flaky")])
-          ~tezt_parallel:3
-          ~parallel:(Vector 100)
+          ~tezt_parallel:6
+          ~parallel:(Vector 50)
           ~timeout:(Minutes 40)
           ~rules
           ~dependencies
+          ~keep_going
           ?job_select_tezts
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_3k : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~name:"tezt-memory-3k"
-          ~tag:Gcp_tezt_memory_3k
-          ~tezt_tests:(Tezt.tests_tag_selector ~memory_3k:true [])
-          ~tezt_variant:"-memory_3k"
-          ~parallel:(Vector 6)
-          ~dependencies
-          ?job_select_tezts
-          ~rules
-          ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
-      in
-      let tezt_memory_4k : tezos_job =
-        Tezt.job
-          ~__POS__
-          ~name:"tezt-memory-4k"
-          ~tag:Gcp_tezt_memory_4k
-          ~tezt_tests:(Tezt.tests_tag_selector ~memory_4k:true [])
-          ~tezt_variant:"-memory_4k"
-          ~parallel:(Vector 4)
-          ~dependencies
-          ?job_select_tezts
-          ~rules
           ()
         |> enable_coverage_output_artifact ~expire_in:coverage_expiry
       in
@@ -1465,6 +1584,7 @@ let jobs pipeline_type =
           ~tezt_tests:(Tezt.tests_tag_selector ~time_sensitive:true [])
           ~tezt_variant:"-time_sensitive"
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ~rules
           ()
@@ -1495,6 +1615,24 @@ let jobs pipeline_type =
           ~tezt_parallel:3
           ~parallel:(Vector 20)
           ~dependencies
+          ~keep_going
+          ?job_select_tezts
+          ~disable_test_timeout:true
+          ()
+      in
+      let tezt_extra : tezos_job =
+        Tezt.job
+          ~__POS__
+          ~name:"tezt-extra"
+          ~rules:rules_manual
+          ~tezt_tests:
+            (Tezt.tests_tag_selector ~extra:true [Not (Has_tag "flaky")])
+          ~tezt_variant:"-extra"
+          ~retry:2
+          ~tezt_parallel:6
+          ~parallel:(Vector 10)
+          ~dependencies
+          ~keep_going
           ?job_select_tezts
           ()
       in
@@ -1517,6 +1655,7 @@ let jobs pipeline_type =
           ~tezt_retry:3
           ~tezt_parallel:1
           ~dependencies
+          ~keep_going
           ?job_select_tezts
           ~rules:rules_manual
           ~allow_failure:Yes
@@ -1539,6 +1678,7 @@ let jobs pipeline_type =
                  Artifacts job_static_x86_64_experimental;
                  Artifacts job_tezt_fetch_records;
                ])
+          ~keep_going
           ~rules
           ?job_select_tezts
           ~before_script:(before_script ["mv octez-binaries/x86_64/octez-* ."])
@@ -1546,10 +1686,9 @@ let jobs pipeline_type =
       in
       [
         tezt;
-        tezt_memory_3k;
-        tezt_memory_4k;
         tezt_time_sensitive;
         tezt_slow;
+        tezt_extra;
         tezt_flaky;
         tezt_static_binaries;
       ]
@@ -1569,14 +1708,33 @@ let jobs pipeline_type =
       in
       [job_test_sdk_rust]
     in
+    let jobs_sdk_bindings : tezos_job list =
+      let job_test_sdk_bindings =
+        job
+          ~__POS__
+          ~name:"test_sdk_bindings"
+          ~image:Images.rust_sdk_bindings
+          ~stage:Stages.test
+          ~dependencies:dependencies_needs_start
+          ~before_script:(before_script ~init_python_venv:true [])
+          ~rules:
+            (make_rules ~dependent:true ~changes:changeset_test_sdk_bindings ())
+          [
+            "make -C contrib/sdk-bindings check";
+            "make -C contrib/sdk-bindings test";
+          ]
+        |> enable_cargo_cache |> enable_sccache
+      in
+      [job_test_sdk_bindings]
+    in
     let jobs_kernels : tezos_job list =
-      let make_job_kernel ?dependencies ?(stage = Stages.test) ~__POS__ ~name
-          ~changes script =
+      let make_job_kernel ?dependencies ?(image = Images.rust_toolchain)
+          ?(stage = Stages.test) ~__POS__ ~name ~changes script =
         job
           ?dependencies
           ~__POS__
           ~name
-          ~image:Images.rust_toolchain
+          ~image
           ~stage
           ~rules:(make_rules ~dependent:true ~changes ())
           script
@@ -1609,43 +1767,28 @@ let jobs pipeline_type =
       let job_audit_riscv_deps : tezos_job =
         make_job_kernel
           ~stage:Stages.sanity
+          ~image:Images.rust_toolchain_master
+          ~dependencies:(Dependent [])
           ~__POS__
           ~name:"audit_riscv_deps"
           ~changes:changeset_riscv_kernels
           ["make -C src/riscv audit"]
       in
+      let riscv_ci_flags =
+        (* These flags ensure we don't need Ocaml installed in the check and test jobs *)
+        "--no-default-features --features ci"
+      in
       let job_check_riscv_kernels : tezos_job =
         make_job_kernel
-          ~stage:Stages.build
           ~__POS__
           ~name:"check_riscv_kernels"
           ~changes:changeset_riscv_kernels
           ~dependencies:(Dependent [Job job_audit_riscv_deps])
-          ["make -C src/riscv CHECK_FEATURES= check"]
-      in
-      let job_test_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test"]
-      in
-      let job_test_long_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_long_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test-long"]
-      in
-      let job_test_miri_riscv_kernels : tezos_job =
-        make_job_kernel
-          ~__POS__
-          ~name:"test_miri_riscv_kernels"
-          ~changes:changeset_riscv_kernels
-          ~dependencies:(Dependent [Job job_check_riscv_kernels])
-          ["make -C src/riscv test-miri"]
+          [
+            Format.asprintf
+              "make -C src/riscv CHECK_FLAGS= EXTRA_FLAGS='%s' check"
+              riscv_ci_flags;
+          ]
       in
       let job_test_evm_compatibility : tezos_job =
         make_job_kernel
@@ -1656,10 +1799,11 @@ let jobs pipeline_type =
           [
             "make -f etherlink.mk EVM_EVALUATION_FEATURES=disable-file-logs \
              evm-evaluation-assessor";
-            "git clone --depth 1 --branch v13 \
-             https://github.com/ethereum/tests ethereum_tests";
+            "git clone --depth 1 --branch v14.1@etherlink \
+             https://github.com/functori/tests ethereum_tests";
             "./evm-evaluation-assessor --eth-tests ./ethereum_tests/ \
-             --resources ./etherlink/kernel_evm/evm_evaluation/resources/ -c";
+             --resources ./etherlink/kernel_latest/evm_evaluation/resources/ \
+             -c";
           ]
       in
       [
@@ -1668,9 +1812,6 @@ let jobs pipeline_type =
         job_test_etherlink_firehose;
         job_audit_riscv_deps;
         job_check_riscv_kernels;
-        job_test_riscv_kernels;
-        job_test_long_riscv_kernels;
-        job_test_miri_riscv_kernels;
         job_test_evm_compatibility;
       ]
     in
@@ -1729,10 +1870,11 @@ let jobs pipeline_type =
             job_debian_repository_trigger_full;
             job_rpm_repository_trigger_full;
             job_homebrew_trigger_full;
+            job_base_images_trigger;
           ]
     in
-    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_kernels @ jobs_unit
-    @ jobs_install_octez @ jobs_tezt
+    jobs_debian @ jobs_misc @ jobs_sdk_rust @ jobs_sdk_bindings @ jobs_kernels
+    @ jobs_unit @ jobs_install_octez @ jobs_tezt
   in
 
   (*Coverage jobs *)
@@ -1759,7 +1901,6 @@ let jobs pipeline_type =
             ~image:Images.CI.e2etest
             ~name:"oc.unified_coverage"
             ~stage:Stages.test_coverage
-            ~before_script:(before_script ~datadog_job_info:true [])
             ~coverage:"/Coverage: ([^%]+%)/"
             ~rules:
               (make_rules
@@ -1785,7 +1926,7 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
 
-  (*Doc jobs*)
+  (* Doc jobs *)
   let doc =
     let jobs_install_python =
       (* Creates a job that tests installation of the python environment in [image] *)
@@ -1794,7 +1935,7 @@ let jobs pipeline_type =
           ~__POS__
           ~name
           ~image
-          ~stage:Stages.doc
+          ~stage:Stages.test
           ~dependencies:dependencies_needs_start
           ~rules:
             (make_rules
@@ -1823,19 +1964,19 @@ let jobs pipeline_type =
           [
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_noble"
+              ~name:"documentation:install_python_noble"
               ~image:Images.ubuntu_noble
               ~project:"tezos/tezos"
               ~branch:"master";
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_jammy"
+              ~name:"documentation:install_python_jammy"
               ~image:Images.ubuntu_jammy
               ~project:"tezos/tezos"
               ~branch:"master";
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_bookworm"
+              ~name:"documentation:install_python_bookworm"
               ~image:Images.debian_bookworm
               ~project:"tezos/tezos"
               ~branch:"master";
@@ -1844,7 +1985,7 @@ let jobs pipeline_type =
           [
             job_install_python
               ~__POS__
-              ~name:"oc.install_python_bookworm"
+              ~name:"documentation:install_python_bookworm"
               ~image:Images.debian_bookworm
               ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
               ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
@@ -1858,7 +1999,20 @@ let jobs pipeline_type =
       let job_odoc =
         Documentation.job_odoc ~rules ~dependencies ~lite:true ()
       in
-      let job_manuals = Documentation.job_manuals ~rules ~dependencies () in
+      let job_manuals =
+        Documentation.job_manuals
+          ~rules
+          ~use_static_executables:false
+          ~dependencies:
+            (Dependent
+               [
+                 Artifacts job_build_x86_64_release;
+                 Artifacts job_build_x86_64_exp_dev_extra;
+                 Artifacts job_build_kernels;
+                 Artifacts job_build_dsn_node;
+               ])
+          ()
+      in
       let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
       let job_build_all =
         Documentation.job_build_all
@@ -1904,14 +2058,6 @@ let jobs pipeline_type =
        and tested. There is a similar job job_debian_repository_trigger_auto
        in the test stage that is started automatically if any files related to
        packaging is changed. *)
-    let job_ocaml4_octez_trigger_auto =
-      trigger_job
-        ~__POS__
-        ~rules:(make_rules ~manual:Yes ())
-        ~dependencies:(Dependent [])
-        ~stage:Stages.manual
-        Ocaml4_build.child_pipeline_ocaml4
-    in
     let job_debian_repository_trigger_partial : tezos_job =
       (* Same as [job_debian_repository_trigger_auto] but manual,
          so that one can trigger it without triggering the whole main pipeline.
@@ -1944,6 +2090,14 @@ let jobs pipeline_type =
         ~stage:Stages.manual
         Homebrew.child_pipeline_full
     in
+    let job_base_images_trigger =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:Yes ())
+        ~stage:Stages.manual
+        ~dependencies:(Dependent [])
+        Base_images.child_pipeline
+    in
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -1966,6 +2120,7 @@ let jobs pipeline_type =
           job_docker_build
             ~__POS__
             ~arch:Arm64
+            ~storage:Ramfs
             ~dependencies:(Dependent [])
             ~rules:(make_rules ~changes:changeset_docker_files ~manual:Yes ())
             Test_manual
@@ -1991,14 +2146,22 @@ let jobs pipeline_type =
             ["./scripts/ci/docker_verify_signature.sh"]
         in
         let jobs =
-          [job_docker_amd64_test_manual; job_docker_arm64_test_manual]
-          @ [job_docker_verify_test_arm64; job_docker_verify_test_amd64]
+          [
+            job_docker_amd64_test_manual;
+            job_docker_arm64_test_manual;
+            job_docker_verify_test_arm64;
+            job_docker_verify_test_amd64;
+            job_base_images_trigger;
+          ]
         in
         if pipeline_type = Merge_train then jobs
         else
-          job_ocaml4_octez_trigger_auto :: job_homebrew_repository_trigger
-          :: job_rpm_repository_trigger_partial
-          :: job_debian_repository_trigger_partial :: jobs
+          [
+            job_homebrew_repository_trigger;
+            job_rpm_repository_trigger_partial;
+            job_debian_repository_trigger_partial;
+          ]
+          @ jobs
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in

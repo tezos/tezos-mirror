@@ -29,6 +29,16 @@ val sk_to_bytes : sk -> Bytes.t
     default value of [key_info] is the empty bytes sequence. *)
 val generate_sk : ?key_info:Bytes.t -> Bytes.t -> sk
 
+(** [share_secret_key [s_0;...;s_{m-1}] n] shares a secret key [s_0]
+    between [n] participants so that any [m] participants can
+    collaboratively sign messages, while fewer than [m] participants
+    cannot produce a valid signature. Other coefficients [s_i] are
+    random secrets. Each participant is assigned a unique identifier
+    [id_i] in range [1; n].
+
+    Precondition: 1 < m and m <= n. *)
+val share_secret_key : sk list -> n:int -> (int * sk) list
+
 (** BLS signatures instantiation minimizing the size of the public keys (48
     bytes) but use longer signatures (96 bytes). *)
 module MinPk : sig
@@ -114,8 +124,34 @@ module MinPk : sig
       [signatures], following {{:
       https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-2.8
       } section 2.8}.
-      Return [None] if [INVALID] is expected in the specification *)
-  val aggregate_signature_opt : signature list -> signature option
+      Return [None] if [INVALID] is expected in the specification. If
+      [subgroup_check] is set, the function also checks if the points are in G2.
+      (set by default) *)
+  val aggregate_signature_opt :
+    ?subgroup_check:bool -> signature list -> signature option
+
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in G2. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
+
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in G1. *)
+  val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
+
+  (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in G1. *)
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}
@@ -191,15 +227,19 @@ module MinPk : sig
         in section 4.2.3}. *)
     val verify : pk -> Bytes.t -> signature -> bool
 
-    (** [pop_proof sk] implements
+    (** [pop_prove ?msg sk] implements
         {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.2}
-        section 3.3.2}. *)
-    val pop_prove : sk -> proof
+        section 3.3.2}.
+        If [msg] is provided, will provide a proof for [msg] instead of the public key of [sk].
+    *)
+    val pop_prove : ?msg:pk -> sk -> proof
 
-    (** [pop_verify pk signature] implements
+    (** [pop_verify pk ?msg signature] implements
         {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.3}
-        section 3.3.3}. *)
-    val pop_verify : pk -> proof -> bool
+        section 3.3.3}.
+        If [msg] is provided, will verify the proof against [msg] instead of [pk].
+    *)
+    val pop_verify : pk -> ?msg:pk -> proof -> bool
 
     (** [aggregate_verify pks msg aggregated_signature] performs a aggregate
         signature verification. It supposes the same message [msg] has been
@@ -296,8 +336,34 @@ module MinSig : sig
       [signatures], following {{:
       https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-2.8
       } section 2.8 }.
-      Return [None] if [INVALID] is expected in the specification *)
-  val aggregate_signature_opt : signature list -> signature option
+      Return [None] if [INVALID] is expected in the specification. If
+      [subgroup_check] is set, the function also checks if the points are in G1.
+      (set by default) *)
+  val aggregate_signature_opt :
+    ?subgroup_check:bool -> signature list -> signature option
+
+  (** [aggregate_signature_weighted_opt [(w_1, s_1);(w_1, s_2);...]] aggregates the signatures
+      [s_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * s_i].
+      Return [None] if deserialization of signatures fails. If [subgroup_check] is set, the
+      function also checks if the points are in G1. *)
+  val aggregate_signature_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * signature) list -> signature option
+
+  (** [threshold_signature_opt [(id_x, s_x);(id_y, s_y);...] ]
+      reconstructs a signature if at least [m] valid signatures [s_i]
+      produced by a participant [id_i] are provided. *)
+  val threshold_signature_opt : (int * signature) list -> signature option
+
+  (** [aggregate_public_key_opt ?subgroup_check pks] aggregates the public keys
+      [pks]. If [subgroup_check] is set, the function also checks if the
+      points are in G2. *)
+  val aggregate_public_key_opt : ?subgroup_check:bool -> pk list -> pk option
+
+  (** [aggregate_public_key_weighted_opt [(w_1, pk_1);(w_2, pk_2);...]] aggregates the public
+      keys [pk_i] multiplied by their weights [w_i], i.e it returns the sum of [w_i * pk_i].
+      If [subgroup_check] is set, the function also checks if the points are in G2. *)
+  val aggregate_public_key_weighted_opt :
+    ?subgroup_check:bool -> (Z.t * pk) list -> pk option
 
   (** Basic scheme described in
       {{:https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.1}
@@ -374,15 +440,19 @@ module MinSig : sig
         section 4.2.3 } *)
     val verify : pk -> Bytes.t -> signature -> bool
 
-    (** [pop_proof sk] implements the algorithm described in {{:
+    (** [pop_prove ?msg sk] implements the algorithm described in {{:
         https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.2
-        } section 3.3.2 } *)
-    val pop_prove : sk -> proof
+        } section 3.3.2 }.
+        If [msg] is provided, will provide a proof for [msg] instead of the public key of [sk].
+    *)
+    val pop_prove : ?msg:pk -> sk -> proof
 
-    (** [pop_verify pk proof] implements the algorithm described in {{:
+    (** [pop_verify pk ?msg proof] implements the algorithm described in {{:
         https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-04#section-3.3.3
-        } section 3.3.3 } *)
-    val pop_verify : pk -> proof -> bool
+        } section 3.3.3 }.
+        If [msg] is provided, will verify the proof against [msg] instead of [pk].
+    *)
+    val pop_verify : pk -> ?msg:pk -> proof -> bool
 
     (** [aggregate_verify pks msg aggregated_signature] performs a aggregate
         signature verification. It supposes the same message [msg] has been

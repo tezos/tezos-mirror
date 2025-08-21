@@ -8,9 +8,10 @@ However, these solutions are **not** enabled by default, so you have to turn the
 
 Indeed, by default:
 
-- Private keys are stored unencrypted in file ``$OCTEZ_CLIENT_DIR/secret_keys``.
+- Private keys are stored in ``$OCTEZ_CLIENT_DIR/secret_keys``. Keys generated with ``octez-client`` are stored encrypted by default for Tezos ``mainnet``, whereas they are unencrypted by default for test networks.
 - The client uses these keys to sign user operations (e.g. transfers) by itself.
 - The baker daemon uses these keys to automatically sign its operations (e.g. (pre-)attestations).
+- The baker's own key is used to sign consensus operations and :doc:`DAL <../shell/dal>` attestations.
 
 The solutions provided to strengthen the security of the default key management and signing are the following:
 
@@ -20,9 +21,11 @@ The solutions provided to strengthen the security of the default key management 
   + sign user operations (e.g. transfers) interactively on the wallet
   + automatically sign baking operations, such as (pre-)attestations, more securely.
 
-- If you don't have a hardware wallet, the option ``--encrypted`` of the client offers a first protection for storing your keys.
+- Using option ``--encrypted`` to encrypt the keys when using a testnet (this is the default on mainnet, where you must use option ``--unencrypted`` to force unencrypted keys.)
 
 - A separate signer daemon allows to decouple the client and baker from the signing process.
+
+- Separate keys (known as "consensus key" and "companion key") can be used to sign consensus operations and/or DAL attestations, respectively.
 
   In particular, this allows executing the signer remotely (that is, on a different machine than the client and/or the baker), perhaps less exposed to attacks.
 
@@ -39,6 +42,8 @@ It is possible and advised to use a hardware wallet to securely store and manage
 keys. The Octez client supports Ledger Nano devices provided that they have
 two Tezos apps installed, `Tezos Wallet app <https://github.com/trilitech/ledger-app-tezos-wallet>`_ and `Tezos Baking app <https://github.com/trilitech/ledger-app-tezos-baking>`_ which are provided by `Trilitech Ltd <https://www.trili.tech/>`_. They can be installed from the Ledger Live store.
 
+For performance reasons (see `details <https://github.com/trilitech/ledger-app-tezos-baking?tab=readme-ov-file#benchmarking>`__), a Ledger Nano S Plus model is a preferable choice with respect to a Ledger Nano.
+
 Ledger Manager
 ~~~~~~~~~~~~~~
 
@@ -52,6 +57,9 @@ In Ledger Live install ``Tezos Wallet`` from the applications list.
 To install the ``Tezos Baking`` app, you need to enable Developer Mode in the Ledger Live settings.
 Then you can install the app from the Manager tab in the Ledger Live.
 
+.. warning::
+
+    Ledger does not support tz4 addresses. If you wish to use a tz4 address, consider using an alternative method.
 
 Tezos Wallet app
 ~~~~~~~~~~~~~~~~
@@ -94,6 +102,8 @@ Setup the Ledger baking app on any Tezos network using the following command::
 More details on setting up baking with the Ledger can be found on the `Tezos Baking app readme
 <https://github.com/trilitech/ledger-app-tezos-baking>`_.
 
+For details about baking using a Ledger device, see a `dedicated tutorial <https://docs.tezos.com/tutorials/bake-with-ledger>`__.
+
 .. _signer:
 
 Signer
@@ -101,6 +111,8 @@ Signer
 
 A solution to decouple the client and the baker from the signing process is to
 use a *remote signer*.
+
+A complete manual page of the signer is available :ref:`here <signer_manual>`.
 
 In this configuration, the client sends signing requests over a
 communication channel towards ``octez-signer``, which can run on a
@@ -254,7 +266,7 @@ However, this setup **does not guarantee confidentiality**: an eavesdropper can
 see the transactions that you sign (on a public blockchain this may be less of a concern).
 In order to avoid that, you can use the ``https`` scheme or a tunnel to encrypt your traffic.
 
-.. _consensus_key:
+.. _consensus_key_details:
 
 Consensus Key
 -------------
@@ -273,9 +285,12 @@ for example, a cloud platform providing hosted Key Management Systems (KMS) wher
 generated within the system and can never be downloaded by the operator. The delegate can designate
 such a KMS key as its consensus key. Shall they lose access to the cloud platform for any reason, they can simply switch to a new key.
 
-However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus key may sign a
-Drain operation to transfer the delegate's free balance to an arbitrary account.
-
+However, both the delegate key and the consensus key give total control over the delegate's funds: indeed, the consensus
+key may sign a ``Drain_delegate`` operation to transfer the delegate's
+spendable balance to an arbitrary account. In :doc:`relevant
+RPCs<../api/openapi>` like
+``/chains/main/blocks/head/helpers/baking_rights``, both the
+delegate's manager and consensus keys are listed.
 As a consequence, the consensus key should be treated with equal care as the manager key.
 
 Registering a Consensus Key
@@ -302,16 +317,21 @@ However, it is also possible to register as a delegate and immediately set the c
    octez-client register key <mananger_key> as delegate with consensus key <consensus_key>
 
 There can be multiple pending updates: it is possible to have multiple pending consensus keys for multiple future cycles.
-A subsequent update within the same cycle takes precedences over the initial one.
+A subsequent update within the same cycle takes precedence over the initial one.
+
+Note that registering a tz4 consensus key, just like revealing a tz4 public key, requires a proof of
+possession. This is the signature of the consensus public key using the consensus private key, and it
+ensures ownership of the key. This process is done automatically by the client, and the proof is included in
+the receipt of the update operation.
 
 Baking With a Consensus Key
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In your baker's command, replace the delegate's manager key alias with the consenus key alias::
+In your baker's command, replace the delegate's manager key alias with the consensus key alias::
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> --liquidity-baking-toggle-vote pass
 
-While transitioning from the delegate's manager key, it is possible to pass the alias for both delegate's manager key and consensus key.
+While :ref:`transitioning from the delegate's manager key <consensus_key>`, it is possible to pass the alias for both delegate's manager key and consensus key.
 The delegate will seamlessly keep baking when the transition happens::
 
    octez-baker-Ptxxxxxx run with local node ~/.tezos-node <consensus_key_alias> <delegate_key_alias> --liquidity-baking-toggle-vote pass
@@ -334,6 +354,43 @@ The drain operation has no effect on the frozen balance.
 
 A fixed fraction of the drained delegate’s spendable balance is transferred as fees to the baker that includes the operation,
 i.e. the maximum between 1 tez or 1% of the spendable balance.
+
+.. _companion_key:
+
+Companion Key
+-------------
+
+Starting with protocol S, bakers will be able to register a second key called the *companion key*. It is a tz4 key,
+whose purpose is to sign DAL specific content in consensus operations. This key is required for delegates with
+a tz4 consensus key that wish to participate in the DAL.
+
+More precisely, if a delegate has an active tz4 consensus key, but no companion key is active,
+or if it is missing from the client set of known keys, the baker
+will still be able to produce attestations, but without any DAL attestations.
+In other words, even if the baker is connected to a DAL node and receives attestable slots for the delegate,
+since the companion key is not available, it will not be able to include a DAL attestation in its
+consensus operation, and will only send a regular attestation.
+
+Any delegate, regardless of their kind of address, can register a companion key,
+it will only be used when necessary. There is no downside in doing so, because ``drain delegate``
+only applies to consensus keys, not companion keys.
+
+The command to update the companion key is::
+
+   octez-client set companion key for <manager_key> to <companion_key>
+
+Since a companion key has to be a tz4, this command will also create a proof of possession and include it in the operation.
+
+A companion key takes the same amount of time as a consensus key to become activated, which is
+up to ``CONSENSUS_KEY_ACTIVATION_DELAY + 1`` cycles (see :ref:`cs_constants`).
+
+Alternatively, it is possible to register a companion key when registering as a delegate::
+
+   octez-client register key <manager_key> as delegate --companion-key <companion_key>
+
+It is even possible to register both a consensus key and a companion key, with the following command::
+
+   octez-client register key <manager_key> as delegate --consensus-key <consensus_key> --companion-key <companion_key>
 
 .. _activate_fundraiser_account:
 

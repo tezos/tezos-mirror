@@ -26,6 +26,7 @@
 open Protocol.Alpha_context
 module Events = Baking_events.Scheduling
 open Baking_state
+open Baking_state_types
 
 module Profiler = struct
   include (val Profiler.wrap Baking_profiler.baker_profiler)
@@ -287,18 +288,16 @@ let rec wait_next_event ~timeout loop_state =
       return_some (New_forge_event event)
   | `Timeout e -> return_some (Timeout e)
 
-let first_potential_round_at_next_level state ~earliest_round =
+let first_potential_round ~committee_size ~owned_slots ~earliest_round =
   let open Option_syntax in
   let ( let*? ) res f = match res with Error _ -> None | Ok x -> f x in
-  let committee_size =
-    state.global_state.constants.Constants.parametric.consensus_committee_size
-  in
-  let owned_slots = state.level_state.next_level_delegate_slots in
   (* Rounds attribution cycles with a period of [committee_size].
      To find the next owned round, we translate [earliest_round] into a slot
      within the range [0 ... committee_size], look for the first subsequent slot
      we own, and finally translate it back to a round by restoring the original
      offset. *)
+  (* TODO https://gitlab.com/tezos/tezos/-/issues/7931
+     The use of Round.to_slot should be avoided *)
   let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
   let*? earliest_round = Round.to_int earliest_round in
   let period_offset = earliest_round / committee_size in
@@ -314,6 +313,20 @@ let first_potential_round_at_next_level state ~earliest_round =
         Round.of_int (slot + (committee_size * (1 + period_offset)))
       in
       Some (round, delegate.delegate)
+
+let first_potential_round_at_next_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.next_level_delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
+
+let first_potential_round_at_current_level state ~earliest_round =
+  let committee_size =
+    state.global_state.constants.Constants.parametric.consensus_committee_size
+  in
+  let owned_slots = state.level_state.delegate_slots in
+  first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 (** [current_round_at_next_level] converts the current system timestamp
     into the first non-expired round at the next level *)
@@ -348,7 +361,7 @@ let compute_next_potential_baking_time_at_next_level state =
   let open Baking_state in
   match state.level_state.elected_block with
   | None -> Lwt.return_none
-  | Some elected_block -> (
+  | Some elected_block ->
       let*! () =
         Events.(
           emit
@@ -370,39 +383,38 @@ let compute_next_potential_baking_time_at_next_level state =
           ~predecessor_round
         |> Result.to_option
       in
-      (* Find the first baking round we own at next level that is greater or
-         equal than [current_round_at_next_level] *)
-      let*? first_potential_round, delegate =
-        first_potential_round_at_next_level
-          state
-          ~earliest_round:current_round_at_next_level
+      (* Compute the maximum of [current_round_at_next_level] and
+         [next_level_latest_forge_request + 1]. It is the smallest round at next
+         level that is not expired and not already sent to the forge worker. *)
+      let earliest_round =
+        match state.level_state.next_level_latest_forge_request with
+        | None -> current_round_at_next_level
+        | Some latest_forged_round ->
+            Round.(max current_round_at_next_level (succ latest_forged_round))
       in
-      (* Check if we don't have already injected a round greater or equal than
-         [first_potential_round]. *)
-      match state.level_state.next_level_proposed_round with
-      | Some injected_round when Round.(injected_round >= first_potential_round)
-        ->
-          let*! () = Events.(emit proposal_already_injected ()) in
-          Lwt.return_none
-      | None | Some _ ->
-          let*? first_potential_baking_time =
-            timestamp_of_round
-              state
-              ~predecessor_timestamp
-              ~predecessor_round
-              ~round:first_potential_round
-            |> Result.to_option
-          in
-          let*! () =
-            Events.(
-              emit
-                next_potential_slot
-                ( Int32.succ state.level_state.current_level,
-                  first_potential_round,
-                  first_potential_baking_time,
-                  delegate ))
-          in
-          return (first_potential_baking_time, first_potential_round))
+      (* Find the first baking round we own at next level that is greater or
+         equal than [earliest_round] *)
+      let*? first_potential_round, delegate =
+        first_potential_round_at_next_level state ~earliest_round
+      in
+      let*? first_potential_baking_time =
+        timestamp_of_round
+          state
+          ~predecessor_timestamp
+          ~predecessor_round
+          ~round:first_potential_round
+        |> Result.to_option
+      in
+      let*! () =
+        Events.(
+          emit
+            next_potential_slot
+            ( Int32.succ state.level_state.current_level,
+              first_potential_round,
+              first_potential_baking_time,
+              delegate ))
+      in
+      return (first_potential_baking_time, first_potential_round)
 
 (** From the current [state], the function returns an Lwt promise that
     fulfills once the nearest timeout is expired and at which the state
@@ -518,8 +530,6 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
            Lwt.return
              (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7390
-     re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
   let*! next_baking = compute_next_potential_baking_time_at_next_level state in
@@ -613,7 +623,6 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
   let open Lwt_result_syntax in
   (* FIXME: https://gitlab.com/tezos/tezos/-/issues/7391
      consider saved attestable value *)
-  let open Protocol in
   let open Baking_state in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
   let* constants =
@@ -718,7 +727,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       elected_block;
       delegate_slots;
       next_level_delegate_slots;
-      next_level_proposed_round = None;
+      next_level_latest_forge_request = None;
       dal_attestable_slots;
       next_level_dal_attestable_slots;
     }
@@ -873,38 +882,21 @@ let perform_sanity_check cctxt ~chain_id =
   in
   return_unit
 
-let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
     ~tries ?(msg = "Connection failed. ") f x =
-  let open Lwt_result_syntax in
-  let*! result = f x in
-  match result with
-  | Ok _ as r -> Lwt.return r
-  | Error
-      (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
-    as err
-    when tries > 0 -> (
-      let*! () = cctxt#message "%sRetrying in %.2f seconds..." msg delay in
-      let*! result =
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep delay in
-             Lwt.return `Continue);
-            (let*! _ = Lwt_exit.clean_up_starts in
-             Lwt.return `Killed);
-          ]
-      in
-      match result with
-      | `Killed -> Lwt.return err
-      | `Continue ->
-          let next_delay = delay *. factor in
-          let delay =
-            Option.fold
-              ~none:next_delay
-              ~some:(fun max_delay -> Float.min next_delay max_delay)
-              max_delay
-          in
-          retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
-  | Error _ as err -> Lwt.return err
+  Utils.retry
+    ~emit:(cctxt#message "%s")
+    ?max_delay
+    ~delay
+    ~factor
+    ~tries
+    ~msg
+    ~is_error:(function
+      | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
+          true
+      | _ -> false)
+    f
+    x
 
 (* This function attempts to resolve the primary delegate associated with the given [key].
 
@@ -918,7 +910,7 @@ let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
 let try_resolve_consensus_keys cctxt key =
   let open Lwt_syntax in
   let levels_to_inspect = 50 in
-  let pkh = Consensus_key_id.to_pkh key.Consensus_key.id in
+  let pkh = Key_id.to_pkh key.Key.id in
   let* res =
     Plugin.Alpha_services.Delegate.deactivated cctxt (`Main, `Head 0) pkh
   in
@@ -944,7 +936,13 @@ let try_resolve_consensus_keys cctxt key =
           | Error _ | Ok [] -> try_find_delegate_key (head_offset - 1)
           | Ok
               (Plugin.RPC.Validators.
-                 {delegate; level = _; consensus_key = _; slots = _}
+                 {
+                   delegate;
+                   level = _;
+                   consensus_key = _;
+                   companion_key = _;
+                   slots = _;
+                 }
               :: _) ->
               (* The primary registered key as delegate found. Return it. *)
               return delegate
@@ -961,10 +959,11 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
     in
     let*! () =
       match profiles with
-      | Tezos_dal_node_services.Types.Bootstrap | Random_observer -> warn ()
-      | Operator operator_profile ->
+      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
+      | Controller controller_profile ->
           let attesters =
-            Tezos_dal_node_services.Operator_profile.attesters operator_profile
+            Tezos_dal_node_services.Controller_profiles.attesters
+              controller_profile
           in
           if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
             warn ()
@@ -989,13 +988,13 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
     ?(on_error = fun _ -> Lwt_result_syntax.return_unit) ?constants ~chain
     config delegates =
   let open Lwt_result_syntax in
-  let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
+  let*! () = Events.(emit Baking_events.Launch.keys_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c
-    | None ->
-        Protocol.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
+    | None -> Plugin.Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   in
   let* () = perform_sanity_check cctxt ~chain_id in
   let cache = Baking_cache.Block_cache.create 10 in

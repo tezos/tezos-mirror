@@ -4,7 +4,7 @@
 
 ### SDK
 
-- Add experimental support for compiling kernels to a Hermit RISC-V image behind the `proto-alpha` flag.
+- Add experimental support for compiling kernels to a RISC-V image behind the `proto-alpha` flag.
 - Add an experimental rollup host for RISC-V with an in-memory store behind the `experimental-host-in-memory-store` flag.
 - Add an `OutboxQueue` that can be used when more than 100 outbox messages are produced at a given level.
 - Add `From OutboxMessageTransaction`, `From OutboxMessageTransactionBatch` for `OutboxMessage` to simplify construction.
@@ -33,6 +33,7 @@
 - Disable `testing` as default features of the main `sdk` crate.
 - Change `Runtime::store_value_size` to return `PathNotFound` when the input is the path of a directory.
 - Add support for `MichelsonTimestamp` encoding and decoding.
+- Return a dummy value for `Runtime::reboot_left` on RISC-V, as RISC-V kernels do not need to reboot.
 
 ### Installer client/kernel
 
@@ -54,7 +55,7 @@
   with `DEBUG:` and do not print a newline by default.
 - Correctly initialise `MockHost::reboots_remaining` flag for testing outside of `run_level` api.
 - Add `Runtime::reveal_dal_parameters` to let a kernel request DAL parameters from the L1.
-- Add experimental, partial support for RISC-V kernels behind the `proto-alpha`flag.
+- Add experimental, partial support for RISC-V kernels behind the `proto-alpha` flag.
 - Add a `bls` feature flag, enabled by default, which allows disabling features which require
   the `bls` feature from `tezos_crypto_rs`.
 

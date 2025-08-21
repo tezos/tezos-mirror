@@ -1,0 +1,3 @@
+code { IS_IMPLICIT_ACCOUNT } ;
+input { Stack_elt address "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5" } ;
+output { Stack_elt (option key_hash) None }

@@ -31,6 +31,14 @@ module CommonStubs = struct
     Unsigned.Size_t.t ->
     unit = "caml_bls12_381_signature_blst_signature_keygen_stubs"
 
+  external polynomial_evaluation :
+    scalar -> scalar array -> int -> Bls12_381.Fr.t -> int
+    = "caml_bls12_381_signature_blst_polynomial_evaluation"
+
+  external lagrange_coeff_zero :
+    Bls12_381.Fr.t array -> Bls12_381.Fr.t array -> int -> int
+    = "caml_bls12_381_signature_blst_lagrange_coeff_zero"
+
   external pairing_init : bool -> Bytes.t -> Unsigned.Size_t.t -> ctxt
     = "caml_bls12_381_signature_blst_pairing_init_stubs"
 
@@ -113,6 +121,21 @@ let generate_sk ?(key_info = Bytes.empty) ikm =
       key_info
       (Unsigned.Size_t.of_int key_info_length) ;
   buffer_scalar
+
+let share_secret_key secret_polynomial ~n =
+  let poly_s = Array.of_list secret_polynomial in
+  let len = Array.length poly_s in
+  assert (len > 1) ;
+  let polynomial_evaluation x =
+    let res_scalar = CommonStubs.allocate_scalar () in
+    ignore @@ CommonStubs.polynomial_evaluation res_scalar poly_s len x ;
+    res_scalar
+  in
+  (* Secret polynomial s(x) is evaluated at n distinct points called
+     ids. Note: they cannot be equal to 0 because s(0) = s_0 is the secret. *)
+  List.init n (fun i ->
+      let id = i + 1 in
+      (id, polynomial_evaluation (Bls12_381.Fr.of_int id)))
 
 module MinPk = struct
   module Stubs = struct
@@ -241,20 +264,48 @@ module MinPk = struct
           else false
         else false)
 
-  let aggregate_signature_opt signatures =
-    let rec aux signatures acc =
-      match signatures with
-      | [] -> Some acc
-      | signature :: signatures -> (
-          let signature = Bls12_381.G2.of_compressed_bytes_opt signature in
-          match signature with
-          | None -> None
-          | Some signature ->
-              let acc = Bls12_381.G2.(add signature acc) in
-              aux signatures acc)
-    in
-    let res = aux signatures Bls12_381.G2.zero in
-    Option.map Bls12_381.G2.to_compressed_bytes res
+  let aggregate_signature_opt ?(subgroup_check = true) signatures =
+    Bls12_381.G2.add_bulk_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list signatures)
+
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    Bls12_381.G2.pippenger_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list signatures)
+      scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G2.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
+
+  let aggregate_public_key_opt ?(subgroup_check = true) pks =
+    Bls12_381.G1.add_bulk_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list pks)
+
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
+    let weights, pks = List.split pks_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    Bls12_381.G1.pippenger_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list pks)
+      scalars
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
@@ -387,30 +438,27 @@ module MinPk = struct
       in
       core_verify pk msg signature ciphersuite
 
-    let pop_prove sk =
+    let pop_prove ?msg sk =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
       in
       let pk = derive_pk sk in
-      core_sign sk pk ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_sign sk msg ciphersuite
 
-    let pop_verify pk signature =
+    let pop_verify pk ?msg signature =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_"
       in
-      core_verify pk pk signature ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_verify pk msg signature ciphersuite
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in
-      let pks_opts = List.map Bls12_381.G1.of_compressed_bytes_opt pks_bytes in
-      let pks_are_ok = List.for_all Option.is_some pks_opts in
-      if not pks_are_ok then false
+      let aggregated_pk = aggregate_public_key_opt pks_bytes in
+      if Option.is_none aggregated_pk then false
       else
-        let pks = List.map Option.get pks_opts in
-        let aggregated_pk =
-          List.fold_left Bls12_381.G1.add Bls12_381.G1.zero pks
-        in
-        let aggregated_pk = Bls12_381.G1.to_compressed_bytes aggregated_pk in
+        let aggregated_pk = Option.get aggregated_pk in
         let signature_check = verify aggregated_pk msg aggregated_signature in
         let pop_checks =
           List.for_all
@@ -548,20 +596,48 @@ module MinSig = struct
           else false
         else false)
 
-  let aggregate_signature_opt signatures =
-    let rec aux signatures acc =
-      match signatures with
-      | [] -> Some acc
-      | signature :: signatures -> (
-          let signature = Bls12_381.G1.of_compressed_bytes_opt signature in
-          match signature with
-          | None -> None
-          | Some signature ->
-              let acc = Bls12_381.G1.(add signature acc) in
-              aux signatures acc)
-    in
-    let res = aux signatures Bls12_381.G1.zero in
-    Option.map Bls12_381.G1.to_compressed_bytes res
+  let aggregate_signature_opt ?(subgroup_check = true) signatures =
+    Bls12_381.G1.add_bulk_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list signatures)
+
+  let aggregate_signature_weighted_opt ?(subgroup_check = true)
+      signatures_with_weights =
+    let weights, signatures = List.split signatures_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    Bls12_381.G1.pippenger_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list signatures)
+      scalars
+
+  let threshold_signature_opt ids_signatures : signature option =
+    let len = List.length ids_signatures in
+    if len <= 1 then None
+    else
+      let ids, signatures = List.split ids_signatures in
+      let scalars = List.map Bls12_381.Fr.of_int ids |> Array.of_list in
+      let scalars_res = Array.init len (fun _i -> Bls12_381.Fr.(copy zero)) in
+      let b = CommonStubs.lagrange_coeff_zero scalars_res scalars len in
+      if b = 0 then
+        Bls12_381.G1.pippenger_with_compressed_bytes_array_opt
+          ~subgroup_check:true
+          (Array.of_list signatures)
+          scalars_res
+      else None
+
+  let aggregate_public_key_opt ?(subgroup_check = true) pks =
+    Bls12_381.G2.add_bulk_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list pks)
+
+  let aggregate_public_key_weighted_opt ?(subgroup_check = true)
+      pks_with_weights =
+    let weights, pks = List.split pks_with_weights in
+    let scalars = List.map Bls12_381.Fr.of_z weights |> Array.of_list in
+    Bls12_381.G2.pippenger_with_compressed_bytes_array_opt
+      ~subgroup_check
+      (Array.of_list pks)
+      scalars
 
   let core_aggregate_verify pks_with_msgs aggregated_signature ciphersuite =
     let rec aux aggregated_signature pks_with_msgs ctxt =
@@ -694,30 +770,27 @@ module MinSig = struct
       in
       core_verify pk msg signature ciphersuite
 
-    let pop_prove sk =
+    let pop_prove ?msg sk =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
       in
       let pk = derive_pk sk in
-      core_sign sk pk ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_sign sk msg ciphersuite
 
-    let pop_verify pk signature =
+    let pop_verify pk ?msg signature =
       let ciphersuite =
         Bytes.of_string "BLS_POP_BLS12381G1_XMD:SHA-256_SSWU_RO_POP_"
       in
-      core_verify pk pk signature ciphersuite
+      let msg = Option.value ~default:pk msg in
+      core_verify pk msg signature ciphersuite
 
     let aggregate_verify pks_with_pops msg aggregated_signature =
       let pks_bytes = List.map fst pks_with_pops in
-      let pks_opts = List.map Bls12_381.G2.of_compressed_bytes_opt pks_bytes in
-      let pks_are_ok = List.for_all Option.is_some pks_opts in
-      if not pks_are_ok then false
+      let aggregated_pk = aggregate_public_key_opt pks_bytes in
+      if Option.is_none aggregated_pk then false
       else
-        let pks = List.map Option.get pks_opts in
-        let aggregated_pk =
-          List.fold_left Bls12_381.G2.add Bls12_381.G2.zero pks
-        in
-        let aggregated_pk = Bls12_381.G2.to_compressed_bytes aggregated_pk in
+        let aggregated_pk = Option.get aggregated_pk in
         let signature_check = verify aggregated_pk msg aggregated_signature in
         let pop_checks =
           List.for_all

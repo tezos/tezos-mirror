@@ -7,13 +7,16 @@
 
 //! Representation for typed Michelson `signature` values.
 
+#[cfg(feature = "bls")]
+use tezos_crypto_rs::hash::{BlsSignature, HashTrait};
+
 use tezos_crypto_rs::{
     base58::*,
-    hash::{self, HashTrait},
-    hash::{BlsSignature, FromBytesError},
+    hash::{self, FromBytesError},
     PublicKeySignatureVerifier,
 };
 
+#[cfg(feature = "bls")]
 use base58::*;
 
 use super::{ByteReprError, ByteReprTrait};
@@ -176,6 +179,7 @@ macro_rules! key_type_and_impls {
     };
 }
 
+#[cfg(feature = "bls")]
 key_type_and_impls! {
     /// Ed25519 signature, `edsig...`.
     Ed25519(Ed25519Signature),
@@ -183,8 +187,21 @@ key_type_and_impls! {
     Secp256k1(Secp256k1Signature),
     /// P256 signature, `p2sig...`.
     P256(P256Signature),
+    /// Signature of yet-unknown type. Can be either Ed25519, Secp256k1 or P256,
+    /// but not BLS. See [GenericSignature] for more information.
+    Generic(GenericSignature), // See Note: [Generic signatures]
     /// BLS signature, `BLsig...`.
-    Bls(BlsSignature),
+    Bls(BlsSignature)
+}
+
+#[cfg(not(feature = "bls"))]
+key_type_and_impls! {
+    /// Ed25519 signature, `edsig...`.
+    Ed25519(Ed25519Signature),
+    /// Secp256k1 signature, `spsig...`.
+    Secp256k1(Secp256k1Signature),
+    /// P256 signature, `p2sig...`.
+    P256(P256Signature),
     /// Signature of yet-unknown type. Can be either Ed25519, Secp256k1 or P256,
     /// but not BLS. See [GenericSignature] for more information.
     Generic(GenericSignature), // See Note: [Generic signatures]
@@ -221,6 +238,7 @@ impl TryFrom<&str> for Signature {
 
 /// tezos_crypto_rs refuses to accept strings of length >= 128 for some ungodly
 /// reason. This is a reimplementation without that check.
+#[cfg(feature = "bls")]
 fn from_b58check(s: &str) -> Result<Vec<u8>, FromBase58CheckError> {
     const CHECKSUM_BYTE_SIZE: usize = 4;
     let bytes_with_checksum = s
@@ -246,17 +264,22 @@ impl ByteReprTrait for Signature {
     fn from_base58_check(data: &str) -> Result<Self, ByteReprError> {
         use Signature::*;
 
+        #[cfg(feature = "bls")]
+        {
+            if data.starts_with("BLsig") {
+                // BLS signatures are broken in tezos_crypto_rs
+                let raw_bytes = from_b58check(data)?;
+                let bytes = &raw_bytes[4..]; // strip 4-byte prefix
+                return Ok(Bls(BlsSignature::try_from(bytes)?));
+            }
+        }
+
         Ok(if data.starts_with("edsig") {
             Ed25519(SignatureTrait::from_b58check(data)?)
         } else if data.starts_with("spsig1") {
             Secp256k1(SignatureTrait::from_b58check(data)?)
         } else if data.starts_with("p2sig") {
             P256(SignatureTrait::from_b58check(data)?)
-        } else if data.starts_with("BLsig") {
-            // BLS signatures are broken in tezos_crypto_rs
-            let raw_bytes = from_b58check(data)?;
-            let bytes = &raw_bytes[4..]; // strip 4-byte prefix
-            Bls(BlsSignature::try_from(bytes)?)
         } else if data.starts_with("sig") {
             Generic(SignatureTrait::from_b58check(data)?)
         } else {
@@ -269,11 +292,19 @@ impl ByteReprTrait for Signature {
 
         match bytes.len() {
             Self::GENERIC_BYTE_LENGTH => Ok(Generic(GenericSignature::try_from_bytes(bytes)?)),
+            #[cfg(feature = "bls")]
             Self::BLS_BYTE_LENGTH => Ok(Bls(BlsSignature::try_from_bytes(bytes)?)),
+            #[cfg(feature = "bls")]
             len => Err(ByteReprError::WrongFormat(format!(
                 "signature must be either {} or {} bytes long, but it is {} bytes long",
                 Self::GENERIC_BYTE_LENGTH,
                 Self::BLS_BYTE_LENGTH,
+                len
+            ))),
+            #[cfg(not(feature = "bls"))]
+            len => Err(ByteReprError::WrongFormat(format!(
+                "signature must be {} bytes long, but it is {} bytes long",
+                Self::GENERIC_BYTE_LENGTH,
                 len
             ))),
         }
@@ -286,6 +317,7 @@ impl ByteReprTrait for Signature {
             Ed25519(hash) => hash.to_base58_check(),
             Secp256k1(hash) => hash.to_base58_check(),
             P256(hash) => hash.to_base58_check(),
+            #[cfg(feature = "bls")]
             Bls(hash) => hash.to_base58_check(),
             Generic(hash) => hash.to_base58_check(),
         }
@@ -298,6 +330,7 @@ impl ByteReprTrait for Signature {
             Ed25519(hash) => out.extend_from_slice(hash.as_ref()),
             Secp256k1(hash) => out.extend_from_slice(hash.as_ref()),
             P256(hash) => out.extend_from_slice(hash.as_ref()),
+            #[cfg(feature = "bls")]
             Bls(hash) => out.extend_from_slice(hash.as_ref()),
             Generic(hash) => out.extend_from_slice(hash.as_ref()),
         }
@@ -306,6 +339,7 @@ impl ByteReprTrait for Signature {
 
 impl Signature {
     /// This is byte-length of `BLsig` variant.
+    #[cfg(feature = "bls")]
     pub const BLS_BYTE_LENGTH: usize = 96;
 
     /// This is byte-length of `edsig`, `spsig1`, `p2sig` and `sig` variants.
@@ -320,18 +354,25 @@ impl Signature {
             Key::Ed25519(key) => match self {
                 Ed25519(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
-                P256(..) | Secp256k1(..) | Bls(..) => Ok(false),
+                #[cfg(feature = "bls")]
+                Bls(..) => Ok(false),
+                P256(..) | Secp256k1(..) => Ok(false),
             },
             Key::Secp256k1(key) => match self {
                 Secp256k1(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
-                P256(..) | Ed25519(..) | Bls(..) => Ok(false),
+                #[cfg(feature = "bls")]
+                Bls(..) => Ok(false),
+                P256(..) | Ed25519(..) => Ok(false),
             },
             Key::P256(key) => match self {
                 P256(sig) => key.verify_signature(&sig.0.clone().into(), msg),
                 Generic(sig) => key.verify_signature(&sig.0.clone().into(), msg),
-                Ed25519(..) | Secp256k1(..) | Bls(..) => Ok(false),
+                #[cfg(feature = "bls")]
+                Bls(..) => Ok(false),
+                Ed25519(..) | Secp256k1(..) => Ok(false),
             },
+            #[cfg(feature = "bls")]
             Key::Bls(key) => match self {
                 Bls(sig) => sig.aggregate_verify(&mut [(msg, key)].into_iter()),
                 // can't be represented as generic

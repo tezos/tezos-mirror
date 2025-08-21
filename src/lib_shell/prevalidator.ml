@@ -1,26 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Open Source License                                                       *)
+(* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(*                                                                           *)
-(* Permission is hereby granted, free of charge, to any person obtaining a   *)
-(* copy of this software and associated documentation files (the "Software"),*)
-(* to deal in the Software without restriction, including without limitation *)
-(* the rights to use, copy, modify, merge, publish, distribute, sublicense,  *)
-(* and/or sell copies of the Software, and to permit persons to whom the     *)
-(* Software is furnished to do so, subject to the following conditions:      *)
-(*                                                                           *)
-(* The above copyright notice and this permission notice shall be included   *)
-(* in all copies or substantial portions of the Software.                    *)
-(*                                                                           *)
-(* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR*)
-(* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,  *)
-(* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL   *)
-(* THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER*)
-(* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING   *)
-(* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER       *)
-(* DEALINGS IN THE SOFTWARE.                                                 *)
+(* Copyright (c) 2018-2025 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -81,7 +63,7 @@ module Events = Prevalidator_events
 module Classification = Prevalidator_classification
 
 (** This module encapsulates pending operations to maintain them in two
-    different data structure and avoid coslty repetitive convertions when
+    different data structure and avoid costly repetitive conversions when
     handling batches in [classify_pending_operations]. *)
 module Pending_ops = Prevalidator_pending_operations
 
@@ -90,7 +72,7 @@ module Pending_ops = Prevalidator_pending_operations
     [include] this module in {!Internal_for_tests} below and avoid
     code duplication.
 
-    The raison d'etre of these records of functions is to be able to use
+    The raison d'être of these records of functions is to be able to use
     alternative implementations of all functions in tests.
 
     The purpose of the {!Tools.tools} record is to abstract away from {!Store.chain_store}.
@@ -380,18 +362,18 @@ module Make_s
 
   type pre_filter_result = Drop | Priority of Pending_ops.priority
 
-  let pre_filter pv ~notifier parsed_op : pre_filter_result Lwt.t =
-    let open Lwt_syntax in
-    let* v =
+  let pre_filter pv ~notifier parsed_op : pre_filter_result =
+    let v =
       Prevalidation_t.pre_filter pv.validation_state pv.config parsed_op
     in
     match v with
     | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as errs
       ->
         handle_classification ~notifier pv.shell (parsed_op, errs) ;
-        let* () = Events.(emit operation_classified) parsed_op.hash in
-        return Drop
-    | `Passed_prefilter priority -> return (Priority priority)
+        Events.(emit__dont_wait__use_with_care operation_classified)
+          parsed_op.hash ;
+        Drop
+    | `Passed_prefilter priority -> Priority priority
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
@@ -423,40 +405,18 @@ module Make_s
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
         None
 
-  (* Determine the classification of a given operation in the current
-     validation state, i.e. whether it could be included in a
-     block on top of the current head, and if not, why. If yes, the
-     operation is accumulated in the given [mempool].
-
-     The function returns a tuple
-     [(validation_state, validated_operation, to_handle)],
-     where:
-     - [validation_state] is the (possibly) updated validation_state,
-     - [validated_operation] is an (operation * bool) option set to [None] if
-     the operation has not been validated. If the operation has been validated
-     the function return [Some (operation,is_advertisable)]. [is_advertisable]
-     is true if the operation must be advertise.
-     - [to_handle] contains the given operation and its classification, and all
-       operations whose classes are changed/impacted by this classification
-       (eg. in case of operation replacement).
-  *)
-  let classify_operation shell ~config ~validation_state
-      (status_and_priority : Pending_ops.status_and_priority) op :
-      (prevalidation_t
-      * (Operation_hash.t * bool) option
-      * (protocol_operation operation * Classification.classification) trace)
-      Lwt.t =
-    let open Lwt_syntax in
+  let handle_classify_operation_result shell
+      (status_and_priority : Pending_ops.status_and_priority) op classification
+      replacements :
+      (Operation_hash.t * bool) option
+      * (protocol_operation operation * Classification.classification) trace =
     let[@warning "-26"] section =
       match status_and_priority.priority with
       | High -> "classify_operation : consensus"
       | Medium -> "classify_operation : voting/anonymous"
       | Low _ -> "classify_operation : manager"
     in
-    (let* v_state, op, classification, replacements =
-       Prevalidation_t.add_operation validation_state config op
-     in
-     let to_replace =
+    (let to_replace =
        List.filter_map
          (fun (replaced_oph, new_classification) ->
            reclassify_replaced_manager_op replaced_oph shell new_classification)
@@ -502,8 +462,81 @@ module Make_s
        | `Outdated _ ->
            None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
      in
-     return (v_state, validated_operation, to_handle))
-    [@profiler.aggregate_s {verbosity = Info} section]
+     (validated_operation, to_handle))
+    [@profiler.aggregate_f {verbosity = Info} section]
+
+  (** Determine the classification of a given operation in the current
+      validation state, i.e. whether it could be included in a block on top of
+      the current head, and if not, why. If yes, the operation is accumulated in
+      the given [mempool].
+
+      The function returns a tuple [(validation_state, validated_operation,
+      to_handle)], where:
+      - [validation_state] is the (possibly) updated validation_state,
+      - [validated_operation] is an (operation * bool) option set to [None] if
+        the operation has not been validated. If the operation has been
+        validated the function return [Some (operation,is_advertisable)].
+        [is_advertisable] is true if the operation must be advertise.
+      - [to_handle] contains the given operation and its classification, and all
+        operations whose classes are changed/impacted by this classification
+        (eg. in case of operation replacement).
+  *)
+  let legacy_classify_operation shell ~config ~validation_state
+      (status_and_priority : Pending_ops.status_and_priority) op :
+      (prevalidation_t
+      * (Operation_hash.t * bool) option
+      * (protocol_operation operation * Classification.classification) list)
+      Lwt.t =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7985 *)
+    let open Lwt_syntax in
+    let* validation_state, op, classification, replacements =
+      Prevalidation_t.legacy_add_operation validation_state config op
+    in
+    let validated_operation, to_handle =
+      handle_classify_operation_result
+        shell
+        status_and_priority
+        op
+        classification
+        replacements
+    in
+    Lwt.return (validation_state, validated_operation, to_handle)
+
+  (** Determine the classification of a given operation in the current
+      validation state, i.e. whether it could be included in a block on top of
+      the current head, and if not, why. If yes, the operation is accumulated in
+      the given [mempool].
+
+      The function returns a tuple [(validation_state, validated_operation,
+      to_handle)], where:
+      - [validation_state] is the (possibly) updated validation_state,
+      - [validated_operation] is an (operation * bool) option set to [None] if
+        the operation has not been validated. If the operation has been
+        validated the function return [Some (operation,is_advertisable)].
+        [is_advertisable] is true if the operation must be advertise.
+      - [to_handle] contains the given operation and its classification, and all
+        operations whose classes are changed/impacted by this classification
+        (eg. in case of operation replacement).
+  *)
+  let new_classify_operation shell ~config ~validation_state
+      (status_and_priority : Pending_ops.status_and_priority) res :
+      prevalidation_t
+      * (Operation_hash.t * bool) option
+      * (protocol_operation operation * Classification.classification) list =
+    let validation_state, op, classification, replacements =
+      match res with
+      | Ok op -> Prevalidation_t.add_valid_operation validation_state config op
+      | Error (op, res) -> (validation_state, op, res, [])
+    in
+    let validated_operation, to_handle =
+      handle_classify_operation_result
+        shell
+        status_and_priority
+        op
+        classification
+        replacements
+    in
+    (validation_state, validated_operation, to_handle)
 
   (* Classify pending operations into either:
      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
@@ -522,7 +555,8 @@ module Make_s
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier shell config state =
+  let legacy_classify_pending_operations ~notifier shell config state =
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7985 *)
     let open Lwt_syntax in
     let* r =
       Pending_ops.fold_es
@@ -541,7 +575,7 @@ module Make_s
             (* Defined as a function to avoid an useless allocation *)
             shell.pending <- Pending_ops.remove oph shell.pending ;
             let* new_validation_state, validated_operation, to_handle =
-              classify_operation
+              legacy_classify_operation
                 shell
                 ~config
                 ~validation_state:acc_validation_state
@@ -580,6 +614,175 @@ module Make_s
         Lwt.return (state, advertisable_mempool, validated_mempool)
     | Ok (state, advertisable_mempool, validated_mempool, _) ->
         Lwt.return (state, advertisable_mempool, validated_mempool)
+
+  (** [create_batches state operations batch_size] build a list sub-batches
+      containing at most [batch_size] operations each. This step sequentially
+      pre-validate operations and return the result of this pre-validation: a
+      list of remaining checks to execute. *)
+  let create_batches state operations batch_size =
+    let open Lwt_syntax in
+    Pending_ops.fold_es
+      (fun status_and_priority oph op (validated, pending, size) ->
+        if size = batch_size then Lwt.return_error (validated, pending)
+        else
+          let* checks = Prevalidation_t.partial_op_validation state op in
+          let size = size + 1 in
+          let validated, pending =
+            let item = (status_and_priority, oph, op, checks) in
+            match checks with
+            | Ok (_, []) -> (item :: validated, pending)
+            | _ ->
+                let pending =
+                  if size mod batch_size = 0 then [item] :: pending
+                  else
+                    match pending with
+                    | hd :: tl -> (item :: hd) :: tl
+                    | [] -> [item] :: pending
+                in
+                (validated, pending)
+          in
+          Lwt.return_ok (validated, pending, size))
+      operations
+      ([], [], 0)
+
+  (** Execute the pending checks. *)
+  let process_partially_validated_op (status_and_priority, oph, op, checks) =
+    let validation =
+      Result.map_error
+        (fun classification ->
+          (op, (classification :> Classification.classification)))
+        (Prevalidation_t.handle_partially_validated checks)
+    in
+    (status_and_priority, oph, validation)
+
+  (** [update_after_operation_validation
+        shell config notifier
+        (validation_state, advertisable_mempool, validated_mempool)
+        (status_and_priority, oph, operation_validation)]
+
+      Removes the operation from the shell's pending ops and returns updated
+      [validation_state, advertisable_mempool, validated_mempool]. *)
+  let update_after_operation_validation shell config notifier
+      (validation_state, advertisable_mempool, validated_mempool)
+      (status_and_priority, oph, operation_validation) =
+    let open Lwt_syntax in
+    let* () = Events.(emit operation_classified) oph in
+    shell.pending <- Pending_ops.remove oph shell.pending ;
+    let state, validated_operation, to_handle =
+      new_classify_operation
+        shell
+        ~config
+        ~validation_state
+        status_and_priority
+        operation_validation
+    in
+    List.iter (handle_classification ~notifier shell) to_handle ;
+    let advertisable_mempool, validated_mempool =
+      match validated_operation with
+      | None -> (advertisable_mempool, validated_mempool)
+      | Some (oph, true) ->
+          ( Mempool.cons_valid oph advertisable_mempool,
+            Mempool.cons_valid oph validated_mempool )
+      | Some (oph, false) ->
+          (advertisable_mempool, Mempool.cons_valid oph validated_mempool)
+    in
+    Lwt.return (state, advertisable_mempool, validated_mempool)
+
+  (** Classify pending operations into either:
+      [Refused | Outdated | Branch_delayed | Branch_refused | Validated].
+      To ensure fairness with other worker requests, classification of
+      operations is done by batch of [operation_batch_size] operations.
+
+      This function ensures the following invariants:
+
+      - If an operation is classified, it is not part of the [pending]
+      map
+
+      - See {!type-Prevalidator_classification.t} for additional details
+      and invariants on the classifications themselves.
+
+      Moreover, this function ensures that only each newly classified
+      operations are advertised to the remote peers. However, if a peer
+      requests our mempool, we advertise all our classified operations and
+      all our pending operations. *)
+  let new_classify_pending_operations ~notifier shell config state =
+    let open Lwt_syntax in
+    let max_batch_size = shell.parameters.limits.operations_batch_size in
+    let sub_batch_size =
+      max 1 (max_batch_size / Tezos_bees.Task_worker.number_of_domains)
+    in
+    let* list_r = create_batches state shell.pending sub_batch_size in
+    let validated, pending, leftover =
+      (* If we returned with an error, it means that more elements are available
+         in the structure. *)
+      match list_r with
+      | Ok (validated, pending, _n) -> (validated, pending, false)
+      | Error (validated, pending) -> (validated, pending, true)
+    in
+    let* state, advertisable_mempool, validated_mempool =
+      Lwt_list.fold_left_s
+        (fun acc op ->
+          process_partially_validated_op op
+          |> update_after_operation_validation shell config notifier acc)
+        (state, Mempool.empty, Mempool.empty)
+        validated
+    in
+    let update_after_operation_validation =
+      update_after_operation_validation shell config notifier
+    in
+    let* (state, advertisable_mempool, validated_mempool), leftover =
+      match pending with
+      | [[op]] ->
+          process_partially_validated_op op
+          |> update_after_operation_validation
+               (state, advertisable_mempool, validated_mempool)
+          |> Lwt.map (fun states -> (states, leftover))
+      | [batch] ->
+          List.map process_partially_validated_op batch
+          |> Lwt_list.fold_left_s
+               update_after_operation_validation
+               (state, advertisable_mempool, validated_mempool)
+          |> Lwt.map (fun states -> (states, leftover))
+      | _ ->
+          (* When there is more than one sub-batch, we delegate pending checks to
+             the task_worker *)
+          let* results =
+            Lwt_eio.run_eio @@ fun () ->
+            Tezos_bees.Task_worker.launch_tasks_and_wait
+              "process_partially_validated_op"
+              (List.map process_partially_validated_op)
+              pending
+          in
+          Lwt_list.fold_left_s
+            (fun (states, leftover) -> function
+              | Ok res ->
+                  Lwt_list.fold_left_s
+                    update_after_operation_validation
+                    states
+                    res
+                  |> Lwt.map (fun states -> (states, leftover))
+              | Error _ ->
+                  (* In case of a worker error, ignore it because concerned batch
+                     will be treated in the next classify_pending_operations loop.
+                     We simply force leftover to be true. *)
+                  Lwt.return (states, true))
+            ((state, advertisable_mempool, validated_mempool), leftover)
+            results
+    in
+    let* () =
+      (* If the list has been return via Error, it means that we exited
+         before handling all of the operations *)
+      if leftover then
+        Lwt.map ignore (shell.worker.push_request Request.Leftover)
+      else Lwt.return_unit
+    in
+    Lwt.return (state, advertisable_mempool, validated_mempool)
+
+  let classify_pending_operations =
+    if Protocol.compare_version Proto.environment_version V15 < 0 then
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7985 *)
+      legacy_classify_pending_operations
+    else new_classify_pending_operations
 
   let update_advertised_mempool_fields pv_shell advertisable_mempool
       validated_mempool =
@@ -730,7 +933,7 @@ module Make_s
             ()
             [@profiler.overwrite
               Opentelemetry_profiler.add_event "parse_operation succeeded"] ;
-            let* v =
+            let v =
               pre_filter
                 pv
                 ~notifier:(mk_notifier pv.operation_stream)
@@ -779,7 +982,7 @@ module Make_s
               {driver_ids = [Opentelemetry]}
                 (Opentelemetry_profiler.add_event "parse_operation failed")] ;
             failwith
-              "Invalid operation %a: %a."
+              "Invalid operation %a: %a"
               Operation_hash.pp
               oph
               Error_monad.pp_print_trace
@@ -816,7 +1019,7 @@ module Make_s
             else
               let notifier = mk_notifier pv.operation_stream in
               let*! validation_state, validated_operation, to_handle =
-                classify_operation
+                legacy_classify_operation
                   pv.shell
                   ~config:pv.config
                   ~validation_state:pv.validation_state
@@ -939,14 +1142,14 @@ module Make_s
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun oph op (pending, nb_pending) ->
-            (let*! v =
+            (let v =
                pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
              in
              match v with
              | Drop -> Lwt.return (pending, nb_pending)
              | Priority ((High | Medium | Low _) as priority) ->
                  (* Here, an operation injected in this node with High priority will
-                    now get its approriate priority. *)
+                    now get its appropriate priority. *)
                  let status =
                    (* If the operation has not yet been classified we set its
                       status to Fresh *)
@@ -1591,6 +1794,15 @@ module Make
         Prevalidation_t.create chain_store ~head ~timestamp
       in
       let fetching = mempool.known_valid in
+      let* () =
+        (* We clear the shared mempool datatype to ensure that at protocol
+           change, every signature operation is checked at block validation
+           time. *)
+        Store.Chain.set_mempool
+          chain_store
+          ~head:(Store.Block.hash head)
+          Mempool.empty
+      in
       let classification_parameters =
         Classification.
           {

@@ -815,8 +815,11 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
       field
 
 let measure ?(repeat = 1) ?(tags = []) ?field measurement f =
-  let _data_points = measure_data_points ~repeat ~tags ?field measurement f in
-  ()
+  if !config.influxdb = None then
+    Log.info ~color:Log.Color.FG.green "MEASURE: %s: %f" measurement (f ())
+  else
+    let _data_points = measure_data_points ~repeat ~tags ?field measurement f in
+    ()
 
 let time ?repeat ?tags measurement f =
   measure ?repeat ?tags measurement (fun () ->

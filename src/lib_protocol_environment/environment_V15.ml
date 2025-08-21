@@ -79,15 +79,15 @@ module type T = sig
        and type P256.Public_key.t = Tezos_crypto.Signature.P256.Public_key.t
        and type P256.t = Tezos_crypto.Signature.P256.t
        and type Bls.Public_key_hash.t =
-        Tezos_crypto.Signature.Bls_aug.Public_key_hash.t
-       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls_aug.Public_key.t
-       and type Bls.t = Tezos_crypto.Signature.Bls_aug.t
+        Tezos_crypto.Signature.Bls.Public_key_hash.t
+       and type Bls.Public_key.t = Tezos_crypto.Signature.Bls.Public_key.t
+       and type Bls.t = Tezos_crypto.Signature.Bls.t
        and type Signature.public_key_hash =
-        Tezos_crypto.Signature.V1.public_key_hash
-       and type Signature.public_key = Tezos_crypto.Signature.V1.public_key
-       and type Signature.signature = Tezos_crypto.Signature.V1.signature
-       and type Signature.t = Tezos_crypto.Signature.V1.t
-       and type Signature.watermark = Tezos_crypto.Signature.V1.watermark
+        Tezos_crypto.Signature.V2.public_key_hash
+       and type Signature.public_key = Tezos_crypto.Signature.V2.public_key
+       and type Signature.signature = Tezos_crypto.Signature.V2.signature
+       and type Signature.t = Tezos_crypto.Signature.V2.t
+       and type Signature.watermark = Tezos_crypto.Signature.V2.watermark
        and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
@@ -335,10 +335,12 @@ struct
   module Ed25519 = Tezos_crypto.Signature.Ed25519
   module Secp256k1 = Tezos_crypto.Signature.Secp256k1
   module P256 = Tezos_crypto.Signature.P256
-  module Bls = Tezos_crypto.Signature.Bls_aug
+  module Bls = Tezos_crypto.Signature.Bls
 
   module Signature = struct
-    include Tezos_crypto.Signature.V1
+    include Tezos_crypto.Signature.V2
+
+    let pop_verify pk proof = Bls.pop_verify pk proof
 
     let check ?watermark pk s bytes =
       (check
@@ -347,7 +349,7 @@ struct
          s
          bytes
        [@profiler.span_f
-         {verbosity = Debug}
+         {verbosity = Notice}
            [
              (match (pk : public_key) with
              | Ed25519 _ -> "check_signature_ed25519"
@@ -527,7 +529,16 @@ struct
       val aggregate_check :
         (Public_key.t * watermark option * bytes) list -> t -> bool
 
-      val aggregate_signature_opt : t list -> t option
+      val aggregate_signature_opt : ?subgroup_check:bool -> t list -> t option
+
+      val aggregate_signature_weighted_opt :
+        ?subgroup_check:bool -> (Z.t * t) list -> t option
+
+      val aggregate_public_key_opt :
+        ?subgroup_check:bool -> Public_key.t list -> Public_key.t option
+
+      val aggregate_public_key_weighted_opt :
+        ?subgroup_check:bool -> (Z.t * Public_key.t) list -> Public_key.t option
     end
 
     module type SPLIT_SIGNATURE = sig
@@ -1161,7 +1172,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V13.T
+      Environment_protocol_T_V15.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
@@ -1377,22 +1388,38 @@ struct
         | Validation_error of Error_monad.shell_tztrace
         | Add_conflict of operation_conflict
 
+      let convert_error = function
+        | Mempool.Validation_error e -> Validation_error (wrap_tztrace e)
+        | Mempool.Add_conflict c -> Add_conflict c
+
+      let partial_op_validation ?check_signature validation_info op =
+        let open Lwt_syntax in
+        let* operation_validation =
+          Mempool.partial_op_validation ?check_signature validation_info op
+        in
+        match operation_validation with
+        | Ok checks ->
+            List.map
+              (fun check () -> check () |> Result.map_error wrap_tztrace)
+              checks
+            |> Lwt.return_ok
+        | Error e -> Lwt.return_error (wrap_tztrace e)
+
+      let add_valid_operation ?conflict_handler mempool op =
+        Result.map_error
+          convert_error
+          (Mempool.add_valid_operation ?conflict_handler mempool op)
+
       let add_operation ?check_signature ?conflict_handler info mempool op :
           (t * add_result, add_error) result Lwt.t =
-        let open Lwt_syntax in
-        let+ r =
-          Mempool.add_operation
-            ?check_signature
-            ?conflict_handler
-            info
-            mempool
-            op
-        in
-        match r with
-        | Ok v -> Ok v
-        | Error (Mempool.Validation_error e) ->
-            Error (Validation_error (wrap_tztrace e))
-        | Error (Mempool.Add_conflict c) -> Error (Add_conflict c)
+        Lwt_result.map_error
+          convert_error
+          (Mempool.add_operation
+             ?check_signature
+             ?conflict_handler
+             info
+             mempool
+             op)
 
       let init ctxt chain_id ~head_hash ~head ~cache =
         let open Lwt_result_syntax in
@@ -1589,9 +1616,6 @@ struct
       | Ok () -> Ok true
 
     let share_is_trap delegate share ~traps_fraction =
-      let delegate =
-        Tezos_crypto.Signature.V_latest.Of_V1.public_key_hash delegate
-      in
       match
         Tezos_crypto_dal.Trap.share_is_trap delegate share ~traps_fraction
       with
@@ -1609,5 +1633,71 @@ struct
 
     module Merkelized_payload_hashes_hash =
       Tezos_crypto.Hashed.Smart_rollup_merkelized_payload_hashes_hash
+  end
+
+  module Riscv = struct
+    module Backend = Octez_riscv_pvm.Backend
+    module Storage = Octez_riscv_pvm.Storage
+
+    type state = Backend.state
+
+    type proof = Backend.proof
+
+    type output_info = Backend.output_info = {
+      message_index : Z.t;
+      outbox_level : Bounded.Non_negative_int32.t;
+    }
+
+    type output = Backend.output = {
+      info : output_info;
+      encoded_message : string;
+    }
+
+    type output_proof = Backend.output_proof
+
+    type hash = Backend.hash
+
+    type input = Backend.input =
+      | Inbox_message of int32 * int64 * string
+      | Reveal of string
+
+    type input_request = Backend.input_request =
+      | No_input_required
+      | Initial
+      | First_after of int32 * int64
+      | Needs_reveal of string
+
+    let state_hash state = Backend.state_hash state
+
+    let empty_state () = Storage.empty ()
+
+    let proof_start_state proof = Backend.proof_start_state proof
+
+    let proof_stop_state proof = Backend.proof_stop_state proof
+
+    let proof_to_bytes proof = Backend.serialise_proof proof
+
+    let bytes_to_proof bytes = Backend.deserialise_proof bytes
+
+    let install_boot_sector state boot_sector =
+      Backend.install_boot_sector state boot_sector
+
+    let verify_proof input proof = Backend.verify_proof input proof
+
+    let output_info_of_output_proof output_proof =
+      Backend.output_info_of_output_proof output_proof
+
+    let state_of_output_proof output_proof =
+      Backend.state_of_output_proof output_proof
+
+    let verify_output_proof output_proof =
+      Backend.verify_output_proof output_proof
+
+    let output_proof_to_bytes output_proof =
+      Backend.serialise_output_proof output_proof
+
+    let bytes_to_output_proof bytes = Backend.deserialise_output_proof bytes
+
+    let get_current_level state = Backend.get_current_level state
   end
 end

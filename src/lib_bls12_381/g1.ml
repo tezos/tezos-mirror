@@ -91,6 +91,13 @@ module Stubs = struct
   external set_affine_coordinates : affine -> Fq.t -> Fq.t -> int
     = "caml_blst_p1_set_coordinates_stubs"
 
+  external affine_array_of_compressed_bytes :
+    affine_array -> Bytes.t array -> int -> bool -> int
+    = "caml_blst_p1_affine_array_of_compressed_bytes_stubs"
+
+  external affine_add_bulk : jacobian -> affine_array -> int -> int
+    = "caml_blst_p1s_add_stubs"
+
   external pippenger :
     jacobian ->
     jacobian array ->
@@ -120,8 +127,6 @@ module G1 = struct
 
   type affine_array = Stubs.affine_array * int
 
-  let global_buffer = Stubs.allocate_g1 ()
-
   let size_in_bytes = 96
 
   let compressed_size_in_bytes = 48
@@ -149,6 +154,18 @@ module G1 = struct
         let p = Stubs.allocate_g1 () in
         ignore @@ Stubs.continuous_array_get p l i ;
         p)
+
+  let affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes =
+    let npoints = Array.length points_in_bytes in
+    let buffer = Stubs.allocate_g1_affine_contiguous_array npoints in
+    let res =
+      Stubs.affine_array_of_compressed_bytes
+        buffer
+        points_in_bytes
+        npoints
+        subgroup_check
+    in
+    if res = 0 then Some (buffer, npoints) else None
 
   let size_of_affine_array (_, n) = n
 
@@ -230,13 +247,16 @@ module G1 = struct
     ignore @@ Stubs.dadd buffer x y ;
     buffer
 
-  let add_inplace x y =
-    ignore @@ Stubs.dadd global_buffer x y ;
-    memcpy x global_buffer
+  let add_inplace res x y = ignore @@ Stubs.dadd res x y
 
   let add_bulk xs =
     let buffer = Stubs.allocate_g1 () in
     List.iter (fun x -> ignore @@ Stubs.dadd buffer buffer x) xs ;
+    buffer
+
+  let affine_add_bulk (affine_points, npoints) =
+    let buffer = Stubs.allocate_g1 () in
+    ignore @@ Stubs.affine_add_bulk buffer affine_points npoints ;
     buffer
 
   let double x =
@@ -250,14 +270,8 @@ module G1 = struct
     ignore @@ Stubs.mult buffer g bytes (Unsigned.Size_t.of_int (32 * 8)) ;
     buffer
 
-  let mul_inplace g n =
-    ignore
-    @@ Stubs.mult
-         global_buffer
-         g
-         (Fr.to_bytes n)
-         (Unsigned.Size_t.of_int (32 * 8)) ;
-    memcpy g global_buffer
+  let mul_inplace res g n =
+    ignore @@ Stubs.mult res g (Fr.to_bytes n) (Unsigned.Size_t.of_int (32 * 8))
 
   let b = Fq.(one + one + one + one)
 
@@ -345,8 +359,9 @@ module G1 = struct
     if start < 0 || len < 1 || start + len > n then
       raise @@ Invalid_argument (Format.sprintf "start %i len %i" start len) ;
     (if len = 1 then (
-       ignore @@ Stubs.continuous_array_get buffer ps start ;
-       mul_inplace buffer ss.(start))
+       let tmp = Stubs.allocate_g1 () in
+       ignore @@ Stubs.continuous_array_get tmp ps start ;
+       mul_inplace buffer tmp ss.(start))
      else
        let res =
          Stubs.pippenger_with_affine_array
@@ -358,6 +373,27 @@ module G1 = struct
        in
        assert (res = 0)) ;
     buffer
+
+  let pippenger_with_compressed_bytes_array_opt ~subgroup_check points_in_bytes
+      scalars =
+    let affine_points =
+      affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes
+    in
+    Option.map
+      (fun affine_points ->
+        let res = pippenger_with_affine_array affine_points scalars in
+        to_compressed_bytes res)
+      affine_points
+
+  let add_bulk_with_compressed_bytes_array_opt ~subgroup_check points_in_bytes =
+    let affine_points =
+      affine_array_of_compressed_bytes_opt ~subgroup_check points_in_bytes
+    in
+    Option.map
+      (fun affine_points ->
+        let res = affine_add_bulk affine_points in
+        to_compressed_bytes res)
+      affine_points
 end
 
 include G1

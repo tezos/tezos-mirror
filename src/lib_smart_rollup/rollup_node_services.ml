@@ -241,6 +241,9 @@ module Encodings = struct
       (opt "first_published_at_level" int32)
       (opt "published_at_level" int32)
 
+  let lcc =
+    obj2 (req "commitment_hash" Commitment.Hash.encoding) (req "level" int32)
+
   let outbox =
     obj2
       (req "outbox_level" int32)
@@ -250,6 +253,10 @@ module Encodings = struct
             (obj2
                (req "message_index" int31)
                (opt "message" Outbox_message.summary_encoding))))
+
+  let outbox_msg_status : [`Executable | `Lost | `Pending] t =
+    string_enum
+      [("executable", `Executable); ("pending", `Pending); ("lost", `Lost)]
 
   let queued_message = L2_message.encoding
 
@@ -910,6 +917,26 @@ module Query = struct
     |+ field "drop_duplicate" Tezos_rpc.Arg.bool false (fun q ->
            q#drop_duplicate)
     |> seal
+
+  let outbox_level_query =
+    let open Tezos_rpc.Query in
+    query (fun l -> l)
+    |+ opt_field "outbox_level" Tezos_rpc.Arg.int32 (fun k -> k)
+    |> seal
+
+  let outbox_query : bool Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun b -> b)
+    |+ field "outbox" Tezos_rpc.Arg.bool false (fun b -> b)
+    |> seal
+
+  type key_query = {key : string}
+
+  let key_query : key_query Tezos_rpc.Query.t =
+    let open Tezos_rpc.Query in
+    query (fun key -> {key})
+    |+ field "key" Tezos_rpc.Arg.string "" (fun t -> t.key)
+    |> seal
 end
 
 module type PREFIX = sig
@@ -970,12 +997,110 @@ module Global = struct
       ~output:(Data_encoding.option Encodings.commitment_with_hash)
       (path / "last_stored_commitment")
 
+  let last_cemented_commitment =
+    Tezos_rpc.Service.get_service
+      ~description:"Last commitment computed by the node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:(Data_encoding.option Encodings.commitment_with_hash)
+      (path / "last_cemented_commitment")
+
   let global_block_watcher =
     Tezos_rpc.Service.get_service
       ~description:"Monitor and streaming the L2 blocks"
       ~query:Tezos_rpc.Query.empty
       ~output:Sc_rollup_block.encoding
       (path / "monitor_blocks")
+end
+
+module Block = struct
+  open Tezos_rpc.Path
+
+  include Make_services (struct
+    type prefix = unit * Arg.block_id
+
+    let prefix = open_root / "global" / "block" /: Arg.block_id
+  end)
+
+  let block =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Layer-2 block of the layer-2 chain with respect to a Layer 1 block \
+         identifier"
+      ~query:Query.outbox_query
+      ~output:Sc_rollup_block.full_encoding
+      path
+
+  let hash =
+    Tezos_rpc.Service.get_service
+      ~description:"Tezos block hash of block known to the smart rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Block_hash.encoding
+      (path / "hash")
+
+  let level =
+    Tezos_rpc.Service.get_service
+      ~description:"Level of Tezos block known to the smart rollup node"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.int32
+      (path / "level")
+
+  let inbox =
+    Tezos_rpc.Service.get_service
+      ~description:"Rollup inbox for block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Inbox.encoding
+      (path / "inbox")
+
+  let ticks =
+    Tezos_rpc.Service.get_service
+      ~description:"Number of ticks for specified level"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.z
+      (path / "ticks")
+
+  let total_ticks =
+    Tezos_rpc.Service.get_service
+      ~description:"Total number of ticks at specified block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.n
+      (path / "total_ticks")
+
+  let num_messages =
+    Tezos_rpc.Service.get_service
+      ~description:"Number of messages for specified block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.z
+      (path / "num_messages")
+
+  let state_hash =
+    Tezos_rpc.Service.get_service
+      ~description:"State hash for this block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:State_hash.encoding
+      (path / "state_hash")
+
+  let state_current_level =
+    Tezos_rpc.Service.get_service
+      ~description:"Retrieve the current level of a PVM"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Data_encoding.(option int32)
+      (path / "state_current_level")
+
+  let state_value =
+    Tezos_rpc.Service.get_service
+      ~description:"Retrieve value from key is PVM state of specified block"
+      ~query:Query.key_query
+      ~output:Data_encoding.bytes
+      (path / "state")
+
+  let committed_status =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Commitment status of the rollup state which will include content of \
+         this block"
+      ~query:Tezos_rpc.Query.empty
+      ~output:Encodings.committed_status
+      (path / "committed_status")
 end
 
 module Local = struct
@@ -1013,17 +1138,31 @@ module Local = struct
         (Data_encoding.option Encodings.commitment_with_hash_and_level_infos)
       (path / "commitments" /: Arg.commitment_hash)
 
+  let outbox_pending =
+    Tezos_rpc.Service.get_service
+      ~description:
+        "Pending outbox messages with their status (executable, pending, or \
+         lost)"
+      ~query:Query.outbox_level_query
+      ~output:
+        Data_encoding.(
+          list
+            (merge_objs
+               Encodings.outbox
+               (obj1 (req "status" Encodings.outbox_msg_status))))
+      (path / "outbox" / "pending")
+
   let outbox_pending_executable =
     Tezos_rpc.Service.get_service
       ~description:"Pending outbox messages which can be executed"
-      ~query:Tezos_rpc.Query.empty
+      ~query:Query.outbox_level_query
       ~output:(Data_encoding.list Encodings.outbox)
       (path / "outbox" / "pending" / "executable")
 
   let outbox_pending_unexecutable =
     Tezos_rpc.Service.get_service
       ~description:"Pending outbox messages which cannot yet be executed"
-      ~query:Tezos_rpc.Query.empty
+      ~query:Query.outbox_level_query
       ~output:(Data_encoding.list Encodings.outbox)
       (path / "outbox" / "pending" / "unexecutable")
 

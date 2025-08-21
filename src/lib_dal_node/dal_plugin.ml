@@ -42,10 +42,12 @@ module type T = sig
 
   type attestation_operation
 
+  type tb_slot
+
   val block_info :
     ?chain:Tezos_shell_services.Block_services.chain ->
     ?block:Tezos_shell_services.Block_services.block ->
-    metadata:[`Always | `Never] ->
+    operations_metadata:[`Always | `Never] ->
     Tezos_rpc.Context.generic ->
     block_info tzresult Lwt.t
 
@@ -56,16 +58,20 @@ module type T = sig
     Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t
 
   val get_published_slot_headers :
-    block_info ->
-    (slot_header * operation_application_result) list tzresult Lwt.t
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    slot_header list tzresult Lwt.t
 
   val get_attestations :
-    block_info ->
-    (int
+    block_level:int32 ->
+    Tezos_rpc__RPC_context.generic ->
+    (tb_slot
     * Signature.public_key_hash option
     * attestation_operation
     * dal_attestation option)
     list
+    tzresult
+    Lwt.t
 
   val get_committee :
     Tezos_rpc.Context.generic ->
@@ -89,6 +95,7 @@ module type T = sig
     slot_index:slot_index ->
     shard:Cryptobox.shard ->
     proof:Cryptobox.shard_proof ->
+    tb_slot:tb_slot ->
     unit tzresult Lwt.t
 
   val is_delegate :
@@ -114,12 +121,14 @@ module type T = sig
     val cell_hash : cell -> hash
 
     val cells_of_level :
-      block_info ->
+      attested_level:int32 ->
       Tezos_rpc.Context.generic ->
       dal_constants:Tezos_dal_node_services.Types.proto_parameters ->
       pred_publication_level_dal_constants:
         Tezos_dal_node_services.Types.proto_parameters tzresult Lwt.t Lazy.t ->
-      (hash * cell) list tzresult Lwt.t
+      (hash * cell * slot_index) list tzresult Lwt.t
+
+    val slot_header_of_cell : cell -> slot_header option
   end
 
   module RPC : sig

@@ -33,6 +33,15 @@ val load :
   Configuration.t ->
   t tzresult Lwt.t
 
+(** [read_chain_family chain_id] returns the chain_family associated to the
+    chain_id passed on parameter. *)
+val read_chain_family :
+  t -> L2_types.chain_id -> L2_types.ex_chain_family tzresult Lwt.t
+
+(** [read_enable_multichain_flag] reads the value of the `enable_multichain`
+    feature_flag that enables multichain and tezos compatibility on the l2_node. *)
+val read_enable_multichain_flag : t -> bool tzresult Lwt.t
+
 (** [preload_known_kernels ctxt] uses [ctxt] to preload every kernel known to
     the node in the Fast Execution kernel cache. *)
 val preload_known_kernels : t -> unit tzresult Lwt.t
@@ -50,14 +59,24 @@ val ro_backend :
   Configuration.t ->
   (module Services_backend_sig.S)
 
+type replay_result =
+  | Replay_success of {
+      block : Ethereum_types.legacy_transaction_object L2_types.block;
+      evm_state : Evm_state.t;
+      diverged : bool;
+      process_time : Ptime.span;
+      execution_gas : Ethereum_types.quantity;
+    }
+  | Replay_failure
+
 val replay :
   t ->
   ?log_file:string ->
-  ?profile:bool ->
+  ?profile:Configuration.profile_mode ->
   ?alter_evm_state:
     (Irmin_context.tree -> (Irmin_context.tree, tztrace) result Lwt.t) ->
   Ethereum_types.quantity ->
-  (Evm_state.apply_result, tztrace) result Lwt.t
+  replay_result tzresult Lwt.t
 
 val evm_services_methods :
   t -> Configuration.time_between_blocks -> Rpc_server.evm_services_methods

@@ -24,9 +24,9 @@ val with_timing_f_e :
     error monad returns an error. *)
 val unwrap_error_monad : (unit -> 'a tzresult Lwt.t) -> 'a Lwt.t
 
-(** [normalize_addr addr] normalized an L2 address [addr],
-    i.e. lowercase it and remove prefix "0x". *)
-val normalize_addr : string -> string
+(** [normalize_hex str] normalized an hexa-encoded string, i.e. lowercase it
+    and remove prefix "0x" if it exists. *)
+val normalize_hex : string -> Hex.t tzresult
 
 (** [interpolate str vars] computes a new string when the variables specified
     in [vars] are replaced by their value.
@@ -34,7 +34,7 @@ val normalize_addr : string -> string
     We use a format similar to [printf], that is [%<c>] where [<c>] is a
     character. [vars] is therefore a list of pair containing a character (the
     variable) and a string (its value). *)
-val interpolate : string -> (char * string) list -> string
-
-val download_file :
-  keep_alive:bool -> working_dir:string -> string -> string tzresult Lwt.t
+val interpolate :
+  string ->
+  (char * [`Available of string | `Disabled of string]) list ->
+  string tzresult

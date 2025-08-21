@@ -325,7 +325,7 @@ module Maintenance = struct
     Test.register
       ~__FILE__
       ~title:"p2p-maintenance-init-expected_connections"
-      ~tags:[team; "p2p"; "node"; "maintenance"; Tag.memory_4k]
+      ~tags:[team; "p2p"; "node"; "maintenance"]
     @@ fun () ->
     (* Connections values evaluated from --connections option. *)
     let min_connections = expected_connections / 2 in
@@ -591,7 +591,7 @@ module Swap = struct
     Test.register
       ~__FILE__
       ~title:"p2p-swap-disable"
-      ~tags:[team; "p2p"; "node"; "swap"; Tag.memory_4k]
+      ~tags:[team; "p2p"; "node"; "swap"]
       ~uses_client:false
       ~uses_admin_client:false
     @@ fun () ->
@@ -991,6 +991,16 @@ let trusted_ring () =
   in
   unit
 
+let check_connected_points expected node =
+  let* points = Node.RPC.(call node @@ get_network_points) in
+  let connected_points = List.filter point_is_running points in
+  Check.(
+    (List.length connected_points = expected)
+      int
+      ~__LOC__
+      ~error_msg:"Expected %R connected points, got %L") ;
+  unit
+
 (* This test sets up a clique between a set of [M] nodes [N_1;
    ...; N_M].
 
@@ -1020,6 +1030,7 @@ let expected_peer_id () =
   let nodes = Cluster.create num_nodes [] in
   Cluster.clique nodes ;
   let* () = Cluster.start ~wait_connections:true nodes in
+  let* () = Lwt_list.iter_s (check_connected_points (num_nodes - 1)) nodes in
   let point_id_of_node node =
     let addr, port = Node.point node in
     sf "%s:%d" addr port
@@ -1071,15 +1082,9 @@ let expected_peer_id () =
         ~error_msg:
           ("Expected the expected_peer_id of neighbor of " ^ Node.name node
          ^ " to be %R, got %L")) ;
-    let* points = Node.RPC.(call node @@ get_network_points) in
-    let connected_points = List.filter point_is_running points in
-    Check.(
-      (List.length connected_points = num_nodes - 1)
-        int
-        ~__LOC__
-        ~error_msg:"Expected %R connected points, got %L") ;
-    unit
+    check_connected_points (num_nodes - 1) node
   in
+
   Log.info "Set wrong [expected_peer_id]" ;
   (* For all nodes [node], we set [expected_peer_id] on its
      connection to its neighbor [next(node)] to the peer id of
@@ -1126,15 +1131,8 @@ let expected_peer_id () =
   (* Each node should now have two connected peers less *)
   let* () =
     iter_p nodes @@ fun node ->
-    let* points = Node.RPC.(call node @@ get_network_points) in
-    let connected_points = List.filter point_is_running points in
     (* We lost two connections *)
-    Check.(
-      (List.length connected_points = num_nodes - 3)
-        int
-        ~__LOC__
-        ~error_msg:"Expected %R connected points, got %L") ;
-    unit
+    check_connected_points (num_nodes - 3) node
   in
   unit
 
@@ -1275,7 +1273,7 @@ module P2p_stat = struct
     Test.register
       ~__FILE__
       ~title:"Test [octez-admin-client p2p stat]"
-      ~tags:[team; "p2p"; "connections"; "p2p_stat"; Tag.memory_3k]
+      ~tags:[team; "p2p"; "connections"; "p2p_stat"]
     @@ fun () ->
     let num_nodes = 5 in
     Log.info "Start a clique of %d nodes" num_nodes ;

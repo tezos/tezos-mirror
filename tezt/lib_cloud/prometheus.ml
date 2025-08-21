@@ -67,6 +67,18 @@ let get_name (t : t) = t.name
 
 let get_port (t : t) = t.port
 
+let get_query_endpoint ~query =
+  if Env.prometheus then
+    Some
+      (Uri.make
+         ~scheme:"http"
+         ~host:"localhost"
+         ~port:Env.prometheus_port
+         ~path:"/api/v1/query"
+         ~query:[("query", [query])]
+         ())
+  else None
+
 let netdata_source_of_agents agents =
   let name = "netdata" in
   let metrics_path = "/api/v1/allmetrics?format=prometheus&help=yes" in
@@ -95,7 +107,8 @@ let tezt_source =
       [
         {
           address = "localhost";
-          port = (if Env.mode = `Orchestrator then 80 else 8080);
+          port =
+            (if Env.mode = `Remote_orchestrator_local_agents then 80 else 8080);
           app_name = "tezt";
         };
       ];
@@ -211,11 +224,35 @@ let add_job (t : t) ?(metrics_path = "/metrics") ~name targets =
     write_configuration_file t ;
     reload t)
 
-let update_groups t (group : group) =
-  match Hashtbl.find_opt t.groups group.name with
-  | None -> Hashtbl.replace t.groups group.name group
-  | Some _group' ->
-      Test.fail "There is already a group registered with that name"
+let default_group_name = "tezt"
+
+let add_group groups {name; interval; rules} =
+  match Hashtbl.find_opt groups name with
+  | None -> Hashtbl.add groups name {name; interval; rules}
+  | Some group ->
+      let min_of left right =
+        match (left, right) with
+        | None, right -> right
+        | left, None -> left
+        | Some left, Some right ->
+            if Duration.(compare (of_string left) (of_string right)) > 0 then
+              Some right
+            else Some left
+      in
+      Hashtbl.replace
+        groups
+        name
+        {
+          name;
+          interval = min_of interval group.interval;
+          rules = List.sort_uniq compare (group.rules @ rules);
+        }
+
+let add_rule groups (alert : alert) =
+  let interval = alert.interval in
+  let group_name = Option.value ~default:default_group_name alert.group_name in
+  let group = {name = group_name; interval; rules = [Alert alert]} in
+  add_group groups group
 
 let make_alert ?for_ ?description ?summary ?severity ?group_name ?interval ~name
     ~expr () =
@@ -229,46 +266,20 @@ let rule_of_record x = Record x
 
 let name_of_alert ({name; _} : alert) = name
 
-let default_group_name = "tezt"
-
 let register_rules ?(group_name = default_group_name) ?interval rules t =
   let group = {name = group_name; interval; rules} in
-  update_groups t group ;
+  add_group t.groups group ;
   write_rules_file t ;
   reload t
 
 let start ~alerts agents =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
-  let dir = Filename.get_temp_dir_name () // "prometheus" in
+  let dir = Path.tmp_dir // "prometheus" in
   (* Group alerts by group name. *)
   let groups =
     let groups = Hashtbl.create 10 in
-    let add_rule alert =
-      let name = Option.value ~default:default_group_name alert.group_name in
-      let interval = alert.interval in
-      match Hashtbl.find_opt groups name with
-      | None -> Hashtbl.add groups name {name; interval; rules = [Alert alert]}
-      | Some group ->
-          let min_of left right =
-            match (left, right) with
-            | None, right -> right
-            | left, None -> left
-            | Some left, Some right ->
-                if Duration.(compare (of_string left) (of_string right)) > 0
-                then Some right
-                else Some left
-          in
-          Hashtbl.replace
-            groups
-            name
-            {
-              name;
-              interval = min_of interval group.interval;
-              rules = Alert alert :: group.rules;
-            }
-    in
-    List.iter add_rule alerts ;
+    List.iter (add_rule groups) alerts ;
     groups
   in
   let jobs =
@@ -367,9 +378,7 @@ let export_snapshot {snapshot_filename; name; port; _} =
   let json = JSON.parse ~origin:"Prometheus.export" stdout in
   let snapshot_name = JSON.(json |-> "data" |-> "name" |> as_string) in
   let destination =
-    Option.value
-      ~default:(Filename.get_temp_dir_name () // snapshot_name)
-      snapshot_filename
+    Option.value ~default:(Path.tmp_dir // snapshot_name) snapshot_filename
   in
   let* () =
     Docker.cp

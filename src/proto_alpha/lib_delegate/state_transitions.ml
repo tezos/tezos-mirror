@@ -442,7 +442,7 @@ let rec handle_proposal ~is_proposal_applied state (new_proposal : proposal) =
           elected_block = None;
           delegate_slots;
           next_level_delegate_slots;
-          next_level_proposed_round = None;
+          next_level_latest_forge_request = None;
           dal_attestable_slots;
           next_level_dal_attestable_slots;
         }
@@ -554,9 +554,14 @@ let prepare_block_to_bake ~attestations ?last_proposal
           Operation_pool.level = predecessor.shell.level;
           round = predecessor.round;
           payload_hash = predecessor.payload_hash;
+          branch = predecessor.grandparent;
         }
       in
+      let aggregate_attestation_feature_flag =
+        state.global_state.constants.parametric.aggregate_attestation
+      in
       (Operation_pool.filter_with_relevant_consensus_ops
+         ~aggregate_attestation_feature_flag
          ~attestation_filter
          ~preattestation_filter:None
          current_mempool.consensus
@@ -655,6 +660,7 @@ let propose_block_action state delegate round ~last_proposal =
             Operation_pool.level = proposal.predecessor.shell.level;
             round = proposal.predecessor.round;
             payload_hash = proposal.predecessor.payload_hash;
+            branch = proposal.predecessor.grandparent;
           }
         in
         let preattestation_filter =
@@ -663,10 +669,15 @@ let propose_block_action state delegate round ~last_proposal =
               Operation_pool.level = prequorum.level;
               round = prequorum.round;
               payload_hash = prequorum.block_payload_hash;
+              branch = proposal.predecessor.shell.predecessor;
             }
+        in
+        let aggregate_attestation_feature_flag =
+          state.global_state.constants.parametric.aggregate_attestation
         in
         Operation_pool.(
           filter_with_relevant_consensus_ops
+            ~aggregate_attestation_feature_flag
             ~attestation_filter
             ~preattestation_filter
             all_consensus_operations
@@ -772,7 +783,7 @@ let time_to_prepare_next_level_block state at_round =
   | Some elected_block, Some {delegate; _} ->
       let attestations = elected_block.attestation_qc in
       let new_level_state =
-        {state.level_state with next_level_proposed_round = Some at_round}
+        {state.level_state with next_level_latest_forge_request = Some at_round}
       in
       let new_state = {state with level_state = new_level_state} in
       let* action =

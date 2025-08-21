@@ -38,7 +38,8 @@ module Name = struct
 end
 
 module Worker =
-  Worker.MakeSingle (Name) (Evm_events_follower_types.Request) (Types)
+  Octez_telemetry.Worker.MakeSingle (Name) (Evm_events_follower_types.Request)
+    (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
@@ -170,8 +171,14 @@ let fetch_events =
               (* 404, Rollup node is too old to support fetching all at
                  once. Always fallback in the future. *)
               always_fallback := true
+          | RPC_client_errors.Request_failed
+              {error = Unauthorized_uri | Forbidden; _}
+            :: _ ->
+              (* Rollup node forbids this RPC due to ACL. Always fallback in the
+                 future. *)
+              always_fallback := true
           | _ -> ()) ;
-          let*! () = Evm_events_follower_events.fallback () in
+          let*! () = Evm_events_follower_events.fallback e in
           fetch_events_one_by_one state rollup_block_lvl
 
 let apply_events state rollup_block_lvl =
@@ -208,7 +215,7 @@ let new_rollup_block worker rollup_level =
   in
   (* add request for fetching evm events for rollup node block going
      from [from] to [to_] inclusive. *)
-  let[@tailrec] rec aux ~from ~to_ =
+  let rec aux ~from ~to_ =
     if from > to_ then
       failwith
         "Internal error: The catchup of evm_event went too far, it should be \
@@ -218,7 +225,7 @@ let new_rollup_block worker rollup_level =
     else
       let* () = add_request from in
       if from = to_ then (* we are catching up *) return_unit
-      else aux ~from:(Int32.succ from) ~to_
+      else (aux [@tailcall]) ~from:(Int32.succ from) ~to_
   in
   match state.last_l1_level with
   | Some last_l1_level
@@ -359,3 +366,13 @@ let worker_add_request ~request =
 
 let new_rollup_block rollup_level =
   worker_add_request ~request:(New_rollup_node_block rollup_level)
+
+let status () =
+  let open Result_syntax in
+  let+ worker = Lazy.force worker in
+  Worker.status worker
+
+let available () =
+  match status () with
+  | Error _ | Ok (Closed _ | Closing _) -> false
+  | Ok (Launching _) | Ok (Running _) -> true

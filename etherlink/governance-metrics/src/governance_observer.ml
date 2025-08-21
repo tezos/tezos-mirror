@@ -237,20 +237,18 @@ let argv () = Array.to_list Sys.argv |> List.tl |> Stdlib.Option.get
 let parse_options () =
   let open Lwt_result_syntax in
   let args = argv () in
-  let _ =
+  ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short)
-  in
-  let _ =
+        Short) ;
+  ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stderr)
         Format.err_formatter
-        (if Unix.isatty Unix.stderr then Ansi else Plain)
-        Short)
-  in
+        Short) ;
   let commands =
     Tezos_clic.add_manual
       ~executable_name
@@ -291,4 +289,8 @@ let handle_error = function
         errs ;
       Stdlib.exit 1
 
-let () = Tezos_base_unix.Event_loop.main_run (parse_options ()) |> handle_error
+let () =
+  Tezos_base_unix.Event_loop.main_run
+    ~process_name:"etherlink parse options"
+    parse_options
+  |> handle_error

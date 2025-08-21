@@ -163,6 +163,22 @@ module Handler = struct
       ~msg:"found public key for hash {hash} (name: {name})"
       ("hash", Tezos_crypto.Signature.Public_key_hash.encoding)
       ("name", Data_encoding.string)
+
+  let request_for_known_keys =
+    declare_0
+      ~section
+      ~level
+      ~name:"request_for_known_keys"
+      ~msg:"request for known keys"
+      ()
+
+  let request_for_proof_of_possession =
+    declare_1
+      ~section
+      ~level
+      ~name:"request_for_proof_of_possession"
+      ~msg:"Request for proof of possession of {pkh}"
+      ("pkh", Tezos_crypto.Signature.Public_key_hash.encoding)
 end
 
 module Socket_daemon = struct

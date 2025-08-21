@@ -144,6 +144,18 @@ module Request = struct
 
   let eth_getChainId = {method_ = "eth_chainId"; parameters = `A []}
 
+  let tez_getChainFamily ~chain_id =
+    {
+      method_ = "tez_chainFamily";
+      parameters = `A [`String (string_of_int chain_id)];
+    }
+
+  let tez_getTransactionGasInfo ~transaction_hash =
+    {
+      method_ = "tez_getTransactionGasInfo";
+      parameters = `A [`String transaction_hash];
+    }
+
   let net_version = {method_ = "net_version"; parameters = `A []}
 
   let tez_kernelVersion = {method_ = "tez_kernelVersion"; parameters = `Null}
@@ -330,6 +342,13 @@ let net_version ?websocket evm_node =
 let get_chain_id ?websocket evm_node =
   let* json = Evm_node.jsonrpc ?websocket evm_node Request.eth_getChainId in
   return (decode_or_error (fun json -> JSON.(json |-> "result" |> as_int)) json)
+
+let get_chain_family ?websocket evm_node chain_id =
+  let* json =
+    Evm_node.jsonrpc ?websocket evm_node (Request.tez_getChainFamily ~chain_id)
+  in
+  return
+    (decode_or_error (fun json -> JSON.(json |-> "result" |> as_string)) json)
 
 let get_transaction_by_hash ?websocket ~transaction_hash evm_node =
   let* json =
@@ -541,6 +560,28 @@ let get_transaction_receipt ?websocket ~tx_hash evm_node =
          Evm_node.extract_result response
          |> JSON.as_opt
          |> Option.map Transaction.transaction_receipt_of_json)
+       response
+
+let get_transaction_gas_info ?websocket ~tx_hash evm_node =
+  let* response =
+    Evm_node.jsonrpc
+      ?websocket
+      evm_node
+      (Request.tez_getTransactionGasInfo ~transaction_hash:tx_hash)
+  in
+  return
+  @@ decode_or_error
+       (fun response ->
+         Evm_node.extract_result response
+         |> JSON.as_opt
+         |> Option.map (fun result ->
+                let inclusion_gas =
+                  JSON.(result |-> "inclusion_gas" |> as_int64)
+                in
+                let execution_gas =
+                  JSON.(result |-> "execution_gas" |> as_int64)
+                in
+                (`Inclusion_gas inclusion_gas, `Execution_gas execution_gas)))
        response
 
 let estimate_gas ?websocket eth_call ?(block = Latest) evm_node =

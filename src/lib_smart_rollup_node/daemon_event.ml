@@ -36,6 +36,7 @@ module Simple = struct
       ~section
       ~name:"smart_rollup_node_daemon_process_head"
       ~msg:"Processing head {hash} at level {level}"
+      ~pp1:Block_hash.pp_short
       ~level:Notice
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
@@ -44,21 +45,35 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_new_head_processed"
-      ~msg:
-        "Finished processing layer 1 head {hash} at level {level} in \
-         {process_time}"
+      ~msg:"Processed head {hash} at level {level} in {process_time}"
       ~level:Notice
+      ~pp1:Block_hash.pp_short
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("process_time", Time.System.Span.encoding)
       ~pp3:Ptime.Span.pp
 
+  let etherlink_blocks_processed =
+    declare_4
+      ~section
+      ~name:"smart_rollup_node_daemon_etherlink_blocks_processed"
+      ~msg:
+        "{nb_blocks} Etherlink blocks (from {first_block} to {last_block}) \
+         processed in {process_time}"
+      ~level:Notice
+      ("nb_blocks", Data_encoding.int31)
+      ("first_block", Data_encoding.int31)
+      ("last_block", Data_encoding.int31)
+      ("process_time", Time.System.Span.encoding)
+      ~pp4:Ptime.Span.pp
+
   let new_head_degraded =
     declare_2
       ~section
       ~name:"smart_rollup_node_daemon_new_head_degraded"
-      ~msg:"[DEGRADED MODE] Seen layer 1 head {hash} at level {level}"
+      ~msg:"[DEGRADED MODE] Seen head {hash} at level {level}"
       ~level:Error
+      ~pp1:Block_hash.pp_short
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
 
@@ -71,6 +86,14 @@ module Simple = struct
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
       ("to", Data_encoding.int32)
+
+  let catch_up =
+    declare_1
+      ~section
+      ~name:"smart_rollup_node_daemon_catch_up"
+      ~msg:"Catching up on {levels} blocks"
+      ~level:Notice
+      ("levels", Data_encoding.int32)
 
   let processing_heads_iteration =
     declare_3
@@ -88,8 +111,7 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_new_heads_processed"
-      ~msg:
-        "Finished processing {number} layer 1 heads for levels {from} to {to}"
+      ~msg:"Processed {number} heads for levels {from} to {to}"
       ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
@@ -99,9 +121,7 @@ module Simple = struct
     declare_3
       ~section
       ~name:"smart_rollup_node_daemon_loop_process_finished"
-      ~msg:
-        "Finished main loop processing {number} layer 1 heads for levels \
-         {from} to {to}"
+      ~msg:"Main loop processed {number} heads up to level {to}"
       ~level:Info
       ("number", Data_encoding.int31)
       ("from", Data_encoding.int32)
@@ -222,6 +242,20 @@ let head_processing hash level = Simple.(emit head_processing (hash, level))
 let new_head_processed hash level process_time =
   Simple.(emit new_head_processed (hash, level, process_time))
 
+let etherlink_blocks_processed ~etherlink_start_block ~etherlink_end_block
+    process_time =
+  match (etherlink_start_block, etherlink_end_block) with
+  | None, _ | _, None -> Lwt.return_unit
+  | Some start_block, Some end_block ->
+      let nb = end_block - start_block in
+      if nb <= 0 then Lwt.return_unit
+      else
+        let first_block = start_block + 1 in
+        Simple.(
+          emit
+            etherlink_blocks_processed
+            (nb, first_block, end_block, process_time))
+
 let new_head_degraded hash level = Simple.(emit new_head_degraded (hash, level))
 
 let new_heads_iteration event = function
@@ -247,6 +281,8 @@ let new_heads_processed = new_heads_iteration Simple.new_heads_processed
 
 let new_heads_side_process_finished =
   new_heads_iteration Simple.new_heads_side_process_finished
+
+let catch_up levels = Simple.(emit catch_up) levels
 
 let included_operation ?errors status operation =
   match status with

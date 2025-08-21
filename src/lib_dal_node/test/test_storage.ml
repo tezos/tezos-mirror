@@ -153,7 +153,7 @@ module Helpers = struct
     type t =
       | Insert of {
           attested_level : Level.t;
-          payload : (Skip_list_hash.t * Skip_list_cell.t) list;
+          payload : (Skip_list_hash.t * Skip_list_cell.t * int) list;
         }
       | Find of {skip_list_hash : Skip_list_hash.t}
       | Remove of {attested_level : Level.t}
@@ -167,9 +167,10 @@ module Helpers = struct
           ~size:(return number_of_slots)
           (pair Skip_list_hash.gen Skip_list_cell.gen)
       in
+      let payload = List.mapi (fun i (h, c) -> (h, c, i)) payload in
       let hashes =
         List.fold_left
-          (fun acc (hash, _) -> HashSet.add hash acc)
+          (fun acc (hash, _, _) -> HashSet.add hash acc)
           HashSet.empty
           payload
       in
@@ -213,14 +214,15 @@ module Helpers = struct
           in
           return (Some (new_state, Remove {attested_level}))
 
-    let pp_action_insert_payload_item fmt (hash, cell) =
+    let pp_action_insert_payload_item fmt (hash, cell, slot_index) =
       Format.fprintf
         fmt
-        "(%a, %a)"
+        "(%a, %a, %d)"
         Skip_list_hash.pp
         hash
         Skip_list_cell.pp
         cell
+        slot_index
 
     let pp_action_insert_payload fmt payload =
       Format.pp_print_list pp_action_insert_payload_item fmt payload
@@ -312,7 +314,7 @@ let perform_sqlite store action =
   | Action.Insert {attested_level; payload} ->
       insert store ~attested_level payload
   | Find {skip_list_hash} ->
-      let* _cell = find store skip_list_hash in
+      let* _cell = find_opt store skip_list_hash in
       return_unit
   | Remove {attested_level} -> remove store ~attested_level
 
@@ -337,8 +339,10 @@ let handshake state kvs_store sql_store =
       (fun hash ->
         (* The hash must exist in the stores and the associated cell must be the same. *)
         let* kvs_cell = Kvs_skip_list_cells_store.find kvs_store hash in
-        let* sql_cell = Dal_store_sqlite3.Skip_list_cells.find sql_store hash in
-        assert (Skip_list_cell.equal kvs_cell sql_cell) ;
+        let* sql_cell =
+          Dal_store_sqlite3.Skip_list_cells.find_opt sql_store hash
+        in
+        assert (Option.equal Skip_list_cell.equal (Some kvs_cell) sql_cell) ;
         return_unit)
       must_exist_hashes
   in
@@ -364,7 +368,7 @@ let handshake state kvs_store sql_store =
   in
   return_unit
 
-(* As found in bin_dal_node/store.ml *)
+(* As found in lib_dal_node/store.ml *)
 let init_skip_list_cells_store node_store_dir =
   let padded_encoded_cell_size = 64 * (32 + 1) in
   let encoded_hash_size = 32 + 4 in
@@ -374,7 +378,8 @@ let init_skip_list_cells_store node_store_dir =
     ~padded_encoded_cell_size
     ~encoded_hash_size
 
-let init_sqlite_skip_list_cells_store ?(perm = `Read_write) data_dir =
+let init_sqlite_skip_list_cells_store ?(perm = Octez_sqlite.Sqlite.Read_write)
+    data_dir =
   Dal_store_sqlite3.Skip_list_cells.init
     ~data_dir:(Filename.concat data_dir "skip_list_store")
     ~perm
@@ -476,6 +481,7 @@ let populate n kvs_store =
     let* payload =
       list ~size:(return number_of_slots) (pair Skip_list_hash.gen cells)
     in
+    let payload = List.mapi (fun i (h, c) -> (h, c, i)) payload in
     return payload
   in
   let rec loop state n =
@@ -500,7 +506,7 @@ let migration_skip_list_test () =
   let t2 = Unix.gettimeofday () in
   Log.info "Execution time for generating %d elements: %f seconds" n (t2 -. t1) ;
   let* sql_store =
-    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:`Read_write ()
+    Dal_store_sqlite3.Skip_list_cells.init ~data_dir ~perm:Read_write ()
   in
   let t1 = Unix.gettimeofday () in
   let* () = Store_migrations.migrate_skip_list_store kvs_store sql_store in

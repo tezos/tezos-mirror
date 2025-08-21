@@ -28,6 +28,12 @@
 (** Cryptographic signatures are versioned to expose different versions to
     different protocols, depending on the support.  *)
 
+type version = Version_0 | Version_1 | Version_2
+
+val version_encoding : version Data_encoding.t
+
+val version_arg : version Resto.Arg.t
+
 (** The type of conversion modules from one version to another. *)
 module type CONV = sig
   module V_from : S.COMMON_SIGNATURE
@@ -76,10 +82,16 @@ end
 
 (** The module [V_latest] is to be used by the shell and points to the latest
     available version of signatures. *)
-module V_latest : module type of Signature_v2
+module V_latest : sig
+  val version : version
+
+  include module type of Signature_v2
+end
 
 (** [V0] supports Ed25519, Secp256k1, and P256. *)
 module V0 : sig
+  val version : version
+
   include module type of Signature_v0
 
   (** Converting from signatures of {!V_latest} to {!V0}. *)
@@ -89,6 +101,8 @@ end
 
 (** [V1] supports Ed25519, Secp256k1, P256, and BLS (aug). *)
 module V1 : sig
+  val version : version
+
   include module type of Signature_v1
 
   (** Converting from signatures of {!V_latest} to {!V1}. *)
@@ -98,6 +112,8 @@ end
 
 (** [V2] supports Ed25519, Secp256k1, P256, and BLS (aug). *)
 module V2 : sig
+  val version : version
+
   include module type of Signature_v2
 
   (** Converting from signatures of {!V_latest} to {!V2}. *)
@@ -110,7 +126,7 @@ include module type of V_latest
 (** Converting from signatures of {!V_latest} to {!V_latest}. This module
     implements conversions which are the identity, so total, but we keep the
     signature as {!CONV_OPT} for compatibility with {!V0.Of_V_latest} and
-    {!V1.Of_V_latest} and to ease snapshotting. TODO ADAPT THIS WITH V2*)
+    {!V1.Of_V_latest} and to ease snapshotting. *)
 module Of_V_latest :
   CONV_OPT with module V_from := V_latest and module V_to := V_latest
 

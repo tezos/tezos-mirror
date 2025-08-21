@@ -9,6 +9,9 @@ type evm_services_methods = {
   next_blueprint_number : unit -> Ethereum_types.quantity Lwt.t;
   find_blueprint :
     Ethereum_types.quantity -> Blueprint_types.with_events option tzresult Lwt.t;
+  find_blueprint_legacy :
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t;
   smart_rollup_address : Address.t;
   time_between_blocks : Evm_node_config.Configuration.time_between_blocks;
 }
@@ -29,8 +32,10 @@ type block_production = [`Single_node | `Disabled]
     sequencer setup, [`Disabled] means no block production method is
     available. *)
 val start_private_server :
+  rpc_server_family:'f Rpc_types.rpc_server_family ->
   ?block_production:block_production ->
   Configuration.t ->
+  'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t
 
@@ -43,9 +48,14 @@ val start_private_server :
     If [data_dir] is provided and the host provides the necessary binaries,
     performance metrics are enabled. *)
 val start_public_server :
+  is_sequencer:bool ->
+  rpc_server_family:'f Rpc_types.rpc_server_family ->
+  l2_chain_id:L2_types.chain_id option ->
   ?delegate_health_check_to:Uri.t ->
   ?evm_services:evm_services_methods ->
   ?data_dir:string ->
+  Validate.validation_mode ->
   Configuration.t ->
+  'f Services_backend_sig.tx_container ->
   (module Services_backend_sig.S) * 'a ->
   finalizer tzresult Lwt.t

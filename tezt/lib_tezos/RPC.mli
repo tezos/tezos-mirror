@@ -571,6 +571,14 @@ val post_chain_block_helpers_preapply_operations :
 val post_chain_block_helpers_forge_operations :
   ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
 
+(** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/signed_operations]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"].
+*)
+val post_chain_block_helpers_forge_signed_operations :
+  ?chain:string -> ?block:string -> data:data -> unit -> JSON.t t
+
 (** RPC: [POST /chains/<chain>/blocks/<block>/helpers/forge/consensus_operations]
 
     [chain] defaults to ["main"].
@@ -773,7 +781,14 @@ val get_chain_block_helper_current_level :
     [block] defaults to ["head"].
 *)
 val get_chain_block_helper_attestation_rights :
-  ?chain:string -> ?block:string -> ?delegate:string -> unit -> JSON.t t
+  ?chain:string ->
+  ?block:string ->
+  ?level:int ->
+  ?cycle:int ->
+  ?delegate:string ->
+  ?consensus_key:string ->
+  unit ->
+  JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/helpers/validators]
 
@@ -795,6 +810,31 @@ val get_chain_block_helper_validators :
 *)
 val get_chain_block_helper_levels_in_current_cycle :
   ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/helpers/total_baking_power]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_helper_total_baking_power :
+  ?chain:string -> ?block:string -> unit -> JSON.t t
+
+(** RPC: [POST /bls/aggregate_signatures] *)
+val post_bls_aggregate_signatures :
+  pk:string -> msg:string -> string list -> string t
+
+(** RPC: [POST /bls/check_proof] *)
+val post_bls_check_proof : pk:string -> proof:string -> unit -> bool t
+
+(** RPC: [POST /bls/aggregate_public_keys] *)
+val post_bls_aggregate_public_keys :
+  (string * string) list -> (string * string) t
+
+(** RPC: [POST /bls/aggregate_proofs] *)
+val post_bls_aggregate_proofs : pk:string -> string list -> string t
+
+(** RPC: [POST /bls/threshold_signatures] *)
+val post_bls_threshold_signatures :
+  pk:string -> msg:string -> (int * string) list -> string t
 
 (** {2 Big maps RPC module} *)
 
@@ -1029,7 +1069,11 @@ val get_chain_block_context_smart_rollups_smart_rollup_whitelist :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegates :
-  ?chain:string -> ?block:string -> unit -> string list t
+  ?chain:string ->
+  ?block:string ->
+  ?query_string:(string * string) list ->
+  unit ->
+  string list t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>]
 
@@ -1043,6 +1087,13 @@ val get_chain_block_context_delegate :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_active_staking_parameters :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/pending_staking_parameters]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_pending_staking_parameters :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/current_frozen_deposits]
@@ -1156,15 +1207,47 @@ val get_chain_block_context_delegate_min_delegated_in_current_cycle :
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
-val get_chain_block_context_delegate_participation :
+val get_chain_block_context_delegate_participation_raw :
   ?chain:string -> ?block:string -> string -> JSON.t t
+
+type participation = {
+  expected_cycle_activity : int;
+  minimal_cycle_activity : int;
+  missed_slots : int;
+  missed_levels : int;
+  remaining_allowed_missed_slots : int;
+  expected_attesting_rewards : Tez.t;
+}
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/participation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_participation :
+  ?chain:string -> ?block:string -> string -> participation t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/dal_participation]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_dal_participation_raw :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+type dal_participation = {
+  expected_assigned_shards_per_slot : int;
+  delegate_attested_dal_slots : int;
+  delegate_attestable_dal_slots : int;
+  expected_dal_rewards : Tez.t;
+  sufficient_dal_participation : bool;
+  denounced : bool;
+}
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/dal_participation]
 
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_dal_participation :
-  ?chain:string -> ?block:string -> string -> JSON.t t
+  ?chain:string -> ?block:string -> string -> dal_participation t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/balance]
 
@@ -1199,6 +1282,13 @@ val get_chain_block_context_delegate_voting_power :
     [chain] defaults to ["main"].
     [block] defaults to ["head"]. *)
 val get_chain_block_context_delegate_consensus_key :
+  ?chain:string -> ?block:string -> string -> JSON.t t
+
+(** RPC: [GET /chains/<chain>/blocks/<block>/context/delegates/<pkh>/companion_key]
+
+    [chain] defaults to ["main"].
+    [block] defaults to ["head"]. *)
+val get_chain_block_context_delegate_companion_key :
   ?chain:string -> ?block:string -> string -> JSON.t t
 
 (** RPC: [GET /chains/<chain>/blocks/<block>/context/total_supply]
@@ -1372,3 +1462,8 @@ val nonexistent_path : JSON.t t
     [block] defaults to ["head"]. *)
 val get_chain_block_context_denunciations :
   ?chain:string -> ?block:string -> unit -> JSON.t t
+
+type baker_with_power = {delegate : string; baking_power : int}
+
+val get_stake_distribution :
+  ?chain:string -> ?block:string -> cycle:int -> unit -> baker_with_power list t

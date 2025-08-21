@@ -518,8 +518,6 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
            Lwt.return
              (Time_to_prepare_next_level_block {at_round = next_baking_round}))
   in
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/7390
-     re-use what has been done in round_synchronizer.ml *)
   (* Compute the timestamp of the next possible round. *)
   let next_round = compute_next_round_time state in
   let*! next_baking = compute_next_potential_baking_time_at_next_level state in
@@ -873,38 +871,21 @@ let perform_sanity_check cctxt ~chain_id =
   in
   return_unit
 
-let rec retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
+let retry (cctxt : #Protocol_client_context.full) ?max_delay ~delay ~factor
     ~tries ?(msg = "Connection failed. ") f x =
-  let open Lwt_result_syntax in
-  let*! result = f x in
-  match result with
-  | Ok _ as r -> Lwt.return r
-  | Error
-      (RPC_client_errors.Request_failed {error = Connection_failed _; _} :: _)
-    as err
-    when tries > 0 -> (
-      let*! () = cctxt#message "%sRetrying in %.2f seconds..." msg delay in
-      let*! result =
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep delay in
-             Lwt.return `Continue);
-            (let*! _ = Lwt_exit.clean_up_starts in
-             Lwt.return `Killed);
-          ]
-      in
-      match result with
-      | `Killed -> Lwt.return err
-      | `Continue ->
-          let next_delay = delay *. factor in
-          let delay =
-            Option.fold
-              ~none:next_delay
-              ~some:(fun max_delay -> Float.min next_delay max_delay)
-              max_delay
-          in
-          retry cctxt ?max_delay ~delay ~factor ~msg ~tries:(tries - 1) f x)
-  | Error _ as err -> Lwt.return err
+  Utils.retry
+    ~emit:(cctxt#message "%s")
+    ?max_delay
+    ~delay
+    ~factor
+    ~tries
+    ~msg
+    ~is_error:(function
+      | RPC_client_errors.Request_failed {error = Connection_failed _; _} ->
+          true
+      | _ -> false)
+    f
+    x
 
 (* This function attempts to resolve the primary delegate associated with the given [key].
 
@@ -961,10 +942,11 @@ let register_dal_profiles cctxt dal_node_rpc_ctxt delegates =
     in
     let*! () =
       match profiles with
-      | Tezos_dal_node_services.Types.Bootstrap | Random_observer -> warn ()
-      | Operator operator_profile ->
+      | Tezos_dal_node_services.Types.Bootstrap -> warn ()
+      | Controller controller_profile ->
           let attesters =
-            Tezos_dal_node_services.Operator_profile.attesters operator_profile
+            Tezos_dal_node_services.Controller_profiles.attesters
+              controller_profile
           in
           if Tezos_crypto.Signature.Public_key_hash.Set.is_empty attesters then
             warn ()
@@ -991,6 +973,7 @@ let run cctxt ?dal_node_rpc_ctxt ?canceler ?(stop_on_event = fun _ -> false)
   let open Lwt_result_syntax in
   let*! () = Events.(emit Baking_events.Delegates.delegates_used delegates) in
   let* chain_id = Shell_services.Chain.chain_id cctxt ~chain () in
+  let*! () = Events.emit Baking_events.Node_rpc.chain_id chain_id in
   let* constants =
     match constants with
     | Some c -> return c

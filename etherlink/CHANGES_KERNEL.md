@@ -2,20 +2,99 @@
 
 ## Version NEXT
 
+Its storage version is 36.
+
 ### Features
+
+- The EVM now supports optional access lists.
+  See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
+- Introduces a new feature flag to enable REVM as the EVM execution
+  engine instead of Sputnik. (!18384)
+- REVM is plugged in the kernel and is guarded by a feature flag. (!18390) 
+- The validation mechanism that automatically rejects transactions
+  with over-estimated gas limits exceeding the maximum threshold will
+  be disabled. During execution, any gas limit above the maximum will
+  be automatically capped at the maximum permitted value. (!18179)
+- Bump the capacity of Etherlink to 8MGas/s (meaning a target per second to
+  4MGas/s). (!18452)
+- Update the Layer 1 governance contracts to take into account alternative voting keys for bakers. (!18505)
+    - [`KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r`](https://better-call.dev/mainnet/KT1VZVNCNnhUp7s15d9RsdycP7C1iwYhAQ8r) for the slow upgrade governance
+    - [`KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R`](https://better-call.dev/mainnet/KT1DxndcFitAbxLdJCN3C1pPivqbC3RJxD1R) for the fast upgrade governance
+    - [`KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf`](https://better-call.dev/mainnet/KT1WckZ2uiLfHCfQyNp1mtqeRcC1X6Jg2Qzf) for the sequencer governance
+
+### Bug fixes
+
+### Internal
+
+## Dionysus (1f47de0)
+
+This kernel has been activated on Etherlink Testnet on block
+[19,307,965][1f47-activation-testnet], and on Etherlink Mainnet on block
+[15,262,162][1f47-activation-mainnet].
+
+[1f47-activation-testnet]: https://testnet.explorer.etherlink.com/block/0x905031212562def1cecd79e6472bf3b6588b9ea75563d0c8fc34c9c8b61871f0
+[1f47-activation-mainnet]: https://explorer.etherlink.com/block/0x0f3872315951a148220bd3fe63ec9012c59ddcca49dfcdc40ec3ffbfec93ea63
+
+Its storage version is 33.
+
+### Features
+
+- The EVM's configuration has been bumped to Cancun. (!16141)
+  The following EIPs are now supported by Etherlink:
+  * [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153)
+  * [EIP-5656](https://eips.ethereum.org/EIPS/eip-5656)
+  * [EIP-6780](https://eips.ethereum.org/EIPS/eip-6780)
+- A fast withdrawal entrypoint was added to the FA bridge precompiled contract
+  under a feature flag. (!17114 !17494)
+- Hot and cold accesses are now enabled to better align gas consumption
+  with the actual execution on Etherlink. (!17308)
+- Removes the `OutOfTicks` error when executing the EVM interpreter. We only
+  use gas to decide when to reboot. (!15079)
+- The flag to activate DAL has been enabled, slots from 0 to 7 can now be used
+  from the kernel's perspective. (!17636)
+- Execution gas is now used to compute the changes in gas price over time,
+  instead of estimated ticks. (!17630)
+- The EVM now uses a cache for contract code/hash/size which improves time
+  performances on the execution side. (!17716)
+- Updates the Layer 1 governance contracts to take into account Rio new cycle
+  duration. (!17943)
+    - [`KT1XdSAYGXrUDE1U5GNqUKKscLWrMhzyjNeh` for the regular upgrade governance][kgov]
+    - [`KT1D1fRgZVdjTj5sUZKcSTPPnuR7LRxVYnDL` for the security upgrade governance][sgov]
+    - [`KT1NnH9DCAoY1pfPNvb9cw9XPKQnHAFYFHXa` for the sequencer governance][sqgov]
+- Computes the execution gas assuming a minimum base fee per gas instead of
+  current gas price. The paid DA fees remain unchanged. (!17954)
+- The EVM now supports optional access lists.
+  See [EIP-2930](https://eips.ethereum.org/EIPS/eip-2930). (!17766)
 
 ### Bug fixes
 
 - Improves call trace of `DELEGATECALL` and `CALLCODE`. (!16588)
+- The EVM now complies to [EIP-3529](https://eips.ethereum.org/EIPS/eip-3529). (!16887, !17319)
+- The EVM now complies to [EIP-3651](https://eips.ethereum.org/EIPS/eip-3651). (!16888)
+- The EVM now properly record init code cost for `CREATE`/`CREATE2`
+  opcodes, now fully complying with [EIP-3860](https://eips.ethereum.org/EIPS/eip-3860). (!16890)
+- The EVM is now refunding accounts as expected during inter (layer)
+  transactions. (!16973)
+- Ported a security patch that fixed a bug causing proxy calls from FA deposits to
+  not correctly revert state on failure. This also includes a fix for tracing inner calls. (!17704)
 
 ### Internal
 
 - Rework block production to simplify data flow and remove unnecessary
   IO. (!16661 !16684 !16685 !16618)
+- The EVM version is now written in the durable storage at `/evm/evm_version`. (!17202)
+- Replaced the custom ABI encoder/decoder with `alloy`'s encoder/decoder
+  for improved maintainability. (!16670)
+- Keeps track of execution gas in addition to estimated ticks. (!17507)
 
-## Next proposal
+## Calypso (6046630)
 
-This is a release candidate for a kernel upgrade proposal.
+This kernel has been activated on Etherlink Testnet on block
+[17,443,389][6046-activation-testnet], and on Etherlink Mainnet on block
+[7,056,139][6046-activation-mainnet].
+
+[6046-activation-testnet]: https://testnet.explorer.etherlink.com/block/0xe1df4a09691c11dc795dc230e5a3929932527f6f66e937bd97a25d709f3c4a01?tab=index
+[6046-activation-mainnet]: https://explorer.etherlink.com/block/0xc7788ef7ccf24ad003757a73b6f8903c15d0d514bf9738011c6b3b583aad733f
 
 Its storage version is 26.
 
@@ -79,6 +158,19 @@ Its storage version is 26.
   ec7c3b349624896b269e179384d0a45cf39e1145, has been removed. (!16302)
 - Deposits can now specify a chain id, but it is currently ignored. (!16153)
 - All blueprints in storage are deleted after a flush event. (!15673)
+
+### Security Upgrades
+
+#### Calypso2 (9ab8acd)
+
+**Note:** This commit is not part of the `master` branch of the Octez
+repository, but is part of [`etherlink-security-upgrades`][su-3] instead.
+
+[su-3]: https://gitlab.com/tezos/tezos/-/tree/etherlink-security-upgrade-3
+
+This security upgrade addresses a severe bug found in the deposit of FA tokens
+from Tezos to Etherlink. The bug was never triggered on Mainnet before the
+activation of the kernel on block 10,453,254.
 
 ## Bifrost (7386d0b)
 

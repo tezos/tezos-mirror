@@ -20,13 +20,13 @@ module Request = struct
         payload : Blueprint_types.payload;
         delayed_transactions : Evm_events.Delayed_transaction.t list;
       }
-        -> (unit, tztrace) t
+        -> (Ethereum_types.hash Seq.t, tztrace) t
     | Last_known_L1_level : (int32 option, tztrace) t
     | Delayed_inbox_hashes : (Ethereum_types.hash list, tztrace) t
     | Patch_state : {
         commit : bool;
         key : string;
-        value : string;
+        patch : string option -> string option;
         block_number : Ethereum_types.quantity option;
       }
         -> (unit, tztrace) t
@@ -36,6 +36,23 @@ module Request = struct
         blueprint_with_events : Blueprint_types.with_events;
       }
         -> (Ethereum_types.quantity option, tztrace) t
+    | Finalized_levels : {
+        l1_level : int32;
+        start_l2_level : Ethereum_types.quantity;
+        end_l2_level : Ethereum_types.quantity;
+      }
+        -> (unit, tztrace) t
+
+  let name (type a b) (t : (a, b) t) =
+    match t with
+    | Apply_evm_events _ -> "Apply_evm_events"
+    | Apply_blueprint _ -> "Apply_blueprint"
+    | Last_known_L1_level -> "Last_known_l1_level"
+    | Delayed_inbox_hashes -> "Delayed_inbox_hashes"
+    | Patch_state _ -> "Patch_state"
+    | Wasm_pvm_version -> "Wasm_pvm_version"
+    | Potential_observer_reorg _ -> "Potential_observer_reorg"
+    | Finalized_levels _ -> "Finalized_levels"
 
   type view = View : _ t -> view
 
@@ -94,18 +111,19 @@ module Request = struct
         case
           (Tag 4)
           ~title:"Patch_state"
-          (obj5
+          (obj4
              (req "request" (constant "patch_state"))
              (req "commit" bool)
              (req "key" string)
-             (req "value" (string' Hex))
              (opt "block_number" Ethereum_types.quantity_encoding))
           (function
-            | View (Patch_state {commit; key; value; block_number}) ->
-                Some ((), commit, key, value, block_number)
+            | View (Patch_state {commit; key; patch = _; block_number}) ->
+                Some ((), commit, key, block_number)
             | _ -> None)
-          (fun ((), commit, key, value, block_number) ->
-            View (Patch_state {commit; key; value; block_number}));
+          (fun ((), commit, key, block_number) ->
+            (* This is dead code, the encoding is only used for logging (i.e.,
+               encoding) *)
+            View (Patch_state {commit; key; patch = Fun.id; block_number}));
         case
           (Tag 5)
           ~title:"Wasm_pvm_version"
@@ -132,6 +150,21 @@ module Request = struct
                    evm_node_endpoint = Uri.of_string evm_node_endpoint;
                    blueprint_with_events;
                  }));
+        case
+          (Tag 7)
+          ~title:"Finalized_levels"
+          (obj4
+             (req "request" (constant "finalized_levels"))
+             (req "l1_level" int32)
+             (req "start_l2_level" Ethereum_types.quantity_encoding)
+             (req "end_l2_level" Ethereum_types.quantity_encoding))
+          (function
+            | View (Finalized_levels {l1_level; start_l2_level; end_l2_level})
+              ->
+                Some ((), l1_level, start_l2_level, end_l2_level)
+            | _ -> None)
+          (fun ((), l1_level, start_l2_level, end_l2_level) ->
+            View (Finalized_levels {l1_level; start_l2_level; end_l2_level}));
       ]
 
   let pp ppf view =

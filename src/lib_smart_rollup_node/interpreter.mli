@@ -33,7 +33,7 @@
     the PVM after the evaluation. *)
 val process_head :
   (module Protocol_plugin_sig.PARTIAL) ->
-  Node_context.rw ->
+  _ Node_context.t ->
   'a Context.t ->
   predecessor:Layer1.head ->
   Layer1.head ->
@@ -60,7 +60,7 @@ val genesis_state :
     [start_state]. *)
 val state_of_tick :
   (module Protocol_plugin_sig.PARTIAL) ->
-  Node_context.rw ->
+  _ Node_context.t ->
   Pvm_plugin_sig.state_cache ->
   ?start_state:Fuel.Accounted.t Pvm_plugin_sig.eval_state ->
   tick:Z.t ->
@@ -72,7 +72,7 @@ val state_of_tick :
     the rollup origination. *)
 val state_of_head :
   (module Protocol_plugin_sig.PARTIAL) ->
-  'a Node_context.t ->
+  < context : 'a ; store : _ > Node_context.t ->
   'a Context.t ->
   Layer1.head ->
   Context.pvmstate tzresult Lwt.t

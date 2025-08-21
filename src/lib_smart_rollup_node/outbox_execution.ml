@@ -213,7 +213,7 @@ let outbox_message_match_filter (message : Outbox_message.summary)
         txs
   | _ -> false
 
-let publish_executable_messages (node_ctxt : _ Node_context.t) =
+let publish_executable_messages (node_ctxt : _ Node_context.rw_context) =
   let open Lwt_result_syntax in
   let operator = Node_context.get_operator node_ctxt Executing_outbox in
   let executes =
@@ -222,6 +222,10 @@ let publish_executable_messages (node_ctxt : _ Node_context.t) =
   in
   when_ executes @@ fun () ->
   (* Configured to execute outbox messages *)
+  Octez_telemetry.Trace.with_tzresult
+    ~service_name:"Outbox"
+    "publish_executable_messages"
+  @@ fun _scope ->
   let lcc = Reference.get node_ctxt.lcc in
   let* lcc_block_hash = Node_context.hash_of_level node_ctxt lcc.level in
   let* ctxt = Node_context.checkout_context node_ctxt lcc_block_hash in

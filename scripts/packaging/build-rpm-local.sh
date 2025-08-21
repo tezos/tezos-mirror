@@ -60,7 +60,7 @@ eval "$(opam env)"
 
 packages() {
   # Build Octez as usual
-  make octez
+  make release
 
   rm -f "${BINARIES:?}/*"
   EXECUTABLES=$(cat script-inputs/*-executables)

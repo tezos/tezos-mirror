@@ -5,8 +5,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Path = Path
 module Agent = Agent
 module Types = Types
+module Chronos = Chronos
 
 module Alert = struct
   include Alert_manager
@@ -41,7 +43,9 @@ let register_docker_push ~tags =
     ~__FILE__
     ~title:"Push the dockerfile to the GCP registry"
     ~tags:("docker" :: "push" :: tags)
-  @@ fun _cloud -> Jobs.docker_build ~push:true ()
+  @@ fun _cloud ->
+  let* ssh_public_key = Ssh.public_key () in
+  Jobs.docker_build ~push:true ~ssh_public_key ()
 
 let register_docker_build ~tags =
   Cloud.register
@@ -49,7 +53,9 @@ let register_docker_build ~tags =
     ~__FILE__
     ~title:"Build the dockerfile"
     ~tags:("docker" :: "build" :: tags)
-  @@ fun _cloud -> Jobs.docker_build ~push:false ()
+  @@ fun _cloud ->
+  let* ssh_public_key = Ssh.public_key () in
+  Jobs.docker_build ~push:false ~ssh_public_key ()
 
 let register_deploy_docker_registry ~tags =
   Cloud.register
@@ -288,3 +294,11 @@ let register ~tags =
   register_list_dns_domains ~tags ;
   register_dns_add ~tags ;
   register_dns_remove ~tags
+
+module Prometheus = struct
+  let get_query_endpoint ~query = Prometheus.get_query_endpoint ~query
+end
+
+module Tezt_cloud_cli = struct
+  let prometheus = Cli.prometheus
+end

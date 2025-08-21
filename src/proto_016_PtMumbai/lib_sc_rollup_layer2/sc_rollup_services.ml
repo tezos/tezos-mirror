@@ -369,27 +369,6 @@ module Block = struct
       ~output:Encodings.eval_result
       (path / "simulate")
 
-  let dal_slots =
-    Tezos_rpc.Service.get_service
-      ~description:"Availability slots for a given block"
-      ~query:Tezos_rpc.Query.empty
-      ~output:(Data_encoding.list Dal.Slot.Header.encoding)
-      (path / "dal" / "slot_headers")
-
-  let dal_slot_status_encoding : [`Confirmed | `Unconfirmed] Data_encoding.t =
-    Data_encoding.string_enum
-      [("confirmed", `Confirmed); ("unconfirmed", `Unconfirmed)]
-
-  let dal_processed_slots =
-    Tezos_rpc.Service.get_service
-      ~description:"Data availability processed slots and their statuses"
-      ~query:Tezos_rpc.Query.empty
-      ~output:
-        Data_encoding.(
-          list
-          @@ obj2 (req "index" int31) (req "status" dal_slot_status_encoding))
-      (path / "dal" / "processed_slots")
-
   let level_param =
     let destruct s =
       match Int32.of_string_opt s with

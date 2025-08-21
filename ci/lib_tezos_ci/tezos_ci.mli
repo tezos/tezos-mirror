@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) 2023-2024 Nomadic Labs. <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2023 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -170,6 +170,58 @@ module Pipeline : sig
   val describe_pipeline : string -> unit
 end
 
+(** Add variable enabling sccache.
+
+    This function should be applied to jobs that build rust files and
+    which has a configured sccache Gitlab CI cache.
+
+    - [key] and [path] configure the key under which the cache is
+    stored, and the path that will be cached. By default, the [key]
+    contains the name of the job, thus scoping the cache to all
+    instances of that job. By default, [path] is the folder
+    ["$CI_PROJECT_DIR/_sccache"], and this function also sets the
+    environment dir [SCCACHE_DIR] such that sccache stores its caches
+    there.
+
+    - [cache_size] sets the environment variable [SCCACHE_CACHE_SIZE]
+    that configures the maximum size of the cache.
+
+    - [error_log], [idle_timeout] and [log] sets the environment
+    variables [SCCACHE_ERROR_LOG], [SCCACHE_IDLE_TIMEOUT] and
+    [SCCACHE_LOG] respectively. See the sccache documentation for more
+    information on these variables. *)
+val enable_sccache :
+  ?key:string ->
+  ?error_log:string ->
+  ?idle_timeout:string ->
+  ?log:string ->
+  ?path:string ->
+  ?cache_size:string ->
+  tezos_job ->
+  tezos_job
+
+(** Allow cargo to access the network by setting [CARGO_NET_OFFLINE=false].
+
+    This function should only be applied to jobs that have a GitLab CI
+    cache for [CARGO_HOME], as enabled through [enable_cache_cargo] (that
+    function calls this function, so there is no need to apply both).
+    Exceptions can be made for jobs that must have CARGO_HOME set to
+    something different than {!cargo_home}. *)
+val enable_networked_cargo : tezos_job -> tezos_job
+
+(** Adds a GitLab CI cache for the CARGO_HOME folder.
+
+    More precisely, we only cache the non-SCM dependencies in the
+    sub-directory [registry/cache]. *)
+val enable_cargo_cache : tezos_job -> tezos_job
+
+(** Enable caching of Cargo's target folder which stores files which
+    can speed up subsequent compilation passes.
+
+    All folders are stored in a single cacheable directory to work
+    around GitLab's restriction on the number caches a job may have. *)
+val enable_cargo_target_caches : ?key:string -> tezos_job -> tezos_job
+
 (** A facility for registering images for [image:] keywords.
 
     Images can be registered in two manners:
@@ -251,14 +303,6 @@ type tag =
       (** GCP prod AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
   | Gcp_tezt_dev
       (** GCP dev AMD64 runner, suitable for tezt jobs (more RAM and CPU) *)
-  | Gcp_tezt_memory_3k
-      (** GCP prod AMD64 runner, suitable for tezt memory 3k jobs (more RAM and CPU) *)
-  | Gcp_tezt_memory_3k_dev
-      (** GCP dev AMD64 runner, suitable for tezt memory 3k jobs (more RAM and CPU) *)
-  | Gcp_tezt_memory_4k
-      (** GCP prod AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
-  | Gcp_tezt_memory_4k_dev
-      (** GCP dev AMD64 runner, suitable for tezt memory 4k jobs (more RAM and CPU) *)
   | Gcp_high_cpu
       (** GCP prod AMD64 runner, suitable for jobs needing high CPU. *)
   | Gcp_high_cpu_dev
@@ -267,6 +311,10 @@ type tag =
       (** GCP prod AMD64 runner, suitable for jobs needing very high CPU. *)
   | Gcp_very_high_cpu_dev
       (** GCP dev AMD64 runner, suitable for jobs needing very high CPU. *)
+  | Gcp_very_high_cpu_ramfs
+      (** GCP prod AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
+  | Gcp_very_high_cpu_ramfs_dev
+      (** GCP dev AMD64 runner, suitable for jobs needing very high CPU and RAMFS. *)
   | Aws_specific
       (** AWS runners, in cases where a CI is legacy or not suitable for GCP. *)
   | Dynamic
@@ -344,6 +392,10 @@ type cpu =
   | High  (** Target GCP high runner pool. *)
   | Very_high  (** Target GCP very high runner pool. *)
 
+type storage =
+  | Network  (** Target default storage runner pool. *)
+  | Ramfs  (** Target ramfs storage runner pool. *)
+
 (** Define a job.
 
     This smart constructor for {!Gitlab_ci.Types.job} additionally:
@@ -377,7 +429,11 @@ type cpu =
 
     - The [cpu] parameter specifies the CPU allocation for the job,
       allowing it to run on a GCP GitLab runner with normal, high,
-      or very high CPU capacity. *)
+      or very high CPU capacity.
+
+    - The [dev_infra] parameter allows to run the job on the dev infrastructure.
+      This parameter is used for tests only and should not be merged in
+      production.*)
 
 val job :
   ?arch:arch ->
@@ -396,11 +452,13 @@ val job :
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?tag:tag ->
   ?cpu:cpu ->
+  ?storage:storage ->
   ?git_strategy:git_strategy ->
   ?coverage:string ->
   ?retry:Gitlab_ci.Types.retry ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?description:string ->
+  ?dev_infra:bool ->
   __POS__:string * int * int * int ->
   ?image:Image.t ->
   ?template:Gitlab_ci.Types.template ->
@@ -494,12 +552,14 @@ val job_docker_authenticated :
   ?dependencies:dependencies ->
   ?image_dependencies:Image.t list ->
   ?arch:arch ->
+  ?storage:storage ->
   ?tag:tag ->
   ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
   ?parallel:Gitlab_ci.Types.parallel ->
   ?timeout:Gitlab_ci.Types.time_interval ->
   ?retry:Gitlab_ci.Types.retry ->
   ?description:string ->
+  ?dev_infra:bool ->
   __POS__:string * int * int * int ->
   stage:Stage.t ->
   name:string ->
@@ -521,22 +581,9 @@ module Stages : sig
 
   val packaging : Stage.t
 
-  val publishing : Stage.t
+  val publish : Stage.t
 
   val publishing_tests : Stage.t
-
-  val doc : Stage.t
-
-  (* Scanning vulnerabilities of Docker images. *)
-  val scan : Stage.t
-
-  val prepare_release : Stage.t
-
-  val publish_release_gitlab : Stage.t
-
-  val publish_release : Stage.t
-
-  val publish_package_gitlab : Stage.t
 
   val manual : Stage.t
 end
@@ -610,26 +657,38 @@ module Images : sig
 
   val macosx_14 : Image.t
 
-  val stage : Stage.t
-
   val client_libs_dependencies : Image.t
 
   val rust_toolchain : Image.t
 
+  val rust_toolchain_master : Image.t
+
+  val rust_sdk_bindings : Image.t
+
+  val trivy : Image.t
+
   val jsonnet : Image.t
 
-  module CI : sig
-    val job_docker_ci : arch -> tezos_job
+  val jsonnet_master : Image.t
 
-    val mk_ci_image : image_path:string -> Image.t
+  module CI : sig
+    val job_docker_ci : arch -> ?storage:storage -> unit -> tezos_job
 
     val runtime : Image.t
 
+    val monitoring : Image.t
+
     val prebuild : Image.t
+
+    val prebuild_master : Image.t
 
     val build : Image.t
 
+    val build_master : Image.t
+
     val test : Image.t
+
+    val test_master : Image.t
 
     val e2etest : Image.t
   end
@@ -637,3 +696,25 @@ end
 
 (* OIDC tokens to be generated by GitLab *)
 val id_tokens : Gitlab_ci.Types.id_tokens
+
+module Hooks : sig
+  (** Hooks for other libraries.
+
+      Hooks allow to extend CIAO from outside of CIAO.
+      This makes it possible for components to define their CI locally
+      and can result in better separation of concerns. *)
+
+  (** Jobs to add to [before_merging] and [merge_train] pipelines. *)
+  val before_merging : tezos_job list ref
+
+  (** Jobs to add to [master] branch pipelines. *)
+  val master : tezos_job list ref
+
+  (** Regular expressions that match release tags.
+
+      Used by [ci/bin/main.ml] to define the [non_release_tag]
+      and [non_release_tag_test] pipelines. *)
+  val release_tags : string list ref
+end
+
+val job_datadog_pipeline_trace : tezos_job

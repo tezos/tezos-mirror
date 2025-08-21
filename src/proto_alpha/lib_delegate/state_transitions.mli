@@ -29,6 +29,7 @@
 open Protocol
 open Alpha_context
 open Baking_state
+open Baking_state_types
 open Baking_actions
 
 val do_nothing : state -> (state * action) Lwt.t

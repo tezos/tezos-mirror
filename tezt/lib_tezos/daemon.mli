@@ -113,6 +113,12 @@ module Make : functor (X : PARAMETERS) -> sig
   (** Get the name of a daemon. *)
   val name : t -> string
 
+  (** Get the pid of a process, or none if it is not yet running. *)
+  val pid : t -> int option
+
+  (** Get the executable path of the daemon. *)
+  val path : t -> string
+
   (** Send SIGTERM to a daemon and wait for it to terminate.
 
       Default [timeout] is 30 seconds, after which SIGKILL is sent. *)

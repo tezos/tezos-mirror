@@ -345,7 +345,7 @@ type slot_header = {
   status : header_status;
 }
 
-type profile = Bootstrap | Operator of Operator_profile.t | Random_observer
+type profile = Bootstrap | Controller of Controller_profiles.t
 
 type with_proof = {with_proof : bool}
 
@@ -361,6 +361,7 @@ type proto_parameters = {
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
   blocks_per_cycle : int32;
+  minimal_block_delay : int64;
 }
 
 type trap = {
@@ -458,7 +459,7 @@ let profile_encoding =
   union
     [
       case
-        ~title:"Boostrap node"
+        ~title:"Bootstrap node"
         (Tag 1)
         (obj1 (req "kind" (constant "bootstrap")))
         (function Bootstrap -> Some () | _ -> None)
@@ -468,17 +469,11 @@ let profile_encoding =
         (Tag 2)
         (obj2
            (req "kind" (constant "controller"))
-           (req "controller_profiles" Operator_profile.encoding))
+           (req "controller_profiles" Controller_profiles.encoding))
         (function
-          | Operator operator_profiles -> Some ((), operator_profiles)
+          | Controller controller_profiles -> Some ((), controller_profiles)
           | _ -> None)
-        (function (), operator_profiles -> Operator operator_profiles);
-      case
-        ~title:"Random_observer"
-        (Tag 3)
-        (obj1 (req "kind" (constant "random_observer")))
-        (function Random_observer -> Some () | _ -> None)
-        (function () -> Random_observer);
+        (function (), controller_profiles -> Controller controller_profiles);
     ]
 
 let with_proof_encoding =
@@ -510,6 +505,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
            commitment_period_in_blocks;
            dal_attested_slots_validity_lag;
            blocks_per_cycle;
+           minimal_block_delay;
          } ->
       ( ( feature_enable,
           incentives_enable,
@@ -521,7 +517,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           sc_rollup_challenge_window_in_blocks,
           commitment_period_in_blocks,
           dal_attested_slots_validity_lag,
-          blocks_per_cycle ) ))
+          blocks_per_cycle,
+          minimal_block_delay ) ))
     (fun ( ( feature_enable,
              incentives_enable,
              number_of_slots,
@@ -532,7 +529,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
              sc_rollup_challenge_window_in_blocks,
              commitment_period_in_blocks,
              dal_attested_slots_validity_lag,
-             blocks_per_cycle ) ) ->
+             blocks_per_cycle,
+             minimal_block_delay ) ) ->
       {
         feature_enable;
         incentives_enable;
@@ -545,6 +543,7 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
         commitment_period_in_blocks;
         dal_attested_slots_validity_lag;
         blocks_per_cycle;
+        minimal_block_delay;
       })
     (merge_objs
        (obj6
@@ -554,12 +553,13 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
           (req "attestation_lag" int31)
           (req "attestation_threshold" int31)
           (req "traps_fraction" q_encoding))
-       (obj5
+       (obj6
           (req "cryptobox_parameters" Cryptobox.Verifier.parameters_encoding)
           (req "sc_rollup_challenge_window_in_blocks" int31)
           (req "commitment_period_in_blocks" int31)
           (req "dal_attested_slots_validity_lag" int31)
-          (req "blocks_per_cycle" int32)))
+          (req "blocks_per_cycle" int32)
+          (req "minimal_block_delay" int64)))
 
 let trap_encoding =
   Data_encoding.(

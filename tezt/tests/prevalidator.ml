@@ -1908,11 +1908,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (delegate : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+           ~slot:(Operation.Consensus.first_slot ~slots delegate)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2159,12 +2159,12 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (delegate : Account.key) =
       let* op =
         Operation.Consensus.operation
           (Operation.Consensus.attestation
-             ~slot:(Operation.Consensus.first_slot ~slots_json delegate)
+             ~slot:(Operation.Consensus.first_slot ~slots delegate)
              ~level
              ~round:0
              ~block_payload_hash
@@ -2421,11 +2421,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2534,11 +2534,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation (account : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash
@@ -2666,11 +2666,11 @@ module Revamped = struct
     let* block_payload_hash =
       Operation.Consensus.get_block_payload_hash client
     in
-    let* slots_json = Operation.Consensus.get_slots ~level client in
+    let* slots = Operation.Consensus.get_slots ~level client in
     let inject_attestation ~(account : Account.key) ~(signer : Account.key) =
       Operation.Consensus.inject
         (Operation.Consensus.attestation
-           ~slot:(Operation.Consensus.first_slot ~slots_json account)
+           ~slot:(Operation.Consensus.first_slot ~slots account)
            ~level
            ~round:0
            ~block_payload_hash
@@ -3760,6 +3760,103 @@ module Revamped = struct
           client)
     in
     unit
+
+  let consensus_minimal_slots_feature_flag =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Mempool filters consensus operations with non-minimal slots"
+      ~tags:[team; "mempool"; "consensus"; "minimal"; "slots"]
+      ~supports:(Protocol.From_protocol 023)
+    @@ fun protocol ->
+    log_step 1 "Initialize node and activate protocol" ;
+    let* parameter_file =
+      Protocol.write_parameter_file
+        ~base:(Either.Right (protocol, None))
+        [(["aggregate_attestation"], `Bool true)]
+    in
+    let* node, client =
+      Client.init_with_protocol `Client ~protocol ~parameter_file ()
+    in
+    let* _ = Node.wait_for_level node 1 in
+    log_step 2 "Bake 3 blocks to have multiple valid levels to attest for" ;
+    let* level = Client.bake_for_and_wait_level ~count:3 client in
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash client
+    in
+    log_step 3 "Inject consensus operations for all accepted levels " ;
+    (* Mempool is expected to accept consensus operations for the following
+       levels *)
+    let accepted_levels = [level - 1; level; level + 1] in
+    let attest_for ~delegate ~level ~slot =
+      Operation.Consensus.(
+        inject
+          (attestation ~slot ~level ~round:0 ~block_payload_hash ())
+          ~force:true
+          ~protocol
+          ~signer:delegate
+          client)
+    in
+    let preattest_for ~delegate ~level ~slot =
+      Operation.Consensus.(
+        inject
+          (preattestation ~slot ~level ~round:0 ~block_payload_hash)
+          ~force:true
+          ~protocol
+          ~signer:delegate
+          client)
+    in
+    let* validated, refused =
+      Lwt_list.fold_left_s
+        (fun (validated, refused) level ->
+          let* attesting_rights = Operation.Consensus.get_slots ~level client in
+          (* Look for a delegate that has more than one slot *)
+          let delegate, slots =
+            let delegate_opt =
+              Array.find_map
+                (fun account ->
+                  match
+                    List.assoc_opt
+                      account.Account.public_key_hash
+                      attesting_rights
+                  with
+                  | Some (_ :: _ :: _ as slots) -> Some (account, slots)
+                  | _ -> None)
+                Account.Bootstrap.keys
+            in
+            match delegate_opt with
+            | Some (delegate, slots) -> (delegate, slots)
+            | None ->
+                Test.fail
+                  "found no delegate with more than one slot at level %d"
+                  level
+          in
+          (* Inject an attestation with a minimal slot *)
+          let* (`OpHash valid_attestation) =
+            attest_for ~delegate ~level ~slot:(List.hd slots)
+          in
+          (* Inject an attestation with a non-minimal slot *)
+          let* (`OpHash refused_attestation) =
+            attest_for ~delegate ~level ~slot:(List.nth slots 1)
+          in
+          (* Inject a preattestation with a minimal slot *)
+          let* (`OpHash valid_preattestation) =
+            preattest_for ~delegate ~level ~slot:(List.hd slots)
+          in
+          (* Inject a preattestation with a non-minimal slot *)
+          let* (`OpHash refused_preattestation) =
+            preattest_for ~delegate ~level ~slot:(List.nth slots 1)
+          in
+          return
+            ( valid_attestation :: valid_preattestation :: validated,
+              refused_attestation :: refused_preattestation :: refused ))
+        ([], [])
+        accepted_levels
+    in
+    log_step 4 "Check that operations where correctly filtered by the mempool" ;
+    (* Check that operations with minimal slots were validated, while those with
+       non-minimal slots were refused *)
+    let* () = check_mempool ~validated ~refused client in
+    unit
 end
 
 let check_operation_is_in_validated_mempool ops oph =
@@ -4209,7 +4306,8 @@ let force_operation_injection =
     rex
       ~opts:[`Dotall]
       "Fatal error:\n\
-      \  Command failed: Error while validating injected operation.*:"
+      \  Command failed: Asynchronous injection failed with:\n\
+      \                  Error while validating injected operation.*"
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
@@ -4271,4 +4369,5 @@ let register ~protocols =
   Revamped.refused_operations_are_not_reclassified protocols ;
   Revamped.request_operations_from_peer protocols ;
   force_operation_injection protocols ;
-  Revamped.injecting_old_operation_fails protocols
+  Revamped.injecting_old_operation_fails protocols ;
+  Revamped.consensus_minimal_slots_feature_flag protocols

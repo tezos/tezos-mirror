@@ -11,7 +11,7 @@ module type S = sig
   (** See {!Evm_context.replay}. *)
   val replay :
     ?log_file:string ->
-    ?profile:bool ->
+    ?profile:Configuration.profile_mode ->
     ?alter_evm_state:(Irmin_context.tree -> Irmin_context.tree tzresult Lwt.t) ->
     Ethereum_types.quantity ->
     Evm_state.apply_result tzresult Lwt.t

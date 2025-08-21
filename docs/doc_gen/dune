@@ -4,7 +4,7 @@
 (executables
  (names rpc_doc p2p_doc)
  (libraries
-  octez-rustzcash-deps
+  octez-rust-deps
   bls12-381.archive
   octez-libs.base
   octez-libs.rpc
@@ -17,12 +17,16 @@
   octez-libs.data-encoding
   re
   tezos-protocol-genesis.embedded-protocol
-  tezos-protocol-021-PsQuebec.embedded-protocol
   tezos-protocol-022-PsRiotum.embedded-protocol
-  tezos-protocol-alpha.embedded-protocol)
+  tezos-protocol-023-PtSeouLo.embedded-protocol
+  tezos-protocol-alpha.embedded-protocol
+  octez-protocol-022-PsRiotum-libs.plugin-registerer
+  octez-protocol-023-PtSeouLo-libs.plugin-registerer
+  octez-protocol-alpha-libs.plugin-registerer)
  (link_flags
   (:standard)
-  (:include %{workspace_root}/macos-link-flags.sexp))
+  (:include %{workspace_root}/macos-link-flags.sexp)
+  (-linkall))
  (flags
   (:standard)
   -open Tezos_base.TzPervasives

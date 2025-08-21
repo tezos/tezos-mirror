@@ -370,8 +370,8 @@ let test_payload_producer_gets_evidence_rewards () =
   in
   let* b' =
     Block.bake
-      ~payload_round:(Some Round.zero)
-      ~locked_round:(Some Round.zero)
+      ~payload_round:Round.zero
+      ~locked_round:Round.zero
       ~policy:(By_account baker1)
       ~operations:(preattestations @ [db_evidence])
       b1

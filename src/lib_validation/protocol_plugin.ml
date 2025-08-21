@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -38,7 +38,6 @@ module type T = sig
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
-      Lwt.t
 
     val conflict_handler : config -> Mempool.conflict_handler
 
@@ -103,7 +102,7 @@ module No_plugin (Proto : Registered_protocol.T) :
 
     let syntactic_check _ = Lwt.return `Well_formed
 
-    let pre_filter _ _ _ = Lwt.return @@ `Passed_prefilter (`Low [])
+    let pre_filter _ _ _ = `Passed_prefilter (`Low [])
 
     let conflict_handler _ ~existing_operation ~new_operation =
       if compare_operations existing_operation new_operation < 0 then `Replace

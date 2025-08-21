@@ -153,6 +153,10 @@ module Mock_all_unit :
 
     let encoding = Data_encoding.unit
 
+    let partial_op_validation ?check_signature:_ _ _ = assert false
+
+    let add_valid_operation ?conflict_handler:_ _ _ = assert false
+
     let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
       assert false
 

@@ -29,7 +29,3 @@ fi
 if [[ -r "$CARGO_TARGET_DIR/release/liboctez_rust_deps.dylib" ]]; then
   cp -f "$CARGO_TARGET_DIR/release/liboctez_rust_deps.dylib" "$OUT_DIR/dlloctez_rust_deps.so"
 fi
-
-# Copy the header files to the output directory.
-cp "wasmer-3.3.0/lib/c-api/wasmer.h" "$OUT_DIR/wasmer.h"
-cp "wasmer-3.3.0/lib/c-api/wasm.h" "$OUT_DIR/wasm.h"

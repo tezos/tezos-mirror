@@ -42,8 +42,6 @@ let asetmap = external_lib "asetmap" V.(at_least "0.8.1")
 
 let astring = external_lib "astring" V.True
 
-let bam_ppx = external_lib "bam-ppx" V.(at_least "0.3")
-
 let base64 = external_lib "base64" V.(at_least "3.3.0")
 
 let bheap = external_lib "bheap" V.(at_least "2.0.0")
@@ -58,7 +56,7 @@ let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let camlp_streams = external_lib "camlp-streams" V.(at_least "5.0.1")
 
-let camlzip = external_lib "camlzip" V.(at_least "1.12" && less_than "1.13")
+let camlzip = external_lib "camlzip" V.(at_least "1.13")
 
 let caqti = external_lib "caqti" V.True
 
@@ -123,6 +121,12 @@ let dune_configurator = external_lib "dune-configurator" V.True
 
 let dynlink = external_lib "dynlink" V.True ~opam:""
 
+let eio = external_lib "eio" V.True
+
+let eio_main = external_lib "eio_main" V.True
+
+let lwt_eio = external_lib "lwt_eio" V.True
+
 let eqaf = external_lib "eqaf" V.True
 
 let ezgzip = external_lib "ezgzip" V.True
@@ -175,6 +179,8 @@ let lwt_canceler =
 
 let lwt_exit = external_lib "lwt-exit" V.True
 
+let lwt_log = external_lib "lwt_log" V.True
+
 let lwt_ppx = external_lib "lwt_ppx" V.True
 
 let lwt_unix = external_sublib lwt "lwt.unix"
@@ -206,7 +212,12 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let opam_file_format = external_lib "opam-file-format" V.(at_least "2.1.6")
+
 let opentelemetry = external_lib "opentelemetry" V.True
+
+let opentelemetry_ambient_context_lwt =
+  external_sublib opentelemetry "opentelemetry.ambient-context.lwt"
 
 let opentelemetry_lwt = external_lib "opentelemetry-lwt" V.True
 

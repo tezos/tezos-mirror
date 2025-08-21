@@ -1,4 +1,4 @@
-Version 21.3
+Version 21.4
 ============
 
 Version 21 contains a new version (V13) of the protocol environment.
@@ -49,7 +49,7 @@ the new safety net.
 
 Not applying round 1 -- 2 block proposals by default while creating
 them will allow for faster propagation and earlier consensus
-agreement. See :ref:`here <baker_manual_quebec>`
+agreement. See :ref:`here <baker_manual>`
 for further details on how bakers can fine-tune this parameter.
 
 .. _dal_node_v21_changes:
@@ -69,7 +69,7 @@ corresponding modes of an accompanying smart rollup node.
 
    The binary encoding of ``/config/netwok/dal`` changed.
    As a result, the v21 DAL node is not compatible with earlier versions of Octez -- it cannot interact with earlier versioned Octez nodes. If you are operating a Tezos DAL node, make sure to upgrade all Octez infra to v21.1 (or at least v21.0).
-   Also, for attesters, it is recommended that they start their DAL node using the argument ``--attester-profiles=<pkh>`` where <pkh> is the attester's address (not the alias).
+   Also, for attesters, it is recommended that they start their DAL node using the argument ``--attester-profile=<pkh>`` where <pkh> is the attester's address (not the alias).
 
 Octez v21.1 contains several improvements concerning the DAL, mainly concerning network reliability and diagnostics enabling bakers to detect more easily whether their DAL node is working as expected.
 In particular, the DAL node now does the following.
@@ -145,14 +145,14 @@ Update Instructions
 To update from sources::
 
   git fetch
-  git checkout octez-v21.3
+  git checkout octez-v21.4
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v21.3`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v21.`` Docker images of Octez.
 
 You can also install Octez using Opam by running ``opam install octez``.
 
@@ -163,11 +163,12 @@ The packages, as introduced since Octez version 20, are now **available via APT 
 We recommend users to install them from the APT repository corresponding to their Linux distribution, rather than from the links available in the GitLab release page.
 
 In addition, a **new set of Debian packages is now available for testing**. These packages will replace the current available packages in the future.
-Check :ref:`the documentation <new_packages>` for more details.
+Check :ref:`the documentation <installing_packages>` for more details.
 
 Changelog
 ---------
 
+- `Version 21.4 <../CHANGES.html#version-21-4>`_
 - `Version 21.3 <../CHANGES.html#version-21-3>`_
 - `Version 21.2 <../CHANGES.html#version-21-2>`_
 - `Version 21.1 <../CHANGES.html#version-21-1>`_

@@ -36,17 +36,11 @@ pub mod rust {
 /// Built-in primitive encoding to use.
 pub const BUILTIN: Symbol = Symbol("builtin");
 
-/// Kind of built-in primitive encoding to use.
-pub const KIND: Symbol = Symbol("kind");
-
 /// Composite encoding
 pub const COMPOSITE: Symbol = Symbol("composite");
 
 /// Attribute name used to mark field/variant as ignored.
 pub const SKIP: Symbol = Symbol("skip");
-
-/// Attribute used to specify maximal size/lengh.
-pub const MAX: Symbol = Symbol("max");
 
 pub const ENCODING: Symbol = Symbol("encoding");
 pub const BYTES: Symbol = Symbol("bytes");
@@ -56,7 +50,6 @@ pub const OPTION: Symbol = Symbol("option");
 pub const TIMESTAMP: Symbol = Symbol("timestamp");
 
 pub const SIZED: Symbol = Symbol("sized");
-pub const SIZE: Symbol = Symbol("size");
 
 pub const LIST: Symbol = Symbol("list");
 pub const BOUNDED: Symbol = Symbol("bounded");
@@ -68,6 +61,7 @@ pub const IGNORE_UNKNOWN: Symbol = Symbol("ignore_unknown");
 pub const TAG: Symbol = Symbol("tag");
 
 pub const Z_ARITH: Symbol = Symbol("zarith");
+pub const N_ARITH: Symbol = Symbol("narith");
 pub const MU_TEZ: Symbol = Symbol("mutez");
 
 pub const RESERVE: Symbol = Symbol("reserve");

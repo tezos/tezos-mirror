@@ -28,7 +28,7 @@ open Refutation_game
 
 module Types = struct
   type state = {
-    node_ctxt : Node_context.rw;
+    node_ctxt : Access_mode.ro Node_context.rw_context;
     state_cache : Pvm_plugin_sig.state_cache;
     self : Signature.public_key_hash;
     opponent : Signature.public_key_hash;
@@ -39,7 +39,7 @@ module Types = struct
   }
 
   type parameters = {
-    node_ctxt : Node_context.rw;
+    node_ctxt : Access_mode.ro Node_context.rw_context;
     self : Signature.public_key_hash;
     conflict : Octez_smart_rollup.Game.conflict;
   }
@@ -51,7 +51,7 @@ module Name = struct
   include Signature.Public_key_hash
 end
 
-module Worker = Worker.MakeSingle (Name) (Request) (Types)
+module Worker = Octez_telemetry.Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
@@ -141,7 +141,7 @@ let init node_ctxt ~self ~conflict =
     @@ Worker.launch
          table
          conflict.other
-         {node_ctxt; self; conflict}
+         {node_ctxt = Node_context.readonly_store node_ctxt; self; conflict}
          (module Handlers)
   in
   let () = Lwt.wakeup worker_waker worker in
@@ -194,9 +194,10 @@ let init_and_play node_ctxt ~self ~conflict ~game ~level =
   in
   return_unit
 
-let current_games () =
-  List.map
-    (fun (_name, worker) -> ((Worker.state worker).opponent, worker))
-    (Worker.list table)
+let play opponent game ~level =
+  Worker.find_opt table opponent |> Option.iter_s (fun w -> play w game ~level)
 
-let shutdown = Worker.shutdown
+let current_games () =
+  List.map (fun (opponent, _worker) -> opponent) (Worker.list table)
+
+let shutdown name = Worker.find_opt table name |> Option.iter_s Worker.shutdown

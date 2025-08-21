@@ -11,14 +11,6 @@ type mode =
   | Sequencer
   | Relay
       (** Relays the transactions when they are valid w.r.t. the local state. *)
-  | Forward of {
-      injector :
-        Ethereum_types.legacy_transaction_object ->
-        string ->
-        (Ethereum_types.hash, string) result tzresult Lwt.t;
-    }
-      (** Forwards the transactions without checking the
-          transaction validity. *)
 
 type parameters = {
   backend : (module Services_backend_sig.S);  (** The backend RPC module. *)
@@ -28,36 +20,16 @@ type parameters = {
   tx_pool_addr_limit : int;  (** Maximum allowed addresses inside the pool. *)
   tx_pool_tx_per_addr_limit : int;
       (** Maximum allowed transactions per address inside the pool. *)
-  max_number_of_chunks : int option;
-      (** Maximum allowed number of chunks to be sent (relevant for the
-          sequencer). *)
+  chain_family : L2_types.ex_chain_family;
 }
 
 (** [start parameters] starts the tx-pool *)
-val start : parameters -> unit tzresult Lwt.t
+val start : tx_pool_parameters:parameters -> unit tzresult Lwt.t
 
-(** [shutdown ()] stops the tx-pool, waiting for the ongoing request
-    to be processed. *)
-val shutdown : unit -> unit tzresult Lwt.t
-
-(** [add transaction_object raw_tx] adds a eth transaction and its raw contents
-    to the tx-pool.
-
-    The consistency between [transaction_object] and [raw_tx] is assumed by
-    [add]. It is the responsibility of the caller to enforce it. *)
-val add :
-  Ethereum_types.legacy_transaction_object ->
-  string ->
-  (Ethereum_types.hash, string) result tzresult Lwt.t
-
-(** [nonce address] returns the nonce of the user
-    Returns the first gap in the tx-pool, or the nonce stored on the rollup
-    if no transactions are in the pool. *)
-val nonce : Ethereum_types.Address.t -> Ethereum_types.quantity tzresult Lwt.t
-
-(** [pop_transactions maximum_cumulative_size] pops as much valid transactions
-    as possible from the pool, until their cumulative size exceeds
-    `maximum_cumulative_size`. Returns no transactions if the pool is locked. *)
+(** [pop_transactions chain_family maximum_cumulative_size] pops as much
+    valid transactions as possible from the pool, until their cumulative
+    size exceeds `maximum_cumulative_size`. If the pool is locked or node
+    in tezlink mode, returns no transactions. *)
 val pop_transactions :
   maximum_cumulative_size:int ->
   (string * Ethereum_types.legacy_transaction_object) list tzresult Lwt.t
@@ -72,26 +44,15 @@ val pop_and_inject_transactions : unit -> unit tzresult Lwt.t
     complete *)
 val pop_and_inject_transactions_lazy : unit -> unit tzresult Lwt.t
 
-(** [lock_transactions] locks the transactions in the pool, new transactions
-    can be added but nothing can be retrieved with {!pop_transactions}. *)
-val lock_transactions : unit -> unit tzresult Lwt.t
-
-(** [unlock_transactions] unlocks the transactions if it was locked by
-    {!lock_transactions}. *)
-val unlock_transactions : unit -> unit tzresult Lwt.t
-
-(** [is_locked] checks if the pools is locked. *)
-val is_locked : unit -> bool tzresult Lwt.t
-
 val size_info : unit -> Metrics.Tx_pool.size_info tzresult Lwt.t
 
-val get_tx_pool_content : unit -> Ethereum_types.txpool tzresult Lwt.t
-
-(** [find tx_hash] look into the tx pool if a transaction with hash
-    [tx_hash] exists and returns it's corresponding
-    {!Ethereum_types.transaction_object}. *)
-val find :
-  Ethereum_types.hash ->
-  Ethereum_types.legacy_transaction_object option tzresult Lwt.t
-
 val clear_popped_transactions : unit -> unit tzresult Lwt.t
+
+(** [mode] retrieves the current pool mode *)
+val mode : unit -> mode tzresult Lwt.t
+
+(** wrapper of the Tx_pool to be compatible with the Tx_container
+    signature for the services. *)
+val tx_container :
+  chain_family:'f L2_types.chain_family ->
+  'f Services_backend_sig.tx_container tzresult

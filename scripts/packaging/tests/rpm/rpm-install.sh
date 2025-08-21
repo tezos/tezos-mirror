@@ -1,6 +1,9 @@
 #!/bin/sh
 #
 
+# include apt-get function with retry
+. scripts/packaging/tests/tests-common.inc.sh
+
 set -eu
 
 REPO="https://storage.googleapis.com/$GCP_LINUX_PACKAGES_BUCKET/$CI_COMMIT_REF_NAME"
@@ -18,7 +21,7 @@ while [ "$(systemctl is-system-running)" = "offline" ]; do
   sleep 1
 done
 
-# Update and install the config-mananger plugin
+# Update and install the config-manager plugin
 dnf -y update
 dnf -y install dnf-plugins-core
 
@@ -32,9 +35,14 @@ dnf -y update
 # Install public key
 rpm --import "$REPO/$DISTRO/octez.asc"
 
-dnf -y install sudo procps
+dnf -y install sudo procps util-linux
 
-dnf -y install octez-client octez-node octez-baker
+dnf -y install \
+  octez-client \
+  octez-node \
+  octez-dal-node \
+  octez-baker \
+  octez-smart-rollup-node
 
 #shellcheck disable=SC2129,SC1091
 echo "NETWORK=ghostnet" >> /etc/default/octez-node
@@ -62,3 +70,9 @@ if [ "$(ps --no-headers -o comm 1)" = "systemd" ]; then
   . scripts/packaging/tests/tests-systemd-common.inc.sh
 
 fi
+
+dnf -y remove octez-node \
+  octez-client \
+  octez-baker \
+  octez-dal-node \
+  octez-smart-rollup-node

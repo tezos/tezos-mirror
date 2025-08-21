@@ -16,7 +16,11 @@
   -open Tezt_core
   -open Tezt_core.Base
   -open Octez_alcotezt)
- (modules test_aggregated_signature test_signature utils))
+ (modules
+  test_threshold_signature
+  test_aggregated_signature
+  test_signature
+  utils))
 
 (executable
  (name main)

@@ -30,6 +30,7 @@
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   brassaia_test_tezt_lib
   tezt)
  (modules main))

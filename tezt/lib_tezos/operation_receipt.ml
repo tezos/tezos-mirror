@@ -7,6 +7,13 @@
 
 (* Helper functions to handle operation results  *)
 
+(* Use the node for RPC call when possible because it is much faster *)
+let rpc_call client =
+  let mode = Client.get_mode client in
+  match Client.mode_to_endpoint mode with
+  | Some (Node node) -> Node.RPC.call node
+  | _ -> Client.RPC.call client
+
 (** Returns the content of the "operation_result" field from the metadata of the
     operation with hash [operation] in the [check_previous] blocks before the
     current head using  the 'get_chain_block_operations' RPC.
@@ -17,7 +24,7 @@ let get_result_for operation ?(check_previous = 10) client =
     else
       let block = Format.sprintf "head~%d" i in
       let* operations =
-        Client.RPC.call client
+        rpc_call client
         @@ RPC.get_chain_block_operations_validation_pass
              ~block
              ~force_metadata:true
@@ -43,7 +50,7 @@ let get_result_for operation ?(check_previous = 10) client =
   aux 0
 
 let get_block_metadata client =
-  Client.RPC.call client @@ RPC.get_chain_block_metadata_raw ()
+  rpc_call client @@ RPC.get_chain_block_metadata_raw ()
 
 module Balance_updates = struct
   type staker =

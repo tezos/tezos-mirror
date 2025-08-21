@@ -1,10 +1,12 @@
 Protocol Quebec
 ===============
 
-This page documents the changes brought by protocol Quebec with respect
+This page lists the changes brought by protocol Quebec with respect
 to Paris (see :ref:`naming_convention`).
+For the list of changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
 
-For changes brought by Paris with respect to Oxford, see :doc:`../protocols/020_paris`.
+For a higher-level overview of the most salient new features see the
+`Quebec announcement <https://research-development.nomadic-labs.com/quebec-announcement.html>`__.
 
 The code can be found in directory :src:`src/proto_021_PsQuebec` of the ``master``
 branch of Octez.
@@ -44,12 +46,12 @@ No changes.
 Adaptive Issuance
 -----------------
 
-- Added the :ref:`Adaptive Maximum<adaptive_maximum_quebec>` system,
+- Added the :ref:`Adaptive Maximum<adaptive_maximum>` system,
   that imposes a new bound on the issuance as a function of the staked
   ratio. (MRs :gl:`!13519`, :gl:`!14635`)
 
 - Changed the semantics of the
-  :ref:`min-delegated-in-current-cycle<min_delegated_quebec>` used to
+  :ref:`min-delegated-in-current-cycle<min_delegated>` used to
   compute baking rights. It now only considers the minimum in between
   blocks. (MR :gl:`!13945`)
 
@@ -89,7 +91,7 @@ RPC Changes
 
 - In the following paths, ``../`` is short for
   ``/chains/<chain_id>/blocks/<block_id>/context/delegates/<baker_pkh>/``.
-  See https://tezos.gitlab.io/quebec/baking_power.html for more
+  See :doc:`../active/baking_power` for more
   details on the renamed and new RPCs.
 
   * Renamed RPC ``GET ../current_frozen_deposits`` to ``GET

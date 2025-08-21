@@ -173,13 +173,13 @@ local logs = panel.logs;
 
   logs:
     {
-
-      new(title, q, h, w, x, y):
+      new(title, q, h, w, x, y, d, dn):
         logs.new(title)
         + logs.panelOptions.withGridPos(h, w, x, y)
-        + logs.queryOptions.withDatasource('loki', 'Loki')
-        + logs.queryOptions.withTargets(q),
-
+        + logs.queryOptions.withTargets(q)
+        + logs.options.withSortOrder('Descending')
+        + logs.options.withWrapLogMessage(true)
+        + logs.queryOptions.withDatasource(d, dn),
     },
 
   // Variables

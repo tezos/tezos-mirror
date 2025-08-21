@@ -15,6 +15,7 @@ type t = {
   dir : string;
   monitoring : bool;
   prometheus : bool;
+  opentelemetry : bool;
   mutable services : service list;
 }
 
@@ -24,8 +25,11 @@ let pp_docker_image fmt = function
 
 let domain agents =
   match Env.mode with
-  | `Orchestrator -> Proxy.get_agent agents |> Agent.point |> Option.get |> fst
-  | `Host | `Localhost | `Cloud -> "localhost"
+  | `Remote_orchestrator_local_agents | `Ssh_host _ ->
+      Proxy.get_agent agents |> Agent.point |> Option.get |> fst
+  | `Remote_orchestrator_remote_agents | `Local_orchestrator_local_agents
+  | `Local_orchestrator_remote_agents ->
+      "localhost"
 
 let string_docker_command agent =
   match Agent.runner agent with
@@ -100,15 +104,17 @@ let agent_jingo_template agent =
 let monitoring_jingo_template agents agent =
   let open Jingoo.Jg_types in
   let host =
-    if Env.mode = `Localhost then "localhost"
+    if Env.mode = `Local_orchestrator_local_agents then "localhost"
     else
       match Agent.point agent with
       | Some (host, _port) -> host
       | None -> domain agents
   in
+  let vm_name = Option.value ~default:"None" (Agent.vm_name agent) in
   Tobj
     [
       ("name", Tstr (Agent.name agent));
+      ("vm_name", Tstr vm_name);
       ("uri", Tstr (sf "http://%s:19999" host));
     ]
 
@@ -141,6 +147,12 @@ let jingoo_template t agents =
         (if Env.monitoring then
            List.map (monitoring_jingo_template agents) agents
          else []) );
+    ( "opentelemetry",
+      Tobj
+        [
+          ("activated", Tbool Env.open_telemetry);
+          ("uri", Tstr (Format.asprintf "http://%s:16686" (domain agents)));
+        ] );
     ("agents", Tlist (List.map agent_jingo_template agents));
     ("services", Tlist (List.map service_jingo_template t.services));
   ]
@@ -169,12 +181,13 @@ let add_service t ~agents service =
 let run () =
   (* We do not use the Temp.dir so that the base directory is predictable and
      can be mounted by the proxy VM if [--proxy] is used. *)
-  let dir = Filename.get_temp_dir_name () // "website" in
+  let dir = Path.tmp_dir // "website" in
   let* () = Process.run "mkdir" ["-p"; dir] in
   let index = index dir in
   let port = Env.website_port in
   let prometheus = Env.prometheus in
   let monitoring = Env.monitoring in
+  let opentelemetry = Env.open_telemetry in
   let stop, to_stop = Lwt.task () in
   let logger next_handler request =
     let meth = Dream.method_to_string (Dream.method_ request) in
@@ -211,6 +224,7 @@ let run () =
                let content =
                  if Sys.file_exists file then read_file file else ""
                in
+               Log.report "[WEB] GET /metrics" ;
                let response = Dream.response content in
                Dream.add_header
                  response
@@ -225,7 +239,16 @@ let run () =
                Dream.html content);
          ]
   in
-  Lwt.return {process; to_stop; dir; monitoring; prometheus; services = []}
+  Lwt.return
+    {
+      process;
+      to_stop;
+      dir;
+      monitoring;
+      prometheus;
+      opentelemetry;
+      services = [];
+    }
 
 let start ~agents =
   let* t = run () in

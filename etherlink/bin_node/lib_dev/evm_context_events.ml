@@ -83,8 +83,9 @@ let gc_waiter_failed =
     ~section
     ~name:"evm_context_gc_waiter_failed"
     ~level:Warning
-    ~msg:"garbage collector waiter failed with an exception:"
+    ~msg:"garbage collector waiter failed with an exception: {exn}"
     ("exn", Data_encoding.string)
+    ~pp1:Format.pp_print_string
 
 let unexpected_l1_block =
   declare_2

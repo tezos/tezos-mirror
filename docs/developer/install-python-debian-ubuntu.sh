@@ -109,7 +109,7 @@ cd tezos
 poetry install
 
 # [print sphinx-build versions]
-poetry run sphinx-build --version # should output 4.2.0
+poetry run sphinx-build --version # should output 7.3.7
 
 # [verify sphinx-build version]
 [ "$(poetry run sphinx-build --version)" = "sphinx-build 7.3.7" ]

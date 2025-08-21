@@ -71,24 +71,18 @@ struct
         ~pp1
 
     let initialized =
-      declare_0
+      declare_1
         ~level:Info
         ~name:"initialized"
-        ~msg:(Params.name ^ " initialized and listening")
-        ()
+        ~msg:(Params.name ^ " initialized and listening with pid {pid}")
+        ~pp1:Format.pp_print_int
+        ("pid", Data_encoding.int31)
 
     let terminated =
       declare_0
         ~level:Info
         ~name:"terminated_request"
         ~msg:(Params.name ^ " terminated")
-        ()
-
-    let initialization_request =
-      declare_0
-        ~level:Info
-        ~name:"initialization_request"
-        ~msg:(Format.sprintf "initializing %s's environment" Params.name)
         ()
 
     let request =
@@ -121,7 +115,6 @@ struct
      the init scenario. *)
   let init input output =
     let open Lwt_result_syntax in
-    let*! () = Events.(emit initialization_request ()) in
     let*! parameters = Lwt_unix_socket.recv input Params.parameters_encoding in
     let* state = Processing.initial_state parameters in
     (* It is necessary to send the ok result, as a blocking promise for
@@ -135,18 +128,14 @@ struct
     in
     return (parameters, state)
 
-  let run ~using_std_channel input output =
+  let run input output =
     let open Lwt_result_syntax in
     let* () = handshake input output in
     let* parameters, state = init input output in
     let*! () =
-      (* if the external process is spawned in a standalone way and communicates
-         with the node through stdin/stdoud, we do no start the logging
-         system. *)
-      if using_std_channel then Lwt.return_unit
-      else
-        Internal_event_unix.init ~config:(Params.internal_events parameters) ()
+      Internal_event_unix.init ~config:(Params.internal_events parameters) ()
     in
+    let*! () = Events.(emit initialized (Unix.getpid ())) in
     let rec loop state =
       let*! (Params.Erequest recved) =
         Lwt_unix_socket.recv input Params.request_encoding
@@ -173,26 +162,22 @@ struct
     in
     loop state
 
-  let main ?socket_dir () =
+  let main ~socket_dir =
     let open Lwt_result_syntax in
     let canceler = Lwt_canceler.create () in
-    let* in_channel, out_channel, using_std_channel =
-      match socket_dir with
-      | Some socket_dir ->
-          let pid = Unix.getpid () in
-          let socket_path = Params.socket_path ~socket_dir ~pid in
-          let* socket_process =
-            Lwt_unix_socket.create_socket_connect ~canceler ~socket_path
-          in
-          let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
-          let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
-          return (socket_in, socket_out, false)
-      | None -> return (Lwt_io.stdin, Lwt_io.stdout, true)
+    let* in_channel, out_channel =
+      let pid = Unix.getpid () in
+      let socket_path = Params.socket_path ~socket_dir ~pid in
+      let* socket_process =
+        Lwt_unix_socket.create_socket_connect ~canceler ~socket_path
+      in
+      let socket_in = Lwt_io.of_fd ~mode:Input socket_process in
+      let socket_out = Lwt_io.of_fd ~mode:Output socket_process in
+      return (socket_in, socket_out)
     in
-    let*! () = Events.(emit initialized ()) in
     let*! r =
       Error_monad.catch_es (fun () ->
-          let* () = run ~using_std_channel in_channel out_channel in
+          let* () = run in_channel out_channel in
           let*! r = Lwt_canceler.cancel canceler in
           match r with
           | Ok () | Error [] -> return_unit

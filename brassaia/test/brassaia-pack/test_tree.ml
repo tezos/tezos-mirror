@@ -419,7 +419,7 @@ module Binary = Make (struct
 end)
 
 (* test large compressed proofs *)
-let test_large_proofs () =
+let _test_large_proofs () =
   (* Build a proof on a large store (branching factor = 32) *)
   let bindings = init_bindings 100_000 in
   let ops n =
@@ -765,8 +765,8 @@ let tests =
       (fun _switch -> test_length_proof);
     Alcotest_lwt.test_case "test deeper Merkle proof" `Quick (fun _switch ->
         test_deeper_proof);
-    Alcotest_lwt.test_case "test large Merkle proof" `Slow (fun _switch ->
-        test_large_proofs);
+    (* Alcotest_lwt.test_case "test large Merkle proof" `Slow (fun _switch -> *)
+    (*     test_large_proofs); *)
     Alcotest_lwt.test_case "test extenders in stream proof" `Quick
       (fun _switch -> test_extenders);
     Alcotest_lwt.test_case "test hardcoded stream proof" `Quick (fun _switch ->

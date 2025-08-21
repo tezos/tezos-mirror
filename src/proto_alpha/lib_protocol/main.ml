@@ -86,9 +86,7 @@ let validation_passes =
       {max_size = 512 * 1024; max_op = None};
     ]
 
-let rpc_services =
-  Alpha_services.register () ;
-  Services_registration.get_rpc_services ()
+let rpc_services = RPC_directory.empty
 
 type validation_state = Validate.validation_state
 
@@ -148,6 +146,7 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
       ctxt
       ~allowed_attestations:(Some attestations_map)
       ~allowed_preattestations
+      ~allowed_consensus:None
   in
   return ctxt
 
@@ -162,30 +161,33 @@ let init_consensus_rights_for_block ctxt mode ~predecessor_level =
 let init_consensus_rights_for_mempool ctxt ~predecessor_level =
   let open Lwt_result_syntax in
   let open Alpha_context in
-  (* We don't want to compute the tables by first slot for all three
-     possible levels because it is time-consuming. So we don't compute
-     any [allowed_attestations] or [allowed_preattestations] tables. *)
+  (* For each allowed level, compute a map associating slots to their owners.
+     Only the lowest slot assigned to each delegate is included. *)
+  let allowed_levels =
+    let levels = [predecessor_level; Level.(succ ctxt predecessor_level)] in
+    match Level.pred ctxt predecessor_level with
+    | Some grandparent_level -> grandparent_level :: levels
+    | None -> levels
+  in
+  let* ctxt, minimal_slots =
+    List.fold_left_es
+      (fun (ctxt, minimal_slots) level ->
+        let* ctxt, level_minimal_slot =
+          Baking.attesting_rights_by_first_slot ctxt level
+        in
+        return (ctxt, Level.Map.add level level_minimal_slot minimal_slots))
+      (ctxt, Level.Map.empty)
+      allowed_levels
+  in
   let ctxt =
+    (* Store the resulting map in the context as [allowed_consensus]. *)
     Consensus.initialize_consensus_operation
       ctxt
       ~allowed_attestations:None
       ~allowed_preattestations:None
+      ~allowed_consensus:(Some minimal_slots)
   in
-  (* However, we want to ensure that the cycle rights are loaded in
-     the context, so that {!Stake_distribution.slot_owner} doesn't
-     have to initialize them each time it is called (we do this now
-     because the context is discarded at the end of the validation of
-     each operation, so we can't rely on the caching done by
-     [slot_owner] itself). *)
-  let cycle = (Level.current ctxt).cycle in
-  let* ctxt = Stake_distribution.load_sampler_for_cycle ctxt cycle in
-  (* If the cycle has changed between the grandparent level and the
-     current level, we also initialize the sampler for that
-     cycle. That way, all three allowed levels are covered. *)
-  match Level.pred ctxt predecessor_level with
-  | Some gp_level when Cycle.(gp_level.cycle <> cycle) ->
-      Stake_distribution.load_sampler_for_cycle ctxt gp_level.cycle
-  | Some _ | None -> return ctxt
+  return ctxt
 
 let prepare_ctxt ctxt mode ~(predecessor : Block_header.shell_header) =
   let open Lwt_result_syntax in

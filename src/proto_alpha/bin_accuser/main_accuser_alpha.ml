@@ -36,4 +36,12 @@ let select_commands _ _ =
        (Tezos_clic.map_command (new Protocol_client_context.wrap_full))
        (Baking_commands.accuser_commands ()))
 
+module Daemon_config = struct
+  include Daemon_config
+
+  let default_daily_logs_path = Some ("octez-accuser-" ^ Protocol.name)
+
+  let advertise_log_levels = Some true
+end
+
 let () = Client_main_run.run (module Daemon_config) ~select_commands

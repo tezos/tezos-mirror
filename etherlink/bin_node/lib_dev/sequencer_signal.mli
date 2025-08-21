@@ -29,8 +29,7 @@
     in the inbox.
 *)
 val create :
-  cctxt:#Client_context.wallet ->
-  sequencer_key:Client_keys.sk_uri ->
+  signer:Signer.t ->
   smart_rollup_address:Tezos_crypto.Hashed.Smart_rollup_address.t ->
   slot_ids:(int * int32) list ->
   [> `External of string] tzresult Lwt.t

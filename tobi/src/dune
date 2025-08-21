@@ -7,7 +7,8 @@
  (package tobi)
  (libraries
   unix
-  clap)
+  clap
+  opam-file-format)
  (link_flags
   (:standard)
   (:include %{workspace_root}/static-link-flags.sexp)))

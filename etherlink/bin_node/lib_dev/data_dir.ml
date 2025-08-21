@@ -48,7 +48,7 @@ let lock ~data_dir =
 
 let export_store ~data_dir ~output_db_file =
   let open Lwt_result_syntax in
-  let* store = Evm_store.init ~data_dir ~perm:`Read_only () in
+  let* store = Evm_store.init ~data_dir ~perm:(Read_only {pool_size = 1}) () in
   Evm_store.use store @@ fun conn ->
   let* metadata = Evm_store.Metadata.get conn in
   let* legacy_block_storage = Evm_store.Block_storage_mode.legacy conn in

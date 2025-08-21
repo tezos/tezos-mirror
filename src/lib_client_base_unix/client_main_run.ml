@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -81,9 +82,13 @@ module type M = sig
     Tezos_client_base.Client_context.full Tezos_clic.command list
 
   val logger : RPC_client_unix.logger option
+
+  val advertise_log_levels : bool option
+
+  val version : string option
 end
 
-let register_default_signer ?other_registrations ?logger
+let register_default_signer ?signing_version ?other_registrations ?logger
     (cctxt : Client_context.io_wallet) =
   let module Remote_params = struct
     let authenticate pkhs payload =
@@ -103,7 +108,16 @@ let register_default_signer ?other_registrations ?logger
             | _ -> None)
           keys
       with
-      | sk_uri :: _ -> Client_keys.sign cctxt sk_uri payload
+      | sk_uri :: _ -> (
+          match signing_version with
+          | Some Signature.Version_0 ->
+              let* sign = Client_keys.V0.sign cctxt sk_uri payload in
+              return @@ Signature.V_latest.Of_V0.signature sign
+          | Some Signature.Version_1 ->
+              let* sign = Client_keys.V1.sign cctxt sk_uri payload in
+              return @@ Signature.V_latest.Of_V1.signature sign
+          | Some Signature.Version_2 -> Client_keys.V2.sign cctxt sk_uri payload
+          | None -> Client_keys.V_latest.sign cctxt sk_uri payload)
       | [] ->
           failwith
             "remote signer expects authentication signature, but no authorized \
@@ -156,15 +170,18 @@ let register_signer (module C : M) (cctxt : Client_context.io_wallet)
        module C *)
     match C.logger with Some logger -> logger | None -> rpc_config.logger
   in
-  let other_registrations =
+  let other_registrations, signing_version =
     match parsed_config_file with
-    | None -> None
+    | None -> (None, None)
     | Some parsed_config_file -> (
+        let version =
+          parsed_config_file.Client_config.Cfg_file.signing_version
+        in
         match C.other_registrations with
-        | Some r -> Some (r parsed_config_file)
-        | None -> None)
+        | Some r -> (Some (r parsed_config_file), version)
+        | None -> (None, version))
   in
-  register_default_signer ?other_registrations ~logger cctxt
+  register_default_signer ?signing_version ?other_registrations ~logger cctxt
 
 (** Warn the user if there are duplicate URIs in the sources (may or may
     not be a misconfiguration). *)
@@ -404,8 +421,45 @@ let warn_if_argv0_name_not_octez () =
         expected_name
         executable_name
 
+let init_logging (module C : M) ?(parsed_args : Client_config.cli_args option)
+    ?parsed_config_file ~base_dir () =
+  let open Tezos_base_unix.Internal_event_unix in
+  let daily_logs_path =
+    C.default_daily_logs_path
+    |> Option.map Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
+  in
+  (* Update config with color logging switch and advertise levels *)
+  let default_log_cfg =
+    let colors =
+      match parsed_args with
+      | None -> None
+      | Some parsed_args -> parsed_args.log_coloring
+    in
+    Tezos_base_unix.Logs_simple_config.create_cfg
+      ?advertise_levels:C.advertise_log_levels
+      ?colors
+      ()
+  in
+  let log_cfg =
+    match parsed_config_file with
+    | Some parsed_config_file ->
+        Option.value
+          ~default:default_log_cfg
+          parsed_config_file.Client_config.Cfg_file.log
+    | None -> default_log_cfg
+  in
+  let config =
+    make_with_defaults ?enable_default_daily_logs_at:daily_logs_path ~log_cfg ()
+  in
+  match parsed_config_file with
+  | None -> init ~config ()
+  | Some cf -> (
+      match cf.Client_config.Cfg_file.internal_events with
+      | None -> init ~config ()
+      | Some config -> init ~config ())
+
 (* Main (lwt) entry *)
-let main (module C : M) ~select_commands =
+let main (module C : M) ~select_commands ?(disable_logging = false) () =
   let open Lwt_result_syntax in
   let global_options = C.global_options () in
   let executable_name = Filename.basename Sys.executable_name in
@@ -426,19 +480,22 @@ let main (module C : M) ~select_commands =
   ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stdout)
         Format.std_formatter
-        (if Unix.isatty Unix.stdout then Ansi else Plain)
-        Short) ;
+        Details) ;
   ignore
     Tezos_clic.(
       setup_formatter
+        ~isatty:(Unix.isatty Unix.stderr)
         Format.err_formatter
-        (if Unix.isatty Unix.stderr then Ansi else Plain)
-        Short) ;
+        Details) ;
   warn_if_argv0_name_not_octez () ;
   let*! retcode =
     Lwt.catch
       (fun () ->
+        (* THIS MUST NOT BE MODIFIED, THIS CODE HAS TO BE COPIED PASTED IN THE
+           AGNOSTIC BAKER. IF YOU NEED TO MODIFY THIS, YOU NEED TO MODIFY
+           ACCORDINGLY THE COPIED CODE. *)
         let full =
           new unix_full
             ~chain:C.default_chain
@@ -462,36 +519,16 @@ let main (module C : M) ~select_commands =
                 | None -> C.default_base_dir
                 | Some p -> p.Client_config.Cfg_file.base_dir)
           in
-          let daily_logs_path =
-            C.default_daily_logs_path
-            |> Option.map
-                 Filename.Infix.(fun logdir -> base_dir // "logs" // logdir)
-          in
           let require_auth = parsed.Client_config.require_auth in
           let*! () =
-            let open Tezos_base_unix.Internal_event_unix in
-            (* Update config with color logging switch *)
-            let log_cfg =
-              match parsed_args with
-              | None -> Tezos_base_unix.Logs_simple_config.default_cfg
-              | Some parsed_args ->
-                  {
-                    Tezos_base_unix.Logs_simple_config.default_cfg with
-                    colors = Option.value parsed_args.log_coloring ~default:true;
-                  }
-            in
-            let config =
-              make_with_defaults
-                ?enable_default_daily_logs_at:daily_logs_path
-                ~log_cfg
+            if disable_logging then Lwt.return_unit
+            else
+              init_logging
+                (module C)
+                ?parsed_args
+                ?parsed_config_file
+                ~base_dir
                 ()
-            in
-            match parsed_config_file with
-            | None -> init ~config ()
-            | Some cf -> (
-                match cf.Client_config.Cfg_file.internal_events with
-                | None -> init ~config ()
-                | Some config -> init ~config ())
           in
           let rpc_config =
             let rpc_config : RPC_client_unix.config =
@@ -581,7 +618,9 @@ let main (module C : M) ~select_commands =
         | Ok () -> Lwt.return 0
         | Error [Tezos_clic.Version] ->
             let version =
-              Tezos_version_value.Bin_version.octez_version_string
+              Option.value
+                C.version
+                ~default:Tezos_version_value.Bin_version.octez_version_string
             in
             Format.printf "%s\n" version ;
             Lwt.return 0
@@ -620,7 +659,10 @@ let main (module C : M) ~select_commands =
   in
   Format.pp_print_flush Format.err_formatter () ;
   Format.pp_print_flush Format.std_formatter () ;
-  let*! () = Tezos_base_unix.Internal_event_unix.close () in
+  let*! () =
+    if disable_logging then Lwt.return_unit
+    else Tezos_base_unix.Internal_event_unix.close ()
+  in
   Lwt.return retcode
 
 (* Where all the user friendliness starts *)
@@ -630,6 +672,16 @@ let run (module M : M)
        Client_config.cli_args ->
        Client_context.full Tezos_clic.command list tzresult Lwt.t) =
   Lwt.Exception_filter.(set handle_all_except_runtime) ;
-  Stdlib.exit @@ Tezos_base_unix.Event_loop.main_run
-  @@ Lwt_exit.wrap_and_forward
-  @@ main (module M) ~select_commands
+  Stdlib.exit
+  @@ Tezos_base_unix.Event_loop.main_run ~process_name:"client"
+  @@ fun () -> Lwt_exit.wrap_and_forward @@ main (module M) ~select_commands ()
+
+let lwt_run (module M : M)
+    ~(select_commands :
+       RPC_client_unix.http_ctxt ->
+       Client_config.cli_args ->
+       Client_context.full Tezos_clic.command list tzresult Lwt.t)
+    ?disable_logging () =
+  Lwt.Exception_filter.(set handle_all_except_runtime) ;
+  Lwt_exit.wrap_and_forward
+  @@ main (module M) ~select_commands ?disable_logging ()

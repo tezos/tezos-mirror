@@ -40,7 +40,7 @@ let algo_param () =
       | "ed25519" -> return Signature.Ed25519
       | "secp256k1" -> return Signature.Secp256k1
       | "p256" -> return Signature.P256
-      | "bls" -> return Signature.Bls_aug
+      | "bls" -> return Signature.Bls
       | name ->
           failwith
             "Unknown signature algorithm (%s). Available: 'ed25519', \
@@ -329,9 +329,9 @@ let generate_test_keys =
   command
     ~group
     ~desc:"Generate an array of accounts for testing purposes."
-    (args1 alias_prefix_param)
+    (args2 alias_prefix_param sig_algo_arg)
     (prefixes ["stresstest"; "gen"; "keys"] @@ keys_count_param @@ stop)
-    (fun alias_prefix n (cctxt : Client_context.full) ->
+    (fun (alias_prefix, algo) n (cctxt : Client_context.full) ->
       let open Lwt_result_syntax in
       (* By default, the alias prefix matches the bootstrap<idx>
          pattern used in sandboxed mode.*)
@@ -343,9 +343,7 @@ let generate_test_keys =
       let* source_list =
         List.init_es ~when_negative_length:[] n (fun i ->
             let alias = alias_prefix i in
-            let pkh, pk, sk =
-              Signature.generate_key ~algo:Signature.Ed25519 ()
-            in
+            let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let*? sk_uri = Tezos_signer_backends.Unencrypted.make_sk sk in
             return ({pkh; pk; sk}, pk_uri, sk_uri, alias))
@@ -386,6 +384,18 @@ let commands network : Client_context.full Tezos_clic.command list =
         (Client_keys.registered_signers ())
     then Tezos_clic.switch ~long:"encrypted" ~doc:"Encrypt the key on-disk" ()
     else Tezos_clic.constant true
+  in
+  let unencrypted_switch () =
+    if
+      List.exists
+        (fun (scheme, _) -> scheme = Tezos_signer_backends.Unencrypted.scheme)
+        (Client_keys.registered_signers ())
+    then
+      Tezos_clic.switch
+        ~long:"unencrypted"
+        ~doc:"Store the secret key unencrypted on-disk"
+        ()
+    else Tezos_clic.constant false
   in
   let show_private_switch =
     switch ~long:"show-secret" ~short:'S' ~doc:"show the private key" ()
@@ -430,14 +440,24 @@ let commands network : Client_context.full Tezos_clic.command list =
         command
           ~group
           ~desc:"Generate a pair of keys."
-          (args2 (Secret_key.force_switch ()) sig_algo_arg)
+          (args3
+             (Secret_key.force_switch ())
+             sig_algo_arg
+             (unencrypted_switch ()))
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
-          (fun (force, algo) name (cctxt : Client_context.full) ->
-            let* name = Secret_key.of_fresh cctxt force name in
+          (fun (force, algo, unencrypted) name (cctxt : Client_context.full) ->
+            let* name =
+              Secret_key.of_fresh ~show_existing_key:false cctxt force name
+            in
             let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
-              Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
+              if unencrypted then
+                Lwt.return (Tezos_signer_backends.Unencrypted.make_sk sk)
+              else
+                Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt
+                  cctxt
+                  sk
             in
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
     | Some `Testnet | None ->
@@ -450,7 +470,9 @@ let commands network : Client_context.full Tezos_clic.command list =
              (encrypted_switch ()))
           (prefixes ["gen"; "keys"] @@ Secret_key.fresh_alias_param @@ stop)
           (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
-            let* name = Secret_key.of_fresh cctxt force name in
+            let* name =
+              Secret_key.of_fresh ~show_existing_key:false cctxt force name
+            in
             let pkh, pk, sk = Signature.generate_key ~algo () in
             let*? pk_uri = Tezos_signer_backends.Unencrypted.make_pk pk in
             let* sk_uri =
@@ -566,7 +588,9 @@ let commands network : Client_context.full Tezos_clic.command list =
       @@ prefixes ["secret"; "key"]
       @@ Secret_key.fresh_alias_param @@ Client_keys.sk_uri_param @@ stop)
       (fun force name sk_uri (cctxt : Client_context.full) ->
-        let* name = Secret_key.of_fresh cctxt force name in
+        let* name =
+          Secret_key.of_fresh ~show_existing_key:false cctxt force name
+        in
         let* pk_uri = Client_keys.neuterize sk_uri in
         let* () = fail_if_already_registered cctxt force pk_uri name in
         let* pkh, public_key =
@@ -593,7 +617,9 @@ let commands network : Client_context.full Tezos_clic.command list =
            @@ prefixes ["fundraiser"; "secret"; "key"]
            @@ Secret_key.fresh_alias_param @@ stop)
            (fun force name (cctxt : Client_context.full) ->
-             let* name = Secret_key.of_fresh cctxt force name in
+             let* name =
+               Secret_key.of_fresh ~show_existing_key:false cctxt force name
+             in
              let* sk = input_fundraiser_params cctxt in
              let* sk_uri =
                Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
@@ -655,6 +681,24 @@ let commands network : Client_context.full Tezos_clic.command list =
               in
               return_unit)
             l);
+      command
+        ~group
+        ~desc:"List the keys known by the remote wallet."
+        no_options
+        (prefix "list"
+        @@ prefixes ["known"; "remote"; "keys"]
+        @@ Client_keys.uri_param @@ stop)
+        (fun () uri (cctxt : Client_context.full) ->
+          let* pkhs = Client_keys.list_known_keys uri in
+          let*! () =
+            cctxt#message
+              "@[<v 2>Tezos remote known keys:@,%a@]"
+              (Format.pp_print_list
+                 ~pp_sep:Format.pp_print_cut
+                 Signature.Public_key_hash.pp)
+              pkhs
+          in
+          return_unit);
       command
         ~group
         ~desc:"Show the keys associated with an implicit account."
@@ -787,7 +831,9 @@ let commands network : Client_context.full Tezos_clic.command list =
         @@ prefixes ["keys"; "from"; "mnemonic"]
         @@ Secret_key.fresh_alias_param @@ stop)
         (fun (force, encrypt) name (cctxt : Client_context.full) ->
-          let* name = Secret_key.of_fresh cctxt force name in
+          let* name =
+            Secret_key.of_fresh ~show_existing_key:false cctxt force name
+          in
           let* mnemonic = cctxt#prompt "Enter your mnemonic: " in
           let mnemonic = String.trim mnemonic |> String.split_on_char ' ' in
           match Bip39.of_words mnemonic with

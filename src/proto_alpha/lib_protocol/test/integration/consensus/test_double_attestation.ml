@@ -250,7 +250,7 @@ let test_different_branch () =
   let* _blk = Block.bake ~operation blk in
   return_unit
 
-(** Check that a double (pre)attestation evidence succeeds when the
+(** Check that a double (pre)attestation evidence fails when the
     operations have distinct slots (that both belong to the delegate)
     and are otherwise identical. *)
 let test_different_slots () =
@@ -271,12 +271,26 @@ let test_different_slots () =
   in
   let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 blk in
   let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 blk in
-  let doubleA = double_attestation (B blk) attestation1 attestation2 in
-  let* (_ : Block.t) = Block.bake ~operation:doubleA blk in
+  let double_attestation =
+    double_attestation (B blk) attestation1 attestation2
+  in
   let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 blk in
   let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 blk in
-  let doubleB = double_preattestation (B blk) preattestation1 preattestation2 in
-  let* (_ : Block.t) = Block.bake ~operation:doubleB blk in
+  let double_preattestation =
+    double_preattestation (B blk) preattestation1 preattestation2
+  in
+  let*! res = Block.bake ~operation:double_attestation blk in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+        | _ -> false)
+  in
+  let*! res = Block.bake ~operation:double_preattestation blk in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+        | _ -> false)
+  in
   return_unit
 
 (** Say a delegate double-attests twice and say the 2 evidences are timely
@@ -327,9 +341,10 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
             {
               contents =
                 Apply_results.Single_result
-                  (Apply_results.Double_attestation_evidence_result rslt);
+                  (Apply_results.Double_consensus_operation_evidence_result
+                    {punished_delegate; _});
             } ->
-            rslt.forbidden_delegate = Some delegate
+            Signature.Public_key_hash.(punished_delegate = delegate)
         | _ -> false)
       operations_recpts
   in
@@ -581,6 +596,102 @@ let test_invalid_double_attestation_variant () =
           true
       | _ -> false)
 
+let invalid_denunciation kind = function
+  | Validate_errors.Anonymous.Invalid_denunciation kind' ->
+      Misbehaviour.equal_kind kind kind'
+  | _ -> false
+
+(** Check that a double attestation operation fails if the same slot
+    is duplicated in the committee of one of the evidences. *)
+let test_invalid_double_attestation_duplicate_in_committee () =
+  let open Lwt_result_wrap_syntax in
+  let* _genesis, block =
+    Test_aggregate.init_genesis_with_some_bls_accounts
+      ~aggregate_attestation:true
+      ()
+  in
+  let* b = Block.bake_until_cycle_end block in
+  let* blk_1, blk_2 = block_fork b in
+  let* blk_a = Block.bake blk_1 in
+  let* blk_b = Block.bake blk_2 in
+  let* attesters = Context.get_attesters (B blk_a) in
+  let attester, slot =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (Test_aggregate.find_attester_with_bls_key attesters)
+  in
+  let* op1 =
+    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_a
+  in
+  let* op2_standalone =
+    Op.raw_attestation ~delegate:attester.RPC.Validators.delegate ~slot blk_b
+  in
+  let op2 =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (Op.raw_aggregate [op2_standalone; op2_standalone])
+  in
+  let op =
+    let contents =
+      if Operation_hash.(Operation.hash op1 < Operation.hash op2) then
+        Single (Double_consensus_operation_evidence {slot; op1; op2})
+      else
+        Single
+          (Double_consensus_operation_evidence {slot; op1 = op2; op2 = op1})
+    in
+    let branch = Context.branch (B blk_a) in
+    {
+      shell = {branch};
+      protocol_data = Operation_data {contents; signature = None};
+    }
+  in
+  let* () =
+    Op.check_validation_and_application_all_modes
+      ~loc:__LOC__
+      ~error:(invalid_denunciation Double_attesting)
+      ~predecessor:blk_a
+      op
+  in
+  (* Also check with duplicate slots with different dal contents *)
+  let* op2_standalone' =
+    let number_of_slots =
+      Default_parameters.constants_test.dal.number_of_slots
+    in
+    let*?@ slot_index = Dal.Slot_index.of_int ~number_of_slots 3 in
+    let dal_content =
+      {attestation = Dal.Attestation.(commit empty slot_index)}
+    in
+    Op.raw_attestation
+      ~delegate:attester.RPC.Validators.delegate
+      ~slot
+      ~dal_content
+      blk_b
+  in
+  let op2 =
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (Op.raw_aggregate [op2_standalone; op2_standalone'])
+  in
+  let op =
+    let contents =
+      if Operation_hash.(Operation.hash op1 < Operation.hash op2) then
+        Single (Double_consensus_operation_evidence {slot; op1; op2})
+      else
+        Single
+          (Double_consensus_operation_evidence {slot; op1 = op2; op2 = op1})
+    in
+    let branch = Context.branch (B blk_a) in
+    {
+      shell = {branch};
+      protocol_data = Operation_data {contents; signature = None};
+    }
+  in
+  Op.check_validation_and_application_all_modes
+    ~loc:__LOC__
+    ~error:(invalid_denunciation Double_attesting)
+    ~predecessor:blk_a
+    op
+
 (** Check that a future-cycle double attestation fails. *)
 let test_too_early_double_attestation_evidence () =
   let open Lwt_result_syntax in
@@ -639,8 +750,8 @@ let test_different_delegates () =
   double_attestation (B blk_b) e_a e_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
@@ -664,8 +775,8 @@ let test_wrong_delegate () =
   double_attestation (B blk_b) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Inconsistent_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
           true
       | _ -> false)
 
@@ -907,6 +1018,42 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
           true
       | _ -> false)
 
+(** Check that a double attestation evidence fails under aggregate_attestation
+    feature flag when operations have distinct slots and are otherwise
+    identical. *)
+let different_slots_under_feature_flag () =
+  let open Lwt_result_syntax in
+  let* genesis, _ =
+    Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
+  in
+  let* block = Block.bake genesis in
+  let* attesters = Context.get_attesters (B block) in
+  let delegate, slot1, slot2 =
+    (* Find an attester with more than 1 slot. *)
+    WithExceptions.Option.get
+      ~loc:__LOC__
+      (List.find_map
+         (fun (attester : RPC.Validators.t) ->
+           match attester.slots with
+           | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+           | _ -> None)
+         attesters)
+  in
+  let* attestation1 = Op.raw_attestation ~delegate ~slot:slot1 block in
+  let* attestation2 = Op.raw_attestation ~delegate ~slot:slot2 block in
+  let double_attestation_evidence =
+    double_attestation (B block) attestation1 attestation2
+  in
+  let*! res = Block.bake ~operation:double_attestation_evidence block in
+  let* () =
+    Assert.proto_error ~loc:__LOC__ res (function
+        | Validate_errors.Anonymous.Invalid_denunciation
+            Misbehaviour.Double_attesting ->
+            true
+        | _ -> false)
+  in
+  return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -948,6 +1095,10 @@ let tests =
       `Quick
       test_invalid_double_attestation_variant;
     Tztest.tztest
+      "invalid double attestation evidence: duplicate slot in committee"
+      `Quick
+      test_invalid_double_attestation_duplicate_in_committee;
+    Tztest.tztest
       "too early double attestation evidence"
       `Quick
       test_too_early_double_attestation_evidence;
@@ -957,6 +1108,10 @@ let tests =
       test_too_late_double_attestation_evidence;
     Tztest.tztest "different delegates" `Quick test_different_delegates;
     Tztest.tztest "wrong delegate" `Quick test_wrong_delegate;
+    Tztest.tztest
+      "different slots under feature flag"
+      `Quick
+      different_slots_under_feature_flag;
     (* This test has been deactivated following the changes of the
        forbidding mechanism that now forbids delegates right after the
        first denunciation, it should be fixed and reactivated

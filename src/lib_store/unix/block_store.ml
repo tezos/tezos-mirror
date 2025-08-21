@@ -879,36 +879,6 @@ let compute_new_caboose block_store history_mode ~new_savepoint
 
 module BlocksLPBL = Set.Make (Int32)
 
-(* Limits the maximum number of elements that can be added into a
-   cycle.
-   This is mandatory when cementing metadata. Indeed, the current
-   version of camlzip support only 32bits zip files, that are files
-   smaller that ~4GB or containing less that 65_535 entries. When
-   cementing cycles, we might reach that limit. We set it to 2^16 - 1. *)
-let default_cycle_size_limit = 65_535l
-
-(* May shrink the size of the given cycles to make sure that the size
-   of a cycle never exceeds the camlzip 32bits limitation. The shrink
-   consist in dividing the cycles in two even parts, recursively,
-   until the limit is not exceeded anymore. *)
-let may_shrink_cycles cycles ~cycle_size_limit =
-  let rec loop acc cycles =
-    match cycles with
-    | [] -> List.rev acc
-    | ((cycle_start, cycle_end) as hd) :: tl ->
-        let diff = Int32.(sub cycle_end cycle_start) in
-        if diff >= cycle_size_limit then
-          let mid = Int32.(div diff 2l) in
-          let left_cycle_upper_bound = Int32.(add cycle_start mid) in
-          let left_cycle = (cycle_start, left_cycle_upper_bound) in
-          let right_cycle =
-            (Int32.(add left_cycle_upper_bound 1l), cycle_end)
-          in
-          loop acc (left_cycle :: right_cycle :: tl)
-        else loop (hd :: acc) tl
-  in
-  loop [] cycles
-
 (* FIXME: update doc *)
 (* [update_floating_stores block_store ~history_mode ~ro_store
    ~rw_store ~new_store ~new_head ~new_head_lpbl
@@ -920,7 +890,7 @@ let may_shrink_cycles cycles ~cycle_size_limit =
    savepoint and caboose candidates. *)
 let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark ~cycle_size_limit =
+    ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lpbl_block =
@@ -988,8 +958,9 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
        {verbosity = Debug; metadata = [("prometheus", "")]}
          "copy all lpbl predecessors"])
   in
-  (* 2. Retrieve ALL cycles (potentially more than one) *)
-  (* 2.1. We write back to the new store all the blocks from
+  (* 2. Retrieve ALL cycles (potentially more than one)
+
+     2.1. We write back to the new store all the blocks from
      [lpbl_block] to the end of the file(s).
 
      2.2 At the same time, retrieve the list of cycle bounds: i.e. the
@@ -1099,16 +1070,13 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     List.sort Compare.Int32.compare (BlocksLPBL.elements !blocks_lpbl)
   in
   let* cycles_to_cement =
-    let* cycles =
-      (loop
-         []
-         initial_pred
-         sorted_lpbl
-       [@profiler.record_s
-         {verbosity = Debug; metadata = [("prometheus", "")]}
-           "retrieve cycle to cement"])
-    in
-    return (may_shrink_cycles cycles ~cycle_size_limit)
+    (loop
+       []
+       initial_pred
+       sorted_lpbl
+     [@profiler.record_s
+       {verbosity = Debug; metadata = [("prometheus", "")]}
+         "retrieve cycle to cement"])
   in
   let* new_savepoint =
     (compute_new_savepoint
@@ -1259,9 +1227,13 @@ let compute_lowest_bound_to_preserve_in_floating block_store ~new_head
        (Int32.of_int
           (match Block_repr.metadata lpbl_block with
           | None ->
-              (* FIXME: this is not valid but it is a good
-                 approximation of the max_op_ttl of a block where the
-                 metadata is missing. *)
+              (* This is not valid but it is a good approximation of
+                 the max_op_ttl of a block where the metadata is
+                 missing. This is harmless if the max_op_ttl of the
+                 head is bigger: we only store more block data than
+                 expected. If the max_op_ttl has decreased in the
+                 head, this might generate a storage with a broken
+                 invariant, but which is not breaking. *)
               Block_repr.max_operations_ttl new_head_metadata
           | Some metadata -> Block_repr.max_operations_ttl metadata)))
 
@@ -1318,7 +1290,7 @@ let unlock lockfile = Lwt_unix.lockf lockfile Unix.F_ULOCK 0
 
 let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lpbl ~lowest_bound_to_preserve_in_floating
-    ~cementing_highwatermark ~cycle_size_limit =
+    ~cementing_highwatermark =
   let open Lwt_result_syntax in
   let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
@@ -1344,7 +1316,6 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
              ~new_head_lpbl
              ~lowest_bound_to_preserve_in_floating
              ~cementing_highwatermark
-             ~cycle_size_limit
            [@profiler.record_s
              {verbosity = Debug; metadata = [("prometheus", "")]}
                "update floating stores"])
@@ -1480,10 +1451,9 @@ let split_context block_store new_head_lpbl =
       let*! () = Store_events.(emit start_context_split new_head_lpbl) in
       split ()
 
-let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
-    ~(on_error : tztrace -> unit tzresult Lwt.t) ~finalizer ~history_mode
-    ~new_head ~new_head_metadata ~cementing_highwatermark
-    ~disable_context_pruning =
+let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
+    ~finalizer ~history_mode ~new_head ~new_head_metadata
+    ~cementing_highwatermark ~disable_context_pruning =
   let open Lwt_result_syntax in
   let* () = fail_when block_store.readonly Cannot_write_in_readonly in
   (* Do not allow multiple merges: force waiting for a potential
@@ -1537,7 +1507,6 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                   (* Lock the block store to avoid RO instances to open the
                      state while the file descriptors are being updated. *)
                   let*! () = lock block_store.lockfile in
-
                   (instantiate_temporary_floating_store
                      block_store
                    [@profiler.record_s
@@ -1573,7 +1542,6 @@ let merge_stores ?(cycle_size_limit = default_cycle_size_limit) block_store
                          let* new_ro_store, new_savepoint, new_caboose =
                            (create_merging_thread
                               block_store
-                              ~cycle_size_limit
                               ~history_mode
                               ~old_ro_store
                               ~old_rw_store
@@ -2058,29 +2026,3 @@ let close block_store =
 
 let stat_metadata_cycles block_store =
   Cemented_block_store.stat_metadata_cycles block_store.cemented_store
-
-(***************** Upgrade to V3.1 *****************)
-
-let v_3_1_upgrade chain_dir =
-  let open Lwt_result_syntax in
-  let legacy_block_store_status_file =
-    Naming.legacy_block_store_status_file chain_dir
-  in
-  let*! exists = Lwt_unix.file_exists legacy_block_store_status_file.path in
-  if exists then
-    (* Load using the legacy block_store_status encoding *)
-    let*! () = Store_events.(emit load_block_store_status ()) in
-    let* legacy_status_data =
-      Stored_data.init
-        legacy_block_store_status_file
-        ~initial_data:Block_store_status.Legacy.create_idle_status
-    in
-    (* Convert to the new encoding *)
-    let* status = Block_store_status.of_legacy legacy_status_data in
-    (* Overwrite the status file *)
-    let* () =
-      Stored_data.write_file (Naming.block_store_status_file chain_dir) status
-    in
-    let*! () = Store_events.(emit fixed_block_store_status ()) in
-    return_unit
-  else (* The store is not containing any data to upgrade yet.*) return_unit

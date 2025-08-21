@@ -12,7 +12,7 @@ tokens in a decentralised
 environment. It was designed and implemented by the Electric Coin
 Company as the last iteration over a series of previous protocols and
 academic works starting with the `Zerocoin seminal
-paper <https://zerocoin.org/media/pdf/ZerocoinOakland.pdf>`_.
+paper <https://ieeexplore.ieee.org/document/6547123>`__.
 
 Keys
 ~~~~

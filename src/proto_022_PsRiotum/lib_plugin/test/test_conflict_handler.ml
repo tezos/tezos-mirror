@@ -83,13 +83,23 @@ let () =
            [conflict_handler]. Instead, we test this case in the
            "manager operations" test below. *)
         ()
-      else if
-        (* When there is at least one non-manager operation, the
-           conflict handler defers to [Operation.compare]: the higher
-           operation is selected. *)
-        Alpha_context.Operation.compare op1 op2 >= 0
-      then check_answer ~__LOC__ `Keep answer
-      else check_answer ~__LOC__ `Replace answer)
+      else
+        (* When there is at least one non-manager operation:
+           - if op1 is a preattestation or attestation, it is kept
+           - otherwise, the conflict handler defers to
+             [Operation.compare]: the higher operation is selected. *)
+        let expected =
+          let never_replace_op1 =
+            let (Operation_data protocol_data) = (snd op1).protocol_data in
+            match protocol_data.contents with
+            | Single (Preattestation _ | Attestation _) -> true
+            | _ -> false
+          in
+          if never_replace_op1 || Alpha_context.Operation.compare op1 op2 >= 0
+          then `Keep
+          else `Replace
+        in
+        check_answer ~__LOC__ expected answer)
     ops ;
   unit
 

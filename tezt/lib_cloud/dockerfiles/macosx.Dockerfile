@@ -23,7 +23,7 @@ FROM step2
 ARG COMMIT
 RUN git fetch --depth 1 origin $COMMIT
 RUN git checkout $COMMIT
-RUN eval $(opam env) && make octez-node octez-dal-node octez-client octez-baker-alpha
+RUN eval $(opam env) && make octez-node octez-dal-node octez-client octez-experimental-agnostic-baker
 
 
 USER root

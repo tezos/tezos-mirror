@@ -279,7 +279,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "The shards stored by this node (1-minute interval)",
+         "title": "The number of shards stored per second (over 1min)",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1141,7 +1141,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Average sent & received app messages (1-minute interval)",
+         "title": "Average sent & received app messages per second (over 1min)",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1256,7 +1256,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Average sent control & metadata messages (1-minute interval)",
+         "title": "Average sent control & metadata messages per second (over 1min)",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1371,7 +1371,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Average received control & metadata messages (1-minute interval)",
+         "title": "Average received control & metadata messages per second (over 1min)",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1485,7 +1485,7 @@
          "thresholds": [ ],
          "timeFrom": null,
          "timeShift": null,
-         "title": "Average data exchange (1-minute interval)",
+         "title": "Average data exchange per second (over 1min)",
          "tooltip": {
             "shared": true,
             "sort": 0,
@@ -1892,7 +1892,7 @@
       {
          "id": 25,
          "type": "timeseries",
-         "title": "Average number of reconstructions (1-minute interval)",
+         "title": "Average number of reconstructions per second (over 1min)",
          "gridPos": {
             "h": 8,
             "w": 12,

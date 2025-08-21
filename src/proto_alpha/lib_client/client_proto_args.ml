@@ -360,6 +360,23 @@ let force_switch =
        of block without a fitness greater than the  current head."
     ()
 
+let force_reproposal =
+  Tezos_clic.switch
+    ~long:"force-reproposal"
+    ~doc:
+      "Force baking a reproposal by crafting a prequorum proof with the \
+       available delegates"
+    ()
+
+let force_round_arg =
+  Tezos_clic.arg
+    ~long:"force-round"
+    ~placeholder:"round"
+    ~doc:
+      "Bake exactly at the given round assuming that it is held by one of your \
+       delegates"
+    int_parameter
+
 let minimal_timestamp_switch =
   Tezos_clic.switch
     ~long:"minimal-timestamp"
@@ -1092,3 +1109,27 @@ let fee_parameter_args =
           force_low_fee_arg
           fee_cap_arg
           burn_cap_arg))
+
+let bls_key_pop_arg ~long =
+  let open Lwt_result_syntax in
+  Tezos_clic.arg
+    ~long
+    ~placeholder:"proof-of-possession"
+    ~doc:
+      "Proof of possession (PoP) for a BLS key (tz4 address), encoded in \
+       Base58. This is a BLS signature over the public key, proving control of \
+       the corresponding private key. If no proof is provided, the client can \
+       generate one, assuming the associated private key is available in your \
+       wallet."
+    (Tezos_clic.parameter (fun (cctxt : #Client_context.full) s ->
+         match Signature.of_b58check_opt s with
+         | Some (Bls s) -> return s
+         | Some _ | None ->
+             cctxt#error "The provided proof is not a BLS signature"))
+
+let consensus_key_pop_arg = bls_key_pop_arg ~long:"consensus-key-pop"
+
+let companion_key_pop_arg = bls_key_pop_arg ~long:"companion-key-pop"
+
+let initial_stake_arg =
+  tez_opt_arg ~parameter:"initial-stake" ~doc:"Amount staked from source"

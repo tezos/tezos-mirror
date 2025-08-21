@@ -25,6 +25,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* To avoid shadowing the module with the [Gas_price] module defining the
+   [eth_gasPrice] RPC. *)
+module G = Gas_price
 open Tezos_rpc
 open Rpc_encodings
 open Batch
@@ -43,14 +46,24 @@ let configuration_service =
     ~output:Data_encoding.Json.encoding
     Path.(root / "configuration")
 
+type health_check_query = {drift_threshold : Z.t}
+
 let health_check_service =
   Service.get_service
     ~description:"Assess the health of the RPC server"
-    ~query:Query.empty
+    ~query:
+      Query.(
+        query (fun drift_threshold ->
+            {drift_threshold = Z.of_int drift_threshold})
+        |+ field "drift_threshold" Arg.int 100 (fun {drift_threshold} ->
+               Z.to_int drift_threshold)
+        |> seal)
     ~output:Data_encoding.empty
     Path.(root / "health_check")
 
 type error += Node_is_bootstrapping
+
+type error += Node_is_lagging
 
 let () =
   register_error_kind
@@ -61,7 +74,17 @@ let () =
       "Node is bootstrapping and result from the RPC servers can be outdated"
     Data_encoding.empty
     (function Node_is_bootstrapping -> Some () | _ -> None)
-    (fun () -> Node_is_bootstrapping)
+    (fun () -> Node_is_bootstrapping) ;
+  register_error_kind
+    `Temporary
+    ~id:"node_is_lagging"
+    ~title:"Node is lagging"
+    ~description:
+      "Node is lagging behind its upstream EVM node and result from the RPC \
+       servers can be outdated"
+    Data_encoding.empty
+    (function Node_is_lagging -> Some () | _ -> None)
+    (fun () -> Node_is_lagging)
 
 let client_version =
   Format.sprintf
@@ -80,12 +103,7 @@ let configuration_handler config =
   let kernel_execution =
     Configuration.{config.kernel_execution with preimages = hidden}
   in
-  let sequencer =
-    Option.map
-      (fun (sequencer_config : sequencer) ->
-        {sequencer_config with sequencer = Client_keys.sk_uri_of_string hidden})
-      config.sequencer
-  in
+  let sequencer = {config.sequencer with sequencer = None} in
   let observer =
     Option.map
       (fun (observer : observer) ->
@@ -105,7 +123,6 @@ let configuration_handler config =
       rollup_node_endpoint = Uri.of_string hidden;
       kernel_execution;
       sequencer;
-      threshold_encryption_sequencer = None;
       proxy;
       observer;
       private_rpc = None;
@@ -117,11 +134,17 @@ let configuration_handler config =
     (Configuration.encoding hidden)
     config
 
-let health_check_handler ?delegate_to () =
+let health_check_handler ?delegate_to query =
   match delegate_to with
   | None ->
       let open Lwt_result_syntax in
       let* () = fail_when (Metrics.is_bootstrapping ()) Node_is_bootstrapping in
+      let* () =
+        fail_when
+          Z.Compare.(
+            Drift_monitor.last_observed_drift () > query.drift_threshold)
+          Node_is_lagging
+      in
       return_unit
   | Some evm_node_endpoint ->
       Rollup_services.call_service
@@ -130,7 +153,7 @@ let health_check_handler ?delegate_to () =
         ~media_types:[Media_type.json]
         health_check_service
         ()
-        ()
+        query
         ()
 
 let version dir =
@@ -142,24 +165,28 @@ let configuration config dir =
       configuration_handler config |> Lwt.return_ok)
 
 let health_check ?delegate_to dir =
-  Evm_directory.register0 dir health_check_service (fun () () ->
-      health_check_handler ?delegate_to ())
+  Evm_directory.register0 dir health_check_service (fun query () ->
+      health_check_handler ?delegate_to query)
 
 let get_block_by_number ~full_transaction_object block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+    Rollup_node_rpc.block_param_to_block_number
+      ~chain_family:L2_types.EVM
+      (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.nth_block ~full_transaction_object n
+  Rollup_node_rpc.Etherlink_block_storage.nth_block ~full_transaction_object n
 
 let get_block_receipts block_param
     (module Rollup_node_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let* (Ethereum_types.Qty n) =
-    Rollup_node_rpc.block_param_to_block_number (Block_parameter block_param)
+    Rollup_node_rpc.block_param_to_block_number
+      ~chain_family:L2_types.EVM
+      (Block_parameter block_param)
   in
-  Rollup_node_rpc.Block_storage.block_receipts n
+  Rollup_node_rpc.Etherlink_block_storage.block_receipts n
 
 let get_transaction_from_index block index
     (module Rollup_node_rpc : Services_backend_sig.S) =
@@ -168,7 +195,8 @@ let get_transaction_from_index block index
   | TxHash l -> (
       match List.nth_opt l index with
       | None -> return_none
-      | Some hash -> Rollup_node_rpc.Block_storage.transaction_object hash)
+      | Some hash ->
+          Rollup_node_rpc.Etherlink_block_storage.transaction_object hash)
   | TxFull l -> return @@ List.nth_opt l index
 
 let block_transaction_count block =
@@ -236,7 +264,8 @@ let filter_logs ~bloom_filter ~receipt =
 let produce_logs_stream ~bloom_filter stream =
   Lwt_stream.map_list (fun receipt -> filter_logs ~bloom_filter ~receipt) stream
 
-let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
+let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
+    (module Backend_rpc : Services_backend_sig.S) =
   let open Lwt_result_syntax in
   let id = make_id ~id:(generate_id ()) in
   let* stream, stopper =
@@ -254,6 +283,40 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind) =
     | Syncing ->
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/7642 *)
         Stdlib.failwith "The websocket event [syncing] is not implemented yet."
+    | Etherlink (L1_L2_levels from_l1_level) ->
+        let* () =
+          unless (Evm_events_follower.available ()) @@ fun () ->
+          failwith "The EVM node does not follow a rollup node"
+        in
+        let* extra =
+          match from_l1_level with
+          | None -> return_nil
+          | Some from_l1_level ->
+              let+ l1_l2 = Backend_rpc.list_l1_l2_levels ~from_l1_level in
+              List.rev_map
+                (fun ( l1_level,
+                       {
+                         Evm_store.L1_l2_finalized_levels.start_l2_level;
+                         end_l2_level;
+                       } ) ->
+                  {
+                    Ethereum_types.Subscription.l1_level;
+                    start_l2_level;
+                    end_l2_level;
+                  })
+                l1_l2
+              |> List.rev
+        in
+        let stream, stopper =
+          Lwt_watcher.create_stream Evm_context.l1_l2_levels_watcher
+        in
+        let stream = Lwt_stream.append (Lwt_stream.of_list extra) stream in
+        let stream =
+          Lwt_stream.map
+            (fun l -> Ethereum_types.Subscription.Etherlink (L1_l2_levels l))
+            stream
+        in
+        return (stream, stopper)
   in
   let stopper () =
     Stdlib.Hashtbl.remove subscriptions id ;
@@ -296,7 +359,8 @@ let build :
             @@ Format.asprintf "%a" pp_print_trace err)
       | Ok value -> Result.map (encode (module Method)) value)
     (fun exn ->
-      Lwt.return_error @@ Rpc_errors.invalid_request @@ Printexc.to_string exn)
+      Telemetry.Jsonrpc.return_error @@ Rpc_errors.invalid_request
+      @@ Printexc.to_string exn)
 
 let rpc_ok result = Lwt_result.return @@ Ok result
 
@@ -321,7 +385,9 @@ let get_fee_history block_count block_parameter config
     | Unlimited -> block_count
     | Limit block_count_limit -> Z.(min (of_int block_count_limit) block_count)
   in
-  let* nb_latest = Backend_rpc.Block_storage.current_block_number () in
+  let* nb_latest =
+    Backend_rpc.Etherlink_block_storage.current_block_number ()
+  in
   let is_reachable nb =
     match Configuration.(config.fee_history.max_past) with
     | None -> true
@@ -336,7 +402,8 @@ let get_fee_history block_count block_parameter config
       (module Backend_rpc)
   in
   let* base_fee_per_gas_next_block =
-    if newest_block.number = nb_latest then Backend_rpc.base_fee_per_gas ()
+    if newest_block.number = nb_latest then
+      Backend_rpc.Etherlink.base_fee_per_gas ()
     else
       let next_block_number = Qty.next newest_block.number in
       let* next_block =
@@ -414,22 +481,34 @@ let process_trace_result trace =
       let msg = Format.asprintf "%a" pp_print_trace e in
       rpc_error (Rpc_errors.internal_error msg)
 
-let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
+let dispatch_request (type f) ~is_sequencer ~websocket
+    (rpc_server_family : f Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (validation : Validate.validation_mode)
+    (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _)
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_result_syntax in
   let open Ethereum_types in
+  Telemetry.Jsonrpc.trace_dispatch_with
+    ~websocket
+    ~service_name:"public_rpc"
+    method_
+    id
+  @@ fun _scope ->
   let*! value =
-    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
+    match
+      map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
+    with
     | Unknown ->
         Metrics.inc_rpc_method ~name:"unknown" ;
-        Lwt.return_error (Rpc_errors.method_not_found method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_not_found method_)
     | Unsupported ->
         Metrics.inc_rpc_method ~name:"unsupported" ;
-        Lwt.return_error (Rpc_errors.method_not_supported method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_not_supported method_)
     | Disabled ->
         Metrics.inc_rpc_method ~name:"disabled" ;
-        Lwt.return_error (Rpc_errors.method_disabled method_)
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
     (* Ethereum JSON-RPC API methods we support *)
     | Method (method_rpc, module_) -> (
         Metrics.inc_rpc_method ~name:method_ ;
@@ -450,24 +529,45 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               rpc_ok chain_id
             in
             build ~f module_ parameters
+        | Rpc_encodings.Chain_family.Method ->
+            let f chain_id =
+              let* chain_family = Backend_rpc.chain_family chain_id in
+              rpc_ok chain_family
+            in
+            build_with_input ~f module_ parameters
         | Get_balance.Method ->
             let f (address, block_param) =
-              let* balance = Backend_rpc.balance address block_param in
+              let* balance =
+                Backend_rpc.Etherlink.balance address block_param
+              in
               rpc_ok balance
             in
             build_with_input ~f module_ parameters
         | Get_storage_at.Method ->
             let f (address, position, block_param) =
               let* value =
-                Backend_rpc.storage_at address position block_param
+                Backend_rpc.Etherlink.storage_at address position block_param
               in
               rpc_ok value
             in
             build_with_input ~f module_ parameters
+        | Generic_block_number.Method ->
+            let f (_ : unit option) =
+              let (Ex_chain_family chain_family) =
+                Configuration.retrieve_chain_family
+                  ~l2_chains:config.experimental_features.l2_chains
+              in
+              let root =
+                Durable_storage_path.root_of_chain_family chain_family
+              in
+              let* block_number = Backend_rpc.current_block_number ~root in
+              rpc_ok block_number
+            in
+            build ~f module_ parameters
         | Block_number.Method ->
             let f (_ : unit option) =
               let* block_number =
-                Backend_rpc.Block_storage.current_block_number ()
+                Backend_rpc.Etherlink_block_storage.current_block_number ()
               in
               rpc_ok block_number
             in
@@ -486,7 +586,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
         | Get_block_by_hash.Method ->
             let f (block_hash, full_transaction_object) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object
                   block_hash
               in
@@ -503,24 +603,73 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Get_code.Method ->
             let f (address, block_param) =
-              let* code = Backend_rpc.code address block_param in
+              let* code = Backend_rpc.Etherlink.code address block_param in
               rpc_ok code
             in
             build_with_input ~f module_ parameters
         | Gas_price.Method ->
             let f (_ : unit option) =
-              let* base_fee = Backend_rpc.base_fee_per_gas () in
-              rpc_ok base_fee
+              (* We want `eth_gasPrice` to give a result that makes it very
+                 unlikely that the transaction is refused by the sequencer
+                 because of a gas price variation. As a consequence, we will
+                 over-approximate the variation of the gas price by computing
+                 the next gas price with these two inputs:
+
+                   – Arbitrary double the backlog
+                   – As if the block of inclusion is done in the very same
+                     second as the latest block
+
+                 This should lead `eth_gasPrice` to provide an
+                 over-approximation when the gas price is not the default one,
+                 but still keep the output of `eth_gasPrice` to the minimal one
+                 when the chain is not overloaded.
+
+                 In order to avoid approximating too much, we cap the gas price
+                 increase to 33% of what it was before. For a current gas price
+                 of 1.5Gwei, the result of `eth_gasPrice` cannot be larger than
+                 2 Gwei (¾ * 1.5). *)
+              let* minimum =
+                Backend_rpc.Etherlink.minimum_base_fee_per_gas ()
+              in
+              let* (Qty latest_price) =
+                Backend_rpc.Etherlink.base_fee_per_gas ()
+              in
+              let* backlog = Backend_rpc.Etherlink.backlog () in
+              let* storage_version = Backend_rpc.storage_version () in
+              let base_fee =
+                let open Z in
+                min
+                  (latest_price * of_int 4 / of_int 3)
+                  (G.price_from_backlog
+                     ~version:storage_version
+                     ~minimum
+                     (backlog * of_int 2))
+              in
+              rpc_ok (Qty base_fee)
             in
             build ~f module_ parameters
         | Get_transaction_count.Method ->
             let f (address, block_param) =
               match block_param with
               | Ethereum_types.Block_parameter.(Block_parameter Pending) ->
-                  let* nonce = Tx_pool.nonce address in
+                  let* (module Tx_container) =
+                    match tx_container with
+                    | Evm_tx_container m -> return m
+                    | Michelson_tx_container _ ->
+                        failwith
+                          "Unsupported JSONRPC method in Tezlink: \
+                           getTransactionCount"
+                  in
+                  let* next_nonce =
+                    Backend_rpc.Etherlink.nonce address block_param
+                  in
+                  let next_nonce = Option.value ~default:Qty.zero next_nonce in
+                  let* nonce = Tx_container.nonce ~next_nonce address in
                   rpc_ok nonce
               | _ ->
-                  let* nonce = Backend_rpc.nonce address block_param in
+                  let* nonce =
+                    Backend_rpc.Etherlink.nonce address block_param
+                  in
                   let nonce = Option.value ~default:Qty.zero nonce in
                   rpc_ok nonce
             in
@@ -528,7 +677,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
         | Get_block_transaction_count_by_hash.Method ->
             let f block_hash =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
@@ -554,25 +703,87 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Get_transaction_receipt.Method ->
             let f tx_hash =
+              Octez_telemetry.Trace.add_attrs (fun () ->
+                  Telemetry.Attributes.[Transaction.hash tx_hash]) ;
+
               let* receipt =
-                Backend_rpc.Block_storage.transaction_receipt tx_hash
+                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
               in
               rpc_ok receipt
             in
             build_with_input ~f module_ parameters
+        | Get_transaction_gas_info.Method ->
+            let f tx_hash =
+              let* receipt =
+                Backend_rpc.Etherlink_block_storage.transaction_receipt tx_hash
+              in
+              let* object_ =
+                Backend_rpc.Etherlink_block_storage.transaction_object tx_hash
+              in
+              match (receipt, object_) with
+              | Some receipt, Some object_ -> (
+                  let tx_data =
+                    Transaction_object.input object_
+                    |> Ethereum_types.hex_to_real_bytes
+                  in
+                  let* block =
+                    let (Qty number) = receipt.blockNumber in
+                    Backend_rpc.Etherlink_block_storage.nth_block
+                      ~full_transaction_object:false
+                      number
+                  in
+                  let* state = Backend_rpc.Reader.get_state () in
+                  let* da_fee_per_byte_bytes =
+                    Backend_rpc.Reader.read
+                      state
+                      Durable_storage_path.da_fee_per_byte
+                  in
+                  match (da_fee_per_byte_bytes, block.baseFeePerGas) with
+                  | Some da_fee_per_byte_bytes, Some (Qty base_fee_per_gas) ->
+                      let da_fee_per_byte =
+                        Helpers.decode_z_le da_fee_per_byte_bytes
+                      in
+                      let da_fees =
+                        Fees.gas_used_for_da_fees
+                          ~da_fee_per_byte:(Qty da_fee_per_byte)
+                          ~base_fee_per_gas
+                          tx_data
+                      in
+                      let (Qty gas_used) = receipt.gasUsed in
+                      rpc_ok
+                        (Some
+                           {
+                             execution_gas = Qty (Z.sub gas_used da_fees);
+                             inclusion_gas = Qty da_fees;
+                           })
+                  | _, _ ->
+                      rpc_error
+                        (Rpc_errors.internal_error
+                           "could not find all necessary inputs"))
+              | _, _ -> rpc_ok None
+            in
+            build_with_input ~f module_ parameters
         | Get_transaction_by_hash.Method ->
             let f tx_hash =
+              Octez_telemetry.Trace.(
+                add_attrs (fun () ->
+                    Telemetry.Attributes.[Transaction.hash tx_hash])) ;
+
+              let* (module Tx_container) =
+                match tx_container with
+                | Evm_tx_container m -> return m
+                | Michelson_tx_container _ ->
+                    failwith
+                      "Unsupported JSONRPC method in Tezlink: \
+                       getTransactionByHash"
+              in
+              let* transaction_object = Tx_container.find tx_hash in
               let* transaction_object =
-                let* transaction_object = Tx_pool.find tx_hash in
                 match transaction_object with
-                | Some transaction_object ->
-                    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
-                       We should instrument the TX pool to return the real
-                       transaction objects. *)
-                    return_some
-                      (Transaction_object.from_store_transaction_object
-                         transaction_object)
-                | None -> Backend_rpc.Block_storage.transaction_object tx_hash
+                | Some transaction_object -> return_some transaction_object
+                | None ->
+                    Backend_rpc.Etherlink_block_storage.transaction_object
+                      tx_hash
               in
               rpc_ok transaction_object
             in
@@ -580,7 +791,7 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
         | Get_transaction_by_block_hash_and_index.Method ->
             let f (block_hash, Qty index) =
               let* block =
-                Backend_rpc.Block_storage.block_by_hash
+                Backend_rpc.Etherlink_block_storage.block_by_hash
                   ~full_transaction_object:false
                   block_hash
               in
@@ -624,51 +835,58 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Send_raw_transaction.Method ->
             if not config.experimental_features.enable_send_raw_transaction then
-              Lwt.return_error
+              Telemetry.Jsonrpc.return_error
               @@ Rpc_errors.transaction_rejected
                    "the node is in read-only mode, it doesn't accept \
                     transactions"
                    None
             else
-              let f tx_raw =
-                let txn = Ethereum_types.hex_to_bytes tx_raw in
-                let* is_valid = Validate.is_tx_valid (module Backend_rpc) txn in
+              let max_number_of_chunks =
+                if is_sequencer then Some config.sequencer.max_number_of_chunks
+                else None
+              in
+              let f raw_tx =
+                let txn = Ethereum_types.hex_to_bytes raw_tx in
+                let* is_valid =
+                  Validate.is_tx_valid
+                    ?max_number_of_chunks
+                    (module Backend_rpc)
+                    ~mode:validation
+                    txn
+                in
                 match is_valid with
                 | Error err ->
                     let*! () =
-                      Tx_pool_events.invalid_transaction ~transaction:tx_raw
+                      Tx_pool_events.invalid_transaction ~transaction:raw_tx
                     in
                     rpc_error (Rpc_errors.transaction_rejected err None)
-                | Ok transaction_object -> (
-                    let* (Qty balance) =
-                      Backend_rpc.balance
-                        transaction_object.from
-                        (Block_parameter.Block_parameter Latest)
+                | Ok (next_nonce, transaction_object) -> (
+                    Octez_telemetry.Trace.(
+                      add_attrs (fun () ->
+                          Telemetry.Attributes.
+                            [Transaction.hash transaction_object.hash])) ;
+
+                    let* (module Tx_container) =
+                      match tx_container with
+                      | Evm_tx_container m -> return m
+                      | Michelson_tx_container _ ->
+                          failwith
+                            "Unsupported JSONRPC method in Tezlink: \
+                             sendRawTransaction"
                     in
-                    let total_cost =
-                      let (Qty gas) = transaction_object.gas in
-                      let (Qty gas_price) = transaction_object.gasPrice in
-                      let (Qty value) = transaction_object.value in
-                      Z.add (Z.mul gas gas_price) value
+                    let* tx_hash =
+                      Tx_container.add ~next_nonce transaction_object ~raw_tx
                     in
-                    if total_cost > balance then
-                      rpc_error
-                        (Rpc_errors.transaction_rejected
-                           "Not enough funds"
-                           None)
-                    else
-                      let* tx_hash = Tx_pool.add transaction_object txn in
-                      match tx_hash with
-                      | Ok tx_hash -> rpc_ok tx_hash
-                      | Error reason ->
-                          rpc_error
-                            (Rpc_errors.transaction_rejected reason None))
+                    match tx_hash with
+                    | Ok tx_hash -> rpc_ok tx_hash
+                    | Error reason ->
+                        rpc_error (Rpc_errors.transaction_rejected reason None))
               in
               build_with_input ~f module_ parameters
         | Eth_call.Method ->
             let f (call, block_param, state_override) =
               let* call_result =
-                Backend_rpc.simulate_call
+                Backend_rpc.Etherlink.simulate_call
                   ~overwrite_tick_limit:
                     config.experimental_features.overwrite_simulation_tick_limit
                   call
@@ -680,17 +898,21 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
               | Ok (Ok {value = None; gas_used = _}) ->
                   rpc_ok (hash_of_string "")
               | Ok (Error reason) ->
-                  rpc_error
-                  @@ Rpc_errors.transaction_rejected
-                       "execution reverted"
-                       (Some reason)
+                  if reason = Hash (Hex "") then
+                    rpc_error
+                    @@ Rpc_errors.transaction_rejected "execution reverted" None
+                  else
+                    rpc_error
+                    @@ Rpc_errors.transaction_rejected
+                         "execution reverted"
+                         (Some reason)
               | Error reason ->
                   rpc_error (Rpc_errors.transaction_rejected reason None)
             in
             build_with_input ~f module_ parameters
         | Get_estimate_gas.Method ->
             let f (call, block) =
-              let* result = Backend_rpc.estimate_gas call block in
+              let* result = Backend_rpc.Etherlink.estimate_gas call block in
               match result with
               | Ok (Ok {value = _; gas_used = Some gas}) -> rpc_ok gas
               | Ok (Ok {value = _; gas_used = None}) ->
@@ -710,7 +932,14 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build_with_input ~f module_ parameters
         | Txpool_content.Method ->
             let f (_ : unit option) =
-              let* txpool_content = Tx_pool.get_tx_pool_content () in
+              let* (module Tx_container) =
+                match tx_container with
+                | Evm_tx_container m -> return m
+                | Michelson_tx_container _ ->
+                    failwith
+                      "Unsupported JSONRPC method in Tezlink: txpoolContent"
+              in
+              let* txpool_content = Tx_container.content () in
               rpc_ok txpool_content
             in
             build ~f module_ parameters
@@ -756,7 +985,9 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             build ~f module_ parameters
         | Trace_transaction.Method ->
             let f ((hash, config) : Tracer_types.input) =
-              let*! trace = Backend_rpc.trace_transaction hash config in
+              let*! trace =
+                Backend_rpc.Tracer_etherlink.trace_transaction hash config
+              in
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
@@ -780,13 +1011,15 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
         | Coinbase.Method ->
             let f (_ : unit option) =
               let open Lwt_result_syntax in
-              let* coinbase = Backend_rpc.coinbase () in
+              let* coinbase = Backend_rpc.Etherlink.coinbase () in
               rpc_ok coinbase
             in
             build ~f module_ parameters
         | Trace_call.Method ->
             let f (((call, block), config) : Tracer_types.call_input) =
-              let*! trace = Backend_rpc.trace_call call block config in
+              let*! trace =
+                Backend_rpc.Tracer_etherlink.trace_call call block config
+              in
               process_trace_result trace
             in
             build_with_input ~f module_ parameters
@@ -794,25 +1027,49 @@ let dispatch_request (rpc : Configuration.rpc) (config : Configuration.t)
             let f ((block_param, config) : Tracer_types.block_input) =
               let* (Ethereum_types.Qty block_number) =
                 Backend_rpc.block_param_to_block_number
+                  ~chain_family:L2_types.EVM
                   (Block_parameter block_param)
               in
               let*! traces =
-                Backend_rpc.trace_block (Qty block_number) config
+                Backend_rpc.Tracer_etherlink.trace_block
+                  (Qty block_number)
+                  config
               in
               process_trace_result traces
             in
 
+            build_with_input ~f module_ parameters
+        | Get_finalized_blocks_of_l1_level.Method ->
+            let f l1_level =
+              let open Lwt_result_syntax in
+              let* l2_levels = Backend_rpc.l2_levels_of_l1_level l1_level in
+              match l2_levels with
+              | Some {start_l2_level; end_l2_level} ->
+                  rpc_ok Rpc_encodings.{start_l2_level; end_l2_level}
+              | None ->
+                  rpc_error
+                    (Rpc_errors.resource_not_found
+                       (Format.sprintf "Unknown L1 block %ld" l1_level))
+            in
             build_with_input ~f module_ parameters
         | _ ->
             Stdlib.failwith "The pattern matching of methods is not exhaustive")
   in
   Lwt.return JSONRPC.{value; id}
 
-let dispatch_private_request (rpc : Configuration.rpc)
-    (_config : Configuration.t)
+let dispatch_private_request (type f) ~websocket
+    (rpc_server_family : f Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) (config : Configuration.t)
+    (tx_container : f Services_backend_sig.tx_container)
     ((module Backend_rpc : Services_backend_sig.S), _) ~block_production
     ({method_; parameters; id} : JSONRPC.request) : JSONRPC.response Lwt.t =
   let open Lwt_syntax in
+  Telemetry.Jsonrpc.trace_dispatch_with
+    ~websocket
+    ~service_name:"private_rpc"
+    method_
+    id
+  @@ fun _scope ->
   let unsupported () =
     return
       (Error
@@ -826,7 +1083,9 @@ let dispatch_private_request (rpc : Configuration.rpc)
   let* value =
     (* Private RPCs can only be accessed locally, they're not accessible to the
        end user. *)
-    match map_method_name ~restrict:rpc.restricted_rpcs method_ with
+    match
+      map_method_name ~rpc_server_family ~restrict:rpc.restricted_rpcs method_
+    with
     | Unknown ->
         return
           (Error
@@ -837,7 +1096,8 @@ let dispatch_private_request (rpc : Configuration.rpc)
                  data = Some (`String method_);
                })
     | Unsupported -> unsupported ()
-    | Disabled -> Lwt.return_error (Rpc_errors.method_disabled method_)
+    | Disabled ->
+        Telemetry.Jsonrpc.return_error (Rpc_errors.method_disabled method_)
     | Method (Produce_block.Method, _) when block_production <> `Single_node ->
         unsupported ()
     | Method (Produce_block.Method, module_) ->
@@ -850,21 +1110,110 @@ let dispatch_private_request (rpc : Configuration.rpc)
             | None -> (None, true)
           in
           let timestamp = Option.value timestamp ~default:(Misc.now ()) in
-          let* nb_transactions =
+          let* has_produced_block =
             Block_producer.Internal_for_tests.produce_block
               ~with_delayed_transactions
               ~force:true
               ~timestamp
           in
-          rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
+          match has_produced_block with
+          | `Block_produced nb_transactions ->
+              rpc_ok (Ethereum_types.quantity_of_z @@ Z.of_int nb_transactions)
+          | `No_block ->
+              rpc_error
+                (Rpc_errors.internal_error
+                   (Format.sprintf "Block production failed"))
         in
         build ~f module_ parameters
     | Method (Inject_transaction.Method, module_) ->
         let open Lwt_result_syntax in
-        let f (transaction_object, raw_txn) =
-          let* tx_hash = Tx_pool.add transaction_object raw_txn in
-          match tx_hash with
-          | Ok tx_hash -> rpc_ok tx_hash
+        let f
+            ( (transaction_object : Ethereum_types.legacy_transaction_object),
+              raw_txn ) =
+          Octez_telemetry.Trace.(
+            add_attrs (fun () ->
+                Telemetry.Attributes.[Transaction.hash transaction_object.hash])) ;
+
+          let* is_valid =
+            let get_nonce () =
+              let* next_nonce =
+                Backend_rpc.Etherlink.nonce
+                  transaction_object.from
+                  (Block_parameter Latest)
+              in
+              let next_nonce =
+                match next_nonce with
+                | None -> Ethereum_types.Qty Z.zero
+                | Some next_nonce -> next_nonce
+              in
+              return @@ Ok (next_nonce, transaction_object)
+            in
+            (* If the tx_queue is enabled the validation is done by
+               the block producer *)
+            if Configuration.is_tx_queue_enabled config then get_nonce ()
+            else
+              (* With the legacy tx_pool we do the full validation
+                 when receiving the transaction even if it was already
+                 partially done by the attached rpc node. *)
+              let* mode = Tx_pool.mode () in
+              match mode with
+              | Sequencer ->
+                  Validate.is_tx_valid (module Backend_rpc) ~mode:Full raw_txn
+              | _ -> get_nonce ()
+          in
+          let transaction = Ethereum_types.hex_encode_string raw_txn in
+          match is_valid with
+          | Error err ->
+              let*! () = Tx_pool_events.invalid_transaction ~transaction in
+              rpc_error (Rpc_errors.transaction_rejected err None)
+          | Ok (next_nonce, transaction_object) -> (
+              let* tx_hash =
+                let* (module Tx_container) =
+                  match tx_container with
+                  | Evm_tx_container m -> return m
+                  | Michelson_tx_container _ ->
+                      failwith
+                        "Unsupported JSONRPC method in Tezlink: \
+                         injectTransaction"
+                in
+                Tx_container.add
+                  ~next_nonce
+                  transaction_object
+                  ~raw_tx:transaction
+              in
+              match tx_hash with
+              | Ok tx_hash -> rpc_ok tx_hash
+              | Error reason ->
+                  rpc_error (Rpc_errors.transaction_rejected reason None))
+        in
+        build_with_input ~f module_ parameters
+    | Method (Inject_tezlink_operation.Method, module_) ->
+        let open Lwt_result_syntax in
+        let f ((op : Tezos_types.Operation.t), raw_op) =
+          Octez_telemetry.Trace.(
+            add_attrs (fun () ->
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/8014
+                   Add an attribute for Tezlink operations (in base58)
+                   instead of reusing the Etherlink hexadecimal
+                   identifier. *)
+                Telemetry.Attributes.
+                  [Transaction.hash (Tezos_types.Operation.hash_operation op)])) ;
+          let* hash =
+            let* (module Tx_container) =
+              match tx_container with
+              | Evm_tx_container _ ->
+                  failwith
+                    "Unsupported JSONRPC method in Etherlink: \
+                     injectTezlinkOperation"
+              | Michelson_tx_container m -> return m
+            in
+            Tx_container.add
+              ~next_nonce:(Ethereum_types.Qty op.counter)
+              op
+              ~raw_tx:(Ethereum_types.hex_of_bytes raw_op)
+          in
+          match hash with
+          | Ok hash -> rpc_ok hash
           | Error reason ->
               rpc_error (Rpc_errors.transaction_rejected reason None)
         in
@@ -893,7 +1242,7 @@ let dispatch_private_request (rpc : Configuration.rpc)
               ~none:[error_of_fmt "missing block number"]
               block_number
           in
-          let* block = Backend_rpc.replay block_number in
+          let* block = Backend_rpc.Etherlink.replay block_number in
           rpc_ok block
         in
         build ~f module_ parameters
@@ -905,17 +1254,20 @@ let can_process_batch size = function
   | Configuration.Limit l -> size <= l
   | Unlimited -> true
 
-let dispatch_handler (rpc : Configuration.rpc) config ctx dispatch_request
-    (input : JSONRPC.request batched_request) =
+let dispatch_handler ~service_name (rpc : Configuration.rpc) config tx_container
+    ctx dispatch_request (input : JSONRPC.request batched_request) =
   let open Lwt_syntax in
   match input with
   | Singleton request ->
-      let* response = dispatch_request config ctx request in
+      let* response = dispatch_request config tx_container ctx request in
       return (Singleton response)
   | Batch requests ->
+      let batch_size = List.length requests in
+      Telemetry.Jsonrpc.trace_batch_with ~service_name ~batch_size
+      @@ fun _scope ->
       let process =
-        if can_process_batch (List.length requests) rpc.batch_limit then
-          dispatch_request config ctx
+        if can_process_batch batch_size rpc.batch_limit then
+          dispatch_request config tx_container ctx
         else fun req ->
           let value =
             Error Rpc_errors.(invalid_request "too many requests in batch")
@@ -942,15 +1294,22 @@ let empty_stream =
 
 let empty_sid = Ethereum_types.(Subscription.Id (Hex ""))
 
-let dispatch_websocket (rpc : Configuration.rpc) config ctx
+let dispatch_websocket ~is_sequencer
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config tx_container ctx
     (input : JSONRPC.request) =
   let open Lwt_syntax in
-  match map_method_name ~restrict:rpc.restricted_rpcs input.method_ with
+  match
+    map_method_name
+      ~rpc_server_family
+      ~restrict:rpc.restricted_rpcs
+      input.method_
+  with
   | Method (Subscribe.Method, module_) ->
       let sub_stream = ref empty_stream in
       let sid = ref empty_sid in
       let f (kind : Ethereum_types.Subscription.kind) =
-        let* id_stream = eth_subscribe ~kind in
+        let* id_stream = eth_subscribe ~kind (fst ctx) in
         let id, stream =
           match id_stream with
           | Ok id_stream -> id_stream
@@ -984,86 +1343,162 @@ let dispatch_websocket (rpc : Configuration.rpc) config ctx
       let+ value = build_with_input ~f module_ input.parameters in
       websocket_response_of_response JSONRPC.{value; id = input.id}
   | _ ->
-      let+ response = dispatch_request rpc config ctx input in
+      let+ response =
+        dispatch_request
+          ~is_sequencer
+          ~websocket:true
+          rpc_server_family
+          rpc
+          validation
+          config
+          tx_container
+          ctx
+          input
+      in
       websocket_response_of_response response
 
-let dispatch_private_websocket ~block_production (rpc : Configuration.rpc)
-    config ctx (input : JSONRPC.request) =
+let dispatch_private_websocket
+    (rpc_server_family : _ Rpc_types.rpc_server_family) ~block_production
+    (rpc : Configuration.rpc) config tx_container ctx (input : JSONRPC.request)
+    =
   let open Lwt_syntax in
   let+ response =
-    dispatch_private_request ~block_production rpc config ctx input
+    dispatch_private_request
+      ~websocket:true
+      rpc_server_family
+      ~block_production
+      rpc
+      config
+      tx_container
+      ctx
+      input
   in
   websocket_response_of_response response
 
-let generic_dispatch (rpc : Configuration.rpc) config ctx dir path
-    dispatch_request =
+let generic_dispatch ~service_name (rpc : Configuration.rpc) config tx_container
+    ctx dir path dispatch_request =
   Evm_directory.register0 dir (dispatch_batch_service ~path) (fun () input ->
-      dispatch_handler rpc config ctx dispatch_request input |> Lwt_result.ok)
+      dispatch_handler
+        ~service_name
+        rpc
+        config
+        tx_container
+        ctx
+        dispatch_request
+        input
+      |> Lwt_result.ok)
 
-let dispatch_public (rpc : Configuration.rpc) config ctx dir =
-  generic_dispatch rpc config ctx dir Path.root (dispatch_request rpc)
-
-let dispatch_private (rpc : Configuration.rpc) ~block_production config ctx dir
-    =
+let dispatch_public (type f) ~is_sequencer
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_dispatch
+    ~service_name:"public_rpc"
     rpc
     config
+    tx_container
+    ctx
+    dir
+    Path.root
+    (dispatch_request
+       ~is_sequencer
+       ~websocket:false
+       rpc_server_family
+       rpc
+       validation)
+
+let dispatch_private (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+  generic_dispatch
+    ~service_name:"private_rpc"
+    rpc
+    config
+    tx_container
     ctx
     dir
     Path.(add_suffix root "private")
-    (dispatch_private_request rpc ~block_production)
+    (dispatch_private_request
+       ~websocket:false
+       rpc_server_family
+       rpc
+       ~block_production)
 
-let generic_websocket_dispatch (rpc : Configuration.rpc)
-    (config : Configuration.t) ctx dir path dispatch_websocket =
-  if config.experimental_features.enable_websocket then
-    Evm_directory.jsonrpc_websocket_register
-      ?monitor:config.experimental_features.monitor_websocket_heartbeat
-      ~max_message_length:
-        config.experimental_features.max_websocket_message_length
-      dir
-      path
-      (dispatch_websocket rpc config ctx)
-  else dir
+let generic_websocket_dispatch (config : Configuration.t) tx_container ctx dir
+    path dispatch_websocket =
+  match config.websockets with
+  | None -> dir
+  | Some {max_message_length; monitor_heartbeat; _} ->
+      Evm_directory.jsonrpc_websocket_register
+        ?monitor:monitor_heartbeat
+        ~max_message_length
+        dir
+        path
+        (dispatch_websocket config tx_container ctx)
 
-let dispatch_websocket_public (rpc : Configuration.rpc) config ctx dir =
-  generic_websocket_dispatch rpc config ctx dir "/ws" dispatch_websocket
-
-let dispatch_websocket_private (rpc : Configuration.rpc) ~block_production
-    config ctx dir =
+let dispatch_websocket_public (type f) ~is_sequencer
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) validation config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
   generic_websocket_dispatch
-    rpc
     config
+    tx_container
+    ctx
+    dir
+    "/ws"
+    (dispatch_websocket ~is_sequencer rpc_server_family rpc validation)
+
+let dispatch_websocket_private (type f)
+    (rpc_server_family : _ Rpc_types.rpc_server_family)
+    (rpc : Configuration.rpc) ~block_production config
+    (tx_container : f Services_backend_sig.tx_container) ctx dir =
+  generic_websocket_dispatch
+    config
+    tx_container
     ctx
     dir
     "/private/ws"
-    (dispatch_private_websocket ~block_production)
+    (dispatch_private_websocket rpc_server_family ~block_production rpc)
 
-let directory ?delegate_health_check_to rpc config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address) =
-  Evm_directory.empty config.experimental_features.rpc_server
-  |> version |> configuration config
+let directory (type f) ~is_sequencer ~rpc_server_family
+    ?delegate_health_check_to rpc validation config
+    (tx_container : f Services_backend_sig.tx_container) backend dir =
+  dir |> version |> configuration config
   |> health_check ?delegate_to:delegate_health_check_to
   |> dispatch_public
+       ~is_sequencer
+       rpc_server_family
        rpc
+       validation
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
   |> dispatch_websocket_public
+       ~is_sequencer
+       rpc_server_family
        rpc
+       validation
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
 
-let private_directory rpc config
-    ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+let private_directory ~rpc_server_family rpc config
+    (tx_container : _ Services_backend_sig.tx_container) backend
     ~block_production =
   Evm_directory.empty config.experimental_features.rpc_server
   |> version
   |> dispatch_private
+       rpc_server_family
        rpc
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
        ~block_production
   |> dispatch_websocket_private
+       rpc_server_family
        rpc
        config
-       ((module Rollup_node_rpc : Services_backend_sig.S), smart_rollup_address)
+       tx_container
+       backend
        ~block_production

@@ -23,7 +23,19 @@
         integer ∈ [1, 128]
         /* Maximum number of chunks a blueprint can be divided into. The
            sequencer will not produce blueprints unable to fit in this limit. */,
-      "sequencer": $unistring /* Secret key URI of the sequencer. */,
+      "sequencer"?:
+        /* Secret key URI of the sequencer. */
+        $unistring
+        /* Wallet */
+        || /* GCP Key */
+        $unistring
+        /* URI */
+        || { /* Full */
+             "project": $unistring /* GCP project hosting the key */,
+             "keyring": $unistring /* Keyring owning the key */,
+             "key": $unistring /* Key name */,
+             "region": $unistring /* GCP region hosting the keyring */,
+             "version": integer ∈ [-2^30, 2^30] /* Key version number */ },
       "blueprints_publisher_config"?:
         { "max_blueprints_lag"?:
             integer ∈ [1, 2^30]
@@ -48,45 +60,11 @@
                sending another batch of blueprints, as part of its catchup
                mechanism. */,
           "dal_slots"?: [ integer ∈ [-128, 127] ... ] } },
-  "threshold_encryption_sequencer"?:
-    { "time_between_blocks"?:
-        $time_between_blocks
-        /* The maximum number of seconds separating two consecutive blocks.
-           If the TX pool of the sequencer is empty after this duration, an
-           empty blueprint is produced. */,
-      "max_number_of_chunks"?: integer ∈ [-2^30, 2^30],
-      "sequencer": $unistring /* Secret key URI of the sequencer. */,
-      "blueprints_publisher_config"?:
-        { "max_blueprints_lag"?:
-            integer ∈ [1, 2^30]
-            /* The number of EVM blocks after which the sequencer considers
-               that something went wrong with the injection of a previous
-               blueprint. Once reached, the sequencer tries to send them a
-               second time. */,
-          "max_blueprints_ahead"?:
-            integer ∈ [1, 2^30]
-            /* The maximum number of EVM blocks that the sequencer accepts to
-               create speculatively. If the difference between its head and
-               the head of its companion rollup node reaches this number, the
-               sequencer will stop creating new blueprints until the rollup
-               node has caught up. */,
-          "max_blueprints_catchup"?:
-            integer ∈ [1, 2^30]
-            /* The maximum number of blueprints the sequencer retries to send
-               at once whenever its companion rollup node is lagging behind. */,
-          "catchup_cooldown"?:
-            integer ∈ [1, 2^30]
-            /* The number of Layer 1 blocks the sequencer awaits before
-               sending another batch of blueprints, as part of its catchup
-               mechanism. */,
-          "dal_slots"?: [ integer ∈ [-128, 127] ... ] },
-      "sidecar_endpoint"?: $unistring },
   "observer"?:
     { "evm_node_endpoint":
         $unistring
         /* Upstream EVM node endpoint used to fetch speculative blueprints
            and forward incoming transactions. */,
-      "threshold_encryption_bundler_endpoint"?: $unistring,
       "rollup_node_tracking"?:
         boolean
         /* Enable or disable monitoring a companion rollup node to verify the
@@ -143,33 +121,37 @@
            to replace the Smart Rollup’s Fast Exec runtime. DEPRECATED: You
            should remove this option from your configuration file. */,
       "rpc_server"?: "dream" | "resto",
-      "enable_websocket"?:
-        boolean
-        /* Enable or disable the experimental websocket server */,
-      "max_websocket_message_length"?:
-        integer ∈ [-2^30, 2^30]
-        /* Maximum message size accepted by the websocket server (only for
-           Resto backend) */,
-      "monitor_websocket_heartbeat"?:
-        /* Parameters to monitor websocket connections */
-        "disabled"
-        || { /* enabled */
-             "ping_interval":
-               number
-               /* Interval, in seconds, at which a ping will be sent to the
-                  client to monitor the websocket connection. */,
-             "ping_timeout":
-               number
-               /* Timeout in seconds after which the connection will be
-                  considered dead and closed. */ },
+      "spawn_rpc"?:
+        /* Spawn a RPC node listening on the given port */
+        { /* Some */
+          "protected_port": integer ∈ [1, 2^16-1] }
+        || null
+        /* None */,
       "l2_chains"?:
         /* Configuration of l2_chains for multisequencing.
                             If not set, the node will adopt a single chain
            behaviour. */
-        [ { "chain_id": $bignum /* The id of the l2 chain */ } ... ]
+        [ { "chain_id": $bignum /* The id of the l2 chain */,
+            "chain_family": "Michelson" | "EVM" } ... ]
         /* Some */
         || null
-        /* None */ },
+        /* None */,
+      "enable_tx_queue"?:
+        /* Replace the observer tx pool by a tx queue */
+        /* tx queue configuration */
+        { /* Some */
+          "max_size"?: integer ∈ [-2^30, 2^30],
+          "max_transaction_batch_length"?:
+            integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+          "max_lifespan"?: integer ∈ [-2^30, 2^30],
+          "tx_per_addr_limit"?: $int64 }
+        || null
+        /* None */
+        || boolean
+        /* tx queue enable */,
+      "periodic_snapshot_path"?:
+        /* Path to the periodic snapshot file */
+        $unistring /* Some */ || null /* None */ },
   "proxy"?:
     { "finalized_view"?:
         boolean
@@ -179,6 +161,36 @@
            instead. */,
       "evm_node_endpoint"?: $unistring,
       "ignore_block_param"?: boolean },
+  "gcp_kms"?:
+    { "connection_pool_size"?:
+        integer ∈ [1, 2^30]
+        /* The number of TCP connections kept alive with the GCP KMS. A
+           number too low will make signing blueprints a bottleneck, while a
+           number unnecessarily high will consume file descriptors. Defaults
+           to 4 if absent. */,
+      "authentication_method"?: "metadata_server" | "gcloud_auth",
+      "authentication_retries"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of retries the node does to get a new GCP token
+           before giving up and exiting. Defaults to `4` if absent. */,
+      "authentication_frequency_min"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of minutes before the node attempts to refresh
+           its current access token. Defaults to `30` if absent. */,
+      "authentication_retry_backoff_sec"?:
+        integer ∈ [1, 2^30]
+        /* Specify the number of seconds between two attemps at refreshing
+           the access token used to interact with GCP. Defaults to `120` if
+           absent. */,
+      "authentication_timeout_sec"?:
+        integer ∈ [1, 2^30]
+        /* Specify the maximum number of seconds the selected authentication
+           method can used before considered having failed. Defaults to `5`
+           if absents. */,
+      "gcloud_path"?:
+        $unistring
+        /* Specify the path of the `gcloud` binary. Defaults to `gcloud` if
+           absent. */ },
   "fee_history"?:
     { "max_count"?:
         /* The maximum number of blocks whose fee history can be retrieved at
@@ -277,11 +289,75 @@
                 The list of JSON RPC API methods disallowed for this server. */
              "blacklist": [ $unistring ... ] },
       "max_active_connections"?: $max_active_rpc_connections },
+  "websockets"?:
+    { "max_message_length"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum allowed length in bytes for a websocket message. */,
+      "monitor_heartbeat"?:
+        /* Configuration for the websocket heartbeat mechanism. When enabled,
+           the server will periodically send ping frames to the client and
+           expect a pong response. */
+        "disabled"
+        || { /* enabled */
+             "ping_interval":
+               number
+               /* Interval, in seconds, at which a ping will be sent to the
+                  client to monitor the websocket connection. */,
+             "ping_timeout":
+               number
+               /* Timeout in seconds after which the connection will be
+                  considered dead and closed. */ },
+      "rate_limit"?:
+        { /* Rate limiting configuration for websocket connections. When
+             enabled, the server will limit the number of messages and/or
+             frames a client can send in a given time interval. */
+          "max_frames"?:
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket frames in the below interval (10x
+               max_messages when unspecified). */,
+          "max_messages"?:
+            integer ∈ [-2^30, 2^30]
+            /* Max allowed websocket messages in the below interval. */,
+          "interval":
+            integer ∈ [-2^30, 2^30]
+            /* Interval in seconds for the rate limit. */,
+          "strategy"?: "wait" | "error" | "close" } },
   "finalized_view"?:
     boolean
     /* When enabled, the node only expose blocks that are finalized, i.e.,
        the `latest` block parameter becomes a synonym for `finalized`. */,
-  "history"?: $history_mode /* History mode of the EVM node */ }
+  "history"?: $history_mode /* History mode of the EVM node */,
+  "db"?:
+    { /* Database connection configuration */
+      "pool_size"?:
+        integer ∈ [-2^30, 2^30]
+        /* Size of the database connection pool, defaults to 8 */,
+      "max_conn_reuse_count"?:
+        integer ∈ [-2^30, 2^30]
+        /* Maximum number of times a connection can be reused */ },
+  "opentelemetry"?:
+    /* Enable or disable opentelemetry profiling */
+    { /* detailed_opentelemetry_config */
+      "enable"?: boolean /* Enable opentelemetry profiling */,
+      "instance_id"?:
+        $unistring
+        /* Instance id to identify the node in Opentelemetry traces. Takes
+           precedence over <data_dir>/telemetry_id. */,
+      "debug"?: boolean /* Enable debug mode */,
+      "url_traces"?: $unistring /* URL to send traces */,
+      "headers"?:
+        [ [ $unistring, $unistring ] ... ]
+        /* API headers sent to the endpoint */,
+      "batch_traces"?:
+        /* Batch traces */
+        integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+      "batch_timeout_ms"?:
+        integer ∈ [-2^30, 2^30]
+        /* Milliseconds after which we emit a batch, even incomplete */ }
+    || boolean
+    /* opentelemetry_boolean */
+    || null
+    /* opentelemetry_null */ }
 $bignum:
   /* Big number
      Decimal representation of a big number */

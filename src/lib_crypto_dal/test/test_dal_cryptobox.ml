@@ -335,7 +335,7 @@ module Test = struct
              t
          in
          let random_shards =
-           Seq.take shards_amount shards
+           Stdlib.Seq.take shards_amount shards
            |> Seq.map (fun ({share; _} : Cryptobox.shard) : Cryptobox.shard ->
                   {
                     index = out_of_range ~min:0 ~max:params.number_of_shards;

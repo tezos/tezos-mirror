@@ -14,6 +14,7 @@ __pycache__
 /_snoop
 /node_modules
 /_opam-repo-for-releases/
+/_tobi/
 
 /test_results
 
@@ -61,13 +62,13 @@ __pycache__
 /safety-checker
 /octez-teztale-archiver
 /octez-teztale-server
-/octez-experimental-agnostic-baker
+/octez-accuser
+/octez-baker
 /octez-teztale-snitch
 
 /src/riscv/riscv-sandbox*
 /src/riscv/riscv-dummy.elf
-/src/riscv/riscv-supervised-dummy.elf
-/src/riscv/riscv-dummy-sdk.elf
+/src/riscv/riscv-dummy-linux-musl.elf
 
 /src/proto_*/parameters/*-parameters.json
 
@@ -86,6 +87,10 @@ tezt/lib_cloud/dockerfiles/*.Dockerfile.dockerignore
 # Unless it is an OS specific dockerfile or an Octez one
 !tezt/lib_cloud/dockerfiles/debian.Dockerfile
 !tezt/lib_cloud/dockerfiles/debian.Dockerfile.dockerignore
+!tezt/lib_cloud/dockerfiles/dal.Dockerfile
+!tezt/lib_cloud/dockerfiles/dal.Dockerfile.dockerignore
+!tezt/lib_cloud/dockerfiles/dal_with_snapshot.Dockerfile
+!tezt/lib_cloud/dockerfiles/dal_with_snapshot.Dockerfile.dockerignore
 !tezt/lib_cloud/dockerfiles/octez.Dockerfile
 !tezt/lib_cloud/dockerfiles/octez.Dockerfile.dockerignore
 .merlin
@@ -114,6 +119,7 @@ target
 evm_kernel.wasm
 evm_installer.wasm
 evm_kernel_unstripped.wasm
+evm_kernel_debug.wasm
 evm-evaluation-assessor
 smart-rollup-installer
 _evm_installer_preimages/
@@ -121,6 +127,7 @@ tx_kernel.wasm
 tx_kernel_dal.wasm
 tx-demo-collector
 dal_echo_kernel.wasm
+dal_echo_kernel_bandwidth.wasm
 sequencer.wasm
 evm_benchmark_kernel.wasm
 evm_unstripped_installer.wasm
@@ -130,6 +137,9 @@ _evm_unstripped_installer_preimages/
 /etherlink/kernels-*
 etherlink-governance-observer
 floodgate
+etherlink-outbox-monitor
+/fa-bridge-watchtower
+/etherlink/docs/book/*
 
 # Terraform
 

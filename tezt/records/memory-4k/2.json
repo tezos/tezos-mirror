@@ -15,13 +15,14 @@
       "sc_rollup"
     ],
     "successful_runs": {
-      "total_time": "3265589",
+      "total_time": "4599273",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1072482000
   },
   {
     "file": "tezt/tests/storage_snapshots.ml",
-    "title": "Quebeca: storage snapshot export and import",
+    "title": "R022-: storage snapshot export and import",
     "tags": [
       "admin_client",
       "client",
@@ -30,42 +31,44 @@
       "layer1",
       "memory_4k",
       "node",
-      "quebeca",
+      "r022",
       "snapshot",
       "storage"
     ],
     "successful_runs": {
-      "total_time": "66904479",
+      "total_time": "73198018",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 1767603000
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
-    "title": "Parisc: bootstrap: many nodes bootstrap",
+    "title": "Quebec: bootstrap: many nodes bootstrap",
     "tags": [
       "admin_client",
-      "baker_psparisc",
+      "agnostic_baker",
       "bootstrap",
       "client",
       "layer1",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "synchronisation_threshold",
       "threshold"
     ],
     "successful_runs": {
-      "total_time": "51247524",
+      "total_time": "51865918",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4884459000
   },
   {
     "file": "tezt/tests/synchronisation_heuristic.ml",
     "title": "Alpha: bootstrap: many nodes bootstrap",
     "tags": [
       "admin_client",
+      "agnostic_baker",
       "alpha",
-      "baker_alpha",
       "bootstrap",
       "client",
       "layer1",
@@ -75,13 +78,14 @@
       "threshold"
     ],
     "successful_runs": {
-      "total_time": "51228463",
+      "total_time": "51712939",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4903954000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Parisc: Testing DAL node (banned attesters receive their shards thanks to amplification)",
+    "title": "Quebec: Testing DAL node (banned attesters receive their shards thanks to amplification)",
     "tags": [
       "admin_client",
       "amplification",
@@ -90,13 +94,14 @@
       "dal_node",
       "memory_4k",
       "node",
-      "parisc",
+      "quebec",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "39194893",
+      "total_time": "38159714",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4573749000
   },
   {
     "file": "tezt/tests/dal.ml",
@@ -113,13 +118,14 @@
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "37899427",
+      "total_time": "60267385",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 4946525000
   },
   {
     "file": "tezt/tests/dal.ml",
-    "title": "Quebeca: Testing DAL node (garbage collection of shards for all profiles)",
+    "title": "R022-: Testing DAL node (garbage collection of shards for all profiles)",
     "tags": [
       "admin_client",
       "client",
@@ -129,12 +135,13 @@
       "memory_4k",
       "multi",
       "node",
-      "quebeca",
+      "r022",
       "tezos2"
     ],
     "successful_runs": {
-      "total_time": "44667391",
+      "total_time": "203124408",
       "count": "1"
-    }
+    },
+    "peak_memory_usage": 5256455000
   }
 ]

@@ -27,5 +27,5 @@
 val patch_context :
   Genesis.t ->
   (string * Data_encoding.json) option ->
-  Context_ops.Environment_context.t ->
-  Context_ops.Environment_context.t tzresult Lwt.t
+  Context_ops.t ->
+  Context_ops.t tzresult Lwt.t

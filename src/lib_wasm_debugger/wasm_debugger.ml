@@ -451,9 +451,9 @@ module Make (Wasm : Wasm_utils_intf.S) = struct
     ignore
       Tezos_clic.(
         setup_formatter
+          ~isatty:(Unix.isatty Unix.stdout)
           Format.std_formatter
-          (if Unix.isatty Unix.stdout then Ansi else Plain)
-          Short) ;
+          Details) ;
     let args = Array.to_list Sys.argv |> List.tl |> Option.value ~default:[] in
     let result = Lwt_main.run (dispatch args) in
     match result with

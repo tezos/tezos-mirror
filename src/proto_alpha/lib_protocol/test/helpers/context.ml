@@ -544,6 +544,8 @@ module Delegate = struct
     voting_info : Alpha_context.Vote.delegate_info;
     active_consensus_key : Signature.Public_key_hash.t;
     pending_consensus_keys : (Cycle.t * Signature.Public_key_hash.t) list;
+    active_companion_key : Signature.Bls.Public_key_hash.t option;
+    pending_companion_keys : (Cycle.t * Signature.Bls.Public_key_hash.t) list;
   }
 
   type stake = {frozen : Tez.t; weighted_delegated : Tez.t}
@@ -582,6 +584,8 @@ module Delegate = struct
   let voting_info ctxt d = Alpha_services.Delegate.voting_info rpc_ctxt ctxt d
 
   let consensus_key ctxt pkh = Delegate_services.consensus_key rpc_ctxt ctxt pkh
+
+  let companion_key ctxt pkh = Delegate_services.companion_key rpc_ctxt ctxt pkh
 
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 
@@ -760,19 +764,19 @@ let init2 = init_gen T2
 
 let init3 = init_gen T3
 
-let create_bootstrap_accounts n =
+let create_bootstrap_accounts ?algo n =
   let open Result_syntax in
-  let* accounts = Account.generate_accounts n in
+  let* accounts = Account.generate_accounts ?algo n in
   let contracts =
     List.map (fun a -> Alpha_context.Contract.Implicit Account.(a.pkh)) accounts
   in
   let bootstrap_accounts = Account.make_bootstrap_accounts accounts in
   return (bootstrap_accounts, contracts)
 
-let init_with_constants_gen tup constants =
+let init_with_constants_gen ?algo tup constants =
   let open Lwt_result_syntax in
   let n = tup_n tup in
-  let*? bootstrap_accounts, contracts = create_bootstrap_accounts n in
+  let*? bootstrap_accounts, contracts = create_bootstrap_accounts ?algo n in
   let parameters =
     Tezos_protocol_alpha_parameters.Default_parameters.parameters_of_constants
       ~bootstrap_accounts
@@ -781,8 +785,8 @@ let init_with_constants_gen tup constants =
   let* blk = Block.genesis_with_parameters parameters in
   return (blk, tup_get tup contracts)
 
-let init_with_constants_n constants n =
-  init_with_constants_gen (TList n) constants
+let init_with_constants_n ?algo constants n =
+  init_with_constants_gen ?algo (TList n) constants
 
 let init_with_constants1 = init_with_constants_gen T1
 

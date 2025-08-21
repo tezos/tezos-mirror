@@ -327,6 +327,6 @@ Grafazos
 
 You can interactively create your own dashboards to monitor your node, using the Grafana GUI. Alternatively Grafana allows you to import dashboards from JSON files.
 
-`Grafazos <https://gitlab.com/nomadic-labs/grafazos>`_ generates JSON files that you can import into the Grafana interface.
+:src:`Grafazos <grafazos/>` generates JSON files that you can import into the Grafana interface.
 
-For more details on how to use Grafazos, check the :doc:`its documentation <../grafazos-doc/index>`.
+For more details on how to use it, check :doc:`Grafazos documentation <../grafazos-doc/index>`.

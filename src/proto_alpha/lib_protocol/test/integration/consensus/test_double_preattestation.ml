@@ -107,13 +107,6 @@ end = struct
             true
         | _ -> false)
 
-  let inconsistent_denunciation loc res =
-    Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Inconsistent_denunciation
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
-
   let outdated_denunciation loc res =
     Assert.proto_error ~loc res (function
         | Validate_errors.Anonymous.Outdated_denunciation
@@ -308,7 +301,7 @@ end = struct
       ~nb_blocks_before_double:0
       ~nb_blocks_before_denunciation:2
       ~test_expected_ok:unexpected_success
-      ~test_expected_ko:inconsistent_denunciation
+      ~test_expected_ko:invalid_denunciation
       ~pick_attesters (* pick different attesters *)
       ~loc:__LOC__
       ()
@@ -403,6 +396,103 @@ end = struct
     in
     already_denounced __LOC__ e
 
+  (** Check that a double preattestation evidence fails under
+    aggregate_attestation feature flag when operations have distinct slots and
+    are otherwise identical. *)
+  let different_slots_under_feature_flag () =
+    let open Lwt_result_syntax in
+    let* genesis, _ =
+      Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
+    in
+    let* block = Block.bake genesis in
+    let* attesters = Context.get_attesters (B block) in
+    let delegate, slot1, slot2 =
+      (* Find an attester with more than 1 slot. *)
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (List.find_map
+           (fun (attester : RPC.Validators.t) ->
+             match attester.slots with
+             | slot1 :: slot2 :: _ -> Some (attester.delegate, slot1, slot2)
+             | _ -> None)
+           attesters)
+    in
+    let* preattestation1 = Op.raw_preattestation ~delegate ~slot:slot1 block in
+    let* preattestation2 = Op.raw_preattestation ~delegate ~slot:slot2 block in
+    let double_preattestation_evidence =
+      double_preattestation (B block) preattestation1 preattestation2
+    in
+    let*! res = Block.bake ~operation:double_preattestation_evidence block in
+    let* () =
+      Assert.proto_error ~loc:__LOC__ res (function
+          | Validate_errors.Anonymous.Invalid_denunciation
+              Misbehaviour.Double_preattesting ->
+              true
+          | _ -> false)
+    in
+    return_unit
+
+  let invalid_denunciation kind = function
+    | Validate_errors.Anonymous.Invalid_denunciation kind' ->
+        Misbehaviour.equal_kind kind kind'
+    | _ -> false
+
+  (** Check that a double preattestation operation fails if the same slot
+      is duplicated in the committee of one of the evidences. *)
+  let test_invalid_double_preattestation_duplicate_in_committee () =
+    let open Lwt_result_syntax in
+    let* _genesis, block =
+      Test_aggregate.init_genesis_with_some_bls_accounts
+        ~aggregate_attestation:true
+        ()
+    in
+    let* b = Block.bake_until_cycle_end block in
+    let* blk_1, blk_2 = block_fork b in
+    let* blk_a = Block.bake blk_1 in
+    let* blk_b = Block.bake blk_2 in
+    let* attesters = Context.get_attesters (B blk_a) in
+    let attester, slot =
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (Test_aggregate.find_attester_with_bls_key attesters)
+    in
+    let* op1 =
+      Op.raw_preattestation
+        ~delegate:attester.RPC.Validators.delegate
+        ~slot
+        blk_a
+    in
+    let* op2_standalone =
+      Op.raw_preattestation
+        ~delegate:attester.RPC.Validators.delegate
+        ~slot
+        blk_b
+    in
+    let op2 =
+      WithExceptions.Option.get
+        ~loc:__LOC__
+        (Op.raw_aggregate_preattestations [op2_standalone; op2_standalone])
+    in
+    let op =
+      let contents =
+        if Operation_hash.(Operation.hash op1 < Operation.hash op2) then
+          Single (Double_consensus_operation_evidence {slot; op1; op2})
+        else
+          Single
+            (Double_consensus_operation_evidence {slot; op1 = op2; op2 = op1})
+      in
+      let branch = Context.branch (B blk_a) in
+      {
+        shell = {branch};
+        protocol_data = Operation_data {contents; signature = None};
+      }
+    in
+    Op.check_validation_and_application_all_modes
+      ~loc:__LOC__
+      ~error:(invalid_denunciation Double_preattesting)
+      ~predecessor:blk_a
+      op
+
   let my_tztest title test =
     Tztest.tztest (Format.sprintf "%s: %s" name title) test
 
@@ -446,6 +536,15 @@ end = struct
         "valid double preattestation injected multiple times"
         `Quick
         test_two_double_preattestation_evidences_leads_to_duplicate_denunciation;
+      my_tztest
+        "different slots under feature flag"
+        `Quick
+        different_slots_under_feature_flag;
+      my_tztest
+        "ko: invalid double preattestation evidence: duplicate slot in \
+         committee"
+        `Quick
+        test_invalid_double_preattestation_duplicate_in_committee;
     ]
 end
 

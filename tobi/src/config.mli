@@ -70,8 +70,11 @@ val pervasive_paths : t -> string list
 (** Get the list of components. *)
 val components : t -> component list
 
+(** Find a component with a given name. *)
+val find_component_by_name : string -> t -> (component, [> `not_found]) r
+
 (** Load the configuration for a given version.
 
     This fetches file ["tobi/config"] for the given version and parses it.
     In particular this can fetch versions from older commits. *)
-val load : unit -> (t, [> `failed]) r
+val load : Version.t -> (t, [> `failed]) r

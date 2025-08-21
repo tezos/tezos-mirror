@@ -10,7 +10,7 @@ let encode_length
         else
             let length_bytes = Converters.nat_to_bytes length in
             let length_of_length = Bytes.length length_bytes in
-            let _ = assert_with_error (length_of_length < 9n) Errors.input_too_long_for_rlp in
+            let _ = Assert.Error.assert (length_of_length < 9n) Errors.input_too_long_for_rlp in
             Bytes.concat (Converters.nat_to_bytes (length_of_length + offset + 55n)) length_bytes
 
 let encode_item

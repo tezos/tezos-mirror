@@ -227,57 +227,67 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
   let tz4_pk = match consensus_pk with Bls pk -> pk | _ -> assert false in
   let* inc = Incremental.begin_construction blk' in
   if allow_tz4_delegate_enable then
-    let expect_failure = function
-      | [
-          Environment.Ecoproto_error
-            (Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof
-              {source; public_key});
-        ]
-        when Signature.Public_key.(public_key = consensus_pk)
-             && source = delegate ->
-          return_unit
-      | err ->
-          failwith
-            "Error trace:@,\
-            \ %a does not match the \
-             [Validate_errors.Manager.Update_consensus_key_with_tz4_without_proof] \
-             error"
-            Error_monad.pp_print_trace
-            err
+    let expect_failure =
+      Error_helpers.expect_missing_bls_proof
+        ~loc:__LOC__
+        ~kind_pk:Consensus_pk
+        ~pk:consensus_pk
+        ~source_pkh:delegate
     in
     let* (_i : Incremental.t) =
       Incremental.validate_operation ~expect_failure inc operation
     in
+    let proof_signer = Account.new_account ~algo:Bls () in
     let* operation_with_incorrect_proof =
       Op.update_consensus_key
-        ~proof_signer:contract
+        ~proof_signer:(Contract.Implicit proof_signer.pkh)
         (B blk')
         (Contract.Implicit delegate)
         consensus_pk
     in
-    let expect_failure = function
-      | [
-          Environment.Ecoproto_error
-            (Validate_errors.Manager.Update_consensus_key_with_incorrect_proof
-              {public_key; proof = _});
-        ]
-        when Signature.Public_key.(public_key = consensus_pk) ->
-          return_unit
-      | err ->
-          failwith
-            "Error trace:@,\
-            \ %a does not match the \
-             [Validate_errors.Manager.Update_consensus_key_with_incorrect_proof] \
-             error"
-            Error_monad.pp_print_trace
-            err
+    let expect_apply_failure =
+      Error_helpers.expect_incorrect_bls_proof
+        ~loc:__LOC__
+        ~kind_pk:Consensus_pk
+        ~pk:consensus_pk
     in
     let* (_i : Incremental.t) =
-      Incremental.validate_operation
-        ~expect_failure
+      Incremental.add_operation
+        ~expect_apply_failure
         inc
         operation_with_incorrect_proof
     in
+    (* update_consensus_key with incorrect ciphersuite *)
+    let proof_incorrect_ciphersuite =
+      match (consensus_account.sk, consensus_account.pk) with
+      | Bls sk, Bls pk ->
+          let signature =
+            Signature.Bls.sign sk (Bls12_381_signature.MinPk.pk_to_bytes pk)
+          in
+          Some signature
+      | _ -> None
+    in
+    let* operation_with_incorrect_ciphersuite =
+      Op.update_consensus_key
+        ~forge_proof:proof_incorrect_ciphersuite
+        (B blk')
+        (Contract.Implicit delegate)
+        consensus_pk
+    in
+    let expect_apply_failure =
+      Error_helpers.expect_incorrect_bls_proof
+        ~loc:__LOC__
+        ~kind_pk:Consensus_pk
+        ~pk:consensus_pk
+    in
+    let* (_i : Incremental.t) =
+      Incremental.add_operation
+        ~expect_apply_failure
+        inc
+        operation_with_incorrect_ciphersuite
+    in
+
+    (* update_consensus_key with correct proof *)
     let* operation_with_correct_proof =
       Op.update_consensus_key
         ~proof_signer:(Contract.Implicit consensus_account.pkh)
@@ -293,9 +303,9 @@ let test_tz4_consensus_key ~allow_tz4_delegate_enable () =
     let expect_failure = function
       | [
           Environment.Ecoproto_error
-            (Delegate_consensus_key.Invalid_consensus_key_update_tz4 pk);
+            (Delegate_consensus_key.Invalid_consensus_key_update_tz4 (pk, kind));
         ]
-        when Signature.Bls_aug.Public_key.(pk = tz4_pk) ->
+        when Signature.Bls.Public_key.(pk = tz4_pk) && kind = Consensus ->
           return_unit
       | err ->
           failwith
@@ -322,28 +332,17 @@ let test_consensus_key_with_unused_proof () =
   let* blk' =
     transfer_tokens genesis account1_pkh consensus_pkh Tez.one_mutez
   in
+  let proof_signer = Account.new_account ~algo:Bls () in
   let* operation =
     Op.update_consensus_key
-      ~proof_signer:(Contract.Implicit consensus_account.pkh)
+      ~proof_signer:(Contract.Implicit proof_signer.pkh)
       (B blk')
       (Contract.Implicit delegate)
       consensus_pk
   in
   let* inc = Incremental.begin_construction blk' in
-  let expect_failure = function
-    | [
-        Environment.Ecoproto_error
-          (Validate_errors.Manager.Update_consensus_key_with_unused_proof _);
-      ] ->
-        return_unit
-    | err ->
-        failwith
-          "Error trace:@,\
-          \ %a does not match the \
-           [Validate_errors.Manager.Update_consensus_key_with_unused_proof] \
-           error"
-          Error_monad.pp_print_trace
-          err
+  let expect_failure =
+    Error_helpers.expect_unused_bls_proof ~loc:__LOC__ ~kind_pk:Consensus_pk
   in
   let* (_i : Incremental.t) =
     Incremental.validate_operation ~expect_failure inc operation

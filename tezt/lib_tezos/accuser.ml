@@ -60,8 +60,8 @@ let set_ready accuser =
 let handle_raw_stdout accuser line =
   if line =~ rex "^Waiting for protocol .+ to start...$" then set_ready accuser
 
-let create ~protocol ?(path = Uses.path (Protocol.accuser protocol)) ?name
-    ?color ?event_pipe ?base_dir ?runner ?preserved_levels node =
+let create ?(path = Uses.path Constant.octez_accuser) ?name ?color ?event_pipe
+    ?base_dir ?runner ?preserved_levels node =
   let name = match name with None -> fresh_name () | Some name -> name in
   let base_dir =
     match base_dir with None -> Temp.dir name | Some dir -> dir
@@ -126,13 +126,12 @@ let wait_for_ready accuser =
         resolver :: accuser.persistent_state.pending_ready ;
       check_event accuser "Accuser started." promise
 
-let init ~protocol ?path ?name ?color ?event_pipe ?event_level ?base_dir ?runner
+let init ?path ?name ?color ?event_pipe ?event_level ?base_dir ?runner
     ?preserved_levels node =
   let* () = Node.wait_for_ready node in
   let accuser =
     create
       ?path
-      ~protocol
       ?name
       ?color
       ?event_pipe

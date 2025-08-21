@@ -165,7 +165,7 @@ let propagate_validateable_bad_block =
   Protocol.register_test
     ~__FILE__
     ~title:"forge fake block"
-    ~tags:[team; "validate"; "fake_block"; "propagation"; Tag.memory_3k]
+    ~tags:[team; "validate"; "fake_block"; "propagation"]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :
@@ -279,8 +279,7 @@ let propagate_validateable_bad_block_payload =
   Protocol.register_test
     ~__FILE__
     ~title:"forge block with wrong payload"
-    ~tags:
-      [team; "validate"; "fake_block"; "propagation"; "payload"; Tag.memory_3k]
+    ~tags:[team; "validate"; "fake_block"; "propagation"; "payload"]
     ~uses:(fun _protocol -> [Constant.octez_codec])
   @@ fun protocol ->
   (* Expected topology is :

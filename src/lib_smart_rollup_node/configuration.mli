@@ -105,6 +105,7 @@ type outbox_message_filter =
 
 type t = {
   sc_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
+  etherlink : bool;
   boot_sector_file : string option;
   operators : Purpose.operators;
   rpc_addr : string;
@@ -143,6 +144,7 @@ type t = {
   history_mode : history_mode option;
   cors : Resto_cohttp.Cors.t;
   bail_on_disagree : bool;
+  opentelemetry : Octez_telemetry.Opentelemetry_config.t;
 }
 
 type error += Empty_operation_kinds_for_custom_mode
@@ -236,9 +238,9 @@ val mode_of_string : string -> mode tzresult
 (** [description_of_mode m] returns a textual description of the mode [m]. *)
 val description_of_mode : mode -> string
 
-(** [config_filename data_dir] returns
-    the configration filename from the [data_dir] *)
-val config_filename : data_dir:string -> string
+(** [config_filename ~data_dir config] returns the configration filename from
+    the [data_dir] when [config] is [None]. *)
+val config_filename : data_dir:string -> string option -> string
 
 (** [purposes_of_mode mode] returns purposes associated with the provided mode. *)
 val purposes_of_mode : mode -> Purpose.ex_purpose list
@@ -278,13 +280,13 @@ val encoding : t Data_encoding.t
 (** Encoding for configuration without any default value. *)
 val encoding_no_default : t Data_encoding.t
 
-(** [save ~force ~data_dir configuration] writes the [configuration] file in
-    [data_dir]. If [force] is [true], existing configurations are
+(** [save ~force ~config_file configuration] writes the [configuration] in file
+    [config_file]. If [force] is [true], existing configurations are
     overwritten. *)
-val save : force:bool -> data_dir:string -> t -> unit tzresult Lwt.t
+val save : force:bool -> config_file:string -> t -> unit tzresult Lwt.t
 
-(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
-val load : data_dir:string -> t tzresult Lwt.t
+(** [load ~config_file] reads a configuration from the file [config_file]. *)
+val load : config_file:string -> t tzresult Lwt.t
 
 module Cli : sig
   val configuration_from_args :
@@ -318,10 +320,12 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    profiling:bool option ->
+    force_etherlink:bool ->
     t tzresult Lwt.t
 
   val create_or_read_config :
-    data_dir:string ->
+    config_file:string ->
     rpc_addr:string option ->
     rpc_port:int option ->
     acl_override:[`Allow_all | `Secure] option ->
@@ -352,5 +356,7 @@ module Cli : sig
     apply_unsafe_patches:bool ->
     unsafe_disable_wasm_kernel_checks:bool ->
     bail_on_disagree:bool ->
+    profiling:bool option ->
+    force_etherlink:bool ->
     t tzresult Lwt.t
 end

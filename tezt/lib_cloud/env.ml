@@ -12,19 +12,32 @@ let tezt_cloud =
       (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
       match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
 
+let mode =
+  match (Cli.proxy, Cli.localhost, Cli.ssh_host) with
+  | true, true, None -> `Remote_orchestrator_local_agents
+  | true, false, None -> `Remote_orchestrator_remote_agents
+  | false, true, None -> `Local_orchestrator_local_agents
+  | false, false, None -> `Local_orchestrator_remote_agents
+  | true, _, Some _ | _, true, Some _ ->
+      Test.fail
+        "Unexpected combination of options: ssh_host and (proxy or localhost)"
+  | _, _, Some endpoint ->
+      let uri = Uri.of_string (Format.asprintf "tcp://%s" endpoint) in
+      let host =
+        match Uri.host uri with
+        | None -> Test.fail "No valid hostname specified: %s" endpoint
+        | Some host -> host
+      in
+      let user = Option.value ~default:(Sys.getenv "USER") (Uri.user uri) in
+      let port = Option.value ~default:22 (Uri.port uri) in
+      `Ssh_host (user, host, port)
+
 let ssh_private_key_filename ?(home = Sys.getenv "HOME") () =
   home // ".ssh" // Format.asprintf "%s-tf" tezt_cloud
 
 let ssh_public_key_filename ?home () =
   let ssh_key = ssh_private_key_filename ?home () in
   Format.asprintf "%s.pub" ssh_key
-
-let mode =
-  match (Cli.localhost, Cli.proxy) with
-  | true, true -> `Orchestrator
-  | true, false -> `Localhost
-  | false, true -> `Host
-  | false, false -> `Cloud
 
 let prometheus = Cli.prometheus
 
@@ -92,14 +105,48 @@ let binaries_path = Cli.binaries_path
 
 let process_monitoring = Cli.process_monitoring
 
+let log_rotation = Cli.log_rotation
+
 let init () =
   if tezt_cloud = "" then
     Test.fail
       "The tezt-cloud value should be set. Either via the CLI or via the \
        environment variable 'TEZT_CLOUD'" ;
+  (* If using logfile, installs a signal handler to close and reopen the logfile.
+     This allows logrotate to use a better strategy than copytruncate
+     https://incoherency.co.uk/blog/stories/logrotate-copytruncate-race-condition.html
+  *)
+  (if log_rotation <> 0 then
+     match Tezt_core.Cli.Logs.file with
+     | None -> ()
+     | Some logfile ->
+         Log.report "Installing signal handler for SIGHUP" ;
+         let signal_hup_handler signal =
+           if signal = Sys.sighup then (
+             (* TODO: Not sure if set_file is async-signal-safe.
+                Maybe implement a better solution if it causes issues *)
+             Tezt_core.Log.set_file logfile ;
+             Log.report "Logfile was reopened")
+         in
+         Sys.set_signal Sys.sighup (Sys.Signal_handle signal_hup_handler)) ;
   match mode with
-  | `Localhost | `Orchestrator -> Lwt.return_unit
-  | `Host | `Cloud ->
+  | `Local_orchestrator_local_agents | `Ssh_host _ -> Lwt.return_unit
+  | `Remote_orchestrator_local_agents ->
+      (* In orchestrator mode, expose the PID of tezt-cloud in a file as the
+         process can be considered as a daemon
+         It will be useful for logrotate *)
+      let* pidfile =
+        match Unix.getuid () with
+        | 0 -> Lwt.return "/var/run/tezt-cloud.pid"
+        | uid ->
+            Format.asprintf "/var/run/user/%d/tezt-cloud.pid" uid |> Lwt.return
+      in
+      let pid = Unix.getpid () in
+      Log.report "Writing %d to pidfile : %s" pid pidfile ;
+      ( with_open_out pidfile @@ fun fd ->
+        output_string fd (Format.asprintf "%d\n" pid) ) ;
+      Lwt.return_unit
+  | `Remote_orchestrator_remote_agents | `Local_orchestrator_remote_agents ->
       let* project_id = project_id () in
       Log.info "Initializing docker registry..." ;
       let* () = Terraform.Docker_registry.init () in
@@ -136,7 +183,14 @@ let registry_uri () =
   let uri = Format.asprintf "%s/%s/%s" hostname project_id docker_registry in
   Lwt.return uri
 
-let rec wait_process ?(sleep = 4) ~is_ready ~run () =
+let pp_process_status fmt = function
+  | Unix.WEXITED n -> Format.fprintf fmt "EXITED %n" n
+  | Unix.WSIGNALED n -> Format.fprintf fmt "SIGNALED %n" n
+  | Unix.WSTOPPED n -> Format.fprintf fmt "STOPPED %n" n
+
+exception Process_failed of Unix.process_status
+
+let rec wait_process ?(sleep = 4) ~is_ready ~run ?(propagate_error = false) () =
   let process = run () in
   let* status = Process.wait process in
   match status with
@@ -149,14 +203,17 @@ let rec wait_process ?(sleep = 4) ~is_ready ~run () =
           (Process.name process)
           sleep ;
         let* () = Lwt_unix.sleep (float_of_int sleep) in
-        wait_process ~sleep ~is_ready ~run ())
-  | _ ->
+        wait_process ~sleep ~is_ready ~run ~propagate_error ())
+  | e ->
       Log.info
-        "Process '%s' failed. Let's wait %d seconds"
+        "Process '%s' failed with %a. Let's wait %d seconds"
         (Process.name process)
+        pp_process_status
+        e
         sleep ;
       let* () = Lwt_unix.sleep (float_of_int sleep) in
-      wait_process ~sleep ~is_ready ~run ()
+      if propagate_error then Lwt.fail (Process_failed e)
+      else wait_process ~sleep ~is_ready ~run ()
 
 let run_command ?cmd_wrapper cmd args =
   match cmd_wrapper with
@@ -171,14 +228,16 @@ let dns_domains () =
     if Cli.no_dns then Lwt.return_nil
     else
       match mode with
-      | `Host -> (
+      | `Remote_orchestrator_remote_agents -> (
           let* domain =
             Gcloud.DNS.get_fqdn ~name:tezt_cloud ~zone:"tezt-cloud"
           in
           match domain with
           | None -> Lwt.return Cli.dns_domains
           | Some domain -> Lwt.return (domain :: Cli.dns_domains))
-      | `Orchestrator | `Localhost | `Cloud -> Lwt.return Cli.dns_domains
+      | `Remote_orchestrator_local_agents | `Local_orchestrator_local_agents
+      | `Local_orchestrator_remote_agents | `Ssh_host _ ->
+          Lwt.return Cli.dns_domains
   in
   (* A fully-qualified domain name requires to end with a dot.
      However, the usage tends to omit this final dot. Because having a
@@ -192,3 +251,20 @@ let dns_domains () =
   |> List.map (fun domain ->
          if String.ends_with ~suffix:"." domain then domain else domain ^ ".")
   |> Lwt.return
+
+let notifier =
+  let open Types in
+  match (Cli.slack_bot_token, Cli.slack_channel_id) with
+  | None, None -> Notifier_null
+  | Some _, None ->
+      Log.warn
+        "A Slack bot token has been provided but no Slack channel id. No \
+         reports or alerts will be sent." ;
+      Notifier_null
+  | None, Some _ ->
+      Log.warn
+        "A Slack channel ID has been provided but no Slack bot token. No \
+         reports or alerts will be sent." ;
+      Notifier_null
+  | Some slack_bot_token, Some slack_channel_id ->
+      Notifier_slack {name = "default-slack"; slack_channel_id; slack_bot_token}

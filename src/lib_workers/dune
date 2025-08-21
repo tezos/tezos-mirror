@@ -8,6 +8,7 @@
  (libraries
   octez-libs.base
   octez-libs.stdlib-unix
+  octez-libs.octez-profiler.complex_backends
   opentelemetry)
  (preprocess (pps octez-libs.ppx_profiler))
  (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
@@ -15,6 +16,7 @@
   (:standard)
   -open Tezos_base.TzPervasives
   -open Tezos_base
-  -open Tezos_stdlib_unix))
+  -open Tezos_stdlib_unix
+  -open Tezos_profiler_complex_backends))
 
 (documentation (package octez-libs) (mld_files tezos_workers))

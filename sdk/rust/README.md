@@ -8,6 +8,7 @@ Namely:
 - [tezos_crypto_rs](./crypto/README.md) 
 - [tezos_encoding](./tezos-encoding/README.md) 
 - [tezos_encoding_derive](./tezos-encoding-derive/README.md)
+- [tezos_protocol](./protocol/README.md)
 
 ## Setup
 

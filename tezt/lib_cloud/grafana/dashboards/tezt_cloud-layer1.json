@@ -1,0 +1,520 @@
+{
+   "description": "A dashboard for Layer 1 related experiments with tezt cloud",
+   "panels": [
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 0,
+            "x": 0,
+            "y": 0
+         },
+         "id": 1,
+         "panels": [ ],
+         "title": "Node stats",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               }
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 0
+         },
+         "id": 2,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(octez_validator_chain_head_level)",
+               "legendFormat": "Head level"
+            }
+         ],
+         "title": "Head level history",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 0
+         },
+         "id": 3,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(octez_validator_block_last_finished_request_completion_timestamp-octez_validator_block_last_finished_request_treatment_timestamp)",
+               "legendFormat": "Validation time"
+            }
+         ],
+         "title": "Block validation time",
+         "type": "timeseries"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 0,
+            "x": 0,
+            "y": 9
+         },
+         "id": 4,
+         "panels": [ ],
+         "title": "Hardware stats",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+         },
+         "id": 5,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_cpu_utilization_percentage_average{app_group=\"octez-node\",dimension=\"user\"})",
+               "legendFormat": "User avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_cpu_utilization_percentage_average{app_group=\"octez-node\",dimension=\"system\"})",
+               "legendFormat": "System avg"
+            }
+         ],
+         "title": "[octez-node] Cpu activity",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "percent"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+         },
+         "id": 6,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_cpu_utilization_percentage_average{app_group=\"octez-baker\",dimension=\"user\"})",
+               "legendFormat": "User avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_cpu_utilization_percentage_average{app_group=\"octez-baker\",dimension=\"system\"})",
+               "legendFormat": "System avg"
+            }
+         ],
+         "title": "[octez-baker] Cpu activity",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "MB"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+         },
+         "id": 7,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_mem_usage_MiB_average{app_group=\"octez-node\"})",
+               "legendFormat": "RAM avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_swap_usage_MiB_average{app_group=\"octez-node\"})",
+               "legendFormat": "swap avg"
+            }
+         ],
+         "title": "[octez-node] Memory usage",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "MB"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+         },
+         "id": 8,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_mem_usage_MiB_average{app_group=\"octez-baker\"})",
+               "legendFormat": "RAM avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_swap_usage_MiB_average{app_group=\"octez-baker\"})",
+               "legendFormat": "swap avg"
+            }
+         ],
+         "title": "[octez-baker] Memory usage",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "kB/s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+         },
+         "id": 9,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez-node\"})",
+               "legendFormat": "Reads avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez-node\"})",
+               "legendFormat": "Writes avg"
+            }
+         ],
+         "title": "[octez-node] Disk IOs",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "kB/s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+         },
+         "id": 10,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez-baker\"})",
+               "legendFormat": "Reads avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(netdata_app_disk_logical_io_KiB_persec_average{app_group=\"octez-baker\"})",
+               "legendFormat": "Writes avg"
+            }
+         ],
+         "title": "[octez-baker] Disk IOs",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "kB/s"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 25
+         },
+         "id": 11,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(abs(netdata_net_net_kilobits_persec_average{interface_type=\"real\",dimension=\"received\"}) / 8)",
+               "legendFormat": "Received avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(abs(netdata_net_net_kilobits_persec_average{interface_type=\"real\",dimension=\"sent\"}) / 8)",
+               "legendFormat": "Transmitted avg"
+            }
+         ],
+         "title": "Network traffic",
+         "type": "timeseries"
+      },
+      {
+         "collapsed": false,
+         "gridPos": {
+            "h": 1,
+            "w": 0,
+            "x": 0,
+            "y": 43
+         },
+         "id": 12,
+         "panels": [ ],
+         "title": "Miscellaneous",
+         "type": "row"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1,
+                  "scaleDistribution": {
+                     "log": 10,
+                     "type": "log"
+                  }
+               }
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 43
+         },
+         "id": 13,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(ocaml_gc_minor_collections)",
+               "legendFormat": "Minor collections avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(ocaml_gc_major_collections)",
+               "legendFormat": "Major collections avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(ocaml_gc_forced_major_collections)",
+               "legendFormat": "Forced major collections avg"
+            },
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(ocaml_gc_compactions)",
+               "legendFormat": "Heap compactions avg"
+            }
+         ],
+         "title": "[octez-node] GC maintenance operations",
+         "type": "timeseries"
+      },
+      {
+         "datasource": {
+            "type": "datasource",
+            "uid": "-- Mixed --"
+         },
+         "fieldConfig": {
+            "defaults": {
+               "custom": {
+                  "lineWidth": 1
+               },
+               "unit": "bytes"
+            }
+         },
+         "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 43
+         },
+         "id": 14,
+         "pluginVersion": "v11.4.0",
+         "targets": [
+            {
+               "datasource": {
+                  "type": "prometheus",
+                  "uid": "${datasource}"
+               },
+               "expr": "avg(ocaml_gc_heap_words * 8)",
+               "legendFormat": "Major heap avg"
+            }
+         ],
+         "title": "[octez-node] GC major word sizes",
+         "type": "timeseries"
+      }
+   ],
+   "refresh": "20s",
+   "schemaVersion": 39,
+   "templating": {
+      "list": [
+         {
+            "label": "Prometheus source",
+            "multi": true,
+            "name": "datasource",
+            "query": "prometheus",
+            "regex": "^(?!default$).*",
+            "type": "datasource"
+         }
+      ]
+   },
+   "time": {
+      "from": "now-3h",
+      "to": "now"
+   },
+   "timezone": "utc",
+   "title": "Tezt Cloud - Layer 1 dashboard"
+}

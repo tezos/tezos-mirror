@@ -26,6 +26,7 @@
 open Client_proto_args
 open Baking_errors
 module Events = Baking_events.Commands
+module Command_run = Octez_agnostic_baker.Command_run
 
 let pidfile_arg =
   let open Lwt_result_syntax in
@@ -35,94 +36,6 @@ let pidfile_arg =
     ~long:"pidfile"
     ~placeholder:"filename"
     (Tezos_clic.parameter (fun _ s -> return s))
-
-let may_lock_pidfile pidfile_opt f =
-  match pidfile_opt with
-  | None -> f ()
-  | Some pidfile ->
-      Lwt_lock_file.with_lock
-        ~when_locked:
-          (`Fail (Exn (Failure ("Failed to create the pidfile: " ^ pidfile))))
-        ~filename:pidfile
-        f
-
-let check_node_version cctxt bypass allowed =
-  let open Lwt_result_syntax in
-  (* Parse and check allowed versions *)
-  let*? allowed =
-    let open Result_syntax in
-    Option.map_e
-      (fun allowed ->
-        match
-          Tezos_version_parser.version_commit (Lexing.from_string allowed)
-        with
-        | None -> tzfail (Node_version_malformatted allowed)
-        | Some x -> return x)
-      allowed
-  in
-  let is_allowed node_version
-      (node_commit_info : Tezos_version.Octez_node_version.commit_info option) =
-    match allowed with
-    | None -> false
-    | Some (v, c) -> (
-        let c =
-          Option.map
-            (fun commit_hash ->
-              Tezos_version.Octez_node_version.{commit_hash; commit_date = ""})
-            c
-        in
-        match
-          Tezos_version.Octez_node_version.partially_compare
-            v
-            c
-            node_version
-            node_commit_info
-        with
-        | None -> false
-        | Some x -> x = 0)
-  in
-  if bypass then
-    let*! () = Events.(emit node_version_check_bypass ()) in
-    return_unit
-  else
-    let baker_version = Tezos_version_value.Current_git_info.octez_version in
-    let (baker_commit_info
-          : Tezos_version.Octez_node_version.commit_info option) =
-      Some
-        {
-          commit_hash = Tezos_version_value.Current_git_info.commit_hash;
-          commit_date = Tezos_version_value.Current_git_info.committer_date;
-        }
-    in
-    let* node_version = Version_services.version cctxt in
-    let*! () =
-      Events.(
-        emit
-          node_version_check
-          ( node_version.version,
-            node_version.commit_info,
-            baker_version,
-            baker_commit_info ))
-    in
-    if is_allowed node_version.version node_version.commit_info then return_unit
-    else
-      match
-        Tezos_version.Octez_node_version.partially_compare
-          baker_version
-          baker_commit_info
-          node_version.version
-          node_version.commit_info
-      with
-      | Some r when r <= 0 -> return_unit
-      | _ ->
-          tzfail
-            (Node_version_incompatible
-               {
-                 node_version = node_version.version;
-                 node_commit_info = node_version.commit_info;
-                 baker_version;
-                 baker_commit_info;
-               })
 
 let http_headers_env_variable =
   "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
@@ -305,8 +218,8 @@ let get_delegates (cctxt : Protocol_client_context.full)
     (pkhs : Signature.public_key_hash list) =
   let open Lwt_result_syntax in
   let proj_delegate (alias, public_key_hash, public_key, secret_key_uri) =
-    Baking_state.Consensus_key.make
-      ~alias:(Some alias)
+    Baking_state_types.Key.make
+      ~alias
       ~public_key_hash
       ~public_key
       ~secret_key_uri
@@ -326,10 +239,8 @@ let get_delegates (cctxt : Protocol_client_context.full)
   let* () =
     Tezos_signer_backends.Encrypted.decrypt_list
       cctxt
-      (List.filter_map
-         (function
-           | {Baking_state.Consensus_key.alias = Some alias; _} -> Some alias
-           | _ -> None)
+      (List.map
+         (function {Baking_state_types.Key.alias; _} -> alias)
          delegates)
   in
   let delegates_no_duplicates = List.sort_uniq compare delegates in
@@ -623,6 +534,33 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
           ?data_dir
           ~state_recorder
           delegates);
+    command
+      ~group
+      ~desc:"Send a block proposal for the current level"
+      (args4
+         force_switch
+         force_round_arg
+         minimal_timestamp_switch
+         force_reproposal)
+      (prefixes ["repropose"; "for"] @@ sources_param)
+      (fun (force, force_round, minimal_timestamp, force_reproposal)
+           sources
+           cctxt ->
+        let*? force_round =
+          Option.map_e
+            (fun r ->
+              Result.map_error Environment.wrap_tztrace
+              @@ Protocol.Alpha_context.Round.of_int r)
+            force_round
+        in
+        let* delegates = get_delegates cctxt sources in
+        Baking_lib.repropose
+          cctxt
+          ~force
+          ~minimal_timestamp
+          ~force_reproposal
+          ?force_round
+          delegates);
   ]
 
 let directory_parameter =
@@ -682,58 +620,6 @@ let remote_calls_timeout_arg =
          try return (Q.of_string s)
          with _ -> failwith "remote-calls-timeout expected int or float."))
 
-let lookup_default_vote_file_path (cctxt : Protocol_client_context.full) =
-  let open Lwt_syntax in
-  let default_filename = Per_block_vote_file.default_vote_json_filename in
-  let file_exists path =
-    Lwt.catch (fun () -> Lwt_unix.file_exists path) (fun _ -> return_false)
-  in
-  let when_s pred x g =
-    let* b = pred x in
-    if b then return_some x else g ()
-  in
-  (* Check in current working directory *)
-  when_s file_exists default_filename @@ fun () ->
-  (* Check in the baker directory *)
-  let base_dir_file = Filename.Infix.(cctxt#get_base_dir // default_filename) in
-  when_s file_exists base_dir_file @@ fun () -> return_none
-
-(* This function checks that a DAL node endpoint was given,
-   and that the specified DAL node is "healthy",
-   (the DAL's nodes 'health' RPC is used for that). *)
-let check_dal_node =
-  let last_check_successful = ref false in
-  fun without_dal dal_node_rpc_ctxt ->
-    let open Lwt_result_syntax in
-    let result_emit f x =
-      let*! () = Events.emit f x in
-      return_unit
-    in
-    match (dal_node_rpc_ctxt, without_dal) with
-    | None, true ->
-        (* The user is aware that no DAL node is running, since they explicitly
-           used the [--without-dal] option. However, we do not want to reduce the
-           exposition of bakers to warnings about DAL, so we keep it. *)
-        result_emit Events.no_dal_node_provided ()
-    | None, false -> tzfail No_dal_node_endpoint
-    | Some _, true -> tzfail Incompatible_dal_options
-    | Some ctxt, false -> (
-        let*! health = Node_rpc.get_dal_health ctxt in
-        match health with
-        | Ok health -> (
-            match health.status with
-            | Tezos_dal_node_services.Types.Health.Up ->
-                if !last_check_successful then return_unit
-                else (
-                  last_check_successful := true ;
-                  result_emit Events.healthy_dal_node ())
-            | _ ->
-                last_check_successful := false ;
-                result_emit Events.unhealthy_dal_node (ctxt#base, health))
-        | Error _ ->
-            last_check_successful := false ;
-            result_emit Events.unreachable_dal_node ctxt#base)
-
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
@@ -756,7 +642,12 @@ let baker_args =
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
 
-let run_baker
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
+let run_baker ?(recommend_agnostic_baker = true)
     ( pidfile,
       node_version_check_bypass,
       node_version_allowed,
@@ -775,30 +666,69 @@ let run_baker
       pre_emptive_forge_time,
       remote_calls_timeout ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
-  may_lock_pidfile pidfile @@ fun () ->
+  Command_run.may_lock_pidfile pidfile @@ fun () ->
+  let*! () =
+    if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
+    else Lwt.return_unit
+  in
   let* () =
-    check_node_version cctxt node_version_check_bypass node_version_allowed
+    Octez_agnostic_baker.Command_run.check_node_version
+      cctxt
+      node_version_check_bypass
+      node_version_allowed
   in
   let*! per_block_vote_file =
     if per_block_vote_file = None then
       (* If the votes file was not explicitly given, we
          look into default locations. *)
-      lookup_default_vote_file_path cctxt
+      Octez_agnostic_baker.Per_block_vote_file.lookup_default_vote_file_path
+        (cctxt :> Client_context.full)
     else Lwt.return per_block_vote_file
+  in
+  let*! () =
+    if Option.is_some adaptive_issuance_vote then
+      Events.(emit unused_cli_adaptive_issuance_vote ())
+    else Lwt.return_unit
   in
   (* We don't let the user run the baker without providing some
      option (CLI, file path, or file in default location) for
      the per-block votes. *)
   let* votes =
-    Per_block_vote_file.load_per_block_votes_config
-      ~default_liquidity_baking_vote:liquidity_baking_vote
-      ~default_adaptive_issuance_vote:adaptive_issuance_vote
-      ~per_block_vote_file
+    let of_protocol = function
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_on ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_on
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_off ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_off
+      | Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass ->
+          Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass
+    in
+    let to_protocol = function
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_on ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_on
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_off ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_off
+      | Octez_agnostic_baker.Per_block_votes.Per_block_vote_pass ->
+          Protocol.Alpha_context.Per_block_votes.Per_block_vote_pass
+    in
+    let* Octez_agnostic_baker.Configuration.
+           {vote_file; liquidity_baking_vote; adaptive_issuance_vote} =
+      Octez_agnostic_baker.Per_block_vote_file.load_per_block_votes_config
+        ~default_liquidity_baking_vote:
+          (Option.map of_protocol liquidity_baking_vote)
+        ~per_block_vote_file
+    in
+    return
+      Baking_configuration.
+        {
+          vote_file;
+          liquidity_baking_vote = to_protocol liquidity_baking_vote;
+          adaptive_issuance_vote = to_protocol adaptive_issuance_vote;
+        }
   in
   let dal_node_rpc_ctxt =
     Option.map create_dal_node_rpc_ctxt dal_node_endpoint
   in
-  let* () = check_dal_node without_dal dal_node_rpc_ctxt in
+  let* () = Command_run.check_dal_node without_dal dal_node_rpc_ctxt in
   let* delegates = get_delegates cctxt sources in
   let data_dir =
     match baking_mode with
@@ -822,6 +752,11 @@ let run_baker
     ~state_recorder
     delegates
 
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
 let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
   let open Tezos_clic in
   let group =
@@ -858,10 +793,15 @@ let baker_commands () : Protocol_client_context.full Tezos_clic.command list =
       (args2 pidfile_arg keep_alive_arg)
       (prefixes ["run"; "vdf"] @@ stop)
       (fun (pidfile, keep_alive) cctxt ->
-        may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.VDF.run cctxt ~chain:cctxt#chain ~keep_alive);
   ]
 
+(* /*\ DO NOT MODIFY /!\
+
+   If you do, you need to have the command in sync with the agnostic baker one. This command
+   is meant to removed, the source of truth is the agnostic baker.
+*)
 let accuser_commands () =
   let open Tezos_clic in
   let group =
@@ -877,7 +817,7 @@ let accuser_commands () =
       (args3 pidfile_arg Client_proto_args.preserved_levels_arg keep_alive_arg)
       (prefixes ["run"] @@ stop)
       (fun (pidfile, preserved_levels, keep_alive) cctxt ->
-        may_lock_pidfile pidfile @@ fun () ->
+        Command_run.may_lock_pidfile pidfile @@ fun () ->
         Client_daemon.Accuser.run
           cctxt
           ~chain:cctxt#chain

@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module provides different services related to DAL slots. *)
+(** This module provides different services related to DAL. *)
 
 open Tezos_crypto_dal
 
@@ -152,7 +152,7 @@ val get_protocol_parameters :
     is incompatible with other profiles. *)
 val patch_profiles :
   < meth : [`PATCH]
-  ; input : Operator_profile.t
+  ; input : Controller_profiles.t
   ; output : unit
   ; prefix : unit
   ; params : unit
@@ -225,7 +225,9 @@ val version :
   service
 
 module P2P : sig
-  (** A service to initiate a connection with another point. *)
+  (** A service to initiate a connection with another point. The connection is
+      not regularly re-established, contrary to what happens to the initial
+      peers given via the configuration or the CLI. *)
   val post_connect :
     < meth : [`POST]
     ; input : P2p_point.Id.t
@@ -327,7 +329,9 @@ module P2P : sig
       ; output : (Types.Topic.t * Types.Peer.t list) list
       ; prefix : unit
       ; params : unit
-      ; query : unit >
+      ; query :
+          < delegate : Signature.public_key_hash option
+          ; slot_index : Types.slot_index option > >
       service
 
     val get_topics :

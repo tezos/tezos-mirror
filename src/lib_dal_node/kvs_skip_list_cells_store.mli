@@ -24,17 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/7068
-
-   Think about a better implementation of the skip list cells store that:
-
-   - Doesn't add padding (KVS with values of variable size)
-
-   - Doesn't encode to intermediate structures (like
-     [Dal_proto_types.Skip_list_cell]). Maybe have a per-protocol store in this
-     case, and move most of the store creating and updating to the proto plugin
-     to avoid existential type variables issues.
-*)
 (**
    This module instantiates the key value store to provide facilities for
    storing and retrieving the cells of the DAL skip list. The store maintains:
@@ -74,7 +63,10 @@ val init :
 val insert :
   t ->
   attested_level:int32 ->
-  (Dal_proto_types.Skip_list_hash.t * Dal_proto_types.Skip_list_cell.t) list ->
+  (Dal_proto_types.Skip_list_hash.t
+  * Dal_proto_types.Skip_list_cell.t
+  * Types.slot_index)
+  list ->
   unit tzresult Lwt.t
 
 (** [find store hash] returns the cell associated to [hash] in the [store], if
@@ -112,6 +104,6 @@ module Internal_for_migrations : sig
   val find_hash :
     t ->
     attested_level:int32 ->
-    slot_index:int ->
+    slot_index:Types.slot_index ->
     Dal_proto_types.Skip_list_hash.t tzresult Lwt.t
 end

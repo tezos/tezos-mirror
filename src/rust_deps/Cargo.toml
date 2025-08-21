@@ -2,6 +2,7 @@
 name = "octez-rust-deps"
 version = "0.0.0"
 edition = "2021"
+resolver = "3"
 
 [lib]
 crate-type = ["staticlib", "cdylib"]
@@ -14,6 +15,8 @@ features = ["singlepass", "cranelift", "wat", "middlewares"]
 [dependencies.librustzcash]
 path = "../rustzcash_deps"
 
-[dependencies.octez-riscv]
-path = "../riscv/lib"
-features = ["ocaml-api"]
+[dependencies.octez-riscv-api]
+path = "../riscv/api"
+
+[dependencies.rust_igd_next]
+path = "./rust_igd_next"

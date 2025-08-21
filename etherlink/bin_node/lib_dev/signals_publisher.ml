@@ -6,9 +6,8 @@
 (*****************************************************************************)
 
 type parameters = {
-  cctxt : Client_context.wallet;
+  signer : Signer.t;
   smart_rollup_address : string;
-  sequencer_key : Client_keys.sk_uri;
   rollup_node_endpoint : Uri.t;
 }
 
@@ -20,20 +19,19 @@ module Types = struct
   type nonrec parameters = parameters
 
   type state = {
-    cctxt : Client_context.wallet;
+    signer : Signer.t;
     smart_rollup_address : Tezos_crypto.Hashed.Smart_rollup_address.t;
-    sequencer_key : Client_keys.sk_uri;
     rollup_node_endpoint : Uri.t;
   }
 
   let of_parameters
-      ({cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint} :
-        parameters) : state tzresult Lwt.t =
+      ({signer; smart_rollup_address; rollup_node_endpoint} : parameters) :
+      state tzresult Lwt.t =
     let open Lwt_result_syntax in
     let*? smart_rollup_address =
       Tezos_crypto.Hashed.Smart_rollup_address.of_string smart_rollup_address
     in
-    return {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
+    return {signer; smart_rollup_address; rollup_node_endpoint}
 end
 
 module Name = struct
@@ -151,8 +149,7 @@ module Worker = struct
         let signals = List.map snd ready_injections in
         let* payload =
           Sequencer_signal.create
-            ~cctxt:state.cctxt
-            ~sequencer_key:state.sequencer_key
+            ~signer:state.signer
             ~smart_rollup_address:state.smart_rollup_address
             ~slot_ids:signals
         in
@@ -228,11 +225,9 @@ let worker_add_request ~request =
   let*! (_pushed : bool) = Worker.Queue.push_request w request in
   return_unit
 
-let start ~cctxt ~smart_rollup_address ~sequencer_key ~rollup_node_endpoint () =
+let start ~signer ~smart_rollup_address ~rollup_node_endpoint () =
   let open Lwt_result_syntax in
-  let parameters =
-    {cctxt; smart_rollup_address; sequencer_key; rollup_node_endpoint}
-  in
+  let parameters = {signer; smart_rollup_address; rollup_node_endpoint} in
   let* worker = Worker.launch table () parameters (module Handlers) in
   let*! () = Signals_publisher_events.publisher_is_ready () in
   Lwt.wakeup worker_waker worker ;

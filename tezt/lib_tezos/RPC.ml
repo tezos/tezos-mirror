@@ -591,6 +591,14 @@ let post_chain_block_helpers_forge_operations ?(chain = "main")
     ["chains"; chain; "blocks"; block; "helpers"; "forge"; "operations"]
     Fun.id
 
+let post_chain_block_helpers_forge_signed_operations ?(chain = "main")
+    ?(block = "head") ~data () =
+  make
+    ~data
+    POST
+    ["chains"; chain; "blocks"; block; "helpers"; "forge"; "signed_operations"]
+    Fun.id
+
 let post_chain_block_helpers_forge_bls_consensus_operations ?(chain = "main")
     ?(block = "head") ~data () =
   make
@@ -854,8 +862,13 @@ let get_chain_block_helper_current_level ?(chain = "main") ?(block = "head")
   {level; level_position; cycle; cycle_position; expected_commitment}
 
 let get_chain_block_helper_attestation_rights ?(chain = "main")
-    ?(block = "head") ?delegate () =
-  let query_string = Query_arg.opt "delegate" Fun.id delegate in
+    ?(block = "head") ?level ?cycle ?delegate ?consensus_key () =
+  let query_string =
+    Query_arg.opt "delegate" Fun.id delegate
+    @ Query_arg.opt "consensus_key" Fun.id consensus_key
+    @ Query_arg.opt "level" string_of_int level
+    @ Query_arg.opt "cycle" string_of_int cycle
+  in
   make
     ~query_string
     GET
@@ -880,6 +893,65 @@ let get_chain_block_helper_levels_in_current_cycle ?(chain = "main")
     GET
     ["chains"; chain; "blocks"; block; "helpers"; "levels_in_current_cycle"]
     Fun.id
+
+let get_chain_block_helper_total_baking_power ?(chain = "main")
+    ?(block = "head") () =
+  make
+    GET
+    ["chains"; chain; "blocks"; block; "helpers"; "total_baking_power"]
+    Fun.id
+
+let post_bls_aggregate_signatures ~pk ~msg sigs =
+  let signatures = List.map (fun signature -> `String signature) sigs in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A signatures);
+    ]
+  in
+  let data = `O pk_msg_sig in
+  make ~data:(Data data) POST ["bls"; "aggregate_signatures"] JSON.as_string
+
+let post_bls_check_proof ~pk ~proof () =
+  let data = `O [("public_key", `String pk); ("proof", `String proof)] in
+  make ~data:(Data data) POST ["bls"; "check_proof"] JSON.as_bool
+
+let post_bls_aggregate_public_keys pks_with_proofs =
+  let data =
+    `A
+      (List.map
+         (fun (pk, proof) ->
+           `O [("public_key", `String pk); ("proof", `String proof)])
+         pks_with_proofs)
+  in
+  make ~data:(Data data) POST ["bls"; "aggregate_public_keys"] @@ fun json ->
+  let group_pk = JSON.(json |-> "public_key" |> as_string) in
+  let group_pkh = JSON.(json |-> "public_key_hash" |> as_string) in
+  (group_pk, group_pkh)
+
+let post_bls_aggregate_proofs ~pk proofs =
+  let proofs = List.map (fun proof -> `String proof) proofs in
+  let pk_with_proofs = [("public_key", `String pk); ("proofs", `A proofs)] in
+  let data = `O pk_with_proofs in
+  make ~data:(Data data) POST ["bls"; "aggregate_proofs"] JSON.as_string
+
+let post_bls_threshold_signatures ~pk ~msg id_signatures =
+  let id_signatures =
+    List.map
+      (fun (id, signature) ->
+        `O [("id", `Float (float_of_int id)); ("signature", `String signature)])
+      id_signatures
+  in
+  let pk_msg_sig =
+    [
+      ("public_key", `String pk);
+      ("message", `String msg);
+      ("signature_shares", `A id_signatures);
+    ]
+  in
+  let data = `O pk_msg_sig in
+  make ~data:(Data data) POST ["bls"; "threshold_signatures"] JSON.as_string
 
 let get_chain_block_context_big_map ?(chain = "main") ?(block = "head") ~id
     ~key_hash () =
@@ -1235,9 +1307,11 @@ let get_chain_block_context_smart_rollups_smart_rollup_whitelist
       | Some l -> Some (List.map JSON.as_string l)
       | None -> None)
 
-let get_chain_block_context_delegates ?(chain = "main") ?(block = "head") () =
+let get_chain_block_context_delegates ?(chain = "main") ?(block = "head")
+    ?query_string () =
   make
     GET
+    ?query_string
     ["chains"; chain; "blocks"; block; "context"; "delegates"]
     (fun contracts -> JSON.as_list contracts |> List.map JSON.as_string)
 
@@ -1260,6 +1334,22 @@ let get_chain_block_context_delegate_active_staking_parameters ?(chain = "main")
       "delegates";
       pkh;
       "active_staking_parameters";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_pending_staking_parameters
+    ?(chain = "main") ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "pending_staking_parameters";
     ]
     Fun.id
 
@@ -1462,7 +1552,7 @@ let get_chain_block_context_delegate_min_delegated_in_current_cycle
     ]
     Fun.id
 
-let get_chain_block_context_delegate_participation ?(chain = "main")
+let get_chain_block_context_delegate_participation_raw ?(chain = "main")
     ?(block = "head") pkh =
   make
     GET
@@ -1478,7 +1568,51 @@ let get_chain_block_context_delegate_participation ?(chain = "main")
     ]
     Fun.id
 
-let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+type participation = {
+  expected_cycle_activity : int;
+  minimal_cycle_activity : int;
+  missed_slots : int;
+  missed_levels : int;
+  remaining_allowed_missed_slots : int;
+  expected_attesting_rewards : Tez.t;
+}
+
+let get_chain_block_context_delegate_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "participation";
+    ]
+  @@ fun json ->
+  let open JSON in
+  let expected_cycle_activity = json |-> "expected_cycle_activity" |> as_int in
+  let minimal_cycle_activity = json |-> "minimal_cycle_activity" |> as_int in
+  let missed_slots = json |-> "missed_slots" |> as_int in
+  let missed_levels = json |-> "missed_levels" |> as_int in
+  let remaining_allowed_missed_slots =
+    json |-> "remaining_allowed_missed_slots" |> as_int
+  in
+  let expected_attesting_rewards =
+    json |-> "expected_attesting_rewards" |> as_int64 |> Tez.of_mutez_int64
+  in
+  {
+    expected_cycle_activity : int;
+    minimal_cycle_activity : int;
+    missed_slots : int;
+    missed_levels : int;
+    remaining_allowed_missed_slots : int;
+    expected_attesting_rewards : Tez.t;
+  }
+
+let get_chain_block_context_delegate_dal_participation_raw ?(chain = "main")
     ?(block = "head") pkh =
   make
     GET
@@ -1493,6 +1627,56 @@ let get_chain_block_context_delegate_dal_participation ?(chain = "main")
       "dal_participation";
     ]
     Fun.id
+
+type dal_participation = {
+  expected_assigned_shards_per_slot : int;
+  delegate_attested_dal_slots : int;
+  delegate_attestable_dal_slots : int;
+  expected_dal_rewards : Tez.t;
+  sufficient_dal_participation : bool;
+  denounced : bool;
+}
+
+let get_chain_block_context_delegate_dal_participation ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "dal_participation";
+    ]
+  @@ fun json ->
+  let open JSON in
+  let expected_assigned_shards_per_slot =
+    json |-> "expected_assigned_shards_per_slot" |> as_int
+  in
+  let delegate_attested_dal_slots =
+    json |-> "delegate_attested_dal_slots" |> as_int
+  in
+  let delegate_attestable_dal_slots =
+    json |-> "delegate_attestable_dal_slots" |> as_int
+  in
+  let expected_dal_rewards =
+    json |-> "expected_dal_rewards" |> as_int64 |> Tez.of_mutez_int64
+  in
+  let sufficient_dal_participation =
+    json |-> "sufficient_dal_participation" |> as_bool
+  in
+  let denounced = json |-> "denounced" |> as_bool in
+  {
+    expected_assigned_shards_per_slot;
+    delegate_attested_dal_slots;
+    delegate_attestable_dal_slots;
+    expected_dal_rewards;
+    sufficient_dal_participation;
+    denounced;
+  }
 
 let get_chain_block_context_delegate_frozen_balance ?(chain = "main")
     ?(block = "head") pkh =
@@ -1594,6 +1778,22 @@ let get_chain_block_context_delegate_consensus_key ?(chain = "main")
       "delegates";
       pkh;
       "consensus_key";
+    ]
+    Fun.id
+
+let get_chain_block_context_delegate_companion_key ?(chain = "main")
+    ?(block = "head") pkh =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "delegates";
+      pkh;
+      "companion_key";
     ]
     Fun.id
 
@@ -1784,3 +1984,34 @@ let nonexistent_path = make GET ["nonexistent"; "path"] Fun.id
 let get_chain_block_context_denunciations ?(chain = "main") ?(block = "head") ()
     =
   make GET ["chains"; chain; "blocks"; block; "context"; "denunciations"] Fun.id
+
+type baker_with_power = {delegate : string; baking_power : int}
+
+let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "raw";
+      "json";
+      "cycle";
+      string_of_int cycle;
+      "selected_stake_distribution";
+    ]
+  @@ fun json ->
+  let bakers_with_pow = JSON.(json |> as_list) in
+  List.map
+    JSON.(
+      fun baker_with_pow ->
+        let active_stake = baker_with_pow |-> "active_stake" in
+        let frozen_stake = active_stake |-> "frozen" |> as_int in
+        let delegated_stake = active_stake |-> "delegated" |> as_int in
+        {
+          delegate = baker_with_pow |-> "baker" |> as_string;
+          baking_power = frozen_stake + delegated_stake;
+        })
+    bakers_with_pow

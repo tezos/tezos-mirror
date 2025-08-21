@@ -33,8 +33,8 @@ type transaction = {
       (** Access list are not yet supported. Even if the kernel does not
           support them, we need to decode them to verify the signature. *)
   v : Z.t;
-  r : bytes;
-  s : bytes;
+  r : Z.t;
+  s : Z.t;
 }
 
 (** [decode_legacy bytes] tries to decode [bytes] into a {!transaction}. *)
@@ -45,6 +45,11 @@ val decode_eip1559 : bytes -> (transaction, string) result
 
 (** [decode_eip2930 bytes] tries to decode [bytes] into a {!transaction}. *)
 val decode_eip2930 : bytes -> (transaction, string) result
+
+(** [decode bytes] tries to decode [bytes] into a {!transaction},
+    using {!decode_eip1559}, {!decode_eip2930} or {!decode_legacy}
+    depending of the first byte of [bytes]. *)
+val decode : string -> (transaction, string) result
 
 (** [to_transaction_object ~hash transaction] transforms a [transaction] and
     its [hash] to a {!Ethereum_types.transaction_object}. *)

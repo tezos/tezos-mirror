@@ -42,7 +42,7 @@ type t = {
   plugin : (module Protocol_plugin_sig.S);
 }
 
-let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
+let simulate_info_per_level (node_ctxt : Node_context.ro) predecessor =
   let open Lwt_result_syntax in
   let* pred_header =
     Layer1.fetch_tezos_shell_header node_ctxt.l1_ctxt predecessor
@@ -51,7 +51,7 @@ let simulate_info_per_level (node_ctxt : [`Read] Node_context.t) predecessor =
   return {predecessor_timestamp; predecessor}
 
 let set_simulation_kernel_log ?log_kernel_debug_file
-    (node_ctxt : _ Node_context.t) =
+    (node_ctxt : Node_context.ro) =
   let open Lwt_syntax in
   let* kernel_debug_logger, finaliser =
     match (node_ctxt.config.log_kernel_debug, log_kernel_debug_file) with

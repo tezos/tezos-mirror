@@ -38,6 +38,9 @@ with different :ref:`constants <protocol_constants>` to speed up the chain.
 Each test network listed there also indicates a **faucet** delivering test tokens. Enter the public key hash of any test
 account on the corresponding website to receive test tokens.
 
+The faucet interface is meant for interactive use.
+If you are looking for a scriptable alternative, check the programmatic `faucet frontend <https://github.com/tacoinfra/tezos-faucet>`__ which includes the ``get-tez`` tool.
+
 .. _builtin_networks:
 
 Built-In Networks

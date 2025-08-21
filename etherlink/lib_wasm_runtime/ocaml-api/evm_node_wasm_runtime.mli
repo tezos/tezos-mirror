@@ -21,6 +21,7 @@ val wasm_runtime_run :
   string list ->
   Irmin_context.tree
 
-val wasm_runtime_preload_kernel : context -> Irmin_context.tree -> unit
+(** Returns [false] if the kernel was loaded from the cache. *)
+val wasm_runtime_preload_kernel : context -> Irmin_context.tree -> bool
 
 val wasm_runtime_logger_init : unit -> unit

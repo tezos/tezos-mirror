@@ -215,7 +215,7 @@ let gen_tx_cmd cmd =
   Process.spawn
     ~name:"tx_gen"
     "node"
-    ("etherlink/kernel_evm/benchmarks/transaction_generator.js" :: cmd)
+    ("etherlink/kernel_latest/benchmarks/transaction_generator.js" :: cmd)
 
 let gen_accounts n ~output =
   let value = gen_tx_cmd ["gen_accounts"; string_of_int n; output] in

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2025 Trilitech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -82,13 +83,34 @@ sig
        logger that might come from elsewhere. Default (in [Client_config]) is
        [None], but [Main_signer] uses this overriding feature. *)
     RPC_client_unix.logger option
+
+  (** Activate logging of levels when set to [true]. *)
+  val advertise_log_levels : bool option
+
+  val version :
+    (* Optionally provide your own version string. Defaults to the Octez
+       version. *)
+    string option
 end
 
 val register_default_signer :
+  ?signing_version:Signature.version ->
   ?other_registrations:((module Client_config.Remote_params) -> unit) ->
   ?logger:RPC_client_unix.logger ->
   Client_context.io_wallet ->
   unit
+
+(** [init_logging (module M) ?parsed_args ?parsed_config_file ~base_dir ()]
+    starts the logging process based on optional parsed arguments [?parse_args],
+    optional configuration file [?parsed_config_file], with output in the
+    [~base_dir] directory. *)
+val init_logging :
+  (module M) ->
+  ?parsed_args:Client_config.cli_args ->
+  ?parsed_config_file:Client_config.Cfg_file.t ->
+  base_dir:string ->
+  unit ->
+  unit Lwt.t
 
 val run :
   (module M) ->
@@ -97,3 +119,18 @@ val run :
     Client_config.cli_args ->
     Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
   unit
+
+(** [lwt_run (module M) ~select_commands ?cmd_args ()] sets up the main
+    application computation as an Lwt promise. Unlike [run], this function
+    does not run the event loop, it merely returns the wrapped promise to be
+    integrated into an existing Lwt-based application. It can optionally
+    disable logging of the underlying process via [?disable_logging]. *)
+val lwt_run :
+  (module M) ->
+  select_commands:
+    (RPC_client_unix.http_ctxt ->
+    Client_config.cli_args ->
+    Client_context.full Tezos_clic.command list tzresult Lwt.t) ->
+  ?disable_logging:bool ->
+  unit ->
+  int Lwt.t

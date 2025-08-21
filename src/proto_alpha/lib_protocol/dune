@@ -283,13 +283,6 @@
   Validate
   Mempool_validation
   Apply
-  Services_registration
-  Constants_services
-  Sapling_services
-  Voting_services
-  Dal_services
-  Adaptive_issuance_services
-  Alpha_services
   Main))
 
 (library
@@ -582,13 +575,6 @@
   validate.ml validate.mli
   mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
-  services_registration.ml services_registration.mli
-  constants_services.ml constants_services.mli
-  sapling_services.ml
-  voting_services.ml voting_services.mli
-  dal_services.ml dal_services.mli
-  adaptive_issuance_services.ml adaptive_issuance_services.mli
-  alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
  (action (run %{bin:octez-protocol-compiler} -no-hash-check -warn-error +a .)))
@@ -882,13 +868,6 @@
   validate.ml validate.mli
   mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
-  services_registration.ml services_registration.mli
-  constants_services.ml constants_services.mli
-  sapling_services.ml
-  voting_services.ml voting_services.mli
-  dal_services.ml dal_services.mli
-  adaptive_issuance_services.ml adaptive_issuance_services.mli
-  alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to
@@ -1166,13 +1145,6 @@
   validate.ml validate.mli
   mempool_validation.ml mempool_validation.mli
   apply.ml apply.mli
-  services_registration.ml services_registration.mli
-  constants_services.ml constants_services.mli
-  sapling_services.ml
-  voting_services.ml voting_services.mli
-  dal_services.ml dal_services.mli
-  adaptive_issuance_services.ml adaptive_issuance_services.mli
-  alpha_services.ml alpha_services.mli
   main.ml main.mli (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to

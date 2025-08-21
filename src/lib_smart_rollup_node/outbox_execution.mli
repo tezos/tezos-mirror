@@ -30,8 +30,9 @@
     message to execute. It publishes and executes the most
     recent/closest one. *)
 val publish_execute_whitelist_update_message :
-  Node_context.rw -> unit tzresult Lwt.t
+  _ Node_context.rw_context -> unit tzresult Lwt.t
 
 (** [publish_executable_message node_ctxt] publishes on L1 all outbox messages
     that can be executed and that have not yet been executed. *)
-val publish_executable_messages : Node_context.rw -> unit tzresult Lwt.t
+val publish_executable_messages :
+  _ Node_context.rw_context -> unit tzresult Lwt.t

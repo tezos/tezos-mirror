@@ -14,8 +14,16 @@ commits=0
 is_snapshot=false
 source_hash=""
 source_label=""
+long_hash=""
 short_hash=""
 capitalized_label=""
+
+skip_copy_source=""
+skip_update_protocol_tests=""
+skip_update_source=""
+skip_update_tezt_tests=""
+skip_misc_updates=""
+skip_generate_doc=""
 
 ## Log colors:
 if [[ -t 1 ]]; then
@@ -77,11 +85,8 @@ function print_and_exit() {
     echo "git reset --hard HEAD~${commits}"
   fi
 
-  log_green "To cleanup other created files"
-  echo "rm -rf src/proto_${protocol_target}"
-  echo "rm -rf docs/${label}"
-  echo "rm -rf src/proto_${version}_${short_hash}"
-  echo "rm -rf src/proto_${version}"
+  log_green "To cleanup other created files after reset --hard"
+  echo "rm -rf src/proto_${protocol_target} docs/${label} src/proto_${version}_${short_hash} src/proto_${version}"
   echo "exiting..."
   exit 1
 }
@@ -260,6 +265,7 @@ while true; do
     ;;
   -f | --from)
     protocol_source="$2"
+    source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
     shift 2
     ;;
   -t | --to)
@@ -276,6 +282,30 @@ while true; do
     ;;
   --force-snapshot | -F)
     is_snapshot=true
+    shift
+    ;;
+  --skip-copy-source)
+    skip_copy_source=true
+    shift
+    ;;
+  --skip-protocol-tests)
+    skip_update_protocol_tests=true
+    shift
+    ;;
+  --skip-update-source)
+    skip_update_source=true
+    shift
+    ;;
+  --skip-update-tezt-tests)
+    skip_update_tezt_tests=true
+    shift
+    ;;
+  --skip-misc-updates)
+    skip_misc_updates=true
+    shift
+    ;;
+  --skip-generate-doc)
+    skip_generate_doc=true
     shift
     ;;
   *)
@@ -493,12 +523,12 @@ function sanity_check_before_script() {
   fi
   case ${command} in
   stabilise | snapshot | copy)
-    if [[ -d "src/proto_${version}" ]]; then
+    if [[ -d "src/proto_${version}" && ! ${skip_copy_source} ]]; then
       error "'src/proto_${version}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
     fi
 
-    if [[ -d "docs/${label}" ]]; then
+    if [[ -d "docs/${label}" && ! ${skip_generate_doc} ]]; then
       error "'docs/${label}'" "already exists, you should remove it."
       print_and_exit 1 "${LINENO}"
     fi
@@ -512,7 +542,45 @@ function sanity_check_before_script() {
   esac
 }
 
+# Recompute the different protocol and version names
+function recompute_names() {
+  if [[ ${is_snapshot} == true ]]; then
+    new_protocol_name="${version}_${short_hash}"
+    new_tezos_protocol="${version}-${short_hash}"
+    new_versioned_name="${version}_${label}"
+  else
+    new_protocol_name="${version}"
+    new_tezos_protocol="${version}"
+    new_versioned_name="${label}"
+  fi
+}
+
+# Assert that ${version} and ${label} are already defined
+function update_hashes() {
+  if [[ -n "${long_hash}" && -n "${short_hash}" ]]; then
+    log_cyan "Hashes already known"
+    log_cyan "Long hash: ${long_hash}"
+    log_cyan "Short hash: ${short_hash}"
+  elif [ -e "src/proto_${version}/lib_protocol" ]; then
+    log_cyan "Computing hash"
+    long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
+    short_hash=$(echo "${long_hash}" | head -c 8)
+    log_magenta "Long hash computed: ${long_hash}"
+    log_magenta "Short hash: ${short_hash}"
+    log_cyan "Updating protocol name and version variables"
+    recompute_names
+  else
+    log_magenta "Can't find src/proto_${version}/lib_protocol"
+    exit 1
+  fi
+}
+
 function copy_source() {
+
+  if [[ $skip_copy_source ]]; then
+    echo "Skipping copy_source step"
+    return 0
+  fi
 
   # Create proto_beta source-code
 
@@ -576,11 +644,7 @@ function copy_source() {
     commit_if_changes "src: restore default vanity nonce"
   fi
 
-  log_cyan "Computing hash"
-  long_hash=$(./octez-protocol-compiler -hash-only "src/proto_${version}/lib_protocol")
-  short_hash=$(echo "${long_hash}" | head -c 8)
-  log_magenta "Hash computed: ${long_hash}"
-  log_magenta "Short hash: ${short_hash}"
+  update_hashes
 
   if [[ ${is_snapshot} == true ]]; then
     echo "Current hash is: ${long_hash}"
@@ -614,10 +678,10 @@ function copy_source() {
       rm -f proto_to_hash.txt
       commit_no_hooks "src: add vanity nonce"
     fi
+    # recompute the protocol and version names, in case it has changed
+    recompute_names
   fi
   cd "src/proto_${version}/lib_protocol"
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "TEZOS_PROTOCOL")
   # replace fake hash with real hash, this file doesn't influence the hash
   sed -i.old -e 's/"hash": "[^"]*",/"hash": "'"${long_hash}"'",/' \
     TEZOS_PROTOCOL
@@ -626,10 +690,7 @@ function copy_source() {
   cd ../../..
 
   if [[ ${is_snapshot} == true ]]; then
-    echo "Renaming src/proto_${version} to src/proto_${version}_${short_hash}"
-    new_protocol_name="${version}_${short_hash}"
-    new_tezos_protocol="${version}-${short_hash}"
-    new_versioned_name="${version}_${label}"
+    echo "Renaming src/proto_${version} to src/proto_${new_protocol_name}"
 
     if [[ -d "src/proto_${new_protocol_name}" ]]; then
       error "'src/proto_${new_protocol_name}' already exists, you should remove it"
@@ -638,10 +699,6 @@ function copy_source() {
 
     git mv "src/proto_${version}" "src/proto_${new_protocol_name}"
     commit_no_hooks "src: rename proto_${version} to proto_${new_protocol_name}"
-  else
-    new_protocol_name="${version}"
-    new_tezos_protocol="${version}"
-    new_versioned_name="${label}"
   fi
 
   # switch protocol_source with protocol_source_original if it was changed
@@ -723,22 +780,24 @@ function copy_source() {
     commit_no_hooks "src: remove proto_${protocol_source}"
   fi
 
-  # modify the first_argument variable directly
-  eval "$1=$long_hash"
-
   ## update agnostic_baker
   ## add protocol as active before alpha in parameters.ml
-  if ! grep -q "${long_hash}" src/bin_agnostic_baker/parameters.ml; then
-    ## look for | "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" -> ("alpha", Active)
-    ## and add   | "${longhash}" ) as full_hash -> (String.sub full_hash 0 8, Active)
-    sed -i.old -e "/| \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\" ->/a \  | \"${long_hash}\" as full_hash -> (String.sub full_hash 0 8, Active)" src/bin_agnostic_baker/parameters.ml
-    ocamlformat -i src/bin_agnostic_baker/parameters.ml
+  if ! grep -q "${long_hash}" src/lib_agnostic_baker/parameters.ml; then
+    ## look for "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" and add "${longhash};"
+    sed -i.old "/ \"ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK\"/i\"${long_hash}\"; " src/lib_agnostic_baker/parameters.ml
+    ocamlformat -i src/lib_agnostic_baker/parameters.ml
     commit "src: add protocol to agnostic_baker"
   fi
 
 }
 
 function update_protocol_tests() {
+
+  if [[ $skip_update_protocol_tests ]]; then
+    echo "Skipping protocol tests update"
+    return 0
+  fi
+
   # Update protocol tests
 
   # Replace test invocation headers that mention protocol_source
@@ -758,7 +817,7 @@ function update_protocol_tests() {
     ocamlformat -i src/lib_scoru_wasm/test/test_protocol_migration.ml
 
     sed -e "s/let proto_${protocol_source}_name = .*/let proto_${label}_name = \"${label}_${version}\"/" -i.old src/lib_scoru_wasm/constants.ml
-    ocamlformat -i src/lib_scoru_wasm/constants.ml
+    ocamlformat -i src/lib_scoru_wasm/constant.ml
 
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.ml
     sed -e "s/${capitalized_source}/ ${capitalized_label}/g" -i.old src/lib_scoru_wasm/pvm_input_kind.mli
@@ -816,6 +875,11 @@ function update_protocol_tests() {
 }
 
 function update_source() {
+
+  if [[ $skip_update_source ]]; then
+    echo "Skipping source update"
+    return 0
+  fi
 
   log_blue "update teztale"
   #  Teztale
@@ -942,7 +1006,7 @@ function generate_regression_test() {
 (*****************************************************************************)
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
-(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) %s Nomadic Labs <contact@nomadic-labs.com>                  *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -985,6 +1049,11 @@ let register () =
 }
 
 function update_tezt_tests() {
+
+  if [[ $skip_update_tezt_tests ]]; then
+    echo "Skipping tezt tests update"
+    return 0
+  fi
 
   # ensure protocols compile and parameter files are generated
   make
@@ -1033,7 +1102,7 @@ function update_tezt_tests() {
     else
       sed -r 's/(.*) '${capitalized_source}' -> ([0-9][0-9][0-9])/printf "\1 '${capitalized_label}' -> \2 | '${capitalized_source}' -> %03i" "$(echo \2+1 | bc)"/ge' -i.old tezt/lib_tezos/protocol.ml
     fi
-    sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/i | ${capitalized_label} -> \"proto_${label}\"\n" -i.old tezt/lib_tezos/protocol.ml
+    sed "/| ${capitalized_source} -> \"proto_${protocol_source}\"/a | ${capitalized_label} -> \"proto_${label}\"\n" -i.old tezt/lib_tezos/protocol.ml
 
     # add $(capitalized_label) -> "$long_hash" before "(* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE *)"
     sed "/\(\* DO NOT REMOVE, AUTOMATICALLY ADD STABILISED PROTOCOL HASH HERE \*\)/i \ | ${capitalized_label} -> \"${long_hash}\"" -i.old tezt/lib_tezos/protocol.ml
@@ -1162,6 +1231,43 @@ function update_tezt_tests() {
     commit "tezt: copy ${protocol_source} regression files"
   fi
 
+  # add new protocol baker
+  # this can be removed once https://gitlab.com/tezos/tezos/-/issues/7763 has been tackled
+  if [[ ${is_snapshot} == false ]]; then
+    awk -v source="$protocol_source" -v target="$protocol_target" '
+$0 ~ "let octez_baker_" source " =" {
+  orig1 = $0
+  getline
+  orig2 = $0
+  print gensub(source, target, "g", orig1)
+  print gensub(source, target, "g", orig2)
+  print ""
+  print orig1
+  print orig2
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  else
+    lowercase_shorthash=$(echo "$short_hash" | tr '[:upper:]' '[:lower:]')
+    awk -v source="$protocol_source" -v short_hash="$short_hash" -v lowercase_shorthash="$lowercase_shorthash" '
+$0 ~ "let octez_baker_" source " =" {
+  print                  # line 1: unchanged
+  getline                # go to line 2
+  gsub("baker_" source, "baker_" lowercase_shorthash)
+  gsub("./octez-baker-" source , "./octez-baker-" short_hash)
+  print
+  next
+}
+1
+' tezt/lib_tezos/constant.ml > tezt/lib_tezos/constant.ml.tmp
+    mv tezt/lib_tezos/constant.ml.tmp tezt/lib_tezos/constant.ml
+  fi
+
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: add unused ${protocol_target} baker"
+
   # mkdir -p "tezt/tests/expected/check_proto_${label}_changes.ml"
   # rm -rf /tmp/tezos_proto_snapshot
   # mkdir -p /tmp/tezos_proto_snapshot
@@ -1188,6 +1294,12 @@ function update_tezt_tests() {
 }
 
 function misc_updates() {
+
+  if [[ $skip_misc_updates ]]; then
+    echo "Skipping miscellaneous updates"
+    return 0
+  fi
+
   # Misc. updates
 
   log_blue "Update kaitai structs"
@@ -1223,7 +1335,7 @@ function misc_updates() {
   fi
 
   find . -name '*.old' -exec rm {} \;
-  scripts/lint.sh --update-ocamlformat
+  scripts/lint.sh --update-ocamlformat || echo "updating ocamlformat files"
   scripts/lint.sh --check-ocamlformat || echo "linting updated ocamlformat files"
   commit_if_changes "scripts: lint"
 
@@ -1234,6 +1346,11 @@ function misc_updates() {
 }
 
 function generate_doc() {
+
+  if [[ $skip_generate_doc ]]; then
+    echo "Skipping doc generation"
+    return 0
+  fi
 
   if [[ ${command} == "copy" ]]; then
     doc_path="${source_label}"
@@ -1445,8 +1562,9 @@ function snapshot_protocol() {
 
   sanity_check_before_script
 
-  copy_source long_hash
-  short_hash=$(echo "${long_hash}" | head -c 8)
+  copy_source
+
+  update_hashes
 
   update_protocol_tests
 
@@ -1457,6 +1575,7 @@ function snapshot_protocol() {
   misc_updates
 
   generate_doc
+
 }
 
 function delete_from_build() {
@@ -1721,8 +1840,6 @@ function hash() {
 
   log_cyan "Computing hash"
 
-  # extract hash from  src/${protocol_source}/TEZOS_PROTOCOL in line "hash": "..."
-  source_hash=$(grep -oP '(?<="hash": ")[^"]*' "src/proto_${protocol_source}/lib_protocol/TEZOS_PROTOCOL")
   source_short_hash=$(echo "${source_hash}" | head -c 8)
   previous_tag=$(grep "${protocol_source}" tezt/lib_alcotezt/alcotezt_utils.ml | sed -e 's/.*->\s*\["\([^"]*\)"\].*/\1/')
   capitalized_previous_tag=$(tr '[:lower:]' '[:upper:]' <<< "${previous_tag:0:1}")${previous_tag:1}
@@ -1969,6 +2086,21 @@ function hash() {
   ocamlformat -i src/bin_testnet_scenarios/*.ml
   commit_if_changes "tezt: fix testnets_scenarios"
 
+  # fix tezt/lib_tezos/constants.ml
+  # replace short hash in Uses.make ~tag:"baker_<uncapitalized short hash>" ~path:"./octez-baker-<short hash>" ()
+  echo "Adding new protocol baker"
+  # print all used variables for debug
+  echo "source_short_hash: ${source_short_hash}"
+  echo "short_hash: ${short_hash}"
+  echo "tezos_protocol_source: ${tezos_protocol_source}"
+  echo "new_tezos_protocol: ${new_tezos_protocol}"
+  sed -e "s/baker_${source_short_hash}/baker_${short_hash}/g" \
+    -e "s/octez-baker-${source_short_hash}/octez-baker-${short_hash}/g" \
+    -e "s/octez-baker-${tezos_protocol_source}/octez-baker-${new_tezos_protocol}/g" \
+    -i tezt/lib_tezos/constant.ml
+  ocamlformat -i tezt/lib_tezos/constant.ml
+  commit_if_changes "tezt: replace baker in constant.ml"
+
   #fix other tests:
   sed -e "s/Protocol.${capitalized_source}/Protocol.${capitalized_label}/g" \
     -e "s/${previous_variant}/${new_variant}/g" -i tezt/tests/*.ml
@@ -1992,10 +2124,16 @@ function hash() {
     regression_source_name="${regression_source_name}-"
   done
 
+  search_name="*${regression_source_name}*.out"
+
+  echo "search_name: ${search_name}"
+
   # shellcheck disable=SC2001
-  find . -type f -name "*${alpha_regression}*.out" | while read -r FILE; do
-    ORIG_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_source_name}/g")
-    NEW_FILENAME=$(echo "${FILE}" | sed "s/${alpha_regression}/${regression_protocol_name}/g")
+  find . -type f -name "${search_name}" | while read -r FILE; do
+    ORIG_FILENAME=${FILE}
+    echo "Processing file: ${ORIG_FILENAME}"
+    NEW_FILENAME=$(echo "${FILE}" | sed "s/${regression_source_name}/${regression_protocol_name}/g")
+    echo "New filename: ${NEW_FILENAME}"
 
     # Create the directory structure for the new file if it doesn't exist
     mkdir -p "$(dirname "${NEW_FILENAME}")"
@@ -2010,6 +2148,8 @@ function hash() {
     orig_filename=$(dirname "${ORIG_FILENAME}")/"${orig_filename}".out
     NEW_FILENAME=$(dirname "${NEW_FILENAME}")/"${filename}".out
 
+    echo "Renaming ${orig_filename} to ${NEW_FILENAME}"
+
     if [[ "${orig_filename}" != "${NEW_FILENAME}" ]]; then
       ## if $FILE exists
       if [[ -f "${orig_filename}" ]]; then
@@ -2018,6 +2158,9 @@ function hash() {
       else
         echo "File ${orig_filename} does not exist"
       fi
+    else
+      echo "File ${orig_filename} already has the correct name"
+      update_files "${NEW_FILENAME}"
     fi
 
   done
@@ -2034,8 +2177,8 @@ function hash() {
 
     # if ${capitalized_label} exist in raw_context.ml, reset weeklynet regression test
     if grep -q "${capitalized_label}" src/proto_alpha/lib_protocol/raw_context.ml; then
-      log_blue "${capitalized_label} is an alph predecessor, reset weeklynet regression test"
-      dune exec tezt/tests/main.exe -- --file tezt/tests/protocol_migration.ml --title 'Alpha: weeklynet regression test' --reset-regressions
+      log_blue "${capitalized_label} is an alpha predecessor, reset weeklynet regression test"
+      dune exec tezt/tests/main.exe -- --file tezt/tests/weeklynet.ml --reset-regressions
       commit_if_changes "tezt: reset weeklynet regression test"
     fi
   fi

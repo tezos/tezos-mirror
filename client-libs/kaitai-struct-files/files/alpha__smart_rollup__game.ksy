@@ -25,14 +25,6 @@ types:
     - id: originated
       type: originated
       if: (alpha__contract_id_tag == alpha__contract_id_tag::originated)
-  attested:
-    seq:
-    - id: attested_tag
-      type: u1
-      enum: attested_tag
-    - id: v0
-      type: v0
-      if: (attested_tag == attested_tag::v0)
   back_pointers:
     seq:
     - id: back_pointers_entries
@@ -80,12 +72,6 @@ types:
     - id: content_tag
       type: u1
       enum: content_tag
-    - id: unattested
-      type: unattested
-      if: (content_tag == content_tag::unattested)
-    - id: attested
-      type: attested
-      if: (content_tag == content_tag::attested)
     - id: unpublished
       type: unpublished
       if: (content_tag == content_tag::unpublished)
@@ -232,12 +218,6 @@ types:
       type: content_0
     - id: back_pointers
       type: back_pointers_2
-  unattested:
-    seq:
-    - id: level
-      type: s4be
-    - id: index
-      type: u1
   unpublished:
     seq:
     - id: level
@@ -256,14 +236,10 @@ enums:
   alpha__contract_id_tag:
     0: implicit
     1: originated
-  attested_tag:
-    0: v0
   bool:
     0: false
     255: true
   content_tag:
-    0: unattested
-    1: attested
     2: unpublished
     3: published
   dal_snapshot_tag:

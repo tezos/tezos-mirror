@@ -9,15 +9,19 @@
 (** The EVM node’s store is built around and SQLite database. *)
 include module type of Sqlite
 
-(** [init ~data_dir ()] returns a handler to the EVM node store located under
-    [data_dir]. If no store is located in [data_dir], an empty store is
-    created. Also returns if the store was created ([true]) or was already
-    existing ([false]).
+(** [init ?max_conn_reuse_count ~data_dir ~perm ()] returns a handler to the EVM
+    node store located under [data_dir]. If no store is located in [data_dir],
+    an empty store is created. Also returns if the store was created ([true]) or
+    was already existing ([false]).
 
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
+    If [perm] is [Read_only], then SQL requests requiring write access will
+    fail. With [Read_write], they will succeed as expected. *)
 val init :
-  data_dir:string -> perm:[`Read_only | `Read_write] -> unit -> t tzresult Lwt.t
+  ?max_conn_reuse_count:int ->
+  data_dir:string ->
+  perm:perm ->
+  unit ->
+  t tzresult Lwt.t
 
 (** name of the sqlite file *)
 val sqlite_file_name : string
@@ -33,6 +37,11 @@ module Blueprints : sig
 
   val find :
     conn -> Ethereum_types.quantity -> Blueprint_types.t option tzresult Lwt.t
+
+  val find_with_events_legacy :
+    conn ->
+    Ethereum_types.quantity ->
+    Blueprint_types.Legacy.with_events option tzresult Lwt.t
 
   val find_with_events :
     conn ->
@@ -83,6 +92,11 @@ type pending_kernel_upgrade = {
   injected_before : Ethereum_types.quantity;
 }
 
+type pending_sequencer_upgrade = {
+  sequencer_upgrade : Evm_events.Sequencer_upgrade.t;
+  injected_before : Ethereum_types.quantity;
+}
+
 module Kernel_upgrades : sig
   val store :
     conn ->
@@ -104,6 +118,30 @@ module Kernel_upgrades : sig
     conn ->
     Ethereum_types.quantity ->
     Evm_events.Upgrade.t option tzresult Lwt.t
+end
+
+module Sequencer_upgrades : sig
+  val store :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Sequencer_upgrade.t ->
+    unit tzresult Lwt.t
+
+  val activation_levels : conn -> Ethereum_types.quantity list tzresult Lwt.t
+
+  val find_latest_pending :
+    conn -> pending_sequencer_upgrade option tzresult Lwt.t
+
+  val record_apply : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+
+  (** [find_latest_injecter_after n] returns the latest sequencer
+      upgrade injected after the blueprint [n] was applied. *)
+  val find_latest_injected_after :
+    conn ->
+    Ethereum_types.quantity ->
+    Evm_events.Sequencer_upgrade.t option tzresult Lwt.t
 end
 
 module Delayed_transactions : sig
@@ -132,6 +170,8 @@ module Blocks : sig
     Ethereum_types.legacy_transaction_object Ethereum_types.block ->
     unit tzresult Lwt.t
 
+  val tez_store : conn -> L2_types.Tezos_block.t -> unit tzresult Lwt.t
+
   (** [find_with_level ~full_transaction_object conn level] returns the block
       if it's present in the storage. If [full_transaction_object] is set to true,
       it will also retrieve the transactions objects part of the block. *)
@@ -140,6 +180,21 @@ module Blocks : sig
     conn ->
     Ethereum_types.quantity ->
     Transaction_object.t Ethereum_types.block option tzresult Lwt.t
+
+  (* See {!find_with_level}. Fails if the block is absent from the store
+     instead of returning [None]. *)
+  val get_with_level :
+    full_transaction_object:bool ->
+    conn ->
+    Ethereum_types.quantity ->
+    Transaction_object.t Ethereum_types.block tzresult Lwt.t
+
+  (** [tez_find_with_level conn level] returns the block of level [level]
+      if it's present in the storage. *)
+  val tez_find_with_level :
+    conn ->
+    Ethereum_types.quantity ->
+    L2_types.Tezos_block.t option tzresult Lwt.t
 
   (** Same as {!find_with_level} but finds with the block hash instead of block
       number. *)
@@ -227,22 +282,70 @@ module Pending_confirmations : sig
 end
 
 module L1_l2_levels_relationships : sig
-  type t = {
-    l1_level : int32;
-    current_number : Ethereum_types.quantity;
-    finalized : Ethereum_types.quantity;
-  }
+  type t = {l1_level : int32; current_number : Ethereum_types.quantity}
 
   val store :
     conn ->
     l1_level:int32 ->
     latest_l2_level:Ethereum_types.quantity ->
-    finalized_l2_level:Ethereum_types.quantity ->
     unit tzresult Lwt.t
 
   val find : conn -> t option tzresult Lwt.t
 
   val clear_after : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
+end
+
+module L1_l2_finalized_levels : sig
+  type t = {
+    start_l2_level : Ethereum_types.quantity;
+    end_l2_level : Ethereum_types.quantity;
+  }
+
+  val store :
+    conn ->
+    l1_level:int32 ->
+    start_l2_level:Ethereum_types.quantity ->
+    end_l2_level:Ethereum_types.quantity ->
+    unit tzresult Lwt.t
+
+  (** [find conn ~l1_level] returns the finalized L2 levels for a given L1
+      level. *)
+  val find : conn -> l1_level:int32 -> t option tzresult Lwt.t
+
+  (** [last conn] returns the last finalized L1-L2 level relationship in the
+      store. *)
+  val last : conn -> (int32 * t) option tzresult Lwt.t
+
+  (** [find_l1_level conn ~l2_level] returns the L1 level in which the L2 level
+      [l2_level] was finalized. *)
+  val find_l1_level :
+    conn -> l2_level:Ethereum_types.quantity -> int32 option tzresult Lwt.t
+
+  (** [list_by_l2_levels conn ~start_l2_level ~end_l2_level] returns all
+      finalized L1-L2 level relationships where the end L2 level is between
+      [start_l2_level] and [end_l2_level]. Requests are paginated by 10000
+      blocks.  Each relationship maps an L1 level to a range (strict on the
+      left, inclusive on the right) of L2 levels that were finalized at that L1
+      level. *)
+  val list_by_l2_levels :
+    conn ->
+    start_l2_level:Ethereum_types.quantity ->
+    end_l2_level:Ethereum_types.quantity ->
+    (int32 * t) list tzresult Lwt.t
+
+  (** [list_by_l1_levels conn ~start_l1_level ~end_l1_level] returns all
+      finalized L1-L2 level relationships where the L1 level is is between
+      [start_l1_level] and [end_l1_level]. Requests are paginated by 10000
+      blocks.  Each relationship maps an L1 level to a range (strict on the
+      left, inclusive on the right) of L2 levels that were finalized at that L1
+      level. *)
+  val list_by_l1_levels :
+    conn ->
+    start_l1_level:int32 ->
+    end_l1_level:int32 ->
+    (int32 * t) list tzresult Lwt.t
+
+  val clear_before : conn -> Ethereum_types.quantity -> unit tzresult Lwt.t
 end
 
 type metadata = {

@@ -16,11 +16,13 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
 
     def test_new_proposal_same_baker(self) -> None:
         baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 500,
             'upvoting_limit': 500,
+            'delegation_contract': delegation.address
         })
 
         for i in range(4):
@@ -35,11 +37,13 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
         baker2 = self.bootstrap_baker()
         baker3 = self.bootstrap_baker()
         baker4 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 500,
             'upvoting_limit': 500,
+            'delegation_contract': delegation.address
         })
 
         for i, baker in enumerate([baker1, baker2, baker3, baker4]):
@@ -51,19 +55,21 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
 
     def test_new_proposal_with_event(self) -> None:
         baker1 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 2,
-            'proposal_quorum': 20, # 1 baker out of 5 will vote,
-            'promotion_quorum': 20, # 1 bakers out of 5 will vote (20%)  
+            'proposal_quorum': 20, # 1 baker out of 5 will vote
+            'promotion_quorum': 20, # 1 bakers out of 5 will vote  
             'promotion_supermajority': 50, # 1 baker will vote yea
+            'delegation_contract': delegation.address
         })
 
         random_bytes = secrets.token_bytes(33)
         governance.using(baker1).new_proposal(random_bytes).send()
         self.bake_blocks(2)
-        
+
         governance.using(baker1).vote(YEA_VOTE).send()
         self.bake_blocks(2)
         
@@ -77,10 +83,12 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
         baker2 = self.bootstrap_baker()
         baker3 = self.bootstrap_baker()
         baker4 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 500,
+            'delegation_contract': delegation.address
         })
 
         random_bytes = secrets.token_bytes(33)
@@ -98,11 +106,13 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
         baker2 = self.bootstrap_baker()
         baker3 = self.bootstrap_baker()
         baker4 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         governance_started_at_level = self.get_current_level() + 1
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 10,
-            'proposal_quorum': 20 # 1 baker out of 5 will vote
+            'proposal_quorum': 20, # 1 baker out of 5 will vote
+            'delegation_contract': delegation.address
         })
 
         random_bytes = secrets.token_bytes(33)
@@ -118,6 +128,7 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
     def test_new_proposal_with_a_lot_of_proposals_on_previous_voting_period(self) -> None:
         baker1 = self.bootstrap_baker()
         baker2 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         def run_test(prev_voting_proposal_count): 
             governance_started_at_level = self.get_current_level() + 1
             governance = self.deploy_kernel_governance(custom_config={
@@ -127,6 +138,7 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
                 'proposal_quorum': 20, # 1 baker out of 5 will vote,
                 'promotion_quorum': 20, # 1 bakers out of 5 will vote (20%)  
                 'promotion_supermajority': 50, # 1 baker will vote yea
+                'delegation_contract': delegation.address
             })
 
             random_bytes = secrets.token_bytes(33)
@@ -149,8 +161,15 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
         for i, prev_voting_proposal_count in enumerate([10, 50, 100]):
             run_test(prev_voting_proposal_count)
 
+        """
+        Restart the sandbox at end to avoid errors due to change in baker's stake relative to each others which can interfere 
+        with the constants `proposal_quorum`, `promotion_quorum` and `promotion_supermajority` of other tests
+        """
+        self.setUpClass()
+
     def test_trigger_upgrade(self) -> None:
         baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         rollup_mock1 = self.deploy_rollup_mock()
         rollup_mock2 = self.deploy_rollup_mock()
         rollup_mock3 = self.deploy_rollup_mock()
@@ -163,6 +182,7 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
             'proposal_quorum': 20,
             'promotion_quorum': 20,
             'promotion_supermajority': 20,
+            'delegation_contract': delegation.address
         })
 
         kernel_root_hash = bytes.fromhex('020202020202020202020202020202020202020202020202020202020202020202')
@@ -179,11 +199,13 @@ class KernelGovernanceGasConsumptionTestCase(BaseTestCase):
         
     # def test_new_proposal_stress(self) -> None:
     #     baker = self.bootstrap_baker()
+    #     delegation = self.deploy_delegated_governance()
     #     governance_started_at_level = self.get_current_level() + 1
     #     governance = self.deploy_kernel_governance(custom_config={
     #         'started_at_level': governance_started_at_level,
     #         'period_length': 5000,
     #         'upvoting_limit': 5000,
+    #         'delegation_contract': delegation.address
     #     })
 
     #     for i in range(5000):

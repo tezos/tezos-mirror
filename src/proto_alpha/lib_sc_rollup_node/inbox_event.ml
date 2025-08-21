@@ -33,9 +33,10 @@ module Simple = struct
       ~section
       ~name:"smart_rollup_node_layer_1_get_messages"
       ~msg:
-        "Fetching {number_of_messages} messages from block {hash} at level \
+        "Fetched {number_of_messages} messages from block {hash} at level \
          {level}"
       ~level:Notice
+      ~pp1:Block_hash.pp_short
       ("hash", Block_hash.encoding)
       ("level", Data_encoding.int32)
       ("number_of_messages", Data_encoding.int32)

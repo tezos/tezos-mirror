@@ -62,7 +62,7 @@ let load :
     type tree repo.
     (repo, tree) pvm_context_impl ->
     cache_size:int ->
-    'a Store_sigs.mode ->
+    'a Access_mode.t ->
     string ->
     'a t tzresult Lwt.t =
  fun (module Pvm_Context_Impl) ~cache_size mode path ->

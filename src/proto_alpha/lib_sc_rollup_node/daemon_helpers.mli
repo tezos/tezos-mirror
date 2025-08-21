@@ -25,6 +25,4 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** React to L1 operations included in a block of the chain. *)
-val process_l1_block_operations :
-  catching_up:bool -> Node_context.rw -> Layer1.header -> unit tzresult Lwt.t
+include Protocol_plugin_sig.L1_PROCESSING

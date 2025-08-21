@@ -111,6 +111,28 @@ pub fn mstore8(state: &mut Machine) -> Control {
 }
 
 #[inline]
+pub fn mcopy(state: &mut Machine) -> Control {
+	pop_u256!(state, dst, src, len);
+
+	try_or_fail!(state.memory.resize_offset(U256::max(dst, src), len));
+
+	if len == U256::zero() {
+		return Control::Continue(1);
+	}
+
+	let dst = as_usize_or_revert!(dst);
+	let src = as_usize_or_revert!(src);
+	let len = as_usize_or_revert!(len);
+
+	let data = state.memory.get(src, len);
+
+	match state.memory.set(dst, &data, None) {
+		Ok(()) => Control::Continue(1),
+		Err(e) => Control::Exit(e.into()),
+	}
+}
+
+#[inline]
 pub fn jump(state: &mut Machine) -> Control {
 	pop_u256!(state, dest);
 	let dest = as_usize_or_fail!(dest, ExitError::InvalidJump);

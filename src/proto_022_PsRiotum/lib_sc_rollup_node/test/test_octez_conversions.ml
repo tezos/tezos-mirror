@@ -119,7 +119,7 @@ let random_algo ~rng_state : Signature.algo =
   | _ -> assert false
 
 let gen_algo =
-  QCheck2.Gen.oneofl [Tezos_crypto.Signature.Ed25519; Secp256k1; P256; Bls_aug]
+  QCheck2.Gen.oneofl [Tezos_crypto.Signature.Ed25519; Secp256k1; P256; Bls]
 
 let gen_pkh =
   let open QCheck2.Gen in

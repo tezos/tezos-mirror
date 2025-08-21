@@ -43,3 +43,9 @@ val octez_evm_node_version_string : string
 
 (** [simple_version_string] applied to the Version of Octez EVM node. *)
 val octez_evm_node_simple_version_string : string
+
+(** [version_string] applied to the Version of the Octez Smart Rollup node. *)
+val octez_smart_rollup_node_version_string : string
+
+(** [simple_version_string] applied to the Version of Octez Smart Rollup node. *)
+val octez_smart_rollup_node_simple_version_string : string

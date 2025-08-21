@@ -21,18 +21,28 @@ val ssh_private_key_filename : ?home:string -> unit -> string
 val ssh_public_key_filename : ?home:string -> unit -> string
 
 (**
-  - [`Localhost]: Agents and the orchestrator are run on the host machine.
+  - [`Local_orchestrator_local_agents]: Agents and the orchestrator are run on
+  the host machine.
 
-  - [`Cloud]: The orchestrator is on the host machine. The agents are run onto
-    the cloud.
+   - [`Local_orchestrator_remote_agents]: The orchestrator is on the host
+   machine. The agents are run onto the cloud.
 
-  - [`Orchestrator]: The orchestrator is run on a VM. This mode is used by the
-    proxy from the orchestrator point of view.
+  - [`Remote_orchestrator_local_agents]: The orchestrator is run on a VM. The
+  scenario is executed locally on the proxy VM.
 
-  - [`Host]: This mode is run by the host machine that initializes the
-    orchestrator running on a VM.
+  - [`Ssh_host (user, host, port)]: This mode is similar to the
+  [`Remote_orchestrator_local_agents] mode, but on a non-GCP VM. Its purpose is
+  to make an initial provisioning of docker if it is not setup.
+
+  - [`Remote_orchestrator_remote_agents]: This mode is run by the host machine
+  that initializes the orchestrator running on a VM.
 *)
-val mode : [`Localhost | `Cloud | `Orchestrator | `Host]
+val mode :
+  [ `Local_orchestrator_local_agents (* aka Localhost mode *)
+  | `Local_orchestrator_remote_agents (* default; aka Cloud mode *)
+  | `Remote_orchestrator_local_agents (* aka Orchestrator mode *)
+  | `Remote_orchestrator_remote_agents (* aka Host mode *)
+  | `Ssh_host of string * string * int (* Ssh_host of (user, host, port) *) ]
 
 (** Equivalent to [Cli.prometheus]. *)
 val prometheus : bool
@@ -130,8 +140,15 @@ val faketime : string option
 (** Equivalent to [Cli.binaries_path]. *)
 val binaries_path : string
 
-(** [init ()] initialises and deploys a Docker registry using Terraform, only when the
-    [mode] is either [`Host] or [`Cloud]. *)
+(** Equivalent to [Cli.log_rotation] *)
+val log_rotation : int
+
+(** Notification backend, slack_channel_id and slack_bot_token *)
+val notifier : Types.notifier
+
+(** [init ()] initialises and deploys a Docker registry using Terraform, only
+    when the [mode] is either [`Remote_orchestrator_remote_agents] or
+    [`Local_orchestrator_remote_agents]. *)
 val init : unit -> unit Lwt.t
 
 (** [zone ()] retrieves the zone of the VM where the Docker registry is deployed, using
@@ -148,6 +165,7 @@ val wait_process :
   ?sleep:int ->
   is_ready:(string -> bool) ->
   run:(unit -> Process.t) ->
+  ?propagate_error:bool ->
   unit ->
   string Lwt.t
 
@@ -163,3 +181,5 @@ val dns_domains : unit -> string list Lwt.t
 (** [process_monitoring] enable the monitoring of process through prometheus-process-exporter
     needs to enable prometheus too *)
 val process_monitoring : bool
+
+exception Process_failed of Unix.process_status

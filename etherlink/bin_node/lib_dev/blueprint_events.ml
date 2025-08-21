@@ -26,7 +26,7 @@ let publisher_shutdown =
     ()
 
 let blueprint_application =
-  declare_6
+  declare_7
     ~name:"blueprint_application"
     ~section
     ~msg:"head is now {level}, applied in {process_time}{timestamp}"
@@ -38,13 +38,30 @@ let blueprint_application =
         let age = Ptime.diff now timestamp in
         Format.fprintf fmt " (%a old)" Ptime.Span.pp age
       else ())
-    ~pp6:Time.System.Span.pp_hum
+    ~pp7:Time.System.Span.pp_hum
     ("level", Data_encoding.n)
     ("timestamp", Time.Protocol.rfc_encoding)
     ("txs_nb", Data_encoding.int31)
     ("gas_used", Data_encoding.n)
     ("block_hash", Ethereum_types.block_hash_encoding)
+    ("execution_gas", Data_encoding.n)
     ("process_time", Time.System.Span.encoding)
+
+let blueprint_replayed =
+  declare_4
+    ~section
+    ~name:"blueprint_replayed"
+    ~msg:
+      "blueprint {level} consuming {execution_gas} gas replayed in \
+       {process_time} {diverged} divergence"
+    ~level:Notice
+    ~pp3:Time.System.Span.pp_hum
+    ~pp4:(fun fmt diverged ->
+      Format.pp_print_string fmt (if diverged then "with" else "without"))
+    ("level", Data_encoding.n)
+    ("execution_gas", Data_encoding.n)
+    ("process_time", Time.System.Span.encoding)
+    ("diverged", Data_encoding.bool)
 
 let blueprint_injection =
   declare_1
@@ -128,6 +145,15 @@ let invalid_blueprint_applied =
     ~level:Error
     ("level", Data_encoding.n)
 
+let unexpected_blueprint_from_remote_node =
+  declare_2
+    ~section
+    ~name:"unexpected_blueprint_from_remote_node"
+    ~msg:"remote node sent blueprint {number} instead of {expected}"
+    ~level:Warning
+    ("number", Data_encoding.n)
+    ("expected", Data_encoding.n)
+
 let missing_blueprints =
   declare_3
     ~section
@@ -149,6 +175,15 @@ let worker_request_failed =
     ("errors", Events.trace_encoding)
     ~pp2:Error_monad.pp_print_trace
 
+let follower_failed =
+  declare_1
+    ~section
+    ~name:"blueprints_follower_failed"
+    ~msg:"blueprint follower failed with {trace}"
+    ~level:Fatal
+    ~pp1:Error_monad.pp_print_trace
+    ("trace", Events.trace_encoding)
+
 let publisher_is_ready () = emit publisher_ready ()
 
 let publisher_shutdown () = emit publisher_shutdown ()
@@ -163,20 +198,38 @@ let blueprint_injected_on_DAL ~level ~nb_chunks =
 let blueprint_injection_failed level trace =
   emit blueprint_injection_failure (level, trace)
 
-let blueprint_applied block process_time =
+let blueprint_applied block execution_gas process_time =
   let open Ethereum_types in
-  let count_txs = function
-    | TxHash l -> List.length l
-    | TxFull l -> List.length l
-  in
-  emit
-    blueprint_application
-    ( Qty.to_z block.number,
-      block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
-      count_txs block.transactions,
-      Qty.to_z block.gasUsed,
-      block.hash,
-      process_time )
+  match block with
+  | L2_types.Eth block ->
+      let count_txs = function
+        | TxHash l -> List.length l
+        | TxFull l -> List.length l
+      in
+      emit
+        blueprint_application
+        ( Qty.to_z block.number,
+          block.timestamp |> Qty.to_z |> Z.to_int64 |> Time.Protocol.of_seconds,
+          count_txs block.transactions,
+          Qty.to_z block.gasUsed,
+          block.hash,
+          execution_gas,
+          process_time )
+  | Tez block ->
+      (* TODO: https://gitlab.com/tezos/tezos/-/issues/7866 *)
+      emit
+        blueprint_application
+        ( Z.of_int32 block.level,
+          block.timestamp,
+          0,
+          Z.zero,
+          block.hash,
+          execution_gas,
+          process_time )
+
+let blueprint_replayed ~execution_gas:(Ethereum_types.Qty execution_gas)
+    ~process_time ~diverged (Ethereum_types.Qty level) =
+  emit blueprint_replayed (level, execution_gas, process_time, diverged)
 
 let invalid_blueprint_produced level = emit invalid_blueprint_produced level
 
@@ -194,5 +247,11 @@ let blueprint_proposal Ethereum_types.(Qty level) time =
 let blueprint_production Ethereum_types.(Qty level) time =
   emit blueprint_production (level, time)
 
+let unexpected_blueprint_from_remote_node ~received:Ethereum_types.(Qty level)
+    ~expected:Ethereum_types.(Qty expected) =
+  emit unexpected_blueprint_from_remote_node (level, expected)
+
 let worker_request_failed request_view errs =
   emit worker_request_failed (request_view, errs)
+
+let follower_failed trace = emit follower_failed trace

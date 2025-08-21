@@ -47,14 +47,45 @@ extensions = [
     'sphinx_copybutton',
     'sphinx_sitemap',
     'sphinx_pushfeedback',
+    'sphinxcontrib.mermaid',
+    'sphinx_biel',
 ]
+
+# mermaid_verbose = True
+# mermaid_params = ['--theme', 'forest', '--width', '300', '--backgroundColor',
+# 'transparent']
 
 # Sitemap
 sitemap_url_scheme = '{link}'
-html_baseurl = 'https://tezos.gitlab.io/'
+html_baseurl = 'https://octez.tezos.com/docs/'
 
 # pushfeedback.com
 pushfeedback_project = '42c4fpgh27'
+pushfeedback_message_placeholder = (
+    'Comments on specific points and/or aspects'
+    ' (out of date, wrong, incomplete, ...)'
+)
+pushfeedback_email_placeholder = 'Email/Slack (optional)'
+pushfeedback_modal_title = 'Provide feedback'
+pushfeedback_footer_text = (
+    "For information about providing feedback"
+    " and the kinds of feedback that we are interested in, see"
+    " <a href='https://octez.tezos.com/docs/developer/contributing.html"
+    "#providing-feedback-on-documentation'"
+    " target='_blank'>Providing feedback on documentation</a>."
+)
+
+# biel.ai
+biel_project = 'w30c27l8fg'
+biel_header_title = 'Tezos documentation chatbot (beta)'
+biel_version = 'latest'
+biel_button_position = 'center-right'
+biel_footer_text = (
+    "AI-generated answers may contain errors. "
+    + "Verify the information before use. For more information, see "
+    + "<a href='https://docs.tezos.com/overview/chatbot' target='_blank'>"
+    + "Using the chatbot</a>."
+)
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -70,7 +101,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = 'Tezos'
-copyright = '2018-2024'
+copyright = '2018-2025'
 author = 'Contributors to the Octez & Tezos protocol documentation'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -103,7 +134,7 @@ exclude_patterns = [
     'Thumbs.db',
     '.DS_Store',
     'doc_gen',
-    'quebec',
+    'rio',
 ]
 # TODO tezos/tezos#2170: exclude the active protocol 'NNN' above
 
@@ -139,6 +170,21 @@ html_theme_options = {
     'use_download_button': False,
     'use_fullscreen_button': True,
     'use_source_button': True,
+    "icon_links": [
+        {
+            "name": "Up to Tezos docs",
+            "url": "https://docs.tezos.com/",
+            "icon": "_static/tezosdocs.png",
+            "type": "local",
+        },
+        {
+            "name": "Documentation map",
+            "url": "https://docs.tezos.com/overview/resources/"
+            "#documentation-map",
+            "icon": "_static/map.png",
+            "type": "local",
+        },
+    ],
 }
 
 html_theme_options["analytics"] = {
@@ -149,7 +195,7 @@ html_logo = "logo.svg"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ['_static', 'api/static']
 html_title = "Octez & Protocol products documentation"
 html_css_files = [
     'css/custom.css',
@@ -261,7 +307,7 @@ linkcheck_ignore = [
     r'^https://opentezos\.com/',
     r'^https://crates\.io/crates/tezos-smart-rollup',
     r'^https://rpc\.ghostnet\.teztnets\.com/chains/main/blocks/',
-    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/2771',
+    r'^https://gitlab\.com/tezos/tezos/-/merge_requests/',
 ]
 linkcheck_allowed_redirects = dict(
     [

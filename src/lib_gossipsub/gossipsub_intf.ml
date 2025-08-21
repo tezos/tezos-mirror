@@ -1106,7 +1106,11 @@ module type WORKER = sig
   include WORKER_CONFIGURATION
 
   (** A message together with a header, that is, a topic and an id.
-     This corresponds to what the spec calls a "full message". *)
+      This corresponds to what the spec calls a "full message".
+
+      TODO: https://gitlab.com/tezos/tezos/-/issues/5415
+      The topic can be inferred from the message_id and can thus be omitted;
+      this also applies for the IHave message. *)
   type message_with_header = {
     message : GS.Message.t;
     topic : GS.Topic.t;
@@ -1180,15 +1184,15 @@ module type WORKER = sig
     | App_input of app_input
     | Check_unknown_messages
 
-  (** [make ~events_logging ~bootstrap_points rng limits parameters] initializes
+  (** [make ~events_logging ~initial_points rng limits parameters] initializes
       a new Gossipsub automaton with the given arguments. Then, it initializes
       and returns a worker for it. The [events_logging] function can be used to
-      define a handler for logging the worker's events. [bootstrap_points]
+      define a handler for logging the worker's events. [initial_points]
       allows to resolve a list of known peers' addresses to which we may want
       to reconnect in the worker. *)
   val make :
     ?events_logging:(event -> unit Monad.t) ->
-    ?bootstrap_points:(unit -> Point.t list) ->
+    ?initial_points:(unit -> Point.t list) ->
     self:GS.Peer.t ->
     Random.State.t ->
     (GS.Topic.t, GS.Peer.t, GS.Message_id.t, GS.span) limits ->

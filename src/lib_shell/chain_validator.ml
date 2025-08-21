@@ -328,12 +328,21 @@ let instantiate_prevalidator parameters set_prevalidator block chain_db =
         ~block_hash:(Store.Block.hash block)
         new_protocol_hash
     in
+    (* Plug the environment and context_ops profilers to the instances plugged
+       to the mempool profiler since operations happening in the mempool also
+       include environment and context_ops operations. *)
     let instances =
       Tezos_profiler.Profiler.plugged Shell_profiling.mempool_profiler
     in
     List.iter
       Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
       instances ;
+    let context_instances =
+      Tezos_profiler.Profiler.plugged Shell_profiling.mempool_profiler
+    in
+    List.iter
+      Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
+      context_instances ;
     Prevalidator.create parameters.prevalidator_limits proto chain_db
   in
   match r with
@@ -475,7 +484,6 @@ let[@warning "-32"] reset_profilers =
         chain_validator_profiler;
         peer_validator_profiler;
         rpc_server_profiler;
-        Tezos_protocol_environment.Environment_profiler.context_ops_profiler;
       ]
   in
   let reset_sections =

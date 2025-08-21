@@ -7,4 +7,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val tezt_etherlink : Manifest.target
+
 val registered_octez_evm_node_libs : Manifest.Sub_lib.container

@@ -28,13 +28,9 @@ module Skip_list_cells : sig
     located under [data_dir]. If no store is located in [data_dir], an
     empty store is created.
 
-    If [perm] is [`Read_only], then SQL requests requiring write access will
-    fail. With [`Read_write], they will succeed as expected. *)
-  val init :
-    data_dir:string ->
-    perm:[`Read_only | `Read_write] ->
-    unit ->
-    t tzresult Lwt.t
+    If [perm] is [Read_only], then SQL requests requiring write access will
+    fail. With [Read_write], they will succeed as expected. *)
+  val init : data_dir:string -> perm:Sqlite.perm -> unit -> t tzresult Lwt.t
 
   (** [close t] closes the store by freeing all resources and closing
     database connections. *)
@@ -43,11 +39,24 @@ module Skip_list_cells : sig
   (** [use t k] executes [k] with a fresh connection to [t]. *)
   val use : t -> (conn -> 'a tzresult Lwt.t) -> 'a tzresult Lwt.t
 
-  (** [find ?conn store hash] returns the cell associated to [hash] in
+  (** [find_opt ?conn store hash] returns the cell associated to [hash] in
       the [store], if any. Uses the [conn] if provided (defaults to
       [None]). *)
-  val find :
-    ?conn:conn -> t -> Skip_list_hash.t -> Skip_list_cell.t tzresult Lwt.t
+  val find_opt :
+    ?conn:conn ->
+    t ->
+    Skip_list_hash.t ->
+    Skip_list_cell.t option tzresult Lwt.t
+
+  (** [find_by_slot_id_opt ?conn store ~attested_level ~slot_index] returns the cell
+      associated to ([attested_level], [slot_index]) in the [store], if
+      any. Uses the [conn] if provided (defaults to [None]). *)
+  val find_by_slot_id_opt :
+    ?conn:conn ->
+    t ->
+    attested_level:int32 ->
+    slot_index:Types.slot_index ->
+    Skip_list_cell.t option tzresult Lwt.t
 
   (** [insert ?conn store ~attested_level values] inserts the given
       list of [values] associated to the given [attested_level] in the
@@ -57,7 +66,7 @@ module Skip_list_cells : sig
     ?conn:conn ->
     t ->
     attested_level:int32 ->
-    (Skip_list_hash.t * Skip_list_cell.t) list ->
+    (Skip_list_hash.t * Skip_list_cell.t * Types.slot_index) list ->
     unit tzresult Lwt.t
 
   (** [remove ?conn store ~attested_level] removes any data related to

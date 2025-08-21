@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This module defines the main types related to DAL. *)
+
 module Cryptobox = Tezos_crypto_dal.Cryptobox
 
 (** A Tezos level. *)
@@ -52,10 +54,10 @@ end
 type slot_id = Slot_id.t
 
 (** A topic is defined by a public key hash of an attester and a slot index.
-    - A slot producer tracks the topic associated to a given slot index for all
+    - An operator tracks the topic associated to a given slot index for all
     the public key-hashes;
     - The attester tracks its own public key hash for all the slot indices;
-    - A slot consumer tracks topics associated to a given slot index and enough
+    - An observer tracks topics associated to a given slot index and enough
     public key-hashes so that the number of covered shards is enough to recover
     the slot data. *)
 module Topic : sig
@@ -237,16 +239,16 @@ type header_status =
     (** The slot header was included in an L1 block but not timely attested. *)
   ]
 
-(** DAL node can track one or many profiles that correspond to various modes
-      that the DAL node would operate in. *)
+(** A DAL node can be in one of two profiles (aka modes): bootstrap or
+    controller. A controller node can have one or more (sub)profiles that
+    correspond to various roles that the DAL node may have. *)
 type profile =
   | Bootstrap
-      (** The bootstrap profile facilitates peer discovery in the DAL
-          network.  Note that bootstrap nodes are incompatible with
-          attester/producer/observer profiles as bootstrap nodes are
-          expected to connect to all the meshes with degree 0. *)
-  | Operator of Operator_profile.t
-  | Random_observer
+      (** The bootstrap profile/mode facilitates peer discovery in the DAL
+          network. Note that bootstrap nodes are incompatible with
+          attester/operator/observer profiles as bootstrap nodes are expected to
+          connect to all the meshes with degree 0. *)
+  | Controller of Controller_profiles.t
 
 (** Information associated to a slot header in the RPC services of the DAL
       node. *)
@@ -272,6 +274,7 @@ type proto_parameters = {
   commitment_period_in_blocks : int;
   dal_attested_slots_validity_lag : int;
   blocks_per_cycle : int32;
+  minimal_block_delay : int64;
 }
 
 (** The type contains all elements required to construct a trap accusation.

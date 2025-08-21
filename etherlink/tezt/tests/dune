@@ -12,7 +12,6 @@
   tezt-tezos
   tezt_etherlink
   octez-evm-node-libs.evm_node_lib_dev_encoding
-  octez-rustzcash-deps
   tezos-protocol-alpha.protocol)
  (preprocess (staged_pps ppx_import ppx_deriving.show))
  (library_flags (:standard -linkall))
@@ -26,12 +25,13 @@
   -open Tezt_tezos
   -open Tezt_tezos.Runnable.Syntax
   -open Tezt_etherlink)
- (modules evm_rollup evm_sequencer validate dal_sequencer eth_call gc))
+ (modules evm_rollup evm_sequencer validate dal_sequencer eth_call gc tezlink))
 
 (executable
  (name main)
  (instrumentation (backend bisect_ppx --bisect-sigterm))
  (libraries
+  octez-rust-deps
   etherlink_tezt_tests_tezt_lib
   tezt)
  (link_flags
@@ -46,7 +46,7 @@
   (glob_files evm_kernel_inputs/*)
   (glob_files ../../tezos_contracts/*)
   (glob_files ../../config/*)
-  (glob_files_rec ../../kernel_evm/*))
+  (glob_files_rec ../../kernel_latest/*))
  (enabled_if (<> false %{env:RUNTEZTALIAS=true}))
  (action (run %{dep:./main.exe} /flaky /ci_disabled)))
 

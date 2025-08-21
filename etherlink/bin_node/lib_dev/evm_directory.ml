@@ -29,6 +29,8 @@ let empty = function
       Resto {dir = Tezos_rpc.Directory.empty; extra = EndpointMap.empty}
   | Configuration.Dream -> Dream []
 
+let init_from_resto_directory dir = Resto {dir; extra = EndpointMap.empty}
+
 let register dir service handler =
   match dir with
   | Resto {dir; extra} ->
@@ -39,6 +41,16 @@ let register dir service handler =
             handler params query input)
       in
       Dream (route :: routes)
+
+let register_describe = function
+  | Resto {dir; extra} ->
+      let dir =
+        Tezos_rpc.Directory.register_describe_directory_service
+          dir
+          Tezos_rpc.Service.description_service
+      in
+      Resto {dir; extra}
+  | dir -> dir
 
 let opt_register dir service handler =
   match dir with

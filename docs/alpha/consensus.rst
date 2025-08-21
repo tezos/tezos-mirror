@@ -20,7 +20,7 @@ with a probability that increases rapidly with fork length.
 
 `Tenderbake <https://arxiv.org/abs/2001.11965>`_ instead, like any classic
 BFT-style consensus algorithm (such as
-`PBFT <https://pmg.csail.mit.edu/papers/osdi99.pdf>`_ or
+`PBFT <https://www.scs.stanford.edu/nyu/03sp/sched/bfs.pdf>`_ or
 `Tendermint <https://arxiv.org/abs/1807.04938>`_), offers *deterministic*
 finality: a block that has just been appended to the chain of some node is known
 to be final once it has two additional blocks on top of it, regardless of
@@ -155,7 +155,7 @@ formula<baking_power_overview_alpha>`.
 
 The baking rights are determined
 :ref:`CONSENSUS_RIGHTS_DELAY<cs_constants_alpha>` in advance, which is
-``2`` :ref:`cycles<def_cycle_alpha>` for the Quebec protocol. More
+currently ``2`` :ref:`cycles<def_cycle_alpha>`. More
 precisely, at the end of cycle ``n`` and beginning of cycle ``n+1``,
 the baking rights for cycle ``n+1+CONSENSUS_RIGHTS_DELAY=n+3`` are
 :doc:`randomly generated<randomness_generation>` based on the current

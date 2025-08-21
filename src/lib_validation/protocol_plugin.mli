@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
 (* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
-(* Copyright (c) 2024 TriliTech <contact@trili.tech>                         *)
+(* Copyright (c) 2024-2025 TriliTech <contact@trili.tech>                    *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -74,7 +74,6 @@ module type T = sig
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
-      Lwt.t
 
     (** Return a conflict handler for {!Mempool.add_operation}.
 

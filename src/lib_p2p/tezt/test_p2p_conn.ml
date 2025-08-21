@@ -32,8 +32,9 @@
 
 let mock_conn ?(reader = Lwt_pipe.Maybe_bounded.create ())
     ?(writer = Lwt_pipe.Maybe_bounded.create ()) () =
-  let socket =
-    let auth_connection =
+  let open Lwt_result_syntax in
+  let* socket =
+    let* auth_connection =
       P2p_socket.Internal_for_tests.mock_authenticated_connection ()
     in
     P2p_socket.Internal_for_tests.mock ~reader ~writer auth_connection
@@ -59,7 +60,7 @@ let mock_conn ?(reader = Lwt_pipe.Maybe_bounded.create ())
     version
 
 (** This test checks that when disabling the peer discovery feature,
-   [P2p_node.t] connctions can ignore [Bootstrap] and [Advertize]
+   [P2p_node.t] connections can ignore [Bootstrap] and [Advertize]
    messages, being still able to continue consuming user messages. *)
 let check_message_consumption_without_peer_discovery () =
   Test.register
@@ -71,7 +72,16 @@ let check_message_consumption_without_peer_discovery () =
   let reader = Lwt_pipe.Maybe_bounded.create () in
 
   (* Instantiate the connexion and starts the worker. *)
-  let conn = mock_conn ~reader () in
+  let* conn = mock_conn ~reader () in
+  let conn =
+    match conn with
+    | Ok conn -> conn
+    | Error trace ->
+        Test.fail
+          "Failed to create the mocked connection: %a"
+          pp_print_trace
+          trace
+  in
 
   (* Push a Bootstrap, an Advertise, then a message in the socket. *)
   let messages =
@@ -98,7 +108,7 @@ let check_message_consumption_without_peer_discovery () =
   let* () = P2p_conn.close ~reason:(User "end of the tests") conn in
 
   match res with
-  | Ok () -> unit
+  | Ok () -> Lwt.return_unit
   | Error [Timeout] ->
       Test.fail
         "Timeout reached. The message has not been processed. The connection \

@@ -2,12 +2,692 @@
 
 ## Unreleased
 
+### Breaking changes
+
+### Configuration changes
+
+### RPCs changes
+
+### Metrics changes
+
+### Execution changes
+
+- Add a new command `show gcp key` which can be used to retrieve Tezos-specific
+  (b58-encoded public key, Tezos implicit account) information about a key
+  stored in a GCP KMS. (!18617)
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.32 (2025-07-08)
+
+This release of the EVM node adds support for the sequencer to sign blueprint
+using a key stored on GCP KMS. It also allows to download the upcoming kernel
+`dionysus-r1` by its alias and fixes an issue in the metrics introduced in
+version 0.31.
+
+This release will not apply any migration to the node’s store (version 21),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
+- Remove CLI arguments and configuration options related to the threshold
+  encryption mode. This mode was never used in production, so it should not
+  affect existing deployment as long as they have not configured in their
+  configuration file. You can run `check config` to make sure you are not
+  concerned by the breaking change. (!18535)
+
+### Configuration changes
+
+- Adds `gcp_kms` top-level field to configure the interaction with a GCP KMS.
+  See `describe config` for more information about the available options.
+  (!18585)
+
+### Metrics changes
+
+- Fix the finalized number metrics for EVM nodes not tracking a rollup
+  node. (!18603)
+
+### Execution changes
+
+- Support signing blueprints via a key stored in a GCP KMS. (!18527 !18586
+  !18587)
+- Support downloading Etherlink 4.1 kernel (Dionysus first revision,
+  `dionysus-r1`) by name. (!18594)
+
+## Version 0.31 (2025-06-26)
+
+This release of the EVM node allows the `finalized` block to be available on
+nodes which are not tracking a rollup node and adds new RPCs for future
+sequencer upgrades. It is also now easier to enable profiling on the CLI or in
+the configuration.
+
+The node will apply one migration to its internal store (version 21), meaning
+it is not possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Sandbox mode can either generates automatically the used sequencer
+  key, or uses the one given in argument. (!18385)
+- Opentelemetry profiling is now enabled by default when then `"opentelemetry"`
+  field of the config is present. `"opentelemetry" : true` also now enables
+  Opentelemetry profiling with the default parameters. (!18411)
+- New CLI argument/switch `--profiling` to enable or disable opentelemetry
+  profiling. (!18411)
+
+### RPCs changes
+
+- Observers not tracking a rollup node now receive finalized L2 block
+  levels through the EVM endpoint, enabling `eth_getBlockByNumber`
+  with the `"finalized"` parameter to be handled correctly (!18355).
+- Add new GET RPCs `/evm/v2/blueprint/`, `/evm/v2/blueprints/range`
+  whose purpose is to fetch the contents of blueprints with a complete
+  list of events, and notably the sequencer upgrade event. (!18367, !18471)
+
+### Metrics changes
+
+- Opentelemetry traces now have the namespace `emv_node` and include an instance
+  id which can either be user provided (in the `opentelemetry` configuration) or
+  is generated on the fly. (!18441)
+
+### Execution changes
+
+- Node correctly applies an sequencer upgrade EVM event when it sees
+  one. (!18286)
+
+## Version 0.30 (2025-06-18)
+
+This release of the EVM node adds a new database connection pool implementation
+for the store which should eliminate lock ups in the RPC server. The node now
+always checks the gas limit to avoid sending invalid transactions, and
+compatibility is improved with older tools and hardhat. An extensive profiling
+instrumentation was added which will allow developers to precisely analyze and
+improve performance.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- New field `"db"` which allows to configure some parameters for the database
+  such as the connection pool size and the connection reuse limit. (!18235)
+- New `"enable_revm"` config key feature flag to change the EVM execution's VM
+  from Sputnik to REVM. (!18384)
+
+### RPCs changes
+
+- Add field `gasPrice` to EIP-1559 transactions for compatibility with older
+  tools and hardhat in particular. (!18255)
+- After the next kernel upgrade, the system will accept transactions
+  submitted via `eth_sendRawTransaction` even when users specify gas
+  limits that exceed the maximum allowed threshold. During execution,
+  any gas limit above the maximum will be automatically capped at the
+  maximum permitted value. (!18179)
+
+### Metrics changes
+
+- Extensive profiling with OpenTelemetry traces. Profiling is disabled by
+  default and can be activated with the configuration field
+  `opentelemetry`. (!18227 !18229 !18279 !18290 !18291
+  !18312 !18315 !18328 !18331 !18337 !18347 !18348 !18368)
+
+### Execution changes
+
+- Node validation always checks that the gas limit are set correctly.
+  (!18236)
+- Gas limit validation changes. After the next kernel upgrade, the
+  validation mechanism that automatically rejects transactions with
+  over-estimated gas limits exceeding the maximum threshold will be
+  disabled. (!18179)
+
+### Storage changes
+
+- New database connection pool which should be more efficient and not suffer
+  from locks. (!18235)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.29 (2025-06-06)
+
+This release of the EVM node more accurately computes the inclusion fee gas
+(e.g. in `eth_estimateGas`) which should sort out issues with transactions being
+ignored by the sequencer. This release also fixes RPCs encoding of compressed
+transactions to better follow the spec and fixes a regression with the RPC
+server (which manifests as non responding RPCs) introduced by a dependency
+upgrade in 0.28. Finally, this release adds a new RPC and metric to better track
+the _gas consumed by execution_ of transactions and blocks (_i.e._ without
+inclusion gas) which impacts gas prices.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- Aligns the validation logic of the node wrt. the execution gas limit with the
+  one implemented in Dionysus. That is, the execution gas is now derived from
+  the gas limit of a transaction by removing the inclusion fees paid with the
+  minimum base fee per gas (not the current one).  (!18184)
+- Fix encoding of signature fields `r` and `s` in transactions to use
+  [quantities](https://ethereum.org/en/developers/docs/apis/json-rpc/#eth_gettransactionbyhash),
+  _i.e._ compressed without leading zeros. (!18178)
+- Adds the Etherlink-specific `tez_getTransactionGasInfo` RPC to determine how
+  many units of gas were used to execute a given (included) transaction, and
+  how many units of gas were paid for covering the inclusion fees. (!18212)
+
+### Metrics changes
+
+- Advertises the execution gas used on new blueprint application. (!18213)
+
+### Execution changes
+
+- `replay blueprint` and `replay blueprints` now log the execution gas, process
+  time and whether or not the produced block diverged from the canonical one
+  for each replayed blueprint. (!18215)
+
+### Dependencies
+
+- Downgrade [caqti](https://github.com/paurkedal/ocaml-caqti) from 2.2.4 to
+  2.1.2 which fixes instabilities (deadlocks) in the RPC server. (!18226)
+
+## Version 0.28 (2025-05-28)
+
+This is a re-release of version 0.27 with the additional stabilized websockets
+server (which can now be enabled simply with `--ws`). Binaries and images for
+version 0.27 were not built due to an issue in the CI.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- Stabilize websocket server. The fields in `experimental_features` related to
+  websockets are now deprecated in favor of a top level `websockets` field
+  (which can contain additional configuration parameters for the websockets
+  server). A new CLI parameter `--ws` allows to activate the websockets server
+  without editing the configuration. (!18145)
+
+## Version 0.27 (2025-05-26)
+
+This is a hot fix release to address an issue in the encoding of transaction
+type in JSON RPC responses.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- Fix transaction type encoding to use a compact hex encoding following the
+  [standard](https://ethereum.org/en/developers/docs/transactions/#typed-transaction-envelope). (!18132)
+
+## Version 0.26 (2025-05-20)
+
+This release of the EVM node adds support for executing natively the Dionysus
+kernel. This improves performance for computationally intensive RPCs like
+`eth_call` when the update is activated on the network. This releases also
+improves compatibility of the EVM node with Ethereum tooling like
+anvil/cast. The docker images produced as part of this release _do not_ suffer
+from [CVE-2025-4207](https://nvd.nist.gov/vuln/detail/CVE-2025-4207) and
+[CVE-2025-29087](https://nvd.nist.gov/vuln/detail/CVE-2025-29087) anymore.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- `eth_call` does not returns the `data` field when it's empty if it
+  fails during the execution. (!17893)
+- RPCs that return transaction objects now include access lists when present,
+  per EIP-1559 and EIP-2930. (!18062)
+
+### Metrics changes
+
+- Aggregate performance metrics for all child processes (including Irmin
+  GC). (!17973)
+
+### Execution changes
+
+- Supports executing Dionysus natively. (!17975 !17976 !17977)
+
+### Command-line interface changes
+
+- Renames `--bootstrap-account` and `--bootstrap-balance` to
+  `--eth-bootstrap-account` and `--eth-bootstrap-balance` for the `make kernel
+  installer config` and `make l2 kernel installer config` commands. The old
+  behavior is conserved (!17710)
+- Adds support for downloading Dionysus kernel with`download kernel dionysus`.
+  (!17974)
+
+## Version 0.25 (2025-05-05)
+
+This is a hot fix release to improve end-user experience with `eth_gasPrice` and
+fix an issue with daily logs rotation.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+If you used an EVM node v0.22 or later using the experimental RPC mode please
+delete the log files prefixed with `rpc-<port>-` from
+`<evm-node-datadir>/dailylogs/`.
+
+### RPCs changes
+
+- Changes `eth_gasPrice` to make it more resilient to gas price changes. The
+  RPC will now anticipate gas price increases. (!17921)
+
+### Command-line interface changes
+
+- Adds `--kernel-verbosity` to `run sandbox` to control the level of logs
+  emitted by the kernel. Note that printing kernel logs to the standard output
+  still requires to set the `RUST_LOG` environment variable to
+  `octez_evm_node_wasm_runtime::write_debug=trace`. (!17909)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- The event for the rpc mode when forwarding transaction was
+  incorrectly named `forwarding_error`. It's now renamed
+  `forward_transaction`. (!17910)
+- The daily logs of the experimental RPC node are written in a
+  different directory prefixed by `rpc-<port>`, and not in the same
+  log directory as the main node. Since v0.23 the daily logs of the RPC
+  node was written in the same directory, and the log files of the main node
+  `dailylog-<date>.log` were incorrectly deleted on rotation. If you
+  used an RPC EVM node v0.22 or later, please delete files prefixed
+  with `rpc-<port>-` from `<evm-node-datadir>/dailylogs/`. (!17923)
+
+## Version 0.24 (2025-04-30)
+
+This is a hot fix release to address a regression in the `eth_getBlockBy*`
+family of RPCs. Providers having updated to version 0.21 and higher are
+encouraged to upgrade in order to restore full services.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### RPCs changes
+
+- Fixes the `eth_getBlockBy*` family of RPCs being unable to return blocks
+  recorded with a version older than 0.21. (!17899)
+
+## Version 0.23 (2025-04-28)
+
+This release of the EVM node brings improvements to the robustness, notably
+with more graceful exits on connection issues which are experienced by end users
+and partners. It also brings additional options to the sandbox mode which allows
+the development team to better test and evaluate the features of the upcoming D
+kernel.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+This is the minimal required version to run when the Dionysus kernel is active.
+
+### Breaking changes
+
+- Replaces the command `download kernel with root hash` by `download kernel`.
+  In addition to supporting root hash prefixed by `0x` (something the previous
+  command was rejecting), `download kernel` also accept known kernel names
+  (currently, `bifrost`, `calypso` and `calypso2`). (!17696)
+
+### RPCs changes
+
+- Blocks now include placeholders for (!17673):
+  - `withdrawals` and `withdrawalsRoot` (EIP-4895)
+  - `blobGasUsed` and `excessBlobGas` (EIP-4844)
+  - `parentBeaconBlockRoot` (EIP-4788)
+
+### Command-line interface changes
+
+- Adds `--private-rpc-port` to `run observer` to enable the private RPC server
+  from command-line. (!17762)
+- Adds `--replicate` to `run sandbox` to provide an easy way to make local
+  tests on a local endpoint with realistic traffic. (!17845)
+- Adds `--disable-da-fees` to `run sandbox` to provide an easy way to disable
+  DA fees in the local sandbox. (!17852)
+- Previously when submitting the same transaction multiple times, if
+  the first fails to be included by the sequencer then all following
+  will fails. Now when submitting multiple time the same transaction,
+  the first occurrence that could succeed does. (!17740)
+
+### Execution changes
+
+- Exits with 103 when the node fails to follow the head of its upstream node.
+  (!17857)
+- Fixes an issue where the node would hang when the upstream EVM node endpoint
+  returned a 502 Bad Gateway error in observer or RPC mode. (!17856)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- The daily logs of the experimental RPC node are written in the same
+  directory but in a different file. (!17836)
+- RPC node now logs the transaction it forwards when using the private
+  inject endpoint of its local node. (!17836)
+
+## Version 0.22 (2025-04-14)
+
+This release of the EVM node adds support for executing natively the Calypso2
+kernel (the update which was activated on mainnet on block 10,453,254). This
+will improve performance for computationally intensive RPCs like `eth_call`
+(where the native execution is used by default).
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+### Execution changes
+
+- `--profile` now has two different modes; `minimal` and `flamegraph`.
+  `minimal` provides a file to which it streamlines tick and gas
+  consumption, `flamegraph` creates a flamegraph indexed on tick
+  consumption (!17608)
+- Adds support for Calypso2 native execution. (!17693)
+
+## Version 0.21 (2025-04-09)
+
+This release finalizes the new experimental `tx_queue` which allows to send
+multiple transactions to be included in a single block. It also improves the
+bootstrapping process with snapshots and considerably speeds up the catch-up
+phases.
+
+This release will not apply any migration to the node’s store (version 20),
+meaning it is possible to downgrade to the previous version.
+
+Configuration files created with versions v0.17 and v0.18 might cause encoding
+errors related to `l2_chain` or lead to `Mismatched_chain_family`
+issues. Operators of EVM nodes should verify their configurations by running:
+
+```
+octez-evm-node check config
+```
+
+If issues persist after verification, remove the `l2_chains` entry from the `experimental_features` section of your configuration file.
+
+By default, the configuration file (`config.json`) is located in your `data_dir`
+directory.
+
+### RPCs changes
+
+- Fixes `mixHash` being renamed into `prevRandao` in the output of our JSON RPC
+  API server. (!17394)
+- Adds `GET /evm/blueprints/range?from_level=l&max_count=c` which returns a
+  sequence of at most `c` consecutive blueprints starting from (and containing
+  at least) level `l`. If the node does not have the blueprint for level `l` in
+  its store, the RPC returns a 404 error instead of an empty list. `c` default
+  to `1` if not specified and reduced to `500` if superior. (!17592)
+
+### Execution changes
+
+- `replay blueprint` can export tick and gas consumption with `--profile`. (!17441)
+- `replay blueprint` can disable data availability fees with `--disable-da-fees`. (!17441)
+- Adds `replay blueprints from <l1> to <l2>` to replay a range of blocks.
+  (!17441 !17598)
+- Fixes a bug (which negatively impacted performance) in the EVM events batch
+  fetching in case the rollup node has ACL filtering for the required RPC.
+  (!17572)
+- Speeds up catch-up by fetching up to 500 blueprints at once when upstream EVM
+  node allows it before applying them. (!17593)
+- Recovers automatically when the remote EVM node streams unexpected blueprints
+  from the future. (!17621)
+
+### Storage changes
+
+- Snapshots are downloaded and extracted simultaneously which uses a smaller
+  disk footprint and is slightly more efficient. (!17407 !17420)
+- Command `snapshot info` now supports remote snapshot URLs and can print the
+  snapshot header without downloading the whole snapshot. (!17407)
+- Allow to import snapshots from standard input with `-`. (!17463)
+- Use `curl` (faster) to download snapshots when available. (!17477)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Websocket server (with Resto backend) can be configured to rate limit messages
+  with the field `experimental_features.websocket_rate_limit`. (!17510 !17523)
+- Add support for the `tx_queue` in RPC mode. (!17254)
+- Add support for the `tx_queue` in proxy mode. (!17246)
+
+## Version 0.20 (2025-03-21)
+
+This release contains general UX improvements with the configuration and command
+line interface documentation. Configuration files can now be placed outside the
+data directory and important options can be set up using environment variables,
+both of which should facilitate cloud deployments.
+
+The node will apply one migration to its internal store (version 20), meaning
+it is not possible to downgrade to the previous version. This migration can take
+a couple seconds depending on the machine and is necessary to better track
+relationships between L2 blocks and L1 blocks (information which is exposed in
+new RPCs).
+
+EVM nodes with configuration produced by v0.18 or v0.17 may emit the
+warning `the configuration for the l2_chains experimental feature was
+ignored`. In this case, remove the field `experimental_features.l2_chains` from
+your configuration file to be compatible with future versions.
+
+### Configuration changes
+
+- Fixes `check config` ignoring `--data-dir` when passed `--config-file`.
+  (!17214)
+- It is now possible to pass `--config-file` to the commands of the EVM node,
+  to locate the configuration file outside of the data directory. (!17216)
+- Supports selecting the data-directory using the `EVM_NODE_DATA_DIR`
+  environment variable. If `--data-dir` is passed and `EVM_NODE_DATA_DIR` is
+  set, `--data-dir` is selected. (!17282)
+- Supports selecting the configuration file using the `EVM_NODE_CONFIG_FILE`
+  environment variable. If `--config-file` is passed and `EVM_NODE_CONFIG_FILE`
+  is set, `--config-file` is selected. (!17282)
+- Supports selecting the network using the `EVM_NODE_NETWORK` environment
+  variable. If `--network` is passed and `EVM_NODE_NETWORK` is set, `--network`
+  is selected. (!17282)
+
+### RPCs changes
+
+- Added a `/describe` endpoint compatible with `octez-client`. (!17190)
+- New Etherlink specific method for ``eth_subscribe``: ``tez_l1L2Levels``
+  to be notified of L2/L1 levels associations when an L2 block is
+  finalized. (!16923)
+- New Etherlink specific JSONRPC ``tez_getFinalizedBlocksOfL1Level``
+  to retrieve the finalized L2 levels for a given L1 level. (!16923)
+
+### Execution changes
+
+- Validates Ethereum addresses passed as arguments to existing CLI commands
+  like `make kernel installer config`. (!17137)
+
+### Storage changes
+
+- Augment L1/L2 relationships with a new table to keep more accurate
+  information. (!16848)
+
+### Documentation changes
+
+- Improves and cleans up the `man` command of the node. (!17289 !17311 !17282
+  !17295 !17331 !17317 !17309)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- With the `tx_queue` feature enabled in an observer node, for the RPC
+  `eth_getTransactionCount` at the `pending` block, it will return the
+  next available nonce found in the `tx_queue`. It also works for
+  transactions that have been already forwarded to the upstream node
+  but not yet confirmed. (!!16829)
+- `tx_queue` limits the number of transaction one user can submit.
+  This limits is for pending transactions the node has seen.
+  configurable with `tx_per_addr_limit`. (!16903)
+- An sequencer EVM node can uses the tx_queue to speed the inclusion
+  of transaction. (!17134 !17100 !17109 !17211)
+- A proxy EVM node can now use the tx_queue. (!17246)
+- A RPC EVM node can uses the tx_queue. (!17246)
+- `tx_queue` now has a maximum number of transactions. (!17083)
+- Observer nodes can now be run with `periodic_snapshot_path` defined in
+  the configuration. It exports a snapshot to the given path every time they
+  perform a garbage collection. (!17038)
+- `Txpool_content` RPC now works for the `tx_queue` as well, it displays its
+  information mapped into a `tx_pool` object to avoid breaking changes. (!17102)
+
+## Version 0.19 (2025-03-10)
+
+This release contains a number of quality of life improvements, notably related
+to snapshots. The integration between the Octez EVM node and our [snapshot
+service] is deepened, and it is now possible to initialize a new data directory
+for arbitrary history mode using `run observer --network NETWORK --history
+HISTORY --init-from-snapshot`. To a large extent, this release fully concludes
+the stabilization of the new block storage feature initiated in version 0.16.
+
+[snapshot service]: https://snapshotter-sandbox.nomadic-labs.eu/
+
+This release will not apply any migration to the node’s store (version 19),
+meaning it is possible to downgrade to the previous version.
+
+### Breaking changes
+
+- The default snapshot filename has been changed from
+  `evm-snapshot-<rollup_address>-<head>` to
+  `evm-<history_mode>-snapshot-<rollup_address>-<head>`. (!16946)
+- When an explicit snapshot filename is omitted, `snapshot export` will append
+  `.gz` to compressed snapshots and will not add any file extension to
+  uncompressed snapshots. Previously, the node was not adding any extension to
+  compressed snapshots, and was appending `.uncompressed` to uncompressed
+  snapshots. (!16957)
+- The node now advertises the level of each log by default. It can be disabled through
+  the use of [environment variables][docs]. (!16976)
+- Replaces `--initial-kernel` with `--kernel` in `run sandbox`, to patch the
+  kernel on pre-existing data directories. (!17148)
+
+[docs]: https://octez.tezos.com/docs/user/logging.html#environment-variables
+
+### Configuration changes
+
+- Commands emitting logs now systematically comply with the `verbosity`
+  configuration option. (!16975)
+- Fixes experimental features being set by `init config`. (!17078)
+- Fixes `--private-rpc-port` being ignored by the `run observer` command.
+  (!17078)
+
+### RPCs changes
+
+- `GET /health_check` now returns an error if the node does not keep up with
+  its remote EVM node. More precisely, the node will fetch the current head of
+  the upstream node every 60 seconds, and compare it with its own. If the
+  difference is larger than a given `drift_threshold` (defaults to 100), then
+  the RPC returns an error. To use a different threshold, it is possible to
+  specify it in the URL, *e.g.*, `GET /health_check?drift_threshold=10` to set
+  the threshold to 10. (!17025)
+
+### Metrics changes
+
+- Deduplicates metrics `block_process_time_histogram_bucket{le="0.100000"}`
+  (!17035)
+
+### Execution changes
+
+- Adds `--network` and `--init-from-snapshot` to `run sandbox` to simplify
+  starting a sandbox for a supported network. For instance, `run sandbox
+  --network mainnet` will start a new sandbox using Mainnet’s initial kernel,
+  while `run sandbox --network testnet --init-from-snapshot` will start a new
+  sandbox from a `rolling:1` snapshot downloaded from the default snapshots
+  provider. (!17098)
+- Adds `--fund ADDRESS` to `run sandbox`, where `ADDRESS` is a wallet address
+  in hexadecimal form that will be provisioned with 10,000 native tokens inside
+  the sandbox. The parameter can be used multiple times. (!17104)
+
+### Storage changes
+
+- Adds support for the `%h` variable in the `snapshot export` and `run observer
+  --init-from-snapshot` commands, to generalize over the current history mode
+  of the node. (!16946)
+- Ensures `snapshot export` does not leave temporary files behind when
+  interrupted. (!16985)
+- Observer `--init-from-snapshot` now also accepts a path to an existing
+  snapshot. (!16963)
+- Supports specifying an expected history mode in `run observer` with the
+  `--history` argument. The node will refuse to start if its context is using a
+  different history mode, but it can be used with `--init-from-snapshot` to
+  download a snapshot of the expected mode. (!16979)
+- Observer `--init-from-snapshot` now defaults to our new snapshot services.
+  Snapshots are generated nightly (Europe time) for each history mode. (!17052)
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- Adds a configuration for the `tx_queue`. (!16903)
+- With the `tx_queue` feature enable in an observer node, the RPC
+  `eth_getTransactionByhash` returns the transaction found in the `tx_queue`,
+  it also works for transaction that have been already forwarded to the
+  upstream node. (!16829)
+- The `tx_queue` respect the configuration field `keep_alive` for it's RPC.
+  (!16894)
+- `tx_queue` clears itself when a delayed inbox flush has happened. (!17091)
+
+## Version 0.18 (2025-02-24)
+
+This releases notably includes support for executing the Calypso kernel
+natively. Besides, the EVM node now uses native execution for RPCs by default
+(was disabled before).
+
+This release will not apply any migration to the node’s store (version 19),
+meaning it is possible to downgrade to the previous version.
+
 ### Features
 
-- RPC node uses a private injector to bypass the excessive validations of
-  going through the public endpoint. Reads `--evm-node-private-endpoint` if
-  specified or the RW config private rpc if not. (!16664)
+- Observer nodes now perform a lighter validation on submitted transactions.
+  (!16713)
 - Supports native execution for the Calypso kernel. (!16728 !16729 !16734)
+- Native execution is now enabled by default for RPCs (can be disabled with
+  `--native-execution-policy never` or with
+  `kernel_execution.native_execution_policy: never` in the configuration file).
+  (!16881)
+- Adds the `octez_evm_node_pruning_history` metrics which is set to 1.0 when
+  the node is pruning the history past its specified retention period, and 0.0
+  otherwise. (!16908)
+
+#### Experimental
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+- RPC nodes now perform a lighter validation on submitted transactions.
+  (!16713)
+- RPC nodes can bypass transaction validation of their read/write node if it
+  exposes a private RPC server. (!16664)
+- Adds a new experimental feature `enable_tx_queue` to replace the tx pool by a
+  tx queue to improve performance and simplify the code. (!16812)
 
 ### Bug fixes
 
@@ -16,8 +696,10 @@
 - Fixes switching to a history mode with a smaller retention period.
   Previously, the command would succeed, but the node would keep using the
   previous retention period. (!16798)
-
-### Internals
+- Fixes exporting a snapshot using the `/tmp` directory to generate temporary
+  files. (!16919)
+- Fixes the node crashing when it cannot predownload a kernel ahead of an
+  upgrade activation. It will now retry a minute later. (!16911)
 
 ## Version 0.17 (2025-02-14)
 
@@ -71,6 +753,7 @@ it is not possible to downgrade to the previous version.
 ### Features
 
 - Defaults to the new block storage, which significantly reduces the size of
+  data directories.
 - New command `switch history to` which is now the only way to change history
   mode for and already populated EVM node. (!16533)
 - CLI command `list events`, allows listing events relative to the EVM node. (!16446)
@@ -172,6 +855,9 @@ you start using them, you probably want to use `octez-evm-node check config
 
 - New snapshot header for Sqlite3 block storage. Snapshots in the previous
   format are called legacy as reported by the `snapshot info` command. (!16435)
+- Disallow importing of snapshots in the legacy format, unless the flag
+ `--force` is provided, or the data dir already contains block storage in the
+ legacy format. (!16438)
 
 ## Version 0.14 (2025-01-21)
 

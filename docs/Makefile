@@ -16,17 +16,17 @@ P2PDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/p2p_doc.exe
 RPCDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCGENDIR)/rpc_doc.exe
 ERRDOCEXE     = $(TOPBUILDDIR)/default/docs/$(DOCERRORDIR)/error_doc.exe
 
-NAMED_PROTOS  = quebec r022
+NAMED_PROTOS  = rio s023
 PROTOCOLS     = $(NAMED_PROTOS) alpha
 
 # The following variables names are lowercase, so their names can be computed
 # from the names of the corresponding protocol directories
-quebec_long  = PsQuebecnLByd3JwTiGadoG4nGWi3HYiLXUjkibeFV8dCFeVMUg
-r022_long      = PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7
+rio_long      = PsRiotumaAMotcRoDWW1bysEhQy2n1M5fy8JgRp8jjRfHGmfeA7
+s023_long     = PtSeouLouXkxhg39oWzjxDWaCydNfR3RxCUrNe4Q9Ro8BTehcbh
 alpha_long    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
-quebec_short = PsQuebec
-r022_short    = PsRiotum
+rio_short    = PsRiotum
+s023_short    = PtSeouLo
 alpha_short   = alpha
 
 SCRIPTSDIR    = scripts
@@ -103,7 +103,7 @@ odoc:
 odoc-lite:
 	$(MAKE) odoc-raw slim_mode=on odoc_errors=true
 
-.PHONY: odoc
+.PHONY: odoc-raw
 odoc-raw:
 	rm -rf $(TMPDOCDIR)/
 	mkdir -p $(TMPDOCDIR)/
@@ -141,8 +141,8 @@ redirectcheck:
 # - on each other protocol including alpha, also checking label defs (option -l)
 .PHONY: xrefscheck
 xrefscheck:
-	$(CHECKXREFS) r022
-	$(CHECKXREFS) quebec
+	$(CHECKXREFS) s023
+	$(CHECKXREFS) rio
 	$(CHECKXREFS) -l alpha
 
 .PHONY: installcheck
@@ -198,8 +198,8 @@ rpc-protocols: $(NAMED_PROTOS:%=%/rpc.rst)
 openapi:
 	cd ..; ./src/bin_openapi/generate.sh
 	@if ! git diff --quiet --ignore-matching-lines='^ *"version":' api/*.json ;\
-		then echo "Error: docs/api/*.json have changed, commit them if you want to update the repo"; exit 1;\
-		else echo "OK: Your docs/api/*.json are up to date";\
+		then ./scripts/openapi2html.sh api/*.json; echo "docs/api/*.json have changed, commit them if you want to update the repo";\
+		else git checkout api/*.json; echo "OK: Your docs/api/*.json are up to date";\
 	fi
 
 shell/p2p_api.rst: $(P2PDOCEXE) shell/p2p_usage.rst.inc
@@ -225,7 +225,7 @@ docexes-gen: api/errors.rst shell/p2p_api.rst rpc
 sphinx: install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	$(SPHINXBUILD) --builder html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/quebec" || true
+	@ln -s active "$(BUILDDIR)/rio" || true
 
 # Syntax check RST files.
 # Run Sphinx, but first create dummy version of all generated files,
@@ -315,5 +315,5 @@ clean:
 	@-rm -Rf "$(BUILDDIR)" "$(BUILDDIRTXT)" linkcheck odoc.log
 	@-rm -f $(ERRDOCEXE) $(RPCDOCEXE) $(P2PDOCEXE)
 	@-rm -Rf api/errors.rst developer/metrics.csv user/node-config.json alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES-dev.rst developer/rollup_metrics.csv octezdoc.txt
-	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html r022/octez-*.html quebec/octez-*.html
+	@-rm -Rf api/octez-*.html api/octez-*.txt alpha/octez-*.html s023/octez-*.html rio/octez-*.html
 	@-rm -Rf ../openapi-tmp

@@ -28,13 +28,14 @@ let merged_result = merge_request_event_type_eq Merged_result
 let merge_train = merge_request_event_type_eq Merge_train
 
 (** The source of a pipeline. *)
-type pipeline_source = Schedule | Merge_request_event | Push
+type pipeline_source = Schedule | Merge_request_event | Push | Api
 
 (** Convert at {!pipeline_source} to string. *)
 let pipeline_source_to_string = function
   | Schedule -> "schedule"
   | Merge_request_event -> "merge_request_event"
   | Push -> "push"
+  | Api -> "api"
 
 let pipeline_source_eq pipeline_source =
   Predefined_vars.ci_pipeline_source
@@ -43,6 +44,10 @@ let pipeline_source_eq pipeline_source =
 let merge_request = pipeline_source_eq Merge_request_event
 
 let push = pipeline_source_eq Push
+
+let api = pipeline_source_eq Api
+
+let api_release_page = api && var "TZ_API_KIND" == str "RELEASE_PAGE"
 
 let scheduled = pipeline_source_eq Schedule
 
@@ -55,8 +60,17 @@ let schedule_extended_rpc_tests =
 let schedule_extended_validation_tests =
   scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_VALIDATION_TESTS"
 
+let schedule_extended_baker_remote_mode_tests =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_BAKER_REMOTE_MODE_TESTS"
+
+let schedule_extended_dal_use_baker =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "EXTENDED_DAL_USE_BAKER"
+
 let schedule_test_release =
   scheduled && var "TZ_SCHEDULE_KIND" == str "TEST_RELEASE"
+
+let schedule_security_scans =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "SECURITY_SCANS"
 
 let schedule_container_scanning_master =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_MASTER"
@@ -64,9 +78,18 @@ let schedule_container_scanning_master =
 let schedule_container_scanning_octez_releases =
   scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RELEASES"
 
+let schedule_container_scanning_octez_rc =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_OCTEZ_RC"
+
 let schedule_container_scanning_evm_node_releases =
   scheduled
   && var "TZ_SCHEDULE_KIND" == str "CONTAINER_SCANNING_EVM_NODE_RELEASES"
+
+let schedule_documentation =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "DOCUMENTATION"
+
+let schedule_docker_build =
+  scheduled && var "TZ_SCHEDULE_KIND" == str "DOCKER_FRESH_IMAGE_BUILD"
 
 let on_master = Predefined_vars.ci_commit_branch == str "master"
 

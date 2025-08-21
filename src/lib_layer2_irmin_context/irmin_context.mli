@@ -25,8 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Store_sigs
-
 type repo
 
 (** The type of trees stored in the context, i.e. the actual data. *)
@@ -80,7 +78,8 @@ val to_imm : mut_state -> tree
 (** [load cache_size path] initializes from disk a context from [path].
     [cache_size] allows to change the LRU cache size of Irmin
     (100_000 by default at irmin-pack/config.ml *)
-val load : cache_size:int -> 'a mode -> string -> 'a index tzresult Lwt.t
+val load :
+  cache_size:int -> 'a Access_mode.t -> string -> 'a index tzresult Lwt.t
 
 val reload : ro_index -> unit
 

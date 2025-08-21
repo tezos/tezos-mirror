@@ -69,13 +69,15 @@ class KernelGovernanceProposalPeriodTestCase(BaseTestCase):
 
     def test_should_reset_proposals_when_period_is_finished_with_no_votes_except_proposer(self) -> None:
         baker = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1 
         # Period index: 0. Block: 1 of 2
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 2,
-            'proposal_quorum': 40 # 1 baker out of 5 will vote
+            'proposal_quorum': 40, # 1 baker out of 5 will vote
+            'delegation_contract': delegation.address            
         })
         assert self.get_current_level() == governance_started_at_level
 
@@ -117,13 +119,15 @@ class KernelGovernanceProposalPeriodTestCase(BaseTestCase):
     def test_should_reset_proposals_when_period_is_finished_with_not_enough_votes(self) -> None:
         baker1 = self.bootstrap_baker()
         baker2 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1 
         # Period index: 0. Block: 1 of 3
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 3,
-            'proposal_quorum': 60 # 2 bakers out of 5 will vote
+            'proposal_quorum': 60, # 2 bakers out of 5 will vote
+            'delegation_contract': delegation.address
         })
         assert self.get_current_level() == governance_started_at_level
 
@@ -182,13 +186,15 @@ class KernelGovernanceProposalPeriodTestCase(BaseTestCase):
     def test_should_reset_proposals_when_period_is_finished_with_2_winners(self) -> None:
         baker1 = self.bootstrap_baker()
         baker2 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1 
         # Period index: 0. Block: 1 of 3
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 3,
-            'proposal_quorum': 20 # 1 bakers out of 5 will vote for each proposal
+            'proposal_quorum': 20, # 1 bakers out of 5 will vote for each proposal
+            'delegation_contract': delegation.address
         })
         assert self.get_current_level() == governance_started_at_level
 
@@ -248,13 +254,15 @@ class KernelGovernanceProposalPeriodTestCase(BaseTestCase):
     def test_should_reset_proposals_when_promotion_period_is_skipped(self) -> None:
         baker1 = self.bootstrap_baker()
         baker2 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1 
         # Period index: 0. Block: 1 of 3
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 3,
-            'proposal_quorum': 40 # 2 bakers out of 5 voted
+            'proposal_quorum': 40, # 2 bakers out of 5 voted
+            'delegation_contract': delegation.address
         })
         assert self.get_current_level() == governance_started_at_level
 
@@ -313,13 +321,15 @@ class KernelGovernanceProposalPeriodTestCase(BaseTestCase):
     def test_should_prolong_to_promotion_when_proposal_period_is_finished_with_a_winner(self) -> None:
         baker1 = self.bootstrap_baker()
         baker2 = self.bootstrap_baker()
+        delegation = self.deploy_delegated_governance()
         # deploying will take 1 block
         governance_started_at_level = self.get_current_level() + 1 
         # Period index: 0. Block: 1 of 3
         governance = self.deploy_kernel_governance(custom_config={
             'started_at_level': governance_started_at_level,
             'period_length': 3,
-            'proposal_quorum': 40 # 2 bakers out of 5 voted
+            'proposal_quorum': 40, # 2 bakers out of 5 voted
+            'delegation_contract': delegation.address
         })
         assert self.get_current_level() == governance_started_at_level
 

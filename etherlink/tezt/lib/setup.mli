@@ -3,7 +3,7 @@
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2024 Trilitech <contact@trili.tech>                         *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -14,6 +14,23 @@ type l1_contracts = {
   admin : string;
   sequencer_governance : string;
   ticket_router_tester : string;
+}
+
+type multichain_sequencer_setup = {
+  node : Node.t;
+  client : Client.t;
+  sc_rollup_address : string;
+  sc_rollup_node : Sc_rollup_node.t;
+  observers : Evm_node.t list;
+  sequencer : Evm_node.t;
+  proxies : Evm_node.t list;
+  l1_contracts : l1_contracts;
+  boot_sector : string;
+  kernel : Uses.t;
+  enable_dal : bool;
+  evm_version : Evm_version.t;
+  enable_multichain : bool;
+  l2_chains : Evm_node.l2_setup list;
 }
 
 type sequencer_setup = {
@@ -28,7 +45,9 @@ type sequencer_setup = {
   boot_sector : string;
   kernel : Uses.t;
   enable_dal : bool;
+  evm_version : Evm_version.t;
   enable_multichain : bool;
+  l2_chains : Evm_node.l2_setup list;
 }
 
 (** [uses protocol] returns the list of dependencies for the tests. *)
@@ -51,6 +70,8 @@ val run_new_observer_node :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?l2_chain:Evm_node.l2_setup ->
   Evm_node.t ->
   Evm_node.t Lwt.t
 
@@ -71,7 +92,8 @@ val register_test :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?max_number_of_chunks:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   kernel:Kernel.t ->
@@ -82,10 +104,11 @@ val register_test :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?commitment_period:int ->
   ?challenge_window:int ->
-  ?threshold_encryption:bool ->
   ?uses:(Protocol.t -> Uses.t list) ->
   ?additional_uses:Uses.t list ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
@@ -95,7 +118,62 @@ val register_test :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
+  title:string ->
+  tags:string list ->
+  Protocol.t list ->
+  unit
+
+val register_multichain_test :
+  __FILE__:string ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?sequencer_rpc_port:int ->
+  ?sequencer_private_rpc_port:int ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?time_between_blocks:Evm_node.time_between_blocks ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?max_number_of_chunks:int ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?tez_bootstrap_contracts:Evm_node.tez_contract list ->
+  ?sequencer:Account.key ->
+  ?sequencer_pool_address:string ->
+  kernel:Kernel.t ->
+  ?da_fee:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?preimages_dir:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?enable_fa_bridge:bool ->
+  enable_revm:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
+  ?commitment_period:int ->
+  ?challenge_window:int ->
+  ?uses:(Protocol.t -> Uses.t list) ->
+  ?additional_uses:Uses.t list ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
+  enable_dal:bool ->
+  ?dal_slots:int list option ->
+  enable_multichain:bool ->
+  l2_setups:Evm_node.l2_setup list option ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  (multichain_sequencer_setup -> Protocol.t -> unit Lwt.t) ->
   title:string ->
   tags:string list ->
   Protocol.t list ->
@@ -118,7 +196,8 @@ val register_test_for_kernels :
   ?delayed_inbox_timeout:int ->
   ?delayed_inbox_min_levels:int ->
   ?max_number_of_chunks:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   ?kernels:Kernel.t list ->
@@ -129,18 +208,23 @@ val register_test_for_kernels :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  enable_revm:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
   ?commitment_period:int ->
   ?challenge_window:int ->
   ?additional_uses:Tezt_wrapper.Uses.t list ->
-  threshold_encryption:bool ->
   enable_dal:bool ->
   ?dal_slots:int list option ->
   enable_multichain:bool ->
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
   title:string ->
   tags:string list ->
   (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
@@ -164,7 +248,8 @@ val setup_sequencer :
   ?max_number_of_chunks:int ->
   ?commitment_period:int ->
   ?challenge_window:int ->
-  ?bootstrap_accounts:string list ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
   ?sequencer:Account.key ->
   ?sequencer_pool_address:string ->
   ?kernel:Uses.t ->
@@ -175,8 +260,9 @@ val setup_sequencer :
   ?maximum_gas_per_transaction:int64 ->
   ?max_blueprint_lookahead_in_seconds:int64 ->
   ?enable_fa_bridge:bool ->
+  enable_revm:bool ->
   ?enable_fast_withdrawal:bool ->
-  ?threshold_encryption:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
   ?drop_duplicate_when_injection:bool ->
   ?blueprints_publisher_order_enabled:bool ->
   ?rollup_history_mode:Sc_rollup_node.history_mode ->
@@ -186,5 +272,76 @@ val setup_sequencer :
   ?rpc_server:Evm_node.rpc_server ->
   ?websockets:bool ->
   ?history_mode:Evm_node.history_mode ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_chains:Evm_node.l2_setup list ->
   Protocol.t ->
   sequencer_setup Lwt.t
+
+(* For each feature (threshold encryption, DAL, FA Bridge), tests may
+   registered with the feature enabled, with the feature disabled, or both. *)
+type feature_test_registration =
+  | Register_with_feature
+  | Register_without_feature
+  | Register_both of {
+      additional_tags_with : string list;
+      additional_tags_without : string list;
+    }
+(* We want at most one variant of the test in MR CI, the
+   [additional_tags_with] and [additional_tags_without] fields allow to
+   select which one by passing [Tag.ci_disabled] or
+   [Tag.extra] to the case which should not run in
+   MR CI. *)
+
+val ci_enabled_dal_registration : feature_test_registration
+
+val activate_revm_registration : feature_test_registration
+
+val register_all :
+  __FILE__:string ->
+  ?max_delayed_inbox_blueprint_length:int ->
+  ?sequencer_rpc_port:int ->
+  ?sequencer_private_rpc_port:int ->
+  ?genesis_timestamp:Client.timestamp ->
+  ?time_between_blocks:Evm_node.time_between_blocks ->
+  ?max_blueprints_lag:int ->
+  ?max_blueprints_ahead:int ->
+  ?max_blueprints_catchup:int ->
+  ?catchup_cooldown:int ->
+  ?delayed_inbox_timeout:int ->
+  ?delayed_inbox_min_levels:int ->
+  ?max_number_of_chunks:int ->
+  ?eth_bootstrap_accounts:string list ->
+  ?tez_bootstrap_accounts:Account.key list ->
+  ?sequencer:Account.key ->
+  ?sequencer_pool_address:string ->
+  ?kernels:Kernel.t list ->
+  ?da_fee:Wei.t ->
+  ?minimum_base_fee_per_gas:Wei.t ->
+  ?preimages_dir:string ->
+  ?maximum_allowed_ticks:int64 ->
+  ?maximum_gas_per_transaction:int64 ->
+  ?max_blueprint_lookahead_in_seconds:int64 ->
+  ?enable_fa_bridge:bool ->
+  ?rollup_history_mode:Sc_rollup_node.history_mode ->
+  ?commitment_period:int ->
+  ?challenge_window:int ->
+  ?additional_uses:Uses.t list ->
+  ?rpc_server:Evm_node.rpc_server ->
+  ?websockets:bool ->
+  ?enable_fast_withdrawal:bool ->
+  ?enable_fast_fa_withdrawal:bool ->
+  ?history_mode:Evm_node.history_mode ->
+  ?use_dal:feature_test_registration ->
+  ?use_multichain:feature_test_registration ->
+  ?use_revm:feature_test_registration ->
+  ?enable_tx_queue:Evm_node.tx_queue_config ->
+  ?spawn_rpc:int ->
+  ?periodic_snapshot_path:string ->
+  ?l2_setups:Evm_node.l2_setup list ->
+  title:string ->
+  tags:string list ->
+  (sequencer_setup -> Protocol.t -> unit Lwt.t) ->
+  Protocol.t list ->
+  unit

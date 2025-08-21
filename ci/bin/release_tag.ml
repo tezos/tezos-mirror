@@ -46,15 +46,52 @@ let monitoring_child_pipeline =
     "octez_monitoring"
     ~description:"Octez monitoring jobs"
     ~inherit_:
-      (Gitlab_ci.Types.Variable_list ["ci_image_name"; "jsonnet_image_name"])
+      (Gitlab_ci.Types.Variable_list
+         ["ci_image_name"; "ci_image_name_protected"; "jsonnet_image_name"])
     ~jobs:
       [
         job_datadog_pipeline_trace;
-        Grafazos_ci.job_build_grafazos ();
+        Grafazos.Common.job_build ();
         job_build_layer1_profiling ~expire_in:Never ();
-        Teztale.job_build ~expire_in:Never ~arch:Arm64 ();
-        Teztale.job_build ~expire_in:Never ~arch:Amd64 ();
+        Teztale.Common.job_build ~expire_in:Never ~arch:Arm64 ~storage:Ramfs ();
+        Teztale.Common.job_build ~expire_in:Never ~arch:Amd64 ~cpu:Very_high ();
       ]
+
+let job_release_page ~test ?dependencies () =
+  job
+    ~__POS__
+    ~image:Images.ci_release
+    ~stage:Stages.publish
+    ~description:
+      "A job  to update the Octez release page. If running in a test pipleine, \
+       the assets are pushed in the [release-page-test.nomadic-labs.com] \
+       bucket. Otherwise they are pushed in [site.prod.octez.tezos.com]. Then \
+       its [index.html] is updated accordingly."
+    ~name:"publish:release-page"
+    ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Days 1))
+         ["./index.md"; "index.html"])
+    ?dependencies
+    ~variables:
+      (if test then
+         (* The S3_BUCKET, AWS keys and DISTRIBUTION_ID
+            depends on the release type (tests or not). *)
+         [
+           ("S3_BUCKET", "release-page-test.nomadic-labs.com");
+           ("DISTRIBUTION_ID", "E19JF46UG3Z747");
+           ("AWS_ACCESS_KEY_ID", "${AWS_KEY_RELEASE_PUBLISH}");
+           ("AWS_SECRET_ACCESS_KEY", "${AWS_SECRET_RELEASE_PUBLISH}");
+         ]
+       else
+         [
+           ("S3_BUCKET", "site-prod.octez.tezos.com");
+           ("BUCKET_PATH", "/releases");
+           ("URL", "octez.tezos.com");
+           ("DISTRIBUTION_ID", "${CLOUDFRONT_DISTRIBUTION_ID}");
+         ])
+    ["./scripts/releases/publish_release_page.sh"]
 
 (** Create an Octez release tag pipeline of type {!release_tag_pipeline_type}.
 
@@ -62,8 +99,11 @@ let monitoring_child_pipeline =
     built of the [Test] type and are published to the GitLab registry
     instead of Docker hub.
 
+    If [major] is false (default is [true]), then components jobs are
+    excluded from the Octez jobs.
+
     On release pipelines these jobs can start immediately *)
-let octez_jobs ?(test = false) release_tag_pipeline_type =
+let octez_jobs ?(test = false) ?(major = true) release_tag_pipeline_type =
   let variables =
     match release_tag_pipeline_type with
     | Schedule_test -> Some [("CI_COMMIT_TAG", "octez-v0.0")]
@@ -81,6 +121,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       (if test then Test else Release)
   in
   let job_docker_merge =
@@ -97,6 +138,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~dependencies:(Dependent [])
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~release:true
       ()
   in
@@ -106,6 +148,9 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
+      ~storage:Ramfs
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~release:true
       ()
   in
@@ -137,9 +182,10 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
-      ~dependencies
+      ~dependencies:(Dependent (Job job_docker_merge :: dependencies))
+      ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:release"
       ?variables
       [
@@ -156,11 +202,12 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_package_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
-      ~dependencies
+      ~dependencies:(Dependent dependencies)
       ?before_script
       ?variables
+      ~id_tokens:Tezos_ci.id_tokens
       ~name:"gitlab:publish"
       [
         ("${CI_PROJECT_DIR}/scripts/ci/create_gitlab_package.sh"
@@ -171,47 +218,35 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
       ]
   in
   let jobs_dnf_repository = Rpm_repository.jobs Release in
-  let jobs_debian_repository, _, _, _, _ = Debian_repository.jobs Release in
+  let jobs_debian_repository = Debian_repository.jobs Release in
   let job_gitlab_release_or_publish =
     let dependencies =
-      Dependent
-        [
-          Artifacts job_static_x86_64_release;
-          Artifacts job_static_arm64_release;
-          Artifacts job_build_homebrew_release;
-        ]
+      [
+        Artifacts job_static_x86_64_release;
+        Artifacts job_static_arm64_release;
+        Artifacts job_build_homebrew_release;
+      ]
     in
     match release_tag_pipeline_type with
     | Non_release_tag | Schedule_test -> job_gitlab_publish ~dependencies ()
     | _ -> job_gitlab_release ~dependencies
   in
-  let job_release_page_test =
-    job
-      ~__POS__
-      ~image:Images.CI.test
-      ~stage:Stages.publish_release
-      ~description:
-        "A manual job in the test release tag pipeline to update the Octez \
-         test release page. The release assets are pushed in the \
-         [release-page-test.nomadic-labs.com] bucket. Then its [index.html] is \
-         updated accordingly."
-      ~name:"publish:release-page"
-      ~allow_failure:Yes
-      ~rules:[Gitlab_ci.Util.job_rule ~when_:Manual ()]
+  let job_release_page =
+    job_release_page
+      ~test
       ~dependencies:
         (Dependent
            [
              Artifacts job_static_x86_64_release;
              Artifacts job_static_arm64_release;
            ])
-      ~variables:[("S3_BUCKET", "release-page-test.nomadic-labs.com")]
-      ["./scripts/releases/publish_release_page.sh"]
+      ()
   in
   let job_opam_release ?(dry_run = false) () : Tezos_ci.tezos_job =
     job
       ~__POS__
       ~image:Images.CI.prebuild
-      ~stage:Stages.publish_release
+      ~stage:Stages.publish
       ~description:
         "Update opam package descriptions on tezos/tezos opam-repository fork.\n\n\
          This job does preliminary work for releasing Octez opam packages on \
@@ -251,11 +286,17 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
     job_trigger_monitoring;
   ]
   @ jobs_debian_repository @ jobs_dnf_repository
+  (* Include components release jobs only if this is a major release. *)
+  @ (if major then
+       let dry_run = test && release_tag_pipeline_type == Schedule_test in
+       Grafazos.Release.jobs ~test ~dry_run ()
+       @ Teztale.Release.jobs ~test ~dry_run ()
+     else [])
   @
   match (test, release_tag_pipeline_type) with
   (* for the moment the apt repository are not official, so we do not add to the release
      pipeline . *)
-  | false, Release_tag -> [job_opam_release ()]
+  | false, Release_tag -> [job_opam_release (); job_release_page]
   | true, Release_tag ->
       [
         (* This job normally runs in the {!Octez_latest_release} pipeline
@@ -265,7 +306,7 @@ let octez_jobs ?(test = false) release_tag_pipeline_type =
            (indeed, the second `latest_release_test` pipeline is rarely tested). *)
         job_promote_to_latest_test;
         job_opam_release ~dry_run:true ();
-        job_release_page_test;
+        job_release_page;
       ]
   | _ -> []
 
@@ -281,6 +322,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_build
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       (if test then Test else Octez_evm_node_release)
   in
   let job_docker_merge =
@@ -295,6 +337,9 @@ let octez_evm_node_jobs ?(test = false) () =
       ~__POS__
       ~arch:Amd64
       ~cpu:Very_high
+      ~storage:Ramfs
+      ~retry:
+        {max = 2; when_ = [Stuck_or_timeout_failure; Runner_system_failure]}
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"
@@ -304,6 +349,7 @@ let octez_evm_node_jobs ?(test = false) () =
     job_build_static_binaries
       ~__POS__
       ~arch:Arm64
+      ~storage:Ramfs
       ~executable_files:"script-inputs/octez-evm-node-executable"
       ~release:true
       ~version_executable:"octez-evm-node"
@@ -320,12 +366,24 @@ let octez_evm_node_jobs ?(test = false) () =
     job
       ~__POS__
       ~image:Images.ci_release
-      ~stage:Stages.publish_release_gitlab
+      ~stage:Stages.publish
       ~interruptible:false
       ~dependencies
       ~name:"gitlab:octez-evm-node-release"
       ~description:"Create a GitLab release for Etherlink"
       ["./scripts/ci/create_gitlab_octez_evm_node_release.sh"]
+  in
+  let job_docker_promote_to_latest ~ci_docker_hub () : tezos_job =
+    job_docker_authenticated
+      ~__POS__
+      ~dependencies:(Dependent [Job job_docker_merge])
+      ~stage:Stages.publish
+      ~name:"docker:promote_to_latest"
+      ~ci_docker_hub
+      [
+        "./scripts/ci/docker_promote_to_latest.sh octez-evm-node-latest \
+         ./scripts/ci/octez-evm-node-release.sh";
+      ]
   in
   [
     (* Stage: start *)
@@ -337,4 +395,5 @@ let octez_evm_node_jobs ?(test = false) () =
     job_docker_arm64;
     job_docker_merge;
     job_gitlab_release;
+    job_docker_promote_to_latest ~ci_docker_hub:(not test) ();
   ]

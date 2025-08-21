@@ -25,6 +25,13 @@ else
   dev=
 fi
 
+# if the variable is defined in the environment, re-export them for
+# opam to pick them up. Otherwise they are ignored.
+if [ -e "$KISSCACHE" ]; then
+  export KISSCACHE="$KISSCACHE"
+  export OPAMFETCH="$OPAMFETCH"
+fi
+
 # $OPAMSWITCH variable makes the following commands fail if the switch referred
 # to by it does not exist. Since we're going to create it later, for now let's
 # pretend it's not set.

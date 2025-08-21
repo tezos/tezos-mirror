@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -33,6 +33,9 @@ val hex_encoding : hex Data_encoding.t
 (** version of [hex_encoding] that do not add `0x` on encoded values. *)
 val hex_encoding_no0x : hex Data_encoding.t
 
+(** Produced string is prefixed with [0x]. *)
+val hex_to_string : hex -> string
+
 (** Strips the [0x] prefix of a string. *)
 val hex_of_string : string -> hex
 
@@ -53,16 +56,6 @@ val hex_of_utf8 : string -> hex
 (** [hex_of_bytes] transforms the [bytes] to hexadecimal. *)
 val hex_of_bytes : bytes -> hex
 
-type chain_id = Chain_id of Z.t [@@unboxed]
-
-module Chain_id : sig
-  val encoding : chain_id Data_encoding.t
-
-  val decode_le : bytes -> chain_id
-
-  val decode_be : bytes -> chain_id
-end
-
 (** Ethereum block hash (32 bytes) *)
 type block_hash = Block_hash of hex [@@unboxed]
 
@@ -72,9 +65,13 @@ val pp_block_hash : Format.formatter -> block_hash -> unit
 
 val decode_block_hash : bytes -> block_hash
 
+val encode_block_hash : block_hash -> bytes
+
 val genesis_parent_hash : block_hash
 
 val block_hash_to_bytes : block_hash -> string
+
+val block_hash_of_bytes : bytes -> block_hash
 
 val block_hash_of_string : string -> block_hash
 
@@ -137,6 +134,8 @@ val hash_to_string : hash -> string
 (** [hash_to_bytes hash] transforms the [hash] to binary format. *)
 val hash_to_bytes : hash -> string
 
+val equal_hash : hash -> hash -> bool
+
 (** Ethereum address (20 bytes) *)
 type address = Address of hex [@@unboxed]
 
@@ -151,14 +150,14 @@ type legacy_transaction_object = {
   gas : quantity;
   gasPrice : quantity;
   hash : hash;
-  input : hash;
+  input : hex;
   nonce : quantity;
   to_ : address option;
   transactionIndex : quantity option;
   value : quantity;
   v : quantity;
-  r : hash;
-  s : hash;
+  r : quantity;
+  s : quantity;
 }
 
 val legacy_transaction_object_encoding :
@@ -199,11 +198,19 @@ type 'transaction_object block = {
      them*)
   baseFeePerGas : quantity option;
   prevRandao : block_hash option;
+  withdrawals : hash list option;
+  withdrawalsRoot : hash option;
+  blobGasUsed : hex option;
+  excessBlobGas : hex option;
+  parentBeaconBlockRoot : hash option;
 }
 
 val block_encoding :
   'transaction_object Data_encoding.t ->
   'transaction_object block Data_encoding.t
+
+val block_transactions_encoding :
+  'a Data_encoding.t -> 'a block_transactions Data_encoding.t
 
 type transaction_log = {
   address : address;
@@ -290,7 +297,11 @@ module Address : sig
 
   val compare : t -> t -> int
 
+  val equal : t -> t -> bool
+
   val to_string : t -> string
+
+  val of_string : string -> t
 end
 
 (** [timestamp_to_bytes timestamp] transforms the timestamp to bytes
@@ -362,7 +373,14 @@ module Subscription : sig
     topics : Filter.topic option list option;
   }
 
-  type kind = NewHeads | Logs of logs | NewPendingTransactions | Syncing
+  type etherlink_extension = L1_L2_levels of int32 option
+
+  type kind =
+    | NewHeads
+    | Logs of logs
+    | NewPendingTransactions
+    | Syncing
+    | Etherlink of etherlink_extension
 
   val kind_encoding : kind Data_encoding.t
 
@@ -382,11 +400,20 @@ module Subscription : sig
 
   type sync_output = {syncing : bool; status : sync_status}
 
+  type l1_l2_levels_output = {
+    l1_level : int32;
+    start_l2_level : quantity;
+    end_l2_level : quantity;
+  }
+
+  type etherlink_extension_output = L1_l2_levels of l1_l2_levels_output
+
   type 'transaction_object output =
     | NewHeads of 'transaction_object block
     | Logs of transaction_log
     | NewPendingTransactions of hash
     | Syncing of sync_output
+    | Etherlink of etherlink_extension_output
 
   val output_encoding :
     'transaction_object Data_encoding.t ->

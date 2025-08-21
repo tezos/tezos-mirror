@@ -5,6 +5,8 @@ set -eu
 # Project ID defaults to tezos/tezos.
 CI_PROJECT_NAMESPACE="${CI_PROJECT_NAMESPACE:-tezos}"
 BRANCH="${BRANCH:-$(git rev-parse --abbrev-ref HEAD)}"
+CI_MERGE_REQUEST_TARGET_BRANCH_NAME="${CI_MERGE_REQUEST_TARGET_BRANCH_NAME:-master}"
+CI_MERGE_REQUEST_DIFF_BASE_SHA="${CI_MERGE_REQUEST_DIFF_BASE_SHA:-$(git merge-base HEAD origin/master)}"
 
 # Compile parameters into a JSON input for GitLab's API.
 DATA="$(
@@ -19,6 +21,14 @@ DATA="$(
     {
       "key": "CI_PROJECT_NAMESPACE",
       "value": "$CI_PROJECT_NAMESPACE"
+    },
+    {
+      "key": "CI_MERGE_REQUEST_TARGET_BRANCH_NAME",
+      "value": "$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    },
+    {
+      "key": "CI_MERGE_REQUEST_DIFF_BASE_SHA",
+      "value": "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
     }
   ]
 }
@@ -29,8 +39,10 @@ EOF
 cat << EOF
 Will run a before_merging pipeline for:
 
-  CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
-                BRANCH = $BRANCH
+               CI_PROJECT_NAMESPACE = $CI_PROJECT_NAMESPACE
+                             BRANCH = $BRANCH
+CI_MERGE_REQUEST_TARGET_BRANCH_NAME = $CI_MERGE_REQUEST_TARGET_BRANCH_NAME
+     CI_MERGE_REQUEST_DIFF_BASE_SHA = $CI_MERGE_REQUEST_DIFF_BASE_SHA
 EOF
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && echo "$(pwd -P)/")"

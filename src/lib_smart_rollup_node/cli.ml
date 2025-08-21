@@ -282,6 +282,28 @@ struct
            binary_name
            default)
       ~default
+      (Tezos_clic.parameter (fun (_cctxt : Client_context.full) data_dir ->
+           let open Lwt_result_syntax in
+           let open Filename.Infix in
+           (* Check if the data directory of the smart rollup node is not the
+              one of Octez node *)
+           let*! identity_file_in_data_dir_exists =
+             Lwt_unix.file_exists (data_dir // "identity.json")
+           in
+           if identity_file_in_data_dir_exists then
+             failwith
+               "Invalid data directory. This is a data directory for an Octez \
+                node, please choose a different directory for the smart rollup \
+                node data."
+           else return data_dir))
+
+  let config_file_arg =
+    Tezos_clic.arg
+      ~long:"config-file"
+      ~placeholder:"config.json"
+      ~doc:
+        "Location of the configuration file for the rollup node. Defaults to \
+         `<data-dir>/config.json`."
       string_parameter
 
   let boot_sector_file_arg =
@@ -478,6 +500,15 @@ let snapshot_file_param next =
     string_parameter
     next
 
+let snapshot_file_or_url_param next =
+  Tezos_clic.param
+    ~name:"snapshot_file_or_url"
+    ~desc:
+      "Snapshot archive file name, URL to download the snapshot or stdin (when \
+       given `-`)"
+    string_parameter
+    next
+
 let no_checks_arg : (bool, Client_context.full) Tezos_clic.arg =
   Tezos_clic.switch
     ~long:"no-check"
@@ -582,3 +613,32 @@ let unsafe_disable_wasm_kernel_checks_switch :
 
 let level_param next =
   Tezos_clic.param ~name:"level" ~desc:"Level" positive_int32_parameter next
+
+let block_hash_or_level_param next =
+  Tezos_clic.param
+    ~name:"block_or_level"
+    ~desc:"An L1 block hash or a level"
+    (Tezos_clic.parameter (fun (_cctxt : Client_context.full) s ->
+         let open Lwt_result_syntax in
+         match Int32.of_string_opt s with
+         | Some l -> return (`Level l)
+         | None ->
+             let*? b = Block_hash.of_b58check s in
+             return (`Hash b)))
+    next
+
+let profiling_arg : (bool option, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.arg
+    ~long:"profiling"
+    ~placeholder:"BOOL"
+    ~doc:"Enable or disable profiling with opentelemetry"
+  @@ Tezos_clic.parameter (fun (_cctxt : Client_context.full) -> function
+       | "true" -> Lwt_result_syntax.return_true
+       | "false" -> Lwt_result_syntax.return_false
+       | s -> failwith "Invalid value %S for --profiling" s)
+
+let etherlink_switch : (bool, Client_context.full) Tezos_clic.arg =
+  Tezos_clic.switch
+    ~long:"etherlink"
+    ~doc:"Force this rollup to be detected as an Etherlink rollup"
+    ()

@@ -49,9 +49,8 @@ module Processing = struct
 
   type state = {
     context_index : Context_ops.index;
-    cache : Context_ops.Environment_context.block_cache option;
-    cached_result :
-      (Block_validation.apply_result * Context_ops.Environment_context.t) option;
+    cache : Context_ops.block_cache option;
+    cached_result : (Block_validation.apply_result * Context_ops.t) option;
     headless : Tezos_profiler.Profiler.instance;
     profiler_headless : Tezos_profiler.Profiler.instance;
   }
@@ -443,3 +442,5 @@ end
 
 include
   Tezos_base_unix.External_process_main.Make (External_validation) (Processing)
+module Hypervisor =
+  Tezos_base_unix.Hypervisor_process_main.Make (External_validation)

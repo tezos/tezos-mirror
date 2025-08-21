@@ -14,6 +14,7 @@ type head = {
   next_blueprint_number : Ethereum_types.quantity;
   evm_state : Evm_state.t;
   pending_upgrade : Evm_events.Upgrade.t option;
+  pending_sequencer_upgrade : Evm_events.Sequencer_upgrade.t option;
 }
 
 type error += Cannot_apply_blueprint of {local_state_level : Z.t}
@@ -45,9 +46,10 @@ val start :
   ?kernel_path:Wasm_debugger.kernel ->
   data_dir:string ->
   ?smart_rollup_address:string ->
-  store_perm:[`Read_only | `Read_write] ->
-  ?sequencer_wallet:Client_keys.sk_uri * Client_context.wallet ->
+  store_perm:Sqlite.perm ->
+  ?signer:Signer.t ->
   ?snapshot_url:string ->
+  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   (init_status * Address.t) tzresult Lwt.t
 
@@ -62,6 +64,7 @@ val init_from_rollup_node :
   omit_delayed_tx_events:bool ->
   data_dir:string ->
   rollup_node_data_dir:string ->
+  tx_container:_ Services_backend_sig.tx_container ->
   unit ->
   unit tzresult Lwt.t
 
@@ -82,13 +85,33 @@ val apply_evm_events :
 (** [apply_blueprint ?events timestamp payload delayed_transactions]
     applies [payload] in the freshest EVM state stored under [ctxt] at
     timestamp [timestamp], forwards the
-    {!Blueprint_types.with_events}.  It commits the result if the
-    blueprint produces the expected block. *)
+    {!Blueprint_types.with_events}, and returns the transaction hashes
+    of the created block. It commits the result if the blueprint
+    produces the expected block. *)
 val apply_blueprint :
   ?events:Evm_events.t list ->
   Time.Protocol.t ->
   Blueprint_types.payload ->
   Evm_events.Delayed_transaction.t list ->
+  Ethereum_types.hash Seq.t tzresult Lwt.t
+
+(** [apply_finalized_levels ~l1_level ~start_l2_level ~end_l2_level]
+    stores the finalization relationship between L1 level [l1_level]
+    and the L2 level range from [start_l2_level] to [end_l2_level]. It
+    updates the L1-L2 level mappings, records the finalized level
+    ranges, updates metrics, and broadcasts notifications to
+    subscribers about the finalization event.
+
+    It is only used for observers not tracking a rollup node (i.e not
+    sequencer, observers tracking a rollup-node) since all actions
+    described above are already performed by calling the
+    [apply_evm_events] function when receiving events from the rollup
+    node.
+*)
+val apply_finalized_levels :
+  l1_level:int32 ->
+  start_l2_level:Ethereum_types.quantity ->
+  end_l2_level:Ethereum_types.quantity ->
   unit tzresult Lwt.t
 
 val head_info : unit -> head Lwt.t
@@ -102,10 +125,23 @@ val shutdown : unit -> unit tzresult Lwt.t
 (** [delayed_inbox_hashes ctxt] returns the hashes in the delayed inbox. *)
 val delayed_inbox_hashes : unit -> Ethereum_types.hash list tzresult Lwt.t
 
-(** [patch_kernel path] modifies the state of the current head of the EVM node
-    to replace its kernel with the kernel file [path]. *)
+(** [patch_kernel ?block_number kernel] modifies the state of the
+    [block_number] (defaults to current head) of the EVM node to replace its
+    kernel with the provided [kernel]. *)
 val patch_kernel :
-  ?block_number:Ethereum_types.quantity -> string -> unit tzresult Lwt.t
+  ?block_number:Ethereum_types.quantity ->
+  Wasm_debugger.kernel ->
+  unit tzresult Lwt.t
+
+(** [provision_balance address value] modifies the state of the current head of
+    the EVM node to increase the balance of [address] by [value].
+
+    [block_number] can be provided to modify another block. *)
+val provision_balance :
+  ?block_number:Ethereum_types.quantity ->
+  Ethereum_types.address ->
+  Ethereum_types.quantity ->
+  unit tzresult Lwt.t
 
 (** [patch_sequencer_key public_key] modifies the in memory state of the
     EVM node to replace the sequencer key with [public_key]. It does not
@@ -140,6 +176,10 @@ val head_watcher :
 
 (** Watcher that gets notified each time a new receipt is produced. *)
 val receipt_watcher : Transaction_receipt.t Lwt_watcher.input
+
+(** Watcher that gets notified of new L1 levels its associated L2 levels. *)
+val l1_l2_levels_watcher :
+  Ethereum_types.Subscription.l1_l2_levels_output Lwt_watcher.input
 
 (** [check_history_mode ?switch ~store_history_mode ~history_mode ()] checks
     that the history mode are compatible, and returns the history mode the node

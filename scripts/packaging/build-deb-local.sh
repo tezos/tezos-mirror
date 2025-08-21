@@ -9,7 +9,7 @@ packages() {
   # shellcheck disable=SC1091
   . "$HOME/.cargo/env"
   eval "$(opam env)"
-  make octez
+  make release
 
   # Prepare the packaging by copying all the freshly compiled binaries
   mkdir -p scripts/packaging/octez/binaries
@@ -30,6 +30,7 @@ packages() {
 }
 
 zcash() {
+  eval "$(opam env)"
   # Link the zcash DAL parameters to be packaged
   if [ ! -e scripts/packaging/octez-data/zcash-params ]; then
     md5sum --status -c script-inputs/sapling-params.md5

@@ -125,27 +125,34 @@ module Make (SimulationBackend : SimulationBackend) = struct
       The whole point of this function is to avoid an unncessary call
       to the WASM PVM to improve the performances.
   *)
-  let gas_for_fees simulation_state tx_data : (Z.t, tztrace) result Lwt.t =
+  let da_fees_gas_limit_overhead simulation_state tx_data :
+      (Z.t, tztrace) result Lwt.t =
     let open Lwt_result_syntax in
     let read_qty path =
       let+ bytes = SimulationBackend.read simulation_state path in
       Option.map Ethereum_types.decode_number_le bytes
     in
     let* da_fee_per_byte =
-      Durable_storage.da_fee_per_byte (SimulationBackend.read simulation_state)
+      Etherlink_durable_storage.da_fee_per_byte
+        (SimulationBackend.read simulation_state)
     in
-    let* (Qty gas_price) =
+    let* (Qty minimum_base_fee_per_gas) =
       (* In future iterations of the kernel, the default value will be
          written to the storage. This default value will no longer need to
          be declared here. *)
       let path = Durable_storage_path.minimum_base_fee_per_gas in
-      let* gas_price_opt = read_qty path in
-      match gas_price_opt with
+      let* minimum_base_feer_per_gas_opt = read_qty path in
+      match minimum_base_feer_per_gas_opt with
       | None ->
           return (Ethereum_types.quantity_of_z (Z.of_string "1_000_000_000"))
-      | Some gas_price -> return gas_price
+      | Some minimum_base_feer_per_gas -> return minimum_base_feer_per_gas
     in
-    let da_fee = Fees.gas_for_fees ~da_fee_per_byte ~gas_price tx_data in
+    let da_fee =
+      Fees.da_fees_gas_limit_overhead
+        ~da_fee_per_byte
+        ~minimum_base_fee_per_gas
+        tx_data
+    in
     return da_fee
 
   let rec confirm_gas ~timestamp ~maximum_gas_per_transaction
@@ -209,7 +216,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
             | Some (Hash (Hex data)) -> `Hex data |> Hex.to_bytes_exn
             | None -> Bytes.empty
           in
-          let* da_fees = gas_for_fees simulation_state tx_data in
+          let* da_fees = da_fees_gas_limit_overhead simulation_state tx_data in
           let (Qty gas) = gas in
           return @@ quantity_of_z @@ Z.add gas da_fees
     | Ok (Ok {gas_used = None; _}) ->
@@ -222,7 +229,7 @@ module Make (SimulationBackend : SimulationBackend) = struct
     in
     let timestamp = Misc.now () in
     let* (Qty maximum_gas_per_transaction) =
-      Durable_storage.maximum_gas_per_transaction
+      Etherlink_durable_storage.maximum_gas_per_transaction
         (SimulationBackend.read simulation_state)
     in
     let* simulation_version = simulation_version simulation_state in

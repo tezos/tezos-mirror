@@ -22,3 +22,6 @@ val patch_durable_storage :
 
 (** Hooks to be used for the WASM PVM. *)
 val hooks : check_invalid_kernel:bool -> Tezos_scoru_wasm.Hooks.t
+
+val preload_kernel :
+  _ Node_context.t -> Sc_rollup_block.header -> unit tzresult Lwt.t

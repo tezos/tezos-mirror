@@ -54,14 +54,20 @@ let id ?counter content =
   Id.hash_bytes
     [Data_encoding.Binary.to_bytes_exn id_encoding (counter, content)]
 
-type t = {order : Z.t option; counter : Z.t; id : Id.t; content : string}
+type t = {
+  order : Z.t option;
+  counter : Z.t;
+  id : Id.t;
+  content : string;
+  scope : Opentelemetry.Scope.t option;
+}
 
 let make =
   let counter = ref Z.zero in
-  fun ?order ~unique content ->
+  fun ?order ?scope ~unique content ->
     let counter_for_id = if unique then Some !counter else None in
     let id = id ?counter:counter_for_id content in
-    let m = {order; counter = !counter; id; content} in
+    let m = {order; counter = !counter; id; content; scope} in
     counter := Z.succ !counter ;
     m
 
@@ -83,15 +89,34 @@ let counter t = t.counter
 
     *)
 
+let scope_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun ({trace_id; span_id; _} : Opentelemetry.Scope.t) ->
+      Opentelemetry.Trace_context.Traceparent.to_value
+        ~trace_id
+        ~parent_id:span_id
+        ())
+    (fun s ->
+      let open Result_syntax in
+      let+ trace_id, span_id =
+        Opentelemetry.Trace_context.Traceparent.of_value s
+      in
+      Opentelemetry.Scope.make ~trace_id ~span_id ())
+    string
+
 let encoding =
   let open Data_encoding in
   conv
-    (fun {order; counter; id; content} -> (order, id, (content, counter)))
-    (fun (order, id, (content, counter)) -> {order; counter; id; content})
-  @@ obj3
+    (fun {order; counter; id; content; scope} ->
+      (order, id, (content, counter), scope))
+    (fun (order, id, (content, counter), scope) ->
+      {order; counter; id; content; scope})
+  @@ obj4
        (opt "order" n)
        (req "id" Id.encoding)
        (req "message" (obj2 (req "content" content_encoding) (req "counter" n)))
+       (opt "traceparent" scope_encoding)
 
 (* compare order messages in the following order: First are messages
    with an `order`, meaning the messages priority was set by the
@@ -108,3 +133,5 @@ let compare msg1 msg2 =
   | _, Some _p -> 1
 
 let order {order; _} = order
+
+let scope {scope; _} = scope

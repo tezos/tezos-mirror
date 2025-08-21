@@ -36,6 +36,7 @@ types-pygments = "2.14.0.1"
 types-docutils = "0.19.1.2"
 sphinx-copybutton = "0.5.2"
 sphinx-sitemap = "2.6.0"
+sphinxcontrib-mermaid = "1.0.0"
 
 # scripts/b58_prefix dependencies
 base58 = "2.1.0"
@@ -43,7 +44,8 @@ fire = "0.4.0"
 
 # scripts/ci/coverage.py dependencies
 python-gitlab = "2.10.1"
-sphinx-pushfeedback = "^0.1.0"
+sphinx-pushfeedback = "^0.1.2"
+sphinx-biel = "^0.1.2"
 
 [tool.black]
 line-length = 80

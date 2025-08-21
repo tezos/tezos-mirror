@@ -13,14 +13,12 @@ val chunk_encoding : t Data_encoding.t
 (** [chunk_to_rlp chunk] encodes a chunk into its RLP format. *)
 val chunk_to_rlp : t -> Rlp.item
 
-(** [prepare ~secret_key ~timestamp ~number ~parent_hash ~delayed_transactions
+(** [prepare ~signer ~timestamp ~number ~parent_hash ~delayed_transactions
     ~transactions] creates a sequencer blueprint at [timestamp] with a given
-    [number] containing [transactions], signed with [secret_key]. Returns the
-    list of prepared chunks.
-*)
+    [number] containing [transactions], signed with [signer]. Returns the list
+    of prepared chunks. *)
 val prepare :
-  cctxt:#Client_context.wallet ->
-  sequencer_key:Client_keys.sk_uri ->
+  signer:Signer.t ->
   timestamp:Time.Protocol.t ->
   number:Ethereum_types.quantity ->
   parent_hash:Ethereum_types.block_hash ->

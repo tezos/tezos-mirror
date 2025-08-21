@@ -44,6 +44,10 @@ impl ExitReason {
 		matches!(self, Self::Error(_))
 	}
 
+	pub fn is_out_of_gas(&self) -> bool {
+		matches!(self, Self::Error(ExitError::OutOfGas))
+	}
+
 	/// Whether the exit is revert.
 	pub fn is_revert(&self) -> bool {
 		matches!(self, Self::Revert(_))

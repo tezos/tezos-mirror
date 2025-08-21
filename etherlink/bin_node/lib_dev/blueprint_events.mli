@@ -17,11 +17,20 @@ val publisher_is_ready : unit -> unit Lwt.t
     will not accept requests anymore. *)
 val publisher_shutdown : unit -> unit Lwt.t
 
-(** [blueprint_applied block duration] advertizes that a blueprint
-    leading to [block] has been applied in [duration] time onto the
-    local state. *)
+(** [blueprint_applied block execution_gas duration] advertizes that a blueprint
+    leading to [block] requiring [execution_gas] to be executed has been
+    applied in [duration] time onto the local state. *)
 val blueprint_applied :
-  'transaction_object Ethereum_types.block -> Time.System.Span.t -> unit Lwt.t
+  'transaction_object L2_types.block -> Z.t -> Time.System.Span.t -> unit Lwt.t
+
+(** [blueprint_replayed ~execution_gas ~process_time ~diverged number]
+    advertises that the node was able to replay the blueprint for level [number]. *)
+val blueprint_replayed :
+  execution_gas:Ethereum_types.quantity ->
+  process_time:Time.System.Span.t ->
+  diverged:bool ->
+  Ethereum_types.quantity ->
+  unit Lwt.t
 
 (** [blueprint_injected level] advertizes that a blueprint for level
     [level] has been forwarded to a rollup node  *)
@@ -70,7 +79,16 @@ val blueprint_proposal :
 val blueprint_production :
   Ethereum_types.quantity -> Time.System.Span.t -> unit Lwt.t
 
+(** [unexpected_blueprint_from_remote_node ~received ~expected] advertizes the node has
+    received a blueprint [number] while expected for [expected]. *)
+val unexpected_blueprint_from_remote_node :
+  received:Ethereum_types.quantity ->
+  expected:Ethereum_types.quantity ->
+  unit Lwt.t
+
 (** [worker_request_failed request_view state errs] warns that the
     blueprints_publisher worker encountered errors [errs]. *)
 val worker_request_failed :
   Blueprints_publisher_types.Request.view -> Error_monad.tztrace -> unit Lwt.t
+
+val follower_failed : tztrace -> unit Lwt.t

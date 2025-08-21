@@ -7,9 +7,9 @@
 
 let simple () =
   Cloud.register
-    ~vms:[Agent.Configuration.make (); Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make (); Agent.Configuration.make ()])
     ~__FILE__
-    ~tags:["simple"; "health"; Tag.cloud]
+    ~tags:["simple"; "health"]
     ~title:"Simple health check to check local configuration"
   @@ fun t ->
   let agents = Cloud.agents t in
@@ -17,7 +17,7 @@ let simple () =
   let agent1 = List.nth agents (1 mod List.length agents) in
   let* output =
     Process.spawn
-      ~name:"agent0"
+      ~name:(Agent.name agent0)
       ?runner:(Agent.runner agent0)
       "echo"
       ["Hello world"]
@@ -26,7 +26,7 @@ let simple () =
   Log.info "%s from agent 0" (String.trim output) ;
   let* output =
     Process.spawn
-      ~name:"agent1"
+      ~name:(Agent.name agent1)
       ?runner:(Agent.runner agent1)
       "echo"
       ["Hello world"]
@@ -37,9 +37,9 @@ let simple () =
 
 let run_vm () =
   Cloud.register
-    ~vms:[Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make ()])
     ~__FILE__
-    ~tags:["run"; "vm"; Tag.cloud]
+    ~tags:["run"; "vm"]
     ~title:"Run a new VM"
   @@ fun t ->
   let agents = Cloud.agents t in
@@ -61,9 +61,9 @@ let run_vm () =
 
 let run_detached () =
   Cloud.register
-    ~vms:[Agent.Configuration.make ()]
+    ~vms:(return [Agent.Configuration.make ()])
     ~__FILE__
-    ~tags:["run"; "detach"; Tag.cloud]
+    ~tags:["run"; "detach"]
     ~title:"Run a command and detach in a vm"
   @@ fun t ->
   let agents = Cloud.agents t in

@@ -31,7 +31,8 @@ type t
     (multiple identical calls to [make] will return different values)
     because it will be given a unique id. Using [unique = false], on the
     contrary, makes the call idempotent. *)
-val make : ?order:Z.t -> unique:bool -> string -> t
+val make :
+  ?order:Z.t -> ?scope:Opentelemetry.Scope.t -> unique:bool -> string -> t
 
 (** [content message] returns the string content of [message], i.e.
     [content (make s) = s]. *)
@@ -54,5 +55,7 @@ val id : t -> Id.t
 val counter : t -> Z.t
 
 val order : t -> Z.t option
+
+val scope : t -> Opentelemetry.Scope.t option
 
 val compare : t -> t -> int

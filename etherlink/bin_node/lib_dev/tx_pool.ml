@@ -222,16 +222,7 @@ module Pool = struct
       transactions
 end
 
-type mode =
-  | Proxy
-  | Sequencer
-  | Relay
-  | Forward of {
-      injector :
-        Ethereum_types.legacy_transaction_object ->
-        string ->
-        (Ethereum_types.hash, string) result tzresult Lwt.t;
-    }
+type mode = Proxy | Sequencer | Relay
 
 type parameters = {
   backend : (module Services_backend_sig.S);
@@ -240,7 +231,7 @@ type parameters = {
   tx_timeout_limit : int64;
   tx_pool_addr_limit : int;
   tx_pool_tx_per_addr_limit : int;
-  max_number_of_chunks : int option;
+  chain_family : L2_types.ex_chain_family;
 }
 
 module Types = struct
@@ -253,8 +244,8 @@ module Types = struct
     tx_timeout_limit : int64;
     tx_pool_addr_limit : int;
     tx_pool_tx_per_addr_limit : int;
-    max_number_of_chunks : int option;
     mutable locked : bool;
+    chain_family : L2_types.ex_chain_family;
   }
 
   type nonrec parameters = parameters
@@ -405,18 +396,6 @@ module Worker = Worker.MakeSingle (Name) (Request) (Types)
 
 type worker = Worker.infinite Worker.queue Worker.t
 
-let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
-  let maximum_chunks_per_l1_level =
-    Option.value
-      ~default:Sequencer_blueprint.maximum_chunks_per_l1_level
-      max_number_of_chunks
-  in
-  Bytes.length tx_data
-  > Sequencer_blueprint.maximum_usable_space_in_blueprint
-      (* Minus one so that the "rest" of the raw transaction can
-         be contained within one of the chunks. *)
-      (maximum_chunks_per_l1_level - 1)
-
 let check_address_boundaries ~pool ~address ~tx_pool_addr_limit
     ~tx_pool_tx_per_addr_limit =
   let open Lwt_result_syntax in
@@ -446,68 +425,59 @@ let insert_valid_transaction state tx_raw
     pool;
     tx_pool_addr_limit;
     tx_pool_tx_per_addr_limit;
-    max_number_of_chunks;
     _;
   } =
     state
   in
-  let tx_data =
-    transaction_object.input |> Ethereum_types.hash_to_bytes |> Bytes.of_string
+  let add_transaction ~must_replace =
+    (* Add the transaction to the pool *)
+    match Pool.add ~must_replace pool tx_raw transaction_object with
+    | Ok pool ->
+        let*! () =
+          Tx_pool_events.add_transaction
+            ~transaction:(Ethereum_types.hash_to_string transaction_object.hash)
+        in
+        state.pool <- pool ;
+        return (Ok transaction_object.hash)
+    | Error msg -> return (Error msg)
   in
-  if tx_data_size_limit_reached ~max_number_of_chunks ~tx_data then
-    let*! () = Tx_pool_events.tx_data_size_limit_reached () in
-    return @@ Error "Transaction data exceeded the allowed size."
-  else
-    let add_transaction ~must_replace =
-      (* Add the transaction to the pool *)
-      match Pool.add ~must_replace pool tx_raw transaction_object with
-      | Ok pool ->
-          let*! () =
-            Tx_pool_events.add_transaction
-              ~transaction:
-                (Ethereum_types.hash_to_string transaction_object.hash)
-          in
-          state.pool <- pool ;
-          return (Ok transaction_object.hash)
-      | Error msg -> return (Error msg)
-    in
-    let*! res_boundaries =
-      check_address_boundaries
-        ~pool
-        ~address:transaction_object.from
-        ~tx_pool_addr_limit
-        ~tx_pool_tx_per_addr_limit
-    in
-    match res_boundaries with
-    | Error `MaxUsers ->
+  let*! res_boundaries =
+    check_address_boundaries
+      ~pool
+      ~address:transaction_object.from
+      ~tx_pool_addr_limit
+      ~tx_pool_tx_per_addr_limit
+  in
+  match res_boundaries with
+  | Error `MaxUsers ->
+      return
+        (Error
+           "The transaction pool has reached its maximum threshold for user \
+            transactions. Transaction is rejected.")
+  | Error (`MaxPerUser transactions) ->
+      let (Qty nonce) = transaction_object.nonce in
+      let max_nonce, nonce_exists =
+        Pool.Nonce_map.fold
+          (fun nonce' _tx (max_nonce, nonce_exists) ->
+            (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
+          transactions
+          (Z.zero, false)
+      in
+      if nonce_exists then
+        (* It must replace an existing one, otherwise it'll be above
+           the limit. *)
+        add_transaction ~must_replace:`Replace_existing
+      else if nonce < max_nonce then
+        (* If the nonce is smaller than the max nonce, we must shift the
+           list and drop one transaction. *)
+        add_transaction ~must_replace:(`Replace_shift max_nonce)
+      else
+        (* Otherwise we have just reached the limit of transactions. *)
         return
           (Error
-             "The transaction pool has reached its maximum threshold for user \
-              transactions. Transaction is rejected.")
-    | Error (`MaxPerUser transactions) ->
-        let (Qty nonce) = transaction_object.nonce in
-        let max_nonce, nonce_exists =
-          Pool.Nonce_map.fold
-            (fun nonce' _tx (max_nonce, nonce_exists) ->
-              (Z.max max_nonce nonce', nonce_exists || nonce = nonce'))
-            transactions
-            (Z.zero, false)
-        in
-        if nonce_exists then
-          (* It must replace an existing one, otherwise it'll be above
-             the limit. *)
-          add_transaction ~must_replace:`Replace_existing
-        else if nonce < max_nonce then
-          (* If the nonce is smaller than the max nonce, we must shift the
-             list and drop one transaction. *)
-          add_transaction ~must_replace:(`Replace_shift max_nonce)
-        else
-          (* Otherwise we have just reached the limit of transactions. *)
-          return
-            (Error
-               "Limit of transaction for a user was reached. Transaction is \
-                rejected.")
-    | Ok () -> add_transaction ~must_replace:`No
+             "Limit of transaction for a user was reached. Transaction is \
+              rejected.")
+  | Ok () -> add_transaction ~must_replace:`No
 
 (** Checks that the transaction can be paid given the [gas_price] that was set
     and the current [base_fee_per_gas]. *)
@@ -528,11 +498,12 @@ let pop_transactions state ~maximum_cumulative_size =
           pool;
           locked;
           tx_timeout_limit;
+          chain_family;
           _;
         } =
     state
   in
-  if locked then return []
+  if locked || chain_family = L2_types.Ex_chain_family Michelson then return []
   else
     (* Get all the addresses in the tx-pool. *)
     let addresses = Pool.addresses pool in
@@ -541,13 +512,13 @@ let pop_transactions state ~maximum_cumulative_size =
       Lwt_list.map_p
         (fun address ->
           let* nonce =
-            Backend.nonce
+            Backend.Etherlink.nonce
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
           let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
           let* (Qty balance) =
-            Backend.balance
+            Backend.Etherlink.balance
               address
               Ethereum_types.Block_parameter.(Block_parameter Latest)
           in
@@ -557,7 +528,7 @@ let pop_transactions state ~maximum_cumulative_size =
     let addr_with_nonces = List.filter_ok addr_with_nonces in
     (* Remove transactions with too low nonce, timed-out and the ones that
        can not be prepayed anymore. *)
-    let* (Qty base_fee_per_gas) = Backend.base_fee_per_gas () in
+    let* (Qty base_fee_per_gas) = Backend.Etherlink.base_fee_per_gas () in
     let current_timestamp = Misc.now () in
     let pool =
       List.fold_left
@@ -665,7 +636,7 @@ let pop_and_inject_transactions state =
   if not (List.is_empty txs) then
     let (module Backend : Services_backend_sig.S) = state.backend in
     let*! hashes =
-      Backend.inject_transactions
+      Backend.Etherlink.inject_transactions
       (* The timestamp is ignored in observer and proxy mode, it's just for
          compatibility with sequencer mode. *)
         ~timestamp:(Misc.now ())
@@ -726,7 +697,7 @@ module Handlers = struct
           Worker.Queue.push_request w Request.Pop_and_inject_transactions
         in
         return_unit
-    | Sequencer | Proxy | Forward _ -> return_unit
+    | Sequencer | Proxy -> return_unit
 
   let on_request :
       type r request_error.
@@ -739,12 +710,7 @@ module Handlers = struct
     | Request.Add_transaction (transaction_object, txn) ->
         protect @@ fun () ->
         Tx_watcher.notify transaction_object.hash ;
-        let* res =
-          match state.mode with
-          | Forward {injector} -> injector transaction_object txn
-          | Proxy | Sequencer | Relay ->
-              insert_valid_transaction state txn transaction_object
-        in
+        let* res = insert_valid_transaction state txn transaction_object in
         let* () = relay_self_inject_request w in
         return res
     | Request.Pop_transactions maximum_cumulative_size ->
@@ -771,7 +737,7 @@ module Handlers = struct
          tx_timeout_limit;
          tx_pool_addr_limit;
          tx_pool_tx_per_addr_limit;
-         max_number_of_chunks;
+         chain_family;
        } :
         Types.parameters) =
     let state =
@@ -785,8 +751,8 @@ module Handlers = struct
           tx_timeout_limit;
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
-          max_number_of_chunks;
           locked = false;
+          chain_family;
         }
     in
     Lwt_result_syntax.return state
@@ -837,17 +803,10 @@ let handle_request_error rq =
   | Error (Closed (Some errs)) -> Lwt.return_error errs
   | Error (Any exn) -> Lwt.return_error [Exn exn]
 
-let start parameters =
+let start ~tx_pool_parameters =
   let open Lwt_result_syntax in
-  let+ worker = Worker.launch table () parameters (module Handlers) in
+  let+ worker = Worker.launch table () tx_pool_parameters (module Handlers) in
   Lwt.wakeup worker_waker worker
-
-let shutdown () =
-  let open Lwt_result_syntax in
-  bind_worker @@ fun w ->
-  let*! () = Tx_pool_events.shutdown () in
-  let*! () = Worker.shutdown w in
-  return_unit
 
 let add transaction_object raw_tx =
   let open Lwt_result_syntax in
@@ -862,7 +821,9 @@ let nonce pkey =
   let*? w = Lazy.force worker in
   let Types.{backend = (module Backend); pool; _} = Worker.state w in
   let+ current_nonce =
-    Backend.nonce pkey Ethereum_types.Block_parameter.(Block_parameter Latest)
+    Backend.Etherlink.nonce
+      pkey
+      Ethereum_types.Block_parameter.(Block_parameter Latest)
   in
   let current_nonce =
     Option.value ~default:Ethereum_types.Qty.zero current_nonce
@@ -882,7 +843,7 @@ let pop_and_inject_transactions () =
   let*? worker = Lazy.force worker in
   let state = Worker.state worker in
   match state.mode with
-  | Sequencer | Forward _ ->
+  | Sequencer ->
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit
@@ -897,7 +858,7 @@ let pop_and_inject_transactions_lazy () =
   bind_worker @@ fun w ->
   let state = Worker.state w in
   match state.mode with
-  | Sequencer | Forward _ ->
+  | Sequencer ->
       (* the sequencer injects blueprint in a rollup node, not
          transaction. *)
       return_unit
@@ -906,24 +867,6 @@ let pop_and_inject_transactions_lazy () =
         Worker.Queue.push_request w Request.Pop_and_inject_transactions
       in
       return_unit
-
-let lock_transactions () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Lock_transactions
-  |> handle_request_error
-
-let unlock_transactions () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
-  |> handle_request_error
-
-let is_locked () =
-  let open Lwt_result_syntax in
-  let*? worker = Lazy.force worker in
-  Worker.Queue.push_request_and_wait worker Request.Is_locked
-  |> handle_request_error
 
 let size_info () =
   let open Lwt_result_syntax in
@@ -940,13 +883,13 @@ let get_tx_pool_content () =
     Lwt_list.map_p
       (fun address ->
         let* nonce =
-          Backend.nonce
+          Backend.Etherlink.nonce
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
         let (Qty nonce) = Option.value ~default:(Qty Z.zero) nonce in
         let* (Qty balance) =
-          Backend.balance
+          Backend.Etherlink.balance
             address
             Ethereum_types.Block_parameter.(Block_parameter Latest)
         in
@@ -976,3 +919,82 @@ let clear_popped_transactions () =
     Worker.Queue.push_request w Request.Clear_popped_transactions
   in
   return_unit
+
+let mode () =
+  let open Lwt_result_syntax in
+  let*? worker = Lazy.force worker in
+  let state = Worker.state worker in
+  return state.mode
+
+module Tx_container = struct
+  type address = Ethereum_types.address
+
+  type legacy_transaction_object = Ethereum_types.legacy_transaction_object
+
+  type transaction_object = Transaction_object.t
+
+  let nonce ~next_nonce:_ address = nonce address
+
+  let add ~next_nonce:_ tx_object ~raw_tx =
+    let raw_tx_str = Ethereum_types.hex_to_bytes raw_tx in
+    add tx_object raw_tx_str
+
+  let find hash =
+    let open Lwt_result_syntax in
+    let* legacy_tx_object = find hash in
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/7747
+       We should instrument the TX pool to return the real
+       transaction objects. *)
+    return
+      (Option.map
+         Transaction_object.from_store_transaction_object
+         legacy_tx_object)
+
+  let content = get_tx_pool_content
+
+  let shutdown () =
+    let open Lwt_result_syntax in
+    bind_worker @@ fun w ->
+    let*! () = Tx_pool_events.shutdown () in
+    let*! () = Worker.shutdown w in
+    return_unit
+
+  let clear () = Lwt_result_syntax.return_unit
+
+  let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
+
+  let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
+    Lwt_result_syntax.return_unit
+
+  let lock_transactions () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Lock_transactions
+    |> handle_request_error
+
+  let unlock_transactions () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Unlock_transactions
+    |> handle_request_error
+
+  let is_locked () =
+    let open Lwt_result_syntax in
+    let*? worker = Lazy.force worker in
+    Worker.Queue.push_request_and_wait worker Request.Is_locked
+    |> handle_request_error
+
+  let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
+    clear_popped_transactions ()
+
+  let pop_transactions ~maximum_cumulative_size ~validate_tx:_
+      ~initial_validation_state:_ =
+    pop_transactions ~maximum_cumulative_size
+end
+
+let tx_container (type f) ~(chain_family : f L2_types.chain_family) :
+    f Services_backend_sig.tx_container tzresult =
+  let open Result_syntax in
+  match chain_family with
+  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
+  | Michelson -> error_with "Tx pool not supported in Tezlink"

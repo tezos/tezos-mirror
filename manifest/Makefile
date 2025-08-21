@@ -4,6 +4,7 @@
 SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        dgraph.mli dgraph.ml \
        tezos_protocol.ml \
+       manifest_link_deps.mli manifest_link_deps.ml \
        manifest.mli manifest.ml \
        externals.ml \
        internals.ml \
@@ -19,6 +20,7 @@ SOURCE=JSON_AST.ml JSON_parser.mli JSON_parser.ml JSON_lexer.ml \
        product_tooling.mli product_tooling.ml \
        product_etherlink.mli product_etherlink.ml \
        product_teztale.ml \
+       product_tezt_cloud_tests.ml \
        product_ciao.ml \
        product_tobi.ml \
        main.mli main.ml

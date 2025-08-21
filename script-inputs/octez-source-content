@@ -12,6 +12,7 @@ scripts
 sdk
 irmin
 brassaia
+brassaia-eio
 rust-toolchain
 data-encoding
 cohttp

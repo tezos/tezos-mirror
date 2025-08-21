@@ -34,10 +34,6 @@ module type PARAM = sig
   type subcontext
 
   val context_of_prefix : context -> prefix -> subcontext tzresult Lwt.t
-end
-
-module type PARAM_PREFIX = sig
-  include PARAM
 
   val prefix : (unit, prefix) Tezos_rpc.Path.t
 end
@@ -48,7 +44,24 @@ module Make_sub_directory (S : PARAM) = struct
   let directory : subcontext tzresult Tezos_rpc.Directory.t ref =
     ref Tezos_rpc.Directory.empty
 
+  let service_name = "Rpc_server"
+
   let register service f =
+    let prefix = Resto.Path.to_string prefix in
+    let path = Tezos_rpc.Service.path service |> Resto.Path.to_string in
+    let route = prefix ^ path in
+    let meth =
+      Tezos_rpc.Service.meth service |> Tezos_rpc.Service.string_of_meth
+    in
+    let trace_name = String.concat " " [meth; route] in
+    let f a q i =
+      Octez_telemetry.Trace.with_tzresult
+        ~kind:Span_kind_server
+        ~service_name
+        trace_name
+        ~attrs:[("http.route", `String route)]
+      @@ fun _scope -> f a q i
+    in
     directory := Tezos_rpc.Directory.register !directory service f
 
   let register0 service f =
@@ -79,7 +92,7 @@ module Make_sub_directory (S : PARAM) = struct
     | Ok ctxt -> f ctxt query input
 end
 
-module Make_directory (S : PARAM_PREFIX) = struct
+module Make_directory (S : PARAM) = struct
   include Make_sub_directory (S)
 
   let of_subdirectory = Tezos_rpc.Directory.prefix S.prefix

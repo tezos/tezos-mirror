@@ -19,7 +19,7 @@
    Invocation:   dune exec etherlink/tezt/tests/main.exe -- --file dal_sequencer.ml
 *)
 
-open Helpers
+open Test_helpers
 open Setup
 open Rpc.Syntax
 
@@ -28,7 +28,7 @@ let register_test =
     ~__FILE__
     ~enable_dal:true
     ~enable_multichain:false
-    ~threshold_encryption:false
+    ~enable_revm:false
 
 let count_event ?(get_count_from_event = fun _event -> 1) sequencer event
     counter =

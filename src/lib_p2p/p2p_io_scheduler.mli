@@ -52,7 +52,7 @@ val create :
   ?write_queue_size:int ->
   read_buffer_size:int ->
   unit ->
-  t
+  t tzresult Lwt.t
 
 (** [ma_state sched] returns the state of the moving average
     worker. *)

@@ -13,14 +13,18 @@ type t
 val register :
   ?proxy_files:string list ->
   ?proxy_args:string list ->
-  ?vms:Agent.Configuration.t list ->
+  ?vms:Agent.Configuration.t list Lwt.t ->
   __FILE__:string ->
   title:string ->
   tags:string list ->
   ?seed:Test.seed ->
   ?alerts:Alert_manager.alert list ->
+  ?tasks:Chronos.task list ->
   (t -> unit Lwt.t) ->
   unit
+
+(** Dynamically add an alert *)
+val add_alert : t -> alert:Alert_manager.alert -> unit Lwt.t
 
 val agents : t -> Agent.t list
 
@@ -51,3 +55,18 @@ val register_binary :
   name:string ->
   unit ->
   unit Lwt.t
+
+val service_register :
+  name:string ->
+  executable:string ->
+  ?on_alive_callback:(alive:bool -> unit) ->
+  Agent.t ->
+  unit
+
+val notify_service_start : name:string -> pid:int -> unit
+
+val notify_service_stop : name:string -> unit
+
+val register_chronos_task : t -> Chronos.task -> unit
+
+val notifier : t -> Types.notifier

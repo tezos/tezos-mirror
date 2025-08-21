@@ -90,7 +90,10 @@ module Term = struct
         ~progress_display_mode
     in
     Lwt.Exception_filter.(set handle_all_except_runtime) ;
-    match Tezos_base_unix.Event_loop.main_run @@ Lwt_exit.wrap_and_exit run with
+    match
+      Tezos_base_unix.Event_loop.main_run ~process_name:"node reconstruct"
+      @@ fun () -> Lwt_exit.wrap_and_exit run
+    with
     | Ok () -> `Ok ()
     | Error err -> `Error (false, Format.asprintf "%a" pp_print_trace err)
 

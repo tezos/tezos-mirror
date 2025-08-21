@@ -101,7 +101,7 @@ let start_layer_1_node ~network ?data_dir ?net_addr ?rpc_addr ?metrics_addr
 
 (** Start a DAL node with the given information and wait until it's ready. *)
 let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
-    ?metrics_addr ?metrics_port ?public_ip_addr ?producer_profiles
+    ?metrics_addr ?metrics_port ?public_ip_addr ?operator_profiles
     ?attester_profiles ?bootstrap_profile node =
   let listen_addr =
     match (net_addr, net_port) with
@@ -138,7 +138,7 @@ let start_dal_node ~peers ?data_dir ?net_addr ?net_port ?rpc_addr ?rpc_port
     Dal_node.init_config
       ~expected_pow:26.
       ~peers
-      ?producer_profiles
+      ?operator_profiles
       ?attester_profiles
       ?bootstrap_profile
       dal_node
@@ -185,7 +185,7 @@ let scenario_on_teztnet =
   in
   fun ~network
       ?(dal_bootstrap_peers = [])
-      ?producer_profiles
+      ?operator_profiles
       ?attester_profiles
       ~main_scenario
       () ->
@@ -261,7 +261,7 @@ let scenario_on_teztnet =
       start_dal_node
         ~peers:(peer :: dal_bootstrap_peers)
         ?data_dir:dal_producer
-        ?producer_profiles
+        ?operator_profiles
         ?attester_profiles
         ?public_ip_addr
         ?net_addr:dal_net_addr
@@ -401,8 +401,9 @@ let baker_scenario ?baker_sk ~airdropper_alias client dal_node l1_node =
   (* Manually stake a part of the baker's balance
      after it is declared as delegate. *)
   let* () = stake_or_unstake_half_balance client ~baker_alias in
-  let baker = Baker.create ~protocol:Protocol.Alpha ~dal_node l1_node client in
-  let* () = Baker.run baker in
+  let dal_node_rpc_endpoint = Dal_node.as_rpc_endpoint dal_node in
+  let baker = Agnostic_baker.create ~dal_node_rpc_endpoint l1_node client in
+  let* () = Agnostic_baker.run baker in
   Lwt_unix.sleep Float.max_float
 
 (** A slots injector test parameterized by a network. Typically, to run a slot
@@ -436,7 +437,7 @@ let slots_injector_test ~network =
     ?dal_bootstrap_peers
     ~network
     ~main_scenario:(slots_injector_scenario ~slot_index ?publisher_sk)
-    ~producer_profiles:[slot_index]
+    ~operator_profiles:[slot_index]
     ()
 
 (** A baker test parameterized by a network. Typically, to run a baker that
@@ -457,7 +458,7 @@ let baker_test ~network =
     ~__FILE__
     ~title:(sf "Join %s and bake" network)
     ~tags:[Tag.tezos2; "dal"; "baker"; network]
-    ~uses:[Protocol.baker Alpha]
+    ~uses:[Constant.octez_agnostic_baker]
   @@ fun () ->
   let baker_sk = Cli.get_string_opt "baker-sk" in
   let dal_bootstrap_peers =

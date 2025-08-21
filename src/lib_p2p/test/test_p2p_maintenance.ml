@@ -184,7 +184,7 @@ module Triggers = struct
       let maintenance_log, maintenance_stopper =
         Lwt_watcher.create_stream maintenance_watcher
       in
-      let maintenance =
+      let* maintenance =
         let maintenance_config =
           {
             P2p_maintenance.maintenance_idle_time;
@@ -393,7 +393,7 @@ module Triggers = struct
       let maintenance_log, maintenance_stopper =
         Lwt_watcher.create_stream maintenance_watcher
       in
-      let maintenance =
+      let* maintenance =
         let maintenance_config =
           {
             P2p_maintenance.maintenance_idle_time;

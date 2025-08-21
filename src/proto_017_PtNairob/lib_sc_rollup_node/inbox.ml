@@ -89,13 +89,12 @@ let get_messages Node_context.{l1_ctxt; _} head =
   in
   return messages
 
-let same_as_layer_1 node_ctxt head_hash inbox =
+let same_as_layer_1 node_ctxt level inbox =
   let open Lwt_result_syntax in
-  let head_block = `Hash (head_hash, 0) in
   let Node_context.{cctxt; _} = node_ctxt in
   let cctxt = new Protocol_client_context.wrap_full cctxt in
   let* layer1_inbox =
-    Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, head_block)
+    Plugin.RPC.Sc_rollup.inbox cctxt (cctxt#chain, `Level level)
   in
   let layer1_inbox = Sc_rollup_proto_types.Inbox.to_octez layer1_inbox in
   fail_unless

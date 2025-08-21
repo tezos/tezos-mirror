@@ -11,6 +11,20 @@ let exit_code_when_out_of_sync = 101
 
 let exit_code_when_flushed_blueprint = 102
 
+let exit_code_when_error_blueprints_follower = 103
+
+let exit_code_when_gcp_kms_auth_error = 104
+
+type error_source = [`Node | `Kernel]
+
+let error_source_encoding =
+  let open Data_encoding in
+  string_enum [("node", `Node); ("kernel", `Kernel)]
+
+let pp_proxy_finalize_multichain_source fmt = function
+  | `Node -> Format.fprintf fmt "Node"
+  | `Kernel -> Format.fprintf fmt "Kernel"
+
 type error +=
   | Diverged of {
       level : Z.t;
@@ -20,6 +34,15 @@ type error +=
     }
   | Out_of_sync of {level_expected : int32; level_received : int32}
   | Cannot_handle_flushed_blueprint of Ethereum_types.quantity
+  | Unexpected_multichain
+  | Proxy_finalize_with_multichain of error_source
+  | Singlechain_node_multichain_kernel
+  | Mismatched_chain_family of {
+      chain_id : L2_types.chain_id;
+      node_family : L2_types.ex_chain_family;
+      kernel_family : L2_types.ex_chain_family;
+    }
+  | Dream_rpc_tezlink
 
 let () =
   register_error_kind
@@ -62,8 +85,8 @@ let () =
       Format.fprintf
         ppf
         "Evm node received finalized level %ld but was expected %ld."
-        expected
-        received)
+        received
+        expected)
     Data_encoding.(obj2 (req "expected" int32) (req "received" int32))
     (function
       | Out_of_sync {level_expected; level_received} ->
@@ -84,4 +107,84 @@ let () =
         level)
     Data_encoding.(obj1 (req "level" Ethereum_types.quantity_encoding))
     (function Cannot_handle_flushed_blueprint level -> Some level | _ -> None)
-    (fun level -> Cannot_handle_flushed_blueprint level)
+    (fun level -> Cannot_handle_flushed_blueprint level) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_multichain"
+    ~title:"Multiple chains configured to a single chain node"
+    ~description:
+      "Observer, proxy, and rpc nodes follow a single chain. However, the \
+       configuration attempted to configure multiple chains."
+    Data_encoding.empty
+    (function Unexpected_multichain -> Some () | _ -> None)
+    (fun () -> Unexpected_multichain) ;
+  register_error_kind
+    `Permanent
+    ~id:"proxy_finalize_with_multichain"
+    ~title:"Proxy node finalized_view with multichain"
+    ~description:
+      "The `finalized_view` and `l2_chains` features of the proxy node are not \
+       compatible, please configure at most one of them."
+    ~pp:(fun ppf source ->
+      Format.fprintf
+        ppf
+        "The %a was configured in multichain mode, which is incompatible with \
+         the proxy node's finalized_view option."
+        pp_proxy_finalize_multichain_source
+        source)
+    Data_encoding.(obj1 (req "source" error_source_encoding))
+    (function Proxy_finalize_with_multichain src -> Some src | _ -> None)
+    (fun src -> Proxy_finalize_with_multichain src) ;
+  register_error_kind
+    `Permanent
+    ~id:"singlechain_node_multichain_kernel"
+    ~title:"Node is single chain while the Kernel is multichain"
+    ~description:
+      "The rollup has the mulichain feature enabled, please configure the \
+       l2_chains experimental feature to specify which layer-2 chain this node \
+       should follow."
+    Data_encoding.empty
+    (function Singlechain_node_multichain_kernel -> Some () | _ -> None)
+    (fun () -> Singlechain_node_multichain_kernel) ;
+  register_error_kind
+    `Permanent
+    ~id:"dream_rpc_tezlink"
+    ~title:"Dream RPC node with Tezlink"
+    ~description:"Tezlink is only compatible with Resto RPC nodes."
+    Data_encoding.empty
+    (function Dream_rpc_tezlink -> Some () | _ -> None)
+    (fun () -> Dream_rpc_tezlink) ;
+  register_error_kind
+    `Permanent
+    ~id:"mismatched_chain_family"
+    ~title:"Mismatched chain family"
+    ~description:
+      "The node was configured with a chain family which does not match the \
+       one found in the durable storage."
+    ~pp:(fun
+        ppf
+        ( chain_id,
+          L2_types.Ex_chain_family node_family,
+          L2_types.Ex_chain_family kernel_family )
+      ->
+      Format.fprintf
+        ppf
+        "The node was configured with the %a chain family for chain %a but the \
+         rollup expects the %a chain family for this chain."
+        L2_types.Chain_id.pp
+        chain_id
+        L2_types.Chain_family.pp
+        node_family
+        L2_types.Chain_family.pp
+        kernel_family)
+    Data_encoding.(
+      obj3
+        (req "chain_id" L2_types.Chain_id.encoding)
+        (req "node_family" L2_types.Chain_family.encoding)
+        (req "kernel_family" L2_types.Chain_family.encoding))
+    (function
+      | Mismatched_chain_family {chain_id; node_family; kernel_family} ->
+          Some (chain_id, node_family, kernel_family)
+      | _ -> None)
+    (fun (chain_id, node_family, kernel_family) ->
+      Mismatched_chain_family {chain_id; node_family; kernel_family})

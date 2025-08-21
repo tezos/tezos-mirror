@@ -25,10 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Context_ops_profiler = struct
-  include (val Profiler.wrap Environment_profiler.context_ops_profiler)
-end
-
 module Profiler = struct
   include (val Profiler.wrap Shell_profiling.block_validator_profiler)
 end
@@ -56,6 +52,8 @@ module type S = sig
   val kind : simple_kind
 
   val close : t -> unit Lwt.t
+
+  val restart : t -> unit tzresult Lwt.t
 
   val apply_block :
     simulate:bool ->
@@ -124,7 +122,7 @@ let[@warning "-32"] handle_reports = function
       | Some report -> ( try Profiler.inc report with _ -> ())) ;
       match profiler_report with
       | None -> ()
-      | Some report -> ( try Context_ops_profiler.inc report with _ -> ()))
+      | Some report -> ( try Profiler.inc report with _ -> ()))
   | _ -> ()
 
 (** The standard block validation method *)
@@ -214,19 +212,21 @@ module Internal_validator_process = struct
     mutable preapply_result :
       (Block_validation.apply_result * Tezos_protocol_environment.Context.t)
       option;
-    headless : Tezos_profiler.Profiler.instance;
-    profiler_headless : Tezos_profiler.Profiler.instance;
+    environment_headless : Tezos_profiler.Profiler.instance;
+    context_headless : Tezos_profiler.Profiler.instance;
   }
 
   let[@warning "-32"] headless_reports validator =
-    let report = Tezos_profiler.Profiler.report validator.headless in
+    let report =
+      Tezos_profiler.Profiler.report validator.environment_headless
+    in
     (match report with
     | None -> ()
     | Some report -> ( try Profiler.inc report with _ -> ())) ;
-    let report = Tezos_profiler.Profiler.report validator.profiler_headless in
+    let report = Tezos_profiler.Profiler.report validator.context_headless in
     match report with
     | None -> ()
-    | Some report -> ( try Context_ops_profiler.inc report with _ -> ())
+    | Some report -> ( try Profiler.inc report with _ -> ())
 
   let init
       ({
@@ -237,21 +237,36 @@ module Internal_validator_process = struct
         validator_environment) chain_store =
     let open Lwt_syntax in
     let* () = Events.(emit init ()) in
-    let headless =
+    let environment_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
-        Profiler.Info
+        Profiler.Debug
     in
-    let profiler_headless =
+    let context_headless =
       Tezos_profiler.Profiler.instance
         Tezos_profiler_backends.Simple_profiler.headless
-        Profiler.Info
+        Profiler.Debug
     in
-    Tezos_profiler.Profiler.(plug main) headless ;
+    Tezos_profiler.Profiler.(plug main) environment_headless ;
+
+    (* These profilers need to be plugged to a headless backend that can be
+       shared with external processes.
+
+       The reasoning behind this is the following:
+       - The main process has profilers that are plugged to proper backends
+       - When creating a child process to handle a request, its profilers are
+       not plugged to any backend so any profiler call will be a no-op
+       - Creating headless backends allows to share them between processes and
+       gather the results when the child process has finished
+       - The main process gathers the reports and writes them in the profilers
+       that are plugged to backends.
+
+       Another solution may be to plug the backends in the child processes.
+    *)
     Tezos_protocol_environment.Environment_profiler.Environment_profiler.plug
-      headless ;
+      environment_headless ;
     Tezos_protocol_environment.Environment_profiler.Context_ops_profiler.plug
-      profiler_headless ;
+      context_headless ;
     return_ok
       {
         chain_store;
@@ -260,13 +275,19 @@ module Internal_validator_process = struct
         operation_metadata_size_limit;
         cache = None;
         preapply_result = None;
-        headless;
-        profiler_headless;
+        environment_headless;
+        context_headless;
       }
 
   let kind = Single_process
 
   let close _ = Events.(emit close ())
+
+  let restart _ =
+    (* The single process validator cannot restarted. This is fine because the
+       restart is necessary to mitigate Irmin/Brassia errors, errors that occur
+       only when the validator is external. *)
+    Lwt_result_syntax.return_unit
 
   let get_context_index chain_store =
     Store.context_index (Store.Chain.global_store chain_store)
@@ -500,6 +521,8 @@ end
 module External_validator_process = struct
   include External_process.Make (External_validation)
 
+  let restart = restart_hypervisee
+
   let kind = External_process
 
   let apply_block ~simulate ?(should_validate = true) validator chain_store
@@ -654,6 +677,9 @@ let kind (E {validator_process; _}) =
   M.kind
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
+
+let restart (E {validator_process = (module VP); validator}) =
+  VP.restart validator
 
 let reconfigure_event_logging (E {validator_process = (module VP); validator})
     config =

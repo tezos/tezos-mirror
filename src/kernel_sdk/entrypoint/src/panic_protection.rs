@@ -4,7 +4,7 @@
 
 #![cfg(pvm_kind = "riscv")]
 
-// This module is enabled for HermitOS targets where `std` is available.
+// This module is enabled for RISC-V targets where `std` is available.
 extern crate alloc;
 extern crate std;
 

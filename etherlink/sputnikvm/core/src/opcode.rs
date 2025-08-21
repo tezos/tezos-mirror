@@ -83,6 +83,8 @@ impl Opcode {
 	pub const MSTORE: Opcode = Opcode(0x52);
 	/// `MSTORE8`
 	pub const MSTORE8: Opcode = Opcode(0x53);
+	/// `MCOPY`
+	pub const MCOPY: Opcode = Opcode(0x5e);
 	/// `JUMP`
 	pub const JUMP: Opcode = Opcode(0x56);
 	/// `JUMPI`
@@ -189,6 +191,10 @@ impl Opcode {
 	pub const SELFBALANCE: Opcode = Opcode(0x47);
 	/// `BASEFEE`
 	pub const BASEFEE: Opcode = Opcode(0x48);
+	/// `BLOBHASH`
+	pub const BLOBHASH: Opcode = Opcode(0x49);
+	/// `BLOBBASEFEE`
+	pub const BLOBBASEFEE: Opcode = Opcode(0x4a);
 	/// `ORIGIN`
 	pub const ORIGIN: Opcode = Opcode(0x32);
 	/// `CALLER`
@@ -223,6 +229,10 @@ impl Opcode {
 	pub const SLOAD: Opcode = Opcode(0x54);
 	/// `SSTORE`
 	pub const SSTORE: Opcode = Opcode(0x55);
+	/// `TLOAD`
+	pub const TLOAD: Opcode = Opcode(0x5c);
+	/// `TSTORE`
+	pub const TSTORE: Opcode = Opcode(0x5d);
 	/// `GAS`
 	pub const GAS: Opcode = Opcode(0x5a);
 	/// `LOGn`

@@ -9,7 +9,7 @@ open Tezos_rpc.Context
 
 module type REGISTERED = sig
   type t = {
-    registered_backend : Profiler.view list;
+    registered_backends : Profiler.view list;
     backends : (string * Profiler.view) list;
   }
 
@@ -25,7 +25,7 @@ end
 
 module MakeRegistered () : REGISTERED = struct
   type t = {
-    registered_backend : Profiler.view list;
+    registered_backends : Profiler.view list;
     backends : (string * Profiler.view) list;
   }
 
@@ -39,12 +39,14 @@ module MakeRegistered () : REGISTERED = struct
 
   let encoding =
     let open Data_encoding in
-    def "profiler registered backend" ~description:"Registered backend."
+    def "profiler registered backends" ~description:"Registered backends."
     @@ conv
-         (fun {registered_backend; backends} -> (registered_backend, backends))
-         (fun (registered_backend, backends) -> {registered_backend; backends})
+         (fun {registered_backends; backends} ->
+           (registered_backends, backends))
+         (fun (registered_backends, backends) ->
+           {registered_backends; backends})
          (obj2
-            (req "registered_backend" (list Profiler_kind.kind_encoding))
+            (req "registered_backends" (list Profiler_kind.kind_encoding))
             (req "backends" backends_encoding))
 
   module S = struct

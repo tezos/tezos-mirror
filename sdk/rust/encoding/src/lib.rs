@@ -47,6 +47,41 @@
 //! # assert!(_remaining_input.is_empty());
 //! # assert_eq!(outer, result);
 //! ```
+//! Derivation is also supported for rust enum with one unnamed field.
+//!
+//! Let's create encoding for a simple enum that holds a String or a Vec<u8>
+//! ```rust
+//! use tezos_data_encoding::nom::NomReader;
+//! use tezos_data_encoding::enc::BinWriter;
+//! use tezos_data_encoding::encoding::HasEncoding;
+//!
+//! #[derive(Debug, PartialEq, HasEncoding, NomReader, BinWriter)]
+//! enum Message {
+//!   Readable(String),
+//!   Bytes(Vec<u8>),
+//! }
+//!
+//! # let message_1 = Message::Readable(String::from("Hello World !"));
+//! # let message_2 = Message::Bytes(vec![1_u8; 10_usize]);
+//! #
+//! # let mut encoded_1 = Vec::new();
+//! # message_1.bin_write(&mut encoded_1).expect("encoding works");
+//! #
+//! # let (_remaining_input_1, result_1) = Message::nom_read(&encoded_1)
+//! #     .expect("decoding works");
+//! #
+//! # assert!(_remaining_input_1.is_empty());
+//! # assert_eq!(message_1, result_1);
+//!
+//! # let mut encoded_2 = Vec::new();
+//! # message_2.bin_write(&mut encoded_2).expect("encoding works");
+//! #
+//! # let (_remaining_input_2, result_2) = Message::nom_read(&encoded_2)
+//! #     .expect("decoding works");
+//! #
+//! # assert!(_remaining_input_2.is_empty());
+//! # assert_eq!(message_2, result_2);
+//! ```
 
 mod bit_utils;
 pub mod types;

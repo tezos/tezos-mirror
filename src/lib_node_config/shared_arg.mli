@@ -27,6 +27,9 @@
 
 type net_config
 
+val load_config_from_url :
+  Uri.t -> Config_file.blockchain_network tzresult Lwt.t
+
 (* NOTE: Some fields are not documented.
  *       Please help complete it if you can. *)
 
@@ -98,6 +101,10 @@ val process_command : unit tzresult Lwt.t -> unit Cmdliner.Term.ret
 
 module Term : sig
   val args : t Cmdliner.Term.t
+
+  val listen_addr : string option Cmdliner.Term.t
+
+  val advertised_net_port : int option Cmdliner.Term.t
 
   val data_dir : string option Cmdliner.Term.t
 

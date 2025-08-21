@@ -104,4 +104,10 @@ module Request = struct
           Z.pp_print
           order_below
           (if drop_no_order then ",and drop messages with node order" else "")
+
+  let name : type a b. (a, b) t -> string = function
+    | Register _ -> "Register"
+    | Produce_batches -> "Produce_batches"
+    | Clear_queues -> "Clear_queues"
+    | Remove_messages _ -> "Remove_messages"
 end

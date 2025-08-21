@@ -26,3 +26,4 @@
 module Gossipsub_intf = Gossipsub_intf
 module Automaton = Gossipsub_automaton.Make
 module Worker = Gossipsub_worker.Make
+module Profiler = Gossipsub_profiler

@@ -41,8 +41,45 @@ val compute_ssh :
     address of a VM from its name [name]. *)
 val get_ip_address_from_name : zone:string -> string -> string Lwt.t
 
-(** [list_vms ~prefix] retrieves a list "RUNNING" VMs matching specified [~prefix]. *)
+(** [list_vms ~prefix] retrieves a list "RUNNING" VMs matching specified
+    [~prefix]. *)
 val list_vms : prefix:string -> string Lwt.t
+
+(** [list_instances ?filter] retrieves a list of virtual machines with details
+    in json format. Filter can be used to filter by name *)
+val list_instances : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_instance_groups ?filter] retrieves a list of virtual machines groups
+    with details in json format. Filter can be used to filter by name *)
+val list_instance_groups : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_instance_templates ?filter] retrieves a list of virtual machines
+    templates with details in json format. Filter can be used to filter by name *)
+val list_instance_templates : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_addresses ?filter] retrieves a list of virtual machines with details
+    in json format. Filter can be used to filter by name *)
+val list_addresses : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_networks ?filter] retrieves a list of gcp networks with details in
+    json format. Filter can be used to filter by name *)
+val list_networks : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_subnets ?filter] retrieves a list of gcp subnets with details in json
+    format. Filter can be used to filter by name *)
+val list_subnets : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_firewalls ?filter] retrieves a list of virtual machines instances
+    with details in json format. Filter can be used to filter by name *)
+val list_firewalls : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_iam_service_accounts ?filter] retrieves a list of service accounts
+    with details in json format. Filter can be used to filter by name *)
+val list_iam_service_accounts : ?filter:string -> unit -> JSON.t Lwt.t
+
+(** [list_disks ?filter] retrieves a list of disks with details in json format.
+    Filter can be used to filter by name *)
+val list_disks : ?filter:string -> unit -> JSON.t Lwt.t
 
 module DNS : sig
   (** [create_zone ~domain ~zone ()] creates a [~zone] associated with

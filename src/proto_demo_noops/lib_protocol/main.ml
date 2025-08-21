@@ -198,6 +198,10 @@ module Mempool = struct
 
   let encoding = Data_encoding.unit
 
+  let partial_op_validation ?check_signature:_ _ _ = Lwt.return_ok []
+
+  let add_valid_operation ?conflict_handler:_ _ _  = Ok ((), Unchanged)
+
   let add_operation ?check_signature:_ ?conflict_handler:_ _ _ _ =
     Lwt.return_ok ((), Unchanged)
 

@@ -46,10 +46,12 @@ license_check_exclude=$(
   cat << EOF
 .*_generated.ml
 src/lib_protocol_environment/sigs/.*
-src/riscv/lib/octez_riscv_api.ml
-src/riscv/lib/octez_riscv_api.mli
+src/riscv/api/octez_riscv_api.ml
+src/riscv/api/octez_riscv_api.mli
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.ml
 etherlink/lib_wasm_runtime/ocaml-api/wasm_runtime_gen.mli
+src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.ml
+src/rust_deps/rust_igd_next/ocaml-api/igd_next_gen.mli
 EOF
 )
 
@@ -193,7 +195,7 @@ check_redirects() {
 }
 
 check_rust_toolchain_files() {
-  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.77.2" "1.78.0")
+  authorized_version=("1.66.0" "1.73.0" "1.76.0" "1.78.0" "1.86.0")
 
   declare -a rust_toolchain_files
   mapfile -t rust_toolchain_files <<< "$(find src/ -name rust-toolchain)"

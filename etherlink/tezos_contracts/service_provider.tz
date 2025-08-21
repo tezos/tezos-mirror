@@ -1,14 +1,24 @@
 { parameter
     (or (ticket %payout (pair nat (option bytes)))
-        (pair %payout_proxy
-           (address %fast_withdrawal_contract)
-           (address %exchanger)
-           (nat %withdrawal_id)
-           (address %target)
-           (timestamp %timestamp)
-           (address %service_provider)
-           (bytes %payload)
-           (bytes %l2_caller))) ;
+        (or (pair %payout_proxy_fa
+               (address %fast_withdrawal_contract)
+               (address %exchanger)
+               (nat %amount)
+               (nat %withdrawal_id)
+               (address %target)
+               (timestamp %timestamp)
+               (address %service_provider)
+               (bytes %payload)
+               (bytes %l2_caller))
+            (pair %payout_proxy_tez
+               (address %fast_withdrawal_contract)
+               (address %exchanger)
+               (nat %withdrawal_id)
+               (address %target)
+               (timestamp %timestamp)
+               (address %service_provider)
+               (bytes %payload)
+               (bytes %l2_caller)))) ;
   storage
     (pair (address %fast_withdrawal_contract)
           (address %exchanger)
@@ -18,68 +28,147 @@
           (address %service_provider)
           (bytes %payload)
           (bytes %l2_caller)) ;
-  code { UNPAIR ;
-         IF_LEFT
-           { SWAP ;
-             UNPAIR 8 ;
-             DUP ;
-             CONTRACT %payout_withdrawal
-               (pair nat (ticket (pair nat (option bytes))) address timestamp address bytes bytes) ;
-             IF_NONE
-               { DROP 9 ; PUSH string "Invalid entrypoint" ; FAILWITH }
-               { DUP 9 ;
-                 DUP 9 ;
-                 DUP 9 ;
-                 DUP 9 ;
-                 DUP 9 ;
-                 DUP 9 ;
-                 DIG 8 ;
-                 DIG 8 ;
-                 PAIR 8 ;
-                 NIL operation ;
-                 DIG 2 ;
-                 PUSH mutez 0 ;
-                 DIG 9 ;
-                 DIG 9 ;
-                 PAIR ;
-                 DIG 8 ;
-                 PAIR ;
-                 DIG 7 ;
-                 PAIR ;
-                 DIG 6 ;
-                 PAIR ;
-                 DIG 6 ;
-                 PAIR ;
-                 DIG 5 ;
-                 PAIR ;
-                 TRANSFER_TOKENS ;
-                 CONS ;
-                 PAIR } }
-           { SWAP ;
-             DROP ;
-             UNPAIR 8 ;
-             PUSH nat 20 ;
-             DUP 9 ;
+  code { LAMBDA
+           bytes
+           unit
+           { PUSH nat 20 ;
+             SWAP ;
              SIZE ;
              COMPARE ;
              EQ ;
              NOT ;
-             IF { DROP 8 ;
-                  PUSH string "L2 caller's address size should be 20 bytes long" ;
-                  FAILWITH }
-                { AMOUNT ;
-                  SELF %payout ;
-                  ADDRESS ;
-                  DUP 4 ;
-                  CONTRACT %mint address ;
-                  IF_NONE
-                    { DROP 10 ; PUSH string "Invalid tez ticket contract" ; FAILWITH }
-                    { DUG 2 ;
-                      TRANSFER_TOKENS ;
-                      DUG 8 ;
-                      PAIR 8 ;
-                      NIL operation ;
-                      DIG 2 ;
-                      CONS ;
-                      PAIR } } } } }
+             IF { PUSH string "L2 caller's address size must be exactly 20 bytes" ; FAILWITH }
+                { UNIT } } ;
+         SWAP ;
+         UNPAIR ;
+         IF_LEFT
+           { DIG 2 ;
+             DROP ;
+             DUP 2 ;
+             CAR ;
+             CONTRACT %payout_withdrawal
+               (pair nat (ticket (pair nat (option bytes))) timestamp address address bytes bytes) ;
+             IF_NONE
+               { DROP 2 ;
+                 PUSH string
+                      "Invalid fast withdrawal contract: missing %payout_withdrawal entrypoint" ;
+                 FAILWITH }
+               { PUSH mutez 0 ;
+                 DUP 4 ;
+                 GET 14 ;
+                 DUP 5 ;
+                 GET 13 ;
+                 PAIR ;
+                 DUP 5 ;
+                 GET 11 ;
+                 PAIR ;
+                 DUP 5 ;
+                 GET 7 ;
+                 PAIR ;
+                 DUP 5 ;
+                 GET 9 ;
+                 PAIR ;
+                 DIG 3 ;
+                 PAIR ;
+                 DUP 4 ;
+                 GET 5 ;
+                 PAIR ;
+                 TRANSFER_TOKENS ;
+                 SWAP ;
+                 NIL operation ;
+                 DIG 2 ;
+                 CONS ;
+                 PAIR } }
+           { SWAP ;
+             DROP ;
+             IF_LEFT
+               { DUP ;
+                 GET 16 ;
+                 DIG 2 ;
+                 SWAP ;
+                 EXEC ;
+                 DROP ;
+                 SELF %payout ;
+                 ADDRESS ;
+                 PUSH mutez 0 ;
+                 UNIT ;
+                 LEFT (or address bytes) ;
+                 DIG 2 ;
+                 PAIR 3 ;
+                 DUP 2 ;
+                 GET 3 ;
+                 CONTRACT %set
+                   (pair (address %target)
+                         (or %entrypoint
+                            (unit %default)
+                            (or (address %routerWithdraw) (bytes %rollupDeposit)))
+                         (mutez %xtz_amount)) ;
+                 IF_NONE
+                   { DROP 2 ;
+                     PUSH string "Invalid exchanger contract: missing %set entrypoint" ;
+                     FAILWITH }
+                   { PUSH mutez 0 ;
+                     DIG 2 ;
+                     TRANSFER_TOKENS ;
+                     DUP 2 ;
+                     GET 3 ;
+                     CONTRACT %mint (pair (pair nat (option bytes)) nat) ;
+                     IF_NONE
+                       { DROP 2 ;
+                         PUSH string "Invalid exchanger contract: missing %mint entrypoint" ;
+                         FAILWITH }
+                       { PUSH mutez 0 ;
+                         DUP 4 ;
+                         GET 5 ;
+                         NONE bytes ;
+                         PUSH nat 0 ;
+                         PAIR ;
+                         PAIR ;
+                         TRANSFER_TOKENS ;
+                         DUP 3 ;
+                         GET 16 ;
+                         DUP 4 ;
+                         GET 15 ;
+                         DUP 5 ;
+                         GET 13 ;
+                         DUP 6 ;
+                         GET 11 ;
+                         DUP 7 ;
+                         GET 9 ;
+                         DUP 8 ;
+                         GET 7 ;
+                         DUP 9 ;
+                         GET 3 ;
+                         DIG 9 ;
+                         CAR ;
+                         PAIR 8 ;
+                         NIL operation ;
+                         DIG 2 ;
+                         CONS ;
+                         DIG 2 ;
+                         CONS ;
+                         PAIR } } }
+               { DUP ;
+                 GET 14 ;
+                 DIG 2 ;
+                 SWAP ;
+                 EXEC ;
+                 DROP ;
+                 AMOUNT ;
+                 SELF %payout ;
+                 ADDRESS ;
+                 DUP 3 ;
+                 GET 3 ;
+                 CONTRACT %mint address ;
+                 IF_NONE
+                   { PUSH string "Invalid exchanger contract: missing %mint entrypoint" ;
+                     FAILWITH }
+                   {} ;
+                 DUG 2 ;
+                 TRANSFER_TOKENS ;
+                 SWAP ;
+                 NIL operation ;
+                 DIG 2 ;
+                 CONS ;
+                 PAIR } } } }
 

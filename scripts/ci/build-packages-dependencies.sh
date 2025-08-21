@@ -15,7 +15,7 @@ gcp_arm64 | gcp_dev_arm64)
   PLATFORM="linux/arm64"
   ARCHITECTURE="arm64"
   ;;
-gcp | gcp_dev)
+gcp | gcp_dev | gcp_high_cpu | gcp_very_high_cpu | gcp_very_high_cpu_ramfs | gcp_very_high_cpu_ramfs_dev)
   PLATFORM="linux/amd64"
   ARCHITECTURE="amd64"
   ;;
@@ -39,6 +39,7 @@ docker build \
   -f "$DOCKERFILE" \
   --build-arg=BUILDKIT_INLINE_CACHE=1 \
   --build-arg IMAGE="$DISTRIBUTION:$RELEASE" \
+  --build-arg APT_PROXY="${APT_PROXY_DEB:-}" \
   --cache-from="${DEP_IMAGE}:${ARCHITECTURE}-${CI_COMMIT_REF_SLUG}" \
   --cache-from="${DEP_IMAGE_PROTECTED}:master" \
   -t "$LOCAL_IMAGE_NAME" \
@@ -52,8 +53,17 @@ docker build \
 LATEST_TAG="${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}"
 LATEST_TAG_GENERIC="${CI_COMMIT_REF_SLUG}"
 
-echo "Checking for existance of image $DEP_IMAGE:$LATEST_TAG"
-docker buildx imagetools inspect "$DEP_IMAGE:$LATEST_TAG" || export IMAGE_EXISTS="false"
+# Enforce image rebuild ignoring inputs changes (i.e. rebuild the image
+# for security updates purposes)
+skip_registry_cache_check=${DOCKER_FORCE_BUILD:-"false"}
+
+if [ "$skip_registry_cache_check" != "true" ]; then
+  echo "Checking for existance of image $DEP_IMAGE:$LATEST_TAG"
+  docker buildx imagetools inspect "$DEP_IMAGE:$LATEST_TAG" || export IMAGE_EXISTS="false"
+else
+  export IMAGE_EXISTS="false"
+  echo "Force rebuild of CI images, using no cached layers"
+fi
 
 if [ "$IMAGE_EXISTS" = "false" ]; then
   echo "Creating image manifesto for $DEP_IMAGE:$LATEST_TAG"

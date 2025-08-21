@@ -44,6 +44,8 @@ pub fn eval<H: Handler>(state: &mut Runtime, opcode: Opcode, handler: &mut H) ->
 		Opcode::GASLIMIT => system::gaslimit(state, handler),
 		Opcode::SLOAD => system::sload(state, handler),
 		Opcode::SSTORE => system::sstore(state, handler),
+		Opcode::TLOAD => system::tload(state, handler),
+		Opcode::TSTORE => system::tstore(state, handler),
 		Opcode::GAS => system::gas(state, handler),
 		Opcode::LOG0 => system::log(state, 0, handler),
 		Opcode::LOG1 => system::log(state, 1, handler),
@@ -59,6 +61,8 @@ pub fn eval<H: Handler>(state: &mut Runtime, opcode: Opcode, handler: &mut H) ->
 		Opcode::STATICCALL => system::call(state, CallScheme::StaticCall, handler),
 		Opcode::CHAINID => system::chainid(state, handler),
 		Opcode::BASEFEE => system::base_fee(state, handler),
+		Opcode::BLOBHASH => system::blob_hash(state, handler),
+		Opcode::BLOBBASEFEE => system::blob_base_fee(state, handler),
 		_ => handle_other(state, opcode, handler),
 	}
 }

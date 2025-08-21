@@ -1,0 +1,9 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_lib_upnp_args)
+ (public_name octez-lib-upnp-args)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  cmdliner))

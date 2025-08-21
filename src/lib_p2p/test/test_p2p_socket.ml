@@ -224,10 +224,7 @@ module Low_level = struct
     let msg = Bytes.create (Bytes.length simple_msg) in
     let*! r = raw_connect sched addr port in
     match r with
-    | Error
-        ( `Network_unreachable | `Connection_unreachable | `Connection_refused
-        | `Connection_canceled | `Unexpected_error _ ) ->
-        Lwt.fail Alcotest.Test_error
+    | Error _ -> Lwt.fail Alcotest.Test_error
     | Ok fd ->
         let* () =
           P2p_buffer_reader.(
@@ -241,8 +238,7 @@ module Low_level = struct
     let open Lwt_result_syntax in
     let*! r = raw_accept sched socket in
     match r with
-    | Error (`Socket_error ex | `System_error ex | `Unexpected_error ex) ->
-        Lwt.fail ex
+    | Error e -> fail e
     | Ok (fd, _point) ->
         let* () = P2p_io_scheduler.write fd simple_msg in
         let* () = sync ch in

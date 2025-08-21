@@ -4,7 +4,7 @@ meta:
 doc: ! >-
   Encoding id: 015-PtLimaPt.errors
 
-  Description: The full list of RPC errors would be too long to include.It is
+  Description: The full list of RPC errors would be too long to include. It is
 
   available through the RPC `/errors` (GET).
 types:

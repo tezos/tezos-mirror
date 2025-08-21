@@ -18,17 +18,27 @@ type state = Api.state
 
 type status = Api.status
 
-type reveal_data = Api.reveal_data
+(* TODO RV-615: Improve the `input` type exposed in protocol environment *)
+(* Mirrors Api.input but requires manual conversion *)
+type input = Inbox_message of int32 * int64 * string | Reveal of string
 
-type input = Api.input
-
-type input_request = Api.input_request
+(* Mirrors Api.input_request but requires manual conversion *)
+type input_request =
+  | No_input_required
+  | Initial
+  | First_after of int32 * int64
+  | Needs_reveal of string
 
 type proof = Api.proof
 
 type output_proof = Api.output_proof
 
-type output = Api.output
+type output_info = {
+  message_index : Z.t;
+  outbox_level : Bounded.Non_negative_int32.t;
+}
+
+type output = {info : output_info; encoded_message : string}
 
 module Mutable_state : sig
   type t = Api.mut_state
@@ -56,6 +66,10 @@ module Mutable_state : sig
   val state_hash : t -> hash
 
   val set_input : t -> input -> unit Lwt.t
+
+  val get_reveal_request : t -> string Lwt.t
+
+  val insert_failure : t -> unit Lwt.t
 end
 
 val compute_step_many :
@@ -98,7 +112,7 @@ val serialise_proof : proof -> bytes
 
 val deserialise_proof : bytes -> (proof, string) result
 
-val output_of_output_proof : output_proof -> output
+val output_info_of_output_proof : output_proof -> output_info
 
 val state_of_output_proof : output_proof -> hash
 
@@ -107,3 +121,7 @@ val verify_output_proof : output_proof -> output option
 val serialise_output_proof : output_proof -> bytes
 
 val deserialise_output_proof : bytes -> (output_proof, string) result
+
+val get_reveal_request : state -> string Lwt.t
+
+val insert_failure : state -> state Lwt.t

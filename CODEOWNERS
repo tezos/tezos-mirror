@@ -33,8 +33,10 @@
 # @ole.kruger = Ole Krüger
 # @lthms = Thomas Letan
 # @rodibozman = Rodi-Can Bozman
-/src/kernel_sdk           @emturner @ole.kruger @lthms @rodibozman
-/sdk/rust                 @emturner @ole.kruger @lthms @rodibozman
+# @spalmer25 = Palmer Sébastien
+/src/kernel_sdk           @emturner @ole.kruger @lthms @rodibozman @spalmer25
+/sdk/rust                 @emturner @ole.kruger @lthms @rodibozman @spalmer25
+/contrib/sdk-bindings     @emturner @spalmer25
 
 # Octez Merge Team
 #

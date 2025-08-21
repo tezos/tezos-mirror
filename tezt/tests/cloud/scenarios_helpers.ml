@@ -10,7 +10,7 @@ let toplog (fmt : ('a, Format.formatter, unit, unit) format4) : 'a =
 
 let init_teztale cloud agent =
   let () = toplog "Initialize Teztale server" in
-  let* teztale = Tezos.Teztale.run_server agent in
+  let* teztale = Tezos.Teztale.run_server cloud agent in
   let* () = Tezos.Teztale.wait_server teztale in
   let () = toplog "Teztale server is ready" in
   let* () =

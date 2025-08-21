@@ -293,8 +293,8 @@ let test_rewards_block_and_payload_producer () =
   let baker_b2' = Context.get_first_different_baker baker_b2 bakers in
   let* b2' =
     Block.bake
-      ~payload_round:(Some Round.zero)
-      ~locked_round:(Some Round.zero)
+      ~payload_round:Round.zero
+      ~locked_round:Round.zero
       ~policy:(By_account baker_b2')
       ~operations:(preattestations @ attestations @ [tx])
       b1

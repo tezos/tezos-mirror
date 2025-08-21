@@ -8,16 +8,27 @@
 module Configuration = struct
   include Types.Agent_configuration
 
+  let pp fmt x =
+    Format.fprintf
+      fmt
+      "%a"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct encoding x)
+
   let uri_of_docker_image docker_image =
     match (docker_image, Env.mode) with
-    | Types.Agent_configuration.Gcp {alias}, (`Cloud | `Host | `Orchestrator) ->
+    | ( Types.Agent_configuration.Gcp {alias},
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
         let* registry_uri = Env.registry_uri () in
         Lwt.return (Format.asprintf "%s/%s" registry_uri alias)
-    | Gcp {alias}, `Localhost -> Lwt.return alias
-    | Octez_release _, (`Cloud | `Host | `Orchestrator) ->
+    | Gcp {alias}, `Local_orchestrator_local_agents -> Lwt.return alias
+    | ( Octez_release _,
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
         let* registry_uri = Env.registry_uri () in
         Lwt.return (Format.asprintf "%s/octez" registry_uri)
-    | Octez_release _, `Localhost -> Lwt.return "octez"
+    | Octez_release _, `Local_orchestrator_local_agents -> Lwt.return "octez"
 
   let gen_name =
     let cpt = ref (-1) in
@@ -50,14 +61,14 @@ module Configuration = struct
 end
 
 type t = {
-  (* The name initially is the same as [vm_name] and can be changed dynamically by the scenario. *)
-  name : string;
+  vm_name : string option;
   zone : string option;
   point : (string * int) option;
   runner : Runner.t option;
   next_available_port : unit -> int;
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
+  service_manager : Service_manager.t option;
 }
 
 let ssh_id () = Env.ssh_private_key_filename ()
@@ -68,16 +79,27 @@ let encoding =
   let open Data_encoding in
   conv
     (fun {
-           name;
+           vm_name;
            zone;
            point;
            runner = _;
            next_available_port;
            configuration;
            process_monitor;
+           service_manager = _;
          } ->
-      (name, zone, point, next_available_port (), configuration, process_monitor))
-    (fun (name, zone, point, next_available_port, configuration, process_monitor) ->
+      ( vm_name,
+        zone,
+        point,
+        next_available_port (),
+        configuration,
+        process_monitor ))
+    (fun ( vm_name,
+           zone,
+           point,
+           next_available_port,
+           configuration,
+           process_monitor ) ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -93,16 +115,18 @@ let encoding =
             |> Option.some
       in
       {
-        name;
+        vm_name;
         zone;
         point;
         runner;
         next_available_port;
         configuration;
         process_monitor;
+        service_manager = None;
+        (* As of now, this encoding is only used when reattaching *)
       })
     (obj6
-       (req "name" string)
+       (req "vm_name" (option string))
        (req "zone" (option string))
        (req "point" (option (tup2 string int31)))
        (req "next_available_port" int31)
@@ -111,7 +135,9 @@ let encoding =
 
 (* Getters *)
 
-let name {name; _} = name
+let name {configuration = {name; _}; _} = name
+
+let vm_name {vm_name; _} = vm_name
 
 let point {point; _} = point
 
@@ -121,7 +147,7 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
-let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name
+let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     ~process_monitor () =
   let ssh_user = "root" in
   let runner =
@@ -135,27 +161,34 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~name
   {
     point;
     runner;
-    name;
+    vm_name;
     next_available_port;
     configuration;
     zone;
     process_monitor;
+    service_manager = Service_manager.init () |> Option.some;
   }
 
-let cmd_wrapper {zone; name; _} =
-  match zone with
-  | None -> None
-  | Some zone ->
+let cmd_wrapper {zone; vm_name; _} =
+  match (zone, vm_name) with
+  | None, None -> None
+  | Some zone, Some vm_name ->
       let ssh_private_key_filename =
-        if Env.mode = `Orchestrator then
+        if Env.mode = `Remote_orchestrator_local_agents then
           Env.ssh_private_key_filename ~home:"$HOME" ()
         else Env.ssh_private_key_filename ()
       in
-      Some (Gcloud.cmd_wrapper ~zone ~vm_name:name ~ssh_private_key_filename)
+      Some (Gcloud.cmd_wrapper ~zone ~vm_name ~ssh_private_key_filename)
+  | _ ->
+      Test.fail
+        "Inconsistent agent setup, only one of zone and vm_name has been \
+         declared."
 
 let path_of agent binary = agent.configuration.vm.binaries_path // binary
 
 let process_monitor agent = agent.process_monitor
+
+let service_manager t = t.service_manager
 
 let host_run_command agent cmd args =
   match cmd_wrapper agent with

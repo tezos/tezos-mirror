@@ -27,7 +27,12 @@ local node = import './node.jsonnet';
 local p2p = import './p2p.jsonnet';
 local workers = import './workers.jsonnet';
 
-dashboard.new('Octez compact dashboard')
+// External variables
+local uid_ext = std.extVar('uid_ext');
+local uid = uid_ext == 'default';
+
+dashboard.new('Octez compact dashboard' + if !uid && uid_ext != '' then ' (' + std.strReplace(uid_ext, '-', '') + ')' else '')
++ (if !uid then dashboard.withUid('octez-compact' + uid_ext) else {})
 + dashboard.withDescription('A compact dashboard for Octez')
 + dashboard.withTags(['tezos', 'octez'])
 + dashboard.time.withFrom('now-3h')

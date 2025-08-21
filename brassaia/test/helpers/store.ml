@@ -2506,4 +2506,4 @@ let run ~__FILE__ name ?(slow = false) ?random_seed ~sleep ~misc tl =
   (Lwt.async_exception_hook := fun exn -> raise exn);
   let tl1 = List.map (suite sleep) tl in
   let tl1 = if slow then tl1 @ List.map slow_suite tl else tl1 in
-  Alcotest_lwt.run ~__FILE__ name (misc @ tl1)
+  Alcotest_lwt.run ~__FILE__ ~tags:[ "ci_disabled" ] name (misc @ tl1)

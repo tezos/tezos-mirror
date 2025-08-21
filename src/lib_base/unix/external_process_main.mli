@@ -43,5 +43,5 @@ module Make
                     with type parameters := Params.parameters
                      and type 'response request := 'response Params.request) : sig
   (** Main entry point of the external process. *)
-  val main : ?socket_dir:string -> unit -> unit tzresult Lwt.t
+  val main : socket_dir:string -> unit tzresult Lwt.t
 end

@@ -54,6 +54,14 @@ end
 (** Builds a new Hash type using Blake2B. *)
 module Make_minimal (Name : Name) : S.MINIMAL_HASH
 
+(** Builds a new Hash type using Blake2B, with the necessary functions for
+    conversion. *)
+module Make_minimal_with_data (Name : Name) : sig
+  include S.MINIMAL_HASH
+
+  include S.RAW_DATA with type t := t
+end
+
 module type Register = sig
   val register_encoding :
     prefix:string ->

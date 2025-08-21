@@ -4,7 +4,7 @@
 (* Copyright (c) 2023 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2023 Functori <contact@functori.com>                        *)
 (* Copyright (c) 2023 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -30,18 +30,48 @@ type time_between_blocks = Nothing | Time_between_blocks of float
 
 type history_mode = Archive | Rolling of int | Full of int
 
+type tez_contract = {address : string; path : string; initial_storage : string}
+
+type l2_setup = {
+  l2_chain_id : int;
+  l2_chain_family : string;
+  world_state_path : string option;
+  eth_bootstrap_accounts : string list option;
+  tez_bootstrap_accounts : Account.key list option;
+  tez_bootstrap_contracts : tez_contract list option;
+  sequencer_pool_address : string option;
+  minimum_base_fee_per_gas : Wei.t option;
+  da_fee_per_byte : Wei.t option;
+  maximum_gas_per_transaction : int64 option;
+}
+
+let eth_default_bootstrap_accounts =
+  List.map
+    (fun account -> account.Eth_account.address)
+    (Array.to_list Eth_account.bootstrap_accounts)
+
+let tez_default_bootstrap_accounts = Array.to_list Account.Bootstrap.keys
+
+let default_l2_setup ~l2_chain_id =
+  {
+    l2_chain_id;
+    l2_chain_family = "EVM";
+    world_state_path = Some "/evm/world_state";
+    eth_bootstrap_accounts = Some eth_default_bootstrap_accounts;
+    tez_bootstrap_accounts = Some tez_default_bootstrap_accounts;
+    tez_bootstrap_contracts = None;
+    sequencer_pool_address = None;
+    minimum_base_fee_per_gas = None;
+    da_fee_per_byte = None;
+    maximum_gas_per_transaction = None;
+  }
+
 type mode =
   | Observer of {
       initial_kernel : string;
       preimages_dir : string option;
       private_rpc_port : int option;
       rollup_node_endpoint : string;
-    }
-  | Threshold_encryption_observer of {
-      initial_kernel : string;
-      preimages_dir : string;
-      rollup_node_endpoint : string;
-      bundler_node_endpoint : string;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -73,25 +103,6 @@ type mode =
       tx_pool_addr_limit : int option;
       tx_pool_tx_per_addr_limit : int option;
     }
-  | Threshold_encryption_sequencer of {
-      initial_kernel : string;
-      preimage_dir : string option;
-      private_rpc_port : int option;
-      time_between_blocks : time_between_blocks option;
-      sequencer : string;
-      genesis_timestamp : Client.timestamp option;
-      max_blueprints_lag : int option;
-      max_blueprints_ahead : int option;
-      max_blueprints_catchup : int option;
-      catchup_cooldown : int option;
-      max_number_of_chunks : int option;
-      wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
-      sequencer_sidecar_endpoint : string;
-      dal_slots : int list option;
-    }
   | Proxy
   | Rpc of mode
 
@@ -111,11 +122,14 @@ module Parameters = struct
     mode : mode;
     mutable history : history_mode option;
     data_dir : string;
+    config_file : string option;
     rpc_addr : string;
     rpc_port : int;
+    websockets : bool;
     endpoint : string;
     runner : Runner.t option;
     restricted_rpcs : string option;
+    spawn_rpc : int option;
   }
 
   type session_state = {mutable ready : bool}
@@ -132,23 +146,19 @@ let mode t = t.persistent_state.mode
 
 let is_sequencer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ -> true
-  | Observer _ | Threshold_encryption_observer _ | Proxy | Rpc _ -> false
+  | Sequencer _ | Sandbox _ -> true
+  | Observer _ | Proxy | Rpc _ -> false
 
 let is_observer t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Proxy | Rpc _
-    ->
-      false
-  | Observer _ | Threshold_encryption_observer _ -> true
+  | Sequencer _ | Sandbox _ | Proxy | Rpc _ -> false
+  | Observer _ -> true
 
 let initial_kernel t =
   let rec from_mode = function
     | Sandbox {initial_kernel; _}
     | Sequencer {initial_kernel; _}
-    | Threshold_encryption_sequencer {initial_kernel; _}
-    | Observer {initial_kernel; _}
-    | Threshold_encryption_observer {initial_kernel; _} ->
+    | Observer {initial_kernel; _} ->
         initial_kernel
     | Rpc mode -> from_mode mode
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
@@ -157,9 +167,7 @@ let initial_kernel t =
 
 let can_apply_blueprint t =
   match t.persistent_state.mode with
-  | Sequencer _ | Sandbox _ | Threshold_encryption_sequencer _ | Observer _
-  | Threshold_encryption_observer _ ->
-      true
+  | Sequencer _ | Sandbox _ | Observer _ -> true
   | Proxy | Rpc _ -> false
 
 let connection_arguments ?rpc_addr ?rpc_port ?runner () =
@@ -401,6 +409,12 @@ let wait_for_predownload_kernel ?timeout evm_node ~root_hash =
   json |> JSON.as_string |> fun hash ->
   if root_hash = hash then Some () else None
 
+let wait_for_predownload_kernel_failed ?timeout evm_node ~root_hash =
+  wait_for_event ?timeout evm_node ~event:"predownload_kernel_failed.v0"
+  @@ fun json ->
+  let event_root_hash = JSON.(json |-> "version" |> as_string) in
+  if root_hash = event_root_hash then Some () else None
+
 let wait_for_pending_upgrade ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"pending_upgrade.v0"
   @@ JSON.(
@@ -416,6 +430,20 @@ let wait_for_successful_upgrade ?timeout evm_node =
          let root_hash = json |-> "root_hash" |> as_string in
          let level = json |-> "level" |> as_int in
          Some (root_hash, level))
+
+let wait_for_spawn_rpc_ready ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"spawn_rpc_is_ready.v0"
+  @@ Fun.const (Some ())
+
+let wait_for_import_finished ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"import_finished.v0"
+  @@ Fun.const (Some ())
+
+let wait_for_finished_exporting_snapshot ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"finished_exporting_snapshot.v0"
+  @@ fun json ->
+  let filename = JSON.(json |> as_string) in
+  Some filename
 
 let wait_for_block_producer_locked ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"block_producer_locked.v0"
@@ -555,6 +583,38 @@ let wait_for_rollup_node_ahead evm_node =
 let wait_for_tx_pool_add_transaction ?timeout evm_node =
   wait_for_event ?timeout evm_node ~event:"tx_pool_add_transaction.v0"
   @@ JSON.as_string_opt
+
+let wait_for_tx_queue_add_transaction ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_add_transaction.v0"
+  @@ fun json -> JSON.(json |> as_string |> Option.some)
+
+let wait_for_tx_queue_transaction_confirmed ?timeout ?hash evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_transaction_confirmed.v0"
+  @@ fun json ->
+  let found_hash = JSON.(json |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some found_hash else None
+  | None -> Some found_hash
+
+let wait_for_tx_queue_injecting_transaction ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_injecting_transaction.v0"
+  @@ fun json -> JSON.(json |> as_int |> Option.some)
+
+let wait_for_tx_queue_cleared ?timeout evm_node =
+  wait_for_event ?timeout evm_node ~event:"tx_queue_cleared.v0"
+  @@ Fun.const (Some ())
+
+let wait_for_block_producer_rejected_transaction ?timeout ?hash evm_node =
+  wait_for_event
+    ?timeout
+    evm_node
+    ~event:"block_producer_transaction_rejected.v0"
+  @@ fun json ->
+  let found_hash = JSON.(json |-> "tx_hash" |> as_string) in
+  let reason = JSON.(json |-> "error" |> as_string) in
+  match hash with
+  | Some hash -> if found_hash = hash then Some reason else None
+  | None -> Some reason
 
 let wait_for_split ?level evm_node =
   wait_for_event evm_node ~event:"evm_context_gc_split.v0" @@ fun json ->
@@ -702,51 +762,11 @@ let mode_with_new_private_rpc (mode : mode) =
           tx_pool_addr_limit;
           tx_pool_tx_per_addr_limit;
         }
-  | Threshold_encryption_sequencer
-      {
-        initial_kernel;
-        preimage_dir;
-        private_rpc_port = Some _;
-        time_between_blocks;
-        sequencer;
-        genesis_timestamp;
-        max_blueprints_lag;
-        max_blueprints_ahead;
-        max_blueprints_catchup;
-        catchup_cooldown;
-        max_number_of_chunks;
-        wallet_dir;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
-        sequencer_sidecar_endpoint;
-        dal_slots;
-      } ->
-      Threshold_encryption_sequencer
-        {
-          initial_kernel;
-          preimage_dir;
-          private_rpc_port = Some (Port.fresh ());
-          time_between_blocks;
-          sequencer;
-          genesis_timestamp;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
-          sequencer_sidecar_endpoint;
-          dal_slots;
-        }
   | _ -> mode
 
 let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
-    ?(mode = Proxy) ?history ?data_dir ?rpc_addr ?rpc_port ?restricted_rpcs
-    endpoint =
+    ?(mode = Proxy) ?history ?data_dir ?config_file ?rpc_addr ?rpc_port
+    ?restricted_rpcs ?spawn_rpc ?(websockets = false) endpoint =
   let arguments, rpc_addr, rpc_port =
     connection_arguments ?rpc_addr ?rpc_port ?runner ()
   in
@@ -755,10 +775,7 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
     | Proxy -> "proxy_" ^ fresh_name ()
     | Sequencer _ -> "sequencer_" ^ fresh_name ()
     | Sandbox _ -> "sandbox_" ^ fresh_name ()
-    | Threshold_encryption_sequencer _ -> "te_sequencer_" ^ fresh_name ()
     | Observer _ -> "observer_" ^ fresh_name ()
-    | Threshold_encryption_observer _ ->
-        "threshold_encryption_observer_" ^ fresh_name ()
     | Rpc _ -> "rpc_" ^ fresh_name ()
   in
   let name = Option.value ~default:(new_name ()) name in
@@ -781,32 +798,42 @@ let create ?(path = Uses.path Constant.octez_evm_node) ?name ?runner
         mode;
         history;
         data_dir;
+        config_file;
         rpc_addr;
         rpc_port;
+        websockets;
         endpoint;
         restricted_rpcs;
         runner;
+        spawn_rpc;
       }
   in
-  on_event evm_node (handle_is_ready_event evm_node) ;
-  on_event evm_node (handle_blueprint_injected_event evm_node) ;
-  on_event evm_node (handle_blueprint_applied_event evm_node) ;
-  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   evm_node
 
 let name evm_node = evm_node.name
 
 let rpc_port evm_node = evm_node.persistent_state.rpc_port
 
+let spawn_rpc evm_node = evm_node.persistent_state.spawn_rpc
+
 let data_dir evm_node = evm_node.persistent_state.data_dir
 
+let config_file evm_node = evm_node.persistent_state.config_file
+
 let data_dir_arg evm_node = ["--data-dir"; evm_node.persistent_state.data_dir]
+
+let config_file_arg evm_node =
+  Cli_arg.optional_arg
+    "config-file"
+    Fun.id
+    evm_node.persistent_state.config_file
 
 (* assume a valid config for the given command and uses new latest run
    command format. *)
 let run_args evm_node =
   let shared_args =
-    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+    config_file_arg evm_node @ data_dir_arg evm_node
+    @ evm_node.persistent_state.arguments
   in
   let mode_args =
     match evm_node.persistent_state.mode with
@@ -820,23 +847,7 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Sandbox {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        ["run"; "sandbox"; "--initial-kernel"; initial_kernel]
-        @ Cli_arg.optional_arg
-            "genesis-timestamp"
-            (fun timestamp ->
-              Client.time_of_timestamp timestamp |> Client.Time.to_notation)
-            genesis_timestamp
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-    | Threshold_encryption_sequencer
-        {initial_kernel; genesis_timestamp; wallet_dir; _} ->
-        [
-          "run";
-          "threshold";
-          "encryption";
-          "sequencer";
-          "--initial-kernel";
-          initial_kernel;
-        ]
+        ["run"; "sandbox"; "--kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
             (fun timestamp ->
@@ -845,21 +856,15 @@ let run_args evm_node =
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
-    | Threshold_encryption_observer {initial_kernel; bundler_node_endpoint; _}
-      ->
-        [
-          "run";
-          "observer";
-          "--initial-kernel";
-          initial_kernel;
-          "--bundler-node-endpoint";
-          bundler_node_endpoint;
-        ]
     | Rpc _ -> ["experimental"; "run"; "rpc"]
   in
   mode_args @ shared_args
 
 let run ?(wait = true) ?(extra_arguments = []) evm_node =
+  on_event evm_node (handle_is_ready_event evm_node) ;
+  on_event evm_node (handle_blueprint_injected_event evm_node) ;
+  on_event evm_node (handle_blueprint_applied_event evm_node) ;
+  on_event evm_node (handle_blueprint_finalized_event evm_node) ;
   let on_terminate _status =
     (* Cancel all event listeners. *)
     trigger_ready evm_node None ;
@@ -879,6 +884,14 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (fun _ pending_list ->
         List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
       pending_blueprint_applied ;
+    let pending_blueprint_finalized =
+      evm_node.persistent_state.pending_blueprint_finalized
+    in
+    evm_node.persistent_state.pending_blueprint_finalized <- Per_level_map.empty ;
+    Per_level_map.iter
+      (fun _ pending_list ->
+        List.iter (fun pending -> Lwt.wakeup_later pending None) pending_list)
+      pending_blueprint_finalized ;
     unit
   in
   let env =
@@ -901,7 +914,17 @@ let run ?(wait = true) ?(extra_arguments = []) evm_node =
       (run_args evm_node @ extra_arguments)
       ~on_terminate
   in
-  let* () = if wait then wait_for_ready evm_node else unit in
+  let* () =
+    if wait then
+      let* () = wait_for_ready evm_node
+      and* () =
+        match evm_node.persistent_state.spawn_rpc with
+        | None -> unit
+        | Some _ -> wait_for_spawn_rpc_ready evm_node
+      in
+      unit
+    else unit
+  in
   unit
 
 let spawn_command evm_node args =
@@ -917,7 +940,9 @@ let spawn_run ?(extra_arguments = []) evm_node =
 
 module Config_file = struct
   let filename evm_node =
-    Filename.concat evm_node.persistent_state.data_dir "config.json"
+    match evm_node.persistent_state.config_file with
+    | Some config_file -> config_file
+    | None -> Filename.concat evm_node.persistent_state.data_dir "config.json"
 
   let read evm_node =
     match evm_node.persistent_state.runner with
@@ -947,15 +972,17 @@ module Config_file = struct
     write node config
 end
 
-let spawn_init_config_minimal ~data_dir
+let spawn_init_config_minimal ~data_dir ?config_file
     ?(path = Uses.(path Constant.octez_evm_node)) ?(extra_arguments = []) () =
   Process.spawn ~name:"evm_node_init_config" path
   @@ ["init"; "config"; "--data-dir"; data_dir]
+  @ Cli_arg.optional_arg "config-file" Fun.id config_file
   @ extra_arguments
 
 let spawn_init_config ?(extra_arguments = []) evm_node =
   let shared_args =
-    data_dir_arg evm_node @ evm_node.persistent_state.arguments
+    data_dir_arg evm_node @ config_file_arg evm_node
+    @ evm_node.persistent_state.arguments
     @ Cli_arg.optional_arg
         "restricted-rpcs"
         Fun.id
@@ -967,6 +994,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           | Rolling n -> sf "rolling:%d" n
           | Full n -> sf "full:%d" n)
         evm_node.persistent_state.history
+    @ Cli_arg.optional_switch "ws" evm_node.persistent_state.websockets
   in
 
   let time_between_blocks_fmt = function
@@ -1089,77 +1117,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_pool_tx_per_addr_limit
-    | Threshold_encryption_sequencer
-        {
-          initial_kernel = _;
-          preimage_dir;
-          private_rpc_port;
-          time_between_blocks;
-          sequencer;
-          genesis_timestamp = _;
-          max_blueprints_lag;
-          max_blueprints_ahead;
-          max_blueprints_catchup;
-          catchup_cooldown;
-          max_number_of_chunks;
-          wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
-          sequencer_sidecar_endpoint;
-          dal_slots;
-        } ->
-        [
-          "--rollup-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--sequencer-key";
-          sequencer;
-          "--sequencer-sidecar-endpoint";
-          sequencer_sidecar_endpoint;
-        ]
-        @ Cli_arg.optional_arg "preimages-dir" Fun.id preimage_dir
-        @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-lag"
-            string_of_int
-            max_blueprints_lag
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-ahead"
-            string_of_int
-            max_blueprints_ahead
-        @ Cli_arg.optional_arg
-            "maximum-blueprints-catch-up"
-            string_of_int
-            max_blueprints_catchup
-        @ Cli_arg.optional_arg
-            "catch-up-cooldown"
-            string_of_int
-            catchup_cooldown
-        @ Cli_arg.optional_arg
-            "time-between-blocks"
-            time_between_blocks_fmt
-            time_between_blocks
-        @ Cli_arg.optional_arg
-            "max-number-of-chunks"
-            string_of_int
-            max_number_of_chunks
-        @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
-        @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_pool_tx_per_addr_limit
-        @ Cli_arg.optional_arg
-            "dal-slots"
-            (fun l -> String.concat "," (List.map string_of_int l))
-            dal_slots
     | Observer
         {
           preimages_dir;
@@ -1175,23 +1132,6 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         ]
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
-    | Threshold_encryption_observer
-        {
-          preimages_dir;
-          initial_kernel = _;
-          rollup_node_endpoint;
-          bundler_node_endpoint;
-        } ->
-        [
-          "--evm-node-endpoint";
-          evm_node.persistent_state.endpoint;
-          "--rollup-node-endpoint";
-          rollup_node_endpoint;
-          "--bundler-node-endpoint";
-          bundler_node_endpoint;
-          "--preimages-dir";
-          preimages_dir;
-        ]
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -1211,21 +1151,20 @@ let rpc_endpoint ?(local = false) ?(private_ = false) (evm_node : t) =
       | Sequencer {private_rpc_port = None; _}
       | Sandbox {private_rpc_port = None; _} ->
           Test.fail "Sequencer doesn't have a private RPC server"
-      | Threshold_encryption_sequencer
-          {private_rpc_port = Some private_rpc_port; _} ->
-          (host, private_rpc_port, "/private")
-      | Threshold_encryption_sequencer {private_rpc_port = None; _} ->
-          Test.fail
-            "Threshold encryption sequencer doesn't have a private RPC server"
       | Proxy -> Test.fail "Proxy doesn't have a private RPC server"
       | Observer _ -> Test.fail "Observer doesn't have a private RPC server"
       | Rpc _ -> Test.fail "Rpc node doesn't have a private RPC server"
-      | Threshold_encryption_observer _ ->
-          Test.fail
-            "Threshold encryption observer doesn't have a private RPC server"
     else (host, evm_node.persistent_state.rpc_port, "")
   in
   Format.sprintf "http://%s:%d%s" addr port path
+
+let rpc_endpoint_record ?(local = false) (evm_node : t) =
+  let host =
+    if local then Constant.default_host
+    else Runner.address evm_node.persistent_state.runner
+  in
+  let port = evm_node.persistent_state.rpc_port in
+  Endpoint.make ~host ~scheme:"http" ~port ()
 
 let endpoint = rpc_endpoint ?local:None
 
@@ -1238,6 +1177,13 @@ let conditional_json_put ~name cond value_json json =
       json
   else json
 
+let conditional_json_put_default ~name cond value_json ~default json =
+  JSON.put
+    ( name,
+      JSON.annotate ~origin:"evm_node.config_patch"
+      @@ if cond then value_json else default )
+    json
+
 let optional_json_put ~name v f json =
   match v with
   | None -> json
@@ -1247,10 +1193,18 @@ let optional_json_put ~name v f json =
         (name, JSON.annotate ~origin:"evm_node.config_patch" @@ value_json)
         json
 
+type tx_queue_config =
+  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
+  | Enable of bool
+
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?rpc_server ?(enable_websocket = false) ?max_websocket_message_length () =
+    ?rpc_server
+    ?(enable_tx_queue =
+      Config
+        {max_size = 1000; max_lifespan = 100_000; tx_per_addr_limit = 100_000})
+    ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1268,17 +1222,56 @@ let patch_config_with_experimental_feature
   |> optional_json_put ~name:"rpc_server" rpc_server (function
          | Resto -> `String "resto"
          | Dream -> `String "dream")
-  |> conditional_json_put enable_websocket ~name:"enable_websocket" (`Bool true)
+  |> fun json ->
+  let value_json =
+    JSON.annotate ~origin:"evm_node.config_patch"
+    @@
+    match enable_tx_queue with
+    | Config {max_size; max_lifespan; tx_per_addr_limit} ->
+        `O
+          [
+            ("max_size", `Float (Float.of_int max_size));
+            ("max_lifespan", `Float (Float.of_int max_lifespan));
+            ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
+          ]
+    | Enable b -> `Bool b
+  in
+  JSON.put ("enable_tx_queue", value_json) json
+  |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
+         `O [("protected_port", `Float (float_of_int port))])
   |> optional_json_put
-       max_websocket_message_length
-       ~name:"max_websocket_message_length"
-       (fun max -> `Float (float_of_int max))
-  (* Monitor websocket connections with frequent heartbeats and small timeout
-     for the tests. *)
-  |> conditional_json_put
-       enable_websocket
-       ~name:"monitor_websocket_heartbeat"
-       (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
+       ~name:"periodic_snapshot_path"
+       periodic_snapshot_path
+       (fun path -> `String path)
+  |> optional_json_put ~name:"l2_chains" l2_chains (fun l2_chains ->
+         `A
+           (List.map
+              (fun {l2_chain_id; l2_chain_family; _} ->
+                `O
+                  [
+                    ("chain_id", `String (string_of_int l2_chain_id));
+                    ("chain_family", `String l2_chain_family);
+                  ])
+              l2_chains))
+
+let patch_config_websockets_if_enabled ?max_message_length
+    ?(monitor_heartbeat = true) ?rate_limit =
+  JSON.update "websockets" @@ fun json ->
+  if JSON.is_null json then json
+  else
+    optional_json_put
+      max_message_length
+      ~name:"max_message_length"
+      (fun max -> `Float (float_of_int max))
+      json
+    (* Monitor websocket connections with frequent heartbeats and small timeout
+       for the tests. *)
+    |> conditional_json_put_default
+         monitor_heartbeat
+         ~name:"monitor_heartbeat"
+         (`O [("ping_interval", `Float 0.5); ("ping_timeout", `Float 2.)])
+         ~default:(`String "disabled")
+    |> optional_json_put rate_limit ~name:"rate_limit" Fun.id
 
 let patch_config_gc ?history_mode json =
   json
@@ -1287,8 +1280,9 @@ let patch_config_gc ?history_mode json =
          | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
          | Full retention -> `String (Format.sprintf "full:%d" retention))
 
-let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
-    ?restricted_rpcs ?history_mode rollup_node =
+let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
+    ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets
+    ?extra_arguments rollup_node =
   let evm_node =
     create
       ?name
@@ -1296,9 +1290,12 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
       ?mode
       ?history:history_mode
       ?data_dir
+      ?config_file
       ?rpc_addr
       ?rpc_port
       ?restricted_rpcs
+      ?spawn_rpc
+      ?websockets
       rollup_node
   in
   let* () = Process.check @@ spawn_init_config evm_node in
@@ -1307,7 +1304,7 @@ let init ?patch_config ?name ?runner ?mode ?data_dir ?rpc_addr ?rpc_port
     | Some patch_config -> Config_file.update evm_node patch_config
     | None -> unit
   in
-  let* () = run evm_node in
+  let* () = run ?extra_arguments evm_node in
   return evm_node
 
 let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
@@ -1317,7 +1314,7 @@ let init_from_rollup_node_data_dir ?(omit_delayed_tx_events = false) evm_node
     spawn_command
       evm_node
       (["init"; "from"; "rollup"; "node"; rollup_node_data_dir]
-      @ data_dir_arg evm_node
+      @ data_dir_arg evm_node @ config_file_arg evm_node
       @ Cli_arg.optional_switch "omit-delayed-tx-events" omit_delayed_tx_events
       )
   in
@@ -1463,7 +1460,7 @@ let debug_print_store_schemas ?(path = Uses.path Constant.octez_evm_node) ?hooks
   Process.check process
 
 let man ?(path = Uses.path Constant.octez_evm_node) ?hooks () =
-  let args = ["man"] in
+  let args = ["man"; "-v"; "3"] in
   let process = Process.spawn ?hooks path @@ args in
   Process.check process
 
@@ -1583,24 +1580,32 @@ let wait_termination (evm_node : t) =
 
 let ten_years_in_seconds = 3600 * 24 * 365 * 10 |> Int64.of_int
 
-let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
-    ?(mainnet_compat = false) ?(remove_whitelist = false) ?kernel_root_hash
-    ?chain_id ?bootstrap_balance ?bootstrap_accounts ?sequencer ?delayed_bridge
+let make_kernel_installer_config ?(l2_chain_ids = [])
+    ?max_delayed_inbox_blueprint_length ?(mainnet_compat = false)
+    ?(remove_whitelist = false) ?kernel_root_hash ?chain_id
+    ?eth_bootstrap_balance ?eth_bootstrap_accounts ?sequencer ?delayed_bridge
     ?ticketer ?administrator ?sequencer_governance ?kernel_governance
     ?kernel_security_governance ?minimum_base_fee_per_gas
     ?(da_fee_per_byte = Wei.zero) ?delayed_inbox_timeout
     ?delayed_inbox_min_levels ?sequencer_pool_address ?maximum_allowed_ticks
     ?maximum_gas_per_transaction
     ?(max_blueprint_lookahead_in_seconds = ten_years_in_seconds)
-    ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_dal = false)
-    ?dal_slots ?(enable_fast_withdrawal = false) ?(enable_multichain = false)
-    ~output () =
+    ?(set_account_code = []) ?(enable_fa_bridge = false) ?(enable_revm = false)
+    ?(enable_dal = false) ?dal_slots ?(enable_fast_withdrawal = false)
+    ?(enable_fast_fa_withdrawal = false) ?(enable_multichain = false)
+    ?evm_version ~output () =
   let set_account_code =
     List.flatten
     @@ List.map
          (fun (address, code) ->
            ["--set-code"; Format.sprintf "%s,%s" address code])
          set_account_code
+  in
+  let l2_chain_ids =
+    List.flatten
+    @@ List.map
+         (fun l2_chain_id -> ["--l2-chain-id"; string_of_int l2_chain_id])
+         l2_chain_ids
   in
   let cmd =
     ["make"; "kernel"; "installer"; "config"; output]
@@ -1612,6 +1617,7 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
     @ Cli_arg.optional_switch "remove-whitelist" remove_whitelist
     @ Cli_arg.optional_arg "kernel-root-hash" Fun.id kernel_root_hash
     @ Cli_arg.optional_arg "chain-id" string_of_int chain_id
+    @ l2_chain_ids
     @ Cli_arg.optional_arg "sequencer" Fun.id sequencer
     @ Cli_arg.optional_arg "delayed-bridge" Fun.id delayed_bridge
     @ Cli_arg.optional_arg "ticketer" Fun.id ticketer
@@ -1653,23 +1659,102 @@ let make_kernel_installer_config ?max_delayed_inbox_blueprint_length
         Int64.to_string max_blueprint_lookahead_in_seconds;
       ]
     @ Cli_arg.optional_switch "enable-fa-bridge" enable_fa_bridge
+    @ Cli_arg.optional_switch "enable-revm" enable_revm
     @ Cli_arg.optional_switch "enable-multichain" enable_multichain
     @ Cli_arg.optional_switch "enable-dal" enable_dal
     @ Cli_arg.optional_switch "enable-fast-withdrawal" enable_fast_withdrawal
+    @ Cli_arg.optional_switch
+        "enable-fast-fa-withdrawal"
+        enable_fast_fa_withdrawal
     @ Cli_arg.optional_arg
         "dal-slots"
         (fun l -> String.concat "," (List.map string_of_int l))
         dal_slots
-    @ Cli_arg.optional_arg "bootstrap-balance" Wei.to_string bootstrap_balance
+    @ Cli_arg.optional_arg
+        "eth-bootstrap-balance"
+        Wei.to_string
+        eth_bootstrap_balance
+    @ Cli_arg.optional_arg "evm-version" Evm_version.to_string evm_version
     @
-    match bootstrap_accounts with
+    match eth_bootstrap_accounts with
     | None -> []
-    | Some bootstrap_accounts ->
+    | Some eth_bootstrap_accounts ->
         List.flatten
         @@ List.map
-             (fun bootstrap_account ->
-               ["--bootstrap-account"; bootstrap_account])
-             bootstrap_accounts
+             (fun eth_bootstrap_account ->
+               ["--eth-bootstrap-account"; eth_bootstrap_account])
+             eth_bootstrap_accounts
+  in
+  let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
+  Runnable.{value = process; run = Process.check}
+
+let make_l2_kernel_installer_config ?chain_id ?chain_family
+    ?eth_bootstrap_balance ?tez_bootstrap_balance ?eth_bootstrap_accounts
+    ?tez_bootstrap_accounts ?tez_bootstrap_contracts ?minimum_base_fee_per_gas
+    ?(da_fee_per_byte = Wei.zero) ?sequencer_pool_address
+    ?maximum_gas_per_transaction ?(set_account_code = []) ?world_state_path
+    ~output () =
+  let set_account_code =
+    List.flatten
+    @@ List.map
+         (fun (address, code) ->
+           ["--set-code"; Format.sprintf "%s,%s" address code])
+         set_account_code
+  in
+  let cmd =
+    ["make"; "l2"; "kernel"; "installer"; "config"; output]
+    @ Cli_arg.optional_arg "l2-chain-id" string_of_int chain_id
+    @ Cli_arg.optional_arg "l2-chain-family" Fun.id chain_family
+    @ Cli_arg.optional_arg
+        "minimum-base-fee-per-gas"
+        Wei.to_string
+        minimum_base_fee_per_gas
+    @ Cli_arg.optional_arg "world-state-path" Fun.id world_state_path
+    @ ["--da-fee-per-byte"; Wei.to_string da_fee_per_byte]
+    @ Cli_arg.optional_arg
+        "sequencer-pool-address"
+        Fun.id
+        sequencer_pool_address
+    @ set_account_code
+    @ Cli_arg.optional_arg
+        "maximum-gas-per-transaction"
+        Int64.to_string
+        maximum_gas_per_transaction
+    @ Cli_arg.optional_arg
+        "eth-bootstrap-balance"
+        Wei.to_string
+        eth_bootstrap_balance
+    @ Cli_arg.optional_arg
+        "tez-bootstrap-balance"
+        Tez.to_string
+        tez_bootstrap_balance
+    @ (match tez_bootstrap_accounts with
+      | None -> []
+      | Some tez_bootstrap_accounts ->
+          List.flatten
+          @@ List.map
+               (fun tez_bootstrap_account ->
+                 [
+                   "--tez-bootstrap-account";
+                   tez_bootstrap_account.Account.public_key;
+                 ])
+               tez_bootstrap_accounts)
+    @ (match tez_bootstrap_contracts with
+      | None -> []
+      | Some contracts ->
+          List.flatten
+          @@ List.map
+               (fun contract -> ["--tez-bootstrap-contract"; contract])
+               contracts)
+    @
+    match eth_bootstrap_accounts with
+    | None -> []
+    | Some eth_bootstrap_accounts ->
+        List.flatten
+        @@ List.map
+             (fun eth_bootstrap_account ->
+               ["--eth-bootstrap-account"; eth_bootstrap_account])
+             eth_bootstrap_accounts
   in
   let process = Process.spawn (Uses.path Constant.octez_evm_node) cmd in
   Runnable.{value = process; run = Process.check}
@@ -1678,23 +1763,12 @@ let preimages_dir evm_node =
   let rec from_node ~data_dir = function
     | Sandbox {preimage_dir; _}
     | Sequencer {preimage_dir; _}
-    | Threshold_encryption_sequencer {preimage_dir; _}
     | Observer {preimages_dir = preimage_dir; _} ->
         Option.value ~default:(data_dir // "wasm_2_0_0") preimage_dir
     | Rpc mode -> from_node ~data_dir mode
-    | Threshold_encryption_observer {preimages_dir; _} -> preimages_dir
     | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
   in
   from_node ~data_dir:(data_dir evm_node) evm_node.persistent_state.mode
-
-let supports_threshold_encryption evm_node =
-  let rec from_node = function
-    | Sandbox _ | Sequencer _ | Observer _ -> false
-    | Threshold_encryption_observer _ | Threshold_encryption_sequencer _ -> true
-    | Rpc mode -> from_node mode
-    | Proxy -> Test.fail "cannot start a RPC node from a proxy node"
-  in
-  from_node evm_node.persistent_state.mode
 
 let list_metrics ?hooks () =
   let cmd = ["list"; "metrics"] in
@@ -1727,3 +1801,28 @@ let switch_history_mode evm_node history =
   in
   let process = spawn_command evm_node args in
   {Runnable.value = process; run}
+
+let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
+  let initial_kernel, preimages_dir, private_rpc_port =
+    match mode old_sequencer with
+    | Sequencer {initial_kernel; preimage_dir; private_rpc_port; _} ->
+        (initial_kernel, preimage_dir, private_rpc_port)
+    | _ -> invalid_arg "Evm_node is not a sequencer"
+  in
+  {
+    old_sequencer with
+    name = "observer_sequencer_" ^ fresh_name ();
+    persistent_state =
+      {
+        old_sequencer.persistent_state with
+        mode =
+          Observer
+            {
+              initial_kernel;
+              preimages_dir;
+              private_rpc_port;
+              rollup_node_endpoint = old_sequencer.persistent_state.endpoint;
+            };
+        endpoint = endpoint new_sequencer;
+      };
+  }

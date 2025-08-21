@@ -55,7 +55,7 @@ type p2p = (Message.t, Peer_metadata.t, Connection_metadata.t) P2p.net
 
 type db = {
   p2p : p2p;
-  p2p_readers : P2p_reader.t P2p_peer.Table.t;
+  p2p_readers : P2p_reader.worker P2p_peer.Table.t;
   disk : Store.t;
   active_chains : P2p_reader.chain_db Chain_id.Table.t;
   protocol_db : Distributed_db_requester.Raw_protocol.t;
@@ -123,7 +123,7 @@ let create disk p2p =
 let activate
     ({p2p; active_chains; protocol_db; disk; p2p_readers; _} as global_db)
     chain_store callback =
-  let run_p2p_reader gid =
+  let run_p2p_reader gid conn =
     let register p2p_reader =
       (match P2p_peer.Table.find p2p_readers gid with
       | None -> ()
@@ -135,7 +135,7 @@ let activate
              however to prevent future problems potential exceptions are
              logged. *)
           Lwt.dont_wait
-            (fun () -> P2p_reader.shutdown old_p2p_reader)
+            (fun () -> P2p_reader.shutdown_worker old_p2p_reader)
             (fun exn ->
               match exn with
               | Out_of_memory | Stack_overflow -> raise exn
@@ -146,7 +146,18 @@ let activate
       P2p_peer.Table.add p2p_readers gid p2p_reader
     in
     let unregister () = P2p_peer.Table.remove p2p_readers gid in
-    P2p_reader.run ~register ~unregister p2p disk protocol_db active_chains gid
+    let _ =
+      P2p_reader.run_worker
+        ~register
+        ~unregister
+        p2p
+        disk
+        protocol_db
+        active_chains
+        gid
+        conn
+    in
+    ()
   in
   P2p.on_new_connection p2p run_p2p_reader ;
   P2p.iter_connections p2p run_p2p_reader ;
@@ -254,7 +265,7 @@ let shutdown {p2p_readers; active_chains; _} =
   let open Lwt_syntax in
   let* () =
     P2p_peer.Table.iter_p
-      (fun _peer_id reader -> P2p_reader.shutdown reader)
+      (fun _peer_id reader -> P2p_reader.shutdown_worker reader)
       p2p_readers
   in
   Chain_id.Table.iter_p

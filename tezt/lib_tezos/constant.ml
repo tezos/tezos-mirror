@@ -88,6 +88,33 @@ let teztale_server =
 let _teztale_snitch =
   Uses.make ~tag:"teztale_snitch" ~path:"./octez-teztale-snitch" ()
 
+(* TODO: Remove these once the binaries are completely removed from
+   [released-executables] or [experimental-executables].
+   (issue : https://gitlab.com/tezos/tezos/-/issues/7763) *)
+
+let _octez_baker_rio =
+  Uses.make ~tag:"baker_psriotum" ~path:"./octez-baker-PsRiotum" ()
+
+let _octez_baker_seoul =
+  Uses.make ~tag:"baker_ptseoulo" ~path:"./octez-baker-PtSeouLo" ()
+
+let _octez_baker_alpha =
+  Uses.make ~tag:"baker_alpha" ~path:"./octez-baker-alpha" ()
+
+let octez_agnostic_baker =
+  Uses.make ~tag:"agnostic_baker" ~path:"./octez-baker" ()
+
+let _octez_accuser_rio =
+  Uses.make ~tag:"accuser_psriotum" ~path:"./octez-accuser-PsRiotum" ()
+
+let _octez_accuser_seoul =
+  Uses.make ~tag:"accuser_ptseoulo" ~path:"./octez-accuser-PtSeouLo" ()
+
+let _octez_accuser_alpha =
+  Uses.make ~tag:"accuser_alpha" ~path:"./octez-accuser-alpha" ()
+
+let octez_accuser = Uses.make ~tag:"accuser" ~path:"./octez-accuser" ()
+
 let yes_wallet =
   Uses.make
     ~tag:"yes_wallet"
@@ -98,10 +125,16 @@ module WASM = struct
   let dal_echo_kernel =
     Uses.make ~tag:"dal_echo_kernel" ~path:"dal_echo_kernel.wasm" ()
 
+  let dal_echo_kernel_bandwidth =
+    Uses.make
+      ~tag:"dal_echo_kernel_bandwidth"
+      ~path:"dal_echo_kernel_bandwidth.wasm"
+      ()
+
   let debug_kernel =
     Uses.make
       ~tag:"debug_kernel"
-      ~path:"etherlink/kernel_evm/kernel/tests/resources/debug_kernel.wasm"
+      ~path:"etherlink/kernel_latest/kernel/tests/resources/debug_kernel.wasm"
       ()
 
   (* Note: this should probably depend on the protocol,
@@ -123,26 +156,17 @@ module WASM = struct
   let failed_migration =
     Uses.make
       ~tag:"failed_migration"
-      ~path:"etherlink/kernel_evm/kernel/tests/resources/failed_migration.wasm"
-      ()
-
-  let mainnet_evm_kernel =
-    Uses.make
-      ~tag:"mainnet_evm_kernel"
       ~path:
-        "etherlink/kernel_evm/kernel/tests/resources/mainnet_evm_kernel.wasm"
+        "etherlink/kernel_latest/kernel/tests/resources/failed_migration.wasm"
       ()
 
-  let mainnet_evm_commit = "7386d0bc63f3589525bdfbd3cc0544076231b813"
-
-  let ghostnet_evm_kernel =
+  let mainnet_kernel =
     Uses.make
-      ~tag:"ghostnet_evm_kernel"
-      ~path:
-        "etherlink/kernel_evm/kernel/tests/resources/ghostnet_evm_kernel.wasm"
+      ~tag:"mainnet_kernel"
+      ~path:"etherlink/kernel_latest/kernel/tests/resources/mainnet_kernel.wasm"
       ()
 
-  let ghostnet_evm_commit = "604663095ad8d9f537a7035821bc78112c3b865b"
+  let mainnet_commit = "1f47de061681a9bc4a07b2ddfecc6f4932b5ae9d"
 
   let tx_kernel = Uses.make ~tag:"tx_kernel" ~path:"tx_kernel.wasm" ()
 
@@ -150,10 +174,10 @@ module WASM = struct
     Uses.make ~tag:"tx_kernel_dal" ~path:"tx_kernel_dal.wasm" ()
 end
 
-let octez_experimental_agnostic_baker =
+let octez_p2p_node =
   Uses.make
-    ~tag:"experimental_agnostic_baker"
-    ~path:"./octez-experimental-agnostic-baker"
+    ~tag:"p2p_node"
+    ~path:"./_build/default/src/bin_p2p_node/main_p2p_node.exe"
     ()
 
 (* TODO: tezos/tezos#4803

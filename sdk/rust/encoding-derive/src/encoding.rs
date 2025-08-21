@@ -62,12 +62,12 @@ pub struct Tag<'a> {
 
 #[derive(Debug)]
 pub enum Encoding<'a> {
-    Unit,
+    Unit(Span),
     Primitive(PrimitiveEncoding, Span),
     Bytes(Span),
     Path(&'a syn::Path),
     Zarith(Span),
-    MuTez(Span),
+    Narith(Span),
 
     String(Option<syn::Expr>, Span),
 

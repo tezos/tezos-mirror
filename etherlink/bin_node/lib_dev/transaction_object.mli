@@ -25,9 +25,19 @@ val block_from_legacy :
   Ethereum_types.legacy_transaction_object Ethereum_types.block ->
   t Ethereum_types.block
 
+(** [hash t] returns the hash of the transaction *)
 val hash : t -> Ethereum_types.hash
 
+(** [block_number t] returns the block number in which the transaction was
+    included, if available *)
 val block_number : t -> Ethereum_types.quantity option
+
+(** [input t] returns the data payload of the transaction *)
+val input : t -> Ethereum_types.hex
+
+(** [to_ t] returns the recipient address of the transaction, if available
+    ([None] for contract creation) *)
+val to_ : t -> Ethereum_types.address option
 
 (** [reconstruct blueprint_payload obj] reconstructs the full transaction object
     from the raw transaction of [obj] stored in [blueprint_payload].
