@@ -1,5 +1,5 @@
-Version 23.0~rc2
-================
+Version 23.0
+============
 
 Changes
 -------
@@ -31,6 +31,8 @@ This binary is a protocol-independent that dynamically selects the
 appropriate baking process based on the active protocol.
 
 The bakers names with protocols are still released, but they will be deprecated in an upcoming version.
+ 
+Similarly, there is also a protocol-independent binary ``octez-accuser`` starting from v23.
 
 .. _bls_v23:
 
@@ -79,6 +81,9 @@ Ubuntu and Debian packages
   sudo apt update octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
 
 If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+.. warning::
+
+   If you are running the Octez node with a non-default data directory, check instructions :ref:`here <node_as_service>`.
 
 Fedora or Rocky Linux packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -95,17 +100,18 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v23.0-rc2
+  git checkout octez-v23.0
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v23.0-rc2`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v23.0`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 23.0 <../CHANGES.html#version-23-0>`_
 - `Version 23.0~rc2 <../CHANGES.html#version-23-0-rc2>`_
 - `Version 23.0~rc1 <../CHANGES.html#version-23-0-rc1>`_

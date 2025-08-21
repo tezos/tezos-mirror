@@ -3,6 +3,11 @@
 Changelog
 '''''''''
 
+Version 23.0
+============
+
+No changes compared to octez-v23.0~rc2.
+
 Version 23.0~rc2
 ================
 
