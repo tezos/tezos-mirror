@@ -474,6 +474,10 @@ fn compute_balance_updates(
     Vec<BalanceUpdate>,
     num_bigint::TryFromBigIntError<num_bigint::BigInt>,
 > {
+    if amount.eq(&0_u64.into()) {
+        return Ok(vec![]);
+    };
+
     let src_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
     let dest_delta = BigInt::from_biguint(num_bigint::Sign::Plus, amount.into());
 
