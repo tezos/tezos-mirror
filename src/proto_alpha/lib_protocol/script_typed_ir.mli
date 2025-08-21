@@ -892,6 +892,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | IIndex_address :
       Script.location * (n num, 'S, 'r, 'F) kinstr
       -> (address, 'S, 'r, 'F) kinstr
+  | IGet_address_index :
+      Script.location * (n num option, 'S, 'r, 'F) kinstr
+      -> (address, 'S, 'r, 'F) kinstr
   | ICreate_contract : {
       loc : Script.location;
       storage_type : ('a, _) ty;

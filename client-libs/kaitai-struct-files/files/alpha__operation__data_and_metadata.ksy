@@ -4559,6 +4559,9 @@ enums:
     159:
       id: index_address
       doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   alpha__operation__alpha__contents_tag:
     1: seed_nonce_revelation
     2: double_consensus_operation_evidence

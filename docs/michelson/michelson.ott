@@ -304,6 +304,7 @@ instruction, instr, i, body :: 'i_' ::=
   | PACK :: :: PACK
   | UNPACK ty :: :: UNPACK
   | INDEX_ADRESS :: :: INDEX_ADDRESS
+  | GET_ADDRESS_INDEX :: :: GET_ADDRESS_INDEX
 
   | EXEC :: :: EXEC
   | LSL :: :: LSL
@@ -2370,6 +2371,9 @@ UNPACK ty / byt : S => unpack ty byt : S
 
 ---------------------------------------- :: INDEX_ADRESS
 INDEX_ADDRESS :: address : A => nat : A
+
+---------------------------------------- :: GET_ADRESS_INDEX
+GET_ADDRESS_INDEX :: address : A => nat option : A
 
 % tickets:
 

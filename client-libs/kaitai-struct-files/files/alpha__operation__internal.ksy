@@ -758,6 +758,9 @@ enums:
     159:
       id: index_address
       doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
   alpha__transaction_destination_tag:
     0: implicit
     1: originated

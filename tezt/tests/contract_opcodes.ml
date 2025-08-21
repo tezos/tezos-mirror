@@ -1089,6 +1089,21 @@ let test_index_address =
         "(Some 0)" );
     ]
 
+let test_get_address_index =
+  register_opcode_tests
+    ~supports:(Protocol.From_protocol 24)
+    [
+      (* Test INDEX_ADDRESS instruction *)
+      ( "get_address_index",
+        "None",
+        {|"tz1burnburnburnburnburnburnburjAYjjX"|},
+        "None" );
+      ( "get_address_index",
+        "None",
+        {|"tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"|},
+        "(Some 0)" );
+    ]
+
 let iter l f = Lwt_list.iter_s f l
 
 let run_script_and_check ?(trace_stack = true) ?balance ?now ?level ~storage
@@ -1528,6 +1543,7 @@ let register ~protocols =
   test_bitwise protocols ;
   test_is_implicit protocols ;
   test_index_address protocols ;
+  test_get_address_index protocols ;
   List.iter
     (fun (test_opcode_name, test_function) ->
       Protocol.register_regression_test

@@ -412,6 +412,9 @@ enums:
     159:
       id: index_address
       doc: INDEX_ADDRESS
+    160:
+      id: get_address_index
+      doc: GET_ADDRESS_INDEX
 seq:
 - id: alpha__michelson__v1__primitives
   type: alpha__michelson__v1__primitives

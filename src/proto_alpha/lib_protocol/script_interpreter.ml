@@ -1285,6 +1285,13 @@ module Raw = struct
                 Script_address_registry.index ctxt address.destination
               in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
+          | IGet_address_index (_, k) ->
+              let (address : address) = accu in
+              let* res, ctxt, gas =
+                use_gas_counter_in_context ctxt gas @@ fun ctxt ->
+                Script_address_registry.get ctxt address.destination
+              in
+              (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
           | IView (_, view_signature, stack_ty, k) ->
               (iview [@ocaml.tailcall])
                 id

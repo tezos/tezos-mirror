@@ -33,6 +33,11 @@ Michelson
   provides a unique identifier of type ``nat`` for values
   of type ``address``, stored in the context. (MR :gl:`!18866`)
 
+- A new instruction named ``GET_ADDRESS_INDEX`` has been added, and returns the
+  unique identifier of type ``nat option`` for values of type ``address``, if
+  the address has already been indexed through ``INDEX_ADDRESS``. Returns
+  ``None`` otherwise. (MR :gl:`!18866`)
+
 Gas improvements
 ----------------
 

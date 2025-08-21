@@ -39,3 +39,19 @@ let index ctxt contract =
     | Some n -> ok n
   in
   return (index, ctxt)
+
+let get ctxt contract =
+  let open Lwt_result_syntax in
+  let* ctxt, res = Alpha_context.Address_registry.find ctxt contract in
+  let*? res =
+    match res with
+    | None -> ok None
+    | Some res -> (
+        match Script_int.is_nat (Script_int.of_zint res) with
+        (* Note that this case is impossible, as the counter is handled
+           by the protocol. If the counter is negative, this implies the
+           protocol code is broken. *)
+        | None -> Result_syntax.tzfail Address_registry_invalid_counter
+        | Some n -> ok (Some n))
+  in
+  return (res, ctxt)
