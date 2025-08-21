@@ -30,10 +30,12 @@ open Configuration
 let config_env name = "EVM_NODE_" ^ name
 
 module Event = struct
+  include Internal_event.Simple
+
   let section = ["evm_node"]
 
   let event_starting =
-    Internal_event.Simple.declare_1
+    declare_1
       ~section
       ~name:"start"
       ~msg:"starting the EVM node ({mode})"
@@ -41,7 +43,7 @@ module Event = struct
       ("mode", Data_encoding.string)
 
   let sequencer_disabled_native_execution =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"sequencer_disabled_native_execution"
       ~msg:"native execution is disabled in sequencer mode"
@@ -49,7 +51,7 @@ module Event = struct
       ()
 
   let buggy_dream_websocket =
-    Internal_event.Simple.declare_0
+    declare_0
       ~section
       ~name:"dream_websocket"
       ~msg:
@@ -57,6 +59,24 @@ module Event = struct
          as an RPC server or disabling websockets"
       ~level:Warning
       ()
+
+  let ignored_performance_profile =
+    declare_0
+      ~section
+      ~name:"ignored_performance_profile"
+      ~msg:
+        "GC parameters were changed through OCAMLRUNPARAM, ignoring \
+         performance profile"
+      ~level:Warning
+      ()
+
+  let performance_profile =
+    declare_1
+      ~section
+      ~name:"performance_profile"
+      ~msg:"running with {profile} profile"
+      ~level:Notice
+      ("profile", Configuration.performance_profile_encoding)
 end
 
 module Params = struct
@@ -979,6 +999,31 @@ let init_logs ~daily_logs ?rpc_mode_port ~data_dir configuration =
   in
   init ~config ()
 
+(** Performance GC parameters include:
+    - A minor heap size to 8M words, instead of 256k words by default
+    - A space overhead of 120%, which restores the default OCaml setting
+      from the one set in {!Tezos_base_unix.Event_loop.main_run}.
+    These settings reduce GC pauses for the EVM node at the cost of a
+    slight increase in memory consumption.
+*)
+let performance_gc_params = (8388608 (* 8M *), 120)
+
+let set_gc_parameters (config : Configuration.t) =
+  let open Lwt_syntax in
+  match
+    Tezos_base_unix.Gc_setup.
+      (get_ocamlrunparam_param "s", get_ocamlrunparam_param "o")
+  with
+  | Some _, _ | _, Some _ -> Event.(emit ignored_performance_profile) ()
+  | None, None -> (
+      let+ () = Event.(emit performance_profile) config.performance_profile in
+      match config.performance_profile with
+      | Default -> ()
+      | Performance ->
+          let params = Gc.get () in
+          let minor_heap_size, space_overhead = performance_gc_params in
+          Gc.set {params with minor_heap_size; space_overhead})
+
 let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
     ?rpc_batch_limit ?cors_origins ?cors_headers ?enable_websocket
     ?log_filter_max_nb_blocks ?log_filter_max_nb_logs ?log_filter_chunk_size
@@ -1026,6 +1071,7 @@ let start_proxy ~data_dir ~config_file ~keep_alive ?rpc_addr ?rpc_port
     }
   in
   let*! () = init_logs ~daily_logs:true ~data_dir config in
+  let*! () = set_gc_parameters config in
   let*! () = Internal_event.Simple.emit Event.event_starting "proxy" in
   let* () = Evm_node_lib_dev.Proxy.main config in
   let wait, _resolve = Lwt.wait () in
@@ -1168,6 +1214,7 @@ let start_sequencer ~wallet_ctxt ~data_dir ?sequencer_key ?rpc_addr ?rpc_port
     | _ -> Lwt.return configuration
   in
   let* () = websocket_checks configuration in
+  let*! () = set_gc_parameters configuration in
   let*! () = Internal_event.Simple.emit Event.event_starting "sequencer" in
 
   let* signer =
@@ -1310,6 +1357,7 @@ let rpc_command =
         init_logs ~daily_logs:true ~rpc_mode_port:rpc_port ~data_dir config
       in
       let* () = websocket_checks config in
+      let*! () = set_gc_parameters config in
       let*! () = Internal_event.Simple.emit Event.event_starting "rpc" in
       Evm_node_lib_dev.Rpc.main
         ~data_dir
@@ -1365,6 +1413,7 @@ let start_observer ~data_dir ~keep_alive ?rpc_addr ?rpc_port ?rpc_batch_limit
   in
   let*! () = init_logs ~daily_logs:true ~data_dir config in
   let* () = websocket_checks config in
+  let*! () = set_gc_parameters config in
   let*! () = Internal_event.Simple.emit Event.event_starting "observer" in
   Evm_node_lib_dev.Observer.main
     ?network
@@ -1768,6 +1817,7 @@ let replay_many_command =
           config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
+      let*! () = set_gc_parameters configuration in
       Evm_node_lib_dev.Replay.main
         ~disable_da_fees
         ?kernel
@@ -1818,6 +1868,7 @@ let replay_command =
           config_file
       in
       let*! () = init_logs ~daily_logs:false ~data_dir configuration in
+      let*! () = set_gc_parameters configuration in
       Evm_node_lib_dev.Replay.main
         ~disable_da_fees
         ?kernel
@@ -2949,7 +3000,7 @@ let export_snapshot
     Configuration.Cli.create_or_read_config ~data_dir config_file
   in
   let*! () = init_logs ~daily_logs:false ~data_dir configuration in
-
+  let*! () = set_gc_parameters configuration in
   let compression =
     match (compress_on_the_fly, uncompressed) with
     | true, true ->

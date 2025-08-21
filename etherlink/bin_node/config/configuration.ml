@@ -232,6 +232,8 @@ type rpc = {
 
 type db = {pool_size : int; max_conn_reuse_count : int option}
 
+type performance_profile = Default | Performance
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -252,6 +254,7 @@ type t = {
   db : db;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
   tx_queue : tx_queue;
+  performance_profile : performance_profile;
 }
 
 let retrieve_chain_family ~l2_chains =
@@ -420,6 +423,8 @@ let default_blueprints_publisher_config_with_dal =
   }
 
 let default_fee_history = {max_count = Limit 1024; max_past = None}
+
+let default_performance_profile = Default
 
 let make_pattern_restricted_rpcs raw =
   Pattern {raw; regex = Re.Perl.compile_pat raw}
@@ -1481,6 +1486,9 @@ let db_encoding =
           ~description:"Maximum number of times a connection can be reused"
           int31))
 
+let performance_profile_encoding =
+  Data_encoding.string_enum [("default", Default); ("performance", Performance)]
+
 let encoding ?network data_dir : t Data_encoding.t =
   let open Data_encoding in
   let observer_field name encoding =
@@ -1517,6 +1525,7 @@ let encoding ?network data_dir : t Data_encoding.t =
            db;
            opentelemetry;
            tx_queue;
+           performance_profile;
          }
        ->
       ( (log_filter, sequencer, observer),
@@ -1538,7 +1547,8 @@ let encoding ?network data_dir : t Data_encoding.t =
             history_mode,
             db,
             opentelemetry,
-            tx_queue ) ) ))
+            tx_queue,
+            performance_profile ) ) ))
     (fun ( (log_filter, sequencer, observer),
            ( ( _tx_pool_timeout_limit,
                _tx_pool_addr_limit,
@@ -1558,7 +1568,8 @@ let encoding ?network data_dir : t Data_encoding.t =
                history_mode,
                db,
                opentelemetry,
-               tx_queue ) ) )
+               tx_queue,
+               performance_profile ) ) )
        ->
       {
         public_rpc;
@@ -1580,6 +1591,7 @@ let encoding ?network data_dir : t Data_encoding.t =
         db;
         opentelemetry;
         tx_queue;
+        performance_profile;
       })
     (merge_objs
        (obj3
@@ -1636,7 +1648,7 @@ let encoding ?network data_dir : t Data_encoding.t =
              (dft "proxy" proxy_encoding (default_proxy ()))
              (dft "gcp_kms" gcp_kms_encoding default_gcp_kms)
              (dft "fee_history" fee_history_encoding default_fee_history))
-          (obj9
+          (obj10
              (dft
                 "kernel_execution"
                 (kernel_execution_encoding ?network data_dir)
@@ -1674,7 +1686,12 @@ let encoding ?network data_dir : t Data_encoding.t =
                 "tx_pool"
                 ~description:"Configuration for the tx pool"
                 tx_queue_encoding
-                default_tx_queue))))
+                default_tx_queue)
+             (dft
+                "performance_profile"
+                ~description:"Performance profile for EVM node GC"
+                performance_profile_encoding
+                default_performance_profile))))
 
 let pp_print_json ~data_dir fmt config =
   let json =
@@ -1924,6 +1941,7 @@ module Cli = struct
       db = default_db;
       opentelemetry = Octez_telemetry.Opentelemetry_config.default;
       tx_queue = default_tx_queue;
+      performance_profile = default_performance_profile;
     }
 
   let patch_kernel_execution_config kernel_execution ?preimages
@@ -2151,6 +2169,7 @@ module Cli = struct
       db = configuration.db;
       opentelemetry;
       tx_queue;
+      performance_profile = configuration.performance_profile;
     }
 
   let create ~data_dir ?rpc_addr ?rpc_port ?rpc_batch_limit ?cors_origins
