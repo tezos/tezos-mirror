@@ -106,7 +106,7 @@ pub fn transfer_tez<Host: Runtime>(
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let (src_update, dest_update) =
+    let balance_updates =
         compute_balance_updates(src_contract, dest_contract, amount)
             .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
@@ -114,7 +114,7 @@ pub fn transfer_tez<Host: Runtime>(
     Ok(TransferSuccess {
         storage: None,
         lazy_storage_diff: None,
-        balance_updates: vec![src_update, dest_update],
+        balance_updates,
         ticket_receipt: vec![],
         originated_contracts: vec![],
         consumed_gas: 0_u64.into(),
@@ -414,7 +414,7 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
     let src_contract = Contract::Implicit(src.clone());
-    let (src_update, kt1_update) =
+    let balance_updates =
         compute_balance_updates(&src_contract, &dest_contract, balance)
             .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
@@ -429,7 +429,7 @@ fn originate_contract<Host: Runtime>(
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
     let dummy_origination_sucess = OriginationSuccess {
-        balance_updates: vec![src_update, kt1_update],
+        balance_updates,
         originated_contracts: vec![Originated { contract }],
         consumed_gas: 0u64.into(),
         storage_size: 0u64.into(),
@@ -471,7 +471,7 @@ fn compute_balance_updates(
     dest: &Contract,
     amount: &Narith,
 ) -> Result<
-    (BalanceUpdate, BalanceUpdate),
+    Vec<BalanceUpdate>,
     num_bigint::TryFromBigIntError<num_bigint::BigInt>,
 > {
     let src_delta = BigInt::from_biguint(num_bigint::Sign::Minus, amount.into());
@@ -489,7 +489,7 @@ fn compute_balance_updates(
         update_origin: UpdateOrigin::BlockApplication,
     };
 
-    Ok((src_update, dest_update))
+    Ok(vec![src_update, dest_update])
 }
 
 /// Applies balance changes by updating both source and destination accounts.
