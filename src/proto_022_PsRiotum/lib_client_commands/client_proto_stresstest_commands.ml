@@ -140,7 +140,7 @@ let default_parameters =
     tps = 5.0;
     strategy = Fixed_amount {mutez = Tez.one};
     regular_transfer_fee = Tez.of_mutez_exn 2_000L;
-    regular_transfer_gas_limit = Gas.Arith.integral_of_int_exn 1_600;
+    regular_transfer_gas_limit = Gas.Arith.integral_of_int_exn 2_200;
     (* [gas_limit] corresponds to a slight overapproximation of the
        gas needed to inject an operation. It was obtained by simulating
        the operation using the client. *)
@@ -542,7 +542,7 @@ let manager_op_of_transfer parameters
       Manager_operation
         {source; fee; counter; operation; gas_limit; storage_limit}
 
-let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 1_000
+let cost_of_manager_operation = Gas.Arith.integral_of_int_exn 2_200
 
 let inject_transfer (cctxt : Protocol_client_context.full) parameters state
     transfer =
@@ -1357,7 +1357,7 @@ let generate_reveals ~sources ~fee ~gas_limit ~storage_limit =
 *)
 let generate_starter_ops ~sources ~amount ~batch_size =
   let fee = Tez.of_mutez_exn 1_000L in
-  let gas_limit = Gas.Arith.integral_of_int_exn 1_040 in
+  let gas_limit = Gas.Arith.integral_of_int_exn 2200 in
   let storage_limit = Z.of_int 257 in
   let parameters =
     let open Tezos_micheline in
@@ -1398,7 +1398,10 @@ let generate_account_funding_batches (starter_sources : source_with_uri list)
   let open Lwt_result_syntax in
   let nb_sources = List.length starter_sources in
   let fee = Tez.of_mutez_exn 1_000L in
-  let gas_limit = Gas.Arith.integral_of_int_exn 1_040 in
+  let gas_limit =
+    (* We need a bit more gas than usual batch here *)
+    Gas.Arith.integral_of_int_exn 2_500
+  in
   let storage_limit = Z.of_int 257 in
   let parameters =
     let open Tezos_micheline in
