@@ -1711,22 +1711,7 @@ mod tests {
                     TransferSuccess {
                         storage: Some(encoded_storage),
                         lazy_storage_diff: None,
-                        balance_updates: vec![
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Implicit(
-                                    src.pkh.clone()
-                                )),
-                                changes: 0,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                            BalanceUpdate {
-                                balance: Balance::Account(Contract::Originated(
-                                    desthash.clone()
-                                ),),
-                                changes: 0,
-                                update_origin: UpdateOrigin::BlockApplication,
-                            },
-                        ],
+                        balance_updates: vec![],
                         ticket_receipt: vec![],
                         originated_contracts: vec![],
                         consumed_gas: 0_u64.into(),
