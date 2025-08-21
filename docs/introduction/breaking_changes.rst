@@ -178,9 +178,6 @@ As a consequence, `inspecting this Ghostnet contract <https://rpc.ghostnet.teztn
         ...
     ]
 
-Upcoming changes
-================
-
 Baker: Explicit choice on using DAL or not via the CLI
 ------------------------------------------------------
 
@@ -190,3 +187,16 @@ In Octez ``v21.3``, this option is not mandatory and will only trigger a warning
 Starting from Octez ``v22``, launching a baker daemon requires an explicit mention of the DAL.
 The recommended approach is to run a DAL node and start the baker using the ``--dal-node <uri>`` option.
 If you do not wish to use a DAL node, you can opt-out by using the ``--without-dal`` option.
+
+Unique baker executable
+-----------------------
+
+Starting with Octez ``v23``, the single executable ``octez-baker`` (previously named ``octez-experimental-agnostic-baker``) is no longer experimental, and should be preferred over the protocol-suffixed executables ``octez-baker-<proto-hash>``, which will be deprecated in ``v24``, and will be removed in a later version.
+
+Upcoming changes
+================
+
+Unique accuser executable
+-------------------------
+
+Similarly to the unique baker executable, Octez ``v23`` also introduces a single executable ``octez-accuser`` meant to gradually replace the protocol-suffixed executables ``octez-accuser-<proto-hash>``.

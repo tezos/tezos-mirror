@@ -24,21 +24,27 @@ Client manual
          :file: octez-client.html
 
 
-.. _baker_manual:
 .. _baker_manual_rio:
 
 Baker manual
 ============
 
+This is the manual page of the baker command line tool. See :ref:`baker_run` for a general description of this tool.
+
+.. note::
+	The protocol-independent baker executable now available is meant to replace all the protocol-specific bakers like this one. Please refer to :ref:`its manual <baker_manual>`.
+
 .. raw:: html
          :file: octez-baker.html
 
 
-.. _accuser_manual:
 .. _accuser_manual_rio:
 
 Accuser manual
 ==============
+
+.. note::
+	The protocol-independent accuser executable now available is meant to replace all the protocol-specific accusers like this one. Please refer to :ref:`its manual <accuser_manual>`.
 
 .. raw:: html
          :file: octez-accuser.html

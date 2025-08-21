@@ -578,7 +578,7 @@ Now, install all the binaries by:
   :end-before: [test executables]
 
 You can be more specific and only ``opam install octez-node``, ``opam
-install octez-baker-alpha``, ...
+install octez-baker``, ...
 
 .. warning::
 

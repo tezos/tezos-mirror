@@ -340,7 +340,7 @@ events) this call adds a sink to suddenly start pretty-printing all
 Client and baker configuration
 ------------------------------
 
-Both ``octez-client`` and ``octez-{baker,accuser}-*`` can be configured either
+Both ``octez-client`` and ``octez-{baker,accuser}`` can be configured either
 using environment variables or using ``internal-events`` in the client configuration
 file, with the file-descriptor sinks described above.
 
@@ -349,8 +349,8 @@ all the interactions with the node (but it does *not* use the logging
 framework).
 
 By default, the baker also generates internal logs, which are stored at
-``<client-base-dir>/logs/octez-baker-<protocol-name>/*``. Hence, running two bakers
-(for two different accounts) using the same protocol with the same base
+``<client-base-dir>/logs/octez-baker/*``. Hence, running two bakers
+(for two different accounts) with the same base
 directory is not recommended.
 
 Processing Structured Events
