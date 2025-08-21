@@ -513,6 +513,30 @@ fn compute_balance_updates(
     Ok(vec![src_update, dest_update])
 }
 
+/// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
+#[allow(dead_code)]
+pub fn compute_storage_balance_updates(
+    source: &PublicKeyHash,
+    fee: BigUint,
+) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
+    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
+    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
+
+    let src_update = BalanceUpdate {
+        balance: Balance::Account(Contract::Implicit(source.clone())),
+        changes: source_delta.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    let block_fees = BalanceUpdate {
+        balance: Balance::StorageFees,
+        changes: block_fees.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    Ok(vec![src_update, block_fees])
+}
+
 /// Applies balance changes by updating both source and destination accounts.
 fn apply_balance_changes(
     host: &mut impl Runtime,
