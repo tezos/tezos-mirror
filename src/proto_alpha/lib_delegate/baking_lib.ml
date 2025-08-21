@@ -235,7 +235,7 @@ let first_automaton_event state =
 let attestations_attesting_power state attestations =
   let get_attestation_voting_power {slot; _} =
     match
-      Delegate_slots.voting_power state.level_state.delegate_slots ~slot
+      Delegate_infos.voting_power state.level_state.delegate_infos ~slot
     with
     | None -> 0L (* cannot happen *)
     | Some attesting_power -> attesting_power
@@ -349,7 +349,7 @@ let propose_at_next_level ~minimal_timestamp state =
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
   let consensus_threshold =
-    Delegate_slots.consensus_threshold state.level_state.delegate_slots
+    Delegate_infos.consensus_threshold state.level_state.delegate_infos
   in
   if Compare.Int64.(power >= consensus_threshold) then Some (power, attestations)
   else None
@@ -709,7 +709,7 @@ let rec baking_minimal_timestamp ~count state
     |> attestations_attesting_power state
   in
   let consensus_threshold =
-    Delegate_slots.consensus_threshold state.level_state.delegate_slots
+    Delegate_infos.consensus_threshold state.level_state.delegate_infos
   in
   let* () =
     if Compare.Int64.(total_voting_power < consensus_threshold) then

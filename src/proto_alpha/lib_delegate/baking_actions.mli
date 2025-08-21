@@ -54,8 +54,8 @@ and level_update = {
   new_level_proposal : proposal;
   compute_new_state :
     current_round:Round.t ->
-    delegate_slots:delegate_slots ->
-    next_level_delegate_slots:delegate_slots ->
+    delegate_infos:delegate_infos ->
+    next_level_delegate_infos:delegate_infos ->
     dal_attestable_slots:dal_attestable_slots ->
     next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;

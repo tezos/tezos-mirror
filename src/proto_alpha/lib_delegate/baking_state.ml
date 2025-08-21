@@ -126,17 +126,17 @@ let block_info_encoding =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
-type delegate_slot = {
+type delegate_info = {
   delegate : Delegate.t;
   first_slot : Slot.t;
   attesting_power : int64;
 }
 
-module Delegate_slots = struct
+module Delegate_infos = struct
   (* Note that we also use the delegate slots as proposal slots. *)
   type t = {
-    own_delegates : delegate_slot list;
-    own_delegate_slots : delegate_slot SlotMap.t;
+    own_delegates : delegate_info list;
+    own_delegate_slots : delegate_info SlotMap.t;
         (* This map cannot have as keys just the first slot of delegates,
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
@@ -179,7 +179,7 @@ module Delegate_slots = struct
   let consensus_committee {consensus_committee; _} = consensus_committee
 end
 
-type delegate_slots = Delegate_slots.t
+type delegate_infos = Delegate_infos.t
 
 type dal_attestable_slots =
   (Delegate_id.t
@@ -241,7 +241,7 @@ type prepared_block = {
   baking_votes : Per_block_votes_repr.per_block_votes;
 }
 
-(* The fields {current_level}, {delegate_slots}, {next_level_delegate_slots},
+(* The fields {current_level}, {delegate_infos}, {next_level_delegate_infos},
    {next_level_latest_forge_request}, {dal_attestable_slots},
    {next_level_dal_attestable_slots} are updated only when we receive a block at
    a different level than {current_level}.  Note that this means that there is
@@ -257,8 +257,8 @@ type level_state = {
   attestable_payload : attestable_payload option;
   (* Block for which we've seen 2f+1 attestations and that we may bake onto *)
   elected_block : elected_block option;
-  delegate_slots : delegate_slots;
-  next_level_delegate_slots : delegate_slots;
+  delegate_infos : delegate_infos;
+  next_level_delegate_infos : delegate_infos;
   next_level_latest_forge_request : Round.t option;
   dal_attestable_slots : dal_attestable_slots;
   next_level_dal_attestable_slots : dal_attestable_slots;
@@ -942,7 +942,7 @@ let may_load_attestable_data state =
 
 (* Helpers *)
 
-let delegate_slots attesting_rights delegates =
+let delegate_infos attesting_rights delegates =
   let open Lwt_syntax in
   let known_keys = Key.Set.of_list delegates in
   match attesting_rights with
@@ -986,14 +986,14 @@ let delegate_slots attesting_rights delegates =
       in
       return
         {
-          Delegate_slots.own_delegates = own_delegate_first_slots;
+          Delegate_infos.own_delegates = own_delegate_first_slots;
           own_delegate_slots;
           all_delegate_voting_power;
           consensus_threshold;
           consensus_committee;
         }
 
-let compute_delegate_slots (cctxt : Protocol_client_context.full)
+let compute_delegate_infos (cctxt : Protocol_client_context.full)
     ?(block = `Head 0) ~level ~chain delegates =
   let open Lwt_result_syntax in
   let*? level = Environment.wrap_tzresult (Raw_level.of_int32 level) in
@@ -1004,23 +1004,23 @@ let compute_delegate_slots (cctxt : Protocol_client_context.full)
        ~levels:[level]
      [@profiler.record_s {verbosity = Debug} "RPC: get attesting rights"])
   in
-  let*! delegate_slots =
-    (delegate_slots
+  let*! delegate_infos =
+    (delegate_infos
        attesting_rights
-       delegates [@profiler.record_f {verbosity = Debug} "delegate_slots"])
+       delegates [@profiler.record_f {verbosity = Debug} "delegate_infos"])
   in
-  return delegate_slots
+  return delegate_infos
 
 let round_proposer state ~level round =
   let slots =
     match level with
-    | `Current -> state.level_state.delegate_slots
-    | `Next -> state.level_state.next_level_delegate_slots
+    | `Current -> state.level_state.delegate_infos
+    | `Next -> state.level_state.next_level_delegate_infos
   in
   let committee_size =
     state.global_state.constants.parametric.consensus_committee_size
   in
-  match Delegate_slots.own_round_owner slots ~round ~committee_size with
+  match Delegate_infos.own_round_owner slots ~round ~committee_size with
   | Error _ -> None
   | Ok owner -> owner
 
@@ -1173,7 +1173,7 @@ let pp_elected_block fmt {proposal; attestation_qc} =
     proposal.block
     (List.length attestation_qc)
 
-let pp_delegate_slot fmt {delegate; first_slot; attesting_power} =
+let pp_delegate_info fmt {delegate; first_slot; attesting_power} =
   Format.fprintf
     fmt
     "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %Ld"
@@ -1184,9 +1184,9 @@ let pp_delegate_slot fmt {delegate; first_slot; attesting_power} =
     attesting_power
 
 (* this type is only used below for pretty-printing *)
-type delegate_slots_for_pp = {attester : Delegate.t; all_slots : Slot.t list}
+type delegate_infos_for_pp = {attester : Delegate.t; all_slots : Slot.t list}
 
-let delegate_slots_for_pp delegate_slot_map =
+let delegate_infos_for_pp delegate_info_map =
   SlotMap.fold
     (fun slot {delegate; first_slot; attesting_power = _} acc ->
       match SlotMap.find first_slot acc with
@@ -1194,12 +1194,12 @@ let delegate_slots_for_pp delegate_slot_map =
           SlotMap.add first_slot {attester = delegate; all_slots = [slot]} acc
       | Some {attester; all_slots} ->
           SlotMap.add first_slot {attester; all_slots = slot :: all_slots} acc)
-    delegate_slot_map
+    delegate_info_map
     SlotMap.empty
   |> SlotMap.map (fun {attester; all_slots} ->
          {attester; all_slots = List.rev all_slots})
 
-let pp_delegate_slots fmt (Delegate_slots.{own_delegate_slots; _} as t) =
+let pp_delegate_infos fmt (Delegate_infos.{own_delegate_slots; _} as t) =
   Format.fprintf
     fmt
     "@[<v>%a@]"
@@ -1213,12 +1213,12 @@ let pp_delegate_slots fmt (Delegate_slots.{own_delegate_slots; _} as t) =
             Delegate.pp
             attester
             (Option.value ~default:0L
-            @@ Delegate_slots.voting_power t ~slot:first_slot)
+            @@ Delegate_infos.voting_power t ~slot:first_slot)
             (Format.pp_print_list
                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
                Slot.pp)
             (List.filteri (fun i _ -> i < 10) all_slots)))
-    (SlotMap.bindings (delegate_slots_for_pp own_delegate_slots))
+    (SlotMap.bindings (delegate_infos_for_pp own_delegate_slots))
 
 let pp_prepared_block fmt {signed_block_header; delegate; _} =
   Format.fprintf
@@ -1240,8 +1240,8 @@ let pp_level_state fmt
       locked_round;
       attestable_payload;
       elected_block;
-      delegate_slots;
-      next_level_delegate_slots;
+      delegate_infos;
+      next_level_delegate_infos;
       next_level_latest_forge_request;
       dal_attestable_slots = _;
       next_level_dal_attestable_slots = _;
@@ -1262,10 +1262,10 @@ let pp_level_state fmt
     attestable_payload
     (pp_option pp_elected_block)
     elected_block
-    pp_delegate_slots
-    delegate_slots
-    pp_delegate_slots
-    next_level_delegate_slots
+    pp_delegate_infos
+    delegate_infos
+    pp_delegate_infos
+    next_level_delegate_infos
     (pp_option Round.pp)
     next_level_latest_forge_request
 

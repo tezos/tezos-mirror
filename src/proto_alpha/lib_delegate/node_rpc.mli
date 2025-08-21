@@ -88,12 +88,12 @@ val fetch_dal_config :
 
 (** [dal_attestable_slots ctxt ~attestation_level delegates_slots] calls the DAL
     node RPC GET /profiles/<pkh>/attested_levels/<level>/attestable_slots/<pkh>
-    for each of the delegates in [delegate_slots] and returns the corresponding
+    for each of the delegates in [delegate_infos] and returns the corresponding
     promises. *)
 val dal_attestable_slots :
   Tezos_rpc.Context.generic ->
   attestation_level:int32 ->
-  Baking_state.delegate_slot list ->
+  Baking_state.delegate_info list ->
   Baking_state.dal_attestable_slots
 
 (** [get_dal_profiles ctxt delegates] calls the DAL node RPC GET

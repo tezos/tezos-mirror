@@ -146,8 +146,8 @@ and level_update = {
   new_level_proposal : proposal;
   compute_new_state :
     current_round:Round.t ->
-    delegate_slots:delegate_slots ->
-    next_level_delegate_slots:delegate_slots ->
+    delegate_infos:delegate_infos ->
+    next_level_delegate_infos:delegate_infos ->
     dal_attestable_slots:dal_attestable_slots ->
     next_level_dal_attestable_slots:dal_attestable_slots ->
     (state * action) Lwt.t;
@@ -1022,13 +1022,13 @@ let inject_block ?(force_injection = false) ?(asynchronous = true) state
 
 let prepare_waiting_for_quorum state =
   let consensus_threshold =
-    Delegate_slots.consensus_threshold state.level_state.delegate_slots
+    Delegate_infos.consensus_threshold state.level_state.delegate_infos
   in
   let consensus_committee =
-    Delegate_slots.consensus_committee state.level_state.delegate_slots
+    Delegate_infos.consensus_committee state.level_state.delegate_infos
   in
   let get_slot_voting_power ~slot =
-    Delegate_slots.voting_power state.level_state.delegate_slots ~slot
+    Delegate_infos.voting_power state.level_state.delegate_infos ~slot
   in
   let latest_proposal = state.level_state.latest_proposal.block in
   (* assert (latest_proposal.block.round = state.round_state.current_round) ; *)
@@ -1084,15 +1084,15 @@ let compute_round (proposal : proposal) round_durations =
        ~predecessor_round:predecessor_block.round
        ~timestamp
 
-let notice_delegates_without_slots all_delegates delegate_slots level =
+let notice_delegates_without_slots all_delegates delegate_infos level =
   let delegates_without_slots =
     List.filter
       (fun {Baking_state_types.Key.id; _} ->
         not
         @@ List.exists
-             (fun ({delegate = {consensus_key; _}; _} : delegate_slot) ->
+             (fun ({delegate = {consensus_key; _}; _} : delegate_info) ->
                id = consensus_key.id)
-             (Baking_state.Delegate_slots.own_delegates delegate_slots))
+             (Baking_state.Delegate_infos.own_delegates delegate_infos))
       all_delegates
   in
   match delegates_without_slots with
@@ -1112,11 +1112,11 @@ let update_to_level state level_update =
     | Node -> Lwt.return_unit
     | Local index -> index.sync_fun ()
   in
-  let* delegate_slots =
+  let* delegate_infos =
     if Int32.(new_level = succ state.level_state.current_level) then
-      return state.level_state.next_level_delegate_slots
+      return state.level_state.next_level_delegate_infos
     else
-      Baking_state.compute_delegate_slots
+      Baking_state.compute_delegate_infos
         cctxt
         delegates
         ~level:new_level
@@ -1124,8 +1124,8 @@ let update_to_level state level_update =
       [@profiler.record_s
         {verbosity = Debug} "compute predecessor delegate slots"]
   in
-  let* next_level_delegate_slots =
-    (Baking_state.compute_delegate_slots
+  let* next_level_delegate_infos =
+    (Baking_state.compute_delegate_infos
        cctxt
        delegates
        ~level:(Int32.succ new_level)
@@ -1133,7 +1133,7 @@ let update_to_level state level_update =
      [@profiler.record_s {verbosity = Debug} "compute current delegate slots"])
   in
   let*! () =
-    notice_delegates_without_slots delegates delegate_slots new_level
+    notice_delegates_without_slots delegates delegate_infos new_level
   in
   let round_durations = state.global_state.round_durations in
   let*? current_round =
@@ -1153,21 +1153,21 @@ let update_to_level state level_update =
             Node_rpc.dal_attestable_slots
               dal_node_rpc_ctxt
               ~attestation_level:new_level
-              (Delegate_slots.own_delegates delegate_slots)
+              (Delegate_infos.own_delegates delegate_infos)
         in
         let next_level_dal_attestable_slots =
           Node_rpc.dal_attestable_slots
             dal_node_rpc_ctxt
             ~attestation_level:(Int32.succ new_level)
-            (Delegate_slots.own_delegates next_level_delegate_slots)
+            (Delegate_infos.own_delegates next_level_delegate_infos)
         in
         Lwt.return (dal_attestable_slots, next_level_dal_attestable_slots))
   in
   let*! new_state =
     (compute_new_state
        ~current_round
-       ~delegate_slots
-       ~next_level_delegate_slots
+       ~delegate_infos
+       ~next_level_delegate_infos
        ~dal_attestable_slots
        ~next_level_dal_attestable_slots
      [@profiler.record_s {verbosity = Debug} "compute new state"])

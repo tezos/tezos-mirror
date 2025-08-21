@@ -301,13 +301,13 @@ let first_potential_round ~committee_size ~owned_slots ~earliest_round =
   let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
   let*? earliest_round = Round.to_int earliest_round in
   let period_offset = earliest_round / committee_size in
-  match Delegate_slots.find_first_slot_from owned_slots ~slot:earliest_slot with
+  match Delegate_infos.find_first_slot_from owned_slots ~slot:earliest_slot with
   | Some (slot, delegate) ->
       let slot = Slot.to_int slot in
       let*? round = Round.of_int (slot + (committee_size * period_offset)) in
       Some (round, delegate.delegate)
   | None ->
-      let* slot, delegate = Delegate_slots.min_slot owned_slots in
+      let* slot, delegate = Delegate_infos.min_slot owned_slots in
       let slot = Slot.to_int slot in
       let*? round =
         Round.of_int (slot + (committee_size * (1 + period_offset)))
@@ -318,14 +318,14 @@ let first_potential_round_at_next_level state ~earliest_round =
   let committee_size =
     state.global_state.constants.Constants.parametric.consensus_committee_size
   in
-  let owned_slots = state.level_state.next_level_delegate_slots in
+  let owned_slots = state.level_state.next_level_delegate_infos in
   first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 let first_potential_round_at_current_level state ~earliest_round =
   let committee_size =
     state.global_state.constants.Constants.parametric.consensus_committee_size
   in
-  let owned_slots = state.level_state.delegate_slots in
+  let owned_slots = state.level_state.delegate_infos in
   first_potential_round ~committee_size ~owned_slots ~earliest_round
 
 (** [current_round_at_next_level] converts the current system timestamp
@@ -674,15 +674,15 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
     } ;
   let chain = `Hash chain_id in
   let current_level = current_proposal.block.shell.level in
-  let* delegate_slots =
-    Baking_state.compute_delegate_slots
+  let* delegate_infos =
+    Baking_state.compute_delegate_infos
       cctxt
       delegates
       ~level:current_level
       ~chain
   in
-  let* next_level_delegate_slots =
-    Baking_state.compute_delegate_slots
+  let* next_level_delegate_infos =
+    Baking_state.compute_delegate_infos
       cctxt
       delegates
       ~level:(Int32.succ current_level)
@@ -703,7 +703,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
         Node_rpc.dal_attestable_slots
           dal_node_rpc_ctxt
           ~attestation_level:current_level
-          (Delegate_slots.own_delegates delegate_slots))
+          (Delegate_infos.own_delegates delegate_infos))
       dal_node_rpc_ctxt
   in
   let next_level_dal_attestable_slots =
@@ -713,7 +713,7 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
         Node_rpc.dal_attestable_slots
           dal_node_rpc_ctxt
           ~attestation_level:(Int32.succ current_level)
-          (Delegate_slots.own_delegates next_level_delegate_slots))
+          (Delegate_infos.own_delegates next_level_delegate_infos))
       dal_node_rpc_ctxt
   in
   let level_state =
@@ -725,8 +725,8 @@ let create_initial_state cctxt ?dal_node_rpc_ctxt ?(synchronize = true) ~chain
       locked_round = None;
       attestable_payload = None;
       elected_block;
-      delegate_slots;
-      next_level_delegate_slots;
+      delegate_infos;
+      next_level_delegate_infos;
       next_level_latest_forge_request = None;
       dal_attestable_slots;
       next_level_dal_attestable_slots;
