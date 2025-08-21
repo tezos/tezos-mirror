@@ -109,7 +109,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
             attesters
         in
         let total_consensus_power =
-          Alpha_context.Attestation_power.get_slots total_consensus_power
+          Alpha_context.Attesting_power.get_slots total_consensus_power
         in
         if voting_power = total_consensus_power then return_unit
         else
@@ -128,7 +128,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
       in
       let resulting_committee =
         List.map
-          (fun (a, b) -> (a, Alpha_context.Attestation_power.get_slots b))
+          (fun (a, b) -> (a, Alpha_context.Attesting_power.get_slots b))
           resulting_committee
       in
       if

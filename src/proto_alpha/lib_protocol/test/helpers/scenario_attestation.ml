@@ -367,10 +367,10 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
                RPC.Attestation_rights.delegate;
                consensus_key = _;
                first_slot = _;
-               attestation_power;
+               attesting_power;
              } ->
           Tezt.Check.(
-            (attestation_power > 0)
+            (attesting_power > 0)
               int
               ~__LOC__
               ~error_msg:"Attestation power should be greater than 0, got %L") ;
@@ -387,7 +387,7 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
                 RPC.Attestation_rights.delegate = manager_pkh;
                 consensus_key = consensus_pkh;
                 first_slot = slot;
-                attestation_power = _;
+                attesting_power = _;
               } as delegate_rights) ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =
@@ -591,10 +591,10 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
                Plugin.RPC.Attestation_rights.delegate;
                consensus_key = _;
                first_slot = _;
-               attestation_power;
+               attesting_power;
              } ->
           Tezt.Check.(
-            (attestation_power > 0)
+            (attesting_power > 0)
               int
               ~__LOC__
               ~error_msg:"Attestation power should be greater than 0, got %L") ;
@@ -609,7 +609,7 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
                 Plugin.RPC.Attestation_rights.delegate = manager_pkh;
                 consensus_key = consensus_pkh;
                 first_slot = slot;
-                attestation_power = _;
+                attesting_power = _;
               } as delegate_rights) ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =

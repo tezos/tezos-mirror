@@ -693,8 +693,8 @@ end
 
 module Migration = Migration_repr
 
-module Attestation_power = struct
-  include Attestation_power_repr
+module Attesting_power = struct
+  include Attesting_power_repr
   include Consensus_parameters_storage
 
   let get ctxt level {slots; stake} =

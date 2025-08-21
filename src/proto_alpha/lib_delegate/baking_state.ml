@@ -956,11 +956,9 @@ let delegate_slots attesting_rights delegates =
              all_delegate_voting_power ) =
         Lwt_list.fold_left_s
           (fun (own_list, own_map, all_map) validator ->
-            let {Plugin.RPC.Validators.slots; attestation_power; _} =
-              validator
-            in
+            let {Plugin.RPC.Validators.slots; attesting_power; _} = validator in
             let first_slot = Stdlib.List.hd slots in
-            let attesting_power = attestation_power in
+            let attesting_power = attesting_power in
             let all_map = SlotMap.add first_slot attesting_power all_map in
             let* own_list, own_map =
               let* delegate_opt = Delegate.of_validator ~known_keys validator in

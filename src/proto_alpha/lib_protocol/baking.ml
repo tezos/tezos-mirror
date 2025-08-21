@@ -28,77 +28,72 @@ open Alpha_context
 
 type error +=
   | (* `Permanent *)
-      Insufficient_attestation_power of {
-      attestation_power : int64;
+      Insufficient_attesting_power of {
+      attesting_power : int64;
       consensus_threshold : int64;
     }
 
 let () =
   register_error_kind
     `Permanent
-    ~id:"baking.insufficient_attestation_power"
+    ~id:"baking.insufficient_attesting_power"
     ~title:"Insufficient attestation power"
     ~description:
-      "The attestation power is insufficient to satisfy the consensus \
-       threshold."
-    ~pp:(fun ppf (attestation_power, consensus_threshold) ->
+      "The attesting power is insufficient to satisfy the consensus threshold."
+    ~pp:(fun ppf (attesting_power, consensus_threshold) ->
       Format.fprintf
         ppf
-        "The attestation power (%Ld) is insufficient to satisfy the consensus \
+        "The attesting power (%Ld) is insufficient to satisfy the consensus \
          threshold (%Ld)."
-        attestation_power
+        attesting_power
         consensus_threshold)
     Data_encoding.(
-      obj2 (req "attestation_power" int64) (req "consensus_threshold" int64))
+      obj2 (req "attesting_power" int64) (req "consensus_threshold" int64))
     (function
-      | Insufficient_attestation_power {attestation_power; consensus_threshold}
-        ->
-          Some (attestation_power, consensus_threshold)
+      | Insufficient_attesting_power {attesting_power; consensus_threshold} ->
+          Some (attesting_power, consensus_threshold)
       | _ -> None)
-    (fun (attestation_power, consensus_threshold) ->
-      Insufficient_attestation_power {attestation_power; consensus_threshold})
+    (fun (attesting_power, consensus_threshold) ->
+      Insufficient_attesting_power {attesting_power; consensus_threshold})
 
-let bonus_baking_reward ctxt level ~attestation_power =
+let bonus_baking_reward ctxt level ~attesting_power =
   let open Lwt_result_syntax in
-  let attestation_power = Attestation_power.get ctxt level attestation_power in
+  let attesting_power = Attesting_power.get ctxt level attesting_power in
   let* ctxt, consensus_threshold =
-    Attestation_power.consensus_threshold ctxt level
+    Attesting_power.consensus_threshold ctxt level
   in
   let* ctxt, consensus_committee =
-    Attestation_power.consensus_committee ctxt level
+    Attesting_power.consensus_committee ctxt level
   in
   let*? baking_reward_bonus_per_block =
     Delegate.Rewards.baking_reward_bonus_per_block ctxt
   in
-  let extra_attestation_power =
-    Int64.sub attestation_power consensus_threshold
-  in
+  let extra_attesting_power = Int64.sub attesting_power consensus_threshold in
   let*? () =
     error_when
-      Compare.Int64.(extra_attestation_power < 0L)
-      (Insufficient_attestation_power {attestation_power; consensus_threshold})
+      Compare.Int64.(extra_attesting_power < 0L)
+      (Insufficient_attesting_power {attesting_power; consensus_threshold})
   in
-  let max_extra_attestation_power =
+  let max_extra_attesting_power =
     Int64.sub consensus_committee consensus_threshold
   in
   (* Reward computation depends on the flag. If not activated, we keep the same
      rewards as before: division then multiplication. It activated, we have to change
      the order of operations (because the division will always result in 0 otherwise). *)
   let* reward =
-    if Compare.Int64.(max_extra_attestation_power <= 0L) then
-      return (Ok Tez.zero)
-    else if Attestation_power.check_all_bakers_attest_at_level ctxt level then
+    if Compare.Int64.(max_extra_attesting_power <= 0L) then return (Ok Tez.zero)
+    else if Attesting_power.check_all_bakers_attest_at_level ctxt level then
       return
       @@ Tez.mul_ratio
            ~rounding:`Up
-           ~num:extra_attestation_power
-           ~den:max_extra_attestation_power
+           ~num:extra_attesting_power
+           ~den:max_extra_attesting_power
            baking_reward_bonus_per_block
     else
       let*? part =
-        Tez.(baking_reward_bonus_per_block /? max_extra_attestation_power)
+        Tez.(baking_reward_bonus_per_block /? max_extra_attesting_power)
       in
-      return Tez.(part *? extra_attestation_power)
+      return Tez.(part *? extra_attesting_power)
   in
   let*? reward in
   return (ctxt, reward)
@@ -108,7 +103,7 @@ type ordered_slots = {
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
-  attestation_power : int64;
+  attesting_power : int64;
 }
 
 (* Slots returned by this function are assumed by consumers to be in increasing
@@ -116,7 +111,7 @@ type ordered_slots = {
 let attesting_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
   let all_bakers_attest_enabled =
-    Attestation_power.check_all_bakers_attest_at_level ctxt level
+    Attesting_power.check_all_bakers_attest_at_level ctxt level
   in
   let open Lwt_result_syntax in
   let* ctxt, _, delegates = Stake_distribution.stake_info ctxt level in
@@ -148,7 +143,7 @@ let attesting_rights (ctxt : t) level =
                       consensus_key = consensus_pk.consensus_pkh;
                       companion_key = consensus_pk.companion_pkh;
                       slots = [slot];
-                      attestation_power = 0L;
+                      attesting_power = 0L;
                       (* Updated after, once all the slots are attributed *)
                     }
               | Some slots -> Some {slots with slots = slot :: slots.slots})
@@ -162,19 +157,19 @@ let attesting_rights (ctxt : t) level =
     Signature.Public_key_hash.Map.map
       (fun ({slots; delegate; _} as t) ->
         if all_bakers_attest_enabled then
-          let attestation_power =
+          let attesting_power =
             Option.value ~default:0L
             @@ Signature.Public_key_hash.Map.find delegate attesting_power_map
           in
-          {t with attestation_power}
-        else {t with attestation_power = List.length slots |> Int64.of_int})
+          {t with attesting_power}
+        else {t with attesting_power = List.length slots |> Int64.of_int})
       map
   in
   return (ctxt, map)
 
 let incr_slot att_rights =
-  let one = Attestation_power.make ~slots:1 ~stake:0L in
-  Attestation_power.add one att_rights
+  let one = Attesting_power.make ~slots:1 ~stake:0L in
+  Attesting_power.add one att_rights
 
 let attesting_rights_by_first_slot ctxt level :
     (t * Consensus_key.power Slot.Map.t) tzresult Lwt.t =
@@ -216,18 +211,18 @@ let attesting_rights_by_first_slot ctxt level :
                   Some
                     {
                       consensus_key;
-                      attestation_power =
-                        incr_slot Attestation_power.zero
+                      attesting_power =
+                        incr_slot Attesting_power.zero
                         (* stake added in the next step *);
                       dal_power = in_dal_committee;
                     }
               | Some
-                  ({consensus_key; attestation_power; dal_power} :
+                  ({consensus_key; attesting_power; dal_power} :
                     Consensus_key.power) ->
                   Some
                     {
                       consensus_key;
-                      attestation_power = incr_slot attestation_power;
+                      attesting_power = incr_slot attesting_power;
                       dal_power = dal_power + in_dal_committee;
                     })
             slots_map
@@ -252,9 +247,9 @@ let attesting_rights_by_first_slot ctxt level :
                   slot
                   {
                     v with
-                    attestation_power =
-                      Attestation_power.(
-                        add (make ~slots:0 ~stake:weight) v.attestation_power);
+                    attesting_power =
+                      Attesting_power.(
+                        add (make ~slots:0 ~stake:weight) v.attesting_power);
                   }
                   acc))
       Slot.Map.empty

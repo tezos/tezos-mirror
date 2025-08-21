@@ -54,7 +54,7 @@
   Cycle_repr
   Tez_repr
   Deposits_repr
-  Attestation_power_repr
+  Attesting_power_repr
   Unstaked_frozen_deposits_repr
   Staking_pseudotoken_repr
   Period_repr
@@ -346,7 +346,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -643,7 +643,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -924,7 +924,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli

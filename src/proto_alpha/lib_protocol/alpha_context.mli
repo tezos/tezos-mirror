@@ -1057,7 +1057,7 @@ module Constants : sig
   val round_durations : context -> Round.round_durations
 
   (** To be used for rounds and DAL. For attestations,
-      see {!Attestation_power.consensus_committee}. *)
+      see {!Attesting_power.consensus_committee}. *)
   val consensus_committee_size : context -> int
 
   val minimal_participation_ratio : context -> Ratio.t
@@ -2247,9 +2247,9 @@ module Receipt : sig
   val balance_updates_encoding : balance_updates Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Attestation_power_repr} and
+(** This module re-exports definitions from {!Attesting_power_repr} and
     {!Consensus_parameters_storage}. *)
-module Attestation_power : sig
+module Attesting_power : sig
   type t
 
   val encoding : t Data_encoding.t
@@ -2292,7 +2292,7 @@ module Consensus_key : sig
 
   type power = {
     consensus_key : pk;
-    attestation_power : Attestation_power.t;
+    attesting_power : Attesting_power.t;
     dal_power : int;
   }
 
@@ -5578,7 +5578,7 @@ module Consensus : sig
        and type 'a level_map := 'a Level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
-       and type attestation_power := Attestation_power.t
+       and type attesting_power := Attesting_power.t
        and type consensus_power := Consensus_key.power
 
   (** [store_attestation_branch context branch] sets the "attestation branch"

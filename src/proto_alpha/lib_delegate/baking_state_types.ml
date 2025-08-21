@@ -183,7 +183,7 @@ module Delegate = struct
         companion_key = companion_bls_pkh_opt;
         delegate = manager_pkh;
         slots = _;
-        attestation_power = _;
+        attesting_power = _;
       } =
     let open Lwt_syntax in
     match Key.Set.find_pkh consensus_pkh known_keys with
