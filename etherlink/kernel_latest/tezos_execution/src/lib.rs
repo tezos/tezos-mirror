@@ -12,7 +12,8 @@ use mir::{
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
+use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
@@ -437,8 +438,18 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
     let src_contract = Contract::Implicit(src.clone());
-    let balance_updates = compute_balance_updates(&src_contract, &dest_contract, balance)
+    let mut balance_updates = compute_balance_updates(&src_contract, &dest_contract, balance)
         .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+
+    // Balance updates for the impacts of origination on storage space.
+    // storage_fees = total_size * COST_PER_BYTES
+    let storage_fees = BigUint::from(total_size.clone())
+        .checked_mul(&BigUint::from(COST_PER_BYTES))
+        .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
+    let storage_fees_balance_updates =
+        compute_storage_balance_updates(src, storage_fees.clone())
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    balance_updates.extend(storage_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
     apply_balance_changes(
@@ -520,7 +531,6 @@ fn compute_balance_updates(
 }
 
 /// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
-#[allow(dead_code)]
 pub fn compute_storage_balance_updates(
     source: &PublicKeyHash,
     fee: BigUint,
