@@ -285,22 +285,22 @@ HTTP Caching Headers
 It is possible to enable http caching headers in the RPC responses with the
 ``--enable-http-cache-headers`` option. This feature is disabled by default.
 
-When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#response_directives>`_ 
-header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related 
-queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths 
+When enabled, the RPC server will support `max-age <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#response_directives>`_
+header. The header ``Cache-control: public, max-age: <duration>`` will be included in the response headers of head related
+queries (``/chains/main/blocks/head*``) for responses that are cacheable. This also works on paths
 that are relative to ``head`` such as ``head-n`` and ``head~n``. The response is cacheable throughout the ``<duration>``
 of the head block's consensus round where ``<duration>`` is the remaining time until the :ref:`estimated end time<time_between_blocks>`
-of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers. 
+of the consensus round. If a response should not be cached, the RPC server will not include any cache control headers.
 
 The RPC server will also support the conditional request header `If-None-Match <https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/If-None-Match>`_
-and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query 
+and include the ``ETag`` field in every head related query. The value of the ``ETag`` will be set to the block hash that the query
 is related to. If the client sends a request with ``If-None-Match: <comma-separated list of ETag values>`` header and the block hash
 is included in the list of etag values, the RPC server will respond with a ``304 Not Modified`` status code with an empty body.
 
 This feature is useful when running the RPC server behind a reverse proxy that supports automatic
-content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that 
-enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query 
-as the RPC server needs to perform additional checks and calculations. Consequently, it is advised to enable thie feature 
+content caching (eg. `NGINX's proxy_cache setting <https://blog.nginx.org/blog/nginx-caching-guide>`_). Beware that
+enabling this feature adds a non-negligible performance overhead (up to 10-15% slower) to every head related query
+as the RPC server needs to perform additional checks and calculations. Consequently, it is advised to enable thie feature
 only when operating the RPC server behind appropriate caching infrastructure.
 
 .. _configure_p2p:
@@ -352,6 +352,60 @@ specify an advertised port, but not an IP address.
     modification on the router. This is not possible for corporate networks with
     UPnP disabled, but is typically handy for home routers, or other networks
     where this option is available.
+
+
+Mapping ports with UPnP
+~~~~~~~~~~~~~~~~~~~~~~~
+
+Starting with :doc:`Octez v23 <../releases/version-23>`, the Octez node supports
+mapping the port defined with ``--listen-addr``, using UPnP. Note that this
+feature is still experimental in Octez v23 and is done manually, but will become
+automatic in later versions. Mapping port should improve connectivity, and in
+particular allow other nodes to open a connection with the ``octez-node``.
+
+Note that UPnP is generally not supported by professional networks, and might
+not be enabled by default in home networks.
+
+The general workflow of using UPnP with Octez v23 is the following:
+1. Ask for a redirection of the P2P port on any port:
+
+::
+
+   $ octez-node map-port --any-net-port
+
+``--any-net-port`` lets the gateway decide for a port to redirect octez-node's
+P2P port, and registers it in the configuration for ``advertised-net-port``::
+
+   Redirecting <external_ip>:51397 to <octez-node_internal_ip>:9732
+
+
+2. Update the lease of the redirection on a regular basis (generally
+less than the lease, which by default is one week). This can be done by a cron
+job, for example::
+
+   0 0 * * */6 octez-node map-port
+
+Such a cron job will update the lease every 6 days. Note that ``--any-net-port``
+is not used, as the node already has an external port assigned, and it is read
+from the configuration.
+
+.. warning::
+  For port mapping to be working, the Octez node needs to be able to receive
+  broadcast messages from the router. On certain setups, in particular using ``ufw``,
+  broadcast messages are discarded and a rule must be added to accept them. For
+  example::
+
+     $ ufw allow in from <network mask>
+
+  where ``network_mask`` is the local network mask, for example
+  ``192.168.0.0/24``. Any ``Gateway not found`` error would be an indicator that
+  the firewall is preventing the node to receive the router's messages.
+
+  UPnP on some network might be available but not feature-complete. In particular,
+  it might support mapping port but without the ability to map random ports. In
+  such a case, remove ``--any-net-port`` and either use
+  ``--advertised-net-port`` to choose an external port, or no option at all to try
+  to bind the defualt P2P port.
 
 Private node
 ~~~~~~~~~~~~
