@@ -124,7 +124,6 @@ pub fn transfer_tez<Host: Runtime>(
     })
 }
 
-#[allow(dead_code)]
 fn burn_tez(
     host: &mut impl Runtime,
     src_contract: &Contract,
@@ -490,6 +489,14 @@ fn originate_contract<Host: Runtime>(
         src_account,
         &mut smart_contract,
         &balance.0,
+    )
+    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+
+    let _ = burn_tez(
+        host,
+        &src_contract,
+        src_account,
+        &(ORIGINATION_COST + storage_fees),
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
