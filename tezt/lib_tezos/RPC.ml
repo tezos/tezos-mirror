@@ -2018,3 +2018,19 @@ let get_stake_distribution ?(chain = "main") ?(block = "head") ~cycle () =
 
 let get_stake_info ?(chain = "main") ?(block = "head") () =
   make GET ["chains"; chain; "blocks"; block; "helpers"; "stake_info"] Fun.id
+
+let get_chain_block_context_destination_index ?(chain = "main")
+    ?(block = "head") destination =
+  make
+    GET
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "destination";
+      destination;
+      "index";
+    ]
+  @@ JSON.as_int_opt

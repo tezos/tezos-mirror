@@ -4240,6 +4240,7 @@ let register () =
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/7369 *)
   Contract_services.register () ;
   Delegate_services.register () ;
+  Destination_services.register () ;
   Scripts.register () ;
   Forge.register () ;
   Parse.register () ;

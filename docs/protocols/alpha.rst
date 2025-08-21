@@ -60,6 +60,11 @@ RPC Changes
 - Added ``GET /chains/<chain_id>/blocks/<block_id>/helpers/stake_info``,
   which returns the staking power distribution for all the active delegates
   at the current cycle. (MR :gl:`!18019`)
+- Added ``GET
+  /chains/<chain_id>/blocks/<block_id>/context/destination/<destination>/index``
+  which returns the index of the given destination (e.g. tz1, Smart Rollup
+  addresses, etc.) or ``null`` if the destination has not been indexed by
+  the opcode ``INDEX_ADDRESS`` yet. (MR :gl:`!18944`)
 
 Operation receipts
 ------------------

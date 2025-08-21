@@ -4435,6 +4435,8 @@ module Destination : sig
 
   val pp : Format.formatter -> t -> unit
 
+  val rpc_arg : t RPC_arg.t
+
   val compare : t -> t -> int
 
   val equal : t -> t -> bool
