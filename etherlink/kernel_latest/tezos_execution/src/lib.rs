@@ -106,9 +106,8 @@ pub fn transfer_tez<Host: Runtime>(
     dest_contract: &Contract,
     dest_account: &mut impl TezlinkAccount,
 ) -> Result<TransferSuccess, TransferError> {
-    let balance_updates =
-        compute_balance_updates(src_contract, dest_contract, amount)
-            .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
+    let balance_updates = compute_balance_updates(src_contract, dest_contract, amount)
+        .map_err(|_| TransferError::FailedToComputeBalanceUpdate)?;
 
     apply_balance_changes(host, src_contract, src_account, dest_account, &amount.0)?;
     Ok(TransferSuccess {
@@ -414,9 +413,8 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
     let src_contract = Contract::Implicit(src.clone());
-    let balance_updates =
-        compute_balance_updates(&src_contract, &dest_contract, balance)
-            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let balance_updates = compute_balance_updates(&src_contract, &dest_contract, balance)
+        .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Apply the balance change, accordingly to the balance updates computed
     apply_balance_changes(
@@ -470,10 +468,7 @@ fn compute_balance_updates(
     src: &Contract,
     dest: &Contract,
     amount: &Narith,
-) -> Result<
-    Vec<BalanceUpdate>,
-    num_bigint::TryFromBigIntError<num_bigint::BigInt>,
-> {
+) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
     if amount.eq(&0_u64.into()) {
         return Ok(vec![]);
     };
