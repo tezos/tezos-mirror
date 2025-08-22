@@ -86,7 +86,7 @@ impl<'a> ContractScript<'a> {
     ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, TypedValue<'a>), ContractInterpretError<'a>>
     {
         let wrapped_parameter = self.wrap_parameter(arena, parameter, entrypoint, ctx)?;
-        let storage = typecheck_value(storage, ctx, &self.storage)?;
+        let storage = self.typecheck_storage(ctx, storage)?;
         let tc_val = TypedValue::new_pair(wrapped_parameter, storage);
         let mut stack = stk![tc_val];
         self.code.interpret(ctx, arena, &mut stack)?;
@@ -130,6 +130,24 @@ impl<'a> ContractScript<'a> {
         } else {
             Err(TcError::NoSuchEntrypoint(entrypoint.clone()))
         }
+    }
+
+    /// Typechecks the given storage value against the expected storage type of the contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `ctx` - The context in which the typechecking is performed.
+    /// * `storage` - The storage value to be typechecked.
+    ///
+    /// # Returns
+    ///
+    /// Returns a `Result` containing the typechecked `TypedValue` if successful, or a `TcError` if the typechecking fails.
+    pub fn typecheck_storage(
+        &self,
+        ctx: &mut Ctx<'a>,
+        storage: &Micheline<'a>,
+    ) -> Result<TypedValue<'a>, TcError> {
+        typecheck_value(storage, ctx, &self.storage)
     }
 }
 
