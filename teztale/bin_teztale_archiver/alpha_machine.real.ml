@@ -42,13 +42,13 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         return
           (List.map
              (fun Plugin.RPC.Attestation_rights.
-                    {delegate; first_slot; attestation_power; _} ->
+                    {delegate; first_slot; attesting_power; _} ->
                Consensus_ops.
                  {
                    address =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    first_slot = slot_to_int first_slot;
-                   power = attestation_power;
+                   power = attesting_power;
                  })
              answer.Plugin.RPC.Attestation_rights.delegates_rights)
     | [] -> return_nil
@@ -240,7 +240,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                 kind;
               };
             delegate = Tezos_crypto.Signature.Of_V2.public_key_hash ck.delegate;
-            power = Protocol.Alpha_context.Attestation_power.get_slots power;
+            power = Protocol.Alpha_context.Attesting_power.get_slots power;
           }
         :: acc)
       acc
@@ -277,7 +277,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power =
-                     Protocol.Alpha_context.Attestation_power.get_slots
+                     Protocol.Alpha_context.Attesting_power.get_slots
                        consensus_power;
                  }
                :: acc
@@ -301,7 +301,7 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
                    delegate =
                      Tezos_crypto.Signature.Of_V2.public_key_hash delegate;
                    power =
-                     Protocol.Alpha_context.Attestation_power.get_slots
+                     Protocol.Alpha_context.Attesting_power.get_slots
                        consensus_power;
                  }
                :: acc

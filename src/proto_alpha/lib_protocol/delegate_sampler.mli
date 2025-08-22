@@ -61,6 +61,20 @@ val baking_rights_owner :
 val load_sampler_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
+(** [stake_info_for_cycle ctxt cycle] reads the stake info for [cycle] from
+    [ctxt] if it has been previously initialized. Otherwise it initializes
+    the sampler and caches it in [ctxt] with
+    [Raw_context.set_stake_info_for_cycle].
+    Returns the updated context, the total staking power active for the cycle,
+    and the list of all delegates with their respective active staking power. *)
+val stake_info_for_cycle :
+  Raw_context.t ->
+  Cycle_repr.t ->
+  (Raw_context.t * Int64.t * (Delegate_consensus_key.pk * Int64.t) list)
+  tzresult
+  Lwt.t
+
+(** Same as [stake_info_for_cycle], but for the given level (uses the level's cycle) *)
 val stake_info :
   Raw_context.t ->
   Level_repr.t ->
@@ -85,13 +99,14 @@ val clear_outdated_sampling_data :
 val select_distribution_for_cycle :
   Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [attesting_rights_count ctxt level] returns a map of the delegates to
-    their number of attestation slots for the given level. Fails if the
+(** [attesting_power ctxt level] returns a map of the delegates to
+    their attesting power for the given level. Fails if the
     given level is in a cycle for which the seed is not in the storage *)
-val attesting_rights_count :
+val attesting_power :
+  all_bakers_attest_enabled:bool ->
   Raw_context.t ->
   Level_repr.t ->
-  (Raw_context.t * int Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (Raw_context.t * int64 Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
 val cleanup_values_for_protocol_t :
   Raw_context.t ->

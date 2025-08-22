@@ -10,8 +10,31 @@ let check_all_bakers_attest_at_level ctxt level =
   | None -> false
   | Some act_level -> Raw_level_repr.(level.Level_repr.level >= act_level)
 
-let consensus_threshold ctxt _level =
-  Constants_storage.consensus_threshold_size ctxt
+let consensus_committee ctxt level =
+  let open Lwt_result_syntax in
+  if check_all_bakers_attest_at_level ctxt level then
+    let* ctxt, total_staking_weight, _ =
+      Delegate_sampler.stake_info ctxt level
+    in
+    return (ctxt, total_staking_weight)
+  else
+    return
+      (ctxt, Int64.of_int @@ Constants_storage.consensus_committee_size ctxt)
 
-let consensus_committee ctxt _level =
-  Constants_storage.consensus_committee_size ctxt
+let consensus_threshold ctxt level =
+  let open Lwt_result_syntax in
+  if check_all_bakers_attest_at_level ctxt level then
+    let* ctxt, committee = consensus_committee ctxt level in
+    let const_committee =
+      Int64.of_int @@ Constants_storage.consensus_committee_size ctxt
+    in
+    let const_threshold =
+      Int64.of_int @@ Constants_storage.consensus_threshold_size ctxt
+    in
+    let threshold =
+      Int64.(mul const_threshold (div committee const_committee))
+    in
+    return (ctxt, threshold)
+  else
+    return
+      (ctxt, Int64.of_int @@ Constants_storage.consensus_threshold_size ctxt)

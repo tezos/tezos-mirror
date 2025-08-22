@@ -31,8 +31,8 @@ open Alpha_context
 type expected_rewards = {
   cycle : Cycle.t;
   baking_reward_fixed_portion : Tez.t;
-  baking_reward_bonus_per_slot : Tez.t;
-  attesting_reward_per_slot : Tez.t;
+  baking_reward_bonus_per_block : Tez.t;
+  attesting_reward_per_block : Tez.t;
   dal_attesting_reward_per_shard : Tez.t;
   seed_nonce_revelation_tip : Tez.t;
   vdf_revelation_tip : Tez.t;

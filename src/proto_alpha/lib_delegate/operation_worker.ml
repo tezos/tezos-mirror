@@ -36,6 +36,8 @@ module Events = struct
 
   let pp_int = Format.pp_print_int
 
+  let pp_int_64 fmt = Format.fprintf fmt "%Ld"
+
   let loop_failed =
     declare_1
       ~section
@@ -61,8 +63,8 @@ module Events = struct
       ~msg:
         "prequorum reached (voting power: {voting_power}, {preattestations} \
          preattestations)"
-      ~pp1:pp_int
-      ("voting_power", Data_encoding.int31)
+      ~pp1:pp_int_64
+      ("voting_power", Data_encoding.int64)
       ~pp2:pp_int
       ("preattestations", Data_encoding.int31)
 
@@ -84,10 +86,10 @@ module Events = struct
          power: {voting_power}, {preattestations} preattestations)"
       ~pp1:pp_int
       ("count", Data_encoding.int31)
-      ~pp2:pp_int
-      ("delta_power", Data_encoding.int31)
-      ~pp3:pp_int
-      ("voting_power", Data_encoding.int31)
+      ~pp2:pp_int_64
+      ("delta_power", Data_encoding.int64)
+      ~pp3:pp_int_64
+      ("voting_power", Data_encoding.int64)
       ~pp4:pp_int
       ("preattestations", Data_encoding.int31)
 
@@ -112,8 +114,8 @@ module Events = struct
       ~msg:
         "quorum reached (voting power: {voting_power}, {attestations} \
          attestations)"
-      ~pp1:pp_int
-      ("voting_power", Data_encoding.int31)
+      ~pp1:pp_int_64
+      ("voting_power", Data_encoding.int64)
       ~pp2:pp_int
       ("attestations", Data_encoding.int31)
 
@@ -127,10 +129,10 @@ module Events = struct
          power: {voting_power}, {attestations} attestations)"
       ~pp1:pp_int
       ("count", Data_encoding.int31)
-      ~pp2:pp_int
-      ("delta_power", Data_encoding.int31)
-      ~pp3:pp_int
-      ("voting_power", Data_encoding.int31)
+      ~pp2:pp_int_64
+      ("delta_power", Data_encoding.int64)
+      ~pp3:pp_int_64
+      ("voting_power", Data_encoding.int64)
       ~pp4:pp_int
       ("attestations", Data_encoding.int31)
 
@@ -268,10 +270,10 @@ end)
 
 type pqc_watched = {
   candidate_watched : candidate;
-  get_slot_voting_power : slot:Slot.t -> int option;
-  consensus_threshold : int;
-  consensus_committee : int;
-  mutable current_voting_power : int;
+  get_slot_voting_power : slot:Slot.t -> int64 option;
+  consensus_threshold : int64;
+  consensus_committee : int64;
+  mutable current_voting_power : int64;
   mutable preattestations_received : Preattestation_set.t;
   mutable preattestations_count : int;
   mutable previous_prequorum_progression : int;
@@ -279,10 +281,10 @@ type pqc_watched = {
 
 type qc_watched = {
   candidate_watched : candidate;
-  get_slot_voting_power : slot:Slot.t -> int option;
-  consensus_threshold : int;
-  consensus_committee : int;
-  mutable current_voting_power : int;
+  get_slot_voting_power : slot:Slot.t -> int64 option;
+  consensus_threshold : int64;
+  consensus_committee : int64;
+  mutable current_voting_power : int64;
   mutable attestations_received : Attestation_set.t;
   mutable attestations_count : int;
   mutable previous_quorum_progression : int;
@@ -386,13 +388,13 @@ let reset_monitoring state =
   match state.proposal_watched with
   | None -> return_unit
   | Some (Pqc_watch pqc_watched) ->
-      pqc_watched.current_voting_power <- 0 ;
+      pqc_watched.current_voting_power <- 0L ;
       pqc_watched.preattestations_count <- 0 ;
       pqc_watched.preattestations_received <- Preattestation_set.empty ;
       pqc_watched.previous_prequorum_progression <- 0 ;
       return_unit
   | Some (Qc_watch qc_watched) ->
-      qc_watched.current_voting_power <- 0 ;
+      qc_watched.current_voting_power <- 0L ;
       qc_watched.attestations_count <- 0 ;
       qc_watched.attestations_received <- Attestation_set.empty ;
       qc_watched.previous_quorum_progression <- 0 ;
@@ -438,14 +440,14 @@ let update_pqc_monitoring ~pqc_watched ops =
                 pqc_watched.preattestations_count <-
                   succ pqc_watched.preattestations_count ;
                 pqc_watched.current_voting_power <-
-                  pqc_watched.current_voting_power + op_power
+                  Int64.add pqc_watched.current_voting_power op_power
             | None ->
                 (* preattestations that do not use the first slot of a
                    delegate are not added to the quorum *)
                 ()))
     fresh_preattestations ;
   let additional_voting_power =
-    pqc_watched.current_voting_power - current_voting_power
+    Int64.sub pqc_watched.current_voting_power current_voting_power
   in
   let additional_preattestations_count =
     pqc_watched.preattestations_count - preattestations_count
@@ -492,14 +494,14 @@ let update_qc_monitoring ~qc_watched ops =
                 qc_watched.attestations_count <-
                   succ qc_watched.attestations_count ;
                 qc_watched.current_voting_power <-
-                  qc_watched.current_voting_power + op_power
+                  Int64.add qc_watched.current_voting_power op_power
             | None ->
                 (* attestations that do not use the first slot of a delegate
                    are not added to the quorum *)
                 ()))
     fresh_attestations ;
   let additional_voting_power =
-    qc_watched.current_voting_power - current_voting_power
+    Int64.sub qc_watched.current_voting_power current_voting_power
   in
   let additional_attestations_count =
     qc_watched.attestations_count - attestations_count
@@ -544,8 +546,11 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         let* () =
           let current_ratio =
-            pqc_watched.current_voting_power * 100
-            / pqc_watched.consensus_committee
+            Int64.(
+              div
+                (mul pqc_watched.current_voting_power 100L)
+                pqc_watched.consensus_committee
+              |> to_int)
           in
           (* We only want to output an event if the quorum progression has
              progressed of at least [quorum_progression_increment] *)
@@ -593,8 +598,11 @@ let update_monitoring ?(should_lock = true) state ops =
       else
         let* () =
           let current_ratio =
-            qc_watched.current_voting_power * 100
-            / qc_watched.consensus_committee
+            Int64.(
+              div
+                (mul qc_watched.current_voting_power 100L)
+                qc_watched.consensus_committee
+              |> to_int)
           in
           (* We only want to output an event if the quorum progression has
              progressed of at least [quorum_progression_increment] *)
@@ -640,7 +648,7 @@ let monitor_preattestation_quorum state ~consensus_threshold
            get_slot_voting_power;
            consensus_threshold;
            consensus_committee;
-           current_voting_power = 0;
+           current_voting_power = 0L;
            preattestations_received = Preattestation_set.empty;
            preattestations_count = 0;
            previous_prequorum_progression = 0;
@@ -658,7 +666,7 @@ let monitor_attestation_quorum state ~consensus_threshold ~consensus_committee
            get_slot_voting_power;
            consensus_threshold;
            consensus_committee;
-           current_voting_power = 0;
+           current_voting_power = 0L;
            attestations_received = Attestation_set.empty;
            attestations_count = 0;
            previous_quorum_progression = 0;

@@ -54,7 +54,7 @@
   Cycle_repr
   Tez_repr
   Deposits_repr
-  Attestation_power_repr
+  Attesting_power_repr
   Unstaked_frozen_deposits_repr
   Staking_pseudotoken_repr
   Period_repr
@@ -163,7 +163,6 @@
   Global_constants_costs
   Ticket_hash_builder
   Constants_storage
-  Consensus_parameters_storage
   Level_storage
   Cycle_storage
   Nonce_storage
@@ -198,6 +197,7 @@
   Delegate_storage
   Delegate_sampler
   Delegate_rewards
+  Consensus_parameters_storage
   Already_denounced_storage
   Dal_already_denounced_storage
   Delegate_missed_attestations_storage
@@ -346,7 +346,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -458,7 +458,6 @@
   global_constants_costs.ml global_constants_costs.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  consensus_parameters_storage.ml consensus_parameters_storage.mli
   level_storage.ml level_storage.mli
   cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
@@ -493,6 +492,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml
@@ -643,7 +643,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -755,7 +755,6 @@
   global_constants_costs.ml global_constants_costs.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  consensus_parameters_storage.ml consensus_parameters_storage.mli
   level_storage.ml level_storage.mli
   cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
@@ -790,6 +789,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml
@@ -924,7 +924,7 @@
   cycle_repr.ml cycle_repr.mli
   tez_repr.ml tez_repr.mli
   deposits_repr.ml deposits_repr.mli
-  attestation_power_repr.ml attestation_power_repr.mli
+  attesting_power_repr.ml attesting_power_repr.mli
   unstaked_frozen_deposits_repr.ml unstaked_frozen_deposits_repr.mli
   staking_pseudotoken_repr.ml staking_pseudotoken_repr.mli
   period_repr.ml period_repr.mli
@@ -1036,7 +1036,6 @@
   global_constants_costs.ml global_constants_costs.mli
   ticket_hash_builder.ml ticket_hash_builder.mli
   constants_storage.ml constants_storage.mli
-  consensus_parameters_storage.ml consensus_parameters_storage.mli
   level_storage.ml level_storage.mli
   cycle_storage.ml cycle_storage.mli
   nonce_storage.ml nonce_storage.mli
@@ -1071,6 +1070,7 @@
   delegate_storage.ml delegate_storage.mli
   delegate_sampler.ml delegate_sampler.mli
   delegate_rewards.ml delegate_rewards.mli
+  consensus_parameters_storage.ml consensus_parameters_storage.mli
   already_denounced_storage.ml already_denounced_storage.mli
   dal_already_denounced_storage.ml dal_already_denounced_storage.mli
   delegate_missed_attestations_storage.ml

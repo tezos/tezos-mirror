@@ -28,8 +28,8 @@ open Alpha_context
 
 type error +=
   | (* `Permanent *)
-      Insufficient_attestation_power of {
-      attestation_power : int64;
+      Insufficient_attesting_power of {
+      attesting_power : int64;
       consensus_threshold : int64;
     }
 
@@ -38,6 +38,7 @@ type ordered_slots = private {
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
+  attesting_power : int64;
 }
 
 (** For a given level computes who has the right to include an attestation in
@@ -63,4 +64,7 @@ val attesting_rights_by_first_slot :
 
 (** Computes the bonus baking reward depending on the attestation power. *)
 val bonus_baking_reward :
-  context -> Level.t -> attestation_power:Attestation_power.t -> Tez.t tzresult
+  context ->
+  Level.t ->
+  attesting_power:Attesting_power.t ->
+  (context * Tez.t) tzresult Lwt.t

@@ -237,14 +237,14 @@ let attestations_attesting_power state attestations =
     match
       Delegate_slots.voting_power state.level_state.delegate_slots ~slot
     with
-    | None -> 0 (* cannot happen *)
+    | None -> 0L (* cannot happen *)
     | Some attesting_power -> attesting_power
   in
   List.sort_uniq compare attestations
   |> List.fold_left
        (fun power attestation ->
-         power + get_attestation_voting_power attestation)
-       0
+         Int64.add power (get_attestation_voting_power attestation))
+       0L
 
 let generic_attesting_power (filter : packed_operation list -> 'a list)
     (extract : 'a -> consensus_content) state =
@@ -348,11 +348,10 @@ let propose_at_next_level ~minimal_timestamp state =
 
 let attestation_quorum state =
   let power, attestations = state_attesting_power state in
-  (* TODO ABAAB *)
   let consensus_threshold =
     Delegate_slots.consensus_threshold state.level_state.delegate_slots
   in
-  if Compare.Int.(power >= consensus_threshold) then Some (power, attestations)
+  if Compare.Int64.(power >= consensus_threshold) then Some (power, attestations)
   else None
 
 (* Here's the sketch of the algorithm:
@@ -709,15 +708,14 @@ let rec baking_minimal_timestamp ~count state
       own_attestations.unsigned_consensus_votes
     |> attestations_attesting_power state
   in
-  (* TODO ABAAB *)
   let consensus_threshold =
     Delegate_slots.consensus_threshold state.level_state.delegate_slots
   in
   let* () =
-    if Compare.Int.(total_voting_power < consensus_threshold) then
+    if Compare.Int64.(total_voting_power < consensus_threshold) then
       cctxt#error
-        "Delegates do not have enough voting power. Only %d is available while \
-         %d is required."
+        "Delegates do not have enough voting power. Only %Ld is available \
+         while %Ld is required."
         total_voting_power
         consensus_threshold
     else return_unit

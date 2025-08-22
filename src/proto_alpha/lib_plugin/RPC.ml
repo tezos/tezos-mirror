@@ -3803,7 +3803,7 @@ module Attestation_rights = struct
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.Public_key_hash.t;
     first_slot : Slot.t;
-    attestation_power : int;
+    attesting_power : int;
   }
 
   type t = {
@@ -3815,14 +3815,14 @@ module Attestation_rights = struct
   let delegate_rights_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; first_slot; attestation_power} ->
-        (delegate, first_slot, attestation_power, consensus_key))
-      (fun (delegate, first_slot, attestation_power, consensus_key) ->
-        {delegate; first_slot; attestation_power; consensus_key})
+      (fun {delegate; consensus_key; first_slot; attesting_power} ->
+        (delegate, first_slot, attesting_power, consensus_key))
+      (fun (delegate, first_slot, attesting_power, consensus_key) ->
+        {delegate; first_slot; attesting_power; consensus_key})
       (obj4
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "first_slot" Slot.encoding)
-         (req "attestation_power" uint16)
+         (req "attesting_power" uint16)
          (req "consensus_key" Signature.Public_key_hash.encoding))
 
   let encoding =
@@ -3912,7 +3912,7 @@ module Attestation_rights = struct
                     companion_pk = _;
                     companion_pkh = _;
                   };
-                attestation_power;
+                attesting_power;
                 dal_power = _;
               } :
                Consensus_key.power)
@@ -3922,7 +3922,7 @@ module Attestation_rights = struct
             consensus_key;
             first_slot;
             (* TODO ABAAB (this RPC is only used for tests) *)
-            attestation_power = Attestation_power.get_slots attestation_power;
+            attesting_power = Attesting_power.get_slots attesting_power;
           }
           :: acc)
         rights
@@ -3984,27 +3984,29 @@ module Validators = struct
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
     slots : Slot.t list;
+    attesting_power : int64;
   }
 
   type t = {
     level : Raw_level.t;
-    consensus_threshold : int;
-    consensus_committee : int;
+    consensus_threshold : int64;
+    consensus_committee : int64;
     delegates : delegate list;
   }
 
   let delegate_encoding =
     let open Data_encoding in
     conv
-      (fun {delegate; consensus_key; companion_key; slots} ->
-        (delegate, slots, consensus_key, companion_key))
-      (fun (delegate, slots, consensus_key, companion_key) ->
-        {delegate; consensus_key; companion_key; slots})
-      (obj4
+      (fun {delegate; consensus_key; companion_key; slots; attesting_power} ->
+        (delegate, slots, consensus_key, companion_key, attesting_power))
+      (fun (delegate, slots, consensus_key, companion_key, attesting_power) ->
+        {delegate; consensus_key; companion_key; slots; attesting_power})
+      (obj5
          (req "delegate" Signature.Public_key_hash.encoding)
          (req "slots" (list Slot.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
-         (opt "companion_key" Bls.Public_key_hash.encoding))
+         (opt "companion_key" Bls.Public_key_hash.encoding)
+         (req "attesting_power" int64))
 
   let encoding =
     let open Data_encoding in
@@ -4015,8 +4017,8 @@ module Validators = struct
         {level; consensus_threshold; consensus_committee; delegates})
       (obj4
          (req "level" Raw_level.encoding)
-         (req "consensus_threshold" int31)
-         (req "consensus_committee" int31)
+         (req "consensus_threshold" int64)
+         (req "consensus_committee" int64)
          (req "delegates" (list delegate_encoding)))
 
   module S = struct
@@ -4061,19 +4063,29 @@ module Validators = struct
 
   let attestation_slots_at_level ctxt level =
     let open Lwt_result_syntax in
-    let+ ctxt, rights = Baking.attesting_rights ctxt level in
+    let* ctxt, rights = Baking.attesting_rights ctxt level in
     let aggregate_attestation = Constants.aggregate_attestation ctxt in
-    ( ctxt,
-      Signature.Public_key_hash.Map.fold
-        (fun _pkh {Baking.delegate; consensus_key; companion_key; slots} acc ->
-          let companion_key =
-            match consensus_key with
-            | Bls _ when aggregate_attestation -> companion_key
-            | _ -> None
-          in
-          {delegate; consensus_key; companion_key; slots} :: acc)
-        rights
-        [] )
+    return
+      ( ctxt,
+        Signature.Public_key_hash.Map.fold
+          (fun _pkh
+               {
+                 Baking.delegate;
+                 consensus_key;
+                 companion_key;
+                 slots;
+                 attesting_power;
+               }
+               acc ->
+            let companion_key =
+              match consensus_key with
+              | Bls _ when aggregate_attestation -> companion_key
+              | _ -> None
+            in
+            {delegate; consensus_key; companion_key; slots; attesting_power}
+            :: acc)
+          rights
+          [] )
 
   let register () =
     let open Lwt_result_syntax in
@@ -4084,11 +4096,11 @@ module Validators = struct
         let+ _ctxt, rights =
           List.fold_left_es
             (fun (ctxt, acc) level ->
-              let consensus_threshold =
-                Attestation_power.consensus_threshold ctxt level
+              let* ctxt, consensus_threshold =
+                Attesting_power.consensus_threshold ctxt level
               in
-              let consensus_committee =
-                Attestation_power.consensus_committee ctxt level
+              let* ctxt, consensus_committee =
+                Attesting_power.consensus_committee ctxt level
               in
               let* ctxt, delegates = attestation_slots_at_level ctxt level in
               return

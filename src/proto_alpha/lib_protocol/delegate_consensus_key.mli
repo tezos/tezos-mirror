@@ -53,7 +53,7 @@ type pk = Raw_context.consensus_pk = {
 (** The attesting and dal power related to the associated consensus key *)
 type power = Raw_context.consensus_power = {
   consensus_key : pk;
-  attestation_power : Attestation_power_repr.t;
+  attesting_power : Attesting_power_repr.t;
   dal_power : int;
 }
 

@@ -93,7 +93,7 @@ let consensus_pk_encoding =
 
 type consensus_power = {
   consensus_key : consensus_pk;
-  attestation_power : Attestation_power_repr.t;
+  attesting_power : Attesting_power_repr.t;
   dal_power : int;
 }
 
@@ -103,7 +103,7 @@ module Raw_consensus = struct
       this delegate. *)
 
   type t = {
-    current_attestation_power : Attestation_power_repr.t;
+    current_attesting_power : Attesting_power_repr.t;
         (** Number of attestation slots and their related staking power recorded
             for the current block. *)
     allowed_attestations : consensus_power Slot_repr.Map.t option;
@@ -131,7 +131,7 @@ module Raw_consensus = struct
     preattestations_seen : Slot_repr.Set.t;
         (** Record the preattestations already seen. Only initial slots
             are indexed. *)
-    locked_round_evidence : (Round_repr.t * Attestation_power_repr.t) option;
+    locked_round_evidence : (Round_repr.t * Attesting_power_repr.t) option;
         (** Record the preattestation power and staking power for a locked round. *)
     preattestations_quorum_round : Round_repr.t option;
         (** in block construction mode, record the round of preattestations
@@ -151,7 +151,7 @@ module Raw_consensus = struct
 
   let empty : t =
     {
-      current_attestation_power = Attestation_power_repr.zero;
+      current_attesting_power = Attesting_power_repr.zero;
       allowed_attestations = Some Slot_repr.Map.empty;
       allowed_preattestations = Some Slot_repr.Map.empty;
       allowed_consensus = None;
@@ -185,13 +185,13 @@ module Raw_consensus = struct
         (Slot_repr.Set.mem initial_slot t.attestations_seen)
         Double_inclusion_of_consensus_operation
     in
-    let current_attestation_power =
-      Attestation_power_repr.add power t.current_attestation_power
+    let current_attesting_power =
+      Attesting_power_repr.add power t.current_attesting_power
     in
     return
       {
         t with
-        current_attestation_power;
+        current_attesting_power;
         attestations_seen = Slot_repr.Set.add initial_slot t.attestations_seen;
       }
 
@@ -210,7 +210,7 @@ module Raw_consensus = struct
              It doesn't matter in that case since quorum certificates
              are not used in mempool.
              For other cases [Apply.check_round] verifies it. *)
-          let power = Attestation_power_repr.add power evidences in
+          let power = Attesting_power_repr.add power evidences in
           Some (round, power)
     in
     return
@@ -2162,7 +2162,7 @@ module type CONSENSUS = sig
 
   type round
 
-  type attestation_power
+  type attesting_power
 
   type consensus_power
 
@@ -2176,7 +2176,7 @@ module type CONSENSUS = sig
 
   type error += Slot_map_not_found of {loc : string}
 
-  val current_attestation_power : t -> attestation_power
+  val current_attesting_power : t -> attesting_power
 
   val initialize_consensus_operation :
     t ->
@@ -2186,10 +2186,10 @@ module type CONSENSUS = sig
     t
 
   val record_attestation :
-    t -> initial_slot:slot -> power:attestation_power -> t tzresult
+    t -> initial_slot:slot -> power:attesting_power -> t tzresult
 
   val record_preattestation :
-    t -> initial_slot:slot -> power:attestation_power -> round -> t tzresult
+    t -> initial_slot:slot -> power:attesting_power -> round -> t tzresult
 
   val forbid_delegate : t -> Signature.Public_key_hash.t -> t
 
@@ -2201,7 +2201,7 @@ module type CONSENSUS = sig
 
   val set_preattestations_quorum_round : t -> round -> t
 
-  val locked_round_evidence : t -> (round * attestation_power) option
+  val locked_round_evidence : t -> (round * attesting_power) option
 
   val set_attestation_branch : t -> Block_hash.t * Block_payload_hash.t -> t
 
@@ -2216,7 +2216,7 @@ module Consensus :
      and type 'a level_map := 'a Level_repr.Map.t
      and type slot_set := Slot_repr.Set.t
      and type round := Round_repr.t
-     and type attestation_power := Attestation_power_repr.t
+     and type attesting_power := Attesting_power_repr.t
      and type consensus_power := consensus_power = struct
   let[@inline] update_consensus_with ctxt f =
     {ctxt with back = {ctxt.back with consensus = f ctxt.back.consensus}}
@@ -2240,8 +2240,8 @@ module Consensus :
   let[@inline] set_forbidden_delegates ctxt delegates =
     update_consensus_with ctxt (Raw_consensus.set_forbidden_delegates delegates)
 
-  let[@inline] current_attestation_power ctxt =
-    ctxt.back.consensus.current_attestation_power
+  let[@inline] current_attesting_power ctxt =
+    ctxt.back.consensus.current_attesting_power
 
   let[@inline] get_preattestations_quorum_round ctxt =
     ctxt.back.consensus.preattestations_quorum_round

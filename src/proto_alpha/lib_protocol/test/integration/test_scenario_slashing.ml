@@ -145,8 +145,7 @@ let check_has_no_slots ~loc baker_name =
       | [] -> return input
       | [{level = _; delegates_rights; estimated_time = _}] -> (
           match delegates_rights with
-          | [{delegate; consensus_key = _; first_slot = _; attestation_power}]
-            ->
+          | [{delegate; consensus_key = _; first_slot = _; attesting_power}] ->
               Test.fail
                 ~__LOC__
                 "%s: delegate '%s'(%a) expected to have no attestation power, \
@@ -155,7 +154,7 @@ let check_has_no_slots ~loc baker_name =
                 baker_name
                 Signature.Public_key_hash.pp
                 delegate
-                attestation_power
+                attesting_power
           | _ ->
               (* Cannot happen: RPC called for only one delegate *) assert false
           )

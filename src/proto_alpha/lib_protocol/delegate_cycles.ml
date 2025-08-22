@@ -132,8 +132,21 @@ let maybe_distribute_dal_attesting_rewards ctxt delegate ~gets_consensus_rewards
 (* This includes DAL rewards. *)
 let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
   let open Lwt_result_syntax in
-  let*? attesting_reward_per_slot =
-    Delegate_rewards.attesting_reward_per_slot ctxt
+  let cycle_eras = Raw_context.cycle_eras ctxt in
+  let first_level =
+    Level_repr.first_level_in_cycle_from_eras ~cycle_eras last_cycle
+  in
+  let all_bakers_attest_enabled =
+    Consensus_parameters_storage.check_all_bakers_attest_at_level
+      ctxt
+      first_level
+  in
+  let*? attesting_reward_per_block =
+    Delegate_rewards.attesting_reward_per_block ctxt
+  in
+  (* Attesting power is staking power *)
+  let* ctxt, total_active_stake_weight, _ =
+    Delegate_sampler.stake_info_for_cycle ctxt last_cycle
   in
   let unrevealed_nonces_set =
     List.fold_left
@@ -141,12 +154,6 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         Signature.Public_key_hash.Set.add delegate set)
       Signature.Public_key_hash.Set.empty
       unrevealed_nonces
-  in
-  let* total_active_stake =
-    Stake_storage.get_total_active_stake ctxt last_cycle
-  in
-  let total_active_stake_weight =
-    Stake_repr.staking_weight total_active_stake
   in
   let* dal_attesting_reward_per_shard =
     Raw_context.Dal.only_if_incentives_enabled
@@ -158,6 +165,8 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         in
         return @@ Some dal_attesting_reward_per_shard)
   in
+  (* We cannot use the cached stake info: the detailed stake is needed for reward
+     distribution, but it is not cached. *)
   let* delegates = Stake_storage.get_selected_distribution ctxt last_cycle in
   List.fold_left_es
     (fun (ctxt, balance_updates) (delegate, active_stake) ->
@@ -171,14 +180,14 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
         delegate_has_revealed_nonces delegate unrevealed_nonces_set
       in
       let active_stake_weight = Stake_repr.staking_weight active_stake in
-      let expected_slots =
-        Delegate_missed_attestations_storage
-        .expected_slots_for_given_active_stake
+      let*? rewards =
+        Delegate_missed_attestations_storage.attestation_rewards_per_cycle
           ctxt
+          ~all_bakers_attest_enabled
           ~total_active_stake_weight
           ~active_stake_weight
+          ~rewards_per_block:attesting_reward_per_block
       in
-      let rewards = Tez_repr.mul_exn attesting_reward_per_slot expected_slots in
       let gets_consensus_rewards =
         sufficient_participation && has_revealed_nonces
       in

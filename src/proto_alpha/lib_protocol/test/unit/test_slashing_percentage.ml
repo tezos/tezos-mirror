@@ -55,7 +55,10 @@ let make_fake_culprits_with_rights_from_int_list il =
   let map =
     List.fold_left
       (fun map (pkh, rights) ->
-        Environment.Signature.Public_key_hash.Map.add pkh rights map)
+        Environment.Signature.Public_key_hash.Map.add
+          pkh
+          (Int64.of_int rights)
+          map)
       Environment.Signature.Public_key_hash.Map.empty
       pkh_rights_list
   in
@@ -69,8 +72,10 @@ let get_pct ~max_slashing_threshold ~max_slashing_per_block int_list =
   return
   @@ Protocol.Slash_percentage.Internal_for_tests.for_double_attestation
        ctxt
+       ~committee_size:
+         (Int64.of_int
+            Default_parameters.constants_mainnet.consensus_committee_size)
        map
-       Protocol.Level_repr.level_zero_use_with_care
        pkh_list
 
 (** Tests that the slashing amount for several delegates is the same as long

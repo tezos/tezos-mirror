@@ -32,7 +32,7 @@ open Baking_state_types
 type delegate_slot = {
   delegate : Delegate.t;
   first_slot : Slot.t;
-  attesting_power : int;
+  attesting_power : int64;
 }
 
 val pp_delegate_slot : Format.formatter -> delegate_slot -> unit
@@ -57,7 +57,7 @@ module Delegate_slots : sig
 
   (** Returns the voting power of the delegate whose first slot is the given
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
-  val voting_power : t -> slot:Slot.t -> int option
+  val voting_power : t -> slot:Slot.t -> int64 option
 
   (** Finds the first slot greater than or equal to [slot]. Returns the
      corresponding (slot, delegate) pair if found, or [None] if no such slot
@@ -69,10 +69,10 @@ module Delegate_slots : sig
   val min_slot : t -> (Slot.t * delegate_slot) option
 
   (** Returns the consensus threshold at the level the slots were computed *)
-  val consensus_threshold : t -> int
+  val consensus_threshold : t -> int64
 
   (** Returns the consensus committee at the level the slots were computed *)
-  val consensus_committee : t -> int
+  val consensus_committee : t -> int64
 end
 
 type delegate_slots = Delegate_slots.t

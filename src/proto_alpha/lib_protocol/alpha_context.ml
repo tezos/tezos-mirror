@@ -650,6 +650,8 @@ module Stake_distribution = struct
 
   let slot_owner = Delegate_sampler.slot_owner
 
+  let stake_info_for_cycle = Delegate_sampler.stake_info_for_cycle
+
   let stake_info = Delegate_sampler.stake_info
 
   let load_sampler_for_cycle = Delegate_sampler.load_sampler_for_cycle
@@ -691,8 +693,8 @@ end
 
 module Migration = Migration_repr
 
-module Attestation_power = struct
-  include Attestation_power_repr
+module Attesting_power = struct
+  include Attesting_power_repr
   include Consensus_parameters_storage
 
   let get ctxt level {slots; stake} =

@@ -153,6 +153,10 @@ module Tez : sig
 
   val div_exn : t -> int -> t
 
+  (** See {!Tez_repr.mul_ratio}. *)
+  val mul_ratio :
+    rounding:[`Down | `Up] -> t -> num:int64 -> den:int64 -> t tzresult
+
   (** See {!Tez_repr.mul_percentage}. *)
   val mul_percentage : rounding:[`Down | `Up] -> t -> Percentage.t -> t
 end
@@ -1053,7 +1057,7 @@ module Constants : sig
   val round_durations : context -> Round.round_durations
 
   (** To be used for rounds and DAL. For attestations,
-      see {!Attestation_power.consensus_committee}. *)
+      see {!Attesting_power.consensus_committee}. *)
   val consensus_committee_size : context -> int
 
   val minimal_participation_ratio : context -> Ratio.t
@@ -2243,9 +2247,9 @@ module Receipt : sig
   val balance_updates_encoding : balance_updates Data_encoding.t
 end
 
-(** This module re-exports definitions from {!Attestation_power_repr} and
+(** This module re-exports definitions from {!Attesting_power_repr} and
     {!Consensus_parameters_storage}. *)
-module Attestation_power : sig
+module Attesting_power : sig
   type t
 
   val encoding : t Data_encoding.t
@@ -2262,9 +2266,13 @@ module Attestation_power : sig
 
   val get_slots : t -> int
 
-  val consensus_threshold : context -> Level.t -> int
+  val check_all_bakers_attest_at_level : context -> Level.t -> bool
 
-  val consensus_committee : context -> Level.t -> int
+  val consensus_threshold :
+    context -> Level.t -> (context * int64) tzresult Lwt.t
+
+  val consensus_committee :
+    context -> Level.t -> (context * int64) tzresult Lwt.t
 end
 
 (** This module re-exports definitions from {!Delegate_consensus_key}. *)
@@ -2284,7 +2292,7 @@ module Consensus_key : sig
 
   type power = {
     consensus_key : pk;
-    attestation_power : Attestation_power.t;
+    attesting_power : Attesting_power.t;
     dal_power : int;
   }
 
@@ -2449,9 +2457,9 @@ module Delegate : sig
   module Rewards : sig
     val baking_reward_fixed_portion : t -> Tez.t tzresult
 
-    val baking_reward_bonus_per_slot : t -> Tez.t tzresult
+    val baking_reward_bonus_per_block : t -> Tez.t tzresult
 
-    val attesting_reward_per_slot : t -> Tez.t tzresult
+    val attesting_reward_per_block : t -> Tez.t tzresult
 
     val dal_attesting_reward_per_shard : t -> Tez.t tzresult
 
@@ -2464,8 +2472,8 @@ module Delegate : sig
     module For_RPC : sig
       type reward_kind =
         | Baking_reward_fixed_portion
-        | Baking_reward_bonus_per_slot
-        | Attesting_reward_per_slot
+        | Baking_reward_bonus_per_block
+        | Attesting_reward_per_block
         | Dal_attesting_reward_per_shard
         | Seed_nonce_revelation_tip
         | Vdf_revelation_tip
@@ -5278,6 +5286,11 @@ module Stake_distribution : sig
   val slot_owner :
     context -> Level.t -> Slot.t -> (context * Consensus_key.pk) tzresult Lwt.t
 
+  val stake_info_for_cycle :
+    context ->
+    Cycle.t ->
+    (context * Int64.t * (Consensus_key.pk * Int64.t) list) tzresult Lwt.t
+
   val stake_info :
     context ->
     Level.t ->
@@ -5565,7 +5578,7 @@ module Consensus : sig
        and type 'a level_map := 'a Level.Map.t
        and type slot_set := Slot.Set.t
        and type round := Round.t
-       and type attestation_power := Attestation_power.t
+       and type attesting_power := Attesting_power.t
        and type consensus_power := Consensus_key.power
 
   (** [store_attestation_branch context branch] sets the "attestation branch"

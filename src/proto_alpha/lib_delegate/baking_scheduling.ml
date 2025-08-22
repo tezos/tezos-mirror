@@ -945,6 +945,7 @@ let try_resolve_consensus_keys cctxt key =
                         consensus_key = _;
                         companion_key = _;
                         slots = _;
+                        attesting_power = _;
                       }
                       :: _;
                     _;
