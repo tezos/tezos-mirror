@@ -368,7 +368,7 @@ let () =
     (add_dep_to_profile "octez-dev-deps")
     [
       external_lib "merlin" V.(at_least "4.18");
-      external_lib "ocaml-lsp-server" V.(at_least "1.20.1");
+      external_lib "ocaml-lsp-server" V.(at_least "1.21.0");
       external_lib "odoc" V.(at_least "3.0.0");
       external_lib "ocp-indent" V.True;
       external_lib "merge-fmt" V.True;
