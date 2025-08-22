@@ -734,6 +734,10 @@ module type Layer1 = sig
   val vms_config : string option
 
   val config : string option
+
+  val ppx_profiling : bool
+
+  val ppx_profiling_backends : string list
 end
 
 module Layer1 () = struct
@@ -851,6 +855,26 @@ module Layer1 () = struct
       ~description:
         "JSON file optionally describing options for each VM involved in the \
          test"
+      ()
+
+  let ppx_profiling =
+    Clap.flag
+      ~section
+      ~set_long:"ppx-profiling"
+      ~unset_long:"no-ppx-profiling"
+      ~description:
+        "Enable PPX profiling on all components. The level of verbosity is by \
+         default `Debug`. "
+      false
+
+  let ppx_profiling_backends =
+    Clap.list_string
+      ~section
+      ~long:"ppx-profiling-backends"
+      ~description:
+        "Select the backends used by the profiler, bypassing the defaults \
+         selection: always `txt` and `json`, and also `prometheus` if \
+         `--prometheus` and `opentelemetry` if `--opentelemetry`."
       ()
 
   let config =

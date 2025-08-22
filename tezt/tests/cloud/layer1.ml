@@ -64,8 +64,8 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers (agent, node, name) snapshot
-      network migration_offset =
+  let init_bootstrap_node_from_snapshot ~peers ~ppx_profiling
+      (agent, node, name) snapshot network migration_offset =
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
@@ -104,7 +104,11 @@ module Node = struct
     in
     let arguments = Node_helpers.isolated_args peers in
     let* () =
-      run ~env:yes_crypto_env node (Synchronisation_threshold 0 :: arguments)
+      Node.Agent.run
+        ~env:yes_crypto_env
+        node
+        (Synchronisation_threshold 0 :: arguments)
+        ~ppx_profiling
     in
     wait_for_ready node
 
@@ -113,8 +117,8 @@ module Node = struct
       - import the relevant snapshot
       - run it with yes-crypto enabled and allowed peer lists
   *)
-  let init_node_from_snapshot ~delay ~peers ~snapshot ~network ~migration_offset
-      (agent, node, name) =
+  let init_node_from_snapshot ~delay ~peers ~ppx_profiling ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
@@ -133,7 +137,11 @@ module Node = struct
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
     in
     let* () =
-      run ~env:yes_crypto_env node (Synchronisation_threshold 0 :: arguments)
+      Node.Agent.run
+        ~env:yes_crypto_env
+        ~ppx_profiling
+        node
+        (Synchronisation_threshold 0 :: arguments)
     in
     let* () = wait_for_ready node in
     (* As we are playing with dates in the past,
@@ -150,12 +158,13 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ~peers ~snapshot ~network ~migration_offset
-      (agent, node, name) =
+  let init_bootstrap_node ~ppx_profiling ~peers ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_bootstrap_node_from_snapshot
         ~peers
+        ~ppx_profiling
         (agent, node, name)
         snapshot
         network
@@ -205,13 +214,14 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
     *)
-  let init_baker_node ?(delay = 0) ~accounts ~peers ~snapshot ~network
-      ~migration_offset (agent, node, name) =
+  let init_baker_node ?(delay = 0) ~accounts ~peers ~ppx_profiling ~snapshot
+      ~network ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
+        ~ppx_profiling
         ~snapshot
         ~network
         ~migration_offset
@@ -229,12 +239,13 @@ module Node = struct
     Lwt.return client
 
   (** Prerequisite: the chain is running (i.e. bakers are baking blocks) *)
-  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~snapshot ~network
-      ~migration_offset ~tps (agent, node, name) =
+  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~ppx_profiling ~snapshot
+      ~network ~migration_offset ~tps (agent, node, name) =
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
+        ~ppx_profiling
         ~snapshot
         ~network
         ~migration_offset
@@ -300,6 +311,8 @@ type configuration = {
   stresstest : stresstest_conf option;
   maintenance_delay : int;
   migration_offset : int option;
+  ppx_profiling : bool;
+  ppx_profiling_backends : string list;
   daily_logs_destination : string option;
 }
 
@@ -402,6 +415,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       ~accounts
       ~delay
       ~peers
+      ~ppx_profiling:configuration.ppx_profiling
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -415,6 +429,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
         ~env:yes_crypto_env
         ~name
         ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
+        ~ppx_profiling:configuration.ppx_profiling
         ~client
         node
         cloud
@@ -451,6 +466,7 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
       ~pkh
       ~delay
       ~peers
+      ~ppx_profiling:configuration.ppx_profiling
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -466,6 +482,7 @@ let init_network ~peers (configuration : configuration) cloud teztale
   let* client, delegates =
     Node.init_bootstrap_node
       ~peers
+      ~ppx_profiling:configuration.ppx_profiling
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -576,7 +593,8 @@ let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network cloud agent name =
+let number_of_bakers ~snapshot ~network ~ppx_profiling ~ppx_profiling_backends:_
+    cloud agent name =
   let* node =
     Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
   in
@@ -595,7 +613,9 @@ let number_of_bakers ~snapshot ~network cloud agent name =
   let* () =
     Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
   in
-  let* () = Node.Agent.run node (Node_helpers.isolated_args []) in
+  let* () =
+    Node.Agent.run node (Node_helpers.isolated_args []) ~ppx_profiling
+  in
   let* () = Node.wait_for_ready node in
   let* client =
     Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
@@ -630,6 +650,8 @@ let init ~(configuration : configuration) cloud next_agent =
         number_of_bakers
           ~snapshot:configuration.snapshot
           ~network:configuration.network
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
           cloud
           bootstrap_agent
           bootstrap_name
@@ -1065,6 +1087,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
     if snapshot = Snapshot_helpers.No_snapshot then
       Test.fail "snapshot parameter can not be empty" ;
     let daily_logs_destination = Tezt_cloud_cli.retrieve_daily_logs in
+    let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_backends = Cli.ppx_profiling_backends in
     {
       stake;
       network;
@@ -1072,6 +1096,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
       stresstest;
       maintenance_delay;
       migration_offset;
+      ppx_profiling;
+      ppx_profiling_backends;
       daily_logs_destination;
     }
   in
