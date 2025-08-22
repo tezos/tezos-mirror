@@ -267,7 +267,8 @@ let update_ticket_balances ctxt ~self_contract ~ticket_diffs operations =
   (* Update balances for operations. *)
   List.fold_left_es
     (fun (total_storage_diff, ctxt)
-         {Ticket_operations_diff.ticket_token; total_amount; destinations} ->
+         {Ticket_operations_diff.ticket_token; total_amount; destinations}
+       ->
       (* Verify that we are able to spend the given amount of ticket-tokens. *)
       let* is_valid_balance_update, ctxt =
         validate_spending_budget ctxt ticket_token total_amount

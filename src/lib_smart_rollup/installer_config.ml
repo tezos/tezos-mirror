@@ -152,10 +152,10 @@ let generate_yaml instrs =
   | Ok (`O ({m_members = [(name, `A sequence)]; _} as mapping)) ->
       Ok
         (`O
-          {
-            mapping with
-            m_members = [(name, `A {sequence with s_members = instrs})];
-          })
+           {
+             mapping with
+             m_members = [(name, `A {sequence with s_members = instrs})];
+           })
   | Error (`Msg err) -> tzfail (Installer_config_yaml_error err)
   | _ -> tzfail Installer_config_invalid
 

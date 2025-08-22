@@ -87,5 +87,8 @@ let make :
     legacy:bool ->
     unit ->
     elab_config =
- fun ?type_logger ?(keep_extra_types_for_interpreter_logging = false) ~legacy () ->
+ fun ?type_logger
+     ?(keep_extra_types_for_interpreter_logging = false)
+     ~legacy
+     () ->
   {type_logger; keep_extra_types_for_interpreter_logging; legacy}

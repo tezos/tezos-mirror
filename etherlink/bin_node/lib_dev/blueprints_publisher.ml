@@ -305,8 +305,7 @@ module Handlers = struct
         tx_container;
       }
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
    fun self request ->
     let open Lwt_result_syntax in

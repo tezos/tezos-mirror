@@ -76,7 +76,8 @@ let header_encoding =
            context;
            inbox_witness;
            inbox_hash;
-         } ->
+         }
+       ->
       ( block_hash,
         level,
         predecessor,
@@ -92,7 +93,8 @@ let header_encoding =
            previous_commitment_hash,
            context,
            inbox_witness,
-           inbox_hash ) ->
+           inbox_hash )
+       ->
       {
         block_hash;
         level;

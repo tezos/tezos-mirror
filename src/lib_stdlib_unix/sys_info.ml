@@ -120,7 +120,7 @@ let linux_statm pid =
             (error_info "procfs statm" (Format.asprintf "%s not found" fname)))
     (function
       | exn ->
-          Lwt.return_error (error_info "procfs statm" (Printexc.to_string exn)))
+      Lwt.return_error (error_info "procfs statm" (Printexc.to_string exn)))
 
 let darwin_ps pid =
   Lwt.catch

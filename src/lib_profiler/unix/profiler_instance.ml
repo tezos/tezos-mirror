@@ -74,8 +74,7 @@ let get_profiler_verbosity =
            the catch-all case, represented by "", has any verbosity assigned. *)
         Option.join @@ VerbosityMap.find "" profiler_verbosity_map
 
-let register_backend :
-    type config.
+let register_backend : type config.
     string list -> (config driver -> instance_maker) -> config driver -> unit =
  fun env instance_maker driver ->
   let module Driver = (val driver : DRIVER with type config = config) in

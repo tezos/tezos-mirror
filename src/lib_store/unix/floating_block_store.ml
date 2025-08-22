@@ -154,7 +154,9 @@ let append_all floating_store (blocks : (Block_repr.t * info) Seq.t) =
       let*! eof_offset = Lwt_unix.lseek floating_store.fd 0 Unix.SEEK_END in
       let* _last_offset =
         Seq.ES.fold_left
-          (fun offset (block, ({predecessors; resulting_context_hash} : info)) ->
+          (fun offset
+               (block, ({predecessors; resulting_context_hash} : info))
+             ->
             let* written_len =
               locked_write_block
                 floating_store

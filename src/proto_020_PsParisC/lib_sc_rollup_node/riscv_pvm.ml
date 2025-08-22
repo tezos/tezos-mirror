@@ -31,9 +31,10 @@ end
 
 module Embed_into_Irmin
     (P : Sc_rollup.PVM.S)
-    (S : Serializable_state_S
-           with type context = P.context
-            and type state = P.state) : sig
+    (S :
+      Serializable_state_S
+        with type context = P.context
+         and type state = P.state) : sig
   include
     Sc_rollup.PVM.S
       with type context = Context.rw_index

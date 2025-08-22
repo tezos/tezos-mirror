@@ -30,21 +30,21 @@ let of_rlp_bytes block_hash bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
-        [
-          Value hash;
-          Value index;
-          Value block_number;
-          Value from;
-          Value to_;
-          Value cumulative_gas_used;
-          Value effective_gas_price;
-          Value gas_used;
-          Value contract_address;
-          List logs;
-          Value bloom;
-          Value type_;
-          Value status;
-        ]) ->
+         [
+           Value hash;
+           Value index;
+           Value block_number;
+           Value from;
+           Value to_;
+           Value cumulative_gas_used;
+           Value effective_gas_price;
+           Value gas_used;
+           Value contract_address;
+           List logs;
+           Value bloom;
+           Value type_;
+           Value status;
+         ]) ->
       let hash = decode_hash hash in
       let index = decode_number_be index in
       let block_number = decode_number_le block_number in
@@ -116,7 +116,8 @@ let encoding =
            type_;
            status;
            contractAddress;
-         } ->
+         }
+       ->
       ( ( transactionHash,
           transactionIndex,
           blockHash,
@@ -138,7 +139,8 @@ let encoding =
              effectiveGasPrice,
              gasUsed,
              logs ),
-           (logsBloom, type_, status, contractAddress) ) ->
+           (logsBloom, type_, status, contractAddress) )
+       ->
       {
         transactionHash;
         transactionIndex;

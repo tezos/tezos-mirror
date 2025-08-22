@@ -104,12 +104,14 @@ let tx_queue_encoding =
            max_transaction_batch_length;
            max_lifespan_s;
            tx_per_addr_limit;
-         } ->
+         }
+       ->
       (max_size, max_transaction_batch_length, max_lifespan_s, tx_per_addr_limit))
     (fun ( max_size,
            max_transaction_batch_length,
            max_lifespan_s,
-           tx_per_addr_limit ) ->
+           tx_per_addr_limit )
+       ->
       {
         max_size;
         max_transaction_batch_length;
@@ -632,7 +634,8 @@ let blueprints_publisher_config_encoding =
            max_blueprints_catchup;
            catchup_cooldown;
            dal_slots;
-         } ->
+         }
+       ->
       ( max_blueprints_lag,
         max_blueprints_ahead,
         max_blueprints_catchup,
@@ -642,7 +645,8 @@ let blueprints_publisher_config_encoding =
            max_blueprints_ahead,
            max_blueprints_catchup,
            catchup_cooldown,
-           dal_slots ) ->
+           dal_slots )
+       ->
       {
         max_blueprints_lag;
         max_blueprints_ahead;
@@ -784,7 +788,8 @@ let sequencer_encoding =
            sequencer;
            blueprints_publisher_config;
            sunset_sec;
-         } ->
+         }
+       ->
       ( time_between_blocks,
         max_number_of_chunks,
         sequencer,
@@ -794,7 +799,8 @@ let sequencer_encoding =
            max_number_of_chunks,
            sequencer,
            blueprints_publisher_config,
-           sunset_sec ) ->
+           sunset_sec )
+       ->
       {
         time_between_blocks;
         max_number_of_chunks;
@@ -998,7 +1004,8 @@ let experimental_features_encoding =
            l2_chains : l2_chain list option;
            enable_tx_queue;
            periodic_snapshot_path;
-         } ->
+         }
+       ->
       ( ( drop_duplicate_on_injection,
           blueprints_publisher_order_enabled,
           enable_send_raw_transaction,
@@ -1020,7 +1027,8 @@ let experimental_features_encoding =
              spawn_rpc,
              l2_chains,
              enable_tx_queue,
-             periodic_snapshot_path ) ) ->
+             periodic_snapshot_path ) )
+       ->
       {
         drop_duplicate_on_injection;
         blueprints_publisher_order_enabled;
@@ -1195,7 +1203,8 @@ let gcp_kms_encoding =
             authentication_timeout_sec;
             gcloud_path;
           } :
-           gcp_kms) ->
+           gcp_kms)
+       ->
       ( pool_size,
         authentication_method,
         authentication_retries,
@@ -1209,7 +1218,8 @@ let gcp_kms_encoding =
            authentication_frequency_min,
            authentication_retry_backoff_sec,
            authentication_timeout_sec,
-           gcloud_path ) ->
+           gcloud_path )
+       ->
       {
         pool_size;
         authentication_method;
@@ -1409,7 +1419,8 @@ let rpc_encoding =
              batch_limit;
              restricted_rpcs;
              max_active_connections;
-           } ->
+           }
+         ->
         ( port,
           addr,
           cors_origins,
@@ -1423,7 +1434,8 @@ let rpc_encoding =
              cors_headers,
              batch_limit,
              restricted_rpcs,
-             max_active_connections ) ->
+             max_active_connections )
+         ->
         {
           port;
           addr;
@@ -1553,7 +1565,8 @@ let encoding ?network data_dir : t Data_encoding.t =
            history_mode;
            db;
            opentelemetry;
-         } ->
+         }
+       ->
       ( (log_filter, sequencer, observer),
         ( ( tx_pool_timeout_limit,
             tx_pool_addr_limit,
@@ -1591,7 +1604,8 @@ let encoding ?network data_dir : t Data_encoding.t =
                finalized_view,
                history_mode,
                db,
-               opentelemetry ) ) ) ->
+               opentelemetry ) ) )
+       ->
       {
         public_rpc;
         private_rpc;

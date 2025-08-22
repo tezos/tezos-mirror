@@ -318,7 +318,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
              nb_transactions;
              tree_depth;
              tree_branching_factor;
-           } ->
+           }
+         ->
         ( nb_inbox_messages,
           input_payload_size,
           nb_output_buffer_levels,
@@ -332,7 +333,8 @@ module Sc_rollup_verify_output_proof_benchmark = struct
              output_buffer_size,
              nb_transactions,
              tree_depth,
-             tree_branching_factor ) ->
+             tree_branching_factor )
+         ->
         {
           nb_inbox_messages : int;
           input_payload_size : int;
@@ -524,7 +526,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
              output_buffer_size;
              nb_transactions;
              tree_depth;
-           } ->
+           }
+         ->
         ( nb_output_buffer_levels,
           output_buffer_size,
           nb_transactions,
@@ -532,7 +535,8 @@ module Sc_rollup_deserialize_output_proof_benchmark = struct
       (fun ( nb_output_buffer_levels,
              output_buffer_size,
              nb_transactions,
-             tree_depth ) ->
+             tree_depth )
+         ->
         {
           nb_output_buffer_levels;
           output_buffer_size;

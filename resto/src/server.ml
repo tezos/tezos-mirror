@@ -275,8 +275,9 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) = struct
 
     let handle_options root cors headers path =
       let origin_header = Header.get headers "origin" in
-      (if (* Default OPTIONS handler for CORS preflight *)
-          origin_header = None
+      (if
+         (* Default OPTIONS handler for CORS preflight *)
+         origin_header = None
        then Directory.allowed_methods root () path
        else
          match Header.get headers "Access-Control-Request-Method" with

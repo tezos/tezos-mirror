@@ -229,7 +229,8 @@ let push ~versions ~cloud
              attestable_slots;
              in_committee;
              attestation_with_dal;
-           } ->
+           }
+       ->
       if in_committee then (
         let labels = get_labels public_key_hash in
         push_attested ~labels attested_slots ;

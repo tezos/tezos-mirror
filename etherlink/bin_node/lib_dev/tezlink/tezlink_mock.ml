@@ -174,8 +174,8 @@ module Operation_metadata = struct
         tzfail
           (Unsupported_operation_kind "only manager operations are supported")
 
-  let rec contents_list_result :
-      type kind. kind contents_list -> kind contents_result_list tzresult =
+  let rec contents_list_result : type kind.
+      kind contents_list -> kind contents_result_list tzresult =
    fun contents ->
     let open Result_syntax in
     match contents with
@@ -356,7 +356,8 @@ module Storage_repr = struct
                (),
                (),
                selected_stake_distribution,
-               () ) -> {delegate_sampler_state; selected_stake_distribution})
+               () )
+           -> {delegate_sampler_state; selected_stake_distribution})
         (obj9
            (req "already_denounced" empty)
            (req "dal_already_denounced" empty)
@@ -499,7 +500,10 @@ let list_entrypoints code normalize_types =
         in
         let* entrypoint_types, _ctxt =
           Entrypoint.Map.fold_e
-            (fun entry (Script_typed_ir.Ex_ty ty, original_type_expr) (acc, ctxt) ->
+            (fun entry
+                 (Script_typed_ir.Ex_ty ty, original_type_expr)
+                 (acc, ctxt)
+               ->
               let* ty_expr, ctxt =
                 let open Tezos_micheline in
                 if normalize_types then

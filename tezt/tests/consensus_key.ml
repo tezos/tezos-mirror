@@ -54,8 +54,8 @@ module Helpers = struct
   let level_type : RPC.level Check.typ =
     Check.convert
       (fun RPC.
-             {level; level_position; cycle; cycle_position; expected_commitment} ->
-        (level, level_position, cycle, cycle_position, expected_commitment))
+             {level; level_position; cycle; cycle_position; expected_commitment}
+         -> (level, level_position, cycle, cycle_position, expected_commitment))
       Check.(tuple5 int int int int bool)
 
   let get_current_level client =

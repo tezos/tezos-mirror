@@ -145,7 +145,10 @@ let raw_originate ?whitelist ctxt ~kind ~parameters_ty ~genesis_commitment
      There is no need to have both `origination_size` and the size of storage.
      We should remove one of them. *)
   let addresses_size = 2 * Sc_rollup_repr.Address.size in
-  let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
+  let stored_kind_size =
+    2
+    (* because tag_size of kind encoding is 16bits. *)
+  in
   let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
   let* ctxt, whitelist_size =
     let*? () = check_whitelist ctxt whitelist in
@@ -258,7 +261,8 @@ let next_commitment_level ctxt inbox_level =
   let candidate_level =
     List.find_map
       (fun Sc_rollup_repr.Past_commitment_period.
-             {commitment_period_in_blocks; next_protocol_activation} ->
+             {commitment_period_in_blocks; next_protocol_activation}
+         ->
         let candidate_level =
           Raw_level_repr.add inbox_level commitment_period_in_blocks
         in

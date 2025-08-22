@@ -106,7 +106,8 @@ let test_invalid_accusation_too_close_to_migration =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous
-           .Denunciations_not_allowed_just_after_migration {level; _});
+           .Denunciations_not_allowed_just_after_migration
+             {level; _});
       ]
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
@@ -123,7 +124,7 @@ let test_invalid_accusation_no_dal_content =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_no_dal_content
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
@@ -140,7 +141,7 @@ let test_invalid_accusation_slot_not_attested =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_attested
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit
@@ -157,7 +158,7 @@ let test_invalid_accusation_slot_not_published =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_published
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = blk.Block.header.shell.level ->
         Lwt_result_syntax.return_unit

@@ -401,8 +401,8 @@ module Pipeline = struct
     let pipelines =
       all ()
       |> List.filter_map (function
-             | Pipeline pipeline -> Some pipeline
-             | Child_pipeline _ -> None)
+           | Pipeline pipeline -> Some pipeline
+           | Child_pipeline _ -> None)
     in
     let workflow =
       let rules = List.map workflow_rule_of_pipeline pipelines in
@@ -906,14 +906,14 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
         name
   | None, _ | _, None -> ()) ;
   let dependencies, image_builders =
-    (Fun.flip List.iter image_dependencies @@ function
-     | External (Image image_path) ->
-         failwith
-           "It doesn't make any sense for job %s to depend on the external \
-            image %s"
-           name
-           image_path
-     | Internal _ -> ()) ;
+    ( Fun.flip List.iter image_dependencies @@ function
+      | External (Image image_path) ->
+          failwith
+            "It doesn't make any sense for job %s to depend on the external \
+             image %s"
+            name
+            image_path
+      | Internal _ -> () ) ;
     let add_builder (dependencies, image_builders) = function
       | External _ -> (dependencies, image_builders)
       | Internal {builder_amd64; builder_arm64; _} ->

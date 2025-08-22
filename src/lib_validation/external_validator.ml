@@ -129,8 +129,7 @@ module Processing = struct
         profiler_headless;
       }
 
-  let handle_request :
-      type a.
+  let handle_request : type a.
       External_validation.parameters ->
       state ->
       a External_validation.request ->
@@ -159,9 +158,9 @@ module Processing = struct
       in
       Lwt.return
         (`Continue
-          ( res,
-            {context_index; cache; cached_result; headless; profiler_headless}
-          ))
+           ( res,
+             {context_index; cache; cached_result; headless; profiler_headless}
+           ))
     in
     function
     | Commit_genesis {chain_id} ->

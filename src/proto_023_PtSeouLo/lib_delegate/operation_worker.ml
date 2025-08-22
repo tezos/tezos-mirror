@@ -198,13 +198,15 @@ let candidate_encoding =
            round_watched;
            payload_hash_watched;
            branch_watched;
-         } ->
+         }
+       ->
       (hash, level_watched, round_watched, payload_hash_watched, branch_watched))
     (fun ( hash,
            level_watched,
            round_watched,
            payload_hash_watched,
-           branch_watched ) ->
+           branch_watched )
+       ->
       {hash; level_watched; round_watched; payload_hash_watched; branch_watched})
     (obj5
        (req "hash" Block_hash.encoding)

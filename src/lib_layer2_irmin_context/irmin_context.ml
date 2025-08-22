@@ -105,8 +105,7 @@ let context_hash_of_hash h =
 let hash_of_context_hash h =
   Smart_rollup_context_hash.to_string h |> IStore.Hash.unsafe_of_raw_string
 
-let load :
-    type a.
+let load : type a.
     cache_size:int ->
     ?async_domain:bool ->
     a Access_mode.t ->

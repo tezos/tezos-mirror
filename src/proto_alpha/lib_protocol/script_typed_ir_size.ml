@@ -163,8 +163,7 @@ let script_expr_hash_size = !!64
    the recursion is bound by the size of the witness, which is an
    11-bit unsigned integer, i.e. at most 2048. This is enough to
    guarantee there will be no stack overflow. *)
-let rec stack_prefix_preservation_witness_size_internal :
-    type a b c d e f g h.
+let rec stack_prefix_preservation_witness_size_internal : type a b c d e f g h.
     (a, b, c, d, e, f, g, h) stack_prefix_preservation_witness -> nodes_and_size
     = function
   | KPrefix (_loc, ty, w) ->
@@ -252,8 +251,7 @@ let chest_key_size _ =
    tail-recursive and the only recursive call that is not a tailcall
    cannot be nested. (See [big_map_size].) For this reason, these
    functions should not trigger stack overflows. *)
-let rec value_size :
-    type a ac.
+let rec value_size : type a ac.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     (a, ac) ty ->
@@ -283,11 +281,17 @@ let rec value_size :
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
         let module M = (val Script_set.get x) in
-        let boxing_space = !!536 (* By Obj.reachable_words. *) in
+        let boxing_space =
+          !!536
+          (* By Obj.reachable_words. *)
+        in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
         let module M = (val Script_map.get_module x) in
-        let boxing_space = !!696 (* By Obj.reachable_words. *) in
+        let boxing_space =
+          !!696
+          (* By Obj.reachable_words. *)
+        in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->
         (big_map_size [@ocaml.tailcall])
@@ -317,15 +321,18 @@ let rec value_size :
   in
   value_traverse ty x accu {apply}
 
-and big_map_size :
-    type a b bc.
+and big_map_size : type a b bc.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     a comparable_ty ->
     (b, bc) ty ->
     (a, b) big_map ->
     nodes_and_size =
- fun ~count_lambda_nodes accu cty ty' (Big_map {id; diff; key_type; value_type}) ->
+ fun ~count_lambda_nodes
+     accu
+     cty
+     ty'
+     (Big_map {id; diff; key_type; value_type}) ->
   (* [Map.bindings] cannot overflow and only consumes a
      logarithmic amount of stack. *)
   let diff_size =
@@ -354,8 +361,7 @@ and big_map_size :
     (ty_size key_type ++ ty_size value_type ++ diff_size)
     (h4w +! id_size)
 
-and lambda_size :
-    type i o.
+and lambda_size : type i o.
     count_lambda_nodes:bool -> nodes_and_size -> (i, o) lambda -> nodes_and_size
     =
  fun ~count_lambda_nodes accu lam ->
@@ -373,8 +379,7 @@ and lambda_size :
   | Lam (kdescr, node) -> count_lambda_body kdescr node
   | LamRec (kdescr, node) -> count_lambda_body kdescr node
 
-and kdescr_size :
-    type a s r f.
+and kdescr_size : type a s r f.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     (a, s, r, f) kdescr ->
@@ -385,8 +390,7 @@ and kdescr_size :
   in
   (kinstr_size [@ocaml.tailcall]) ~count_lambda_nodes accu kinstr
 
-and kinstr_size :
-    type a s r f.
+and kinstr_size : type a s r f.
     count_lambda_nodes:bool ->
     nodes_and_size ->
     (a, s, r, f) kinstr ->
@@ -409,8 +413,8 @@ and kinstr_size :
       (_k2 : (_, _, _, _) kinstr) (_k3 : (_, _, _, _) kinstr) =
     h4w
   in
-  let apply :
-      type a s r f. nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
+  let apply : type a s r f.
+      nodes_and_size -> (a, s, r, f) kinstr -> nodes_and_size =
    fun accu t ->
     match t with
     | IDrop (loc, k) -> ret_succ_adding accu (base1 loc k)

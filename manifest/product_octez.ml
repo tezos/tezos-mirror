@@ -7106,7 +7106,8 @@ let hash = Protocol.hash
             in
             of_list
               (List.map gen_json networks
-              @ (* TODO: why do we install these files? *)
+              @
+              (* TODO: why do we install these files? *)
               List.
                 [
                   install

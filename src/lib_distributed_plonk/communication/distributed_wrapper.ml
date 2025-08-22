@@ -191,18 +191,18 @@ module Make (A : Enriched_message_type) :
     let step = List.hd steps in
     receive_loop
       (case (function m ->
-           Option.bind (M.to_reply step m) @@ fun r ->
-           Option.map
-             (fun f () ->
-               lift_io
-               @@ Lwt_io.printlf "got message %s from remote node\n"
-               @@ M.string_of_message m
-               >>= fun () ->
-               let* () = lift_io @@ Lwt_io.flush_all () in
-               f () >>= fun y ->
-               replies := IMap.add (M.index m) y !replies ;
-               return (IMap.cardinal !replies < expected))
-             (reply r)))
+          Option.bind (M.to_reply step m) @@ fun r ->
+          Option.map
+            (fun f () ->
+              lift_io
+              @@ Lwt_io.printlf "got message %s from remote node\n"
+              @@ M.string_of_message m
+              >>= fun () ->
+              let* () = lift_io @@ Lwt_io.flush_all () in
+              f () >>= fun y ->
+              replies := IMap.add (M.index m) y !replies ;
+              return (IMap.cardinal !replies < expected))
+            (reply r)))
     >>= fun _ -> return (List.map snd @@ IMap.bindings !replies)
 
   let handle_request :

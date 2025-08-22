@@ -1242,7 +1242,10 @@ let test_store_create ~version =
   assert (value_size_in_durable = Int64.of_int32 contents_size) ;
 
   (* Creating a value of an invalid size (> 2GB) should fail *)
-  let invalid_size = 0xffffffffl (* == 4GB as unsigned int32 *) in
+  let invalid_size =
+    0xffffffffl
+    (* == 4GB as unsigned int32 *)
+  in
   let create_with_invalid_size_values =
     Values.
       [

@@ -332,7 +332,8 @@ module RPC = struct
         conv
           (fun (storage, operations, lazy_storage_diff) ->
             (storage, operations, lazy_storage_diff, lazy_storage_diff))
-          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff) ->
+          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff)
+             ->
             let lazy_storage_diff =
               Option.either lazy_storage_diff legacy_lazy_storage_diff
             in
@@ -363,7 +364,8 @@ module RPC = struct
                  operations,
                  trace,
                  legacy_lazy_storage_diff,
-                 lazy_storage_diff ) ->
+                 lazy_storage_diff )
+             ->
             let lazy_storage_diff =
               Option.either lazy_storage_diff legacy_lazy_storage_diff
             in
@@ -570,8 +572,7 @@ module RPC = struct
       let unparse_stack ctxt (stack, stack_ty) =
         (* We drop the gas limit as this function is only used for debugging/errors. *)
         let ctxt = Gas.set_unlimited ctxt in
-        let rec unparse_stack :
-            type a s.
+        let rec unparse_stack : type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             (Script.expr * string option) list tzresult Lwt.t = function
           | Bot_t, (EmptyCell, EmptyCell) -> return_nil
@@ -861,8 +862,9 @@ module RPC = struct
           ~entrypoint
           ~parameter
           ~internal:true
-        >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _}
-          -> (storage, operations, lazy_storage_diff)
+        >|=?
+        fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
+        (storage, operations, lazy_storage_diff)
       in
       Registration.register0 S.run_code run_code_registration ;
       Registration.register0 S.run_code_normalized run_code_registration ;
@@ -912,8 +914,10 @@ module RPC = struct
           ~script:{storage; code}
           ~entrypoint
           ~parameter
-        >|=? fun ( {Script_interpreter.storage; operations; lazy_storage_diff; _},
-                   trace ) -> (storage, operations, trace, lazy_storage_diff)
+        >|=?
+        fun ( {Script_interpreter.storage; operations; lazy_storage_diff; _},
+              trace )
+          -> (storage, operations, trace, lazy_storage_diff)
       in
       Registration.register0 S.trace_code trace_code_registration ;
       Registration.register0 S.trace_code_normalized trace_code_registration ;
@@ -1070,7 +1074,8 @@ module RPC = struct
           let partial_precheck_manager_contents (type kind) ctxt
               (op : kind Kind.manager contents) : context tzresult Lwt.t =
             let (Manager_operation
-                  {source; fee; counter; operation; gas_limit; storage_limit}) =
+                   {source; fee; counter; operation; gas_limit; storage_limit})
+                =
               op
             in
             Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
@@ -1099,7 +1104,8 @@ module RPC = struct
                 in
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ (* Fail if not enough gas for complete deserialization cost *)
+                @@
+                (* Fail if not enough gas for complete deserialization cost *)
                 ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
                   ctxt )
             | Origination {script; _} ->
@@ -1116,7 +1122,8 @@ module RPC = struct
                 in
                 Lwt.return
                 @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-                @@ (* Fail if not enough gas for complete deserialization cost *)
+                @@
+                (* Fail if not enough gas for complete deserialization cost *)
                 ( Script.force_decode_in_context ctxt script.code
                 >>? fun (_code, ctxt) ->
                   Script.force_decode_in_context ctxt script.storage
@@ -1128,8 +1135,7 @@ module RPC = struct
             Contract.increment_counter ctxt source >>=? fun ctxt ->
             Contract.spend ctxt (Contract.implicit_contract source) fee
           in
-          let rec partial_precheck_manager_contents_list :
-              type kind.
+          let rec partial_precheck_manager_contents_list : type kind.
               Alpha_context.t ->
               kind Kind.manager contents_list ->
               context tzresult Lwt.t =

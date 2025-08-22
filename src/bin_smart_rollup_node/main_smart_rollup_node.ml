@@ -113,7 +113,8 @@ let config_init_command =
          mode
          sc_rollup_address
          operators
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -238,7 +239,8 @@ let legacy_run_command =
              bail_on_disagree,
              unsafe_disable_wasm_kernel_checks,
              profiling ) )
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -366,7 +368,8 @@ let run_command =
          mode
          sc_rollup_address
          operators
-         cctxt ->
+         cctxt
+       ->
       let* () =
         when_ (enable_performance_metrics && disable_performance_metrics)
         @@ fun () ->
@@ -575,7 +578,8 @@ let export_snapshot_named =
            compact,
            rollup_node_endpoint )
          filename
-         cctxt ->
+         cctxt
+       ->
       export_snapshot
         ( data_dir,
           None,
@@ -598,7 +602,10 @@ let import_snapshot =
        Cli.import_force_switch
        Cli.apply_unsafe_patches_switch)
     (prefixes ["snapshot"; "import"] @@ Cli.snapshot_file_or_url_param @@ stop)
-    (fun (data_dir, no_checks, force, apply_unsafe_patches) snapshot_file cctxt ->
+    (fun (data_dir, no_checks, force, apply_unsafe_patches)
+         snapshot_file
+         cctxt
+       ->
       let open Lwt_result_syntax in
       let* () =
         Snapshots.import

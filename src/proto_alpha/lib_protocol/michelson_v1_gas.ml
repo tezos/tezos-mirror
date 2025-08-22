@@ -546,8 +546,7 @@ module Cost_of = struct
 
     let compare : type a. a Script_typed_ir.comparable_ty -> a -> a -> cost =
      fun ty x y ->
-      let rec compare :
-          type a.
+      let rec compare : type a.
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
         match ty with

@@ -41,8 +41,8 @@ let make : type a. a Data_encoding.t -> t -> a -> a =
  fun encoding (module R : ROUNDTRIP) input ->
   R.of_input encoding input |> R.to_input encoding
 
-let make_with_2_encoding :
-    type a. a Data_encoding.t -> a Data_encoding.t -> t -> a -> a =
+let make_with_2_encoding : type a.
+    a Data_encoding.t -> a Data_encoding.t -> t -> a -> a =
  fun encoding1 encoding2 (module R : ROUNDTRIP) input ->
   R.of_input encoding1 input |> R.to_input encoding2
 

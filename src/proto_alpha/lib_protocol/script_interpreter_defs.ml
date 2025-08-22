@@ -461,8 +461,7 @@ let get_log = function None -> return_none | Some logger -> logger.get_log ()
 
 (* The following function pops n elements from the stack
    and push their reintroduction in the continuations stack. *)
-let rec kundip :
-    type a s e z c u d w b t.
+let rec kundip : type a s e z c u d w b t.
     (a, s, e, z, c, u, d, w) stack_prefix_preservation_witness ->
     c ->
     u ->
@@ -802,8 +801,7 @@ let unpack ctxt ~ty ~bytes =
    a well-typed operation [f] under some prefix of the A-stack
    exploiting [w] to justify that the shape of the stack is
    preserved. *)
-let rec interp_stack_prefix_preserving_operation :
-    type a s b t c u d w result.
+let rec interp_stack_prefix_preserving_operation : type a s b t c u d w result.
     (a -> s -> (b * t) * result) ->
     (a, s, b, t, c, u, d, w) stack_prefix_preservation_witness ->
     c ->

@@ -179,10 +179,10 @@ let send_raw_data p2p_node ~data =
       if len = 0 then Lwt.return_unit
       else
         Lwt.bind (Lwt_unix.write_string descr buf pos len) (function
-            | 0 ->
-                Lwt.fail End_of_file
-                (* other endpoint cleanly closed its connection *)
-            | nb_written -> inner (pos + nb_written) (len - nb_written))
+          | 0 ->
+              Lwt.fail End_of_file
+              (* other endpoint cleanly closed its connection *)
+          | nb_written -> inner (pos + nb_written) (len - nb_written))
     in
     inner pos len
   in

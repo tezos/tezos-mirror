@@ -88,9 +88,10 @@ module Make_without_close_checks
     (File_Manager : File_manager.S)
     (Dispatcher : Dispatcher.S with module File_Manager = File_Manager)
     (Hash : Brassaia.Hash.S with type t = File_Manager.Index.key)
-    (Val : Pack_value.Persistent
-             with type hash := Hash.t
-              and type key := Hash.t Pack_key.t) =
+    (Val :
+      Pack_value.Persistent
+        with type hash := Hash.t
+         and type key := Hash.t Pack_key.t) =
 struct
   module Tbl = Table (Hash)
   module Control = File_Manager.Control
@@ -607,9 +608,10 @@ module Make
     (File_Manager : File_manager.S)
     (Dispatcher : Dispatcher.S with module File_Manager = File_Manager)
     (Hash : Brassaia.Hash.S with type t = File_Manager.Index.key)
-    (Val : Pack_value.Persistent
-             with type hash := Hash.t
-              and type key := Hash.t Pack_key.t) =
+    (Val :
+      Pack_value.Persistent
+        with type hash := Hash.t
+         and type key := Hash.t Pack_key.t) =
 struct
   module Inner =
     Make_without_close_checks (File_Manager) (Dispatcher) (Hash) (Val)

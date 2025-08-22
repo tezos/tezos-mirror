@@ -39,8 +39,7 @@ let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
   Int (loc, z)
 
-let rec unparse_ty_and_entrypoints_uncarbonated :
-    type a ac loc.
+let rec unparse_ty_and_entrypoints_uncarbonated : type a ac loc.
     loc:loc -> (a, ac) ty -> a entrypoints_node -> loc Script.michelson_node =
  fun ~loc ty {nested = nested_entrypoints; at_node} ->
   let name, args =
@@ -147,8 +146,8 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
   in
   Prim (loc, name, args, annot)
 
-and unparse_comparable_ty_uncarbonated :
-    type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
+and unparse_comparable_ty_uncarbonated : type a loc.
+    loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc ty -> unparse_ty_and_entrypoints_uncarbonated ~loc ty no_entrypoints
 
 let unparse_ty_uncarbonated ~loc ty =
@@ -174,8 +173,8 @@ let serialize_ty_for_error ty =
   *)
   unparse_ty_uncarbonated ~loc:() ty |> Micheline.strip_locations
 
-let rec unparse_stack_uncarbonated :
-    type a s. (a, s) stack_ty -> Script.expr list = function
+let rec unparse_stack_uncarbonated : type a s.
+    (a, s) stack_ty -> Script.expr list = function
   | Bot_t -> []
   | Item_t (ty, rest) ->
       let uty = unparse_ty_uncarbonated ~loc:() ty in
@@ -392,14 +391,13 @@ let unparse_option ~loc unparse_v ctxt =
 
 (* -- Unparsing data of comparable types -- *)
 
-let comb_witness2 :
-    type t tc. (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
+let comb_witness2 : type t tc.
+    (t, tc) ty -> (t, unit -> unit -> unit) comb_witness = function
   | Pair_t (_, Pair_t _, _, _) -> Comb_Pair (Comb_Pair Comb_Any)
   | Pair_t _ -> Comb_Pair Comb_Any
   | _ -> Comb_Any
 
-let rec unparse_comparable_data_rec :
-    type a loc.
+let rec unparse_comparable_data_rec : type a loc.
     loc:loc ->
     context ->
     unparsing_mode ->
@@ -500,8 +498,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
   open Script_tc_errors
 
   (* -- Unparsing data of any type -- *)
-  let rec unparse_data_rec :
-      type a ac.
+  let rec unparse_data_rec : type a ac.
       context ->
       stack_depth:int ->
       unparsing_mode ->
@@ -728,8 +725,7 @@ module Data_unparser (P : MICHELSON_PARSER) = struct
                ~plaintext_size:(Script_timelock.get_plaintext_size s))
             Script_timelock.chest_encoding
 
-  and unparse_items_rec :
-      type k v vc.
+  and unparse_items_rec : type k v vc.
       context ->
       stack_depth:int ->
       unparsing_mode ->

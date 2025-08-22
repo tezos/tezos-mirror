@@ -267,15 +267,15 @@ let origination_operation block ~sender ~baker ~script ~storage ~forges_tickets
   let unparsed_storage = storage in
   let*@ ( Script_ir_translator.Ex_script
             (Script
-              {
-                storage_type;
-                storage;
-                code = _;
-                arg_type = _;
-                views = _;
-                entrypoints = _;
-                code_size = _;
-              }),
+               {
+                 storage_type;
+                 storage;
+                 code = _;
+                 arg_type = _;
+                 views = _;
+                 entrypoints = _;
+                 code_size = _;
+               }),
           ctxt ) =
     Script_ir_translator.parse_script
       ctxt
@@ -1207,7 +1207,8 @@ let test_transfer_fails_on_multiple_zero_tickets () =
   assert_fails
     ~loc:__LOC__
     ~error:Script_tc_errors.Forbidden_zero_ticket_quantity
-  @@ (* let* operation, incr = *)
+  @@
+  (* let* operation, incr = *)
   transfer_tickets_operation
     ~incr
     ~sender:(Contract sender)

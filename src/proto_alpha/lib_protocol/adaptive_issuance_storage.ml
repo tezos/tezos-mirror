@@ -199,7 +199,10 @@ let compute_reward_coeff_ratio_without_bonus =
   let q_1600 = Q.of_int 1600 in
   fun ~stake_ratio ~issuance_ratio_max ~issuance_ratio_min ->
     let inv_f = Q.(mul (mul stake_ratio stake_ratio) q_1600) in
-    let f = Q.inv inv_f (* f = 1/1600 * (1/x)^2 = yearly issuance rate *) in
+    let f =
+      Q.inv inv_f
+      (* f = 1/1600 * (1/x)^2 = yearly issuance rate *)
+    in
     (* f is truncated so that 0.05% <= f <= 5% *)
     truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f
 
@@ -255,7 +258,8 @@ let compute_coeff =
       ~base_total_issued_per_minute
       ~base_reward_coeff_ratio
       ~q_total_supply
-      ~(bonus : Issuance_bonus_repr.t) ->
+      ~(bonus : Issuance_bonus_repr.t)
+    ->
     if Tez_repr.(base_total_issued_per_minute = zero) then Q.one
     else
       let q_base_total_issued_per_minute =
@@ -263,8 +267,14 @@ let compute_coeff =
       in
       let f = Q.add base_reward_coeff_ratio (bonus :> Q.t) in
       let f = truncate_reward_coeff ~issuance_ratio_min ~issuance_ratio_max f in
-      let f = Q.div f q_min_per_year (* = issuance rate per minute *) in
-      let f = Q.mul f q_total_supply (* = issuance per minute *) in
+      let f =
+        Q.div f q_min_per_year
+        (* = issuance rate per minute *)
+      in
+      let f =
+        Q.mul f q_total_supply
+        (* = issuance per minute *)
+      in
       Q.div f q_base_total_issued_per_minute
 
 let compute_and_store_reward_coeff_at_cycle_end ctxt ~new_cycle =

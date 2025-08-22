@@ -142,7 +142,8 @@ end = struct
     let data_t =
       let open Repr in
       variant "weak_value" (fun node contents -> function
-        | `Node k -> node k | `Contents k -> contents (k, ()))
+        | `Node k -> node k
+        | `Contents k -> contents (k, ()))
       |~ case1 "node" key_t (fun k -> `Node k)
       |~ case1 "contents" (pair key_t unit) (fun (k, ()) -> `Contents k)
       |> sealv

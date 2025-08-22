@@ -178,7 +178,7 @@ let check_vdf ctxt vdf_solution =
   | Nonce_revelation_stage -> tzfail Too_early_revelation
   | Vdf_revelation_stage {seed_discriminant; seed_challenge} ->
       (* To avoid recomputing the discriminant and challenge for every (potentially
-         * invalid) submission in a cycle, we compute them once and store them *)
+       * invalid) submission in a cycle, we compute them once and store them *)
       let* stored = Storage.Seed.VDF_setup.find ctxt in
       let* ctxt, setup =
         match stored with

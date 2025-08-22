@@ -244,7 +244,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_protocol_overrides;
            default_bootstrap_peers;
            dal_config;
-         } ->
+         }
+       ->
       ( genesis,
         genesis_parameters,
         chain_name,
@@ -264,7 +265,8 @@ let blockchain_network_encoding : blockchain_network Data_encoding.t =
            user_activated_upgrades,
            user_activated_protocol_overrides,
            default_bootstrap_peers,
-           dal_config ) ->
+           dal_config )
+       ->
       {
         alias = None;
         genesis;
@@ -453,7 +455,8 @@ let p2p =
            enable_testchain;
            reconnection_config;
            disable_peer_discovery;
-         } ->
+         }
+       ->
       ( ( expected_pow,
           bootstrap_peers,
           listen_addr,
@@ -475,7 +478,8 @@ let p2p =
              disable_mempool,
              enable_testchain,
              reconnection_config,
-             disable_peer_discovery ) ) ->
+             disable_peer_discovery ) )
+       ->
       {
         expected_pow;
         bootstrap_peers;
@@ -593,7 +597,8 @@ let rpc : rpc Data_encoding.t =
            media_type;
            max_active_rpc_connections;
            enable_http_cache_headers;
-         } ->
+         }
+       ->
       let cert, key =
         match tls with
         | None -> (None, None)
@@ -620,7 +625,8 @@ let rpc : rpc Data_encoding.t =
              acl,
              media_type,
              max_active_rpc_connections,
-             enable_http_cache_headers ) ) ->
+             enable_http_cache_headers ) )
+       ->
       let tls =
         match (cert, key) with
         | None, _ | _, None -> None
@@ -741,7 +747,8 @@ let encoding =
            shell;
            blockchain_network;
            metrics_addr;
-         } ->
+         }
+       ->
       ( data_dir,
         disable_config_validation,
         rpc,
@@ -759,7 +766,8 @@ let encoding =
            internal_events,
            shell,
            blockchain_network,
-           metrics_addr ) ->
+           metrics_addr )
+       ->
       {
         disable_config_validation;
         data_dir;

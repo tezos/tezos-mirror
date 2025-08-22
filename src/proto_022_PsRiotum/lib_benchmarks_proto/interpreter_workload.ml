@@ -1235,15 +1235,14 @@ end
 
 open Script_typed_ir
 
-let extract_compare_sized_step :
-    type a. a comparable_ty -> a -> a -> ir_sized_step =
+let extract_compare_sized_step : type a.
+    a comparable_ty -> a -> a -> ir_sized_step =
  fun comparable_ty x y ->
   Instructions.compare
     (Size.size_of_comparable_value comparable_ty x)
     (Size.size_of_comparable_value comparable_ty y)
 
-let extract_ir_sized_step :
-    type bef_top bef res_top res.
+let extract_ir_sized_step : type bef_top bef res_top res.
     Alpha_context.t ->
     (bef_top, bef, res_top, res) Script_typed_ir.kinstr ->
     bef_top * bef ->
@@ -1616,8 +1615,8 @@ let extract_deps (type bef_top bef aft_top aft) ctxt step_constants
       (module struct
         let log_interp _instr _ctxt _log _stack_ty _stack = ()
 
-        let log_entry :
-            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+        let log_entry : type a s b f.
+            (a, s, b, f, a, s) Script_typed_ir.logging_function =
          fun kinstr ctxt _loc _stack_ty stack ->
           trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
           match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()
@@ -1661,8 +1660,8 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
       (module struct
         let log_interp _instr _ctxt _log _stack_ty _stack = ()
 
-        let log_entry :
-            type a s b f. (a, s, b, f, a, s) Script_typed_ir.logging_function =
+        let log_entry : type a s b f.
+            (a, s, b, f, a, s) Script_typed_ir.logging_function =
          fun kinstr ctxt _loc _stack_ty stack ->
           trace := extract_ir_sized_step ctxt kinstr stack :: !trace ;
           match kinstr with IFailwith _ -> raise Stop_bench | _ -> ()

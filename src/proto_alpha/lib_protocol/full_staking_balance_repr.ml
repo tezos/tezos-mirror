@@ -171,7 +171,8 @@ let encoding =
            staked_frozen;
            delegated;
            min_delegated_in_cycle = {last_modified_level; previous_min};
-         } ->
+         }
+       ->
       let previous_min_value, previous_min_level =
         match previous_min with
         | Some (previous_min_value, previous_min_level) ->

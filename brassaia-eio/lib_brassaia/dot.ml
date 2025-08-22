@@ -155,9 +155,9 @@ module Make (S : Store.Generic_key.S) = struct
     let nodes = ref [] in
     let commits = ref [] in
     Slice.iter slice (function
-        | `Contents c -> contents := c :: !contents
-        | `Node n -> nodes := n :: !nodes
-        | `Commit c -> commits := c :: !commits) ;
+      | `Contents c -> contents := c :: !contents
+      | `Node n -> nodes := n :: !nodes
+      | `Commit c -> commits := c :: !commits) ;
     List.iter
       (fun (k, c) ->
         add_vertex (`Contents k) [`Shape `Box; label_of_contents k c])

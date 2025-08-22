@@ -349,7 +349,8 @@ module Benchmark (L : LIB) = struct
              ( dst_pos,
                ( amount,
                  (fee, (msg, (src, (dst, (src_proof, (dst_proof, signature))))))
-               ) ) ) ->
+               ) ) )
+         ->
         {
           src_pos;
           dst_pos;
@@ -375,7 +376,8 @@ module Benchmark (L : LIB) = struct
              ( dst_pos,
                ( amount,
                  (fee, (msg, (src, (dst, (src_proof, (dst_proof, signature))))))
-               ) ) ) ->
+               ) ) )
+         ->
         {
           src_pos = s_to_int src_pos;
           dst_pos = s_to_int dst_pos;
@@ -473,7 +475,8 @@ module Benchmark (L : LIB) = struct
           in
 
           Bool.assert_true b_init_src_leaf
-          >* (* ---------- Batching merkle proof checks ---------- *)
+          >*
+          (* ---------- Batching merkle proof checks ---------- *)
           Num.assert_custom
             ~qm:S.one
             ~qc:S.mone

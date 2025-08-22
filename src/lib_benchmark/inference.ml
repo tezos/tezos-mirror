@@ -202,8 +202,7 @@ let compute_error_statistics ~(predicted : matrix) ~(measured : matrix) =
 (* -------------------------------------------------------------------------- *)
 (* Making problems *)
 
-let make_problem_from_workloads :
-    type workload.
+let make_problem_from_workloads : type workload.
     data:(workload * vector) list ->
     overrides:(Free_variable.t -> float option) ->
     evaluate:(workload -> Eval_to_vector.size Eval_to_vector.repr) ->
@@ -299,7 +298,8 @@ let model_matrix_to_csv (m : matrix) (nmap : NMap.t) : Csv.csv =
   let names =
     List.init ~when_negative_length:() cols (fun i ->
         fv_to_string (NMap.nth_exn nmap i))
-    |> (* number of column cannot be negative *)
+    |>
+    (* number of column cannot be negative *)
     WithExceptions.Result.get_ok ~loc:__LOC__
   in
   let rows = to_list_of_rows m in

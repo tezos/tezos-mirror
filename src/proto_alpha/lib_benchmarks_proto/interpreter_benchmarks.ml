@@ -414,8 +414,7 @@ let make_benchmark :
   end in
   (module B : Benchmark.S)
 
-let make_simple_benchmark :
-    type bef_top bef res_top res.
+let make_simple_benchmark : type bef_top bef res_top res.
     ?amplification:int ->
     ?intercept:bool ->
     ?more_tags:string list ->

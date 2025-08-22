@@ -173,13 +173,13 @@ module Internal_for_tests = struct
     let open Result_syntax in
     let of_internal_transaction
         (Transaction
-          {
-            destination;
-            entrypoint;
-            parameters_ty = _;
-            parameters = _;
-            unparsed_parameters;
-          }) =
+           {
+             destination;
+             entrypoint;
+             parameters_ty = _;
+             parameters = _;
+             unparsed_parameters;
+           }) =
       return
         {Sc_rollup.Outbox.Message.unparsed_parameters; destination; entrypoint}
     in
@@ -193,13 +193,13 @@ module Internal_for_tests = struct
     let open Result_syntax in
     let of_internal_transaction
         (Transaction
-          {
-            destination;
-            entrypoint;
-            parameters_ty;
-            parameters = _;
-            unparsed_parameters;
-          }) =
+           {
+             destination;
+             entrypoint;
+             parameters_ty;
+             parameters = _;
+             unparsed_parameters;
+           }) =
       let unparsed_ty =
         Script_ir_unparser.serialize_ty_for_error parameters_ty
       in

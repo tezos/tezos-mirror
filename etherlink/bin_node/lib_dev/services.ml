@@ -311,7 +311,8 @@ let eth_subscribe ~(kind : Ethereum_types.Subscription.kind)
                        {
                          Evm_store.L1_l2_finalized_levels.start_l2_level;
                          end_l2_level;
-                       } ) ->
+                       } )
+                   ->
                   {
                     Ethereum_types.Subscription.l1_level;
                     start_l2_level;
@@ -345,8 +346,8 @@ let eth_unsubscribe ~id =
       true
   | None -> false
 
-let decode :
-    type a. (module METHOD with type input = a) -> Data_encoding.json -> a =
+let decode : type a.
+    (module METHOD with type input = a) -> Data_encoding.json -> a =
  fun (module M) v ->
   Opentelemetry.Trace.with_
     ~kind:Span_kind_server
@@ -354,8 +355,8 @@ let decode :
     "Service.decode"
   @@ fun _ -> Data_encoding.Json.destruct M.input_encoding v
 
-let encode :
-    type a. (module METHOD with type output = a) -> a -> Data_encoding.json =
+let encode : type a.
+    (module METHOD with type output = a) -> a -> Data_encoding.json =
  fun (module M) v ->
   Opentelemetry.Trace.with_
     ~kind:Span_kind_server
@@ -363,8 +364,7 @@ let encode :
     "Service.encode"
   @@ fun _ -> Data_encoding.Json.construct M.output_encoding v
 
-let build :
-    type input output.
+let build : type input output.
     (module METHOD with type input = input and type output = output) ->
     f:(input option -> (output, Rpc_errors.t) Result.t tzresult Lwt.t) ->
     Data_encoding.json option ->

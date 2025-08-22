@@ -192,8 +192,8 @@ let of_operation_kind (operation_kinds : Operation_kind.t list) :
         operation_kinds)
     all
 
-let new_operator_for_purpose :
-    type kind. kind t -> Signature.public_key_hash list -> kind operator =
+let new_operator_for_purpose : type kind.
+    kind t -> Signature.public_key_hash list -> kind operator =
  fun purpose pkh ->
   match (purpose, pkh) with
   | _, [] -> invalid_arg "no public key hash given for the new operator"
@@ -204,8 +204,7 @@ let new_operator_for_purpose :
   | Executing_outbox, [pkh] -> Single pkh
   | _, _ -> invalid_arg "multiple keys for a purpose allowing only one key"
 
-let update :
-    type kind.
+let update : type kind.
     kind t ->
     Signature.public_key_hash list ->
     ex_operator option ->

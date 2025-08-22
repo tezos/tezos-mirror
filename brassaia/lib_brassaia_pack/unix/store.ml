@@ -254,7 +254,7 @@ module Maker (Config : Conf.S) = struct
                 | None ->
                     Error
                       (`Commit_key_is_dangling
-                        (Brassaia.Type.to_string XKey.t key))
+                         (Brassaia.Type.to_string XKey.t key))
                 | Some (k, _kind) -> Ok k)
 
           let start ~unlink ~use_auto_finalisation ~output t commit_key =

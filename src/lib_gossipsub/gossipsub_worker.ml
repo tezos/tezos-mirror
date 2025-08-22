@@ -808,18 +808,17 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
   (** Handling events received from P2P layer. *)
   let apply_p2p_event ~self ({gossip_state; _} as state) = function
-    | New_connection {peer; direct; trusted; bootstrap} -> (
+    | New_connection {peer; direct; trusted; bootstrap} ->
         ((GS.add_peer {direct; outbound = trusted; peer; bootstrap} gossip_state
          |> update_gossip_state state
          |> handle_new_connection peer ~bootstrap ~trusted)
          [@profiler.span_f
            {verbosity = Notice} ["apply_event"; "P2P_input"; "New_connection"]])
-        )
-    | Disconnection {peer} -> (
+    | Disconnection {peer} ->
         ((GS.remove_peer {peer} gossip_state
          |> update_gossip_state state |> handle_disconnection peer)
          [@profiler.span_f
-           {verbosity = Notice} ["apply_event"; "P2P_input"; "Disconnection"]]))
+           {verbosity = Notice} ["apply_event"; "P2P_input"; "Disconnection"]])
     | In_message {from_peer; p2p_message} ->
         apply_p2p_message
           ~self
@@ -861,7 +860,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
             GS.handle_receive_message message state.gossip_state
             |> update_gossip_state state
             |> handle_receive_message message
-            |> (* Other messages are processed recursively *)
+            |>
+            (* Other messages are processed recursively *)
             check_unknown_messages_id
         | `Unknown -> state
         | `Outdated ->
@@ -875,14 +875,14 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     (* FIXME: https://gitlab.com/tezos/tezos/-/issues/5326
 
        Notify the GS worker about the status of messages sent to peers. *)
-    | Heartbeat -> (
+    | Heartbeat ->
         (((* TODO: https://gitlab.com/tezos/tezos/-/issues/5170
 
              Do we want to detect cases where two successive [Heartbeat] events
              would be handled (e.g. because the first one is late)? *)
           GS.heartbeat gossip_state
          |> update_gossip_state state |> handle_heartbeat)
-         [@profiler.span_f {verbosity = Notice} ["apply_event"; "Heartbeat"]]))
+         [@profiler.span_f {verbosity = Notice} ["apply_event"; "Heartbeat"]])
     | P2P_input event ->
         apply_p2p_event
           ~self

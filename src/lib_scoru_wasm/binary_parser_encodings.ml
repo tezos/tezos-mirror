@@ -571,7 +571,8 @@ module Elem = struct
              index_kind,
              early_ref_type,
              offset_kont,
-             offset_kont_code ) ->
+             offset_kont_code )
+         ->
         EKMode
           {
             left;
@@ -803,7 +804,8 @@ module Field = struct
              globals,
              exports,
              start,
-             (elems, data_count, code, datas) ) ->
+             (elems, data_count, code, datas) )
+         ->
         Decode.
           {
             types;
@@ -833,7 +835,8 @@ module Field = struct
                data_count;
                code;
                datas;
-             } ->
+             }
+         ->
         ( types,
           imports,
           vars,
@@ -1297,7 +1300,8 @@ module Module = struct
              start,
              elems,
              datas,
-             (imports, exports, allocations) ) ->
+             (imports, exports, allocations) )
+         ->
         Ast.
           {
             types;
@@ -1324,7 +1328,8 @@ module Module = struct
              datas;
              start;
              allocations;
-           } ->
+           }
+         ->
         ( types,
           globals,
           tables,
@@ -1421,7 +1426,8 @@ module Building_state = struct
              globals,
              exports,
              start,
-             (elems, data_count, code, datas) ) ->
+             (elems, data_count, code, datas) )
+         ->
         Decode.
           {
             types;
@@ -1450,7 +1456,8 @@ module Building_state = struct
              data_count;
              code;
              datas;
-           } ->
+           }
+         ->
         ( types,
           imports,
           vars,
@@ -1485,7 +1492,8 @@ module Decode = struct
              module_kont,
              allocation_state,
              stream_pos,
-             stream_name ) ->
+             stream_name )
+         ->
         Decode.
           {
             building_state;
@@ -1500,7 +1508,8 @@ module Decode = struct
              allocation_state;
              stream_pos;
              stream_name;
-           } ->
+           }
+         ->
         (building_state, module_kont, allocation_state, stream_pos, stream_name))
     @@ tup5
          ~flatten:true

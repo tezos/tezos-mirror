@@ -405,10 +405,10 @@ let test_wrong_payload_hash () =
 
 let assert_conflict_error ~loc res =
   Assert.proto_error ~loc res (function
-      | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
-        when kind = Validate_errors.Consensus.Attestation ->
-          true
-      | _ -> false)
+    | Validate_errors.Consensus.Conflicting_consensus_operation {kind; _}
+      when kind = Validate_errors.Consensus.Attestation ->
+        true
+    | _ -> false)
 
 (** Test that attestations conflict with:
     - an identical attestation, and
@@ -618,8 +618,8 @@ let test_attestation_threshold ~sufficient_threshold () =
   if sufficient_threshold then return_unit
   else
     Assert.proto_error ~loc:__LOC__ b (function
-        | Validate_errors.Block.Not_enough_attestations _ -> true
-        | _ -> false)
+      | Validate_errors.Block.Not_enough_attestations _ -> true
+      | _ -> false)
 
 let test_two_attestations_with_same_attester () =
   let open Lwt_result_syntax in
@@ -704,7 +704,7 @@ let test_attester_with_no_assigned_shards () =
             Environment.Ecoproto_error
               (Alpha_context.Dal_errors
                .Dal_data_availibility_attester_not_in_committee
-                {attester; level; slot = _});
+                 {attester; level; slot = _});
           ]
           when Signature.Public_key_hash.equal attester pkh
                && Raw_level.to_int32 level = b.header.shell.level ->
@@ -766,7 +766,8 @@ let test_dal_attestation_threshold () =
   let* _ =
     List.fold_left_es
       (fun (acc_ops, acc_power)
-           ({delegate; indexes} : RPC.Dal.S.shards_assignment) ->
+           ({delegate; indexes} : RPC.Dal.S.shards_assignment)
+         ->
         let* op = Op.attestation ~manager_pkh:delegate ~dal_content b in
         let ops = op :: acc_ops in
         let power = acc_power + List.length indexes in

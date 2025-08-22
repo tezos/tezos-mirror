@@ -255,7 +255,12 @@ let commands network () =
       @@ prefix "in"
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun ()
+           key
+           key_type
+           (_, contract)
+           (cctxt : Protocol_client_context.full)
+         ->
         get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain
@@ -427,7 +432,8 @@ let commands network () =
              burn_cap )
            (_, contract)
            delegate
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let fee_parameter =
           {
             Injection.minimal_fees;
@@ -506,7 +512,8 @@ let commands network () =
              fee_cap,
              burn_cap )
            (_, contract)
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let fee_parameter =
           {
             Injection.minimal_fees;
@@ -614,7 +621,8 @@ let commands network () =
            balance
            (_, source)
            program
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         Raw_contract_alias.of_fresh cctxt force alias_name
         >>=? fun alias_name ->
         Lwt.return (Micheline_parser.no_parsing_error program)
@@ -715,7 +723,8 @@ let commands network () =
            amount
            (_, source)
            (_, destination)
-           cctxt ->
+           cctxt
+         ->
         transfer_command
           amount
           source
@@ -781,7 +790,8 @@ let commands network () =
              entrypoint )
            (_, destination)
            (_, source)
-           cctxt ->
+           cctxt
+         ->
         let amount = Tez.zero in
         transfer_command
           amount
@@ -831,7 +841,8 @@ let commands network () =
              fee_cap,
              burn_cap )
            (_, source)
-           cctxt ->
+           cctxt
+         ->
         match Contract.is_implicit source with
         | None -> failwith "only implicit accounts can be revealed"
         | Some source ->
@@ -887,7 +898,8 @@ let commands network () =
              fee_cap,
              burn_cap )
            src_pkh
-           cctxt ->
+           cctxt
+         ->
         Client_keys_v0.get_key cctxt src_pkh >>=? fun (_, src_pk, src_sk) ->
         let fee_parameter =
           {
@@ -1029,7 +1041,8 @@ let commands network () =
         @@ stop)
         (fun (confirmations, predecessors, branch)
              operation_hash
-             (ctxt : Protocol_client_context.full) ->
+             (ctxt : Protocol_client_context.full)
+           ->
           Client_confirmations.wait_for_operation_inclusion
             ctxt
             ~chain:ctxt#chain
@@ -1057,7 +1070,10 @@ let commands network () =
                       Error_monad.failwith "Invalid operation hash: '%s'" x
                   | Some hash -> return hash))
         @@ stop)
-        (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
+        (fun predecessors
+             operation_hash
+             (ctxt : Protocol_client_context.full)
+           ->
           display_receipt_for_operation
             ctxt
             ~chain:ctxt#chain
@@ -1116,7 +1132,8 @@ let commands network () =
         (fun (dry_run, verbose_signing, force)
              (_name, source)
              proposals
-             (cctxt : Protocol_client_context.full) ->
+             (cctxt : Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit proposals"
           | Some src_pkh -> (
@@ -1245,8 +1262,8 @@ let commands network () =
                         Format.pp_print_text
                         (String.split_on_char ' ' msg
                         |> List.filter (function
-                               | "" | "\n" -> false
-                               | _ -> true)
+                             | "" | "\n" -> false
+                             | _ -> true)
                         |> String.concat " "
                         |> String.map (function '\n' | '\t' -> ' ' | c -> c))
                   | el -> cctxt#message "Error:@ %a" pp_print_trace el)
@@ -1283,7 +1300,8 @@ let commands network () =
              (_name, source)
              proposal
              ballot
-             (cctxt : Protocol_client_context.full) ->
+             (cctxt : Protocol_client_context.full)
+           ->
           match Contract.is_implicit source with
           | None -> failwith "only implicit accounts can submit ballot"
           | Some src_pkh ->

@@ -476,7 +476,10 @@ let pp_initial_state fmt {operation_queues; _} =
 let init ~operations_file_path =
   Format.printf "Parsing operations file@." ;
   let op_encoding = Protocol.Alpha_context.Operation.encoding in
-  let buffer = Bytes.create (10 * 1024 * 1024) (* 10mb *) in
+  let buffer =
+    Bytes.create (10 * 1024 * 1024)
+    (* 10mb *)
+  in
   let*! ic = Lwt_io.open_file ~mode:Input operations_file_path in
   let rec loop acc =
     let*! op_len =
@@ -806,10 +809,10 @@ let cycle_eras_encoding =
   let cycle_era_encoding =
     let open Data_encoding in
     conv
-      (fun {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment} ->
-        (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment))
-      (fun (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment) ->
-        {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment})
+      (fun {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment}
+         -> (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment))
+      (fun (first_level, first_cycle, blocks_per_cycle, blocks_per_commitment)
+         -> {first_level; first_cycle; blocks_per_cycle; blocks_per_commitment})
       (obj4
          (req
             "first_level"

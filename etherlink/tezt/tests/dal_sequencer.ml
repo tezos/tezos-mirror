@@ -48,8 +48,7 @@ let test_publish_blueprints_on_dal ~dal_slot =
     ~dal_slots:(Some [dal_slot])
   (* We want this test in the CI so we put no extra tags when DAL
      is active to avoid having the [ci_disabled] or [slow] tag. *)
-  @@
-  fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
+  @@ fun {sequencer; proxy; client; sc_rollup_node; enable_dal; _} _protocol ->
   let number_of_blueprints = 5 in
 
   let number_of_blueprints_sent_to_inbox = ref 0 in

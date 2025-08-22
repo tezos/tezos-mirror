@@ -200,7 +200,8 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
   MisMap.fold_es
     (fun ({Misbehaviour_repr.level = raw_level; round = _; kind; _} as miskey)
          denunciations_map
-         acc ->
+         acc
+       ->
       let ctxt, balance_updates = acc in
       let misbehaviour_level =
         Level_repr.level_from_raw
@@ -219,7 +220,8 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
         List.fold_left_es
           (fun (ctxt, balance_updates)
                ( delegate,
-                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} ) ->
+                 Denunciations_repr.{operation_hash; rewarded; misbehaviour} )
+             ->
             assert (
               Compare.Int.equal
                 (* This compare ignores the slot *)

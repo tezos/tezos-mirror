@@ -462,7 +462,8 @@ module History = struct
                      is_proto_attested,
                      attested_shards,
                      total_shards ),
-                   header ) ->
+                   header )
+               ->
               Published
                 {
                   header;
@@ -927,7 +928,8 @@ module History = struct
                  page_data,
                  page_proof,
                  attestation_threshold_percent,
-                 restricted_commitments_publishers ) ->
+                 restricted_commitments_publishers )
+             ->
             Page_confirmed
               {
                 target_cell;
@@ -968,7 +970,8 @@ module History = struct
                  target_cell,
                  inc_proof,
                  attestation_threshold_percent,
-                 restricted_commitments_publishers ) ->
+                 restricted_commitments_publishers )
+             ->
             Page_unconfirmed
               {
                 target_cell;

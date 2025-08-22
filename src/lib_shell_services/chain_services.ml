@@ -123,7 +123,8 @@ let delegators_contribution_encoding =
            total_delegated_including_overdelegated;
            total_delegated_after_limits;
            overdelegated;
-         } ->
+         }
+       ->
       ( own_delegated,
         delegators_contributions,
         former_delegators_unstake_requests,
@@ -137,7 +138,8 @@ let delegators_contribution_encoding =
            overstaked,
            total_delegated_including_overdelegated,
            total_delegated_after_limits,
-           overdelegated ) ->
+           overdelegated )
+       ->
       {
         own_delegated;
         delegators_contributions;

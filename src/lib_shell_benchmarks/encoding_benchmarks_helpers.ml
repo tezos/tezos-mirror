@@ -202,8 +202,7 @@ struct
     ( (module Bench : Benchmark.Simple),
       (module Bench_intercept : Benchmark.Simple) )
 
-  let make_encode_fixed_size :
-      type a.
+  let make_encode_fixed_size : type a.
       ?check:(unit -> unit) ->
       name:string ->
       encoding:a Data_encoding.t ->
@@ -223,8 +222,7 @@ struct
         Generator.Plain {workload = (); closure})
       ()
 
-  let make_encode_variable_size :
-      type a.
+  let make_encode_variable_size : type a.
       ?check:(unit -> unit) ->
       ?purpose:Tezos_benchmark.Benchmark.purpose ->
       name:string ->
@@ -246,8 +244,7 @@ struct
         Generator.Plain {workload; closure})
       ()
 
-  let make_decode_fixed_size :
-      type a.
+  let make_decode_fixed_size : type a.
       ?check:(unit -> unit) ->
       name:string ->
       encoding:a Data_encoding.t ->
@@ -263,8 +260,7 @@ struct
         in
         Generator.Plain {workload = (); closure})
 
-  let make_decode_variable_size :
-      type a.
+  let make_decode_variable_size : type a.
       ?check:(unit -> unit) ->
       ?purpose:Tezos_benchmark.Benchmark.purpose ->
       name:string ->
@@ -290,8 +286,7 @@ struct
 
   (* Generic functions to cook benchmarks for b58check conversions (used for
      typechecking in readable mode in the protocol...) and byte conversions. *)
-  let make_encode_fixed_size_to_string :
-      type a.
+  let make_encode_fixed_size_to_string : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_string:(a -> string) ->
@@ -305,8 +300,7 @@ struct
         Generator.Plain {workload = (); closure})
 
   (* Exactly the sample implem' as above.*)
-  let make_encode_fixed_size_to_bytes :
-      type a.
+  let make_encode_fixed_size_to_bytes : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_bytes:(a -> bytes) ->
@@ -319,8 +313,7 @@ struct
         let closure () = ignore (to_bytes generated) in
         Generator.Plain {workload = (); closure})
 
-  let make_encode_variable_size_to_string :
-      type a.
+  let make_encode_variable_size_to_string : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_string:(a -> string) ->
@@ -338,8 +331,7 @@ struct
         Generator.Plain {workload; closure})
       ()
 
-  let make_decode_fixed_size_from_string :
-      type a.
+  let make_decode_fixed_size_from_string : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_string:(a -> string) ->
@@ -354,8 +346,7 @@ struct
         let closure () = ignore (from_string string) in
         Generator.Plain {workload = (); closure})
 
-  let make_decode_fixed_size_from_bytes :
-      type a.
+  let make_decode_fixed_size_from_bytes : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_bytes:(a -> bytes) ->
@@ -370,8 +361,7 @@ struct
         let closure () = ignore (from_bytes bytes) in
         Generator.Plain {workload = (); closure})
 
-  let make_decode_variable_size_from_string :
-      type a.
+  let make_decode_variable_size_from_string : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_string:(a -> string) ->
@@ -391,8 +381,7 @@ struct
         Generator.Plain {workload; closure})
       ()
 
-  let make_decode_variable_size_from_bytes :
-      type a.
+  let make_decode_variable_size_from_bytes : type a.
       ?check:(unit -> unit) ->
       name:string ->
       to_bytes:(a -> bytes) ->

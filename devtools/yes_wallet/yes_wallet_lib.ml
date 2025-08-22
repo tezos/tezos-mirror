@@ -291,7 +291,8 @@ let get_delegates_and_accounts (module P : Sigs.PROTOCOL) context
   in
   return
     ( filter_up_to_staking_share staking_share_opt total_stake P.Tez.to_mutez
-      @@ (* By swapping x and y we do a descending sort *)
+      @@
+      (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, _, x, _, _) (_, _, _, y, _, _) -> P.Tez.compare y x)
         delegates,
@@ -716,7 +717,8 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
         List.fold_left_i
           (fun i
                acc
-               (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits) ->
+               (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+             ->
             let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
             let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
             let ck =

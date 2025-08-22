@@ -283,7 +283,8 @@ module Cfg_file = struct
              password_filename;
              internal_events;
              log;
-           } ->
+           }
+         ->
         ( ( base_dir,
             node_addr,
             node_port,
@@ -305,7 +306,8 @@ module Cfg_file = struct
                remote_signer,
                signing_version,
                confirmations ),
-             (password_filename, internal_events, log) ) ->
+             (password_filename, internal_events, log) )
+         ->
         let web_port = Option.value ~default:default.web_port web_port in
         {
           base_dir;
@@ -916,7 +918,9 @@ let commands config_file cfg (client_mode : client_mode)
             ~default:((cfg.base_dir // mockup_protocol_constants) ^ ".json")
             (parameter (fun _ctx str -> Lwt.return_ok str))))
       (fixed ["config"; "init"])
-      (fun (config_file, bootstrap_accounts_file, protocol_constants_file) cctxt ->
+      (fun (config_file, bootstrap_accounts_file, protocol_constants_file)
+           cctxt
+         ->
         match client_mode with
         | `Mode_client | `Mode_light | `Mode_proxy ->
             config_init_client config_file cfg

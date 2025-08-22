@@ -41,10 +41,10 @@ module Kind = struct
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
-    | Preattestations_aggregate_kind
-        : preattestations_aggregate_consensus_kind consensus
-    | Attestations_aggregate_kind
-        : attestations_aggregate_consensus_kind consensus
+    | Preattestations_aggregate_kind :
+        preattestations_aggregate_consensus_kind consensus
+    | Attestations_aggregate_kind :
+        attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
@@ -139,8 +139,8 @@ module Kind = struct
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
-    | Sc_rollup_execute_outbox_message_manager_kind
-        : sc_rollup_execute_outbox_message manager
+    | Sc_rollup_execute_outbox_message_manager_kind :
+        sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
@@ -150,10 +150,10 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
-  | Preattestations_aggregate
-      : Kind.preattestations_aggregate consensus_operation_type
-  | Attestations_aggregate
-      : Kind.attestations_aggregate consensus_operation_type
+  | Preattestations_aggregate :
+      Kind.preattestations_aggregate consensus_operation_type
+  | Attestations_aggregate :
+      Kind.attestations_aggregate consensus_operation_type
 
 type consensus_aggregate_content = {
   level : Raw_level_repr.t;
@@ -646,7 +646,8 @@ module Encoding = struct
   let reserved_tag t =
     (* These tags are reserved for future extensions: [fd] - [ff]. *)
     Compare.Int.(t >= 0xfd)
-    || (* These tags were used by old operations.
+    ||
+    (* These tags were used by old operations.
           The operations have been removed in protocol proposal N, it can
           be unblocked in the future (e.g. proposal O, P etc.). *)
     List.exists (Compare.Int.equal t) tx_rollup_forbidden_operation_tags
@@ -767,7 +768,8 @@ module Encoding = struct
           encoding = obj1 (req "value" Script_repr.lazy_expr_encoding);
           select =
             (function
-            | Manager (Register_global_constant _ as op) -> Some op | _ -> None);
+            | Manager (Register_global_constant _ as op) -> Some op
+            | _ -> None);
           proj = (function Register_global_constant {value} -> value);
           inj = (fun value -> Register_global_constant {value});
         }
@@ -780,7 +782,8 @@ module Encoding = struct
           encoding = obj1 (opt "limit" Tez_repr.encoding);
           select =
             (function
-            | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
+            | Manager (Set_deposits_limit _ as op) -> Some op
+            | _ -> None);
           proj = (function Set_deposits_limit key -> key);
           inj = (fun key -> Set_deposits_limit key);
         }
@@ -796,7 +799,8 @@ module Encoding = struct
               (req "destination" Contract_repr.originated_encoding);
           select =
             (function
-            | Manager (Increase_paid_storage _ as op) -> Some op | _ -> None);
+            | Manager (Increase_paid_storage _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Increase_paid_storage {amount_in_bytes; destination} ->
@@ -870,8 +874,7 @@ module Encoding = struct
               (req "destination" Contract_repr.encoding)
               (req "entrypoint" Entrypoint_repr.simple_encoding);
           select =
-            (function
-            | Manager (Transfer_ticket _ as op) -> Some op | _ -> None);
+            (function Manager (Transfer_ticket _ as op) -> Some op | _ -> None);
           proj =
             (function
             | Transfer_ticket
@@ -900,7 +903,8 @@ module Encoding = struct
               (req "nb_ops" int31);
           select =
             (function
-            | Manager (Zk_rollup_origination _ as op) -> Some op | _ -> None);
+            | Manager (Zk_rollup_origination _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Zk_rollup_origination
@@ -927,7 +931,8 @@ module Encoding = struct
                       (option Zk_rollup_ticket_repr.encoding)));
           select =
             (function
-            | Manager (Zk_rollup_publish _ as op) -> Some op | _ -> None);
+            | Manager (Zk_rollup_publish _ as op) -> Some op
+            | _ -> None);
           proj =
             (function Zk_rollup_publish {zk_rollup; ops} -> (zk_rollup, ops));
           inj = (fun (zk_rollup, ops) -> Zk_rollup_publish {zk_rollup; ops});
@@ -944,7 +949,8 @@ module Encoding = struct
               (req "update" Zk_rollup_update_repr.encoding);
           select =
             (function
-            | Manager (Zk_rollup_update _ as op) -> Some op | _ -> None);
+            | Manager (Zk_rollup_update _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Zk_rollup_update {zk_rollup; update} -> (zk_rollup, update));
@@ -965,7 +971,8 @@ module Encoding = struct
               (opt "whitelist" Sc_rollup_whitelist_repr.encoding);
           select =
             (function
-            | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_originate _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Sc_rollup_originate {kind; boot_sector; parameters_ty; whitelist}
@@ -988,7 +995,8 @@ module Encoding = struct
                  Dal_operations_repr.Publish_commitment.encoding);
           select =
             (function
-            | Manager (Dal_publish_commitment _ as op) -> Some op | _ -> None);
+            | Manager (Dal_publish_commitment _ as op) -> Some op
+            | _ -> None);
           proj = (function Dal_publish_commitment slot_header -> slot_header);
           inj = (fun slot_header -> Dal_publish_commitment slot_header);
         }
@@ -1001,7 +1009,8 @@ module Encoding = struct
           encoding = obj1 (req "message" (list (string Hex)));
           select =
             (function
-            | Manager (Sc_rollup_add_messages _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_add_messages _ as op) -> Some op
+            | _ -> None);
           proj = (function Sc_rollup_add_messages {messages} -> messages);
           inj = (fun messages -> Sc_rollup_add_messages {messages});
         }
@@ -1014,7 +1023,8 @@ module Encoding = struct
           encoding = obj1 (req "rollup" Sc_rollup_repr.encoding);
           select =
             (function
-            | Manager (Sc_rollup_cement _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_cement _ as op) -> Some op
+            | _ -> None);
           proj = (function Sc_rollup_cement {rollup} -> rollup);
           inj = (fun rollup -> Sc_rollup_cement {rollup});
         }
@@ -1030,7 +1040,8 @@ module Encoding = struct
               (req "commitment" Sc_rollup_commitment_repr.encoding);
           select =
             (function
-            | Manager (Sc_rollup_publish _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_publish _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Sc_rollup_publish {rollup; commitment} -> (rollup, commitment));
@@ -1050,7 +1061,8 @@ module Encoding = struct
               (req "refutation" Sc_rollup_game_repr.refutation_encoding);
           select =
             (function
-            | Manager (Sc_rollup_refute _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_refute _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Sc_rollup_refute {rollup; opponent; refutation} ->
@@ -1071,10 +1083,10 @@ module Encoding = struct
               (req "stakers" Sc_rollup_game_repr.Index.encoding);
           select =
             (function
-            | Manager (Sc_rollup_timeout _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_timeout _ as op) -> Some op
+            | _ -> None);
           proj =
-            (function
-            | Sc_rollup_timeout {rollup; stakers} -> (rollup, stakers));
+            (function Sc_rollup_timeout {rollup; stakers} -> (rollup, stakers));
           inj = (fun (rollup, stakers) -> Sc_rollup_timeout {rollup; stakers});
         }
 
@@ -1116,7 +1128,8 @@ module Encoding = struct
               (req "staker" Signature.Public_key_hash.encoding);
           select =
             (function
-            | Manager (Sc_rollup_recover_bond _ as op) -> Some op | _ -> None);
+            | Manager (Sc_rollup_recover_bond _ as op) -> Some op
+            | _ -> None);
           proj =
             (function
             | Sc_rollup_recover_bond {sc_rollup; staker} -> (sc_rollup, staker));
@@ -1224,7 +1237,8 @@ module Encoding = struct
         encoding = attestations_aggregate_encoding;
         select =
           (function
-          | Contents (Attestations_aggregate _ as op) -> Some op | _ -> None);
+          | Contents (Attestations_aggregate _ as op) -> Some op
+          | _ -> None);
         proj =
           (fun (Attestations_aggregate {consensus_content; committee}) ->
             (consensus_content, committee));
@@ -1246,7 +1260,8 @@ module Encoding = struct
         encoding = preattestations_aggregate_encoding;
         select =
           (function
-          | Contents (Preattestations_aggregate _ as op) -> Some op | _ -> None);
+          | Contents (Preattestations_aggregate _ as op) -> Some op
+          | _ -> None);
         proj =
           (fun (Preattestations_aggregate {consensus_content; committee}) ->
             (consensus_content, committee));
@@ -1292,8 +1307,11 @@ module Encoding = struct
     def "inlined.consensus_operation"
     @@ conv
          (fun (Consensus_op
-                {shell; protocol_data = {contents = Single contents; signature}}) ->
-           (shell, (Consensus_op_contents contents, signature)))
+                 {
+                   shell;
+                   protocol_data = {contents = Single contents; signature};
+                 })
+            -> (shell, (Consensus_op_contents contents, signature)))
          (fun (shell, (Consensus_op_contents contents, signature)) ->
            Consensus_op
              {shell; protocol_data = {contents = Single contents; signature}})
@@ -1314,7 +1332,8 @@ module Encoding = struct
             (req "nonce" Seed_repr.nonce_encoding);
         select =
           (function
-          | Contents (Seed_nonce_revelation _ as op) -> Some op | _ -> None);
+          | Contents (Seed_nonce_revelation _ as op) -> Some op
+          | _ -> None);
         proj = (fun (Seed_nonce_revelation {level; nonce}) -> (level, nonce));
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
@@ -1369,7 +1388,8 @@ module Encoding = struct
             (req "bh2" (dynamic_size Block_header_repr.encoding));
         select =
           (function
-          | Contents (Double_baking_evidence _ as op) -> Some op | _ -> None);
+          | Contents (Double_baking_evidence _ as op) -> Some op
+          | _ -> None);
         proj = (fun (Double_baking_evidence {bh1; bh2}) -> (bh1, bh2));
         inj = (fun (bh1, bh2) -> Double_baking_evidence {bh1; bh2});
       }
@@ -1384,8 +1404,7 @@ module Encoding = struct
             (req "pkh" Ed25519.Public_key_hash.encoding)
             (req "secret" Blinded_public_key_hash.activation_code_encoding);
         select =
-          (function
-          | Contents (Activate_account _ as op) -> Some op | _ -> None);
+          (function Contents (Activate_account _ as op) -> Some op | _ -> None);
         proj =
           (fun (Activate_account {id; activation_code}) ->
             (id, activation_code));
@@ -1486,10 +1505,12 @@ module Encoding = struct
             (req "shard_with_proof" Dal_slot_repr.Shard_with_proof.encoding);
         select =
           (function
-          | Contents (Dal_entrapment_evidence _ as op) -> Some op | _ -> None);
+          | Contents (Dal_entrapment_evidence _ as op) -> Some op
+          | _ -> None);
         proj =
           (fun (Dal_entrapment_evidence
-                 {attestation; consensus_slot; slot_index; shard_with_proof}) ->
+                  {attestation; consensus_slot; slot_index; shard_with_proof})
+             ->
             ( Consensus_op attestation,
               consensus_slot,
               slot_index,
@@ -1498,7 +1519,8 @@ module Encoding = struct
           (fun ( Consensus_op attestation,
                  consensus_slot,
                  slot_index,
-                 shard_with_proof ) ->
+                 shard_with_proof )
+             ->
             Dal_entrapment_evidence
               {attestation; consensus_slot; slot_index; shard_with_proof});
       }
@@ -1871,8 +1893,7 @@ module Encoding = struct
           name = "bls_mode_preattestation";
           encoding = consensus_aggregate_content_encoding;
           select =
-            (function
-            | Contents (Preattestation _ as op) -> Some op | _ -> None);
+            (function Contents (Preattestation _ as op) -> Some op | _ -> None);
           proj =
             (fun (Preattestation {level; round; block_payload_hash; _}) ->
               {level; round; block_payload_hash});
@@ -2105,8 +2126,8 @@ let hash_packed (o : packed_operation) =
 
 type ('a, 'b) eq = Eq : ('a, 'a) eq
 
-let equal_manager_operation_kind :
-    type a b. a manager_operation -> b manager_operation -> (a, b) eq option =
+let equal_manager_operation_kind : type a b.
+    a manager_operation -> b manager_operation -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
   | Reveal _, Reveal _ -> Some Eq
@@ -2193,8 +2214,8 @@ let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
       | Some Eq -> Some Eq)
   | Manager_operation _, _ -> None
 
-let rec equal_contents_kind_list :
-    type a b. a contents_list -> b contents_list -> (a, b) eq option =
+let rec equal_contents_kind_list : type a b.
+    a contents_list -> b contents_list -> (a, b) eq option =
  fun op1 op2 ->
   match (op1, op2) with
   | Single op1, Single op2 -> equal_contents_kind op1 op2
@@ -2515,8 +2536,7 @@ type operation_weight = W : 'pass pass * 'pass weight -> operation_weight
     Precondition: [op] is a valid manager operation: its sum
     of accumulated [fee] must succeed. Hence, in the unreachable path where
     the [fee] sum fails, we put [Tez_repr.zero] as its value. *)
-let cumulate_fee_and_gas_of_manager :
-    type kind.
+let cumulate_fee_and_gas_of_manager : type kind.
     kind Kind.manager contents_list ->
     Tez_repr.t * Gas_limit_repr.Arith.integral =
  fun op ->
@@ -2525,19 +2545,19 @@ let cumulate_fee_and_gas_of_manager :
     | Ok v -> v
     | Error _ -> (* This cannot happen *) acc
   in
-  let rec loop :
-      type kind. 'a -> 'b -> kind Kind.manager contents_list -> 'a * 'b =
+  let rec loop : type kind.
+      'a -> 'b -> kind Kind.manager contents_list -> 'a * 'b =
    fun fees_acc gas_limit_acc -> function
-    | Single (Manager_operation {fee; gas_limit; _}) ->
-        let total_fees = add_without_error fees_acc fee in
-        let total_gas_limit =
-          Gas_limit_repr.Arith.add gas_limit_acc gas_limit
-        in
-        (total_fees, total_gas_limit)
-    | Cons (Manager_operation {fee; gas_limit; _}, manops) ->
-        let fees_acc = add_without_error fees_acc fee in
-        let gas_limit_acc = Gas_limit_repr.Arith.add gas_limit gas_limit_acc in
-        loop fees_acc gas_limit_acc manops
+     | Single (Manager_operation {fee; gas_limit; _}) ->
+         let total_fees = add_without_error fees_acc fee in
+         let total_gas_limit =
+           Gas_limit_repr.Arith.add gas_limit_acc gas_limit
+         in
+         (total_fees, total_gas_limit)
+     | Cons (Manager_operation {fee; gas_limit; _}, manops) ->
+         let fees_acc = add_without_error fees_acc fee in
+         let gas_limit_acc = Gas_limit_repr.Arith.add gas_limit gas_limit_acc in
+         loop fees_acc gas_limit_acc manops
   in
   loop Tez_repr.zero Gas_limit_repr.Arith.zero op
 
@@ -2549,8 +2569,7 @@ let cumulate_fee_and_gas_of_manager :
    never be zero. We treat this case the same as gas_limit = 1 for the
    sake of simplicity.
 *)
-let weight_manager :
-    type kind.
+let weight_manager : type kind.
     kind Kind.manager contents_list -> Q.t * Signature.public_key_hash =
  fun op ->
   let fee, glimit = cumulate_fee_and_gas_of_manager op in

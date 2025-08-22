@@ -10,7 +10,9 @@ let tezt_cloud =
   | Some tezt_cloud -> tezt_cloud
   | None -> (
       (* This is a lazy value to be sure that this is evaluated only inside a Tezt test. *)
-      match Sys.getenv_opt "TEZT_CLOUD" with None -> "" | Some value -> value)
+      match Sys.getenv_opt "TEZT_CLOUD" with
+      | None -> ""
+      | Some value -> value)
 
 let mode =
   match (Cli.proxy, Cli.localhost, Cli.ssh_host) with

@@ -192,17 +192,17 @@ let decode_legacy : bytes -> (transaction, string) result =
   match decode bytes with
   | Ok
       (List
-        [
-          Value nonce;
-          Value gas_price;
-          Value gas_limit;
-          Value to_;
-          Value value;
-          Value data;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
+         [
+           Value nonce;
+           Value gas_price;
+           Value gas_limit;
+           Value to_;
+           Value value;
+           Value data;
+           Value v;
+           Value r;
+           Value s;
+         ]) ->
       decode_transaction
         ~tx_type:Legacy
         ~nonce
@@ -272,20 +272,20 @@ let decode_eip1559 : bytes -> (transaction, string) result =
   match decode bytes with
   | Ok
       (List
-        [
-          Value chain_id;
-          Value nonce;
-          Value max_priority_fee_per_gas;
-          Value max_fee_per_gas;
-          Value gas_limit;
-          Value to_;
-          Value value;
-          Value data;
-          List access_list;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
+         [
+           Value chain_id;
+           Value nonce;
+           Value max_priority_fee_per_gas;
+           Value max_fee_per_gas;
+           Value gas_limit;
+           Value to_;
+           Value value;
+           Value data;
+           List access_list;
+           Value v;
+           Value r;
+           Value s;
+         ]) ->
       decode_transaction
         ~tx_type:Eip1559
         ~chain_id
@@ -351,19 +351,19 @@ let decode_eip2930 : bytes -> (transaction, string) result =
   match decode bytes with
   | Ok
       (List
-        [
-          Value chain_id;
-          Value nonce;
-          Value max_fee_per_gas;
-          Value gas_limit;
-          Value to_;
-          Value value;
-          Value data;
-          List access_list;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
+         [
+           Value chain_id;
+           Value nonce;
+           Value max_fee_per_gas;
+           Value gas_limit;
+           Value to_;
+           Value value;
+           Value data;
+           List access_list;
+           Value v;
+           Value r;
+           Value s;
+         ]) ->
       decode_transaction
         ~tx_type:Eip2930
         ~chain_id
@@ -427,21 +427,21 @@ let decode_eip7702 : bytes -> (transaction, string) result =
   match decode bytes with
   | Ok
       (List
-        [
-          Value chain_id;
-          Value nonce;
-          Value max_priority_fee_per_gas;
-          Value max_fee_per_gas;
-          Value gas_limit;
-          Value to_;
-          Value value;
-          Value data;
-          List access_list;
-          List authorization_list;
-          Value v;
-          Value r;
-          Value s;
-        ]) ->
+         [
+           Value chain_id;
+           Value nonce;
+           Value max_priority_fee_per_gas;
+           Value max_fee_per_gas;
+           Value gas_limit;
+           Value to_;
+           Value value;
+           Value data;
+           List access_list;
+           List authorization_list;
+           Value v;
+           Value r;
+           Value s;
+         ]) ->
       decode_transaction
         ~tx_type:Eip7702
         ~chain_id

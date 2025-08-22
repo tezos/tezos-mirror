@@ -109,14 +109,12 @@ let respond_error ?status ?code ?headers media err =
     media
     (encode media Rpc_encodings.JSONRPC.error_encoding err)
 
-let get_params :
-    type params.
+let get_params : type params.
     Dream.request -> (unit, params) Path.t -> (params, string) result =
  fun request p ->
   let open Result_syntax in
-  let rec extract :
-      type param. (unit, param) Resto.Internal.path -> (param, string) result =
-    function
+  let rec extract : type param.
+      (unit, param) Resto.Internal.path -> (param, string) result = function
     | Root -> return_unit
     | Static (path, _s) -> extract path
     | Dynamic (path, arg) ->
@@ -156,8 +154,7 @@ let dream_path (path : _ Path.t) : string =
 let bad_request media msg =
   respond ~status:`Bad_Request media (encode media Data_encoding.string msg)
 
-let make_gen_route :
-    type params query input.
+let make_gen_route : type params query input.
     (_, _, params, query, input, _) Service.t ->
     (Dream.request ->
     params:params ->

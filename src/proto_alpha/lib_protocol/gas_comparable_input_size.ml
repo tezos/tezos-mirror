@@ -102,8 +102,8 @@ let address (addr : Script_typed_ir.address) : t =
 let timestamp (tstamp : Script_timestamp.t) : t =
   Z.numbits (Script_timestamp.to_zint tstamp) / 8
 
-let rec size_of_comparable_value :
-    type a. a Script_typed_ir.comparable_ty -> a -> t =
+let rec size_of_comparable_value : type a.
+    a Script_typed_ir.comparable_ty -> a -> t =
  fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
   match wit with
   | Never_t -> ( match v with _ -> .)

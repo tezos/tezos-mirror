@@ -150,7 +150,10 @@ module Make (Registration : Registration.S) = struct
       bootstrap_accounts_json:Data_encoding.json option ->
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
-   fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
+   fun ~cctxt
+       ~protocol_hash
+       ~constants_overrides_json
+       ~bootstrap_accounts_json ->
     let open Lwt_result_syntax in
     let* mockup = get_registered_mockup (Some protocol_hash) cctxt in
     let (module Mockup) = mockup in

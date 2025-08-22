@@ -866,11 +866,11 @@ let finalize_validation_and_application (validation_state, application_state)
   let* () = finalize_validation validation_state in
   finalize_application application_state shell_header
 
-let detect_manager_failure :
-    type kind. kind Apply_results.operation_metadata -> _ =
+let detect_manager_failure : type kind.
+    kind Apply_results.operation_metadata -> _ =
   let open Result_syntax in
-  let rec detect_manager_failure :
-      type kind. kind Apply_results.contents_result_list -> _ =
+  let rec detect_manager_failure : type kind.
+      kind Apply_results.contents_result_list -> _ =
     let open Apply_results in
     let open Apply_operation_result in
     let open Apply_internal_results in
@@ -1133,8 +1133,7 @@ let balance_update_of_internal_operation_result = function
           | IEvent_result _ ->
               []))
 
-let balance_update_of_operation_result :
-    type a.
+let balance_update_of_operation_result : type a.
     a Protocol.Apply_results.manager_operation_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Protocol.Apply_operation_result.Backtracked _ | Failed _ | Skipped _ ->
@@ -1161,8 +1160,7 @@ let balance_update_of_operation_result :
       | Increase_paid_storage_result {balance_updates; _} ->
           balance_updates)
 
-let balance_updates_of_single_content :
-    type a.
+let balance_updates_of_single_content : type a.
     a Protocol.Apply_results.contents_result ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Proposals_result | Ballot_result -> []
@@ -1187,8 +1185,7 @@ let balance_updates_of_single_content :
         |> List.flatten)
       @ balance_update_of_operation_result operation_result
 
-let rec balance_updates_of_contents :
-    type a.
+let rec balance_updates_of_contents : type a.
     a Protocol.Apply_results.contents_result_list ->
     Protocol.Alpha_context.Receipt.balance_updates = function
   | Single_result c -> balance_updates_of_single_content c

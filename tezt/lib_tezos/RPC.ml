@@ -374,15 +374,15 @@ let get_chain_is_bootstrapped ?(chain = "main") () =
   JSON.
     {
       sync_state =
-        (json |-> "sync_state" |> as_string |> function
-         | "synced" -> Synced
-         | "unsynced" -> Unsynced
-         | "stuck" -> Stuck
-         | state ->
-             Test.fail
-               "/chains/%s/is_bootstrapped returned unexpected sync_state: %s"
-               chain
-               state);
+        ( json |-> "sync_state" |> as_string |> function
+          | "synced" -> Synced
+          | "unsynced" -> Unsynced
+          | "stuck" -> Stuck
+          | state ->
+              Test.fail
+                "/chains/%s/is_bootstrapped returned unexpected sync_state: %s"
+                chain
+                state );
       bootstrapped = json |-> "bootstrapped" |> as_bool;
     }
 

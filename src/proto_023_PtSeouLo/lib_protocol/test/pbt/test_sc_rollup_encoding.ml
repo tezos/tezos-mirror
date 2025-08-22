@@ -112,10 +112,11 @@ let gen_inbox level =
     return (Sc_rollup_inbox_repr.finalize_inbox_level_no_history inbox witness)
   in
   return
-  @@ (witness_and_inbox |> function
-      | Ok v -> v
-      | Error e ->
-          Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e))
+  @@ ( witness_and_inbox |> function
+       | Ok v -> v
+       | Error e ->
+           Stdlib.failwith (Format.asprintf "%a" Error_monad.pp_print_trace e)
+     )
 
 module Index = Dal_slot_index_repr
 
@@ -136,7 +137,8 @@ let pack_slots_headers_by_level list =
       (fun map
            (( Dal_slot_repr.Header.{id = {published_level; _}; _},
               _publisher,
-              _status ) as sh) ->
+              _status ) as sh)
+         ->
         let l =
           ML.find published_level map |> Option.value ~default:SSH.empty
         in
@@ -207,7 +209,8 @@ let gen_dal_slots_history () =
           (* Sort the list in the right ordering before adding slots to slots_history. *)
           List.sort_uniq
             (fun ({Header.id = a; _}, _publisher, _status)
-                 ({id = b; _}, _publisher, _status) ->
+                 ({id = b; _}, _publisher, _status)
+               ->
               let c =
                 Raw_level_repr.compare a.published_level b.published_level
               in

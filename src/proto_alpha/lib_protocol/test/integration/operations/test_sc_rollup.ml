@@ -85,8 +85,7 @@ let get_game_status_result incr =
               {
                 contents =
                   Single_result
-                    (Manager_operation_result
-                      {operation_result = Applied op; _});
+                    (Manager_operation_result {operation_result = Applied op; _});
               } -> (
               match op with
               | Sc_rollup_refute_result {game_status; _} ->
@@ -1900,8 +1899,7 @@ let test_number_of_parallel_games_bounded () =
   in
   let expect_apply_failure = function
     | Environment.Ecoproto_error
-        (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached
-          xstaker)
+        (Sc_rollup_errors.Sc_rollup_max_number_of_parallel_games_reached xstaker)
       :: _ ->
         assert (
           Signature.Public_key_hash.(

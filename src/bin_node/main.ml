@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 (** Ensure that the prometheus profiler is linked. *)
-let () = (() [@profiler.overwrite ignore Prometheus_profiler.prometheus])
+let () = () [@profiler.overwrite ignore Prometheus_profiler.prometheus]
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/4025
    Remove backwards compatible Tezos symlinks. *)

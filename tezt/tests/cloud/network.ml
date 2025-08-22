@@ -243,8 +243,8 @@ let versions network =
                  ( json_account |-> "address" |> as_string,
                    json_account |-> "software" |-> "version" |> as_string_opt ))
         |> Seq.filter_map (function
-               | address, None -> Some (address, "unknown")
-               | address, Some version -> Some (address, version))
+             | address, None -> Some (address, "unknown")
+             | address, Some version -> Some (address, version))
         |> Hashtbl.of_seq
       in
       let rpc =
@@ -334,6 +334,6 @@ let aliases ?accounts network =
   | Some aliases ->
       aliases |> List.to_seq
       |> Seq.filter_map (function
-             | None, _, _ -> None
-             | Some alias, address, _ -> Some (address, alias))
+           | None, _, _ -> None
+           | Some alias, address, _ -> Some (address, alias))
       |> Hashtbl.of_seq |> Lwt.return_some

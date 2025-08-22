@@ -116,7 +116,8 @@ module Info = struct
              last_disconnection;
              last_seen;
              last_miss;
-           } ->
+           }
+         ->
         ( (score, trusted, conn_metadata, peer_metadata, state, id_point, stat),
           ( last_failed_connection,
             last_rejected_connection,
@@ -136,7 +137,8 @@ module Info = struct
                last_established_connection,
                last_disconnection,
                last_seen,
-               last_miss ) ) ->
+               last_miss ) )
+         ->
         {
           score;
           trusted;

@@ -128,8 +128,8 @@ end
 *)
 type ('id, 'alloc, 'updates) t =
   | Big_map : (Big_map.Id.t, Big_map.alloc, Big_map.updates) t
-  | Sapling_state
-      : (Sapling_state.Id.t, Sapling_state.alloc, Sapling_state.updates) t
+  | Sapling_state :
+      (Sapling_state.Id.t, Sapling_state.alloc, Sapling_state.updates) t
 
 type ex = Ex_Kind : (_, _, _) t -> ex
 

@@ -155,7 +155,8 @@ let commands () =
            fitness
            sk
            param_json_file
-           (cctxt : Client_context.full) ->
+           (cctxt : Client_context.full)
+         ->
         let fitness = fitness_from_uint32 fitness in
         Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file param_json_file
         >>=? fun json ->

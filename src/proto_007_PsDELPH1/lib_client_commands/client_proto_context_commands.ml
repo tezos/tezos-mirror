@@ -123,7 +123,12 @@ let commands () =
       @@ prefix "in"
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun ()
+           key
+           key_type
+           (_, contract)
+           (cctxt : Protocol_client_context.full)
+         ->
         get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain

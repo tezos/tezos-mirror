@@ -434,8 +434,8 @@ module Handlers = struct
     ctxt.session <- session ;
     return_unit
 
-  let on_request :
-      type r err. self -> (r, err) Request.t -> (r, err) result Lwt.t =
+  let on_request : type r err.
+      self -> (r, err) Request.t -> (r, err) result Lwt.t =
    fun self request ->
     let ctxt = Worker.state self in
     let (Session session) = ctxt.session in

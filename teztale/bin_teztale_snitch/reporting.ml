@@ -157,7 +157,9 @@ let filter_ops :
 let ops_consistency ops =
   let open Delegate_operations in
   List.fold_left
-    (fun (pa, a, r) ({operations; attesting_power; _} : Delegate_operations.t) ->
+    (fun (pa, a, r)
+         ({operations; attesting_power; _} : Delegate_operations.t)
+       ->
       let r =
         if
           List.exists

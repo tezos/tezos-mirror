@@ -252,7 +252,10 @@ module Tasks = struct
          "• Percentage of attested over published DAL commitments: %s")
         (Option.value ~default:"unk" ratio)
     in
-    let slot_size = 126_944 (* TODO: do not hard-code this *) in
+    let slot_size =
+      126_944
+      (* TODO: do not hard-code this *)
+    in
     let bandwidth =
       Option.map
         (fun x ->
@@ -759,7 +762,8 @@ module Alert = struct
           (fun ( `attestation_level attestation_level,
                  `slot_index slot_index,
                  `delegate delegate,
-                 `op_hash hash ) ->
+                 `op_hash hash )
+             ->
             Format.asprintf
               ":black_small_square: %a for attesting slot index `%d` at level \
                `%d`. <https://%s.tzkt.io/%s|See online>"
@@ -817,7 +821,8 @@ module Alert = struct
             (fun ( `attestation_level attestation_level,
                    `shard shard,
                    `slot_index slot_index,
-                   `op_hash hash ) ->
+                   `op_hash hash )
+               ->
               let* json =
                 RPC_core.call
                   endpoint

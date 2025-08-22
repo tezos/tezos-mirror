@@ -1184,7 +1184,8 @@ let test_level protocol client =
 (* Test big map io: adding, removing, and updating values *)
 let test_big_map_contract_io protocol client =
   Lwt_list.iter_s
-    (fun (script_name, storage, input, expected_storage, expected_big_map_diff) ->
+    (fun (script_name, storage, input, expected_storage, expected_big_map_diff)
+       ->
       run_script_and_check
         ~storage
         ~input

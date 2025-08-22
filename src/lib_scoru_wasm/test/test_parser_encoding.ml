@@ -836,8 +836,7 @@ module Field = struct
         pack DataField data_field_gen;
       ]
 
-  let check_field_type :
-      type a a' repr repr'.
+  let check_field_type : type a a' repr repr'.
       (a, repr) Decode.field_type -> (a', repr') Decode.field_type -> bool =
    fun ft ft' ->
     match (ft, ft') with
@@ -859,8 +858,7 @@ module Field = struct
       (Parser.Field.FieldType ft') =
     Lwt.return_ok (check_field_type ft ft')
 
-  let check_field_type_value :
-      type a a' repr repr'.
+  let check_field_type_value : type a a' repr repr'.
       (a, repr) Decode.field_type ->
       (a', repr') Decode.field_type ->
       a ->

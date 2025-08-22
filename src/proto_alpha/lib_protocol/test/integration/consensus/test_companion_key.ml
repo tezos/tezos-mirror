@@ -70,24 +70,25 @@ type key_kind = Protocol.Operation_repr.consensus_key_kind =
 
 let check_error_invalid_consensus_key_update_active ~loc ~pkh ~kind errs =
   Assert.expect_error ~loc errs (function
-      | [
-          Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
-            (err_pkh, err_kind);
-        ]
-        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
-          true
-      | _ -> false)
+    | [
+        Protocol.Delegate_consensus_key.Invalid_consensus_key_update_active
+          (err_pkh, err_kind);
+      ]
+      when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
+        true
+    | _ -> false)
 
 let check_error_invalid_consensus_key_update_another_delegate ~loc ~pkh ~kind
     errs =
   Assert.expect_error ~loc errs (function
-      | [
-          Protocol.Delegate_consensus_key
-          .Invalid_consensus_key_update_another_delegate (err_pkh, err_kind);
-        ]
-        when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
-          true
-      | _ -> false)
+    | [
+        Protocol.Delegate_consensus_key
+        .Invalid_consensus_key_update_another_delegate
+          (err_pkh, err_kind);
+      ]
+      when Signature.Public_key_hash.equal pkh err_pkh && kind = err_kind ->
+        true
+    | _ -> false)
 
 let check_ck_status ~loc ~ck ~registered_for (status : key_status)
     (kind : key_kind) : (t, t) scenarios =
@@ -544,15 +545,15 @@ let test_register_same_key_multiple_times =
         let cycle, ck_pkh = Account_helpers.latest_consensus_key delegate in
         if Signature.Public_key_hash.equal ck_pkh ck.pkh then
           Assert.expect_error ~loc:__LOC__ err (function
-              | [
-                  Protocol.Delegate_consensus_key
-                  .Invalid_consensus_key_update_noop (err_cycle, err_kind);
-                ] ->
-                  Int32.equal
-                    (Protocol.Cycle_repr.to_int32 err_cycle)
-                    (State_account.Cycle.to_int32 cycle)
-                  && err_kind = Consensus
-              | _ -> false)
+            | [
+                Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
+                  (err_cycle, err_kind);
+              ] ->
+                Int32.equal
+                  (Protocol.Cycle_repr.to_int32 err_cycle)
+                  (State_account.Cycle.to_int32 cycle)
+                && err_kind = Consensus
+            | _ -> false)
         else
           check_error_invalid_consensus_key_update_active
             ~loc:__LOC__
@@ -573,15 +574,16 @@ let test_register_same_key_multiple_times =
                 ck_pkh
             then
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Delegate_consensus_key
-                      .Invalid_consensus_key_update_noop (err_cycle, err_kind);
-                    ] ->
-                      Int32.equal
-                        (Protocol.Cycle_repr.to_int32 err_cycle)
-                        (State_account.Cycle.to_int32 cycle)
-                      && err_kind = Companion
-                  | _ -> false)
+                | [
+                    Protocol.Delegate_consensus_key
+                    .Invalid_consensus_key_update_noop
+                      (err_cycle, err_kind);
+                  ] ->
+                    Int32.equal
+                      (Protocol.Cycle_repr.to_int32 err_cycle)
+                      (State_account.Cycle.to_int32 cycle)
+                    && err_kind = Companion
+                | _ -> false)
             else
               check_error_invalid_consensus_key_update_active
                 ~loc:__LOC__
@@ -830,16 +832,13 @@ let test_unregistered =
             ~expected_error:(fun (_block, state) err ->
               let account = State.find_account "account" state in
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Apply
-                      .Update_consensus_key_on_unregistered_delegate
-                        (err_account_pkh, err_kind);
-                    ] ->
-                      Signature.Public_key_hash.equal
-                        err_account_pkh
-                        account.pkh
-                      && err_kind = kind
-                  | _ -> false))
+                | [
+                    Protocol.Apply.Update_consensus_key_on_unregistered_delegate
+                      (err_account_pkh, err_kind);
+                  ] ->
+                    Signature.Public_key_hash.equal err_account_pkh account.pkh
+                    && err_kind = kind
+                | _ -> false))
             (update_key ~kind ~ck_name:"ck" "account"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
@@ -858,15 +857,16 @@ let test_forbidden_tz4 =
               let ck = State.find_account "ck" state in
               let* ck_account = Account.find ck.pkh in
               Assert.expect_error ~loc:__LOC__ err (function
-                  | [
-                      Protocol.Delegate_consensus_key
-                      .Invalid_consensus_key_update_tz4 (err_ck_bls_pk, err_kind);
-                    ] ->
-                      kind = err_kind
-                      && Signature.Public_key.equal
-                           (Bls err_ck_bls_pk)
-                           ck_account.pk
-                  | _ -> false))
+                | [
+                    Protocol.Delegate_consensus_key
+                    .Invalid_consensus_key_update_tz4
+                      (err_ck_bls_pk, err_kind);
+                  ] ->
+                    kind = err_kind
+                    && Signature.Public_key.equal
+                         (Bls err_ck_bls_pk)
+                         ck_account.pk
+                | _ -> false))
             (update_key ~kind ~ck_name:"ck" "delegate"))
         [("update consensus", Consensus); ("update companion", Companion)]
 
@@ -885,15 +885,15 @@ let test_fail_noop =
           | Companion -> Account_helpers.latest_companion_key delegate |> fst
         in
         Assert.expect_error ~loc:__LOC__ err (function
-            | [
-                Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
-                  (err_cycle, err_kind);
-              ] ->
-                Int32.equal
-                  (Protocol.Cycle_repr.to_int32 err_cycle)
-                  (State_account.Cycle.to_int32 cycle)
-                && err_kind = kind
-            | _ -> false))
+          | [
+              Protocol.Delegate_consensus_key.Invalid_consensus_key_update_noop
+                (err_cycle, err_kind);
+            ] ->
+              Int32.equal
+                (Protocol.Cycle_repr.to_int32 err_cycle)
+                (State_account.Cycle.to_int32 cycle)
+              && err_kind = kind
+          | _ -> false))
   in
   init_constants ()
   --> set S.allow_tz4_delegate_enable true
@@ -1012,13 +1012,13 @@ let test_fail_companion_not_tz4 =
           let ck = State.find_account "ck" state in
           let* ck_account = Account.find ck.pkh in
           Assert.expect_error ~loc:__LOC__ err (function
-              | [
-                  Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
-                    {source = err_source; public_key = err_pk};
-                ] ->
-                  Signature.Public_key_hash.equal err_source delegate.pkh
-                  && Signature.Public_key.equal err_pk ck_account.pk
-              | _ -> false))
+            | [
+                Protocol.Validate_errors.Manager.Update_companion_key_not_tz4
+                  {source = err_source; public_key = err_pk};
+              ] ->
+                Signature.Public_key_hash.equal err_source delegate.pkh
+                && Signature.Public_key.equal err_pk ck_account.pk
+            | _ -> false))
         (update_key ~kind:Companion ~ck_name:"ck" delegate)
 
 let test_batch =

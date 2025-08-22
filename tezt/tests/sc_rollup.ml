@@ -2340,7 +2340,8 @@ let commitments_reorgs ~switch_l1_node ~kind _ sc_rollup_node sc_rollup node
          let snapshot_ticks = max_nb_ticks in
          snapshot_ticks * 4
          (* 1 snapshot for collecting messages, 3 snapshots for SOL,
-            Info_per_level and SOL *) * levels_to_commitment
+            Info_per_level and SOL *)
+         * levels_to_commitment
          (* Number of inbox that are actually processed process *)
      | _ -> assert false
    in
@@ -2492,7 +2493,8 @@ let attempt_withdraw_stake =
       ?(src = Constant.bootstrap1.public_key_hash)
       ?(staker = Constant.bootstrap1.public_key_hash)
       ?(keys = [Constant.bootstrap2.alias])
-      client ->
+      client
+    ->
     let recover_bond_fee = 1_000_000 in
     let inject_op () =
       Client.Sc_rollup.submit_recover_bond
@@ -3736,15 +3738,17 @@ let cement_commitments protocol client sc_rollup ?fail =
 *)
 let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
   test_forking_scenario ~variant:"publish, and cement on wrong commitment"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             level0
-             level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      level0
+      level1
+    ->
   let c1, c2, c31, c32, c311, _c321 = commits in
   let* constants = get_sc_rollup_constants client in
   let challenge_window = constants.challenge_window_in_blocks in
@@ -3804,15 +3808,17 @@ let test_no_cementation_if_parent_not_lcc_or_if_disputed_commit =
 *)
 let test_valid_dispute_dissection =
   test_forking_scenario ~variant:"valid dispute dissection"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             _level0
-             _level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      _level0
+      _level1
+    ->
   let c1, c2, c31, c32, _c311, _c321 = commits in
   let cement = cement_commitments protocol client sc_rollup in
   let* constants = get_sc_rollup_constants client in
@@ -3866,15 +3872,17 @@ let test_valid_dispute_dissection =
    to get to the point where we can timeout. *)
 let test_timeout =
   test_forking_scenario ~variant:"timeout"
-  @@ fun client
-             _node
-             protocol
-             ~sc_rollup
-             ~operator1
-             ~operator2
-             commits
-             level0
-             level1 ->
+  @@
+  fun client
+      _node
+      protocol
+      ~sc_rollup
+      ~operator1
+      ~operator2
+      commits
+      level0
+      level1
+    ->
   (* These are the commitments on the rollup. See [test_forking_scenario] to
        visualize the tree structure. *)
   let c1, c2, c31, c32, _c311, _c321 = commits in
@@ -5759,10 +5767,10 @@ let test_rollup_whitelist_update ~kind =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ("whitelist", `A (List.map (fun pkh -> `String pkh) whitelist));
+           ("kind", `String "whitelist_update");
+         ])
   in
   let send_whitelist_then_bake_until_exec encoded_whitelist_msgs =
     let* _res =
@@ -5897,24 +5905,24 @@ let test_rollup_whitelist_outdated_update ~kind =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ("whitelist", `A [`String Constant.bootstrap1.public_key_hash]);
+           ("kind", `String "whitelist_update");
+         ])
   in
   let* payload2 =
     Codec.encode
       ~name:(Protocol.encoding_prefix protocol ^ ".smart_rollup.outbox.message")
       (`O
-        [
-          ( "whitelist",
-            `A
-              [
-                `String Constant.bootstrap1.public_key_hash;
-                `String Constant.bootstrap2.public_key_hash;
-              ] );
-          ("kind", `String "whitelist_update");
-        ])
+         [
+           ( "whitelist",
+             `A
+               [
+                 `String Constant.bootstrap1.public_key_hash;
+                 `String Constant.bootstrap2.public_key_hash;
+               ] );
+           ("kind", `String "whitelist_update");
+         ])
   in
   (* Execute whitelist update with outdated message index. *)
   let* _hash, outbox_level, message_index =

@@ -55,13 +55,13 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
                    contents =
                      Single_result
                        (Attestation_result
-                         {
-                           (* This list is always empty *)
-                           balance_updates = [];
-                           delegate;
-                           consensus_key;
-                           consensus_power = _;
-                         });
+                          {
+                            (* This list is always empty *)
+                            balance_updates = [];
+                            delegate;
+                            consensus_key;
+                            consensus_power = _;
+                          });
                  } )
            | ( Preattestation,
                Protocol.Apply_results.Operation_metadata
@@ -69,13 +69,13 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
                    contents =
                      Single_result
                        (Preattestation_result
-                         {
-                           (* This list is always empty *)
-                           balance_updates = [];
-                           delegate;
-                           consensus_key;
-                           consensus_power = _;
-                         });
+                          {
+                            (* This list is always empty *)
+                            balance_updates = [];
+                            delegate;
+                            consensus_key;
+                            consensus_power = _;
+                          });
                  } ) ->
                Signature.Public_key_hash.(
                  equal delegate delegate_pkh
@@ -107,8 +107,9 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
     if expect_same_order then committee
     else
       List.sort
-        (fun {Alpha_context.Consensus_key.delegate = d1; _} {delegate = d2; _} ->
-          Signature.Public_key_hash.compare d1 d2)
+        (fun {Alpha_context.Consensus_key.delegate = d1; _}
+             {delegate = d2; _}
+           -> Signature.Public_key_hash.compare d1 d2)
         committee
   in
   let committee_expect = may_sort committee_expect in
@@ -123,12 +124,12 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
                    contents =
                      Single_result
                        (Attestations_aggregate_result
-                         {
-                           (* This list is always empty *)
-                           balance_updates = [];
-                           committee;
-                           total_consensus_power = _;
-                         });
+                          {
+                            (* This list is always empty *)
+                            balance_updates = [];
+                            committee;
+                            total_consensus_power = _;
+                          });
                  } )
            | ( Preattestation,
                Protocol.Apply_results.Operation_metadata
@@ -136,12 +137,12 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
                    contents =
                      Single_result
                        (Preattestations_aggregate_result
-                         {
-                           (* This list is always empty *)
-                           balance_updates = [];
-                           committee;
-                           total_consensus_power = _;
-                         });
+                          {
+                            (* This list is always empty *)
+                            balance_updates = [];
+                            committee;
+                            total_consensus_power = _;
+                          });
                  } ) ->
                let committee = List.map fst committee |> may_sort in
                Log.debug
@@ -153,7 +154,8 @@ let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
                         Alpha_context.Consensus_key.delegate = d1;
                         consensus_pkh = c1;
                       }
-                      {delegate = d2; consensus_pkh = c2} ->
+                      {delegate = d2; consensus_pkh = c2}
+                    ->
                    Signature.Public_key_hash.equal d1 d2
                    && Signature.Public_key_hash.equal c1 c2)
                  committee
@@ -297,7 +299,9 @@ let attest_aggreg_with (delegates : string list) : (t, t) scenarios =
       else
         let* state, committee, expected_metadata_committee =
           List.fold_left_es
-            (fun (state, committee, expected_metadata_committee) delegate_name ->
+            (fun (state, committee, expected_metadata_committee)
+                 delegate_name
+               ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
                 Context.Delegate.consensus_key
@@ -368,7 +372,8 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
                consensus_key = _;
                first_slot = _;
                attestation_power;
-             } ->
+             }
+           ->
           Tezt.Check.(
             (attestation_power > 0)
               int
@@ -388,7 +393,8 @@ let attest_with_all_ : t -> t tzresult Lwt.t =
                 consensus_key = consensus_pkh;
                 first_slot = slot;
                 attestation_power = _;
-              } as delegate_rights) ->
+              } as delegate_rights)
+           ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =
             State.find_account_from_pkh manager_pkh state
@@ -521,7 +527,9 @@ let preattest_aggreg_with ?payload_round (delegates : string list) :
         let* fake_block = make_fake_block ?payload_round incr in
         let* state, committee, expected_metadata_committee =
           List.fold_left_es
-            (fun (state, committee, expected_metadata_committee) delegate_name ->
+            (fun (state, committee, expected_metadata_committee)
+                 delegate_name
+               ->
               let delegate = State.find_account delegate_name state in
               let* consensus_key_info =
                 Context.Delegate.consensus_key (I incr) delegate.pkh
@@ -592,7 +600,8 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
                consensus_key = _;
                first_slot = _;
                attestation_power;
-             } ->
+             }
+           ->
           Tezt.Check.(
             (attestation_power > 0)
               int
@@ -610,7 +619,8 @@ let preattest_with_all_ ?payload_round : t_incr -> t_incr tzresult Lwt.t =
                 consensus_key = consensus_pkh;
                 first_slot = slot;
                 attestation_power = _;
-              } as delegate_rights) ->
+              } as delegate_rights)
+           ->
           (* Update delegate activity in any case. *)
           let delegate_name, _ =
             State.find_account_from_pkh manager_pkh state

@@ -802,7 +802,8 @@ let block_data_legacy_v8_encoding =
            predecessor_block_metadata_hash;
            predecessor_ops_metadata_hash;
            resulting_context_hash;
-         } ->
+         }
+       ->
       ( operations,
         block_header,
         predecessor_header,
@@ -814,7 +815,8 @@ let block_data_legacy_v8_encoding =
            predecessor_header,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
-           resulting_context_hash ) ->
+           resulting_context_hash )
+       ->
       {
         block_header;
         operations;
@@ -854,7 +856,8 @@ let block_data_encoding =
            predecessor_block_metadata_hash;
            predecessor_ops_metadata_hash;
            resulting_context_hash;
-         } ->
+         }
+       ->
       ( operations,
         block_header,
         predecessor_header,
@@ -868,7 +871,8 @@ let block_data_encoding =
            predecessor_max_operations_ttl,
            predecessor_block_metadata_hash,
            predecessor_ops_metadata_hash,
-           resulting_context_hash ) ->
+           resulting_context_hash )
+       ->
       {
         block_header;
         operations;
@@ -930,10 +934,9 @@ let ensure_valid_tmp_snapshot_path snapshot_tmp_dir =
         return_unit)
       (function
         | _ ->
-            fail_when
-              exists
-              (Cannot_remove_tmp_export_directory
-                 (Naming.dir_path snapshot_tmp_dir)))
+        fail_when
+          exists
+          (Cannot_remove_tmp_export_directory (Naming.dir_path snapshot_tmp_dir)))
   else return_unit
 
 let ensure_valid_export_path =
@@ -1228,11 +1231,11 @@ end = struct
         (fun () -> f t.fd)
         (function
           | exn ->
-              (* Rewind file descriptor to the start of the current data
+          (* Rewind file descriptor to the start of the current data
                  slot. Then, the next write will overwrite the corrupted
                  data. *)
-              let* _ = Lwt_unix.LargeFile.lseek t.fd t.data_pos SEEK_SET in
-              Lwt.fail exn)
+          let* _ = Lwt_unix.LargeFile.lseek t.fd t.data_pos SEEK_SET in
+          Lwt.fail exn)
     in
     let* eor = Lwt_unix.LargeFile.lseek t.fd 0L SEEK_CUR in
     let bytes_written = Int64.sub eor t.data_pos in
@@ -3896,7 +3899,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       (Context_hash.equal
          validation_store.Block_validation.resulting_context_hash
          expected_context_hash
-      || (* This is needed as the former snapshot's version does not
+      ||
+      (* This is needed as the former snapshot's version does not
             provide enough data to perform this check with the new
             context hash semantics (a block header contains the
             predecessor's context hash). In that particular case, we

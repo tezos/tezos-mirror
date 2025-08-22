@@ -84,7 +84,8 @@ let inject_entrapment_evidences
           let attestation_map = get_attestation_map attestations in
           let traps_to_inject =
             filter_injectable_traps attestation_map traps
-            |> (* We do not emit two denunciations for the same level, delegate
+            |>
+            (* We do not emit two denunciations for the same level, delegate
                   and slot index, even if 2 shards assigned to this delegate
                   were traps *)
             List.sort_uniq
@@ -105,7 +106,8 @@ let inject_entrapment_evidences
                    dal_attestation,
                    shard,
                    shard_proof,
-                   tb_slot ) ->
+                   tb_slot )
+               ->
               if Plugin.is_attested dal_attestation slot_index then
                 let*! () =
                   Event.emit_trap_injection

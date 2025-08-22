@@ -198,7 +198,8 @@ let head =
 let next_index =
   let open Zk_rollup_repr in
   function
-  | Empty {next_index} -> next_index | Pending {next_index; _} -> next_index
+  | Empty {next_index} -> next_index
+  | Pending {next_index; _} -> next_index
 
 let get_pending_length ctxt rollup =
   let open Lwt_result_syntax in

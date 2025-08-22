@@ -13,15 +13,15 @@ open Validate_errors.Manager
 
 let check_error_constructor_name ~loc ~expected errs =
   Assert.expect_error ~loc errs (function
-      | [err] ->
-          let err_constructor_name =
-            Stdlib.Obj.Extension_constructor.(of_val err |> name)
-          in
-          let expected_constructor_name =
-            Stdlib.Obj.Extension_constructor.(of_val expected |> name)
-          in
-          Compare.String.(err_constructor_name = expected_constructor_name)
-      | _ -> false)
+    | [err] ->
+        let err_constructor_name =
+          Stdlib.Obj.Extension_constructor.(of_val err |> name)
+        in
+        let expected_constructor_name =
+          Stdlib.Obj.Extension_constructor.(of_val expected |> name)
+        in
+        Compare.String.(err_constructor_name = expected_constructor_name)
+    | _ -> false)
 
 (** Identifies the [Inconsistent_sources] error. *)
 let check_inconsistent_sources ~first_source ~source = function
@@ -71,33 +71,33 @@ let expect_inconsistent_counters_int ~loc ~source ~previous_counter ~counter
     [Incorrect_reveal_position] error. *)
 let expect_incorrect_reveal_position ~loc errs =
   Assert.expect_error ~loc errs (function
-      | [Incorrect_reveal_position] -> true
-      | _ -> false)
+    | [Incorrect_reveal_position] -> true
+    | _ -> false)
 
 let expect_forbidden_delegate ~loc ~delegate errs =
   Assert.expect_error ~loc errs (function
-      | [Validate_errors.Consensus.Forbidden_delegate d] ->
-          Signature.Public_key_hash.(d = Account.pkh_of_contract_exn delegate)
-      | _ -> false)
+    | [Validate_errors.Consensus.Forbidden_delegate d] ->
+        Signature.Public_key_hash.(d = Account.pkh_of_contract_exn delegate)
+    | _ -> false)
 
 let expect_outdated_denunciation ~loc ?kind ?level ?last_cycle errs =
   Assert.expect_error ~loc errs (function
-      | [
-          Validate_errors.Anonymous.Outdated_denunciation
-            {kind = k; level = l; last_cycle = c};
-        ] -> (
-          (match kind with
-          | Some kind ->
-              Protocol.Alpha_context.Misbehaviour.compare_kind kind k = 0
-          | None -> true)
-          && (match level with
-             | Some level -> Protocol.Alpha_context.Raw_level.equal level l
-             | None -> true)
-          &&
-          match last_cycle with
-          | Some last_cycle -> Cycle.equal last_cycle c
-          | None -> true)
-      | _ -> false)
+    | [
+        Validate_errors.Anonymous.Outdated_denunciation
+          {kind = k; level = l; last_cycle = c};
+      ] -> (
+        (match kind with
+        | Some kind ->
+            Protocol.Alpha_context.Misbehaviour.compare_kind kind k = 0
+        | None -> true)
+        && (match level with
+           | Some level -> Protocol.Alpha_context.Raw_level.equal level l
+           | None -> true)
+        &&
+        match last_cycle with
+        | Some last_cycle -> Cycle.equal last_cycle c
+        | None -> true)
+    | _ -> false)
 
 let expect_outdated_denunciation_state ~loc ~state errs =
   let ds = state.State.double_signings in
@@ -127,20 +127,19 @@ let expect_outdated_denunciation_state ~loc ~state errs =
 
 let expect_no_slots_found_for ~loc ~pkh err =
   Assert.error ~loc (Error err) (function
-      | Block.No_slots_found_for p -> Signature.Public_key_hash.(p = pkh)
-      | _ -> false)
+    | Block.No_slots_found_for p -> Signature.Public_key_hash.(p = pkh)
+    | _ -> false)
 
 let expect_empty_transaction ~loc ~contract errs =
   Assert.expect_error ~loc errs (function
-      | [Apply.Empty_transaction c] -> Contract.(contract = c)
-      | _ -> false)
+    | [Apply.Empty_transaction c] -> Contract.(contract = c)
+    | _ -> false)
 
 let expect_balance_too_low ~loc errs =
   Assert.expect_error ~loc errs (function
-      | [Contract_storage.Balance_too_low _; Tez_repr.Subtraction_underflow _]
-        ->
-          true
-      | _ -> false)
+    | [Contract_storage.Balance_too_low _; Tez_repr.Subtraction_underflow _] ->
+        true
+    | _ -> false)
 
 (** [expect_failwith str err] checks whether [err] is a failwith error containing
     a string that matches the regular expression [str].
@@ -151,12 +150,12 @@ let expect_balance_too_low ~loc errs =
     for such kind of errors. *)
 let expect_failwith ~loc ?str err =
   Assert.error ~loc (Error err) (function
-      | Exn (Failure s) -> (
-          match str with Some str -> Str.string_match str s 0 | None -> true)
-      | _ -> false)
+    | Exn (Failure s) -> (
+        match str with Some str -> Str.string_match str s 0 | None -> true)
+    | _ -> false)
 
 let expect_empty_implicit_delegated_contract ~loc ~contract errs =
   Assert.expect_error ~loc errs (function
-      | [Contract_storage.Empty_implicit_delegated_contract c] ->
-          Signature.Public_key_hash.(c = Account.pkh_of_contract_exn contract)
-      | _ -> false)
+    | [Contract_storage.Empty_implicit_delegated_contract c] ->
+        Signature.Public_key_hash.(c = Account.pkh_of_contract_exn contract)
+    | _ -> false)

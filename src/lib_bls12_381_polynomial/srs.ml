@@ -158,7 +158,10 @@ module Make (Elt : GElt_sig) = struct
           with _ ->
             Error
               (`End_of_file
-                (Format.sprintf "found only %d elements of the required %d" i n))
+                 (Format.sprintf
+                    "found only %d elements of the required %d"
+                    i
+                    n))
         in
         let code = Elt.uncompress point buf in
         let* () = if code <> 0 then Error (`Invalid_point i) else Ok () in

@@ -49,10 +49,11 @@ module Make_internal
 
       val unfindable_of_hash : hash -> t
     end)
-    (Node : Brassaia.Node.Generic_key.S
-              with type hash = H.t
-               and type contents_key = Key.t
-               and type node_key = Key.t) =
+    (Node :
+      Brassaia.Node.Generic_key.S
+        with type hash = H.t
+         and type contents_key = Key.t
+         and type node_key = Key.t) =
 struct
   (** If [should_be_stable ~length ~root] is true for an inode [i], then [i]
       hashes the same way as a [Node.t] containing the same entries. *)
@@ -775,8 +776,7 @@ struct
       (** [force = false] will cause [target] to raise an exception when
           encountering a tag [Lazy] inside a [Partial] inode. This feature is
           used by [to_concrete] to make shallow the non-loaded inode branches. *)
-      let target :
-          type ptr.
+      let target : type ptr.
           expected_depth:int ->
           cache:bool ->
           force:bool ->
@@ -828,8 +828,7 @@ struct
       type ('input, 'output) cps = {f : 'r. 'input -> ('output -> 'r) -> 'r}
       [@@ocaml.unboxed]
 
-      let save :
-          type ptr.
+      let save : type ptr.
           broken:(hash, key) cps ->
           save_dirty:(ptr t, key) cps ->
           clear:bool ->
@@ -876,8 +875,7 @@ struct
                   broken.f (Val_ref.to_hash vref) (fun key ->
                       Val_ref.promote_exn vref key))
 
-      let clear :
-          type ptr.
+      let clear : type ptr.
           iter_dirty:(ptr layout -> ptr t -> unit) -> ptr layout -> ptr -> unit
           =
        fun ~iter_dirty layout target ->
@@ -901,8 +899,7 @@ struct
           let key_of_ptr = Ptr.key_exn layout in
           Array.fold_left
             (fun acc -> function
-              | None -> acc
-              | Some ptr -> (None, `Inode (key_of_ptr ptr)) :: acc)
+              | None -> acc | Some ptr -> (None, `Inode (key_of_ptr ptr)) :: acc)
             []
             i.entries
       | Values l ->
@@ -1040,8 +1037,8 @@ struct
       let len = Int.max_int in
       fun () -> seq_v layout v ~cache empty_continuation ~off ~len
 
-    let to_bin_v :
-        type ptr vref. ptr layout -> vref Bin.mode -> ptr v -> vref Bin.v =
+    let to_bin_v : type ptr vref.
+        ptr layout -> vref Bin.mode -> ptr v -> vref Bin.v =
      fun layout mode node ->
       Stats.incr_inode_to_binv () ;
       match node with
@@ -1781,7 +1778,8 @@ struct
       let value_t : value Repr.ty =
         let open Repr in
         variant "Proof.value" (fun contents node -> function
-          | `Contents h -> contents (h, ()) | `Node h -> node h)
+          | `Contents h -> contents (h, ())
+          | `Node h -> node h)
         |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
         |~ case1 "node" hash_t (fun h -> `Node h)
         |> sealv
@@ -1799,8 +1797,8 @@ struct
            unsafe function is safe. *)
         (step, unsafe_keyvalue_of_hashvalue v)
 
-      let rec proof_of_concrete :
-          type a. hash Lazy.t -> Concrete.t -> (t -> a) -> a =
+      let rec proof_of_concrete : type a.
+          hash Lazy.t -> Concrete.t -> (t -> a) -> a =
        fun h concrete k ->
         match concrete with
         | Blinded -> k (`Blinded (Lazy.force h))
@@ -1832,8 +1830,8 @@ struct
         let v : truncated_ptr v = Tree {depth; length; entries} in
         Bin.V.hash (to_bin_v Truncated Bin.Ptr_any v)
 
-      let rec concrete_of_proof :
-          type a. depth:int -> t -> (hash -> Concrete.t -> a) -> a =
+      let rec concrete_of_proof : type a.
+          depth:int -> t -> (hash -> Concrete.t -> a) -> a =
        fun ~depth proof k ->
         match proof with
         | `Blinded h -> k h Concrete.Blinded
@@ -1845,8 +1843,7 @@ struct
             k hash c
         | `Inode (length, proofs) -> concrete_of_inode ~length ~depth proofs k
 
-      and concrete_of_inode :
-          type a.
+      and concrete_of_inode : type a.
           length:int ->
           depth:int ->
           (int * t) list ->
@@ -1944,7 +1941,8 @@ struct
       let kinded_hash_t : kinded_hash Repr.ty =
         let open Repr in
         variant "Proof.value" (fun contents node -> function
-          | Contents h -> contents (h, ()) | Node h -> node h)
+          | Contents h -> contents (h, ())
+          | Node h -> node h)
         |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> Contents h)
         |~ case1 "node" hash_t (fun h -> Node h)
         |> sealv
@@ -2492,7 +2490,8 @@ struct
       let value_t : value Repr.ty =
         let open Repr in
         variant "Proof.value" (fun contents node -> function
-          | `Contents h -> contents (h, ()) | `Node h -> node h)
+          | `Contents h -> contents (h, ())
+          | `Node h -> node h)
         |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
         |~ case1 "node" hash_t (fun h -> `Node h)
         |> sealv
@@ -2613,15 +2612,17 @@ end
 module Make
     (H : Brassaia.Hash.S)
     (Key : Brassaia.Key.S with type hash = H.t)
-    (Node : Brassaia.Node.Generic_key.S
-              with type hash = H.t
-               and type contents_key = Key.t
-               and type node_key = Key.t)
+    (Node :
+      Brassaia.Node.Generic_key.S
+        with type hash = H.t
+         and type contents_key = Key.t
+         and type node_key = Key.t)
     (Inter : Internal with type hash = H.t and type key = Key.t)
-    (Pack : Indexable.S
-              with type hash = H.t
-               and type key = Key.t
-               and type value = Inter.Raw.t) =
+    (Pack :
+      Indexable.S
+        with type hash = H.t
+         and type key = Key.t
+         and type value = Inter.Raw.t) =
 struct
   module Hash = H
   module Key = Key

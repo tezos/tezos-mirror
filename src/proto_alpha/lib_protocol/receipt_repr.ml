@@ -29,8 +29,7 @@ module Token = struct
     | Tez : Tez_repr.t t
     | Staking_pseudotoken : Staking_pseudotoken_repr.t t
 
-  let eq :
-      type token1 token2.
+  let eq : type token1 token2.
       token1 t -> token2 t -> (token1, token2) Equality_witness.eq option =
    fun t1 t2 ->
     match (t1, t2) with
@@ -137,8 +136,8 @@ let token_of_balance : type token. token balance -> token Token.t = function
 
 let is_not_zero c = not (Compare.Int.equal c 0)
 
-let compare_balance :
-    type token1 token2. token1 balance -> token2 balance -> int =
+let compare_balance : type token1 token2.
+    token1 balance -> token2 balance -> int =
  fun ba bb ->
   match (ba, bb) with
   | Contract ca, Contract cb -> Contract_repr.compare ca cb

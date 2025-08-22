@@ -149,7 +149,8 @@ module Encodings = struct
              commitment_hash;
              first_published_at_level;
              published_at_level;
-           } ->
+           }
+         ->
         ( commitment,
           commitment_hash,
           first_published_at_level,
@@ -157,7 +158,8 @@ module Encodings = struct
       (fun ( commitment,
              commitment_hash,
              first_published_at_level,
-             published_at_level ) ->
+             published_at_level )
+         ->
         {
           commitment;
           commitment_hash;

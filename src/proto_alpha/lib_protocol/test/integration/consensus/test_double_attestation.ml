@@ -288,14 +288,14 @@ let test_different_slots () =
   let*! res = Block.bake ~operation:double_attestation blk in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
-        | _ -> false)
+      | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+      | _ -> false)
   in
   let*! res = Block.bake ~operation:double_preattestation blk in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Anonymous.Invalid_denunciation _ -> true
-        | _ -> false)
+      | Validate_errors.Anonymous.Invalid_denunciation _ -> true
+      | _ -> false)
   in
   return_unit
 
@@ -348,7 +348,7 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
               contents =
                 Apply_results.Single_result
                   (Apply_results.Double_consensus_operation_evidence_result
-                    {punished_delegate; _});
+                     {punished_delegate; _});
             } ->
             Signature.Public_key_hash.(punished_delegate = delegate)
         | _ -> false)
@@ -373,8 +373,8 @@ let test_two_double_attestation_evidences_leadsto_no_bake () =
   (* a delegate with 0 frozen deposits cannot bake *)
   let* () =
     Assert.proto_error ~loc:__LOC__ b (function
-        | Validate_errors.Consensus.Forbidden_delegate _ -> true
-        | _ -> false)
+      | Validate_errors.Consensus.Forbidden_delegate _ -> true
+      | _ -> false)
   in
   (* Bake until the slashing and check the frozen deposits. *)
   let* b =
@@ -487,8 +487,8 @@ let test_two_double_attestation_evidences_staggered () =
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* A forbidden delegate cannot bake *)
   Assert.proto_error ~loc:__LOC__ b (function
-      | Validate_errors.Consensus.Forbidden_delegate _ -> true
-      | _ -> false)
+    | Validate_errors.Consensus.Forbidden_delegate _ -> true
+    | _ -> false)
 
 (** Say a delegate double-attests twice in two consecutive cycles,
     and say the 2 evidences are timely included. Then the delegate
@@ -555,8 +555,8 @@ let test_two_double_attestation_evidences_consecutive_cycles () =
   let*! b = Block.bake ~policy:(By_account delegate) blk_with_evidence2 in
   (* A forbidden delegate cannot bake *)
   Assert.proto_error ~loc:__LOC__ b (function
-      | Validate_errors.Consensus.Forbidden_delegate _ -> true
-      | _ -> false)
+    | Validate_errors.Consensus.Forbidden_delegate _ -> true
+    | _ -> false)
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -573,10 +573,10 @@ let test_invalid_double_attestation () =
   Op.double_attestation (B b) attestation attestation |> fun operation ->
   let*! res = Block.bake ~operation b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation
-          Misbehaviour.Double_attesting ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_denunciation
+        Misbehaviour.Double_attesting ->
+        true
+    | _ -> false)
 
 (** Check that an double attestation operation that is invalid due to
    incorrect ordering of the attestations fails. *)
@@ -597,10 +597,10 @@ let test_invalid_double_attestation_variant () =
   |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation
-          Misbehaviour.Double_attesting ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_denunciation
+        Misbehaviour.Double_attesting ->
+        true
+    | _ -> false)
 
 let invalid_denunciation kind = function
   | Validate_errors.Anonymous.Invalid_denunciation kind' ->
@@ -697,10 +697,10 @@ let test_too_early_double_attestation_evidence () =
   double_attestation (B genesis) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation genesis in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Too_early_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Too_early_denunciation
+        {kind = Misbehaviour.Double_attesting; _} ->
+        true
+    | _ -> false)
 
 (** Check that after [max_slashing_period * blocks_per_cycle + 1], it is not possible
     to create a double_attestation anymore. *)
@@ -719,10 +719,10 @@ let test_too_late_double_attestation_evidence () =
   double_attestation (B blk) attestation_a attestation_b |> fun operation ->
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Outdated_denunciation
-          {kind = Misbehaviour.Double_attesting; _} ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Outdated_denunciation
+        {kind = Misbehaviour.Double_attesting; _} ->
+        true
+    | _ -> false)
 
 (** Check that an invalid double attestation evidence that exposes two
     attestations made by two different attesters fails. *)
@@ -750,10 +750,10 @@ let test_different_delegates () =
   double_attestation (B blk_b) e_a e_b |> fun operation ->
   let*! res = Block.bake ~operation blk_b in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_denunciation
-          Misbehaviour.Double_attesting ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_denunciation
+        Misbehaviour.Double_attesting ->
+        true
+    | _ -> false)
 
 let test_freeze_more_with_low_balance =
   let open Lwt_result_syntax in
@@ -895,8 +895,8 @@ let test_freeze_more_with_low_balance =
     (* Once the denunciations has summed up to 100%, the baker cannot bake anymore *)
     let* () =
       Assert.proto_error ~loc:__LOC__ c3 (function
-          | Validate_errors.Consensus.Forbidden_delegate _ -> true
-          | _ -> false)
+        | Validate_errors.Consensus.Forbidden_delegate _ -> true
+        | _ -> false)
     in
     let* c3 = Block.bake_until_cycle_end c2 ~policy:(By_account account2) in
     (* Second slashing has happened: we check that the full balance of
@@ -955,10 +955,10 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
   in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_denunciation
-            {kind = Misbehaviour.Double_attesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Conflicting_denunciation
+          {kind = Misbehaviour.Double_attesting; _} ->
+          true
+      | _ -> false)
   in
   let* blk_with_evidence1 =
     Block.bake ~policy:(By_account baker) ~operation blk_a
@@ -967,10 +967,10 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
     Block.bake ~policy:(By_account baker) ~operation blk_with_evidence1
   in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Validate_errors.Anonymous.Already_denounced
-          {kind = Misbehaviour.Double_attesting; _} ->
-          true
-      | _ -> false)
+    | Validate_errors.Anonymous.Already_denounced
+        {kind = Misbehaviour.Double_attesting; _} ->
+        true
+    | _ -> false)
 
 (** Check that a double attestation evidence fails under aggregate_attestation
     feature flag when operations have distinct slots and are otherwise
@@ -1007,10 +1007,10 @@ let different_slots_under_feature_flag () =
   let*! res = Block.bake ~operation:double_attestation_evidence block in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Validate_errors.Anonymous.Invalid_denunciation
-            Misbehaviour.Double_attesting ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_attesting ->
+          true
+      | _ -> false)
   in
   return_unit
 

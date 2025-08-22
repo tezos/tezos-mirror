@@ -622,7 +622,7 @@ module Simple = struct
      If [never_empty] is [true], always print something.
      This is useful for inline parameters. *)
   let rec pp_human_readable :
-        'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
+      'a. never_empty:bool -> 'a Data_encoding.t -> _ -> 'a -> _ =
    fun (type a) ~never_empty (encoding : a Data_encoding.t) fmt (value : a) ->
     match encoding.encoding with
     | Null -> if never_empty then Format.pp_print_string fmt "N/A"

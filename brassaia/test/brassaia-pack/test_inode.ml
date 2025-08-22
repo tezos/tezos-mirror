@@ -85,10 +85,11 @@ struct
       (Contents_value)
 
   module Context_make
-      (Inode : Brassaia_pack_unix.Inode.Persistent
-                 with type file_manager = File_manager.t
-                  and type dict = Dict.t
-                  and type dispatcher = Dispatcher.t) =
+      (Inode :
+        Brassaia_pack_unix.Inode.Persistent
+          with type file_manager = File_manager.t
+           and type dict = Dict.t
+           and type dispatcher = Dispatcher.t) =
   struct
     type t = {
       store : read Inode.t;

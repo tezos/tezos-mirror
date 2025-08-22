@@ -85,7 +85,8 @@ module Full_staking_balance_repr_paris = struct
              delegated;
              min_delegated_in_cycle;
              level_of_min_delegated;
-           } ->
+           }
+         ->
         ( own_frozen,
           staked_frozen,
           delegated,

@@ -88,8 +88,13 @@ module Request = struct
           (function
             | View
                 (Apply_blueprint
-                  {events; timestamp; chunks; payload = _; delayed_transactions})
-              ->
+                   {
+                     events;
+                     timestamp;
+                     chunks;
+                     payload = _;
+                     delayed_transactions;
+                   }) ->
                 Some ((), events, timestamp, chunks, delayed_transactions)
             | _ -> None)
           (fun _ -> assert false);
@@ -131,7 +136,7 @@ module Request = struct
           (function
             | View
                 (Potential_observer_reorg
-                  {evm_node_endpoint; blueprint_with_events}) ->
+                   {evm_node_endpoint; blueprint_with_events}) ->
                 Some ((), Uri.to_string evm_node_endpoint, blueprint_with_events)
             | _ -> None)
           (fun ((), evm_node_endpoint, blueprint_with_events) ->

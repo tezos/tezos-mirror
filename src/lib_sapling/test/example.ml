@@ -76,8 +76,10 @@ module Client = struct
         | None ->
             (* decryption failed or incorrect commitment *)
             aux (Int64.succ pos) set balance
-      else if (* cipher not present *)
-              Int64.(equal pos 0L) then (pos, set, balance)
+      else if
+        (* cipher not present *)
+        Int64.(equal pos 0L)
+      then (pos, set, balance)
       else (Int64.pred pos, set, balance)
     in
     let scanned, unspent_inputs, balance =

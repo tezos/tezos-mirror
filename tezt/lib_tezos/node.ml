@@ -547,13 +547,14 @@ module Config_file = struct
       JSON.annotate
         ~origin:"dal_initialisation"
         (`O
-          [
-            ("activated", `Bool dal_config.activated);
-            ( "bootstrap_peers",
-              `A
-                (List.map (fun peer -> `String peer) dal_config.bootstrap_peers)
-            );
-          ])
+           [
+             ("activated", `Bool dal_config.activated);
+             ( "bootstrap_peers",
+               `A
+                 (List.map
+                    (fun peer -> `String peer)
+                    dal_config.bootstrap_peers) );
+           ])
     in
     let network =
       JSON.unannotate JSON.(old_config |-> "network")
@@ -1177,10 +1178,10 @@ let send_raw_data node ~data =
       if len = 0 then Lwt.return_unit
       else
         Lwt.bind (Lwt_unix.write_string descr buf pos len) (function
-            | 0 ->
-                Lwt.fail End_of_file
-                (* other endpoint cleanly closed its connection *)
-            | nb_written -> inner (pos + nb_written) (len - nb_written))
+          | 0 ->
+              Lwt.fail End_of_file
+              (* other endpoint cleanly closed its connection *)
+          | nb_written -> inner (pos + nb_written) (len - nb_written))
     in
     inner pos len
   in

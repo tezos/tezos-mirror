@@ -113,16 +113,14 @@ let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
  fun val_encoding ->
   Data_encoding.Compact.make ~tag_size:`Uint8 @@ compact val_encoding
 
-let pp :
-    type state a.
+let pp : type state a.
     (Format.formatter -> a -> unit) -> Format.formatter -> (state, a) t -> unit
     =
  fun ppv fmt -> function
   | Hidden_index x | Index x -> Format.(fprintf fmt "#%ld" x)
   | Hidden_value x | Value x -> Format.(fprintf fmt "%a" ppv x)
 
-let in_memory_size :
-    type state a.
+let in_memory_size : type state a.
     (a -> Cache_memory_helpers.sint) ->
     (state, a) t ->
     Cache_memory_helpers.sint =
@@ -137,9 +135,8 @@ let size : type state a. (a -> int) -> (state, a) t -> int =
   | Hidden_value x | Value x -> 1 + s x
   | Hidden_index _ | Index _ -> (* tag + int32 *) 1 + 4
 
-let compare :
-    type state state' a. (a -> a -> int) -> (state, a) t -> (state', a) t -> int
-    =
+let compare : type state state' a.
+    (a -> a -> int) -> (state, a) t -> (state', a) t -> int =
  fun c x y ->
   match (x, y) with
   | (Hidden_index x | Index x), (Hidden_index y | Index y) ->

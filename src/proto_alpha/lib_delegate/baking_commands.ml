@@ -452,7 +452,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              block_count,
              state_recorder )
            pkhs
-           cctxt ->
+           cctxt
+         ->
         let* delegates = get_delegates cctxt pkhs in
         let dal_node_rpc_ctxt =
           Option.map create_dal_node_rpc_ctxt dal_node_endpoint
@@ -520,7 +521,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
              data_dir,
              state_recorder )
            sources
-           cctxt ->
+           cctxt
+         ->
         let* delegates = get_delegates cctxt sources in
         Baking_lib.propose
           cctxt
@@ -545,7 +547,8 @@ let delegate_commands () : Protocol_client_context.full Tezos_clic.command list
       (prefixes ["repropose"; "for"] @@ sources_param)
       (fun (force, force_round, minimal_timestamp, force_reproposal)
            sources
-           cctxt ->
+           cctxt
+         ->
         let*? force_round =
           Option.map_e
             (fun r ->

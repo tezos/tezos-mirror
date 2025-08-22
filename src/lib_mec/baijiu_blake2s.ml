@@ -235,8 +235,8 @@ module Unsafe : S = struct
       [|10; 2; 8; 4; 7; 6; 1; 5; 15; 11; 9; 14; 3; 12; 13; 0|];
     |]
 
-  let compress :
-      type a. le32_to_cpu:(a -> int -> int32) -> ctx -> a -> int -> unit =
+  let compress : type a.
+      le32_to_cpu:(a -> int -> int32) -> ctx -> a -> int -> unit =
    fun ~le32_to_cpu ctx block off ->
     let v = Array.make 16 0l in
     let m = Array.make 16 0l in
@@ -292,8 +292,7 @@ module Unsafe : S = struct
     done ;
     ()
 
-  let feed :
-      type a.
+  let feed : type a.
       blit:(a -> int -> By.t -> int -> int -> unit) ->
       le32_to_cpu:(a -> int -> int32) ->
       ctx ->

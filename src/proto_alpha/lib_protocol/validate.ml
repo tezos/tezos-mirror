@@ -99,7 +99,8 @@ let consensus_state_encoding =
               attestations_seen;
               attestations_aggregate_seen;
               preattestations_aggregate_seen;
-            } ->
+            }
+          ->
          ( preattestations_seen,
            attestations_seen,
            attestations_aggregate_seen,
@@ -107,7 +108,8 @@ let consensus_state_encoding =
        (fun ( preattestations_seen,
               attestations_seen,
               attestations_aggregate_seen,
-              preattestations_aggregate_seen ) ->
+              preattestations_aggregate_seen )
+          ->
          {
            preattestations_seen;
            attestations_seen;
@@ -255,7 +257,8 @@ let anonymous_state_encoding =
               dal_entrapments_seen;
               seed_nonce_levels_seen;
               vdf_solution_seen;
-            } ->
+            }
+          ->
          ( activation_pkhs_seen,
            double_baking_evidences_seen,
            double_consensus_operation_evidences_seen,
@@ -267,7 +270,8 @@ let anonymous_state_encoding =
               double_consensus_operation_evidences_seen,
               dal_entrapments_seen,
               seed_nonce_levels_seen,
-              vdf_solution_seen ) ->
+              vdf_solution_seen )
+          ->
          {
            activation_pkhs_seen;
            double_baking_evidences_seen;
@@ -917,8 +921,8 @@ module Consensus = struct
   let check_attestation_conflict vs oph (operation : Kind.attestation operation)
       =
     let (Single
-          (Attestation
-            {consensus_content = {slot; level; round; _}; dal_content = _})) =
+           (Attestation
+              {consensus_content = {slot; level; round; _}; dal_content = _})) =
       operation.protocol_data.contents
     in
     match
@@ -939,8 +943,8 @@ module Consensus = struct
 
   let add_attestation vs oph (op : Kind.attestation operation) =
     let (Single
-          (Attestation
-            {consensus_content = {slot; level; round; _}; dal_content = _})) =
+           (Attestation
+              {consensus_content = {slot; level; round; _}; dal_content = _})) =
       op.protocol_data.contents
     in
     let attestations_seen =
@@ -966,8 +970,8 @@ module Consensus = struct
     (* We do not remove the attesting power because it is not
        relevant for the mempool mode. *)
     let (Single
-          (Attestation
-            {consensus_content = {slot; level; round; _}; dal_content = _})) =
+           (Attestation
+              {consensus_content = {slot; level; round; _}; dal_content = _})) =
       operation.protocol_data.contents
     in
     let attestations_seen =
@@ -1971,7 +1975,7 @@ module Anonymous = struct
         Consensus.check_preattestations_aggregate_signature vi public_keys op
     | Single
         (Attestations_aggregate
-          {consensus_content = {level; round; block_payload_hash}; committee})
+           {consensus_content = {level; round; block_payload_hash}; committee})
       ->
         let serialized_op =
           let attestation : Kind.attestation operation =
@@ -2255,7 +2259,8 @@ module Anonymous = struct
       error_unless
         (Raw_level.(level1 = level2)
         && Round.(round1 = round2)
-        && (* we require an order on hashes to avoid the existence of
+        &&
+        (* we require an order on hashes to avoid the existence of
               equivalent evidences *)
         Block_hash.(hash1 < hash2))
         (Invalid_double_baking_evidence
@@ -2389,8 +2394,8 @@ module Anonymous = struct
       (operation : Kind.dal_entrapment_evidence operation) =
     let open Lwt_result_syntax in
     let (Single
-          (Dal_entrapment_evidence
-            {attestation; consensus_slot; slot_index; shard_with_proof})) =
+           (Dal_entrapment_evidence
+              {attestation; consensus_slot; slot_index; shard_with_proof})) =
       operation.protocol_data.contents
     in
     let*? level, dal_content =
@@ -2555,10 +2560,10 @@ module Anonymous = struct
       operation.protocol_data.contents
     in
     let (Single
-          ( Preattestation {level; _}
-          | Attestation {consensus_content = {level; _}; _}
-          | Preattestations_aggregate {consensus_content = {level; _}; _}
-          | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+           ( Preattestation {level; _}
+           | Attestation {consensus_content = {level; _}; _}
+           | Preattestations_aggregate {consensus_content = {level; _}; _}
+           | Attestations_aggregate {consensus_content = {level; _}; _} )) =
       attestation.protocol_data.contents
     in
     (level, consensus_slot)
@@ -2826,8 +2831,7 @@ module Manager = struct
 
   type batch_elt = Elt : 'kind Kind.manager contents -> batch_elt
 
-  let rec batch_fold_left_e :
-      type kind.
+  let rec batch_fold_left_e : type kind.
       f:('a -> batch_elt -> 'a tzresult) ->
       init:'a ->
       batch:kind Kind.manager contents_list ->
@@ -3032,7 +3036,8 @@ module Manager = struct
 
   let consume_decoding_gas remaining_gas lexpr =
     record_trace Gas_quota_exceeded_init_deserialize
-    @@ (* Fail early if the operation does not have enough gas to
+    @@
+    (* Fail early if the operation does not have enough gas to
           cover the deserialization cost. We always consider the full
           deserialization cost, independently from the internal state
           of the lazy_expr. Otherwise we might risk getting different
@@ -3149,14 +3154,14 @@ module Manager = struct
       (contents : kind Kind.manager contents) remaining_gas vi =
     let open Result_syntax in
     let (Manager_operation
-          {
-            source;
-            fee = _;
-            counter = _;
-            operation;
-            gas_limit = _;
-            storage_limit = _;
-          }) =
+           {
+             source;
+             fee = _;
+             counter = _;
+             operation;
+             gas_limit = _;
+             storage_limit = _;
+           }) =
       contents
     in
     match operation with
@@ -3209,7 +3214,8 @@ module Manager = struct
       remaining_block_gas =
     let open Lwt_result_syntax in
     let (Manager_operation
-          {source; fee; counter = _; operation = _; gas_limit; storage_limit}) =
+           {source; fee; counter = _; operation = _; gas_limit; storage_limit})
+        =
       contents
     in
     let*? () = check_gas_limit vi ~gas_limit in
@@ -3270,8 +3276,7 @@ module Manager = struct
      the cost to be consumed is [cost] and remains to be
      consumed. This cost is consumed in the first operation of the
      batch. *)
-  let rec check_contents_list :
-      type kind.
+  let rec check_contents_list : type kind.
       info ->
       batch_state ->
       kind Kind.manager contents_list ->

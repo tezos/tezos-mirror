@@ -129,8 +129,8 @@ let catch_ef ?(catch_only = fun _ -> true) f h =
 
 let catch_s ?(catch_only = fun _ -> true) f =
   Lwt.try_bind f Lwt.return_ok (function
-      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
-      | e -> if catch_only e then Lwt.return_error e else Lwt.reraise e)
+    | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+    | e -> if catch_only e then Lwt.return_error e else Lwt.reraise e)
 
 let return x = Ok x
 

@@ -576,8 +576,8 @@ type result_data_point = JSON.t String_map.t
 let show_result_data_point (data : result_data_point) =
   JSON.encode_u
     (`O
-      (String_map.bindings data
-      |> List.map (fun (k, v) -> (k, JSON.unannotate v))))
+       (String_map.bindings data
+       |> List.map (fun (k, v) -> (k, JSON.unannotate v))))
 
 type query_result_series = {name : string; values : result_data_point list}
 

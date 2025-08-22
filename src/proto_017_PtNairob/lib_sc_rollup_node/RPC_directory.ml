@@ -169,9 +169,10 @@ let () =
 
 let () =
   Block_directory.register0 Sc_rollup_services.Block.simulate
-  @@ fun (node_ctxt, block)
-             ()
-             {messages; reveal_pages; insight_requests; log_kernel_debug_file}
+  @@
+  fun (node_ctxt, block)
+      ()
+      {messages; reveal_pages; insight_requests; log_kernel_debug_file}
     ->
   simulate_messages
     node_ctxt

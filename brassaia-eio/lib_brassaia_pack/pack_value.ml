@@ -74,14 +74,14 @@ module Kind = struct
 
   let pp =
     Fmt.of_to_string (function
-        | Commit_v1 -> "Commit_v1"
-        | Commit_v2 -> "Commit_v2"
-        | Contents -> "Contents"
-        | Inode_v1_unstable -> "Inode_v1_unstable"
-        | Inode_v1_stable -> "Inode_v1_stable"
-        | Inode_v2_root -> "Inode_v2_root"
-        | Inode_v2_nonroot -> "Inode_v2_nonroot"
-        | Dangling_parent_commit -> "Dangling_parent_commit")
+      | Commit_v1 -> "Commit_v1"
+      | Commit_v2 -> "Commit_v2"
+      | Contents -> "Contents"
+      | Inode_v1_unstable -> "Inode_v1_unstable"
+      | Inode_v1_stable -> "Inode_v1_stable"
+      | Inode_v2_root -> "Inode_v2_root"
+      | Inode_v2_nonroot -> "Inode_v2_nonroot"
+      | Dangling_parent_commit -> "Dangling_parent_commit")
 
   let length_header_exn : t -> length_header =
     let some_varint = Some `Varint in
@@ -170,9 +170,10 @@ end
 module Of_commit
     (Hash : Brassaia.Hash.S)
     (Key : Brassaia.Key.S with type hash = Hash.t)
-    (Commit : Brassaia.Commit.Generic_key.S
-                with type node_key = Key.t
-                 and type commit_key = Key.t) =
+    (Commit :
+      Brassaia.Commit.Generic_key.S
+        with type node_key = Key.t
+         and type commit_key = Key.t) =
 struct
   module Hash = Brassaia.Hash.Typed (Hash) (Commit)
 

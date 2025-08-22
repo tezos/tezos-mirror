@@ -268,7 +268,8 @@ module Encodings = struct
                blockHash;
                blockNumber;
                removed;
-             } ->
+             }
+         ->
         ( transactionHash,
           transactionIndex,
           logIndex,
@@ -280,7 +281,8 @@ module Encodings = struct
              logIndex,
              blockHash,
              blockNumber,
-             removed ) ->
+             removed )
+         ->
         Db.
           {
             transactionHash;

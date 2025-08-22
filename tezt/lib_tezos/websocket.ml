@@ -42,7 +42,10 @@ let send_raw {stdin; _} msg =
   unit
 
 let read_json ~origin {process; _} =
-  let max_size = 10 * 1024 * 1024 (* 10MB *) in
+  let max_size =
+    10 * 1024 * 1024
+    (* 10MB *)
+  in
   let ch = Process.stdout process in
   let buff = Buffer.create 256 in
   let rec loop () =

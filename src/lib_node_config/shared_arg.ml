@@ -347,14 +347,14 @@ module Term = struct
     let parse_error s =
       Error
         (`Msg
-          (Format.asprintf
-             "invalid value '%s', expected one of '%a', a URL or an existing \
-              filename"
-             s
-             (Format.pp_print_list
-                ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
-                Format.pp_print_string)
-             (List.map fst Config_file.builtin_blockchain_networks)))
+           (Format.asprintf
+              "invalid value '%s', expected one of '%a', a URL or an existing \
+               filename"
+              s
+              (Format.pp_print_list
+                 ~pp_sep:(fun ppf () -> Format.fprintf ppf ", ")
+                 Format.pp_print_string)
+              (List.map fst Config_file.builtin_blockchain_networks)))
     in
     let parser s =
       let ( <||> ) = Option.either_f

@@ -66,9 +66,8 @@ let removed = Micheline_printer.{comment = Some "-"}
 let replaced repl = Micheline_printer.{comment = Some ("-> " ^ repr_node repl)}
 
 let rec replace_location :
-      'a.
-      Micheline_printer.location -> ('a, string) node -> Micheline_printer.node
-    =
+    'a.
+    Micheline_printer.location -> ('a, string) node -> Micheline_printer.node =
  fun loc -> function
   | Int (_, i) -> Int (loc, i)
   | String (_, s) -> String (loc, s)

@@ -56,79 +56,79 @@ let get_level ctxt =
 
 let rpc_ctxt =
   object
-    method call_proto_service0
-        : 'm 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            Environment.RPC_context.t,
-            Environment.RPC_context.t,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          t ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_proto_service0 :
+        'm 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          Environment.RPC_context.t,
+          Environment.RPC_context.t,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        t ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun s pr q i ->
         match pr with
         | B b -> Block.rpc_ctxt#call_proto_service0 s b q i
         | I b -> Incremental.rpc_ctxt#call_proto_service0 s b q i
 
-    method call_proto_service1
-        : 'm 'a 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            Environment.RPC_context.t,
-            Environment.RPC_context.t * 'a,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          t ->
-          'a ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_proto_service1 :
+        'm 'a 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          Environment.RPC_context.t,
+          Environment.RPC_context.t * 'a,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        t ->
+        'a ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun s pr a q i ->
         match pr with
         | B bl -> Block.rpc_ctxt#call_proto_service1 s bl a q i
         | I bl -> Incremental.rpc_ctxt#call_proto_service1 s bl a q i
 
-    method call_proto_service2
-        : 'm 'a 'b 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            Environment.RPC_context.t,
-            (Environment.RPC_context.t * 'a) * 'b,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          t ->
-          'a ->
-          'b ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_proto_service2 :
+        'm 'a 'b 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          Environment.RPC_context.t,
+          (Environment.RPC_context.t * 'a) * 'b,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        t ->
+        'a ->
+        'b ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun s pr a b q i ->
         match pr with
         | B bl -> Block.rpc_ctxt#call_proto_service2 s bl a b q i
         | I bl -> Incremental.rpc_ctxt#call_proto_service2 s bl a b q i
 
-    method call_proto_service3
-        : 'm 'a 'b 'c 'q 'i 'o.
-          ( ([< Tezos_rpc.Service.meth] as 'm),
-            Environment.RPC_context.t,
-            ((Environment.RPC_context.t * 'a) * 'b) * 'c,
-            'q,
-            'i,
-            'o )
-          Tezos_rpc.Service.t ->
-          t ->
-          'a ->
-          'b ->
-          'c ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_proto_service3 :
+        'm 'a 'b 'c 'q 'i 'o.
+        ( ([< Tezos_rpc.Service.meth] as 'm),
+          Environment.RPC_context.t,
+          ((Environment.RPC_context.t * 'a) * 'b) * 'c,
+          'q,
+          'i,
+          'o )
+        Tezos_rpc.Service.t ->
+        t ->
+        'a ->
+        'b ->
+        'c ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun s pr a b c q i ->
         match pr with
         | B bl -> Block.rpc_ctxt#call_proto_service3 s bl a b c q i
@@ -206,7 +206,9 @@ let get_baker ctxt ~round =
   let open Lwt_result_syntax in
   let* bakers = get_bakers ~filter:(fun x -> x.round = round) ctxt in
   (* there is only one baker for a given round *)
-  match bakers with [baker] -> return baker | _ -> assert false
+  match bakers with
+  | [baker] -> return baker
+  | _ -> assert false
 
 let get_first_different_baker baker bakers =
   WithExceptions.Option.get ~loc:__LOC__

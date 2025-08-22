@@ -49,7 +49,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         return
           (List.map
              (fun Plugin.RPC.Endorsing_rights.
-                    {delegate; first_slot; endorsing_power} ->
+                    {delegate; first_slot; endorsing_power}
+                ->
                Consensus_ops.
                  {
                    address = public_key_hash_of_v0 delegate;
@@ -227,12 +228,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         match receipt with
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Preendorsement_result
-                      {delegate; preendorsement_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Preendorsement_result
+                        {delegate; preendorsement_power; _});
+               }) ->
             Consensus_ops.
               {
                 op =
@@ -247,12 +248,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             :: acc
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Endorsement_result
-                      {delegate; endorsement_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Endorsement_result
+                        {delegate; endorsement_power; _});
+               }) ->
             Consensus_ops.
               {
                 op =

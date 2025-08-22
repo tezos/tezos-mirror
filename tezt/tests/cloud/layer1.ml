@@ -305,14 +305,16 @@ let configuration_encoding =
            stresstest;
            maintenance_delay;
            migration_offset;
-         } ->
+         }
+       ->
       (stake, network, snapshot, stresstest, maintenance_delay, migration_offset))
     (fun ( stake,
            network,
            snapshot,
            stresstest,
            maintenance_delay,
-           migration_offset ) ->
+           migration_offset )
+       ->
       {
         stake;
         network;
@@ -817,7 +819,7 @@ let docker_image_encoding =
   let octez_release_tag = 1 and octez_release_encoding = string in
   matching
     (* optimised encoding function *)
-      (function
+    (function
       | Gcp {alias} -> matched gcp_tag gcp_encoding alias
       | Octez_release {tag} ->
           matched octez_release_tag octez_release_encoding tag)
@@ -1009,8 +1011,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
            | `Baker i ->
                make_vm_conf ~name:(Format.sprintf "baker-%d" i)
                @@ Option.bind vms_conf (function
-                      | {bakers = Some bakers; _} -> List.nth_opt bakers i
-                      | {bakers = None; _} -> None))
+                    | {bakers = Some bakers; _} -> List.nth_opt bakers i
+                    | {bakers = None; _} -> None))
   in
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries

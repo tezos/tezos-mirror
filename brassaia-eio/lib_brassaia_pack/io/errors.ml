@@ -174,7 +174,7 @@ end
 
 let () =
   Printexc.register_printer (function
-      | Pack_error e -> Some (Fmt.str "Pack_error: %a" pp_base_error e)
-      | RO_not_allowed -> Some "RO_not_allowed"
-      | Closed -> Some "Closed"
-      | _ -> None)
+    | Pack_error e -> Some (Fmt.str "Pack_error: %a" pp_base_error e)
+    | RO_not_allowed -> Some "RO_not_allowed"
+    | Closed -> Some "Closed"
+    | _ -> None)

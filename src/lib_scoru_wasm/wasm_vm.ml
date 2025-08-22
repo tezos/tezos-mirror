@@ -468,7 +468,8 @@ let patch_reboot_counter durable reboot_counter =
 let clean_up_input_buffer buffers =
   let open Tezos_webassembly_interpreter in
   function
-  | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input | _ -> ()
+  | Forcing_yield | Yielding -> Input_buffer.reset buffers.Eval.input
+  | _ -> ()
 
 (** [compute_step pvm_state] does one computation step on [pvm_state].
     Returns the new state.

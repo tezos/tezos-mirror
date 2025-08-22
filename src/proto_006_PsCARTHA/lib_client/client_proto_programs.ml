@@ -77,8 +77,7 @@ let print_run_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
-          | None -> ()
-          | Some diff -> print_big_map_diff ppf diff)
+          | None -> () | Some diff -> print_big_map_diff ppf diff)
         maybe_diff
       >>= fun () -> return_unit
   | Error errs -> print_errors cctxt errs ~show_source ~parsed
@@ -100,8 +99,7 @@ let print_trace_result (cctxt : #Client_context.printer) ~show_source ~parsed =
         (Format.pp_print_list Operation_result.pp_internal_operation)
         operations
         (fun ppf -> function
-          | None -> ()
-          | Some diff -> print_big_map_diff ppf diff)
+          | None -> () | Some diff -> print_big_map_diff ppf diff)
         maybe_big_map_diff
         print_execution_trace
         trace

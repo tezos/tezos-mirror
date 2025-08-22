@@ -272,7 +272,8 @@ let run_command =
            scenario,
            txs_per_salvo,
            elapsed_time_between_report )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let*! () = log_config ~verbose () in
       let* controller =

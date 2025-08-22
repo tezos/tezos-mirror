@@ -192,7 +192,8 @@ let encoding : t Data_encoding.t =
            verbose;
            ignore_l1_config_peers;
            disable_amplification;
-         } ->
+         }
+       ->
       ( ( data_dir,
           rpc_addr,
           listen_addr,
@@ -232,7 +233,8 @@ let encoding : t Data_encoding.t =
              fetch_trusted_setup,
              verbose,
              ignore_l1_config_peers,
-             disable_amplification ) ) ->
+             disable_amplification ) )
+       ->
       {
         data_dir;
         rpc_addr;

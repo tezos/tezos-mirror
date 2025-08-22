@@ -152,8 +152,8 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
     | `Tree l -> raw_of_node (fun l -> k (`Tree (String.Map.of_seq l))) l
     | `Contents (v, _) -> k (`Value v)
 
-  and raw_of_node :
-      type a. ((string * raw) Seq.t -> a) -> (string * concrete) list -> a =
+  and raw_of_node : type a.
+      ((string * raw) Seq.t -> a) -> (string * concrete) list -> a =
    fun k -> function
     | [] -> k Seq.empty
     | (n, v) :: t ->
@@ -171,8 +171,8 @@ module Make_tree (Conf : Conf) (Store : DB) = struct
     | `Tree l -> concrete_of_node (fun l -> k (`Tree l)) (String.Map.to_seq l)
     | `Value v -> k (`Contents (v, ()))
 
-  and concrete_of_node :
-      type a. ((string * concrete) list -> a) -> (string * raw) Seq.t -> a =
+  and concrete_of_node : type a.
+      ((string * concrete) list -> a) -> (string * raw) Seq.t -> a =
    fun k seq ->
     match seq () with
     | Nil -> k []
@@ -281,8 +281,8 @@ struct
         | Inode i -> Inode (to_inode to_inode_tree i)
         | Extender e -> Extender (to_inode_extender to_inode_tree e)
 
-      and to_inode_extender :
-          type a b. (a -> b) -> a DB_proof.inode_extender -> b inode_extender =
+      and to_inode_extender : type a b.
+          (a -> b) -> a DB_proof.inode_extender -> b inode_extender =
        fun f {length; segments = segment; proof} ->
         {length; segment; proof = f proof}
 
@@ -305,8 +305,8 @@ struct
         | Inode i -> Inode (of_inode of_inode_tree i)
         | Extender e -> Extender (of_inode_extender of_inode_tree e)
 
-      and of_inode_extender :
-          type a b. (a -> b) -> a inode_extender -> b DB_proof.inode_extender =
+      and of_inode_extender : type a b.
+          (a -> b) -> a inode_extender -> b DB_proof.inode_extender =
        fun f {length; segment = segments; proof} ->
         {length; segments; proof = f proof}
 

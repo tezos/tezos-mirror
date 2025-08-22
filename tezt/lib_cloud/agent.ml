@@ -91,7 +91,8 @@ let encoding =
            service_manager = _;
            daily_logs_dir;
            on_shutdown = _;
-         } ->
+         }
+       ->
       ( vm_name,
         zone,
         point,
@@ -105,7 +106,8 @@ let encoding =
            next_available_port,
            configuration,
            process_monitor,
-           daily_logs_dir ) ->
+           daily_logs_dir )
+       ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
         fun () ->
@@ -367,7 +369,8 @@ let copy =
       ?(is_directory = false)
       ?destination
       agent
-      ~source ->
+      ~source
+    ->
     let consistency_check =
       Option.value consistency_check ~default:Env.check_file_consistency
     in

@@ -204,7 +204,7 @@ let distribute_attesting_rewards ctxt last_cycle unrevealed_nonces =
             ctxt
             `Attesting_rewards
             (`Lost_attesting_rewards
-              (delegate, not sufficient_participation, not has_revealed_nonces))
+               (delegate, not sufficient_participation, not has_revealed_nonces))
             rewards
       in
       let* ctxt, payed_dal_rewards_receipts =

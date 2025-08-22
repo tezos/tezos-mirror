@@ -422,7 +422,8 @@ let commands_ro () =
       @@ stop)
       (fun (unparsing_mode, normalize_types)
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* v =
           get_script
@@ -479,7 +480,8 @@ let commands_ro () =
       (fun normalize_types
            entrypoint
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_syntax in
         let* t =
           Michelson_v1_entrypoints.contract_entrypoint_type
@@ -1190,7 +1192,8 @@ let commands_rw () =
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter, amount)
            contract
            delegate
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         match contract with
         | Originated contract ->
@@ -1256,7 +1259,8 @@ let commands_rw () =
       @@ stop)
       (fun (fee, dry_run, verbose_signing, fee_parameter)
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         match contract with
         | Originated contract ->
@@ -1353,7 +1357,8 @@ let commands_rw () =
            balance
            source
            program
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* alias_name = Raw_contract_alias.of_fresh cctxt force alias_name in
         let* {expanded = code; _} =
@@ -1469,7 +1474,8 @@ let commands_rw () =
              replace_by_fees )
            source
            operations
-           cctxt ->
+           cctxt
+         ->
         (* When --force is used we want to inject the transfer even if it fails.
            In that case we cannot rely on simulation to compute limits and fees
            so we require the corresponding options to be set. *)
@@ -1612,7 +1618,8 @@ let commands_rw () =
            init_state
            circuits_info
            nb_ops
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _, _, res =
@@ -1646,7 +1653,7 @@ let commands_rw () =
                 operation_result =
                   Apply_operation_result.Applied
                     (Apply_results.Zk_rollup_origination_result
-                      {originated_zk_rollup; _});
+                       {originated_zk_rollup; _});
                 _;
               } ->
               Ok originated_zk_rollup
@@ -1696,7 +1703,8 @@ let commands_rw () =
            source
            zk_rollup
            ops
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -1764,7 +1772,8 @@ let commands_rw () =
            source
            zk_rollup
            update
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -1838,7 +1847,8 @@ let commands_rw () =
            amount
            source
            destination
-           cctxt ->
+           cctxt
+         ->
         transfer_command
           amount
           source
@@ -1890,7 +1900,8 @@ let commands_rw () =
              counter )
            global_constant_str
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let*! errors =
@@ -1965,7 +1976,8 @@ let commands_rw () =
              successor_level )
            destination
            source
-           cctxt ->
+           cctxt
+         ->
         let amount = Tez.zero in
         transfer_command
           amount
@@ -2028,7 +2040,8 @@ let commands_rw () =
              successor_level )
            amount
            source
-           cctxt ->
+           cctxt
+         ->
         let contract = Contract.Implicit source in
         let arg = None in
         let entrypoint = Some Entrypoint.stake in
@@ -2104,7 +2117,8 @@ let commands_rw () =
              successor_level )
            amount
            source
-           cctxt ->
+           cctxt
+         ->
         let contract = Contract.Implicit source in
         let entrypoint = Some Entrypoint.unstake in
         (* TODO #6162
@@ -2173,7 +2187,8 @@ let commands_rw () =
              replace_by_fees,
              successor_level )
            source
-           cctxt ->
+           cctxt
+         ->
         let contract = Contract.Implicit source in
         let arg = None in
         let amount = Tez.zero in
@@ -2240,7 +2255,8 @@ let commands_rw () =
              replace_by_fees,
              successor_level )
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* limit_of_staking_over_baking_millionth =
           match limit_of_staking_over_baking_millionth_opt with
@@ -2334,7 +2350,8 @@ let commands_rw () =
              replace_by_fees,
              successor_level )
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* () =
           let* is_delegate = is_delegate cctxt source in
@@ -2487,7 +2504,8 @@ let commands_rw () =
              companion_key_pop,
              amount )
            src_pkh
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
         let* consensus_keys =
@@ -2581,7 +2599,8 @@ let commands_rw () =
       (fun (fee, dry_run, verbose_signing, fee_parameter, consensus_key_pop)
            src_pkh
            (name_pk, public_key)
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
         let* consensus_keys =
@@ -2644,7 +2663,8 @@ let commands_rw () =
       (fun (fee, dry_run, verbose_signing, fee_parameter, consensus_key_pop)
            delegate_pkh
            (name_pk, public_key)
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, delegate_pk, delegate_sk =
           Client_keys.get_key cctxt delegate_pkh
@@ -2698,7 +2718,8 @@ let commands_rw () =
       (fun (fee, dry_run, verbose_signing, fee_parameter, companion_key_pop)
            delegate_pkh
            (name_pk, public_key)
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, delegate_pk, delegate_sk =
           Client_keys.get_key cctxt delegate_pkh
@@ -2780,7 +2801,8 @@ let commands_rw () =
            delegate_pkh
            destination_pkh
            consensus_pkh
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, _consensus_pk, consensus_sk =
           Client_keys.get_key cctxt consensus_pkh
@@ -2835,7 +2857,8 @@ let commands_rw () =
       @@ stop)
       (fun (confirmations, predecessors, branch)
            operation_hash
-           (ctxt : Protocol_client_context.full) ->
+           (ctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* (_ : Block_hash.t * int * int) =
           Client_confirmations.wait_for_operation_inclusion
@@ -2874,7 +2897,8 @@ let commands_rw () =
       (fun (dry_run, verbose_signing, force)
            src_pkh
            proposals
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* src_name, _src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
         let* info =
@@ -3066,7 +3090,8 @@ let commands_rw () =
            src_pkh
            proposal
            ballot
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* src_name, _src_pk, src_sk = Client_keys.get_key cctxt src_pkh in
         let* info =
@@ -3159,7 +3184,8 @@ let commands_rw () =
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
            mgr
            limit
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
         let* (_ : _ Injection.result) =
@@ -3195,7 +3221,8 @@ let commands_rw () =
       @@ stop)
       (fun (fee, dry_run, verbose_signing, simulation, fee_parameter)
            mgr
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, manager_sk = Client_keys.get_key cctxt mgr in
         let* (_ : _ Injection.result) =
@@ -3240,7 +3267,8 @@ let commands_rw () =
            contract
            amount_in_bytes
            payer
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, manager_sk = Client_keys.get_key cctxt payer in
         let* (_ : _ Injection.result) =
@@ -3322,7 +3350,8 @@ let commands_rw () =
            contents
            ty
            ticketer
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         match Ticket_amount.of_zint amount with
@@ -3406,7 +3435,8 @@ let commands_rw () =
            kind
            parameters_ty
            boot_sector
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let (Packed (module R) as pvm) = Sc_rollup.Kind.pvm_of kind in
@@ -3441,7 +3471,7 @@ let commands_rw () =
               operation_result =
                 Apply_operation_result.Applied
                   (Apply_results.Sc_rollup_originate_result
-                    {address = rollup_address; _});
+                     {address = rollup_address; _});
               _;
             } ->
             if dry_run then return_unit
@@ -3499,7 +3529,8 @@ let commands_rw () =
              counter )
            messages
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* messages =
           match messages with
@@ -3603,7 +3634,8 @@ let commands_rw () =
            inbox_level
            predecessor
            number_of_ticks
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let commitment : Alpha_context.Sc_rollup.Commitment.t =
@@ -3661,7 +3693,8 @@ let commands_rw () =
              fee_parameter )
            source
            rollup
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -3724,7 +3757,8 @@ let commands_rw () =
            staker1
            staker2
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* games =
           Plugin.RPC.Sc_rollup.ongoing_refutation_games
@@ -3833,7 +3867,8 @@ let commands_rw () =
            source
            cemented_commitment
            output_proof
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -3891,7 +3926,8 @@ let commands_rw () =
            staker
            sc_rollup
            source
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* _res =
@@ -4003,7 +4039,12 @@ let commands_rw () =
       @@ prefix "in"
       @@ param ~name:"file" ~desc:" updates dir" string_parameter
       @@ stop)
-      (fun () (time : int) (chest_path : string) (timelock_path : string) cctxt ->
+      (fun ()
+           (time : int)
+           (chest_path : string)
+           (timelock_path : string)
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let open Tezos_crypto.Timelock in
         let* chest = read_encoding chest_path chest_encoding in
@@ -4030,7 +4071,12 @@ let commands_rw () =
       @@ prefix "chest_key"
       @@ param ~name:"chest_key" ~desc:" timelock chest's key" string_parameter
       @@ stop)
-      (fun () (time : int) (chest_path : string) (chest_key_path : string) cctxt ->
+      (fun ()
+           (time : int)
+           (chest_path : string)
+           (chest_key_path : string)
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let open Tezos_crypto.Timelock in
         let* chest = read_encoding chest_path chest_encoding in
@@ -4087,7 +4133,8 @@ let commands_rw () =
            source
            slot_index
            commitment_proof
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source in
         let* {parametric = {dal = {number_of_slots; _}; _}; _} =

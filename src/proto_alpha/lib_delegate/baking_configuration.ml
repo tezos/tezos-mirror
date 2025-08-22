@@ -198,9 +198,11 @@ let fees_config_encoding : fees_config Data_encoding.t =
     conv (fun q -> Q.to_string q) (fun s -> Q.of_string s) string
   in
   conv
-    (fun {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte} ->
+    (fun {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
+       ->
       (minimal_fees, minimal_nanotez_per_gas_unit, minimal_nanotez_per_byte))
-    (fun (minimal_fees, minimal_nanotez_per_gas_unit, minimal_nanotez_per_byte) ->
+    (fun (minimal_fees, minimal_nanotez_per_gas_unit, minimal_nanotez_per_byte)
+       ->
       {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte})
     (obj3
        (req "minimal_fees" Tez.encoding)
@@ -315,7 +317,8 @@ let encoding : t Data_encoding.t =
               extra_operations;
               pre_emptive_forge_time;
               remote_calls_timeout;
-            } ->
+            }
+          ->
          ( ( fees,
              validation,
              nonce,
@@ -337,7 +340,8 @@ let encoding : t Data_encoding.t =
                 force,
                 state_recorder,
                 pre_emptive_forge_time ),
-              (extra_operations, remote_calls_timeout) ) ->
+              (extra_operations, remote_calls_timeout) )
+          ->
          {
            fees;
            validation;

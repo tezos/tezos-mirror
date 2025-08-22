@@ -329,7 +329,8 @@ let transaction_log_encoding =
            blockHash;
            logIndex;
            removed;
-         } ->
+         }
+       ->
       ( address,
         topics,
         data,
@@ -347,7 +348,8 @@ let transaction_log_encoding =
            transactionIndex,
            blockHash,
            logIndex,
-           removed ) ->
+           removed )
+       ->
       {
         address;
         topics;
@@ -469,7 +471,8 @@ let legacy_transaction_object_encoding =
            v;
            r;
            s;
-         } ->
+         }
+       ->
       ( ( blockHash,
           blockNumber,
           from,
@@ -491,7 +494,8 @@ let legacy_transaction_object_encoding =
              nonce,
              to_,
              transactionIndex ),
-           (value, v, r, s) ) ->
+           (value, v, r, s) )
+       ->
       {
         blockHash;
         blockNumber;
@@ -595,21 +599,21 @@ let block_from_rlp_v0 bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
-        [
-          Value number;
-          Value hash;
-          Value parent_hash;
-          Value logsBloom;
-          Value transactionRoot;
-          Value stateRoot;
-          Value receiptRoot;
-          Value miner;
-          Value extraData;
-          Value gasLimit;
-          List transactions;
-          Value gasUsed;
-          Value timestamp;
-        ]) ->
+         [
+           Value number;
+           Value hash;
+           Value parent_hash;
+           Value logsBloom;
+           Value transactionRoot;
+           Value stateRoot;
+           Value receiptRoot;
+           Value miner;
+           Value extraData;
+           Value gasLimit;
+           List transactions;
+           Value gasUsed;
+           Value timestamp;
+         ]) ->
       let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
@@ -693,23 +697,23 @@ let block_from_rlp_v1 bytes =
   match Rlp.decode bytes with
   | Ok
       (Rlp.List
-        [
-          Value number;
-          Value hash;
-          Value parent_hash;
-          Value logsBloom;
-          Value transactionRoot;
-          Value stateRoot;
-          Value receiptRoot;
-          Value miner;
-          Value extraData;
-          Value gasLimit;
-          List transactions;
-          Value gasUsed;
-          Value timestamp;
-          Value baseFeePerGas;
-          Value prevRandao;
-        ]) ->
+         [
+           Value number;
+           Value hash;
+           Value parent_hash;
+           Value logsBloom;
+           Value transactionRoot;
+           Value stateRoot;
+           Value receiptRoot;
+           Value miner;
+           Value extraData;
+           Value gasLimit;
+           List transactions;
+           Value gasUsed;
+           Value timestamp;
+           Value baseFeePerGas;
+           Value prevRandao;
+         ]) ->
       let (Qty number) = decode_number_le number in
       let hash = decode_block_hash hash in
       let parent = decode_block_hash parent_hash in
@@ -849,7 +853,8 @@ let block_encoding transaction_object_encoding =
            blobGasUsed;
            excessBlobGas;
            parentBeaconBlockRoot;
-         } ->
+         }
+       ->
       ( ( ( number,
             hash,
             parent,
@@ -901,7 +906,8 @@ let block_encoding transaction_object_encoding =
              withdrawalsRoot,
              blobGasUsed,
              excessBlobGas,
-             parentBeaconBlockRoot ) ) ->
+             parentBeaconBlockRoot ) )
+       ->
       {
         number;
         hash;
@@ -1463,9 +1469,11 @@ module Subscription = struct
              highestBlock;
              pulledStates;
              knownStates;
-           } ->
+           }
+         ->
         (startingBlock, currentBlock, highestBlock, pulledStates, knownStates))
-      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates) ->
+      (fun (startingBlock, currentBlock, highestBlock, pulledStates, knownStates)
+         ->
         {startingBlock; currentBlock; highestBlock; pulledStates; knownStates})
       (obj5
          (req "startingBlock" quantity_encoding)

@@ -317,7 +317,8 @@ let reveal_encoding =
       (fun ( (),
              page_id,
              attestation_threshold_percent,
-             restricted_commitments_publishers ) ->
+             restricted_commitments_publishers )
+         ->
         Request_adal_page
           {
             page_id;

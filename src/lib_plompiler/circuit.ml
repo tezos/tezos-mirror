@@ -448,8 +448,8 @@ type 'b open_input_com = 'b t
 
 let begin_input_com : 'b -> 'b open_input_com = fun b -> new_input_com >* ret b
 
-let ( |: ) :
-    type c d. (c repr -> d) open_input_com -> c Input.t -> d open_input_com =
+let ( |: ) : type c d.
+    (c repr -> d) open_input_com -> c Input.t -> d open_input_com =
  fun v i s ->
   let s, f = v s in
   let s, r = (input ~kind:`InputCom i) s in

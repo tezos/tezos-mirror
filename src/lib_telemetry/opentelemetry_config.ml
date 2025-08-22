@@ -37,7 +37,8 @@ let detailed_encoding =
                batch_timeout_ms;
                _;
              };
-         } ->
+         }
+       ->
       ( enable,
         instance_id,
         Some debug,
@@ -55,7 +56,8 @@ let detailed_encoding =
            headers,
            batch_traces,
            batch_logs,
-           batch_timeout_ms ) ->
+           batch_timeout_ms )
+       ->
       let config =
         Opentelemetry_client_cohttp_lwt.Config.make
           ?debug

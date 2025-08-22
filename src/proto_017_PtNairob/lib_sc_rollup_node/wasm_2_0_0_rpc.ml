@@ -28,8 +28,8 @@ open Rpc_directory_helpers
 open Context_wrapper.Irmin
 
 module Make_RPC
-    (Durable_state : Wasm_2_0_0_pvm.Durable_state
-                       with type state = Irmin_context.tree) =
+    (Durable_state :
+      Wasm_2_0_0_pvm.Durable_state with type state = Irmin_context.tree) =
 struct
   module Block_directory = Make_sub_directory (struct
     include Sc_rollup_services.Block

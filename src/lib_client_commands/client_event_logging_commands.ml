@@ -129,7 +129,8 @@ let commands () =
              dump_unknown,
              scriptable )
            uri
-           (cctxt : #Client_context.full) ->
+           (cctxt : #Client_context.full)
+         ->
         match Uri.scheme uri with
         | None | Some "unix-files" -> (
             let script_row kind date evname data () =

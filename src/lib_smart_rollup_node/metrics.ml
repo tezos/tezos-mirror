@@ -266,8 +266,8 @@ module Info = struct
 
   let set_dal_enabled =
     set_gauge "DAL enabled in protocol" "dal_enabled" (function
-        | true -> 1.
-        | false -> 0.)
+      | true -> 1.
+      | false -> 0.)
 
   let set_dal_attestation_lag =
     set_gauge "DAL attestation lag" "dal_attestation_lag" float_of_int

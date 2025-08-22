@@ -230,10 +230,10 @@ let filter_with_relevant_consensus_ops ~(attestation_filter : consensus_filter)
               contents =
                 Single
                   (Attestation
-                    {
-                      consensus_content = {level; round; block_payload_hash; _};
-                      dal_content = _;
-                    });
+                     {
+                       consensus_content = {level; round; block_payload_hash; _};
+                       dal_content = _;
+                     });
               _;
             },
           _ ) ->
@@ -320,7 +320,8 @@ let extract_operations_of_list_list = function
         List.fold_left
           (fun ( (preattestations : Kind.preattestation Operation.t list),
                  (attestations : Kind.attestation Operation.t list) )
-               packed_op ->
+               packed_op
+             ->
             let {shell; protocol_data = Operation_data data} = packed_op in
             match data with
             | {contents = Single (Preattestation _); _} ->

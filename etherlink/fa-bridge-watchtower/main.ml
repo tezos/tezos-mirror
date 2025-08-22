@@ -161,7 +161,8 @@ let run_command =
     (prefixes ["run"] @@ stop)
     (fun {data_dir; verbosity}
          (evm_node_endpoint, secret_key, first_block, monitor_all_deposits)
-         _ ->
+         _
+       ->
       let open Lwt_result_syntax in
       let* loaded_config = Config.load_file ~data_dir in
       let config = Option.value ~default:Config.default loaded_config in

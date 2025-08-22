@@ -111,13 +111,13 @@ exception
 
 let () =
   Printexc.register_printer (function
-      | Wrong_number_of_params {expected; got} ->
-          Some
-            (Printf.sprintf
-               "Wrong number of parameters: expected %s, got %s"
-               (Unsigned.Size_t.to_string expected)
-               (Unsigned.Size_t.to_string got))
-      | _ -> None)
+    | Wrong_number_of_params {expected; got} ->
+        Some
+          (Printf.sprintf
+             "Wrong number of parameters: expected %s, got %s"
+             (Unsigned.Size_t.to_string expected)
+             (Unsigned.Size_t.to_string got))
+    | _ -> None)
 
 let check_param_types params param_types =
   let expected = num_params params in
@@ -142,19 +142,20 @@ exception
 
 let () =
   Printexc.register_printer (function
-      | Not_enough_results {expected; got} ->
-          Some
-            (Printf.sprintf
-               "Not enough results: expected %s, got %s"
-               (Unsigned.Size_t.to_string expected)
-               (Unsigned.Size_t.to_string got))
-      | _ -> None)
+    | Not_enough_results {expected; got} ->
+        Some
+          (Printf.sprintf
+             "Not enough results: expected %s, got %s"
+             (Unsigned.Size_t.to_string expected)
+             (Unsigned.Size_t.to_string got))
+    | _ -> None)
 
 let check_result_types results result_types =
   let expected = num_results results in
   let got = Value_type_vector.length result_types in
-  if (* Fewer resuls than expected. *)
-     Unsigned.Size_t.compare got expected < 0
+  if
+    (* Fewer resuls than expected. *)
+    Unsigned.Size_t.compare got expected < 0
   then raise (Not_enough_results {got; expected}) ;
   let rec go : type r. r results -> int -> unit =
    fun results index ->
@@ -172,12 +173,12 @@ exception Function_type_mismatch of {reason : exn}
 
 let () =
   Printexc.register_printer (function
-      | Function_type_mismatch {reason} ->
-          Some
-            (Printf.sprintf
-               "Function type does not match: %s"
-               (Printexc.to_string reason))
-      | _ -> None)
+    | Function_type_mismatch {reason} ->
+        Some
+          (Printf.sprintf
+             "Function type does not match: %s"
+             (Printexc.to_string reason))
+    | _ -> None)
 
 let check_types (Function (params, results)) func_type =
   try

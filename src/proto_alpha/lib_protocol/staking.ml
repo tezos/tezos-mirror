@@ -55,7 +55,7 @@ let perform_finalizable_unstake_transfers contract ctxt finalizable =
         Token.transfer
           ctxt
           (`Unstaked_frozen_deposits
-            (Unstaked_frozen_staker_repr.Single (contract, delegate), cycle))
+             (Unstaked_frozen_staker_repr.Single (contract, delegate), cycle))
           (`Contract contract)
           amount
       in
@@ -80,9 +80,9 @@ let transfer_from_unstake ctxt cycle delegate sender_contract amount =
     Token.transfer
       ctxt
       (`Unstaked_frozen_deposits
-        (Unstaked_frozen_staker_repr.Single (sender_contract, delegate), cycle))
+         (Unstaked_frozen_staker_repr.Single (sender_contract, delegate), cycle))
       (`Frozen_deposits
-        (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
+         (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
       amount
   in
   let* ctxt =
@@ -149,7 +149,7 @@ let stake ctxt ~(amount : Tez_repr.t) ~sender ~delegate =
       ctxt
       (`Contract sender_contract)
       (`Frozen_deposits
-        (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
+         (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
       amount_from_liquid
   in
   ( ctxt,
@@ -176,10 +176,10 @@ let request_unstake ctxt ~sender_contract ~delegate requested_amount =
       Token.transfer
         ctxt
         (`Frozen_deposits
-          (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
+           (Frozen_staker_repr.single_staker ~staker:sender_contract ~delegate))
         (`Unstaked_frozen_deposits
-          ( Unstaked_frozen_staker_repr.Single (sender_contract, delegate),
-            current_cycle ))
+           ( Unstaked_frozen_staker_repr.Single (sender_contract, delegate),
+             current_cycle ))
         tez_to_unstake
     in
     let+ ctxt, finalize_balance_updates =

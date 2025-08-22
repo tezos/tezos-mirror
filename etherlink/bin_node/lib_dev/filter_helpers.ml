@@ -112,8 +112,8 @@ let make_bloom_address_topics address topics =
     address ;
   Option.iter
     (List.iter (function
-        | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
-        | _ -> ()))
+      | Some Filter.(One (Hash topic)) -> Ethbloom.accrue ~input:topic bloom
+      | _ -> ()))
     topics ;
   bloom
 

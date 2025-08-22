@@ -231,7 +231,10 @@ let socket_setopt_user_timeout sock =
      We set the value to 45s, ie "should be set to a value slightly lower than
          TCP_KEEPIDLE + TCP_KEEPINTVL * TCP_KEEPCNT." *)
   let ms_opt =
-    let default = 45000 (* 45s *) in
+    let default =
+      45000
+      (* 45s *)
+    in
     try
       match Sys.getenv_opt "OCTEZ_P2P_TCP_USER_TIMEOUT" with
       | None -> Some default
@@ -531,7 +534,8 @@ let accept ?fd_pool listening_socket =
               (* On Linux EPROTO is 71, ENONET is 64 On BSD systems, accept
                  cannot raise EPROTO.  71 is EREMOTE   for openBSD, NetBSD,
                  Darwin, which is irrelevant here 64 is EHOSTDOWN for openBSD,
-                 NetBSD, Darwin, which is already caught *) ),
+                 NetBSD, Darwin, which is already caught *)
+                ),
               _,
               _ ) as e ->
             Lwt.return_error @@ `Socket_error e

@@ -49,7 +49,8 @@ module Protocol_types = struct
                _level_position,
                cycle,
                cycle_position,
-               _expected_commitment ) ->
+               _expected_commitment )
+           ->
           let level = Raw_level.to_int32 level in
           let cycle = Cycle.to_int32 cycle in
           {level; cycle; cycle_position})
@@ -143,7 +144,8 @@ struct
       List.map
         (fun ( hash,
                (shell_header : Tezos_base.Operation.shell_header),
-               op_receipt ) ->
+               op_receipt )
+           ->
           let protocol_data, receipt =
             Data_encoding.Binary.of_bytes_exn
               Proto.operation_data_and_receipt_encoding

@@ -1425,7 +1425,8 @@ module Anonymous = struct
              level,
              slot_index,
              accusation_published_level,
-             store_published_level ) ->
+             store_published_level )
+         ->
         Accusation_validity_error_levels_mismatch
           {
             delegate;

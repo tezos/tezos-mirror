@@ -128,7 +128,8 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
         List.equal
           (fun ( {Alpha_context.Consensus_key.delegate = d1; consensus_pkh = c1},
                  power1 )
-               ({delegate = d2; consensus_pkh = c2}, power2) ->
+               ({delegate = d2; consensus_pkh = c2}, power2)
+             ->
             Signature.Public_key_hash.equal d1 d2
             && Signature.Public_key_hash.equal c1 c2
             && Int.equal power1 power2)
@@ -615,8 +616,8 @@ let test_attestations_aggregate_non_bls_delegate () =
     Op.raw_attestation ~attesting_slot block
   in
   let (Single
-        (Attestation
-          {consensus_content = {level; round; block_payload_hash; _}; _})) =
+         (Attestation
+            {consensus_content = {level; round; block_payload_hash; _}; _})) =
     contents
   in
   (* Craft an aggregate including the attester slot and signature and

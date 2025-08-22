@@ -659,7 +659,7 @@ let pp_operation_result ~operation_name pp_operation_result ppf = function
 let pp_manager_operation_contents_result ppf op_result =
   let pp_register_global_constant_result
       (Register_global_constant_result
-        {balance_updates; consumed_gas; size_of_constant; global_address}) =
+         {balance_updates; consumed_gas; size_of_constant; global_address}) =
     (match balance_updates with
     | [] ->
         (* Not possible - register global constant operation always returns
@@ -677,7 +677,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_tx_rollup_origination_result
       (Tx_rollup_origination_result
-        {balance_updates; consumed_gas; originated_tx_rollup}) =
+         {balance_updates; consumed_gas; originated_tx_rollup}) =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
@@ -688,7 +688,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_tx_rollup_submit_batch_result
       (Tx_rollup_submit_batch_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff
@@ -705,14 +705,14 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_tx_rollup_finalize_commitment_result
       (Tx_rollup_finalize_commitment_result
-        {balance_updates; consumed_gas; level}) =
+         {balance_updates; consumed_gas; level}) =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
   in
   let pp_tx_rollup_remove_commitment_result
-      (Tx_rollup_remove_commitment_result
-        {balance_updates; consumed_gas; level}) =
+      (Tx_rollup_remove_commitment_result {balance_updates; consumed_gas; level})
+      =
     pp_balance_updates ppf balance_updates ;
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf ppf "@finalized level:@,  %a" Tx_rollup_level.pp level
@@ -724,14 +724,14 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_tx_rollup_dispatch_tickets_result
       (Tx_rollup_dispatch_tickets_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
   let pp_transfer_ticket_result
       (Transfer_ticket_result
-        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+         {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
       =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_ticket_receipt ppf ticket_receipt ;
@@ -744,7 +744,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
-        {address; genesis_commitment_hash; consumed_gas; size; balance_updates})
+         {address; genesis_commitment_hash; consumed_gas; size; balance_updates})
       =
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf size ;
@@ -767,7 +767,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_publish_result
       (Sc_rollup_publish_result
-        {consumed_gas; staked_hash; published_at_level; balance_updates}) =
+         {consumed_gas; staked_hash; published_at_level; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
     Format.fprintf
       ppf
@@ -803,7 +803,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_sc_rollup_execute_outbox_message_result
       (Sc_rollup_execute_outbox_message_result
-        {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
+         {balance_updates; ticket_receipt; consumed_gas; paid_storage_size_diff})
       =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
@@ -817,7 +817,7 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_zk_rollup_origination_result
       (Zk_rollup_origination_result
-        {consumed_gas; originated_zk_rollup; storage_size; balance_updates}) =
+         {consumed_gas; originated_zk_rollup; storage_size; balance_updates}) =
     pp_consumed_gas ppf consumed_gas ;
     pp_storage_size ppf storage_size ;
     Format.fprintf ppf "@,Address: %a" Zk_rollup.Address.pp originated_zk_rollup ;
@@ -825,14 +825,14 @@ let pp_manager_operation_contents_result ppf op_result =
   in
   let pp_zk_rollup_publish_result
       (Zk_rollup_publish_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_consumed_gas ppf consumed_gas ;
     pp_balance_updates ppf balance_updates
   in
   let pp_zk_rollup_update_result
       (Zk_rollup_update_result
-        {balance_updates; consumed_gas; paid_storage_size_diff}) =
+         {balance_updates; consumed_gas; paid_storage_size_diff}) =
     pp_consumed_gas ppf consumed_gas ;
     pp_paid_storage_size_diff ppf paid_storage_size_diff ;
     pp_balance_updates ppf balance_updates
@@ -984,9 +984,8 @@ let pp_manager_operation_result ppf
     internal_operation_results ;
   Format.fprintf ppf "@]"
 
-let pp_contents_and_result :
-    type kind. Format.formatter -> kind contents * kind contents_result -> unit
-    =
+let pp_contents_and_result : type kind.
+    Format.formatter -> kind contents * kind contents_result -> unit =
  fun ppf -> function
   | Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus ->
       Format.fprintf
@@ -1149,8 +1148,8 @@ let pp_contents_and_result :
   | (Manager_operation _ as op), (Manager_operation_result _ as res) ->
       pp_manager_operation_result ppf (op, res)
 
-let rec pp_contents_and_result_list :
-    type kind. Format.formatter -> kind contents_and_result_list -> unit =
+let rec pp_contents_and_result_list : type kind.
+    Format.formatter -> kind contents_and_result_list -> unit =
  fun ppf -> function
   | Single_and_result (op, res) -> pp_contents_and_result ppf (op, res)
   | Cons_and_result

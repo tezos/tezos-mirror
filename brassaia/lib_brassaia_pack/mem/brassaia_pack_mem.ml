@@ -26,9 +26,8 @@ end
 
 module Indexable_mem
     (Hash : Brassaia.Hash.S)
-    (Value : Brassaia_pack.Pack_value.S
-               with type hash := Hash.t
-                and type key = Hash.t) =
+    (Value :
+      Brassaia_pack.Pack_value.S with type hash := Hash.t and type key = Hash.t) =
 struct
   module Pack = Indexable.Maker (Hash)
   module Indexable_mem = Pack.Make (Value)

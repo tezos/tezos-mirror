@@ -94,9 +94,10 @@ module type Sigs = sig
       (Dict : Dict.S with module File_manager = File_manager)
       (Dispatcher : Dispatcher.S with module File_manager = File_manager)
       (Hash : Brassaia.Hash.S with type t = File_manager.Index.key)
-      (Val : Pack_value.Persistent
-               with type hash := Hash.t
-                and type key := Hash.t Pack_key.t) :
+      (Val :
+        Pack_value.Persistent
+          with type hash := Hash.t
+           and type key := Hash.t Pack_key.t) :
     S
       with type key = Hash.t Pack_key.t
        and type hash = Hash.t

@@ -15,7 +15,8 @@ let docker_build =
   fun ?(docker_image = Agent.Configuration.Gcp {alias = Env.dockerfile_alias})
       ~push
       ~ssh_public_key
-      () ->
+      ()
+    ->
     if Hashtbl.mem cache docker_image then (
       Log.info "Docker image is already built. Nothing to do" ;
       Lwt.return_unit)

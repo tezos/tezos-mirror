@@ -423,7 +423,8 @@ let commands_ro () =
       @@ stop)
       (fun (unparsing_mode, normalize_types)
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* v =
           get_script
@@ -480,7 +481,8 @@ let commands_ro () =
       (fun normalize_types
            entrypoint
            contract
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_syntax in
         let* t =
           Michelson_v1_entrypoints.contract_entrypoint_type

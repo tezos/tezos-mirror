@@ -106,7 +106,8 @@ module EIP_2930 = struct
                input,
                nonce,
                to_ ),
-             (transaction_index, value, access_list, v, r, s) ) ->
+             (transaction_index, value, access_list, v, r, s) )
+         ->
         {
           chain_id;
           block_hash;
@@ -188,7 +189,8 @@ module EIP_1559 = struct
              v;
              r;
              s;
-           } ->
+           }
+         ->
         ( ( chain_id,
             hash,
             nonce,
@@ -226,7 +228,8 @@ module EIP_1559 = struct
                input,
                v,
                r,
-               s ) ) ->
+               s ) )
+         ->
         {
           chain_id;
           hash;
@@ -319,7 +322,8 @@ module EIP_7702 = struct
              v;
              r;
              s;
-           } ->
+           }
+         ->
         ( ( chain_id,
             hash,
             nonce,
@@ -359,7 +363,8 @@ module EIP_7702 = struct
                input,
                v,
                r,
-               s ) ) ->
+               s ) )
+         ->
         {
           chain_id;
           hash;
@@ -432,37 +437,37 @@ let block_from_legacy block =
 let decode_access_list =
   let open Result_syntax in
   Rlp.decode_list (function
-      | List [Value address; storage_keys] ->
-          let address = Ethereum_types.decode_address address in
-          let* storage_keys =
-            Rlp.decode_list
-              (function
-                | Value x -> Ok (Ethereum_types.decode_hex x)
-                | _ -> error_with "Invalid storage key")
-              storage_keys
-          in
-          Ok {address; storage_keys}
-      | _ -> error_with "failed to decode access list from raw transaction")
+    | List [Value address; storage_keys] ->
+        let address = Ethereum_types.decode_address address in
+        let* storage_keys =
+          Rlp.decode_list
+            (function
+              | Value x -> Ok (Ethereum_types.decode_hex x)
+              | _ -> error_with "Invalid storage key")
+            storage_keys
+        in
+        Ok {address; storage_keys}
+    | _ -> error_with "failed to decode access list from raw transaction")
 
 let decode_authorization_list =
   Rlp.decode_list (function
-      | List
-          [
-            Value chain_id;
-            Value address;
-            Value nonce;
-            Value y_parity;
-            Value r;
-            Value s;
-          ] ->
-          let chain_id = decode_number_be chain_id in
-          let address = decode_address address in
-          let nonce = decode_number_be nonce in
-          let y_parity = decode_number_be y_parity in
-          let r = decode_number_be r in
-          let s = decode_number_be s in
-          Ok {chain_id; address; nonce; y_parity; r; s}
-      | _ -> error_with "Expected list of 6 elements in authorization list")
+    | List
+        [
+          Value chain_id;
+          Value address;
+          Value nonce;
+          Value y_parity;
+          Value r;
+          Value s;
+        ] ->
+        let chain_id = decode_number_be chain_id in
+        let address = decode_address address in
+        let nonce = decode_number_be nonce in
+        let y_parity = decode_number_be y_parity in
+        let r = decode_number_be r in
+        let s = decode_number_be s in
+        Ok {chain_id; address; nonce; y_parity; r; s}
+    | _ -> error_with "Expected list of 6 elements in authorization list")
 
 let reconstruct_from_eip_7702_transaction (obj : legacy_transaction_object)
     raw_txn =
@@ -470,21 +475,21 @@ let reconstruct_from_eip_7702_transaction (obj : legacy_transaction_object)
   match Rlp.decode (Bytes.unsafe_of_string raw_txn) with
   | Ok
       (List
-        [
-          Value chain_id;
-          Value _nonce;
-          Value max_priority_fee_per_gas;
-          Value max_fee_per_gas;
-          Value _gas_limit;
-          Value _to_;
-          Value _value;
-          Value _input;
-          access_list;
-          authorization_list;
-          Value _v;
-          Value _r;
-          Value _s;
-        ]) ->
+         [
+           Value chain_id;
+           Value _nonce;
+           Value max_priority_fee_per_gas;
+           Value max_fee_per_gas;
+           Value _gas_limit;
+           Value _to_;
+           Value _value;
+           Value _input;
+           access_list;
+           authorization_list;
+           Value _v;
+           Value _r;
+           Value _s;
+         ]) ->
       let chain_id = decode_number_be chain_id in
       let max_fee_per_gas = decode_number_be max_fee_per_gas in
       let max_priority_fee_per_gas =
@@ -522,19 +527,19 @@ let reconstruct_from_eip_2930_transaction (obj : legacy_transaction_object)
   match Rlp.decode (Bytes.unsafe_of_string raw_txn) with
   | Ok
       (List
-        [
-          Value chain_id;
-          Value _nonce;
-          Value _gas_price;
-          Value _gas_limit;
-          Value _to_;
-          Value _value;
-          Value _data;
-          access_list;
-          Value _v;
-          Value _r;
-          Value _s;
-        ]) ->
+         [
+           Value chain_id;
+           Value _nonce;
+           Value _gas_price;
+           Value _gas_limit;
+           Value _to_;
+           Value _value;
+           Value _data;
+           access_list;
+           Value _v;
+           Value _r;
+           Value _s;
+         ]) ->
       let chain_id = decode_number_be chain_id in
       let+ access_list = decode_access_list access_list in
       EIP_2930
@@ -564,20 +569,20 @@ let reconstruct_from_eip_1559_transaction (obj : legacy_transaction_object)
   match Rlp.decode (Bytes.unsafe_of_string raw_txn) with
   | Ok
       (List
-        [
-          Value chain_id;
-          _nonce;
-          Value max_priority_fee_per_gas;
-          Value max_fee_per_gas;
-          _gas_limit;
-          _to_;
-          _value;
-          _input;
-          access_list;
-          _v;
-          _r;
-          _s;
-        ]) ->
+         [
+           Value chain_id;
+           _nonce;
+           Value max_priority_fee_per_gas;
+           Value max_fee_per_gas;
+           _gas_limit;
+           _to_;
+           _value;
+           _input;
+           access_list;
+           _v;
+           _r;
+           _s;
+         ]) ->
       let chain_id = decode_number_be chain_id in
       let max_fee_per_gas = decode_number_be max_fee_per_gas in
       let max_priority_fee_per_gas =

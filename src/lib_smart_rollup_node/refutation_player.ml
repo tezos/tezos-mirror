@@ -69,8 +69,7 @@ let on_play_opening conflict (Types.{node_ctxt; _} : Types.state) =
 module Handlers = struct
   type self = worker
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun w request ->

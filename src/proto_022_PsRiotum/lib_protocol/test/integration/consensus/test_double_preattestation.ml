@@ -68,10 +68,10 @@ end = struct
 
   let invalid_denunciation loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Invalid_denunciation
-            Misbehaviour.Double_preattesting ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Invalid_denunciation
+          Misbehaviour.Double_preattesting ->
+          true
+      | _ -> false)
 
   let malformed_double_preattestation_denunciation
       ?(include_attestation = false) ?(block_round = 0)
@@ -102,24 +102,24 @@ end = struct
 
   let already_denounced loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Already_denounced
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Already_denounced
+          {kind = Misbehaviour.Double_preattesting; _} ->
+          true
+      | _ -> false)
 
   let inconsistent_denunciation loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Inconsistent_denunciation
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Inconsistent_denunciation
+          {kind = Misbehaviour.Double_preattesting; _} ->
+          true
+      | _ -> false)
 
   let outdated_denunciation loc res =
     Assert.proto_error ~loc res (function
-        | Validate_errors.Anonymous.Outdated_denunciation
-            {kind = Misbehaviour.Double_preattesting; _} ->
-            true
-        | _ -> false)
+      | Validate_errors.Anonymous.Outdated_denunciation
+          {kind = Misbehaviour.Double_preattesting; _} ->
+          true
+      | _ -> false)
 
   let unexpected_failure loc res =
     (* no error is expected *)
@@ -390,10 +390,10 @@ end = struct
     in
     let* () =
       Assert.proto_error ~loc:__LOC__ e (function
-          | Validate_errors.Anonymous.Conflicting_denunciation
-              {kind = Misbehaviour.Double_preattesting; _} ->
-              true
-          | _ -> false)
+        | Validate_errors.Anonymous.Conflicting_denunciation
+            {kind = Misbehaviour.Double_preattesting; _} ->
+            true
+        | _ -> false)
     in
     let* blk_with_evidence1 =
       Block.bake ~policy:(By_account baker) ~operation blk_a

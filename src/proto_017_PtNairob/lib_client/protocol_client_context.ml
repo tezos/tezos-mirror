@@ -45,24 +45,24 @@ class wrap_rpc_context (t : Tezos_rpc.Context.generic) : rpc_context =
 
     method generic_media_type_call = t#generic_media_type_call
 
-    method call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       t#call_service
 
-    method call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       t#call_streamed_service
 
     (** Abstracts variables <chain_id> and <block_id> in protocol RPCs
@@ -127,8 +127,8 @@ let transaction_encoding =
   let open Protocol.Alpha_context in
   conv
     (fun ({unparsed_parameters; destination; entrypoint} :
-           Sc_rollup.Outbox.Message.transaction) ->
-      (unparsed_parameters, destination, entrypoint))
+           Sc_rollup.Outbox.Message.transaction)
+       -> (unparsed_parameters, destination, entrypoint))
     (fun (unparsed_parameters, destination, entrypoint) ->
       {unparsed_parameters; destination; entrypoint})
   @@ obj3
@@ -142,8 +142,8 @@ let typed_transaction_encoding =
   let open Protocol.Alpha_context in
   conv
     (fun ({unparsed_parameters; unparsed_ty; destination; entrypoint} :
-           Sc_rollup.Outbox.Message.typed_transaction) ->
-      (unparsed_parameters, unparsed_ty, destination, entrypoint))
+           Sc_rollup.Outbox.Message.typed_transaction)
+       -> (unparsed_parameters, unparsed_ty, destination, entrypoint))
     (fun (unparsed_parameters, unparsed_ty, destination, entrypoint) ->
       {unparsed_parameters; unparsed_ty; destination; entrypoint})
   @@ obj4

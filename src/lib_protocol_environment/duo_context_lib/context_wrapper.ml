@@ -1338,26 +1338,26 @@ end = struct
             Irmin_disk.verify_tree_proof
             irmin_disk_tree
             (function
-              | {tree_1 = Irmin_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Irmin_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Irmin_mem ->
           verify_tree_proof Irmin_mem.verify_tree_proof irmin_mem_tree (function
-              | {tree_1 = Irmin_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Irmin_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Brassaia_disk ->
           verify_tree_proof
             Brassaia_disk.verify_tree_proof
             brassaia_disk_tree
             (function
-              | {tree_1 = Brassaia_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Brassaia_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Brassaia_mem ->
           verify_tree_proof
             Brassaia_mem.verify_tree_proof
             brassaia_mem_tree
             (function
-              | {tree_1 = Brassaia_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_tree_proof")
+            | {tree_1 = Brassaia_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_tree_proof")
       | Tezedge -> assert false
     in
     let verify_tree_proof _name b =
@@ -1403,29 +1403,29 @@ end = struct
             Irmin_disk.verify_stream_proof
             irmin_disk_tree
             (function
-              | {tree_1 = Irmin_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Irmin_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Irmin_mem ->
           verify_stream_proof
             Irmin_mem.verify_stream_proof
             irmin_mem_tree
             (function
-              | {tree_1 = Irmin_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Irmin_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Brassaia_disk ->
           verify_stream_proof
             Brassaia_disk.verify_stream_proof
             brassaia_disk_tree
             (function
-              | {tree_1 = Brassaia_disk_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Brassaia_disk_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Brassaia_mem ->
           verify_stream_proof
             Brassaia_mem.verify_stream_proof
             brassaia_mem_tree
             (function
-              | {tree_1 = Brassaia_mem_tree tree; _} -> tree
-              | _ -> backend_mismatch "verify_stream_proof")
+            | {tree_1 = Brassaia_mem_tree tree; _} -> tree
+            | _ -> backend_mismatch "verify_stream_proof")
       | Tezedge -> assert false
     in
     let verify_stream_proof _name b =

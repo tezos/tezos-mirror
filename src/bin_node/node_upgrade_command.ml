@@ -108,12 +108,12 @@ module Term = struct
             Lwt_lock_file.with_lock
               ~when_locked:
                 (`Fail
-                  (Exn
-                     (Failure
-                        (Format.sprintf
-                           "Failed to lock the data directory '%s'. Is a \
-                            `octez-node` running?"
-                           data_dir))))
+                   (Exn
+                      (Failure
+                         (Format.sprintf
+                            "Failed to lock the data directory '%s'. Is a \
+                             `octez-node` running?"
+                            data_dir))))
               ~filename:(Data_version.lock_file data_dir)
               (fun () ->
                 if status then upgrade_status ~data_dir
@@ -183,7 +183,8 @@ module Manpage = struct
 
   let man =
     description
-    @ (* [ `S misc_docs ] @ *)
+    @
+    (* [ `S misc_docs ] @ *)
     Shared_arg.Manpage.bugs
 
   let info = Cmdliner.Cmd.info ~doc:"Manage node upgrades" ~man "upgrade"

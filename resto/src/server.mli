@@ -230,16 +230,18 @@ module Make_selfserver (Encoding : Resto.ENCODING) (Log : LOGGING) : sig
 
     val handle_rpc_answer :
       string ->
-      ?headers:(* connection identifier for logging *)
-               Cohttp.Header.t ->
+      ?headers:
+        (* connection identifier for logging *)
+        Cohttp.Header.t ->
       ('o -> string) ->
       [< `Created of string option | `No_content | `Ok of 'o] ->
       Cohttp_lwt_unix.Response.t * Cohttp_lwt.Body.t
 
     val handle_rpc_answer_error :
       string ->
-      ?headers:(* connection identifier for logging *)
-               Cohttp.Header.t ->
+      ?headers:
+        (* connection identifier for logging *)
+        Cohttp.Header.t ->
       ('e -> Cohttp_lwt.Body.t * Cohttp.Transfer.encoding) ->
       [< `Conflict of 'e
       | `Error of 'e

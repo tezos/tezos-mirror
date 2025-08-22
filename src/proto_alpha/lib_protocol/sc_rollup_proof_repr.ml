@@ -480,11 +480,11 @@ let valid (type state proof output)
     | ( Some (Reveal_proof (Dal_page_proof {page_id = proof_page_id; proof})),
         Needs_reveal
           (Request_adal_page
-            {
-              page_id;
-              attestation_threshold_percent;
-              restricted_commitments_publishers;
-            }) ) ->
+             {
+               page_id;
+               attestation_threshold_percent;
+               restricted_commitments_publishers;
+             }) ) ->
         Dal_helpers.validate_dal_input_request
           proof
           ~proof_page_id
@@ -622,11 +622,11 @@ let produce ~metadata pvm_and_state commit_inbox_level ~is_reveal_enabled =
           confirmed_slots_history
     | Needs_reveal
         (Request_adal_page
-          {
-            page_id;
-            attestation_threshold_percent;
-            restricted_commitments_publishers;
-          }) ->
+           {
+             page_id;
+             attestation_threshold_percent;
+             restricted_commitments_publishers;
+           }) ->
         let open Dal_with_history in
         let attestation_threshold_percent =
           Some attestation_threshold_percent

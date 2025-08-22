@@ -159,69 +159,69 @@ let info_of_header_and_ops ~in_protocol ~grandparent block_hash block_header
 let compute_block_info cctxt ~in_protocol ?operations ~chain block_hash
     ~grandparent block_header =
   let open Lwt_result_syntax in
-  (let* operations =
-     match operations with
-     | None when not in_protocol -> return_nil
-     | None ->
-         let open Protocol_client_context in
-         (let* operations =
-            Alpha_block_services.Operations.operations
-              cctxt
-              ~chain
-              ~block:(`Hash (block_hash, 0))
-              ()
+  ((let* operations =
+      match operations with
+      | None when not in_protocol -> return_nil
+      | None ->
+          let open Protocol_client_context in
+          ((let* operations =
+              Alpha_block_services.Operations.operations
+                cctxt
+                ~chain
+                ~block:(`Hash (block_hash, 0))
+                ()
+            in
+            let packed_operations =
+              List.map
+                (fun l ->
+                  List.map
+                    (fun {Alpha_block_services.shell; protocol_data; _} ->
+                      {Alpha_context.shell; protocol_data})
+                    l)
+                operations
+            in
+            return packed_operations)
+          [@profiler.record_s
+            {verbosity = Debug}
+              ("retrieve block "
+              ^ Block_hash.to_short_b58check block_hash
+              ^ " operations")])
+      | Some operations ->
+          let parse_op (raw_op : Tezos_base.Operation.t) =
+            let protocol_data =
+              (Data_encoding.Binary.of_bytes_exn
+                 Operation.protocol_data_encoding
+                 raw_op.proto
+               [@profiler.aggregate_f {verbosity = Debug} "parse operation"])
+            in
+            {shell = raw_op.shell; protocol_data}
           in
-          let packed_operations =
-            List.map
-              (fun l ->
-                List.map
-                  (fun {Alpha_block_services.shell; protocol_data; _} ->
-                    {Alpha_context.shell; protocol_data})
-                  l)
-              operations
-          in
-          return packed_operations)
-         [@profiler.record_s
-           {verbosity = Debug}
-             ("retrieve block "
-             ^ Block_hash.to_short_b58check block_hash
-             ^ " operations")]
-     | Some operations ->
-         let parse_op (raw_op : Tezos_base.Operation.t) =
-           let protocol_data =
-             (Data_encoding.Binary.of_bytes_exn
-                Operation.protocol_data_encoding
-                raw_op.proto
-              [@profiler.aggregate_f {verbosity = Debug} "parse operation"])
-           in
-           {shell = raw_op.shell; protocol_data}
-         in
-         protect @@ fun () ->
-         return
-           (List.mapi
-              (fun [@warning "-27"] i -> function
-                | [] -> []
-                | l ->
-                    List.map
-                      parse_op
-                      l
-                    [@profiler.record_f
-                      {verbosity = Debug}
-                        (Printf.sprintf "parse operations (pass : %d)" i)])
-              operations)
-   in
-   let*? block_info =
-     info_of_header_and_ops
-       ~in_protocol
-       ~grandparent
-       block_hash
-       block_header
-       operations
-   in
-   return block_info)
+          protect @@ fun () ->
+          return
+            (List.mapi
+               (fun [@warning "-27"] i -> function
+                 | [] -> []
+                 | l ->
+                     List.map
+                       parse_op
+                       l
+                     [@profiler.record_f
+                       {verbosity = Debug}
+                         (Printf.sprintf "parse operations (pass : %d)" i)])
+               operations)
+    in
+    let*? block_info =
+      info_of_header_and_ops
+        ~in_protocol
+        ~grandparent
+        block_hash
+        block_header
+        operations
+    in
+    return block_info)
   [@profiler.record_s
     {verbosity = Info}
-      ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")]
+      ("compute block " ^ Block_hash.to_short_b58check block_hash ^ " info")])
 
 let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
     block_hash (block_header : Tezos_base.Block_header.t) =
@@ -351,9 +351,9 @@ let proposal cctxt ?(cache : block_info Block_cache.t option) ?operations ~chain
   return {block; predecessor}
 
 let proposal cctxt ?cache ?operations ~chain block_hash block_header =
-  ( (protect @@ fun () ->
-    proposal cctxt ?cache ?operations ~chain block_hash block_header)
-  [@profiler.record_s {verbosity = Notice} "proposal_computation"] )
+  (protect @@ fun () ->
+  proposal cctxt ?cache ?operations ~chain block_hash block_header)
+  [@profiler.record_s {verbosity = Notice} "proposal_computation"]
 
 let monitor_valid_proposals cctxt ~chain ?cache () =
   let open Lwt_result_syntax in

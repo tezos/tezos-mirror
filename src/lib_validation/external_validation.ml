@@ -156,7 +156,8 @@ let parameters_encoding =
            operation_metadata_size_limit;
            sandbox_parameters;
            internal_events;
-         } ->
+         }
+       ->
       ( (protocol_root, genesis, readonly, data_dir),
         ( user_activated_upgrades,
           user_activated_protocol_overrides,
@@ -168,7 +169,8 @@ let parameters_encoding =
              user_activated_protocol_overrides,
              operation_metadata_size_limit,
              sandbox_parameters,
-             internal_events ) ) ->
+             internal_events ) )
+       ->
       {
         protocol_root;
         genesis;
@@ -220,18 +222,18 @@ let case_apply tag =
     (function
       | Erequest
           (Apply
-            {
-              chain_id;
-              block_header;
-              predecessor_block_header;
-              predecessor_block_metadata_hash;
-              predecessor_ops_metadata_hash;
-              predecessor_resulting_context_hash;
-              max_operations_ttl;
-              operations;
-              should_validate;
-              simulate;
-            }) ->
+             {
+               chain_id;
+               block_header;
+               predecessor_block_header;
+               predecessor_block_metadata_hash;
+               predecessor_ops_metadata_hash;
+               predecessor_resulting_context_hash;
+               max_operations_ttl;
+               operations;
+               should_validate;
+               simulate;
+             }) ->
           Some
             ( chain_id,
               block_header,
@@ -253,7 +255,8 @@ let case_apply tag =
            max_operations_ttl,
            operations,
            should_validate,
-           simulate ) ->
+           simulate )
+       ->
       Erequest
         (Apply
            {
@@ -296,20 +299,20 @@ let case_preapply tag =
     (function
       | Erequest
           (Preapply
-            {
-              chain_id;
-              timestamp;
-              protocol_data;
-              live_blocks;
-              live_operations;
-              predecessor_shell_header;
-              predecessor_hash;
-              predecessor_max_operations_ttl;
-              predecessor_block_metadata_hash;
-              predecessor_ops_metadata_hash;
-              predecessor_resulting_context_hash;
-              operations;
-            }) ->
+             {
+               chain_id;
+               timestamp;
+               protocol_data;
+               live_blocks;
+               live_operations;
+               predecessor_shell_header;
+               predecessor_hash;
+               predecessor_max_operations_ttl;
+               predecessor_block_metadata_hash;
+               predecessor_ops_metadata_hash;
+               predecessor_resulting_context_hash;
+               operations;
+             }) ->
           Some
             ( ( chain_id,
                 timestamp,
@@ -333,7 +336,8 @@ let case_preapply tag =
              predecessor_max_operations_ttl,
              predecessor_block_metadata_hash,
              predecessor_ops_metadata_hash ),
-           (predecessor_resulting_context_hash, operations) ) ->
+           (predecessor_resulting_context_hash, operations) )
+       ->
       Erequest
         (Preapply
            {
@@ -369,15 +373,15 @@ let case_validate tag =
     (function
       | Erequest
           (Validate
-            {
-              chain_id;
-              predecessor_block_header;
-              predecessor_block_hash;
-              predecessor_resulting_context_hash;
-              header;
-              operations;
-              hash;
-            }) ->
+             {
+               chain_id;
+               predecessor_block_header;
+               predecessor_block_hash;
+               predecessor_resulting_context_hash;
+               header;
+               operations;
+               hash;
+             }) ->
           Some
             ( chain_id,
               predecessor_block_header,
@@ -393,7 +397,8 @@ let case_validate tag =
            predecessor_resulting_context_hash,
            header,
            hash,
-           operations ) ->
+           operations )
+       ->
       Erequest
         (Validate
            {

@@ -226,8 +226,7 @@ let diff_encoding : type i a u. (i, a, u) ops -> (i, a, u) diff Data_encoding.t
         (fun (((), updates), alloc) -> Update {init = Alloc alloc; updates});
     ]
 
-let init_size :
-    type i a u.
+let init_size : type i a u.
     (i, a, u) ops -> (i, a) init -> Cache_memory_helpers.nodes_and_size =
  fun (module OPS) init ->
   let open Cache_memory_helpers in
@@ -238,8 +237,8 @@ let init_size :
   | Alloc alloc ->
       ret_adding (OPS.alloc_in_memory_size alloc) (header_size +! word_size)
 
-let updates_size :
-    type i a u. (i, a, u) ops -> u -> Cache_memory_helpers.nodes_and_size =
+let updates_size : type i a u.
+    (i, a, u) ops -> u -> Cache_memory_helpers.nodes_and_size =
  fun (module OPS) updates -> OPS.updates_in_memory_size updates
 
 let diff_in_memory_size kind diff =
@@ -255,8 +254,7 @@ let diff_in_memory_size kind diff =
   storage [id] on storage context [ctxt] using operations [ops] and returns the
   updated storage context and the added size in bytes (may be negative).
 *)
-let apply_updates :
-    type i a u.
+let apply_updates : type i a u.
     Raw_context.t ->
     (i, a, u) ops ->
     id:i ->
@@ -278,8 +276,7 @@ let apply_updates :
 
   If [id] represents a temporary lazy storage, the added size may be wrong.
 *)
-let apply_init :
-    type i a u.
+let apply_init : type i a u.
     Raw_context.t ->
     (i, a, u) ops ->
     id:i ->
@@ -307,8 +304,7 @@ let apply_init :
 
   If [id] represents a temporary lazy storage, the added size may be wrong.
 *)
-let apply_diff :
-    type i a u.
+let apply_diff : type i a u.
     Raw_context.t ->
     (i, a, u) ops ->
     id:i ->
@@ -335,8 +331,7 @@ type diffs_item =
       ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff
       -> diffs_item
 
-let make :
-    type i a u.
+let make : type i a u.
     (i, a, u) Lazy_storage_kind.t -> i -> (i, a, u) diff -> diffs_item =
  fun k id diff -> Item (k, id, diff)
 
@@ -364,9 +359,9 @@ let item_encoding =
 
 let item_in_memory_size
     (Item
-      ( kind (* kinds are constant tags *),
-        _id_is_a_Z_fitting_in_an_int_for_a_long_time,
-        diff )) =
+       ( kind (* kinds are constant tags *),
+         _id_is_a_Z_fitting_in_an_int_for_a_long_time,
+         diff )) =
   let open Cache_memory_helpers in
   ret_adding (diff_in_memory_size kind diff) h3w
 
@@ -391,8 +386,7 @@ let apply ctxt diffs =
     (ctxt, Z.zero)
     diffs
 
-let fresh :
-    type i a u.
+let fresh : type i a u.
     (i, a, u) Lazy_storage_kind.t ->
     temporary:bool ->
     Raw_context.t ->

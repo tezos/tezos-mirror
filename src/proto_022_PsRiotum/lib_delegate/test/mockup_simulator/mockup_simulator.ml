@@ -911,11 +911,11 @@ class tezt_printer : Tezos_client_base.Client_context.printer =
   let open Client_context in
   let wrap_tezt_log : (_ format4 -> _) -> _ format4 -> _ =
    fun f x ->
-    Format.kasprintf
-      (fun msg ->
-        f "%s" msg ;
-        Lwt.return_unit)
-      x
+     Format.kasprintf
+       (fun msg ->
+         f "%s" msg ;
+         Lwt.return_unit)
+       x
   in
   object
     method error : type a b. (a, b) lwt_format -> a =
@@ -966,7 +966,8 @@ let baker_process ~(delegates : Baking_state.Consensus_key.t list) ~base_dir
   let* () =
     List.iter_es
       (fun ({alias; public_key; id; secret_key_uri} :
-             Baking_state.Consensus_key.t) ->
+             Baking_state.Consensus_key.t)
+         ->
         let name = alias |> WithExceptions.Option.get ~loc:__LOC__ in
         let* public_key_uri = Client_keys.neuterize secret_key_uri in
         let pkh = Baking_state.Consensus_key_id.to_pkh id in

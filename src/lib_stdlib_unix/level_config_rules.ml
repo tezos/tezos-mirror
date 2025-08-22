@@ -56,8 +56,8 @@ let parse_rules s =
           match
             Re.(split_full arrow_regexp) rule
             |> List.map (function
-                   | `Delim _ as s -> s
-                   | `Text t -> `Text (String.trim t))
+                 | `Delim _ as s -> s
+                 | `Text t -> `Text (String.trim t))
           with
           | [`Delim _; `Text _] | [`Text ""; `Delim _; `Text _] ->
               raise Incorrect_log_rules_missing_pattern

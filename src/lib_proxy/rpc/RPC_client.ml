@@ -82,13 +82,13 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
   object
     method base = Uri.empty
 
-    method call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun service params query input ->
         let local () = local_ctxt#call_service service params query input in
         let distant () = http_ctxt#call_service service params query input in
@@ -100,15 +100,15 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           meth
         @@ print_service service
 
-    method call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query input ->
         let local () =
           local_ctxt#call_streamed_service
@@ -136,13 +136,13 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           meth
         @@ print_service service
 
-    method generic_media_type_call
-        : Service.meth ->
-          ?body:Data_encoding.json ->
-          Uri.t ->
-          Tezos_rpc.Context.generic_call_result
-          Tezos_error_monad.Error_monad.tzresult
-          Lwt.t =
+    method generic_media_type_call :
+        Service.meth ->
+        ?body:Data_encoding.json ->
+        Uri.t ->
+        Tezos_rpc.Context.generic_call_result
+        Tezos_error_monad.Error_monad.tzresult
+        Lwt.t =
       let open Lwt_syntax in
       fun meth ?body uri ->
         let meth_string = Tezos_rpc.Service.string_of_meth meth in

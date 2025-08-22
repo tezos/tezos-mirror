@@ -73,7 +73,8 @@ module Agent_configuration = struct
                  max_run_duration = _;
                  os;
                };
-           } -> (name, machine_type, binaries_path, docker_image, os))
+           }
+         -> (name, machine_type, binaries_path, docker_image, os))
       (fun (name, machine_type, binaries_path, docker_image, os) ->
         {
           name;

@@ -24,8 +24,8 @@
 (*****************************************************************************)
 
 module External
-    (MP : Plonk.Main_protocol.S
-            with type public_inputs = Plompiler.S.t array list) =
+    (MP :
+      Plonk.Main_protocol.S with type public_inputs = Plompiler.S.t array list) =
 struct
   module H = Plonk_test.Helpers.Make (MP)
 

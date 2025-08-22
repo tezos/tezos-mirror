@@ -187,7 +187,8 @@ module Opam = struct
         ]
       ~artifacts:
         (artifacts ~expire_in:(Duration (Weeks 1)) ~when_:Always ["opam_logs/"])
-    |> (* We store caches in [_build] for two reasons: (1) the [_build]
+    |>
+    (* We store caches in [_build] for two reasons: (1) the [_build]
           folder is excluded from opam's rsync. (2) gitlab ci cache
           requires that cached files are in a sub-folder of the checkout. *)
     enable_sccache

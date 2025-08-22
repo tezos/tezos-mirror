@@ -104,7 +104,7 @@ let encoding =
         (object_1 "activate")
         (fun {active_sinks = _} -> None)
         (* (fun {active_sinks} -> Some (List.map Uri.to_string active_sinks)) *)
-          (fun active_sinks ->
+        (fun active_sinks ->
           {active_sinks = List.map Uri.of_string active_sinks});
     ]
 

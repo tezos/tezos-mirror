@@ -46,7 +46,10 @@ module Delegate_sampler_state = struct
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
     let* ctxt = Storage.Delegate_sampler_state.init ctxt cycle sampler_state in
-    let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
+    let size =
+      1
+      (* that's symbolic: 1 cycle = 1 entry *)
+    in
     let*? ctxt = Cache.update ctxt id (Some (sampler_state, size)) in
     return ctxt
 
@@ -293,7 +296,9 @@ let attesting_power ~all_bakers_attest_enabled ctxt level =
     let* ctxt, _, delegates = stake_info ctxt level in
     let map =
       List.fold_left
-        (fun map_acc ((consensus_pk : Raw_context.consensus_pk), staking_power) ->
+        (fun map_acc
+             ((consensus_pk : Raw_context.consensus_pk), staking_power)
+           ->
           Signature.Public_key_hash.Map.add
             consensus_pk.delegate
             staking_power

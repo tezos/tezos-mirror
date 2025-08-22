@@ -142,8 +142,8 @@ module Plugin = struct
     in
     Lwt_result.map
       (List.filter_map (function
-          | header, Dal_plugin.Succeeded -> Some header
-          | _, Dal_plugin.Failed -> None))
+        | header, Dal_plugin.Succeeded -> Some header
+        | _, Dal_plugin.Failed -> None))
       (Layer1_services.(
          process_manager_operations [] operations {apply; apply_internal})
       |> List.map_es (fun (slot_index, commitment, status) ->

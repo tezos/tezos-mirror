@@ -402,7 +402,7 @@ let attestable_slots_encoding : attestable_slots Data_encoding.t =
           | _ -> None)
         (function
           | (), slots, published_level ->
-              Attestable_slots {slots; published_level});
+          Attestable_slots {slots; published_level});
       case
         ~title:"not_in_committee"
         (Tag 1)
@@ -506,7 +506,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
            dal_attested_slots_validity_lag;
            blocks_per_cycle;
            minimal_block_delay;
-         } ->
+         }
+       ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
@@ -530,7 +531,8 @@ let proto_parameters_encoding : proto_parameters Data_encoding.t =
              commitment_period_in_blocks,
              dal_attested_slots_validity_lag,
              blocks_per_cycle,
-             minimal_block_delay ) ) ->
+             minimal_block_delay ) )
+       ->
       {
         feature_enable;
         incentives_enable;

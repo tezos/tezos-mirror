@@ -88,7 +88,7 @@ module Mapping_file = struct
         else
           Error
             (`Corrupted_mapping_file
-              (__FILE__ ^ ": mapping mmap size did not meet size requirements"))
+               (__FILE__ ^ ": mapping mmap size did not meet size requirements"))
     | _ -> Error (`No_such_file_or_directory path)
 
   let close = Int64_mmap.close

@@ -215,7 +215,9 @@ let raw_attestation ?attesting_slot ?manager_pkh ?level ?round
 let raw_aggregate attestations =
   let aggregate_content =
     List.fold_left
-      (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
+      (fun acc
+           ({shell; protocol_data = {contents; signature}} : _ Operation.t)
+         ->
         match (contents, signature) with
         | ( Single (Attestation {consensus_content; dal_content}),
             Some (Bls bls_sig) ) -> (
@@ -252,7 +254,9 @@ let raw_aggregate attestations =
 let raw_aggregate_preattestations preattestations =
   let aggregate_content =
     List.fold_left
-      (fun acc ({shell; protocol_data = {contents; signature}} : _ Operation.t) ->
+      (fun acc
+           ({shell; protocol_data = {contents; signature}} : _ Operation.t)
+         ->
         match (contents, signature) with
         | Single (Preattestation consensus_content), Some (Bls bls_sig) -> (
             let ({slot; _} : consensus_content) = consensus_content in

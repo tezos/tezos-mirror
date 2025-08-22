@@ -30,15 +30,15 @@ open Lwt.Infix
 
 let () =
   Lwt_main.run
-    (allowed_methods dir () ["foo"; "3"; "repeat"] >>= function
-     | Ok [`POST] -> Lwt.return_unit
-     | _ -> assert false)
+    ( allowed_methods dir () ["foo"; "3"; "repeat"] >>= function
+      | Ok [`POST] -> Lwt.return_unit
+      | _ -> assert false )
 
 let () =
   Lwt_main.run
-    (allowed_methods dir () ["bar"; "3"; "4"; "add"] >>= function
-     | Ok [`GET; `POST] -> Lwt.return_unit
-     | _ -> assert false)
+    ( allowed_methods dir () ["bar"; "3"; "4"; "add"] >>= function
+      | Ok [`GET; `POST] -> Lwt.return_unit
+      | _ -> assert false )
 
 module Test (Request : sig
   val request :
@@ -51,47 +51,47 @@ end) =
 struct
   let () =
     Lwt_main.run
-      (Request.request describe_service ((), ["foo"; "3"]) {recurse = true} ()
-       >>= function
-       | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
-           Lwt.return_unit
-       | _ -> assert false)
+      ( Request.request describe_service ((), ["foo"; "3"]) {recurse = true} ()
+      >>= function
+        | `Ok dir ->
+            Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+            Lwt.return_unit
+        | _ -> assert false )
 
   let () =
     Lwt_main.run
-      (Request.request
-         describe_service
-         ((), ["bar"; "3"; "2."; "add"])
-         {recurse = false}
-         ()
-       >>= function
-       | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
-           Lwt.return_unit
-       | _ -> assert false)
+      ( Request.request
+          describe_service
+          ((), ["bar"; "3"; "2."; "add"])
+          {recurse = false}
+          ()
+      >>= function
+        | `Ok dir ->
+            Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+            Lwt.return_unit
+        | _ -> assert false )
 
   let () =
     Lwt_main.run
-      (Request.request
-         describe_service
-         ((), ["bar"; "3"; "2."])
-         {recurse = true}
-         ()
-       >>= function
-       | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
-           Lwt.return_unit
-       | _ -> assert false)
+      ( Request.request
+          describe_service
+          ((), ["bar"; "3"; "2."])
+          {recurse = true}
+          ()
+      >>= function
+        | `Ok dir ->
+            Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+            Lwt.return_unit
+        | _ -> assert false )
 
   let () =
     Lwt_main.run
-      (Request.request describe_service ((), []) {recurse = true} ()
-       >>= function
-       | `Ok dir ->
-           Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
-           Lwt.return_unit
-       | _ -> assert false)
+      ( Request.request describe_service ((), []) {recurse = true} ()
+      >>= function
+        | `Ok dir ->
+            Format.printf "@[<v>%a@]@." Resto.Description.pp_print_directory dir ;
+            Lwt.return_unit
+        | _ -> assert false )
 
   let () =
     let test service args arg expected =
@@ -148,7 +148,7 @@ module Faked = Test (struct
             let json = Json_encoding.construct s.types.output res in
             Lwt.return
               (`Ok
-                (Json_encoding.destruct (Service.output_encoding service) json))
+                 (Json_encoding.destruct (Service.output_encoding service) json))
         | _ -> failwith "Unexpected lwt result (1)")
     | _ -> failwith "Unexpected lwt result (2)"
 end)

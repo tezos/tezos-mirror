@@ -44,8 +44,8 @@ let failing_noop_must_fail_when_injected () =
   let* operation = Op.failing_noop (B blk) source "tezos" in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Protocol.Validate_errors.Failing_noop_error -> true
-      | _ -> false)
+    | Protocol.Validate_errors.Failing_noop_error -> true
+    | _ -> false)
 
 let tests =
   [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]

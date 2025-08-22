@@ -104,13 +104,15 @@ let encoding =
              state;
              paid_l2_operations_storage_space;
              used_l2_operations_storage_space;
-           } ->
+           }
+         ->
         ( state,
           paid_l2_operations_storage_space,
           used_l2_operations_storage_space ))
       (fun ( state,
              paid_l2_operations_storage_space,
-             used_l2_operations_storage_space ) ->
+             used_l2_operations_storage_space )
+         ->
         {
           state;
           paid_l2_operations_storage_space;

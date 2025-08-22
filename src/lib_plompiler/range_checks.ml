@@ -40,10 +40,10 @@ let remove = IMap.remove
 
 let add ~nb_bits i =
   IMap.update i (function
-      | None -> Some nb_bits
-      | _ ->
-          raise
-            (Invalid_argument
-               (Printf.sprintf
-                  "Range_check : index %d is already range-checked."
-                  i)))
+    | None -> Some nb_bits
+    | _ ->
+        raise
+          (Invalid_argument
+             (Printf.sprintf
+                "Range_check : index %d is already range-checked."
+                i)))

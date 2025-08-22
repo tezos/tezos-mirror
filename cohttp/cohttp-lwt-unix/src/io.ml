@@ -18,8 +18,8 @@ exception IO_error of exn
 
 let () =
   Printexc.register_printer (function
-      | IO_error e -> Some ("IO error: " ^ Printexc.to_string e)
-      | _ -> None) ;
+    | IO_error e -> Some ("IO error: " ^ Printexc.to_string e)
+    | _ -> None) ;
   if Sys.os_type <> "Win32" then Sys.(set_signal sigpipe Signal_ignore)
 
 type 'a t = 'a Lwt.t
@@ -42,14 +42,14 @@ let wrap_read f ~if_closed =
   (* TODO Use [Lwt_io.is_closed] when available:
      https://github.com/ocsigen/lwt/pull/635 *)
   Lwt.catch f (function
-      | Lwt_io.Channel_closed _ -> Lwt.return if_closed
-      | Unix.Unix_error _ as e -> Lwt.fail (IO_error e)
-      | exn -> raise exn)
+    | Lwt_io.Channel_closed _ -> Lwt.return if_closed
+    | Unix.Unix_error _ as e -> Lwt.fail (IO_error e)
+    | exn -> raise exn)
 
 let wrap_write f =
   Lwt.catch f (function
-      | Unix.Unix_error _ as e -> Lwt.fail (IO_error e)
-      | exn -> raise exn)
+    | Unix.Unix_error _ as e -> Lwt.fail (IO_error e)
+    | exn -> raise exn)
 
 let read_line ic =
   wrap_read ~if_closed:None (fun () ->
@@ -79,8 +79,8 @@ type error = exn
 
 let catch f =
   Lwt.try_bind f Lwt.return_ok (function
-      | IO_error e -> Lwt.return_error e
-      | ex -> Lwt.fail ex)
+    | IO_error e -> Lwt.return_error e
+    | ex -> Lwt.fail ex)
 
 let pp_error = Fmt.exn
 

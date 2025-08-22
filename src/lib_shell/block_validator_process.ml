@@ -742,12 +742,12 @@ let validate_block (E {validator_process = (module VP); validator}) chain_store
 
 let context_garbage_collection (E {validator_process = (module VP); validator})
     context_index context_hash ~gc_lockfile_path =
-  (VP.context_garbage_collection
-     validator
-     context_index
-     context_hash
-     ~gc_lockfile_path
-   [@profiler.record_s {verbosity = Notice} "context_garbage_collection"])
+  VP.context_garbage_collection
+    validator
+    context_index
+    context_hash
+    ~gc_lockfile_path
+  [@profiler.record_s {verbosity = Notice} "context_garbage_collection"]
 
 let context_split (E {validator_process = (module VP); validator}) context_index
     =

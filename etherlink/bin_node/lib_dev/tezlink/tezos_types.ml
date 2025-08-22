@@ -112,8 +112,7 @@ module Operation = struct
       | Cons (first_contents, _) ->
           source_and_counter_from_contents first_contents
     in
-    let rec contents_list_length :
-        type kind.
+    let rec contents_list_length : type kind.
         kind Tezlink_imports.Alpha_context.contents_list -> int -> int =
      fun contents_list acc ->
       match contents_list with

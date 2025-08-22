@@ -38,7 +38,8 @@ module Header = struct
                  address;
                  head_level;
                  last_commitment;
-               } -> Some (history_mode, address, head_level, last_commitment))
+               }
+             -> Some (history_mode, address, head_level, last_commitment))
           (fun (history_mode, address, head_level, last_commitment) ->
             {version = V0; history_mode; address; head_level; last_commitment});
       ]

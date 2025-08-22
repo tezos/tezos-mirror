@@ -105,8 +105,7 @@ module Ticket_inspection = struct
      so that constructors like [Or_t] and [Pair_t] are traversed
      recursively.
   *)
-  let has_tickets_of_comparable :
-      type a ret.
+  let has_tickets_of_comparable : type a ret.
       a Script_typed_ir.comparable_ty -> (a has_tickets -> ret) -> ret =
    fun key_ty k ->
     let open Script_typed_ir in
@@ -144,8 +143,7 @@ module Ticket_inspection = struct
      The returned value matches the given shape of the [ty] value, except
      it collapses whole branches where no types embed tickets to [False_ht].
   *)
-  let rec has_tickets_of_ty :
-      type a ac ret.
+  let rec has_tickets_of_ty : type a ac ret.
       (a, ac) Script_typed_ir.ty -> (a, ret) continuation -> ret tzresult =
    fun ty k ->
     let open Script_typed_ir in
@@ -219,8 +217,7 @@ module Ticket_inspection = struct
     | Chest_t -> (k [@ocaml.tailcall]) False_ht
     | Chest_key_t -> (k [@ocaml.tailcall]) False_ht
 
-  and has_tickets_of_pair :
-      type a ac b bc c ret.
+  and has_tickets_of_pair : type a ac b bc c ret.
       (a, ac) Script_typed_ir.ty ->
       (b, bc) Script_typed_ir.ty ->
       pair:(a has_tickets -> b has_tickets -> c has_tickets) ->
@@ -231,8 +228,7 @@ module Ticket_inspection = struct
         (has_tickets_of_ty [@ocaml.tailcall]) ty2 (fun ht2 ->
             (k [@ocaml.tailcall]) (pair_has_tickets pair ht1 ht2)))
 
-  and has_tickets_of_key_and_value :
-      type k v vc t ret.
+  and has_tickets_of_key_and_value : type k v vc t ret.
       k Script_typed_ir.comparable_ty ->
       (v, vc) Script_typed_ir.ty ->
       pair:(k has_tickets -> v has_tickets -> t has_tickets) ->
@@ -261,8 +257,7 @@ module Ticket_collection = struct
      needs to be modified. In particular constructors like [Option] and [Pair]
      would have to recurse on their arguments. *)
 
-  let tickets_of_comparable :
-      type a ret.
+  let tickets_of_comparable : type a ret.
       context ->
       a Script_typed_ir.comparable_ty ->
       accumulator ->
@@ -289,8 +284,7 @@ module Ticket_collection = struct
     | Or_t (_, _, _, YesYes) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_t (_, _, Yes) -> (k [@ocaml.tailcall]) ctxt acc
 
-  let tickets_of_set :
-      type a ret.
+  let tickets_of_set : type a ret.
       context ->
       a Script_typed_ir.comparable_ty ->
       a Script_typed_ir.set ->
@@ -304,8 +298,7 @@ module Ticket_collection = struct
          comparable. *)
       (tickets_of_comparable [@ocaml.tailcall]) ctxt key_ty acc k
 
-  let rec tickets_of_value :
-      type a ac ret.
+  let rec tickets_of_value : type a ac ret.
       include_lazy:bool ->
       context ->
       a Ticket_inspection.has_tickets ->
@@ -403,8 +396,7 @@ module Ticket_collection = struct
       | True_ht, Ticket_t (comp_ty, _) ->
           (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
 
-  and tickets_of_list :
-      type a ac ret.
+  and tickets_of_list : type a ac ret.
       context ->
       include_lazy:bool ->
       a Ticket_inspection.has_tickets ->
@@ -436,8 +428,7 @@ module Ticket_collection = struct
                 k)
       | [] -> (k [@ocaml.tailcall]) ctxt acc
 
-  and tickets_of_map :
-      type k v vc ret.
+  and tickets_of_map : type k v vc ret.
       include_lazy:bool ->
       context ->
       v Ticket_inspection.has_tickets ->
@@ -462,8 +453,7 @@ module Ticket_collection = struct
         acc
         k
 
-  and tickets_of_big_map :
-      type k v ret.
+  and tickets_of_big_map : type k v ret.
       context ->
       v Ticket_inspection.has_tickets ->
       k Script_typed_ir.comparable_ty ->
@@ -477,7 +467,8 @@ module Ticket_collection = struct
         key_ty
         (Big_map {id; diff = {map = _; size}; key_type = _; value_type})
         acc
-        k ->
+        k
+      ->
       let*? ctxt = Ticket_costs.consume_gas_steps ctxt ~num_steps:1 in
       (* Require empty overlay *)
       if Compare.Int.(size > 0) then tzfail Unsupported_non_empty_overlay

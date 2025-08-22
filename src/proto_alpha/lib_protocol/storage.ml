@@ -1228,11 +1228,13 @@ module Cycle = struct
                    for_double_preattesting;
                    for_double_attesting;
                    for_double_baking;
-                 } ->
+                 }
+               ->
               (for_double_preattesting, for_double_attesting, for_double_baking))
             (fun ( for_double_preattesting,
                    for_double_attesting,
-                   for_double_baking ) ->
+                   for_double_baking )
+               ->
               {for_double_preattesting; for_double_attesting; for_double_baking})
             (obj3
                (req "for_double_preattesting" bool)
@@ -1727,7 +1729,8 @@ module Ramp_up = struct
                      baking_reward_bonus_per_slot;
                      attesting_reward_per_slot;
                      dal_attesting_reward_per_shard;
-                   } ->
+                   }
+                 ->
                 ( baking_reward_fixed_portion,
                   baking_reward_bonus_per_slot,
                   attesting_reward_per_slot,
@@ -1735,7 +1738,8 @@ module Ramp_up = struct
               (fun ( baking_reward_fixed_portion,
                      baking_reward_bonus_per_slot,
                      attesting_reward_per_slot,
-                     dal_attesting_reward_per_shard ) ->
+                     dal_attesting_reward_per_shard )
+                 ->
                 {
                   baking_reward_fixed_portion;
                   baking_reward_bonus_per_slot;

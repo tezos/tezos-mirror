@@ -428,44 +428,45 @@ let generate_seed_nonce ?timeout
 let register_nonce (cctxt : #Protocol_client_context.full) ~chain_id block_hash
     nonce ~cycle ~level ~round =
   let open Lwt_result_syntax in
-  (let*! () = Events.(emit registering_nonce block_hash) in
-   (* Register the nonce *)
-   let legacy_location =
-     Baking_files.resolve_location ~chain_id `Legacy_nonce
-   in
-   let stateful_location =
-     Baking_files.resolve_location ~chain_id `Stateful_nonce
-   in
-   let orphaned_location =
-     Baking_files.resolve_location ~chain_id `Orphaned_nonce
-   in
-   () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
-   cctxt#with_lock @@ fun () ->
-   let* nonces =
-     (load
-        cctxt
-        ~stateful_location [@profiler.record_s {verbosity = Info} "load nonces"])
-   in
-   let nonces =
-     (add
-        nonces
-        {
-          nonce;
-          nonce_hash = Nonce.hash nonce;
-          block_hash;
-          cycle;
-          level;
-          round = Some round;
-          nonce_state = Committed;
-        } [@profiler.record_f {verbosity = Info} "add nonces"])
-   in
-   (save
-      cctxt
-      ~legacy_location
-      ~stateful_location
-      nonces
-      ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
-  [@profiler.record_s {verbosity = Notice} "register nonce"]
+  ((let*! () = Events.(emit registering_nonce block_hash) in
+    (* Register the nonce *)
+    let legacy_location =
+      Baking_files.resolve_location ~chain_id `Legacy_nonce
+    in
+    let stateful_location =
+      Baking_files.resolve_location ~chain_id `Stateful_nonce
+    in
+    let orphaned_location =
+      Baking_files.resolve_location ~chain_id `Orphaned_nonce
+    in
+    () [@profiler.record_f {verbosity = Info} "waiting lock"] ;
+    cctxt#with_lock @@ fun () ->
+    let* nonces =
+      (load
+         cctxt
+         ~stateful_location
+       [@profiler.record_s {verbosity = Info} "load nonces"])
+    in
+    let nonces =
+      (add
+         nonces
+         {
+           nonce;
+           nonce_hash = Nonce.hash nonce;
+           block_hash;
+           cycle;
+           level;
+           round = Some round;
+           nonce_state = Committed;
+         } [@profiler.record_f {verbosity = Info} "add nonces"])
+    in
+    (save
+       cctxt
+       ~legacy_location
+       ~stateful_location
+       nonces
+       ~orphaned_location [@profiler.record_s {verbosity = Info} "save nonces"]))
+  [@profiler.record_s {verbosity = Notice} "register nonce"])
 
 (** [inject_seed_nonce_revelation cctxt ~chain ~block ~branch nonces] forges one
     [Seed_nonce_revelation] operation per each nonce to be revealed, together with

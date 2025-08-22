@@ -73,10 +73,10 @@ let liquidity_baking_votefile ?path vote =
   JSON.encode_to_file_u
     votefile
     (`O
-      [
-        ( "liquidity_baking_toggle_vote",
-          `String (liquidity_baking_vote_to_string vote) );
-      ]) ;
+       [
+         ( "liquidity_baking_toggle_vote",
+           `String (liquidity_baking_vote_to_string vote) );
+       ]) ;
   votefile
 
 let enable_remote_mode =

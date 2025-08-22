@@ -143,7 +143,8 @@ let peer_validator_limits_encoding =
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
-         } ->
+         }
+       ->
       ( block_header_timeout,
         block_operations_timeout,
         protocol_timeout,
@@ -151,7 +152,8 @@ let peer_validator_limits_encoding =
     (fun ( block_header_timeout,
            block_operations_timeout,
            protocol_timeout,
-           new_head_request_timeout ) ->
+           new_head_request_timeout )
+       ->
       {
         block_header_timeout;
         block_operations_timeout;
@@ -281,7 +283,8 @@ let limits_encoding =
            history_mode;
            disable_context_pruning;
            storage_maintenance_delay;
-         } ->
+         }
+       ->
       ( peer_validator_limits,
         block_validator_limits,
         prevalidator_limits,
@@ -295,7 +298,8 @@ let limits_encoding =
            chain_validator_limits,
            history_mode,
            disable_context_pruning,
-           storage_maintenance_delay ) ->
+           storage_maintenance_delay )
+       ->
       {
         peer_validator_limits;
         block_validator_limits;

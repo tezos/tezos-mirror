@@ -40,7 +40,8 @@ let origination_result_list_encoding =
                  originated_contracts;
                  storage_size;
                  paid_storage_size_diff;
-               } ->
+               }
+             ->
             ( balance_updates,
               originated_contracts,
               storage_size,
@@ -48,7 +49,8 @@ let origination_result_list_encoding =
           (fun ( balance_updates,
                  originated_contracts,
                  storage_size,
-                 paid_storage_size_diff ) ->
+                 paid_storage_size_diff )
+             ->
             {
               balance_updates;
               originated_contracts;

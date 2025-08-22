@@ -133,7 +133,8 @@ module DAL = struct
              ppx_profiling_backends;
              enable_network_health_monitoring;
              tezlink;
-           } ->
+           }
+         ->
         ( ( ( blocks_history,
               producer_key,
               fundraiser,
@@ -213,7 +214,8 @@ module DAL = struct
                  ppx_profiling,
                  ppx_profiling_backends,
                  enable_network_health_monitoring,
-                 tezlink ) ) ) ->
+                 tezlink ) ) )
+         ->
         {
           blocks_history;
           producer_key;

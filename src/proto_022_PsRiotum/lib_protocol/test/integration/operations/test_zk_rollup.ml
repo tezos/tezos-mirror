@@ -700,8 +700,8 @@ let test_invalid_deposit () =
     Incremental.add_operation
       ~expect_apply_failure:
         (check_proto_error_f (function
-            | Script_interpreter.Runtime_contract_error _ -> true
-            | _ -> false))
+          | Script_interpreter.Runtime_contract_error _ -> true
+          | _ -> false))
       i
       operation
   in

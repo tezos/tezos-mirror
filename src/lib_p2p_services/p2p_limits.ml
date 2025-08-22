@@ -51,7 +51,10 @@ type t = {
 }
 
 let default =
-  let greylist_timeout = Time.System.Span.of_seconds_exn 86400. (* one day *) in
+  let greylist_timeout =
+    Time.System.Span.of_seconds_exn 86400.
+    (* one day *)
+  in
   {
     connection_timeout = Time.System.Span.of_seconds_exn 10.;
     authentication_timeout = Time.System.Span.of_seconds_exn 5.;
@@ -109,7 +112,8 @@ let encoding : t Data_encoding.t =
            ip_greylist_cleanup_delay;
            swap_linger;
            binary_chunks_size;
-         } ->
+         }
+       ->
       ( ( ( connection_timeout,
             authentication_timeout,
             min_connections,
@@ -157,7 +161,8 @@ let encoding : t Data_encoding.t =
              ip_greylist_size_in_kilobytes,
              ip_greylist_cleanup_delay,
              greylist_timeout,
-             maintenance_idle_time ) ) ->
+             maintenance_idle_time ) )
+       ->
       {
         connection_timeout;
         authentication_timeout;

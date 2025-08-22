@@ -38,9 +38,10 @@ module SeqM = Seqes.Monadic.Make1 (M)
 
 (** [Make] instantiates a generator for gossipsub transitions. *)
 module Make
-    (GS : AUTOMATON
-            with type Time.t = Milliseconds.t
-             and type Span.t = Milliseconds.Span.t) =
+    (GS :
+      AUTOMATON
+        with type Time.t = Milliseconds.t
+         and type Span.t = Milliseconds.Span.t) =
 struct
   open M
 
@@ -327,8 +328,8 @@ struct
       | Seq [] -> k None
       | Seq (hd :: rest) ->
           next hd (function
-              | Some (event, hd') -> k (Some (event, seq (hd' :: rest)))
-              | None -> next (seq rest) k)
+            | Some (event, hd') -> k (Some (event, seq (hd' :: rest)))
+            | None -> next (seq rest) k)
       | Par [] -> k None
       | Par parallel_components -> (
           let length = List.length parallel_components in
@@ -338,14 +339,13 @@ struct
           | [] -> assert false
           | fragment :: rest ->
               next fragment (function
-                  | None -> next (par (List.rev_append rev_prefix rest)) k
-                  | Some (elt, fragment') ->
-                      k
-                        (Some
-                           ( elt,
-                             par
-                               (List.rev_append rev_prefix (fragment' :: rest))
-                           ))))
+                | None -> next (par (List.rev_append rev_prefix rest)) k
+                | Some (elt, fragment') ->
+                    k
+                      (Some
+                         ( elt,
+                           par (List.rev_append rev_prefix (fragment' :: rest))
+                         ))))
 
     let next : raw -> (event * raw) option M.t =
      fun fragment -> next fragment M.return

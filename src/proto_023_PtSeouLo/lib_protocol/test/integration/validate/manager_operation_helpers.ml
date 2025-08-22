@@ -1056,8 +1056,8 @@ type probes = {
   nb_counter : int;
 }
 
-let rec contents_infos :
-    type kind. kind Kind.manager contents_list -> probes tzresult Lwt.t =
+let rec contents_infos : type kind.
+    kind Kind.manager contents_list -> probes tzresult Lwt.t =
  fun op ->
   let open Lwt_result_syntax in
   match op with

@@ -194,7 +194,9 @@ struct
   let of_bytes_exn b =
     (* no need to copy the bytes [p] because [Bytes.sub] is used and [Bytes.sub]
        creates a new buffer *)
-    match of_bytes_opt b with Some g -> g | None -> raise (Not_on_curve b)
+    match of_bytes_opt b with
+    | Some g -> g
+    | None -> raise (Not_on_curve b)
 
   let to_bytes g =
     let buffer = Bytes.make size_in_bytes '\000' in
@@ -405,7 +407,9 @@ struct
   let of_bytes_exn b =
     (* no need to copy the bytes [p] because [Bytes.sub] is used and [Bytes.sub]
        creates a new buffer *)
-    match of_bytes_opt b with Some g -> g | None -> raise (Not_on_curve b)
+    match of_bytes_opt b with
+    | Some g -> g
+    | None -> raise (Not_on_curve b)
 
   let one = of_bytes_exn Params.bytes_generator
 
@@ -695,7 +699,9 @@ struct
   let of_bytes_exn b =
     (* no need to copy the bytes [p] because [Bytes.sub] is used and [Bytes.sub]
        creates a new buffer *)
-    match of_bytes_opt b with Some g -> g | None -> raise (Not_on_curve b)
+    match of_bytes_opt b with
+    | Some g -> g
+    | None -> raise (Not_on_curve b)
 
   let to_bytes g =
     let buffer = Bytes.make size_in_bytes '\000' in
@@ -963,7 +969,9 @@ struct
   let of_bytes_exn b =
     (* no need to copy the bytes [p] because [Bytes.sub] is used and [Bytes.sub]
        creates a new buffer *)
-    match of_bytes_opt b with Some g -> g | None -> raise (Not_on_curve b)
+    match of_bytes_opt b with
+    | Some g -> g
+    | None -> raise (Not_on_curve b)
 
   let to_bytes g =
     let buffer = Bytes.make size_in_bytes '\000' in
@@ -1239,7 +1247,9 @@ struct
   let of_bytes_exn b =
     (* no need to copy the bytes [p] because [Bytes.sub] is used in
        [of_bytes_opt] and [Bytes.sub] creates a new buffer *)
-    match of_bytes_opt b with None -> raise (Not_on_curve b) | Some p -> p
+    match of_bytes_opt b with
+    | None -> raise (Not_on_curve b)
+    | Some p -> p
 
   let check_bytes b = match of_bytes_opt b with None -> false | Some _ -> true
 

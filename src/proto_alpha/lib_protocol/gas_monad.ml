@@ -86,8 +86,7 @@ let run ctxt m =
           return (res, ctxt)
       | None -> tzfail Gas.Operation_quota_exceeded)
 
-let record_trace_eval :
-    type error_trace error_context.
+let record_trace_eval : type error_trace error_context.
     error_details:(error_context, error_trace) Script_tc_errors.error_details ->
     (error_context -> error) ->
     ('a, error_trace) t ->

@@ -274,8 +274,7 @@ module Type_size : TYPE_SIZE = struct
 
   let one = 1
 
-  let check_eq :
-      type a b error_trace.
+  let check_eq : type a b error_trace.
       error_details:(_, error_trace) Script_tc_errors.error_details ->
       a t ->
       b t ->
@@ -1421,8 +1420,8 @@ and ('before, 'after) comb_get_gadt_witness =
 
 and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_zero : ('value, _, 'value) comb_set_gadt_witness
-  | Comb_set_one
-      : ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
+  | Comb_set_one :
+      ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, ('a, 'before) pair, ('a, 'after) pair) comb_set_gadt_witness
@@ -1535,8 +1534,8 @@ type ('arg, 'storage) script =
     }
       -> ('arg, 'storage) script
 
-let manager_kind :
-    type kind. kind internal_operation_contents -> kind Kind.manager = function
+let manager_kind : type kind.
+    kind internal_operation_contents -> kind Kind.manager = function
   | Transaction_to_implicit _ -> Kind.Transaction_manager_kind
   | Transaction_to_implicit_with_ticket _ -> Kind.Transaction_manager_kind
   | Transaction_to_smart_contract _ -> Kind.Transaction_manager_kind
@@ -1948,8 +1947,7 @@ let address_t = Address_t
 
 let bool_t = Bool_t
 
-let pair_t :
-    type a ac b bc.
+let pair_t : type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult
     =
  fun loc l r ->
@@ -1979,8 +1977,7 @@ let pair_int_int_unit_t =
   Pair_t
     (int_t, Pair_t (int_t, unit_t, iu_metadata, YesYes), iiu_metadata, YesYes)
 
-let or_t :
-    type a ac b bc.
+let or_t : type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) or_ ty_ex_c tzresult =
   let open Result_syntax in
   fun loc l r ->
@@ -2109,8 +2106,8 @@ type 'a kinstr_traverse = {
 }
 
 let kinstr_traverse i init f =
-  let rec aux :
-      type ret a s r f. 'accu -> (a, s, r, f) kinstr -> ('accu -> ret) -> ret =
+  let rec aux : type ret a s r f.
+      'accu -> (a, s, r, f) kinstr -> ('accu -> ret) -> ret =
    fun accu t continue ->
     let accu = f.apply accu t in
     let next k =
@@ -2312,8 +2309,7 @@ let kinstr_traverse i init f =
 type 'a ty_traverse = {apply : 't 'tc. 'a -> ('t, 'tc) ty -> 'a}
 
 let ty_traverse =
-  let rec aux :
-      type ret t tc accu.
+  let rec aux : type ret t tc accu.
       accu ty_traverse -> accu -> (t, tc) ty -> (accu -> ret) -> ret =
    fun f accu ty continue ->
     let accu = f.apply accu ty in
@@ -2338,8 +2334,7 @@ let ty_traverse =
     | Big_map_t (cty, ty1, _) ->
         (next2 [@ocaml.tailcall]) f accu cty ty1 continue
     | Contract_t (ty1, _) -> (aux [@ocaml.tailcall]) f accu ty1 continue
-  and next2 :
-      type a ac b bc ret accu.
+  and next2 : type a ac b bc ret accu.
       accu ty_traverse ->
       accu ->
       (a, ac) ty ->
@@ -2421,8 +2416,7 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
            delegate this case to the client. *)
         (return [@ocaml.tailcall]) ()
     | Contract_t (_, _) -> (return [@ocaml.tailcall]) ()
-  and on_bindings :
-      type ret k v vc.
+  and on_bindings : type ret k v vc.
       'accu ->
       k comparable_ty ->
       (v, vc) ty ->
@@ -2466,8 +2460,7 @@ module Typed_contract = struct
     | Typed_zk_rollup _ -> Entrypoint.deposit
 
   module Internal_for_tests = struct
-    let typed_exn :
-        type a ac.
+    let typed_exn : type a ac.
         (a, ac) ty -> Destination.t -> Entrypoint.t -> a typed_contract =
      fun arg_ty destination entrypoint ->
       match (destination, arg_ty) with

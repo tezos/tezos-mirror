@@ -510,8 +510,7 @@ module Scripts = struct
       let open Lwt_result_syntax in
       (* We drop the gas limit as this function is only used for debugging/errors. *)
       let ctxt = Gas.set_unlimited ctxt in
-      let rec unparse_stack :
-          type a s.
+      let rec unparse_stack : type a s.
           (a, s) Script_typed_ir.stack_ty * (a * s) ->
           Script.expr list Environment.Error_monad.tzresult Lwt.t = function
         | Bot_t, (EmptyCell, EmptyCell) -> return_nil
@@ -628,8 +627,7 @@ module Scripts = struct
       let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
       Int (loc, z)
 
-    let rec unparse_ty :
-        type a ac loc.
+    let rec unparse_ty : type a ac loc.
         loc:loc -> (a, ac) ty -> (loc, Script.prim) Micheline.node =
      fun ~loc ty ->
       let return (name, args, annot) = Prim (loc, name, args, annot) in
@@ -740,8 +738,7 @@ module Scripts = struct
             let+ Ex_stack (sty, y, st), ctxt = parse_stack ctxt ~legacy l in
             (Ex_stack (Item_t (ty, sty), x, (y, st)), ctxt)
 
-    let rec unparse_stack :
-        type a s.
+    let rec unparse_stack : type a s.
         context ->
         Script_ir_unparser.unparsing_mode ->
         (a, s) Script_typed_ir.stack_ty ->
@@ -764,8 +761,7 @@ module Scripts = struct
             ((Micheline.strip_locations ty_node, data_node) :: l, ctxt)
   end
 
-  let rec pp_instr_name :
-      type a b c d.
+  let rec pp_instr_name : type a b c d.
       Format.formatter -> (a, b, c, d) Script_typed_ir.kinstr -> unit =
     let open Script_typed_ir in
     let open Format in
@@ -1602,7 +1598,14 @@ module Scripts = struct
         let code = Script.lazy_expr expr in
         let* ( Ex_code
                  (Code
-                   {code; arg_type; storage_type; views; entrypoints; code_size}),
+                    {
+                      code;
+                      arg_type;
+                      storage_type;
+                      views;
+                      entrypoints;
+                      code_size;
+                    }),
                ctxt ) =
           Script_ir_translator.parse_code ~elab_conf ctxt ~code
         in
@@ -3916,7 +3919,8 @@ module Attestation_rights = struct
                 dal_power = _;
               } :
                Consensus_key.power)
-             acc ->
+             acc
+           ->
           {
             delegate;
             consensus_key;
@@ -4076,7 +4080,8 @@ module Validators = struct
                  slots;
                  attesting_power;
                }
-               acc ->
+               acc
+             ->
             let companion_key =
               match consensus_key with
               | Bls _ when aggregate_attestation -> companion_key
