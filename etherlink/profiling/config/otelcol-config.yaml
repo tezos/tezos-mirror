@@ -9,9 +9,19 @@ exporters:
     verbosity: detailed
   otlphttp/tempo:
     endpoint: http://tempo:4318
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tls:
+      insecure: true
 
 processors:
   batch:
+  attributes/loki:
+    actions:
+      - action: insert
+        key: loki.attribute.labels
+        value: event, section
+
 
 service:
   pipelines:
@@ -19,3 +29,7 @@ service:
       receivers: [otlp]
       processors: [batch]
       exporters: [debug, otlphttp/tempo]
+  logs:
+      receivers: [otlp]
+      processors: [attributes/loki]
+      exporters: [loki]

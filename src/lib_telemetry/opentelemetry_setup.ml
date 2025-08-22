@@ -8,7 +8,7 @@
 
 open Opentelemetry
 
-module Events = struct
+module Event = struct
   include Internal_event.Simple
 
   let section = ["opentelemetry"]
@@ -38,23 +38,23 @@ end
 
 let instance_id_filename = "telemetry_id"
 
-let setup ~data_dir ~service_namespace ~service_name
+let setup ~data_dir ~service_namespace ~service_name ?level ?sections
     {Opentelemetry_config.enable; instance_id; config} =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   if enable then (
-    let* instance_id =
+    let*! instance_id =
       match instance_id with
-      | Some id -> return id
+      | Some id -> Lwt.return id
       | None ->
           let file = Filename.concat data_dir instance_id_filename in
-          let* exists = Lwt_unix.file_exists file in
+          let*! exists = Lwt_unix.file_exists file in
           if exists then Lwt_utils_unix.read_file file
           else
             let _, _, id = Tezos_crypto.Crypto_box.random_keypair () in
             let sid = Tezos_crypto.Crypto_box.Public_key_hash.to_b58check id in
-            let* () = Lwt_utils_unix.create_file file sid in
-            let* () = Events.(emit new_instance_id) sid in
-            return sid
+            let*! () = Lwt_utils_unix.create_file file sid in
+            let*! () = Event.(emit new_instance_id) sid in
+            Lwt.return sid
     in
     Globals.service_name := service_name ;
     Globals.service_namespace := Some service_namespace ;
@@ -63,6 +63,8 @@ let setup ~data_dir ~service_namespace ~service_name
       (Opentelemetry_ambient_context_lwt.storage ()) ;
     Opentelemetry_client_cohttp_lwt.setup ~enable ~config () ;
     if Opentelemetry.Collector.has_backend () then
-      Events.(emit enabled) (service_namespace, instance_id)
+      let* () = Events.activate ?level ?sections () in
+      let*! () = Event.(emit enabled) (service_namespace, instance_id) in
+      return_unit
     else return_unit)
   else return_unit

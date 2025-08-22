@@ -6,14 +6,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Set Opentelemetry global options and registers the Lwt compatible ambient
-    context. [?level] and [?sections] are used to specify which events are
-    exported by Opentelemetry as logs. *)
-val setup :
-  data_dir:string ->
-  service_namespace:string ->
-  service_name:string ->
+(** This module implements an event sink (see {!Internal_event}) to emit events
+    as OpenTelemetry logs. *)
+
+(** [activate ?level ?sections ()] activates the event sink for OpenTelemetry
+    logging. [level] indicate the base level for which otel logs will be emitted
+    and [sections] indicate additional level filters based on sections
+    prefixes. *)
+val activate :
   ?level:Internal_event.level ->
   ?sections:(Internal_event.Section.t * Internal_event.level) list ->
-  Opentelemetry_config.t ->
+  unit ->
   unit tzresult Lwt.t

@@ -861,7 +861,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
           operator_list)
       (Purpose.operators_bindings configuration.operators)
   in
-  let*! () = setup_opentelemetry ~data_dir configuration in
+  let* () = setup_opentelemetry ~data_dir configuration in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -1038,7 +1038,7 @@ module Replay = struct
         ~profiling
         ~force_etherlink:false
     in
-    let*! () = setup_opentelemetry ~data_dir configuration in
+    let* () = setup_opentelemetry ~data_dir configuration in
     Node_context_loader.init
       cctxt
       ~data_dir
