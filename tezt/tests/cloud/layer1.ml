@@ -41,7 +41,7 @@ let stresstest_max_pkh_pre_node = 100
 let nb_stresstester network tps =
   let n1 = tps / stresstest_max_tps_pre_node in
   let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
-  max n1 n2
+  max 1 (max n1 n2)
 
 module Node = struct
   open Snapshot_helpers
