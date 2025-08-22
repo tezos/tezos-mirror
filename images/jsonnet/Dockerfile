@@ -1,6 +1,6 @@
 # Grafazos dependencies
 
-FROM debian:bookworm
+FROM debian:trixie
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
