@@ -536,7 +536,12 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 config,
                 included_delayed_transactions,
             )?;
-            Ok(ComputationResult::RebootNeeded)
+
+            if storage::evm_node_flag(safe_host.host)? {
+                Ok(ComputationResult::Finished)
+            } else {
+                Ok(ComputationResult::RebootNeeded)
+            }
         }
         Ok(BlockComputationResult::RebootNeeded) => {
             // The computation will resume at next reboot, we leave the
