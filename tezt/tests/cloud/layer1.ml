@@ -158,7 +158,7 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ~ppx_profiling ~peers ~snapshot ~network
+  let init_bootstrap_node ?stresstest ~ppx_profiling ~peers ~snapshot ~network
       ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
@@ -174,31 +174,45 @@ module Node = struct
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
+        ?rich_accounts:
+          (match stresstest with
+        | None -> None
+        | Some _ -> Some (1, 1_000_000))
+          (* If the stresstest argument is set we try to find an account with at least 1M tez *)
         ~node
         ~client
         ~network:(Network.to_string network)
         yes_wallet
     in
-    let* delegates, consensus_keys =
+    let* delegates, consensus_keys, rich_account_opt =
       let* known_addresses = Client.list_known_addresses client in
       let get_pk alias =
         let* account = Client.show_address ~alias client in
         return account.public_key
       in
-      (Lwt_list.fold_left_s (fun (delegates, consensus_keys) (alias, pkh) ->
-           match alias =~* rex "(\\w+)_consensus_key" with
-           | None ->
-               (* if the alias does not contain "_consensus_key" *)
-               let* pk = get_pk alias in
-               return (String_map.add alias {pkh; pk} delegates, consensus_keys)
-           | Some consensus_key_alias ->
-               (* if the alias match "baker_n_consensus_key" *)
-               let* pk = get_pk alias in
-               return
-                 ( delegates,
-                   String_map.add consensus_key_alias {pkh; pk} consensus_keys
-                 )))
-        (String_map.empty, String_map.empty)
+      (Lwt_list.fold_left_s
+         (fun (delegates, consensus_keys, rich_account_opt) (alias, pkh) ->
+           if alias =~ rex "rich_" then
+             (* if the alias match "rich_n" *)
+             let* pk = get_pk alias in
+             return (delegates, consensus_keys, Some {pkh; pk})
+           else
+             match alias =~* rex "(\\w+)_consensus_key" with
+             | None ->
+                 (* if the alias does not contain "_consensus_key" *)
+                 let* pk = get_pk alias in
+                 return
+                   ( String_map.add alias {pkh; pk} delegates,
+                     consensus_keys,
+                     rich_account_opt )
+             | Some consensus_key_alias ->
+                 (* if the alias match "baker_n_consensus_key" *)
+                 let* pk = get_pk alias in
+                 return
+                   ( delegates,
+                     String_map.add consensus_key_alias {pkh; pk} consensus_keys,
+                     rich_account_opt )))
+        (String_map.empty, String_map.empty, None)
         (List.rev known_addresses)
     in
     let delegates_with_consensus_keys =
@@ -208,7 +222,7 @@ module Node = struct
         delegates
     in
     let* () = Client.forget_all_keys client in
-    Lwt.return (client, delegates_with_consensus_keys)
+    Lwt.return (client, delegates_with_consensus_keys, rich_account_opt)
 
   (** Initialize the node,
       create the associated client,
@@ -266,12 +280,10 @@ module Node = struct
 end
 
 (** Stresstest parameters
-    - [pkh]: public key hash of the account to use as a faucet
-    - [pk]: public key of the account to use as a faucet
     - [tps]: targeted number of transactions per second
     - [seed]: seed used for stresstest traffic generation
  *)
-type stresstest_conf = {pkh : string; pk : string; tps : int; seed : int}
+type stresstest_conf = {tps : int; seed : int}
 
 (** Scenario configuration
 
@@ -332,13 +344,9 @@ let network_encoding =
 let stresstest_encoding =
   let open Data_encoding in
   conv
-    (fun {pkh; pk; tps; seed} -> (pkh, pk, tps, seed))
-    (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-    (obj4
-       (req "pkh" string)
-       (req "pk" string)
-       (req "tps" int31)
-       (req "seed" int31))
+    (fun {tps; seed} -> (tps, seed))
+    (fun (tps, seed) -> {tps; seed})
+    (obj2 (req "tps" int31) (req "seed" int31))
 
 let configuration_encoding =
   let open Data_encoding in
@@ -479,8 +487,9 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
 let init_network ~peers (configuration : configuration) cloud teztale
     ((agent, node, _) as resources) =
   toplog "init_network: Initializing the bootstrap node" ;
-  let* client, delegates =
+  let* client, delegates, rich_account =
     Node.init_bootstrap_node
+      ?stresstest:configuration.stresstest
       ~peers
       ~ppx_profiling:configuration.ppx_profiling
       ~snapshot:configuration.snapshot
@@ -500,7 +509,7 @@ let init_network ~peers (configuration : configuration) cloud teztale
   let bootstrap =
     {agent; node; node_p2p_endpoint = Node.point_str node; client}
   in
-  Lwt.return (bootstrap, delegates)
+  Lwt.return (bootstrap, delegates, rich_account)
 
 (** Reserves resources for later usage. *)
 let agent_and_node next_agent cloud ~name =
@@ -669,7 +678,7 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun (_, node, _) -> Node.point_str node)
       (stresstest_agents @ baker_agents)
   in
-  let* bootstrap, baker_accounts =
+  let* bootstrap, baker_accounts, stresstest_rich_account_opt =
     init_network ~peers configuration cloud teztale bootstrap
   in
   let peers = Node.point_str bootstrap_node :: peers in
@@ -732,9 +741,13 @@ let init ~(configuration : configuration) cloud next_agent =
       distribution
   in
   let* stresstesters =
-    match configuration.stresstest with
-    | None -> Lwt.return_nil
-    | Some {pkh; pk; tps; seed} ->
+    match (configuration.stresstest, stresstest_rich_account_opt) with
+    | None, _ -> Lwt.return_nil
+    | Some _, None ->
+        Test.fail
+          "Stresstest argument was provided but no rich account was found in \
+           the yes wallet"
+    | Some {tps; seed}, Some {pkh; pk} ->
         let tps = tps / nb_stresstester configuration.network tps in
         let* stresstesters =
           (* init stresstest: init node and create accounts *)
@@ -962,9 +975,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let stake = Cli.stake in
     let network = Cli.network in
     let stresstest =
-      Option.map
-        (fun (pkh, pk, tps, seed) -> {pkh; pk; tps; seed})
-        Cli.stresstest
+      Option.map (fun (tps, seed) -> {tps; seed}) Cli.stresstest
     in
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in
