@@ -888,44 +888,30 @@ let craft_dal_attestation ~protocol ?level ?round ?payload_level ~signer
   let* level =
     match level with Some level -> return level | None -> Client.level client
   in
-  let* json =
-    Client.RPC.call_via_endpoint client
-    @@ RPC.get_chain_block_helper_validators
-         ~level
-         ~delegate:signer.Account.public_key_hash
-         ()
+  let* block_payload_hash, round =
+    let block = Option.value payload_level ~default:level |> string_of_int in
+    let* block_payload_hash =
+      Operation.Consensus.get_block_payload_hash ~block client
+    in
+    let* round =
+      match round with
+      | None ->
+          Client.RPC.call_via_endpoint client
+          @@ RPC.get_chain_block_helper_round ~block ()
+      | Some round -> return round
+    in
+    return (block_payload_hash, round)
   in
-  let slots =
-    if Protocol.number protocol >= 024 then
-      JSON.(json |> as_list |> List.hd |-> "delegates" |> as_list)
-    else JSON.as_list json
+  let* slot =
+    Operation.Consensus.get_attestation_slot_opt
+      ~level
+      ~delegate:signer
+      ~protocol
+      client
   in
-  match slots with
-  | [] ->
-      Log.info
-        "[craft_dal_attestation] %s not in TB committee at level %d"
-        signer.public_key_hash
-        level ;
-      none
-  | [validator] ->
-      let slots = JSON.(validator |-> "slots" |> as_list) in
-      let slot = List.hd slots |> JSON.as_int in
-      let* block_payload_hash, round =
-        let block =
-          Option.value payload_level ~default:level |> string_of_int
-        in
-        let* block_payload_hash =
-          Operation.Consensus.get_block_payload_hash ~block client
-        in
-        let* round =
-          match round with
-          | None ->
-              Client.RPC.call_via_endpoint client
-              @@ RPC.get_chain_block_helper_round ~block ()
-          | Some round -> return round
-        in
-        return (block_payload_hash, round)
-      in
+  match slot with
+  | None -> none
+  | Some slot ->
       let* op =
         Operation.Consensus.operation
           ~signer
@@ -939,10 +925,6 @@ let craft_dal_attestation ~protocol ?level ?round ?payload_level ~signer
           client
       in
       some op
-  | _ ->
-      Test.fail
-        ~__LOC__
-        "Unexpected format for get_chain_block_helper_validators RPC"
 
 let craft_dal_attestation_exn ~protocol ?level ?round ?payload_level ~signer
     ~nb_slots availability client =
@@ -9479,9 +9461,6 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
   Log.info "Inject an attestation" ;
   let level = publication_level + lag - 1 in
   (* BLS consensus keys are now activated *)
-  let* slots =
-    Operation.Consensus.get_slots_by_consensus_key ~level ~protocol client
-  in
   let* round = Baker_test.fetch_round client in
   let* branch = Operation.Consensus.get_branch ~attested_level:level client in
   let* block_payload_hash =
@@ -9496,7 +9475,13 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
   let* () =
     Lwt_list.iter_s
       (fun {delegate_key; companion_key} ->
-        let first_slot = Operation.Consensus.first_slot ~slots delegate_key in
+        let* first_slot =
+          Operation.Consensus.get_attestation_slot
+            ~level
+            ~protocol
+            ~delegate:delegate_key
+            client
+        in
         let attestation =
           Operation.Consensus.attestation
             ~dal_attestation

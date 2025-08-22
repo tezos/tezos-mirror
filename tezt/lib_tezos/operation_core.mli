@@ -309,28 +309,37 @@ module Consensus : sig
     Client.t ->
     [`OpHash of string] Lwt.t
 
-  (** Retrieves the attestation slots at [level] by calling the
+  (** Retrieves the attestation rounds at [level] by calling the
       [GET /chains/<chain>/blocks/<block>/helpers/validators] RPC.
       Returns an association list that maps a public key hash to
-      the owned slot list *)
-  val get_slots :
+      the owned rounds list *)
+  val get_rounds :
     level:int ->
     protocol:Protocol.t ->
     Client.t ->
     (string * int list) list Lwt.t
 
-  (** Same as [get_slots] but maps a consensus key to the owned slot list. *)
-  val get_slots_by_consensus_key :
-    level:int ->
-    protocol:Protocol.t ->
-    Client.t ->
-    (string * int list) list Lwt.t
-
-  (** Returns the first slot of the provided delegate in the [slots]
-      association list that describes all attestation rights at some level.
+  (** Returns the attestation slot of the provided delegate.
 
       Causes the test to fail if the delegate is not found. *)
-  val first_slot : slots:(string * int list) list -> Account.key -> int
+  val get_attestation_slot :
+    level:int ->
+    protocol:Protocol.t ->
+    ?delegate:Account.key ->
+    ?consensus_key:Account.key ->
+    Client.t ->
+    int Lwt.t
+
+  (** Returns the attestation slot of the provided delegate.
+
+      Returns None if the delegate is not found. *)
+  val get_attestation_slot_opt :
+    level:int ->
+    protocol:Protocol.t ->
+    ?delegate:Account.key ->
+    ?consensus_key:Account.key ->
+    Client.t ->
+    int option Lwt.t
 
   (** Calls the [GET /chains/<chain>/blocks/<block>/header] RPC and
       extracts the head block's payload hash from the result. *)

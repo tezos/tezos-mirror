@@ -802,8 +802,9 @@ let prequorum_check_levels =
     return @@ JSON.(json |-> "payload_hash" |> as_string)
   in
   let preattest_for ~delegate level =
-    let* slots = Operation.Consensus.get_slots ~level ~protocol client in
-    let slot = Operation.Consensus.first_slot ~slots delegate in
+    let* slot =
+      Operation.Consensus.get_attestation_slot ~level ~protocol ~delegate client
+    in
     let* _ =
       Operation.Consensus.preattest_for
         ~slot
@@ -969,12 +970,6 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let base_level = 9 in
   (* BLS consensus keys are now activated. We feed the node with just enough
      consensus operations for the baker to bake a block at [base_level + 1]. *)
-  let* slots =
-    Operation.Consensus.get_slots_by_consensus_key
-      ~level:base_level
-      ~protocol
-      client
-  in
   let* round = fetch_round client in
   let* branch =
     Operation.Consensus.get_branch ~attested_level:base_level client
@@ -991,7 +986,13 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let dal_attestation = Array.init 16 (fun _ -> true) in
   let* () =
     Operation.Consensus.(
-      let slot = first_slot ~slots consensus_key1 in
+      let* slot =
+        get_attestation_slot
+          ~level:base_level
+          ~protocol
+          ~consensus_key:consensus_key1
+          client
+      in
       let* _ =
         preattest_for
           ~protocol
@@ -1037,8 +1038,14 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun ((delegate, companion_key) : Account.key * Account.key option) ->
-          let slot = first_slot ~slots delegate in
+        fun ((consensus_key, companion_key) : Account.key * Account.key option) ->
+          let* slot =
+            get_attestation_slot
+              ~level:base_level
+              ~protocol
+              ~consensus_key
+              client
+          in
           let* _ =
             attest_for
               ~protocol
@@ -1049,7 +1056,7 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
               ~block_payload_hash
               ~dal_attestation
               ?companion_key
-              delegate
+              consensus_key
               client
           in
           unit)
@@ -1069,12 +1076,6 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
      power to trigger a prequorum. Consequently, the baker is expected to lock
      on the preattested payload and only bake reproposals. *)
   let* () =
-    let* slots =
-      Operation.Consensus.get_slots_by_consensus_key
-        ~level:(base_level + 1)
-        ~protocol
-        client
-    in
     let* round = fetch_round client in
     let* branch =
       Operation.Consensus.get_branch ~attested_level:(base_level + 1) client
@@ -1089,8 +1090,14 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
       branch ;
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun (delegate : Account.key) ->
-          let slot = first_slot ~slots delegate in
+        fun (consensus_key : Account.key) ->
+          let* slot =
+            get_attestation_slot
+              ~level:(base_level + 1)
+              ~protocol
+              ~consensus_key
+              client
+          in
           let* _ =
             preattest_for
               ~protocol
@@ -1099,7 +1106,7 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
               ~level:(base_level + 1)
               ~round
               ~block_payload_hash
-              delegate
+              consensus_key
               client
           in
           unit)
@@ -1113,8 +1120,14 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun ((delegate, companion_key) : Account.key * Account.key option) ->
-          let slot = first_slot ~slots delegate in
+        fun ((consensus_key, companion_key) : Account.key * Account.key option) ->
+          let* slot =
+            get_attestation_slot
+              ~level:base_level
+              ~protocol
+              ~consensus_key
+              client
+          in
           let* _ =
             attest_for
               ~protocol
@@ -1125,7 +1138,7 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
               ~block_payload_hash
               ~dal_attestation
               ?companion_key
-              delegate
+              consensus_key
               client
           in
           unit)
