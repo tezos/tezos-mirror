@@ -45,6 +45,7 @@ type attester = Plugin.RPC.Validators.delegate = {
   companion_key : Signature.Bls.Public_key_hash.t option;
   slots : Slot.t list;
   attesting_power : int64;
+  attestation_slot : Slot.t;
 }
 
 (** Retrieves the attesting rights at the level of the given context

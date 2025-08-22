@@ -104,6 +104,7 @@ type ordered_slots = {
   companion_key : Bls.Public_key_hash.t option;
   slots : Slot.t list;
   attesting_power : int64;
+  attestation_slot : Slot.t;
 }
 
 (* Slots returned by this function are assumed by consumers to be in increasing
@@ -145,8 +146,15 @@ let attesting_rights (ctxt : t) level =
                       slots = [slot];
                       attesting_power = 0L;
                       (* Updated after, once all the slots are attributed *)
+                      attestation_slot = slot;
                     }
-              | Some slots -> Some {slots with slots = slot :: slots.slots})
+              | Some info ->
+                  Some
+                    {
+                      info with
+                      slots = slot :: info.slots;
+                      attestation_slot = slot;
+                    })
             map
         in
         return (ctxt, map))
@@ -157,6 +165,7 @@ let attesting_rights (ctxt : t) level =
     Signature.Public_key_hash.Map.map
       (fun ({slots; delegate; _} as t) ->
         if all_bakers_attest_enabled then
+          (* TODO ABAAB: correct slot *)
           let attesting_power =
             Option.value ~default:0L
             @@ Signature.Public_key_hash.Map.find delegate attesting_power_map
