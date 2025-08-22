@@ -361,7 +361,8 @@
       "max_transaction_batch_length"?:
         integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
       "max_lifespan"?: integer ∈ [-2^30, 2^30],
-      "tx_per_addr_limit"?: $int64 } }
+      "tx_per_addr_limit"?: $int64 },
+  "performance_profile"?: "performance" | "default" }
 $bignum:
   /* Big number
      Decimal representation of a big number */
