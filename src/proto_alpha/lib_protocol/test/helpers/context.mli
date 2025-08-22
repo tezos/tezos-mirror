@@ -43,7 +43,7 @@ type attester = Plugin.RPC.Validators.delegate = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
   companion_key : Signature.Bls.Public_key_hash.t option;
-  slots : Slot.t list;
+  rounds : Round.t list;
   attesting_power : int64;
   attestation_slot : Slot.t;
 }
@@ -64,7 +64,7 @@ val get_attester : ?manager_pkh:public_key_hash -> t -> attester tzresult Lwt.t
 val get_first_different_attesters : t -> (attester * attester) tzresult Lwt.t
 
 (** Return the [n]th element of the list returns by [get_attesters]. *)
-val get_attester_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
+val get_attester_n : t -> int -> (public_key_hash * Round.t list) tzresult Lwt.t
 
 (** Whether the {!type-attester}'s **consensus key** is a BLS key. *)
 val attester_has_bls_key : attester -> bool
@@ -81,12 +81,12 @@ val get_attester_with_bls_key : t -> attester tzresult Lwt.t
     in the requested level. If ommited, [level] defaults to the next
     level. *)
 val get_attesting_power_for_delegate :
-  t -> ?level:Raw_level.t -> public_key_hash -> int tzresult Lwt.t
+  t -> ?level:Raw_level.t -> public_key_hash -> int64 tzresult Lwt.t
 
 (** Sums the result of [get_attesting_power_for_delegate] over a list
     of levels. *)
 val get_cumulated_attesting_power_for_delegate :
-  t -> levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
+  t -> levels:Raw_level.t list -> public_key_hash -> int64 tzresult Lwt.t
 
 val get_current_voting_power :
   t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t

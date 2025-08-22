@@ -74,7 +74,8 @@ type 'kind aggregate =
   | Preattestation : Alpha_context.Kind.preattestations_aggregate aggregate
   | Attestation : Alpha_context.Kind.attestations_aggregate aggregate
 
-let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
+let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
+    ~level
     (result : kind Tezos_protocol_alpha__Protocol.Apply_results.contents_result)
     =
   let open Lwt_result_syntax in
@@ -104,31 +105,36 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
         let voting_power =
           List.fold_left
             (fun acc (delegate : RPC.Validators.delegate) ->
-              List.length delegate.slots + acc)
-            0
+              Int64.add delegate.attesting_power acc)
+            0L
             attesters
         in
         let total_consensus_power =
-          Alpha_context.Attesting_power.get_slots total_consensus_power
+          Alpha_context.Attesting_power.get ctxt level total_consensus_power
         in
-        if voting_power = total_consensus_power then return_unit
+        if Int64.equal voting_power total_consensus_power then return_unit
         else
           Test.fail
-            "Wrong voting power : expected %d, found %d"
+            "Wrong voting power : expected %Ld, found %Ld"
             voting_power
             total_consensus_power
       in
       (* Check committee *)
       let expected_committee =
         List.map
-          (fun {Context.delegate; consensus_key = consensus_pkh; slots; _} ->
-            let power = List.length slots in
-            ({Alpha_context.Consensus_key.delegate; consensus_pkh}, power))
+          (fun {
+                 Context.delegate;
+                 consensus_key = consensus_pkh;
+                 attesting_power;
+                 _;
+               } ->
+            ( {Alpha_context.Consensus_key.delegate; consensus_pkh},
+              attesting_power ))
           attesters
       in
       let resulting_committee =
         List.map
-          (fun (a, b) -> (a, Alpha_context.Attesting_power.get_slots b))
+          (fun (a, b) -> (a, Alpha_context.Attesting_power.get ctxt level b))
           resulting_committee
       in
       if
@@ -139,7 +145,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
              ->
             Signature.Public_key_hash.equal d1 d2
             && Signature.Public_key_hash.equal c1 c2
-            && Int.equal power1 power2)
+            && Int64.equal power1 power2)
           resulting_committee
           expected_committee
       then return_unit
@@ -148,7 +154,7 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters
           Format.pp_print_list (fun fmt (consensus_key, power) ->
               Format.fprintf
                 fmt
-                "%a with power %d"
+                "%a with power %Ld"
                 Alpha_context.Consensus_key.pp
                 consensus_key
                 power)
@@ -229,8 +235,14 @@ let check_preattestations_aggregate_validation_and_application ~loc ~attesters
   in
   match error with
   | None ->
-      let*? block_with_metadata = res in
-      check_after_preattestations_aggregate ~attesters block_with_metadata
+      let*? ((b, _) as block_with_metadata) = res in
+      let* ctxt = Block.get_alpha_ctxt b in
+      let level = Alpha_context.Level.current ctxt in
+      check_after_preattestations_aggregate
+        ~attesters
+        ~ctxt
+        ~level
+        block_with_metadata
   | Some error -> Assert.proto_error ~loc res error
 
 (** Tests the validation and application of an attestations_aggregate.
@@ -256,9 +268,11 @@ let check_attestations_aggregate_validation_and_application ~loc ~attesters
     | None -> List.map Op.attesting_slot_of_attester attesters
   in
   let* operation = Op.attestations_aggregate ~committee attested_block in
+  let* ctxt = Block.get_alpha_ctxt attested_block in
+  let level = Alpha_context.Level.current ctxt in
   let check_after_block_mode =
     match error with
-    | None -> Some (check_after_attestations_aggregate ~attesters)
+    | None -> Some (check_after_attestations_aggregate ~ctxt ~level ~attesters)
     | Some _ -> None
   in
   Op.check_validation_and_application_all_modes_different_outcomes
@@ -382,7 +396,7 @@ let test_non_canonical_slot () =
     | x1 :: x2 :: _ -> (x1, x2)
     | _ -> Test.fail ~__LOC__ "Expected at least two attesters with BLS key"
   in
-  let non_canonical_attesting_slot =
+  let* non_canonical_attesting_slot =
     Op.non_canonical_attesting_slot_of_attester attester
   in
   let other_attesters_canonical_slot =
@@ -438,8 +452,7 @@ let test_not_owned_slot () =
   let wrong_attesting_slot =
     {
       Op.consensus_pkh = attester.consensus_key;
-      slot =
-        WithExceptions.Option.get ~loc:__LOC__ (List.hd third_attester.slots);
+      slot = third_attester.attestation_slot;
     }
   in
   let other_attesters_canonical_slot =
@@ -982,15 +995,20 @@ let test_preattestation_signature_for_attestation_bls () =
   test_preattestation_signature_for_attestation ~attesting_slot ~attested_block
 
 let test_signature_bls_attestation_with_different_slot () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* _genesis, block =
     init_genesis_with_some_bls_accounts ~aggregate_attestation:true ()
   in
   let* attester = Context.get_attester_with_bls_key (B block) in
   let consensus_pkh = attester.consensus_key in
-  let slot1, slot2 =
-    match attester.slots with
-    | slot1 :: slot2 :: _ -> (slot1, slot2)
+  let* csts = Context.get_constants (B block) in
+  let committee_size = csts.parametric.consensus_committee_size in
+  let* slot1, slot2 =
+    match attester.rounds with
+    | round1 :: round2 :: _ ->
+        let*?@ slot1 = Alpha_context.Round.to_slot ~committee_size round1 in
+        let*?@ slot2 = Alpha_context.Round.to_slot ~committee_size round2 in
+        return (slot1, slot2)
     | _ -> Test.fail ~__LOC__ "Delegate must have at least two slots"
   in
   let* op_attestation1 =

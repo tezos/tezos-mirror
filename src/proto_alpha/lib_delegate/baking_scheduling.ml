@@ -296,21 +296,19 @@ let first_potential_round ~committee_size ~owned_slots ~earliest_round =
      within the range [0 ... committee_size], look for the first subsequent slot
      we own, and finally translate it back to a round by restoring the original
      offset. *)
-  (* TODO https://gitlab.com/tezos/tezos/-/issues/7931
-     The use of Round.to_slot should be avoided *)
-  let*? earliest_slot = Round.to_slot ~committee_size earliest_round in
-  let*? earliest_round = Round.to_int earliest_round in
-  let period_offset = earliest_round / committee_size in
-  match Delegate_infos.find_first_slot_from owned_slots ~slot:earliest_slot with
-  | Some (slot, delegate) ->
-      let slot = Slot.to_int slot in
-      let*? round = Round.of_int (slot + (committee_size * period_offset)) in
+  let*? earliest_round_int = Round.to_int earliest_round in
+  let period_offset = earliest_round_int / committee_size in
+  let*? round_rem = Round.of_int (earliest_round_int mod committee_size) in
+  match Delegate_infos.find_first_round_from owned_slots ~round:round_rem with
+  | Some (round, delegate) ->
+      let*? round = Round.to_int round in
+      let*? round = Round.of_int (round + (committee_size * period_offset)) in
       Some (round, delegate.delegate)
   | None ->
-      let* slot, delegate = Delegate_infos.min_slot owned_slots in
-      let slot = Slot.to_int slot in
+      let* round, delegate = Delegate_infos.min_round owned_slots in
+      let*? round = Round.to_int round in
       let*? round =
-        Round.of_int (slot + (committee_size * (1 + period_offset)))
+        Round.of_int (round + (committee_size * (1 + period_offset)))
       in
       Some (round, delegate.delegate)
 
@@ -944,7 +942,7 @@ let try_resolve_consensus_keys cctxt key =
                         delegate;
                         consensus_key = _;
                         companion_key = _;
-                        slots = _;
+                        rounds = _;
                         attesting_power = _;
                         attestation_slot = _;
                       }

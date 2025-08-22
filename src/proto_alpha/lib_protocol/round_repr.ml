@@ -106,6 +106,10 @@ let to_slot round ~committee_size =
   let slot = r mod committee_size in
   Slot_repr.of_int slot
 
+let of_slot slot =
+  let s = Slot_repr.to_int slot in
+  of_int s
+
 let encoding =
   Data_encoding.conv_with_guard
     (fun i -> i)

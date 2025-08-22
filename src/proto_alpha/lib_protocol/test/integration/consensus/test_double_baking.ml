@@ -356,17 +356,12 @@ let test_payload_producer_gets_evidence_rewards () =
     Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
   in
   let* attesters = Context.get_attesters (B b_with_evidence) in
-  let* preattesters =
-    List.map_es
-      (function
-        | {Plugin.RPC.Validators.delegate; slots; _} -> return (delegate, slots))
-      attesters
-  in
   let* preattestations =
     List.map_ep
-      (fun (attester, _slots) ->
-        Op.preattestation ~manager_pkh:attester b_with_evidence)
-      preattesters
+      (function
+        | {Plugin.RPC.Validators.delegate; _} ->
+            Op.preattestation ~manager_pkh:delegate b_with_evidence)
+      attesters
   in
   let* b' =
     Block.bake

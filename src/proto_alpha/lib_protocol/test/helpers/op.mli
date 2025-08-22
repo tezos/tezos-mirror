@@ -91,7 +91,7 @@ val get_different_attesting_slot :
     its second-smallest slot (that is, a non-canonical slot that still
     belongs to the attester). *)
 val non_canonical_attesting_slot_of_attester :
-  Context.attester -> attesting_slot
+  Context.attester -> attesting_slot tzresult Lwt.t
 
 (** Retrieves the first attester returned by
     {!Plugin.RPC.Validators.S.validators} and builds a non-canonical

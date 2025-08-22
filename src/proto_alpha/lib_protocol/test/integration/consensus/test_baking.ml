@@ -237,8 +237,8 @@ let test_rewards_block_and_payload_producer () =
   let attesting_power =
     List.fold_left
       (fun acc attester ->
-        acc + List.length attester.Plugin.RPC.Validators.slots)
-      0
+        Int64.add acc attester.Plugin.RPC.Validators.attesting_power)
+      0L
       attesters
   in
   let fee = Tez.one in
@@ -255,6 +255,8 @@ let test_rewards_block_and_payload_producer () =
     Context.Delegate.current_frozen_deposits (B b2) baker_b2
   in
   let* baking_reward = Context.get_baking_reward_fixed_portion (B b2) in
+  (* TODO ABAAB: get correct rewards *)
+  let attesting_power = Int64.to_int attesting_power in
   let* bonus_reward = Context.get_bonus_reward (B b2) ~attesting_power in
   let* reward_for_b1 =
     if Signature.Public_key_hash.equal baker_b2 baker_b1 then

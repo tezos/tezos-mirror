@@ -102,7 +102,7 @@ type ordered_slots = {
   delegate : Signature.public_key_hash;
   consensus_key : Signature.public_key_hash;
   companion_key : Bls.Public_key_hash.t option;
-  slots : Slot.t list;
+  rounds : Round.t list;
   attesting_power : int64;
   attestation_slot : Slot.t;
 }
@@ -130,6 +130,7 @@ let attesting_rights (ctxt : t) level =
   let* ctxt, map =
     Slot.Range.rev_fold_es
       (fun (ctxt, map) slot ->
+        let*? round = Round.of_slot slot in
         let* ctxt, consensus_pk =
           Stake_distribution.slot_owner ctxt level slot
         in
@@ -143,7 +144,7 @@ let attesting_rights (ctxt : t) level =
                       delegate = consensus_pk.delegate;
                       consensus_key = consensus_pk.consensus_pkh;
                       companion_key = consensus_pk.companion_pkh;
-                      slots = [slot];
+                      rounds = [round];
                       attesting_power = 0L;
                       (* Updated after, once all the slots are attributed *)
                       attestation_slot = slot;
@@ -152,7 +153,7 @@ let attesting_rights (ctxt : t) level =
                   Some
                     {
                       info with
-                      slots = slot :: info.slots;
+                      rounds = round :: info.rounds;
                       attestation_slot = slot;
                     })
             map
@@ -163,7 +164,7 @@ let attesting_rights (ctxt : t) level =
   in
   let map =
     Signature.Public_key_hash.Map.map
-      (fun ({slots; delegate; _} as t) ->
+      (fun ({rounds; delegate; _} as t) ->
         if all_bakers_attest_enabled then
           (* TODO ABAAB: correct slot *)
           let attesting_power =
@@ -171,7 +172,7 @@ let attesting_rights (ctxt : t) level =
             @@ Signature.Public_key_hash.Map.find delegate attesting_power_map
           in
           {t with attesting_power}
-        else {t with attesting_power = List.length slots |> Int64.of_int})
+        else {t with attesting_power = List.length rounds |> Int64.of_int})
       map
   in
   return (ctxt, map)

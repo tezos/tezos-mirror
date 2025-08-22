@@ -338,6 +338,8 @@ module Round : sig
 
   val to_slot : t -> committee_size:int -> Slot.t tzresult
 
+  val of_slot : Slot.t -> t tzresult
+
   val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t

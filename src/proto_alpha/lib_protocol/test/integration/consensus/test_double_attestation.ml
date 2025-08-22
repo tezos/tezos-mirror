@@ -254,21 +254,27 @@ let test_different_branch () =
     operations have distinct slots (that both belong to the delegate)
     and are otherwise identical. *)
 let test_different_slots () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
+  (* TODO ABAAB: doesn't work with ABAAB *)
   let* genesis, _contracts = Context.init2 ~consensus_threshold_size:0 () in
   let* blk = Block.bake genesis in
   let* attesters = Context.get_attesters (B blk) in
-  let consensus_pkh, slot1, slot2 =
+  let* csts = Context.get_constants (B blk) in
+  let committee_size = csts.parametric.consensus_committee_size in
+  let consensus_pkh, round1, round2 =
     (* Find an attester with more than 1 slot. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
          (fun (attester : RPC.Validators.delegate) ->
-           match attester.slots with
-           | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
+           match attester.rounds with
+           | round1 :: round2 :: _ ->
+               Some (attester.consensus_key, round1, round2)
            | _ -> None)
          attesters)
   in
+  let*?@ slot1 = Round.to_slot ~committee_size round1 in
+  let*?@ slot2 = Round.to_slot ~committee_size round2 in
   let attesting_slot1 = {Op.slot = slot1; consensus_pkh} in
   let attesting_slot2 = {Op.slot = slot2; consensus_pkh} in
   let* attestation1 = Op.raw_attestation ~attesting_slot:attesting_slot1 blk in
@@ -977,23 +983,29 @@ let test_two_double_attestation_evidences_leads_to_duplicate_denunciation () =
     feature flag when operations have distinct slots and are otherwise
     identical. *)
 let different_slots_under_feature_flag () =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
+  (* TODO ABAAB: doesn't work with ABAAB *)
   let* genesis, _ =
     Context.init2 ~consensus_threshold_size:0 ~aggregate_attestation:true ()
   in
   let* block = Block.bake genesis in
   let* attesters = Context.get_attesters (B block) in
-  let consensus_pkh, slot1, slot2 =
+  let* csts = Context.get_constants (B block) in
+  let committee_size = csts.parametric.consensus_committee_size in
+  let consensus_pkh, round1, round2 =
     (* Find an attester with more than 1 slot. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
          (fun (attester : RPC.Validators.delegate) ->
-           match attester.slots with
-           | slot1 :: slot2 :: _ -> Some (attester.consensus_key, slot1, slot2)
+           match attester.rounds with
+           | round1 :: round2 :: _ ->
+               Some (attester.consensus_key, round1, round2)
            | _ -> None)
          attesters)
   in
+  let*?@ slot1 = Round.to_slot ~committee_size round1 in
+  let*?@ slot2 = Round.to_slot ~committee_size round2 in
   let attesting_slot1 = {Op.slot = slot1; consensus_pkh} in
   let attesting_slot2 = {Op.slot = slot2; consensus_pkh} in
   let* attestation1 =

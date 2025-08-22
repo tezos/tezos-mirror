@@ -126,6 +126,8 @@ let block_info_encoding =
 
 module SlotMap : Map.S with type key = Slot.t = Map.Make (Slot)
 
+module RoundMap : Map.S with type key = Round.t = Map.Make (Round)
+
 type delegate_info = {
   delegate : Delegate.t;
   first_slot : Slot.t;
@@ -133,11 +135,10 @@ type delegate_info = {
 }
 
 module Delegate_infos = struct
-  (* Note that we also use the delegate slots as proposal slots. *)
   type t = {
     own_delegates : delegate_info list;
-    own_delegate_slots : delegate_info SlotMap.t;
-        (* This map cannot have as keys just the first slot of delegates,
+    own_delegate_rounds : delegate_info RoundMap.t;
+        (* This map cannot have as keys just the first round of delegates,
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
     all_delegate_voting_power : int64 SlotMap.t;
@@ -155,24 +156,22 @@ module Delegate_infos = struct
     consensus_committee : int64;
   }
 
-  let own_delegates slots = slots.own_delegates
+  let own_delegates t = t.own_delegates
 
-  let own_slot_owner slots ~slot = SlotMap.find slot slots.own_delegate_slots
-
-  let find_first_slot_from slots ~slot =
-    SlotMap.find_first (fun s -> Slot.(s >= slot)) slots.own_delegate_slots
-
-  let min_slot slots = SlotMap.min_binding slots.own_delegate_slots
-
-  let own_round_owner slots ~committee_size ~round =
+  let own_round_owner t ~committee_size ~round =
     let open Result_syntax in
-    let* slot =
-      Round.to_slot ~committee_size round |> Environment.wrap_tzresult
+    let* round_int = Round.to_int round |> Environment.wrap_tzresult in
+    let* round_rem =
+      Round.of_int (round_int mod committee_size) |> Environment.wrap_tzresult
     in
-    return @@ SlotMap.find slot slots.own_delegate_slots
+    return @@ RoundMap.find round_rem t.own_delegate_rounds
 
-  let voting_power slots ~slot =
-    SlotMap.find slot slots.all_delegate_voting_power
+  let find_first_round_from t ~round =
+    RoundMap.find_first (fun s -> Round.(s >= round)) t.own_delegate_rounds
+
+  let min_round t = RoundMap.min_binding t.own_delegate_rounds
+
+  let voting_power t ~slot = SlotMap.find slot t.all_delegate_voting_power
 
   let consensus_threshold {consensus_threshold; _} = consensus_threshold
 
@@ -956,38 +955,45 @@ let delegate_infos attesting_rights delegates =
    };
   ] ->
       let* ( own_delegate_first_slots,
-             own_delegate_slots,
+             own_delegate_rounds,
              all_delegate_voting_power ) =
         Lwt_list.fold_left_s
           (fun (own_list, own_map, all_map) validator ->
-            let {Plugin.RPC.Validators.slots; attesting_power; _} = validator in
-            let first_slot = Stdlib.List.hd slots in
-            let attesting_power = attesting_power in
-            let all_map = SlotMap.add first_slot attesting_power all_map in
+            let {
+              Plugin.RPC.Validators.rounds;
+              attesting_power;
+              attestation_slot;
+              _;
+            } =
+              validator
+            in
+            let all_map =
+              SlotMap.add attestation_slot attesting_power all_map
+            in
             let* own_list, own_map =
               let* delegate_opt = Delegate.of_validator ~known_keys validator in
               match delegate_opt with
               | None -> return (own_list, own_map)
               | Some delegate ->
                   let attesting_slot =
-                    {delegate; first_slot; attesting_power}
+                    {delegate; first_slot = attestation_slot; attesting_power}
                   in
                   return
                     ( attesting_slot :: own_list,
                       List.fold_left
-                        (fun own_map slot ->
-                          SlotMap.add slot attesting_slot own_map)
+                        (fun own_map round ->
+                          RoundMap.add round attesting_slot own_map)
                         own_map
-                        slots )
+                        rounds )
             in
             return (own_list, own_map, all_map))
-          ([], SlotMap.empty, SlotMap.empty)
+          ([], RoundMap.empty, SlotMap.empty)
           attesting_rights
       in
       return
         {
           Delegate_infos.own_delegates = own_delegate_first_slots;
-          own_delegate_slots;
+          own_delegate_rounds;
           all_delegate_voting_power;
           consensus_threshold;
           consensus_committee;
@@ -1184,29 +1190,32 @@ let pp_delegate_info fmt {delegate; first_slot; attesting_power} =
     attesting_power
 
 (* this type is only used below for pretty-printing *)
-type delegate_infos_for_pp = {attester : Delegate.t; all_slots : Slot.t list}
+type delegate_infos_for_pp = {attester : Delegate.t; all_rounds : Round.t list}
 
 let delegate_infos_for_pp delegate_info_map =
-  SlotMap.fold
-    (fun slot {delegate; first_slot; attesting_power = _} acc ->
+  RoundMap.fold
+    (fun round {delegate; first_slot; attesting_power = _} acc ->
       match SlotMap.find first_slot acc with
       | None ->
-          SlotMap.add first_slot {attester = delegate; all_slots = [slot]} acc
-      | Some {attester; all_slots} ->
-          SlotMap.add first_slot {attester; all_slots = slot :: all_slots} acc)
+          SlotMap.add first_slot {attester = delegate; all_rounds = [round]} acc
+      | Some {attester; all_rounds} ->
+          SlotMap.add
+            first_slot
+            {attester; all_rounds = round :: all_rounds}
+            acc)
     delegate_info_map
     SlotMap.empty
-  |> SlotMap.map (fun {attester; all_slots} ->
-         {attester; all_slots = List.rev all_slots})
+  |> SlotMap.map (fun {attester; all_rounds} ->
+         {attester; all_rounds = List.rev all_rounds})
 
-let pp_delegate_infos fmt (Delegate_infos.{own_delegate_slots; _} as t) =
+let pp_delegate_infos fmt (Delegate_infos.{own_delegate_rounds; _} as t) =
   Format.fprintf
     fmt
     "@[<v>%a@]"
     Format.(
       pp_print_list
         ~pp_sep:pp_print_cut
-        (fun fmt (first_slot, {attester; all_slots}) ->
+        (fun fmt (first_slot, {attester; all_rounds}) ->
           Format.fprintf
             fmt
             "attester: %a, power: %Ld, first 10 slots: %a"
@@ -1216,9 +1225,10 @@ let pp_delegate_infos fmt (Delegate_infos.{own_delegate_slots; _} as t) =
             @@ Delegate_infos.voting_power t ~slot:first_slot)
             (Format.pp_print_list
                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ",")
-               Slot.pp)
-            (List.filteri (fun i _ -> i < 10) all_slots)))
-    (SlotMap.bindings (delegate_infos_for_pp own_delegate_slots))
+               pp_print_int)
+            (List.filteri (fun i _ -> i < 10) all_rounds
+            |> List.map (fun x -> Round.to_int32 x |> Int32.to_int))))
+    (SlotMap.bindings (delegate_infos_for_pp own_delegate_rounds))
 
 let pp_prepared_block fmt {signed_block_header; delegate; _} =
   Format.fprintf
@@ -1250,7 +1260,7 @@ let pp_level_state fmt
     fmt
     "@[<v 2>Level state:@ current level: %ld@ @[<v 2>proposal (applied:%b):@ \
      %a@]@ locked round: %a@ attestable payload: %a@ elected block: %a@ @[<v \
-     2>own delegate slots:@ %a@]@ @[<v 2>next level own delegate slots:@ %a@]@ \
+     2>own delegate infos:@ %a@]@ @[<v 2>next level own delegate infos:@ %a@]@ \
      next level proposed round: %a@]"
     current_level
     is_latest_proposal_applied

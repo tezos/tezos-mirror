@@ -3987,7 +3987,7 @@ module Validators = struct
     delegate : Signature.Public_key_hash.t;
     consensus_key : Signature.public_key_hash;
     companion_key : Bls.Public_key_hash.t option;
-    slots : Slot.t list;
+    rounds : Round.t list;
     attesting_power : int64;
     attestation_slot : Slot.t;
   }
@@ -4006,18 +4006,18 @@ module Validators = struct
              delegate;
              consensus_key;
              companion_key;
-             slots;
+             rounds;
              attesting_power;
              attestation_slot;
            } ->
         ( delegate,
-          slots,
+          rounds,
           consensus_key,
           companion_key,
           attesting_power,
           attestation_slot ))
       (fun ( delegate,
-             slots,
+             rounds,
              consensus_key,
              companion_key,
              attesting_power,
@@ -4026,13 +4026,13 @@ module Validators = struct
           delegate;
           consensus_key;
           companion_key;
-          slots;
+          rounds;
           attesting_power;
           attestation_slot;
         })
       (obj6
          (req "delegate" Signature.Public_key_hash.encoding)
-         (req "slots" (list Slot.encoding))
+         (req "rounds" (list Round.encoding))
          (req "consensus_key" Signature.Public_key_hash.encoding)
          (opt "companion_key" Bls.Public_key_hash.encoding)
          (req "attesting_power" int64)
@@ -4103,7 +4103,7 @@ module Validators = struct
                  Baking.delegate;
                  consensus_key;
                  companion_key;
-                 slots;
+                 rounds;
                  attesting_power;
                  attestation_slot;
                }
@@ -4118,7 +4118,7 @@ module Validators = struct
               delegate;
               consensus_key;
               companion_key;
-              slots;
+              rounds;
               attesting_power;
               attestation_slot;
             }

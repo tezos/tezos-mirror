@@ -46,11 +46,6 @@ module Delegate_infos : sig
   val own_delegates : t -> delegate_info list
 
   (** Returns, among our *own* delegates, the delegate (together with its
-      first attesting slot) that owns the given slot, if any (even if the
-      given slot is not the delegate's first slot). *)
-  val own_slot_owner : t -> slot:Slot.t -> delegate_info option
-
-  (** Returns, among our *own* delegates, the delegate (together with its
       first attesting slot) that owns the given round, if any. *)
   val own_round_owner :
     t -> committee_size:int -> round:Round.t -> delegate_info option tzresult
@@ -59,14 +54,15 @@ module Delegate_infos : sig
       slot. Returns [None] if the slot is not the first slot of any delegate. *)
   val voting_power : t -> slot:Slot.t -> int64 option
 
-  (** Finds the first slot greater than or equal to [slot]. Returns the
-     corresponding (slot, delegate) pair if found, or [None] if no such slot
+  (** Finds the first round greater than or equal to [round]. Returns the
+     corresponding (round, delegate) pair if found, or [None] if no such round
      exist. *)
-  val find_first_slot_from : t -> slot:Slot.t -> (Slot.t * delegate_info) option
+  val find_first_round_from :
+    t -> round:Round.t -> (Round.t * delegate_info) option
 
-  (** Returns the slot with the smallest index, along with its associated
+  (** Returns the round with the smallest index, along with its associated
       delegate. Returns [None] if the map is empty. *)
-  val min_slot : t -> (Slot.t * delegate_info) option
+  val min_round : t -> (Round.t * delegate_info) option
 
   (** Returns the consensus threshold at the level the slots were computed *)
   val consensus_threshold : t -> int64

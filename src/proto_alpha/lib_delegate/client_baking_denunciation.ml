@@ -195,11 +195,10 @@ let get_validator_rights state cctxt level =
       | [{delegates = validators; _}] ->
           let validators =
             List.fold_left
-              (fun acc ({consensus_key; slots; _} : RPC.Validators.delegate) ->
-                List.fold_left
-                  (fun acc slot -> Slot.Map.add slot consensus_key acc)
-                  acc
-                  slots)
+              (fun acc
+                   ({consensus_key; attestation_slot; _} :
+                     RPC.Validators.delegate) ->
+                Slot.Map.add attestation_slot consensus_key acc)
               Slot.Map.empty
               validators
           in

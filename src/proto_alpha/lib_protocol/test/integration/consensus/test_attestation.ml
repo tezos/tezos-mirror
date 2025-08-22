@@ -103,26 +103,32 @@ let test_fitness_gap () =
 
 (** Return a delegate and its second smallest slot for the level of [block]. *)
 let delegate_and_second_slot block =
-  let open Lwt_result_syntax in
+  let open Lwt_result_wrap_syntax in
   let* attesters = Context.get_attesters (B block) in
-  let delegate, slots =
-    (* Find an attester with more than 1 slot. *)
+  let* csts = Context.get_constants (B block) in
+  let committee_size = csts.parametric.consensus_committee_size in
+  let delegate, rounds =
+    (* Find an attester with more than 1 round. *)
     WithExceptions.Option.get
       ~loc:__LOC__
       (List.find_map
-         (fun {RPC.Validators.delegate; slots; _} ->
-           if Compare.List_length_with.(slots > 1) then Some (delegate, slots)
+         (fun {RPC.Validators.delegate; rounds; _} ->
+           if Compare.List_length_with.(rounds > 1) then Some (delegate, rounds)
            else None)
          attesters)
   in
-  (* Check that the slots are sorted and have no duplicates. *)
+  (* Check that the rounds are sorted and have no duplicates. *)
   let rec check_sorted = function
     | [] | [_] -> true
-    | x :: (y :: _ as t) -> Slot.compare x y < 0 && check_sorted t
+    | x :: (y :: _ as t) -> Round.compare x y < 0 && check_sorted t
   in
-  assert (check_sorted slots) ;
-  let slot =
-    match slots with [] | [_] -> assert false | _ :: slot :: _ -> slot
+  assert (check_sorted rounds) ;
+  let* slot =
+    match rounds with
+    | [] | [_] -> assert false
+    | _ :: round :: _ ->
+        let*?@ slot = Round.to_slot ~committee_size round in
+        return slot
   in
   return (delegate, slot)
 
@@ -179,9 +185,8 @@ let attesting_slot_with_someone_elses_slot block =
   let* attesters = Context.get_attesters (B block) in
   match attesters with
   | [] | [_] -> Test.fail ~__LOC__ "Expected at least two delegates with rights"
-  | {consensus_key = consensus_pkh; _} :: {slots; _} :: _ ->
-      let slot = WithExceptions.Option.get ~loc:__LOC__ (List.hd slots) in
-      return {Op.slot; consensus_pkh}
+  | {consensus_key = consensus_pkh; _} :: {attestation_slot; _} :: _ ->
+      return {Op.slot = attestation_slot; consensus_pkh}
 
 (** Attestation with a slot that does not belong to the delegate. *)
 let test_not_own_slot () =
@@ -591,17 +596,19 @@ let test_attestation_threshold ~sufficient_threshold () =
      about 1 slot so we can get closer to the limit of [consensus_threshold_size]: we
      check that a block with attesting power [consensus_threshold_size - 1] won't be
      baked. *)
+  (* TODO ABAAB: adapt test with new threshold under flag *)
   let* genesis, _contracts = Context.init_n 10 () in
   let* b = Block.bake genesis in
   let* {parametric = {consensus_threshold_size; _}; _} =
     Context.get_constants (B b)
   in
+  let consensus_threshold_size = Int64.of_int consensus_threshold_size in
   let* attesters = Context.get_attesters (B b) in
   let*?@ round = Block.get_round b in
   let* _, attestations =
     List.fold_left_es
       (fun (counter, attestations) (attester : Context.attester) ->
-        let new_counter = counter + List.length attester.slots in
+        let new_counter = Int64.add counter attester.attesting_power in
         if
           (sufficient_threshold && counter < consensus_threshold_size)
           || (not sufficient_threshold)
@@ -611,7 +618,7 @@ let test_attestation_threshold ~sufficient_threshold () =
           let* attestation = Op.attestation ~attesting_slot ~round b in
           return (new_counter, attestation :: attestations)
         else return (counter, attestations))
-      (0, [])
+      (0L, [])
       attesters
   in
   let*! b = Block.bake ~operations:attestations b in
