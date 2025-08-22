@@ -174,8 +174,8 @@ depends: [
   "ocaml-version" {= "4.0.1"}
   "ocamlbuild" {= "0.16.1"}
   "ocamlfind" {= "1.9.8"}
-  "ocamlformat" {= "0.26.2"}
-  "ocamlformat-lib" {= "0.26.2"}
+  "ocamlformat" {= "0.27.0"}
+  "ocamlformat-lib" {= "0.27.0"}
   "ocamlgraph" {= "2.2.0"}
   "ocp-indent" {= "1.8.1"}
   "ocp-ocamlres" {= "0.4"}

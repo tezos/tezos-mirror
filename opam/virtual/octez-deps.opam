@@ -80,7 +80,7 @@ depends: [
   "mirage-crypto-rng" { >= "1.0.0" }
   "mtime" { >= "2.0.0" }
   "num"
-  "ocamlformat" { = "0.26.2" }
+  "ocamlformat" { = "0.27.0" }
   "ocamlgraph"
   "ocp-ocamlres" { >= "0.4" }
   "ocplib-endian"
