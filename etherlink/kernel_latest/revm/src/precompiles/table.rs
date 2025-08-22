@@ -17,7 +17,7 @@ use crate::{
         constants::{
             FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, TABLE_PRECOMPILE_ADDRESS,
         },
-        send_outbox_message::revert,
+        provider::revert,
     },
 };
 
@@ -76,10 +76,13 @@ where
                 TicketTableInput::abi_decode_data(input_data)
                     .map_err(|e| e.to_string())?;
 
-            let added = context
-                .db_mut()
-                .ticket_balance_add(&ticket_hash, &owner, amount)
-                .map_err(|e| e.to_string())?;
+            let Ok(added) =
+                context
+                    .db_mut()
+                    .ticket_balance_add(&ticket_hash, &owner, amount)
+            else {
+                return Ok(revert(&format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}")));
+            };
 
             if !added {
                 return Ok(revert("ticket balance overflow"));
@@ -98,10 +101,13 @@ where
                 TicketTableInput::abi_decode_data(input_data)
                     .map_err(|e| e.to_string())?;
 
-            let removed = context
-                .db_mut()
-                .ticket_balance_remove(&ticket_hash, &owner, amount)
-                .map_err(|e| e.to_string())?;
+            let Ok(removed) =
+                context
+                    .db_mut()
+                    .ticket_balance_remove(&ticket_hash, &owner, amount)
+            else {
+                return Ok(revert(&format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}")));
+            };
 
             if !removed {
                 return Ok(revert("insufficient ticket balance"));
@@ -119,10 +125,15 @@ where
             let (deposit_id,) = DepositTableInput::abi_decode_data(input_data)
                 .map_err(|e| e.to_string())?;
 
-            let deposit = context
+            let Some(deposit) = context
                 .db()
                 .read_deposit_from_queue(&deposit_id)
-                .map_err(|e| e.to_string())?;
+                .map_err(|e| e.to_string())?
+            else {
+                return Ok(revert(&format!(
+                    "fetching deposit with id {deposit_id} failed"
+                )));
+            };
 
             let sol_deposit = SolFaDepositWithProxy {
                 amount: u256_to_alloy(&deposit.amount).unwrap_or_default(),
@@ -152,10 +163,15 @@ where
             let (deposit_id,) = DepositTableInput::abi_decode_data(input_data)
                 .map_err(|e| e.to_string())?;
 
-            context
+            if context
                 .db_mut()
                 .remove_deposit_from_queue(&deposit_id)
-                .map_err(|e| e.to_string())?;
+                .is_err()
+            {
+                return Ok(revert(&format!(
+                    "removing deposit with id {deposit_id} failed"
+                )));
+            }
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,

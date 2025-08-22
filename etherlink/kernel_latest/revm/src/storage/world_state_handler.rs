@@ -408,10 +408,15 @@ impl StorageAccount {
         &self,
         host: &impl Runtime,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, Error> {
+    ) -> Result<Option<FaDepositWithProxy>, Error> {
         let deposit_path = self.deposit_path(deposit_id)?;
-        let raw_deposit = host.store_read_all(&deposit_path)?;
-        FaDepositWithProxy::from_raw(raw_deposit)
+        let raw_deposit = host.store_read_all(&deposit_path);
+
+        match raw_deposit {
+            Ok(bytes) => FaDepositWithProxy::from_raw(bytes).map(Some),
+            Err(RuntimeError::PathNotFound) => Ok(None),
+            Err(err) => Err(Error::Custom(err.to_string())),
+        }
     }
 
     pub(crate) fn remove_deposit_from_queue(

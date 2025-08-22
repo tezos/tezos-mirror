@@ -92,7 +92,7 @@ pub(crate) trait PrecompileDatabase: Database {
     fn read_deposit_from_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, Error>;
+    ) -> Result<Option<FaDepositWithProxy>, Error>;
     fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
 }
 
@@ -230,7 +230,7 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
     fn read_deposit_from_queue(
         &self,
         deposit_id: &U256,
-    ) -> Result<FaDepositWithProxy, Error> {
+    ) -> Result<Option<FaDepositWithProxy>, Error> {
         let account_zero = self.get_or_create_account(Address::ZERO)?;
         account_zero.read_deposit_from_queue(self.host, deposit_id)
     }

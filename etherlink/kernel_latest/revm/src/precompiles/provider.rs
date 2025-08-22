@@ -6,8 +6,8 @@
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
-    interpreter::{CallInput, InputsImpl, InterpreterResult},
-    primitives::Address,
+    interpreter::{CallInput, Gas, InputsImpl, InstructionResult, InterpreterResult},
+    primitives::{Address, Bytes},
 };
 
 use crate::{
@@ -74,9 +74,9 @@ impl EtherlinkPrecompiles {
                     is_static,
                     inputs,
                     gas_limit,
-                )
-                .map_err(|e| e.to_string())?;
-                Ok(Some(result))
+                );
+                let interpreter_res = result.unwrap_or_else(|e| revert(&e.to_string()));
+                Ok(Some(interpreter_res))
             }
             TABLE_PRECOMPILE_ADDRESS => {
                 let result = table_precompile(
@@ -128,5 +128,13 @@ where
 
     fn contains(&self, address: &Address) -> bool {
         self.contains(address)
+    }
+}
+
+pub(crate) fn revert(reason: &str) -> InterpreterResult {
+    InterpreterResult {
+        result: InstructionResult::Revert,
+        gas: Gas::new(0),
+        output: Bytes::copy_from_slice(reason.as_bytes()),
     }
 }

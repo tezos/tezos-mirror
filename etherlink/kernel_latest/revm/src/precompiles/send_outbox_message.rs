@@ -29,9 +29,12 @@ use tezos_smart_rollup_encoding::{
 use crate::{
     database::PrecompileDatabase,
     helpers::storage::u256_to_bigint,
-    precompiles::constants::{
-        FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST,
-        SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
+    precompiles::{
+        constants::{
+            FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST,
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
+        },
+        provider::revert,
     },
 };
 
@@ -112,14 +115,6 @@ pub type FastWithdrawalInterface = MichelsonPair<
 pub enum Withdrawal {
     Standard(OutboxMessage<RouterInterface>),
     Fast(OutboxMessage<FastWithdrawalInterface>),
-}
-
-pub(crate) fn revert(reason: &str) -> InterpreterResult {
-    InterpreterResult {
-        result: InstructionResult::Revert,
-        gas: Gas::new(0),
-        output: Bytes::copy_from_slice(reason.as_bytes()),
-    }
 }
 
 #[derive(Debug, thiserror::Error)]
