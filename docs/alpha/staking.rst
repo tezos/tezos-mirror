@@ -209,6 +209,7 @@ or more conveniently::
    octez-client finalize unstake for <staker>
 
 Note that starting with protocol S, not only the staker, but anyone can trigger ``finalize_unstake`` (in any case, the unfrozen funds still go to the staker).
+This paves the way for implementing bots that regularly check finalizable unstakes on block explorers and trigger their finalization automatically.
 
 In some circumstances, unstake and finalize can be done implicitly: any call
 to ``stake`` or ``unstake`` will implicitly finalize all currently finalizable pending
