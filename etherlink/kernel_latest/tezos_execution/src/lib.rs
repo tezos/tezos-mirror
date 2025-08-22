@@ -463,8 +463,9 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
     let src_contract = Contract::Implicit(src.clone());
-    let mut balance_updates = compute_balance_updates(&src_contract, &dest_contract, balance)
-        .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let mut balance_updates =
+        compute_balance_updates(&src_contract, &dest_contract, balance)
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
 
     // Balance updates for the impacts of origination on storage space.
     // storage_fees = total_size * COST_PER_BYTES
