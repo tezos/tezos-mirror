@@ -31,7 +31,7 @@ open Baking_state_types
     hash, its first slot, and its attesting power at some level. *)
 type delegate_info = {
   delegate : Delegate.t;
-  first_slot : Slot.t;
+  attestation_slot : Slot.t;
   attesting_power : int64;
 }
 

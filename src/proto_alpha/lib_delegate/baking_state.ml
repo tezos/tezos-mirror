@@ -130,7 +130,7 @@ module RoundMap : Map.S with type key = Round.t = Map.Make (Round)
 
 type delegate_info = {
   delegate : Delegate.t;
-  first_slot : Slot.t;
+  attestation_slot : Slot.t;
   attesting_power : int64;
 }
 
@@ -976,7 +976,7 @@ let delegate_infos attesting_rights delegates =
               | None -> return (own_list, own_map)
               | Some delegate ->
                   let attesting_slot =
-                    {delegate; first_slot = attestation_slot; attesting_power}
+                    {delegate; attestation_slot; attesting_power}
                   in
                   return
                     ( attesting_slot :: own_list,
@@ -1179,12 +1179,12 @@ let pp_elected_block fmt {proposal; attestation_qc} =
     proposal.block
     (List.length attestation_qc)
 
-let pp_delegate_info fmt {delegate; first_slot; attesting_power} =
+let pp_delegate_info fmt {delegate; attestation_slot; attesting_power} =
   Format.fprintf
     fmt
-    "slots: @[<h>first_slot: %a@],@ delegate: %a,@ attesting_power: %Ld"
+    "slots: @[<h>attestation_slot: %a@],@ delegate: %a,@ attesting_power: %Ld"
     Slot.pp
-    first_slot
+    attestation_slot
     Delegate.pp
     delegate
     attesting_power
@@ -1194,13 +1194,16 @@ type delegate_infos_for_pp = {attester : Delegate.t; all_rounds : Round.t list}
 
 let delegate_infos_for_pp delegate_info_map =
   RoundMap.fold
-    (fun round {delegate; first_slot; attesting_power = _} acc ->
-      match SlotMap.find first_slot acc with
+    (fun round {delegate; attestation_slot; attesting_power = _} acc ->
+      match SlotMap.find attestation_slot acc with
       | None ->
-          SlotMap.add first_slot {attester = delegate; all_rounds = [round]} acc
+          SlotMap.add
+            attestation_slot
+            {attester = delegate; all_rounds = [round]}
+            acc
       | Some {attester; all_rounds} ->
           SlotMap.add
-            first_slot
+            attestation_slot
             {attester; all_rounds = round :: all_rounds}
             acc)
     delegate_info_map

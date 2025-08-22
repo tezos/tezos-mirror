@@ -94,7 +94,7 @@ let make_consensus_vote_batch state proposal kind =
   let delegates_and_slots =
     List.map
       (fun (delegate_info : delegate_info) ->
-        (delegate_info.delegate, delegate_info.first_slot))
+        (delegate_info.delegate, delegate_info.attestation_slot))
       (Delegate_infos.own_delegates state.level_state.delegate_infos)
   in
   (* The branch is the latest finalized block. *)
