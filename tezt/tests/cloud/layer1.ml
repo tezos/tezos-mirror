@@ -664,7 +664,11 @@ let init ~(configuration : configuration) cloud next_agent =
           cloud
           bootstrap_agent
           bootstrap_name
-      else Lwt.return (List.length configuration.stake)
+      else
+        Lwt.return
+          (match configuration.stake with
+          | [n] -> n
+          | _ -> List.length configuration.stake)
     in
     let () = toplog "Preparing agents for bakers (%d)" n in
     List.init n (fun i -> i)
@@ -690,6 +694,22 @@ let init ~(configuration : configuration) cloud next_agent =
       in
       match configuration.stake with
       | [] ->
+          let res =
+            List.map
+              (fun (baker_account, consensus_key_opt) ->
+                match consensus_key_opt with
+                | None -> [baker_account]
+                | Some consensus_key -> [consensus_key])
+              baker_accounts
+          in
+          Lwt.return res
+      | [x] ->
+          if List.compare_length_with baker_accounts x != 0 then
+            Test.fail
+              "The number of agents (%d) is not the same as the number of \
+               bakers (%d) retrieved in the yes wallet "
+              x
+              (List.length baker_accounts) ;
           let res =
             List.map
               (fun (baker_account, consensus_key_opt) ->
