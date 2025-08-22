@@ -116,14 +116,18 @@ let attesting_rights (ctxt : t) level =
   in
   let open Lwt_result_syntax in
   let* ctxt, _, delegates = Stake_distribution.stake_info ctxt level in
-  let* attesting_power_map =
+  let* attesting_power_map, _ =
     List.fold_left_es
-      (fun acc_map ((consensus_pk : Consensus_key.pk), power) ->
+      (fun (acc_map, i) ((consensus_pk : Consensus_key.pk), power) ->
         let acc_map =
-          Signature.Public_key_hash.Map.add consensus_pk.delegate power acc_map
+          Signature.Public_key_hash.Map.add
+            consensus_pk.delegate
+            (power, i, consensus_pk)
+            acc_map
         in
-        return acc_map)
-      Signature.Public_key_hash.Map.empty
+        let*? succ_i = Slot.succ i in
+        return (acc_map, succ_i))
+      (Signature.Public_key_hash.Map.empty, Slot.zero)
       delegates
   in
   let*? slots = Slot.Range.create ~min:0 ~count:consensus_committee_size in
@@ -166,14 +170,45 @@ let attesting_rights (ctxt : t) level =
     Signature.Public_key_hash.Map.map
       (fun ({rounds; delegate; _} as t) ->
         if all_bakers_attest_enabled then
-          (* TODO ABAAB: correct slot *)
-          let attesting_power =
-            Option.value ~default:0L
-            @@ Signature.Public_key_hash.Map.find delegate attesting_power_map
-          in
-          {t with attesting_power}
-        else {t with attesting_power = List.length rounds |> Int64.of_int})
+          match
+            Signature.Public_key_hash.Map.find delegate attesting_power_map
+          with
+          | Some (attesting_power, attestation_slot, _) ->
+              (* We override the attestation slot to be accurate wrt the feature flag *)
+              {t with attesting_power; attestation_slot}
+          | None -> t
+        else
+          (* The attestation slot already has the correct value *)
+          {t with attesting_power = List.length rounds |> Int64.of_int})
       map
+  in
+  (* Add delegates without rounds *)
+  let map =
+    if all_bakers_attest_enabled then
+      Signature.Public_key_hash.Map.fold
+        (fun pkh
+             ( attesting_power,
+               attestation_slot,
+               (consensus_pk : Consensus_key.pk) )
+             acc
+           ->
+          match Signature.Public_key_hash.Map.find pkh map with
+          | Some _ -> acc
+          | None ->
+              Signature.Public_key_hash.Map.add
+                pkh
+                {
+                  delegate = consensus_pk.delegate;
+                  consensus_key = consensus_pk.consensus_pkh;
+                  companion_key = consensus_pk.companion_pkh;
+                  rounds = [];
+                  attesting_power;
+                  attestation_slot;
+                }
+                acc)
+        attesting_power_map
+        map
+    else map
   in
   return (ctxt, map)
 
@@ -241,28 +276,52 @@ let attesting_rights_by_first_slot ctxt level :
       (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
       slots
   in
+  let all_bakers_attest_enabled =
+    Attesting_power.check_all_bakers_attest_at_level ctxt level
+  in
   let* ctxt, _, stake_info_list = Stake_distribution.stake_info ctxt level in
-  let slots_map =
-    List.fold_left
-      (fun acc ((consensus_pk, weight) : Consensus_key.pk * Int64.t) ->
+  let* slots_map, _ =
+    List.fold_left_es
+      (fun (acc, i) ((consensus_key, weight) : Consensus_key.pk * Int64.t) ->
         match
-          Signature.Public_key_hash.Map.find consensus_pk.delegate delegates_map
+          Signature.Public_key_hash.Map.find
+            consensus_key.delegate
+            delegates_map
         with
-        | None -> acc
+        | None ->
+            if all_bakers_attest_enabled then
+              (* The delegate doesn't have a round, but under all bakers attest,
+                 it is still added to the map *)
+              let*? succ_i = Slot.succ i in
+              return
+                ( Slot.Map.add
+                    i
+                    {
+                      Consensus_key.consensus_key;
+                      attesting_power =
+                        Attesting_power.make ~slots:0 ~stake:weight;
+                      dal_power = 0;
+                    }
+                    acc,
+                  succ_i )
+            else return (acc, i)
         | Some slot -> (
             match Slot.Map.find slot slots_map with
-            | None -> acc (* Impossible by construction *)
+            | None -> return (acc, i) (* Impossible by construction *)
             | Some v ->
-                Slot.Map.add
-                  slot
+                let v =
                   {
                     v with
                     attesting_power =
                       Attesting_power.(
                         add (make ~slots:0 ~stake:weight) v.attesting_power);
                   }
-                  acc))
-      Slot.Map.empty
+                in
+                if all_bakers_attest_enabled then
+                  let*? succ_i = Slot.succ i in
+                  return (Slot.Map.add i v acc, succ_i)
+                else return (Slot.Map.add slot v acc, i)))
+      (Slot.Map.empty, Slot.zero)
       stake_info_list
   in
   return (ctxt, slots_map)

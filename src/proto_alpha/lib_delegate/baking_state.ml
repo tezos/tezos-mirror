@@ -142,9 +142,9 @@ module Delegate_infos = struct
            because it is used in [round_proposer] for which we need all slots,
            as the round can be arbitrary. *)
     all_delegate_voting_power : int64 SlotMap.t;
-        (* This is a map having as keys the first slot of all delegates, and as
+        (* This is a map having as keys the attestation slot of all delegates, and as
            values their attesting power.
-           This map contains just the first slot for a delegate, because it is
+           Without all bakers attest, this map contains just the first slot for a delegate, because it is
            only used in [slot_voting_power] which is about (pre)attestations,
            not proposals. Indeed, only (pre)attestations that use the delegate's
            first slot are valid for inclusion in a block and count toward the
