@@ -277,6 +277,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         sender_account,
                         &amount,
                         &script,
+                        false, // We skip typechecking for internal operations since CREATE_CONTRACT already typechecks the script and the initial storage.
                     );
                     InternalOperationSum::Origination(InternalContentWithMetadata {
                         content: OriginationContent {
@@ -499,6 +500,7 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
+#[allow(clippy::too_many_arguments)]
 fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
@@ -507,7 +509,26 @@ fn originate_contract<Host: Runtime>(
     src_account: &mut impl TezlinkAccount,
     balance: &Narith,
     script: &Script,
+    typecheck: bool,
 ) -> Result<OriginationSuccess, OriginationError> {
+    if typecheck {
+        let parser = Parser::new();
+        let mut ctx = Ctx::default();
+        let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
+            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+        let contract_typechecked =
+            contract_micheline.typecheck_script(&mut ctx).map_err(|e| {
+                OriginationError::MirTypecheckingError(format!("Script : {e}"))
+            })?;
+        let storage_micheline = Micheline::decode_raw(&parser.arena, &script.storage)
+            .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
+        contract_typechecked
+            .typecheck_storage(&mut ctx, &storage_micheline)
+            .map_err(|e| {
+                OriginationError::MirTypecheckingError(format!("Storage : {e}"))
+            })?;
+    }
+
     // Generate a simple KT1 address depending on the source of the operation
     let contract = origination_nonce.generate_kt1()?;
     let dest_contract = Contract::Originated(contract.clone());
@@ -959,6 +980,7 @@ fn apply_operation<Host: Runtime>(
                 source_account,
                 balance,
                 script,
+                true,
             );
             let manager_result = produce_operation_result(
                 balance_updates,
@@ -994,11 +1016,11 @@ mod tests {
             TransferContent,
         },
         operation_result::{
-            ApplyOperationError, Balance, BalanceTooLow, BalanceUpdate, ContentResult,
-            CounterError, InternalContentWithMetadata, InternalOperationSum,
-            OperationResult, OperationResultSum, Originated, OriginationError,
-            OriginationSuccess, RevealError, RevealSuccess, TransferError,
-            TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
+            ApplyOperationError, ApplyOperationErrors, Balance, BalanceTooLow,
+            BalanceUpdate, ContentResult, CounterError, InternalContentWithMetadata,
+            InternalOperationSum, OperationResult, OperationResultSum, Originated,
+            OriginationError, OriginationSuccess, RevealError, RevealSuccess,
+            TransferError, TransferSuccess, TransferTarget, UpdateOrigin, ValidityError,
         },
     };
 
@@ -3680,5 +3702,60 @@ mod tests {
                 "Account {i} for KT1{expected_kt1} should not exist"
             );
         }
+    }
+
+    #[test]
+    fn test_origination_contract_typecheck_storage() {
+        let mut host = MockKernelHost::default();
+
+        let src = bootstrap1();
+
+        init_account(&mut host, &src.pkh, 50000);
+        reveal_account(&mut host, &src);
+
+        let context = context::Context::init_context();
+        let balance = 10.into();
+
+        let code = mir::parser::Parser::new()
+            .parse_top_level(UNIT_SCRIPT)
+            .expect("Should have succeeded to parse the script")
+            .encode();
+        let storage = Micheline::from(42).encode();
+        let orination_content = OriginationContent {
+            balance,
+            delegate: None,
+            script: Script { code, storage },
+        };
+        let operation = make_operation(
+            10,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![OperationContent::Origination(orination_content)],
+        );
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(receipts.len(), 1, "There should be one receipt");
+        assert!(matches!(
+            &receipts[0],
+            OperationResultSum::Origination(OperationResult {
+            result: ContentResult::Failed(ApplyOperationErrors { errors }),
+            ..
+            }) if errors.len() == 1 && matches!(
+            &errors[0],
+            ApplyOperationError::Origination(
+                OriginationError::MirTypecheckingError(_)
+            )
+            )
+        ), "Expected Failed Origination operation result with MirTypecheckingError, got {:?}", receipts[0]);
     }
 }
