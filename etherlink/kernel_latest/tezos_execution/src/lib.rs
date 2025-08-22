@@ -124,6 +124,33 @@ pub fn transfer_tez<Host: Runtime>(
     })
 }
 
+#[allow(dead_code)]
+fn burn_tez(
+    host: &mut impl Runtime,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
+    amount: &num_bigint::BigUint,
+) -> Result<Narith, TransferError> {
+    let src_balance = src_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+    let new_src_balance = match src_balance.0.checked_sub(amount) {
+        None => {
+            log!(host, Debug, "Balance is too low");
+            return Err(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: src_contract.clone(),
+                balance: src_balance.clone(),
+                amount: amount.into(),
+            }));
+        }
+        Some(new_source_balance) => new_source_balance.into(),
+    };
+    src_account
+        .set_balance(host, &new_src_balance)
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    Ok(new_src_balance)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn execute_internal_operations<'a, Host: Runtime>(
     host: &mut Host,
