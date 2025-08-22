@@ -1124,6 +1124,14 @@ ignored_kernel_arg:
     { /* ignored_kernel_arg version 0 */
       "ignored_kernel_arg.v0": any }
   
+ignored_performance_profile:
+  description: GC parameters were changed through OCAMLRUNPARAM, ignoring performance profile
+  level: warning
+  section: evm_node
+  json format:
+    { /* ignored_performance_profile version 0 */
+      "ignored_performance_profile.v0": any }
+  
 ignored_periodic_snapshot_arg:
   description: ignored the periodic snapshot feature since the EVM node is running in Archive mode
   level: warning
@@ -1457,6 +1465,14 @@ pending_upgrade:
          Either a plain UTF8 string, or a sequence of bytes for strings that
          contain invalid byte sequences. */
       string || { "invalid_utf8_string": [ integer ∈ [0, 255] ... ] }
+  
+performance_profile:
+  description: running with {profile} profile
+  level: notice
+  section: evm_node
+  json format:
+    { /* performance_profile version 0 */
+      "performance_profile.v0": "performance" | "default" }
   
 predownload_kernel:
   description: kernel {version} successfully predownloaded
