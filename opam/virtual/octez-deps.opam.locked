@@ -251,7 +251,7 @@ depends: [
   "terminal" {= "0.4.0"}
   "tezos-sapling-parameters" {= "1.1.0"}
   "tezt" {= "4.2.0"}
-  "tezt-bam" {= "0.3"}
+  "tezt-bam" {= "0.4"}
   "thread-local-storage" {= "0.2"}
   "thread-table" {= "1.0.0"}
   "time_now" {= "v0.16.0"}
