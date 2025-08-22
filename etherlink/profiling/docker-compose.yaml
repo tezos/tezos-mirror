@@ -19,13 +19,27 @@ services:
     ports:
       - "3200:3200"
 
+  loki:
+    image: grafana/loki:latest
+    command: ["-config.file=/etc/loki.yaml"]
+    volumes:
+      - ./config/loki-config.yml:/etc/loki.yaml
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
+      - loki
       - tempo
