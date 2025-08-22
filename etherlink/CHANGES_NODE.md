@@ -15,8 +15,10 @@
 
 ### Metrics changes
 
-- Size informations about tx container was using tx_pool only. Now
-if you activate tx_queue it show the size of the tx_queue.
+- Size informations about tx container was using tx_pool only. Now if you
+  activate tx_queue it show the size of the tx_queue.
+- The EVM node now exports its logs to Opentelemetry when enabled in the
+  configuration file or with `--profiling true`. (!18910)
 
 ### Command-line interface changes
 
