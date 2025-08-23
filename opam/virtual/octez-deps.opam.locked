@@ -218,7 +218,7 @@ depends: [
   "psq" {= "0.2.1"}
   "ptime" {= "1.2.0"}
   "pure-splitmix" {= "0.3"}
-  "pyml" {= "20231101"}
+  "pyml" {= "20250807"}
   "qcheck-alcotest" {= "0.25"}
   "qcheck-core" {= "0.25"}
   "re" {= "1.12.0"}
@@ -239,7 +239,7 @@ depends: [
   "sexplib0" {= "v0.16.0"}
   "sqlite3" {= "5.3.1"}
   "ssl" {= "0.7.0"}
-  "stdcompat" {= "19"}
+  "stdcompat" {= "21.1"}
   "stdint" {= "0.7.2"}
   "stdio" {= "v0.16.0"}
   "stdlib-random" {= "1.2.0"}
@@ -301,12 +301,6 @@ conflicts: [
 available: os-family != "windows"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 pin-depends: [
-  [
-    "base.v0.16.4"
-    "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
-  ]
-  [
-    "stdcompat.19"
-    "git+https://github.com/thierry-martinez/stdcompat.git#d53390d788027fe0a2282c4745eb3d1626341f99"
-  ]
+  "base.v0.16.4"
+  "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
 ]
