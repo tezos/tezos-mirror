@@ -40,6 +40,10 @@ const INPUT_OUTPUT_MAX_SIZE: u32 = 4096;
 fn result_from_binding_error(err: BindingsError) -> Result<i32, RuntimeError> {
     match err {
         BindingsError::HostFuncError(i) => Ok(i),
+        BindingsError::OCamlError(ocaml::Error::Caml(ocaml::CamlError::Exception(exn))) => {
+            let exn = unsafe { exn.exception_to_string().unwrap() };
+            Err(RuntimeError::new(format!("exception: {}", exn)))
+        }
         BindingsError::OCamlError(err) => Err(RuntimeError::new(format!(
             "unexpected internal error: {:?}",
             err
