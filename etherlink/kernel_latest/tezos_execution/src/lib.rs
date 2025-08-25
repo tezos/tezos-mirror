@@ -12,7 +12,8 @@ use mir::{
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::BigInt;
+use num_bigint::{BigInt, BigUint};
+use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
@@ -121,6 +122,32 @@ pub fn transfer_tez<Host: Runtime>(
         paid_storage_size_diff: 0_u64.into(),
         allocated_destination_contract: false,
     })
+}
+
+fn burn_tez(
+    host: &mut impl Runtime,
+    src_contract: &Contract,
+    src_account: &mut impl TezlinkAccount,
+    amount: &num_bigint::BigUint,
+) -> Result<Narith, TransferError> {
+    let src_balance = src_account
+        .balance(host)
+        .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+    let new_src_balance = match src_balance.0.checked_sub(amount) {
+        None => {
+            log!(host, Debug, "Balance is too low");
+            return Err(TransferError::BalanceTooLow(BalanceTooLow {
+                contract: src_contract.clone(),
+                balance: src_balance.clone(),
+                amount: amount.into(),
+            }));
+        }
+        Some(new_source_balance) => new_source_balance.into(),
+    };
+    src_account
+        .set_balance(host, &new_src_balance)
+        .map_err(|_| TransferError::FailedToApplyBalanceChanges)?;
+    Ok(new_src_balance)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -397,6 +424,11 @@ pub fn transfer_external<Host: Runtime>(
     .map(Into::into)
 }
 
+// Values from src/proto_023_PtSeouLo/lib_parameters/default_parameters.ml.
+const ORIGINATION_SIZE: u64 = 257;
+const COST_PER_BYTES: u64 = 250;
+const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
+
 /// Originate a contract deployed by the public key hash given in parameter. For now
 /// the origination is not correctly implemented.
 fn originate_contract<Host: Runtime>(
@@ -431,8 +463,25 @@ fn originate_contract<Host: Runtime>(
 
     // Compute the balance setup of the smart contract as a balance update for the origination.
     let src_contract = Contract::Implicit(src.clone());
-    let balance_updates = compute_balance_updates(&src_contract, &dest_contract, balance)
-        .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    let mut balance_updates =
+        compute_balance_updates(&src_contract, &dest_contract, balance)
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+
+    // Balance updates for the impacts of origination on storage space.
+    // storage_fees = total_size * COST_PER_BYTES
+    let storage_fees = BigUint::from(total_size.clone())
+        .checked_mul(&BigUint::from(COST_PER_BYTES))
+        .ok_or(OriginationError::FailedToComputeBalanceUpdate)?;
+    let storage_fees_balance_updates =
+        compute_storage_balance_updates(src, storage_fees.clone())
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    balance_updates.extend(storage_fees_balance_updates);
+
+    // Balance updates for the base origination cost.
+    let origination_fees_balance_updates =
+        compute_storage_balance_updates(src, ORIGINATION_COST.into())
+            .map_err(|_| OriginationError::FailedToComputeBalanceUpdate)?;
+    balance_updates.extend(origination_fees_balance_updates);
 
     // Apply the balance change, accordingly to the balance updates computed
     apply_balance_changes(
@@ -441,6 +490,14 @@ fn originate_contract<Host: Runtime>(
         src_account,
         &mut smart_contract,
         &balance.0,
+    )
+    .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
+
+    let _ = burn_tez(
+        host,
+        &src_contract,
+        src_account,
+        &(ORIGINATION_COST + storage_fees),
     )
     .map_err(|_| OriginationError::FailedToApplyBalanceUpdate)?;
 
@@ -511,6 +568,29 @@ fn compute_balance_updates(
     };
 
     Ok(vec![src_update, dest_update])
+}
+
+/// Prepares balance updates when accounting storage fees in the format expected by the Tezos operation.
+pub fn compute_storage_balance_updates(
+    source: &PublicKeyHash,
+    fee: BigUint,
+) -> Result<Vec<BalanceUpdate>, num_bigint::TryFromBigIntError<num_bigint::BigInt>> {
+    let source_delta = BigInt::from_biguint(num_bigint::Sign::Minus, fee.clone());
+    let block_fees = BigInt::from_biguint(num_bigint::Sign::Plus, fee);
+
+    let src_update = BalanceUpdate {
+        balance: Balance::Account(Contract::Implicit(source.clone())),
+        changes: source_delta.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    let block_fees = BalanceUpdate {
+        balance: Balance::StorageFees,
+        changes: block_fees.try_into()?,
+        update_origin: UpdateOrigin::BlockApplication,
+    };
+
+    Ok(vec![src_update, block_fees])
 }
 
 /// Applies balance changes by updating both source and destination accounts.
@@ -839,6 +919,8 @@ mod tests {
         },
     };
 
+    use crate::COST_PER_BYTES;
+    use crate::ORIGINATION_COST;
     use crate::{
         account_storage::{Manager, TezlinkAccount},
         context, validate_and_apply_operation, OperationError,
@@ -2466,8 +2548,9 @@ mod tests {
         let mut host = MockKernelHost::default();
 
         let src = bootstrap1();
+        let mut src_acc = init_account(&mut host, &src.pkh);
+        src_acc.set_balance(&mut host, &1000000_u64.into()).unwrap();
 
-        init_account(&mut host, &src.pkh);
         reveal_account(&mut host, &src);
 
         let context = context::Context::init_context();
@@ -2509,6 +2592,9 @@ mod tests {
             },
         );
 
+        let origination_storage_fee: u64 =
+            ((code.len() as u64) + (storage.len() as u64)) * COST_PER_BYTES;
+
         let receipt = validate_and_apply_operation(&mut host, &context, operation)
             .expect(
                 "validate_and_apply_operation should not have failed with a kernel error",
@@ -2544,6 +2630,26 @@ mod tests {
                         changes: 30,
                         update_origin: UpdateOrigin::BlockApplication,
                     },
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -9500,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::StorageFees,
+                        changes: 9500,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::Account(Contract::Implicit(src.pkh.clone())),
+                        changes: -64250,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
+                    BalanceUpdate {
+                        balance: Balance::StorageFees,
+                        changes: 64250,
+                        update_origin: UpdateOrigin::BlockApplication,
+                    },
                 ],
                 originated_contracts: vec![Originated {
                     contract: expected_kt1.clone(),
@@ -2570,7 +2676,11 @@ mod tests {
             .checked_sub(&fee.into())
             .expect("Should have been able to debit the fees")
             .checked_sub(&smart_contract_balance.into())
-            .expect("Should have been able to debit the smart contract balance");
+            .expect("Should have been able to debit the smart contract balance")
+            .checked_sub(&ORIGINATION_COST.into())
+            .expect("Should have been able to debit the origination cost")
+            .checked_sub(&origination_storage_fee.into())
+            .expect("Should have been able to debit the storage fees");
 
         assert_eq!(
             current_balance.0, expected_balance,
@@ -2591,8 +2701,7 @@ mod tests {
         assert_eq!(
             current_kt1_balance,
             smart_contract_balance.into(),
-            "Smart cont
-            ract current balance doesn't match the expected one"
+            "Smart contract current balance doesn't match the expected one"
         );
 
         // Verify code and storage
