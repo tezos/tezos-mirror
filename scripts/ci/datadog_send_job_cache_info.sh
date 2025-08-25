@@ -45,12 +45,14 @@ get_cache_size() {
 
     echo "${cache_name} cache: ${size_human} (${size_bytes} bytes)"
   else
+    size_bytes="0"
+    size_human="0B"
     echo "No $(echo "$cache_name" | tr '[:upper:]' '[:lower:]') cache"
   fi
 
   # Export environment variables
   export "${cache_name}_SIZE_BYTES=${size_bytes:-0}"
-  export "${cache_name}_SIZE_HUMAN=${size_human:-0}"
+  export "${cache_name}_SIZE_HUMAN=${size_human:-0B}"
   # Add tags for datadog
   # shellcheck disable=SC3059
   CACHE_TAGS="$CACHE_TAGS --tags $(echo "$cache_name" | tr '[:upper:]' '[:lower:]')_${SECTION}:${size_bytes:-0}"
