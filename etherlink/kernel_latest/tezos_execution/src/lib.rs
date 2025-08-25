@@ -12,7 +12,7 @@ use mir::{
     context::Ctx,
     parser::Parser,
 };
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigInt;
 use num_traits::ops::checked::CheckedSub;
 use tezos_crypto_rs::PublicKeyWithHash;
 use tezos_data_encoding::types::Narith;
@@ -148,7 +148,11 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 destination_address,
                 amount,
             }) => {
-                let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
+                let amount = Narith(amount.try_into().map_err(
+                    |err: num_bigint::TryFromBigIntError<()>| {
+                        TransferError::MirAmountToNarithError(err.to_string())
+                    },
+                )?);
                 let dest_contract = contract_from_address(destination_address.hash)?;
                 let value = param.into_micheline_optimized_legacy(&parser.arena);
                 let encoded_value = value.encode();
@@ -296,6 +300,20 @@ pub fn transfer<'a, Host: Runtime>(
                 &mut dest_account,
             )?;
             ctx.sender = address_from_contract(src_contract.clone());
+            ctx.amount = amount.0.clone().try_into().map_err(
+                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                    TransferError::MirAmountToNarithError(err.to_string())
+                },
+            )?;
+            ctx.self_address = address_from_contract(dest_contract.clone());
+            let balance = dest_account
+                .balance(host)
+                .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
+            ctx.balance = balance.0.try_into().map_err(
+                |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
+                    TransferError::MirAmountToNarithError(err.to_string())
+                },
+            )?;
             let code = dest_account
                 .code(host)
                 .map_err(|_| TransferError::FailedToFetchContractCode)?;
@@ -1049,7 +1067,7 @@ mod tests {
         host: &mut impl Runtime,
         src: &ContractKt1Hash,
         script: &str,
-        initial_storage: &str,
+        storage_micheline: &Micheline,
         balance: &Narith,
     ) -> TezlinkOriginatedAccount {
         // Setting the account in TezlinkImplicitAccount
@@ -1062,7 +1080,6 @@ mod tests {
 
         let parser = mir::parser::Parser::new();
         let script_micheline = parser.parse_top_level(script).unwrap();
-        let storage_micheline = parser.parse(initial_storage).unwrap();
 
         account
             .set_code(host, &script_micheline.encode())
@@ -1668,9 +1685,8 @@ mod tests {
                             PAIR
                         }
             "#,
-            "Unit",
+            &Micheline::from(()),
         );
-        let encoded_storage = mir::parser::Parser::new().parse(storage).unwrap().encode();
         let faucet = init_contract(&mut host, &desthash, code, storage, &1000.into());
         let requested_amount = 100;
         let operation = make_transfer_operation(
@@ -1709,7 +1725,7 @@ mod tests {
                 ],
                 result: ContentResult::Applied(TransferTarget::ToContrat(
                     TransferSuccess {
-                        storage: Some(encoded_storage),
+                        storage: Some(storage.encode()),
                         lazy_storage_diff: None,
                         balance_updates: vec![],
                         ticket_receipt: vec![],
@@ -1765,7 +1781,6 @@ mod tests {
                 )],
             })
         );
-        println!("Result: {res:?}");
         assert_eq!(
             faucet.balance(&host).unwrap(),
             (faucet_balance - requested_amount).into()
@@ -1785,21 +1800,20 @@ mod tests {
     #[test]
     fn apply_transfer_with_execution() {
         let mut host = MockKernelHost::default();
-        let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
 
         let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeeded");
 
-        let initial_storage = "\"initial\"";
+        let initial_storage = Micheline::from("initial");
 
         let source = init_account(&mut host, &src.pkh);
         reveal_account(&mut host, &src);
         let destination =
-            init_contract(&mut host, &dest, SCRIPT, initial_storage, &50_u64.into());
+            init_contract(&mut host, &dest, SCRIPT, &initial_storage, &50_u64.into());
 
-        let storage_value = parser.parse("\"Hello world\"").unwrap().encode();
+        let storage_value = Micheline::from("Hello world").encode();
         let operation = make_transfer_operation(
             15,
             1,
@@ -1888,14 +1902,13 @@ mod tests {
     #[test]
     fn apply_transfer_with_failed_execution() {
         let mut host = MockKernelHost::default();
-        let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
 
         let dest = ContractKt1Hash::from_base58_check(CONTRACT_1)
             .expect("ContractKt1Hash b58 conversion should have succeed");
 
-        let initial_storage = "Unit";
+        let initial_storage = Micheline::from(());
 
         let source = init_account(&mut host, &src.pkh);
         reveal_account(&mut host, &src);
@@ -1904,7 +1917,7 @@ mod tests {
             &mut host,
             &dest,
             FAILING_SCRIPT,
-            initial_storage,
+            &initial_storage,
             &50_u64.into(),
         );
 
@@ -1918,7 +1931,7 @@ mod tests {
             Contract::Originated(dest),
             Some(Parameter {
                 entrypoint: mir::ast::entrypoint::Entrypoint::default(),
-                value: parser.parse("Unit").unwrap().encode(),
+                value: Micheline::from(()).encode(),
             }),
         );
 
@@ -1968,7 +1981,7 @@ mod tests {
 
         assert_eq!(
             destination.storage(&host).unwrap(),
-            parser.parse(initial_storage).unwrap().encode(),
+            initial_storage.encode(),
             "Storage should not have been updated"
         )
     }
@@ -1976,7 +1989,6 @@ mod tests {
     #[test]
     fn apply_transfer_with_argument_to_implicit_fails() {
         let mut host = MockKernelHost::default();
-        let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
 
@@ -1995,7 +2007,7 @@ mod tests {
             Contract::Implicit(dest.pkh),
             Some(Parameter {
                 entrypoint: mir::ast::entrypoint::Entrypoint::default(),
-                value: parser.parse("0").unwrap().encode(),
+                value: Micheline::from(0).encode(),
             }),
         );
 
@@ -2036,7 +2048,6 @@ mod tests {
     #[test]
     fn apply_transfer_with_non_default_entrypoint_to_implicit_fails() {
         let mut host = MockKernelHost::default();
-        let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
 
@@ -2056,7 +2067,7 @@ mod tests {
             Some(Parameter {
                 entrypoint: mir::ast::entrypoint::Entrypoint::try_from("non_default")
                     .expect("Entrypoint should be valid"),
-                value: parser.parse("0").unwrap().encode(),
+                value: Micheline::from(()).encode(),
             }),
         );
 
@@ -2331,7 +2342,6 @@ mod tests {
     #[test]
     fn apply_smart_contract_failure_reverts_batch() {
         let mut host = MockKernelHost::default();
-        let parser = mir::parser::Parser::new();
 
         let src = bootstrap1();
         let src_acc = init_account(&mut host, &src.pkh);
@@ -2339,9 +2349,20 @@ mod tests {
         let fail_dest = ContractKt1Hash::from_base58_check(CONTRACT_1).unwrap();
         let succ_dest = ContractKt1Hash::from_base58_check(CONTRACT_2).unwrap();
 
-        init_contract(&mut host, &fail_dest, FAILING_SCRIPT, "Unit", &0_u64.into());
-        let succ_account =
-            init_contract(&mut host, &succ_dest, SCRIPT, "\"initial\"", &0_u64.into());
+        init_contract(
+            &mut host,
+            &fail_dest,
+            FAILING_SCRIPT,
+            &Micheline::from(()),
+            &0_u64.into(),
+        );
+        let succ_account = init_contract(
+            &mut host,
+            &succ_dest,
+            SCRIPT,
+            &Micheline::from("initial"),
+            &0_u64.into(),
+        );
 
         let reveal_content = OperationContent::Reveal(RevealContent {
             pk: src.pk.clone(),
@@ -2353,7 +2374,7 @@ mod tests {
             destination: Contract::Originated(succ_dest.clone()),
             parameters: Some(Parameter {
                 entrypoint: mir::ast::entrypoint::Entrypoint::default(),
-                value: parser.parse("\"Hello world\"").unwrap().encode(),
+                value: Micheline::from("Hello world").encode(),
             }),
         });
 
@@ -2362,7 +2383,7 @@ mod tests {
             destination: Contract::Originated(fail_dest.clone()),
             parameters: Some(Parameter {
                 entrypoint: mir::ast::entrypoint::Entrypoint::default(),
-                value: parser.parse("Unit").unwrap().encode(),
+                value: Micheline::from(()).encode(),
             }),
         });
 
@@ -2419,8 +2440,7 @@ mod tests {
 
         // Storage must have reverted
         assert!(
-            succ_account.storage(&host).unwrap()
-                == parser.parse("\"initial\"").unwrap().encode()
+            succ_account.storage(&host).unwrap() == Micheline::from("initial").encode(),
         );
 
         assert_eq!(
@@ -2604,7 +2624,7 @@ mod tests {
             &mut host,
             &contract_chapo_hash,
             SCRIPT_EMITING_INTERNAL_OP,
-            "Unit",
+            &Micheline::from(()),
             &100_u64.into(),
         );
 
@@ -2615,7 +2635,7 @@ mod tests {
             &mut host,
             &internal_fail_contract_hash,
             FAILING_SCRIPT,
-            "Unit",
+            &Micheline::from(()),
             &100_u64.into(),
         );
 
@@ -2627,7 +2647,7 @@ mod tests {
             &mut host,
             &internal_success_contract_hash,
             UNIT_SCRIPT,
-            "Unit",
+            &Micheline::from(()),
             &100_u64.into(),
         );
 
@@ -2775,5 +2795,190 @@ mod tests {
         } else {
             panic!("Second receipt is not a Transfer with Internal Operations");
         }
+    }
+
+    #[test]
+    fn test_smart_contract_amount_instruction() {
+        // Write AMOUNT in the storage
+        const SCRIPT: &str = "
+            parameter unit;
+            storage mutez;
+            code {
+                DROP;
+                AMOUNT;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let initial_amount = 0;
+        let transfer_amount = 30;
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT,
+            &Micheline::from(initial_amount),
+            &0_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            transfer_amount.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            Micheline::from(i128::from(transfer_amount)).encode(),
+            "Storage should contain the amount sent"
+        );
+    }
+
+    #[test]
+    fn test_smart_contract_balance_instruction() {
+        // Write BALANCE in the storage
+        const SCRIPT: &str = "
+            parameter unit;
+            storage mutez;
+            code {
+                DROP;
+                BALANCE;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let transfer_amount = 30;
+        let initial_balance = 200;
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT,
+            &Micheline::from(0),
+            &initial_balance.into(),
+        );
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            transfer_amount.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            Micheline::from(i128::from(initial_balance + transfer_amount)).encode(),
+            "Storage should contain the balance of the contract"
+        );
+    }
+
+    #[test]
+    fn test_smart_contract_self_address_instruction() {
+        // Write SELF_ADDRESS in the storage
+        const SCRIPT_ADDR: &str = "
+            parameter unit;
+            storage address;
+            code {
+                DROP;
+                SELF_ADDRESS;
+                NIL operation;
+                PAIR
+            }
+        ";
+        let mut host = MockKernelHost::default();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh);
+        reveal_account(&mut host, &src);
+
+        let contract_hash = ContractKt1Hash::from_base58_check(CONTRACT_3)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+
+        let micheline_address = Micheline::Bytes(
+            Contract::Originated(contract_hash.clone())
+                .to_bytes()
+                .unwrap(),
+        );
+        let src_contract = init_contract(
+            &mut host,
+            &contract_hash,
+            SCRIPT_ADDR,
+            &micheline_address,
+            &0_u64.into(),
+        );
+
+        let operation = make_transfer_operation(
+            15,
+            1,
+            4,
+            5,
+            src.clone(),
+            30_u64.into(),
+            Contract::Originated(contract_hash.clone()),
+            Some(Parameter {
+                entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                value: Micheline::from(()).encode(),
+            }),
+        );
+
+        let _receipt = validate_and_apply_operation(
+            &mut host,
+            &context::Context::init_context(),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+
+        assert_eq!(
+            src_contract.storage(&host).unwrap(),
+            micheline_address.encode(),
+            "Storage should contain the self address of the contract"
+        );
     }
 }

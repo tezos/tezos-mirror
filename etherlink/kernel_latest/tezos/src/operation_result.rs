@@ -136,6 +136,10 @@ pub enum TransferError {
     MirAddressUnsupportedError,
     #[error("Failed to execute internal operation: {0}")]
     FailedToExecuteInternalOperation(String),
+    #[error("Failed to convert amount to Narith: {0}")]
+    MirAmountToNarithError(String),
+    #[error("Failed to convert Narith to amount: {0}")]
+    MirNarithToAmountError(String),
 }
 
 #[derive(Error, Debug, PartialEq, Eq, NomReader)]
