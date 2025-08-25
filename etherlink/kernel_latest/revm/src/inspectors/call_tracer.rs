@@ -303,7 +303,7 @@ where
             // precompile contract is called.
 
             let memory_offset = Range { start: 0, end: 0 }; // Ignored.
-            let mut outcome = match precompile(&call_data, inputs.gas_limit) {
+            let mut outcome = match precompile.execute(&call_data, inputs.gas_limit) {
                 Ok(result) => CallOutcome {
                     result: InterpreterResult {
                         result: InstructionResult::Return,
