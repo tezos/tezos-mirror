@@ -159,6 +159,9 @@ val tc_jitter : (float * float) option
 (* Artifact path retrieval if set. *)
 val artifacts_dir : string option
 
+(* Retrieves teztale artifacts if the artifact-dir is set. *)
+val teztale_artifacts : bool
+
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
 

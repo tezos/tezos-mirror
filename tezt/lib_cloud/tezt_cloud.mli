@@ -268,6 +268,8 @@ module Tezt_cloud_cli : sig
   val retrieve_daily_logs : bool
 
   val artifacts_dir : string option
+
+  val teztale_artifacts : bool
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
