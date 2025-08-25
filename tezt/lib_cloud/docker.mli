@@ -37,6 +37,7 @@ val push :
 
 (** [pull] is an alias for [docker pull]. *)
 val pull :
+  ?runner:Runner.t ->
   ?image_name:string ->
   ?alias:string ->
   ?tag:string ->
