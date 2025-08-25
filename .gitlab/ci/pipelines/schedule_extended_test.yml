@@ -1951,7 +1951,7 @@ kaitai_e2e_checks:
   tags:
   - gcp
   rules:
-  - when: on_success
+  - when: always
   needs:
   - oc.docker:client-libs-dependencies
   - kaitai_checks

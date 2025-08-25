@@ -986,14 +986,14 @@ let jobs pipeline_type =
     in
 
     (* check that ksy files are still up-to-date with octez *)
-    let job_kaitai_checks : tezos_job =
+    let job_kaitai_checks =
       job
         ~__POS__
         ~name:"kaitai_checks"
         ~image:Images.CI.build
         ~stage:Stages.test
         ~dependencies:dependencies_needs_start
-        ~rules:(make_rules ~changes:changeset_kaitai_checks_files ())
+        ~rules:(make_rules ~manual:Yes ())
         ~before_script:(before_script ~source_version:true ~eval_opam:true [])
         [
           "make -C ${CI_PROJECT_DIR} check-kaitai-struct-files || (echo 'Octez \
@@ -1015,8 +1015,7 @@ let jobs pipeline_type =
         ~image:Images.client_libs_dependencies
         ~stage:Stages.test
         ~dependencies:(Dependent [Artifacts job_kaitai_checks])
-        ~rules:
-          (make_rules ~changes:changeset_kaitai_e2e_files ~dependent:true ())
+        ~rules:(make_rules ~manual:Yes ())
         ~before_script:
           (before_script
              ~source_version:true
@@ -1898,6 +1897,7 @@ let jobs pipeline_type =
         job_mir_tzt;
       ]
     in
+
     let jobs_debian =
       match pipeline_type with
       | Before_merging | Merge_train ->

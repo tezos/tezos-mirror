@@ -1740,18 +1740,8 @@ kaitai_checks:
   tags:
   - gcp
   rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - client-libs/*kaitai*/**/*
-    - images/**/*
-    - scripts/ci/datadog_send_job_info.sh
-    - scripts/install_build_deps.js.sh
-    - scripts/slim-mode.sh
-    - scripts/version.sh
-    - src/**/*
-    when: on_success
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:ci:amd64
   - trigger
@@ -1796,18 +1786,8 @@ kaitai_e2e_checks:
   tags:
   - gcp
   rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - client-libs/*kaitai*/**/*
-    - images/client-libs-dependencies/**/*
-    - scripts/ci/datadog_send_job_info.sh
-    - scripts/install_build_deps.js.sh
-    - scripts/slim-mode.sh
-    - scripts/version.sh
-    - src/**/*
-    when: on_success
+  - when: manual
+    allow_failure: true
   needs:
   - oc.docker:client-libs-dependencies
   - kaitai_checks
