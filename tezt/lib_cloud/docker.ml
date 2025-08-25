@@ -63,6 +63,16 @@ let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
     | Some (hstart, hstop, rstart, rstop) ->
         ["-p"; Format.asprintf "%s-%s:%s-%s" hstart hstop rstart rstop]
   in
+  (* NET_ADMIN capability is currently used in order to
+     tweak network latency with [tc] *)
+  let net_admin =
+    (* Let's prevent the user to accidentally mess with their network configuration *)
+    let enable = not (Cli.localhost && Cli.docker_host_network) in
+    if enable then (
+      Log.warn "Running docker containers with NET_ADMIN capability" ;
+      ["--cap-add"; "NET_ADMIN"])
+    else []
+  in
   let network =
     match network with None -> [] | Some network -> ["--network"; network]
   in
@@ -85,7 +95,7 @@ let run ?runner ?(rm = false) ?name ?(detach = false) ?network ?publish_ports
     ~color
     "docker"
     (["run"] @ detach @ rm @ name @ macos_platform_arg @ volumes @ network
-   @ publish_ports
+   @ net_admin @ publish_ports
     @ [Format.asprintf "%s" image]
     @ args)
 

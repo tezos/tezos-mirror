@@ -530,38 +530,88 @@ let init_proxy ?(proxy_files = []) ?(proxy_args = []) deployement =
 
 (* Set the [FAKETIME] environment variable so that all the ssh sessions have it
    defined if [Env.faketime] is defined. *)
-let set_faketime faketime agent =
-  match Agent.runner agent with
-  | None -> Lwt.return_unit (* ? *)
-  | Some runner ->
-      let open Runner.Shell in
-      let* home =
-        (* Get the directory where you can (hopefully) find .ssh *)
-        let cmd = cmd [] "pwd" [] in
-        let cmd, args = Runner.wrap_with_ssh runner cmd in
-        Process.run_and_read_stdout cmd args
+let set_faketime agent =
+  match Env.faketime with
+  | None -> Lwt.return_unit
+  | Some faketime -> (
+      match Agent.runner agent with
+      | None -> Lwt.return_unit (* ? *)
+      | Some runner ->
+          let open Runner.Shell in
+          let* home =
+            (* Get the directory where you can (hopefully) find .ssh *)
+            let cmd = cmd [] "pwd" [] in
+            let cmd, args = Runner.wrap_with_ssh runner cmd in
+            Process.run_and_read_stdout cmd args
+          in
+          let env_file =
+            Filename.concat (String.trim home) ".ssh/environment"
+          in
+          let* () =
+            (* Avoid error if the environment file does not exist *)
+            let cmd = cmd [] "touch" [env_file] in
+            let cmd, args = Runner.wrap_with_ssh runner cmd in
+            Process.run cmd args
+          in
+          let* contents =
+            (* Read the environment file content
+               and append FAKETIME definition to the result *)
+            let process, stdin =
+              Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
+            in
+            let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
+            let* () = Lwt_io.close stdin in
+            Process.check_and_read_stdout process
+          in
+          (* Write the final environment content *)
+          let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
+          let cmd, args = Runner.wrap_with_ssh runner cmd in
+          Process.run cmd args)
+
+(** Optionally add some latency and jitter to network connection *)
+let adjust_traffic_control agent =
+  match (Env.tc_delay, Env.tc_jitter) with
+  | None, None -> Lwt.return_unit
+  | tc_delay, tc_jitter ->
+      let rand = function
+        | Some (min, max) -> min +. Random.float (max -. min)
+        | None -> 0.
       in
-      let env_file = Filename.concat (String.trim home) ".ssh/environment" in
-      let* () =
-        (* Avoid error if the environment file does not exist *)
-        let cmd = cmd [] "touch" [env_file] in
-        let cmd, args = Runner.wrap_with_ssh runner cmd in
-        Process.run cmd args
+      let delay = rand tc_delay in
+      let jitter = rand tc_jitter in
+      (* Get the interface name in the docker container (among other infos) *)
+      let* ip_output =
+        Agent.docker_run_command agent "ip" ["route"; "show"; "default"]
+        |> Process.check_and_read_stdout
       in
-      let* contents =
-        (* Read the environment file content
-           and append FAKETIME definition to the result *)
-        let process, stdin =
-          Process.spawn_with_stdin ~runner "cat" [env_file; "-"]
+      (* Parse the ip output in order to retrieve the interface name *)
+      let iface_name =
+        let rec loop = function
+          | [] ->
+              Test.fail
+                "Failed to retrieve interface name (%s)"
+                (Agent.name agent)
+          | "dev" :: name :: _ -> name
+          | _ :: tl -> loop tl
         in
-        let* () = Lwt_io.write_line stdin (sf "FAKETIME=%s" faketime) in
-        let* () = Lwt_io.close stdin in
-        Process.check_and_read_stdout process
+        loop (String.split_on_char ' ' ip_output)
       in
-      (* Write the final environment content *)
-      let cmd = redirect_stdout (cmd [] "echo" [contents]) env_file in
-      let cmd, args = Runner.wrap_with_ssh runner cmd in
-      Process.run cmd args
+      (* Run [tc] on this interface *)
+      Agent.docker_run_command
+        agent
+        "tc"
+        [
+          "qdisc";
+          "add";
+          "dev";
+          iface_name;
+          "root";
+          "netem";
+          "delay";
+          Printf.sprintf "%.3fs" delay;
+          Printf.sprintf "%.3fs" jitter;
+        ]
+      |> Process.check
 
 let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
     ?tasks f =
@@ -657,17 +707,14 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
       else
         let tezt_cloud = Env.tezt_cloud in
         let ensure_ready =
-          let wait_and_faketime =
-            match Env.faketime with
-            | None -> wait_ssh_server_running
-            | Some faketime ->
-                fun agent ->
-                  let* () = wait_ssh_server_running agent in
-                  set_faketime faketime agent
+          let ensure_ready agent =
+            let* () = wait_ssh_server_running agent in
+            let* () = adjust_traffic_control agent in
+            let* () = set_faketime agent in
+            Lwt.return_unit
           in
           fun deployement ->
-            Deployement.agents deployement
-            |> List.map wait_and_faketime |> Lwt.join
+            Deployement.agents deployement |> List.map ensure_ready |> Lwt.join
         in
         match Env.mode with
         | `Remote_orchestrator_local_agents ->

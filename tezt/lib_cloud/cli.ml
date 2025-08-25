@@ -759,6 +759,36 @@ let retrieve_daily_logs =
     daily_logs_typ
     None
 
+let float_float =
+  let parse string =
+    try Scanf.sscanf string "%f,%f" (fun min max -> Some (min, max))
+    with _ -> None
+  in
+  let show (min, max) = Printf.sprintf "%f,%f" min max in
+  Clap.typ ~name:"float*float" ~dummy:(0., 0.) ~parse ~show
+
+let tc_delay : (float * float) option =
+  Clap.optional
+    ~section
+    ~long:"tc-delay"
+    ~placeholder:"MIN,MAX"
+    ~description:
+      "Add random network delay to outgoing messages (between MIN and MAX \
+       seconds)."
+    float_float
+    ()
+
+let tc_jitter : (float * float) option =
+  Clap.optional
+    ~section
+    ~long:"tc-jitter"
+    ~placeholder:"MIN,MAX"
+    ~description:
+      "Add random network jitter to outgoing messages, (between MIN and MAX \
+       seconds)."
+    float_float
+    ()
+
 let section =
   Clap.section
     ~description:"Define report and alert managing options"
