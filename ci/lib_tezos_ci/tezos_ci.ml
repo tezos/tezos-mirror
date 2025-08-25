@@ -789,7 +789,8 @@ let enc_git_strategy = function
 let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
     ?artifacts ?(before_script = []) ?cache ?id_tokens ?interruptible
     ?(dependencies = Staged []) ?(image_dependencies = []) ?services ?variables
-    ?rules ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
+    ?(rules : Gitlab_ci.Types.job_rule list option)
+    ?(timeout = Gitlab_ci.Types.Minutes 60) ?(tag : Runner.Tag.t option)
     ?(cpu : Runner.CPU.t option) ?(storage : Runner.Storage.t option)
     ?interruptible_runner ?git_strategy ?coverage ?retry ?parallel ?description
     ?(dev_infra = false) ~__POS__ ?image ?template ?(datadog = true) ~stage
@@ -848,8 +849,25 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
             storage_string ;
         tag
   in
-  if rules = Some [] then
-    failwith "The job '%s' cannot have empty [rules]." name ;
+  (* Check [rules]. *)
+  (match rules with
+  | None -> ()
+  | Some [] ->
+      failwith
+        "In job '%s', ~rules is the empty list. Either specify a non-empty \
+         list, or do not specify ~rules."
+        name
+  | Some rules ->
+      Fun.flip List.iter rules @@ fun {changes; _} ->
+      let changes_count =
+        match changes with None -> 0 | Some list -> List.length list
+      in
+      if changes_count >= 50 then
+        (* See https://docs.gitlab.com/ci/yaml/#ruleschanges *)
+        failwith
+          "In job '%s', one of the ~rules has more than 50 entries in its \
+           changeset. This is not allowed by GitLab."
+          name) ;
   let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
   (match (image, arch) with
   | Some (Internal {image = Image image_path; _}), None ->
