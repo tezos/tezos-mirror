@@ -1861,6 +1861,7 @@ trigger:debian_repository_full:
   stage: test
   variables:
     PIPELINE_TYPE: schedule_extended_test-debian_repository_full
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_full.yml
@@ -1870,6 +1871,7 @@ trigger:rpm_repository_full:
   stage: test
   variables:
     PIPELINE_TYPE: schedule_extended_test-rpm_repository_full
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   needs: []
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_full.yml
@@ -1879,6 +1881,7 @@ trigger:homebrew:
   stage: test
   variables:
     PIPELINE_TYPE: schedule_extended_test-homebrew
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   rules:
   - when: always
   needs: []
@@ -1890,6 +1893,7 @@ trigger:base_images:
   stage: images
   variables:
     PIPELINE_TYPE: schedule_extended_test-base_images
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   rules:
   - when: always
   needs: []

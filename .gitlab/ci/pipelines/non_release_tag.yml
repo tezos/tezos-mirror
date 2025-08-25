@@ -333,6 +333,7 @@ trigger:octez_monitoring:
   stage: build
   variables:
     PIPELINE_TYPE: octez_monitoring
+    DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   inherit:
     variables:
     - ci_image_name

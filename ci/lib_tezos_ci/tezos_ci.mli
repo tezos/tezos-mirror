@@ -473,6 +473,7 @@ val trigger_job :
   ?dependencies:dependencies ->
   ?rules:Gitlab_ci.Types.job_rule list ->
   ?description:string ->
+  ?variables:(string * string) list ->
   __POS__:string * int * int * int ->
   stage:Stage.t ->
   ?parent_pipeline_name:string ->
