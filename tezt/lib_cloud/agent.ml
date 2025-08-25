@@ -30,6 +30,21 @@ module Configuration = struct
         Lwt.return (Format.asprintf "%s/octez" registry_uri)
     | Octez_release _, `Local_orchestrator_local_agents -> Lwt.return "octez"
 
+  let registry_uri_of_docker_image docker_image =
+    match (docker_image, Env.mode) with
+    | ( Types.Agent_configuration.Gcp {alias = _},
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
+        let* registry_uri = Env.registry_uri () in
+        return (Some registry_uri)
+    | Gcp {alias = _}, `Local_orchestrator_local_agents -> Lwt.return None
+    | ( Octez_release _,
+        ( `Local_orchestrator_remote_agents | `Remote_orchestrator_remote_agents
+        | `Remote_orchestrator_local_agents | `Ssh_host _ ) ) ->
+        let* registry_uri = Env.registry_uri () in
+        Lwt.return (Some registry_uri)
+    | Octez_release _, `Local_orchestrator_local_agents -> return None
+
   let gen_name =
     let cpt = ref (-1) in
     fun () ->

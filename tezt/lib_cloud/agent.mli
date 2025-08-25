@@ -29,6 +29,8 @@ module Configuration : sig
 
   val uri_of_docker_image : docker_image -> string Lwt.t
 
+  val registry_uri_of_docker_image : docker_image -> string option Lwt.t
+
   (** [make ?machine_type ()] is a smart-constructor to make a VM
       configuration.
 
