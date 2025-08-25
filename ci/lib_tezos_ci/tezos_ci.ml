@@ -848,8 +848,15 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
             storage_string ;
         tag
   in
-  if rules = Some [] then
-    failwith "The job '%s' cannot have empty [rules]." name ;
+  (* Check [rules]. *)
+  (match rules with
+  | None -> ()
+  | Some [] ->
+      failwith
+        "In job '%s', ~rules is the empty list. Either specify a non-empty \
+         list, or do not specify ~rules."
+        name
+  | Some _ -> ()) ;
   let arch = if Option.is_some arch then arch else Runner.Tag.arch tag in
   (match (image, arch) with
   | Some (Internal {image = Image image_path; _}), None ->
