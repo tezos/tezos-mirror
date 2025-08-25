@@ -2103,6 +2103,15 @@ let jobs pipeline_type =
         ~dependencies:(Dependent [])
         Base_images.child_pipeline
     in
+    let security_scan_trigger =
+      trigger_job
+        ~__POS__
+        ~rules:(make_rules ~manual:Yes ())
+        ~stage:Stages.manual
+        ~dependencies:(Dependent [])
+        Security_scans.child_pipeline
+    in
+
     match pipeline_type with
     | Before_merging | Merge_train ->
         (* Note: manual jobs in stage [manual] (which is the final
@@ -2165,6 +2174,7 @@ let jobs pipeline_type =
             job_rpm_repository_trigger_partial;
             job_debian_repository_trigger_partial;
             job_base_images_trigger;
+            security_scan_trigger;
           ]
           @ jobs
     (* No manual jobs on the scheduled pipeline *)

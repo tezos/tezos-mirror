@@ -4547,6 +4547,18 @@ trigger:base_images:
     include: .gitlab/ci/pipelines/base_images.yml
     strategy: depend
 
+trigger:security-scans-master:
+  stage: manual
+  variables:
+    PIPELINE_TYPE: before_merging-security-scans-master
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  trigger:
+    include: .gitlab/ci/pipelines/security-scans-master.yml
+    strategy: depend
+
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual

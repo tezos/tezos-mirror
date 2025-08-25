@@ -12,19 +12,70 @@ open Gitlab_ci.Util
 open Tezos_ci
 
 let jobs : tezos_job list =
-  let image_tags = ["latest"; "octez-evm-node-latest"; "master"] in
+  let build_images =
+    List.map
+      (fun tag ->
+        {
+          Container_scanning.name = "tezos/tezos";
+          tag;
+          dockerfile = "build.Dockerfile";
+          job_name = "tezos-tezos-" ^ tag;
+        })
+      ["latest"; "octez-evm-node-latest"; "master"]
+  in
 
+  let base_images =
+    List.map
+      (fun release ->
+        {
+          Container_scanning.name =
+            "${GCP_PROTECTED_REGISTRY}/tezos/tezos/debian";
+          tag = release;
+          dockerfile = "images/base-images/Dockerfile.debian";
+          job_name = "tezos-debian-" ^ release ^ "-master";
+        })
+      Base_images.debian_releases
+    @ List.map
+        (fun release ->
+          {
+            Container_scanning.name =
+              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/ubuntu";
+            tag = release;
+            dockerfile = "images/base-images/Dockerfile.debian";
+            job_name = "tezos-ubuntu-" ^ release ^ "-master";
+          })
+        Base_images.ubuntu_releases
+    @ List.map
+        (fun release ->
+          {
+            Container_scanning.name =
+              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/fedora";
+            tag = release;
+            dockerfile = "images/base-images/Dockerfile.rpm";
+            job_name = "tezos-fedora-" ^ release ^ "-master";
+          })
+        Base_images.fedora_releases
+    @ List.map
+        (fun release ->
+          {
+            Container_scanning.name =
+              "${GCP_PROTECTED_REGISTRY}/tezos/tezos/rockylinux";
+            tag = release;
+            dockerfile = "images/base-images/Dockerfile.rpm";
+            job_name = "tezos-rockylinux-" ^ release ^ "-master";
+          })
+        Base_images.rockylinux_releases
+  in
   (* Scans [docker_image:docker_tag] image. A scanning report artifact
      is produced.
      We adapt the template provided by Trivy:
      https://trivy.dev/v0.63/tutorials/integrations/gitlab-ci/#gitlab-ci-using-trivy-container *)
-  let job_container_scanning ?(docker_image = "tezos/tezos") docker_tag :
-      tezos_job =
-    let full_image_name = docker_image ^ ":" ^ docker_tag in
-    let report = "gl-container-scanning-report-" ^ docker_tag ^ ".json" in
+  let job_container_scanning image : tezos_job =
+    let full_image_name = Container_scanning.(image_ref image) in
+    let report = "gl-container-scanning-report-" ^ image.job_name ^ ".json" in
     job
       ~__POS__
-      ~name:("container_scanning_" ^ docker_tag)
+      ~name:("container_scanning_" ^ image.job_name)
       ~description:("Container scanning of [" ^ full_image_name ^ "]")
       ~stage:Stages.test
       ~image:Images.trivy
@@ -42,7 +93,7 @@ let jobs : tezos_job list =
   in
 
   let job_list_container_scanning =
-    List.map job_container_scanning image_tags
+    List.map job_container_scanning (build_images @ base_images)
   in
 
   (* Merges reports from individual image scans into a single report
@@ -75,18 +126,19 @@ let jobs : tezos_job list =
           map(.vulnerabilities[]), remediations: map(.remediations[])}'"
        in
        (* String of all individual image scan reports *)
-       let input_scan_reports =
-         let concat_reports tag report_name : string =
-           Format.sprintf " gl-container-scanning-report-"
-           ^ tag ^ ".json" ^ report_name
-         in
-         List.fold_right concat_reports image_tags " "
-       in
        [
-         "jq --slurp " ^ jq_slurp_filter ^ input_scan_reports
+         "jq --slurp " ^ jq_slurp_filter ^ " gl-container-scanning-report-*"
          ^ "> gl-container-scanning-report.json";
        ])
   in
 
   (Tezos_ci.job_datadog_pipeline_trace :: job_list_container_scanning)
   @ [job_container_scanning_merge_reports]
+
+let child_pipeline =
+  Pipeline.register_child
+    ~description:
+      "A child pipeline of 'before_merging' to launch the security scans for \
+       the images on the master branch"
+    ~jobs
+    "security-scans-master"
