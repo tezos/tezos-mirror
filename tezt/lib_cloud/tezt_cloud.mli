@@ -258,6 +258,8 @@ end
 
 (** Expose the elements of [Cli] which are useful for the scenario. *)
 module Tezt_cloud_cli : sig
+  module Types : module type of Cli.Types
+
   val prometheus : bool
 
   val scenario_specific_json : (string * Data_encoding.Json.t) option

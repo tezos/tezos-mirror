@@ -301,6 +301,8 @@ module Prometheus = struct
 end
 
 module Tezt_cloud_cli = struct
+  module Types = Cli.Types
+
   let prometheus = Cli.prometheus
 
   let scenario_specific_json = Cli.scenario_specific
