@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use paste::paste;
-use tezos::keys::*;
+use tezos::hash::*;
 
 // All keys were generated using `octez-client`
 

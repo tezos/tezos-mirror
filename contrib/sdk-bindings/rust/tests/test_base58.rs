@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use tezos::{keys::*, Error};
+use tezos::{hash::*, Error};
 use tezos_crypto_rs::base58;
 
 macro_rules! test_b58check {
