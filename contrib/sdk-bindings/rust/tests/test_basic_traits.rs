@@ -36,6 +36,12 @@ macro_rules! generate_tests {
 }
 
 generate_tests!(
+    ContractKt1Hash,
+    "KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4",
+    "KT1WPztCUj2wXnsXvgG6C3RnFe9pv2MY9Pv2"
+);
+
+generate_tests!(
     ContractTz1Hash,
     // sk: edsk2stcDLHYC5N5AFowvKTvdQ86zuqQCn7QsFBoFJUgYyHL4xSaYB
     "tz1XFq85mnnXhyhzpNEpxFvrkcuNtFBsSsVu",
@@ -147,6 +153,13 @@ generate_tests!(
     // sk: BLsk2SdiXbRuYrWkfkSDbN1tCBGjGV7tTHxjVrokaiJsv17rDd8scd
     // msg: "a"
     "BLsigBjCT4gTkW7e3yaWrum16tApsZNxw12NQxjpJTTQJyjVt4yJeNjnqxNrzKzrLQ2VqkcJr8djGUeDS3fmgoDn4kukS5zEMGPxGaduG5nrpMd5Vzkray9D9nzpcakWrscVf11KzkH4A6"
+);
+
+generate_tests!(
+    Contract,
+    // sk: edsk4BYt5bFFa7rHeoZSxgbTUJFYJjSynS9tFgFBzjQpRTL4Gku2x2
+    "tz1Pta3ShQiC5uZRjfivFUmYQYd4Lai1vJrU",
+    "KT1DvqNXfdigfmDeh2zyF9Q4mTFruyUr1rmv"
 );
 
 generate_tests!(
