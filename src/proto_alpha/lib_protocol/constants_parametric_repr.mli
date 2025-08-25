@@ -279,6 +279,8 @@ val encoding : t Data_encoding.encoding
     be multiplied by 5/4. *)
 val update_sc_rollup_parameter : (int32 -> int32) -> sc_rollup -> sc_rollup
 
+val update_sc_rollup_parameter_with_block_time : int -> sc_rollup -> sc_rollup
+
 module Internal_for_tests : sig
   val sc_rollup_encoding : sc_rollup Data_encoding.t
 end

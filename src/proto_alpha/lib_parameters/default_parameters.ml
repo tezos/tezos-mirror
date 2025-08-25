@@ -63,7 +63,10 @@ let make_sc_rollup_parameter ~dal_activation_level
       WARNING: Changing this value impacts the storage charge for
       applying messages from the outbox. It also requires migration for
       remapping existing active outbox levels to new indices. *)
-  let max_active_outbox_levels = Int32.of_int challenge_window_in_blocks in
+  let max_active_outbox_levels =
+    let previous_block_time = 8 in
+    Int32.of_int (seconds_in_a_week * 2 / previous_block_time)
+  in
 
   (* The timeout period is about a week.  It suffers from the same
      risk of censorship as {!sc_rollup_challenge_windows_in_blocks} so

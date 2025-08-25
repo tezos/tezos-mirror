@@ -1026,6 +1026,7 @@ type block_time_delays = {
   max_operations_time_to_live : int;
   delay_increment_per_round : Period_repr.t;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
+  sc_rollup : Constants_parametric_repr.sc_rollup;
 }
 
 let update_block_time_related_constants
@@ -1043,11 +1044,17 @@ let update_block_time_related_constants
     Gas_limit_repr.Arith.(integral_of_int_exn 1_040_000)
   in
   let max_operations_time_to_live = 4 * old.max_operations_time_to_live / 3 in
+  let sc_rollup =
+    Constants_parametric_repr.update_sc_rollup_parameter_with_block_time
+      6
+      old.sc_rollup
+  in
   {
     minimal_block_delay;
     max_operations_time_to_live;
     delay_increment_per_round;
     hard_gas_limit_per_block;
+    sc_rollup;
   }
 
 type cycle_duration_delays = {
@@ -1697,6 +1704,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           max_operations_time_to_live;
           delay_increment_per_round;
           hard_gas_limit_per_block;
+          sc_rollup;
         } =
           let previous_blocktime_delays =
             {
@@ -1704,6 +1712,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               max_operations_time_to_live;
               delay_increment_per_round;
               hard_gas_limit_per_block;
+              sc_rollup;
             }
           in
           if
