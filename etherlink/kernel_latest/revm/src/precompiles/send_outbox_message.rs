@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use alloy_sol_types::{sol, SolEvent, SolValue};
+use alloy_sol_types::{sol, SolInterface, SolValue};
 use num_bigint::{BigInt, Sign};
 use revm::{
     context::{Block, ContextTr, Transaction},
@@ -39,47 +39,41 @@ use crate::{
 };
 
 sol! {
-    event SendWithdrawalInput (
-        string target,
-        uint256 amount,
-    );
-}
+    contract SendOutboxMessage {
+        function push_withdrawal_to_outbox(
+            string target,
+            uint256 amount
+        ) external;
 
-sol! {
-    event SendFAWithdrawalInput (
-        bytes   routing_info,
-        uint256 amount,
-        bytes22 ticketer,
-        bytes   content,
-    );
-}
+        function push_fast_withdrawal_to_outbox(
+            string target,
+            string fast_withdrawal_contract,
+            bytes  payload,
+            uint256 amount,
+            uint256 withdrawal_id
+        ) external;
 
-sol! {
-    event SendFastWithdrawalInput (
-        string target,
-        string fast_withdrawal_contract,
-        bytes  payload,
-        uint256 amount,
-        uint256 withdrawal_id,
-    );
-}
+        function push_fa_withdrawal_to_outbox(
+            bytes   routing_info,
+            uint256 amount,
+            bytes22 ticketer,
+            bytes   content,
+        ) external;
 
-sol! {
-    event SendFastFAWithdrawalInput (
-        bytes   routing_info,
-        uint256 amount,
-        bytes22 ticketer,
-        bytes   content,
-        string  fast_withdrawal_contract_address,
-        bytes   payload,
-        uint256 withdrawal_id,
-    );
-}
+        function push_fast_fa_withdrawal_to_outbox(
+            bytes   routing_info,
+            uint256 amount,
+            bytes22 ticketer,
+            bytes   content,
+            string  fast_withdrawal_contract_address,
+            bytes   payload,
+            uint256 withdrawal_id,
+        ) external;
 
-sol! {
-    struct RoutingInfo {
-        bytes22 target;
-        bytes22 proxy;
+        struct RoutingInfo {
+            bytes22 target;
+            bytes22 proxy;
+        }
     }
 }
 
@@ -156,40 +150,22 @@ impl From<Vec<u8>> for SendOutboxError {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn prepare_fast_message(
-    // external
+fn build_fast_parameters(
+    ticket: FA2_1Ticket,
     target: Contract,
-    fast_withdrawal_contract: Contract,
     payload: Vec<u8>,
-    content: MichelsonPair<MichelsonNat, MichelsonOption<MichelsonBytes>>,
-    // contract
-    amount: BigInt,
-    withdrawal_id: U256,
-    // context
     timestamp: U256,
+    withdrawal_id: MichelsonNat,
     caller: Address,
-    // db
-    ticketer: Contract,
-) -> Result<Withdrawal, SendOutboxError> {
-    let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
-
-    let withdrawal_id_nat = MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
-        .ok_or(SendOutboxError::CustomDecode(
-            "Invalid withdrawal id".to_string(),
-        ))?;
-
+) -> FastWithdrawalInterface {
     let bytes_payload = MichelsonBytes(payload);
-
     let caller = MichelsonBytes(caller.to_vec());
-
     let timestamp: MichelsonTimestamp =
         MichelsonTimestamp(Zarith(u256_to_bigint(timestamp)));
-
     let target = MichelsonContract(target.clone());
 
-    let parameters = MichelsonPair(
-        withdrawal_id_nat,
+    MichelsonPair(
+        withdrawal_id,
         MichelsonPair(
             ticket,
             MichelsonPair(
@@ -197,45 +173,63 @@ fn prepare_fast_message(
                 MichelsonPair(target, MichelsonPair(bytes_payload, caller)),
             ),
         ),
-    );
-
-    let entrypoint = Entrypoint::try_from(String::from("default")).unwrap(); // Never fails
-
-    let message = OutboxMessageTransaction {
-        parameters,
-        entrypoint,
-        destination: fast_withdrawal_contract,
-    };
-
-    Ok(Withdrawal::Fast(OutboxMessage::AtomicTransactionBatch(
-        vec![message].into(),
-    )))
+    )
 }
 
-fn prepare_standard_message(
-    target: Contract,
-    ticketer: Contract,
-    content: MichelsonPair<MichelsonNat, MichelsonOption<MichelsonBytes>>,
-    amount: BigInt,
+enum MessageInput {
+    Standard {
+        target: Contract,
+    },
+    Fast {
+        target: Contract,
+        payload: Vec<u8>,
+        withdrawal_id: MichelsonNat,
+        caller: Address,
+        timestamp: U256,
+    },
+}
+
+fn prepare_message(
+    ticket: FA2_1Ticket,
+    parameters: MessageInput,
     entrypoint: Entrypoint,
     destination: Contract,
-) -> Result<Withdrawal, SendOutboxError> {
-    let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
-
-    let parameters = MichelsonPair::<MichelsonContract, FA2_1Ticket>(
-        MichelsonContract(target),
-        ticket,
-    );
-
-    let message = OutboxMessageTransaction {
-        parameters,
-        entrypoint,
-        destination,
-    };
-
-    Ok(Withdrawal::Standard(OutboxMessage::AtomicTransactionBatch(
-        vec![message].into(),
-    )))
+) -> Withdrawal {
+    match parameters {
+        MessageInput::Standard { target } => {
+            let parameters = MichelsonPair(MichelsonContract(target), ticket);
+            let message = OutboxMessageTransaction {
+                parameters,
+                entrypoint,
+                destination,
+            };
+            Withdrawal::Standard(OutboxMessage::AtomicTransactionBatch(
+                vec![message].into(),
+            ))
+        }
+        MessageInput::Fast {
+            target,
+            payload,
+            timestamp,
+            withdrawal_id,
+            caller,
+        } => {
+            let parameters = build_fast_parameters(
+                ticket,
+                target,
+                payload,
+                timestamp,
+                withdrawal_id,
+                caller,
+            );
+            let message = OutboxMessageTransaction {
+                parameters,
+                entrypoint,
+                destination,
+            };
+            Withdrawal::Fast(OutboxMessage::AtomicTransactionBatch(vec![message].into()))
+        }
+    }
 }
 
 fn parse_l1_routing_info(
@@ -285,11 +279,17 @@ where
         return Ok(revert("unauthorized caller"));
     }
 
-    match input {
-        // "0x7bced8e4" is the function selector for `push_withdrawal_to_outbox(string,uint256)`
-        [0x7b, 0xce, 0xd8, 0xe4, input_data @ ..] => {
+    let mut gas = Gas::new(gas_limit);
+
+    if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
+        return Ok(revert("base cost is not covered"));
+    }
+
+    let output = match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
+        SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
+            SendOutboxMessage::push_withdrawal_to_outboxCall { target, amount },
+        ) => {
             // Decode
-            let (target, amount) = SendWithdrawalInput::abi_decode_data(input_data)?;
             let target = Contract::from_b58check(&target)?;
             let amount = BigInt::from_bytes_be(
                 Sign::Plus,
@@ -301,32 +301,28 @@ where
             // Build
             let ticketer = Contract::Originated(context.db().ticketer()?);
             let content = MichelsonPair(0.into(), MichelsonOption(None));
-            let entrypoint = Entrypoint::try_from(String::from("burn")).unwrap(); // Never fails
             let destination = ticketer.clone();
-            let withdrawal = prepare_standard_message(
-                target,
-                ticketer,
-                content,
-                amount,
+            let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
+            let entrypoint = Entrypoint::try_from(String::from("burn")).unwrap(); // Never fails
+            let withdrawal = prepare_message(
+                ticket,
+                MessageInput::Standard { target },
                 entrypoint,
                 destination,
-            )?;
-
-            // Push
+            );
             context.db_mut().push_withdrawal(withdrawal);
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
-                output: Bytes::from(fixed_target),
-            };
-            Ok(result)
+            Bytes::from(fixed_target)
         }
-        // "0xdf1943c8" is the function selector for `push_fast_withdrawal_to_outbox(string,string,bytes,uint256,uint256)`
-        [0xdf, 0x19, 0x43, 0xc8, input_data @ ..] => {
+        SendOutboxMessage::SendOutboxMessageCalls::push_fast_withdrawal_to_outbox(
+            SendOutboxMessage::push_fast_withdrawal_to_outboxCall {
+                target,
+                fast_withdrawal_contract,
+                payload,
+                amount,
+                withdrawal_id,
+            },
+        ) => {
             // Decode
-            let (target, fast_withdrawal_contract, payload, amount, withdrawal_id) =
-                SendFastWithdrawalInput::abi_decode_data(input_data)?;
             let target = Contract::from_b58check(&target)?;
             let fast_withdrawal_contract =
                 Contract::from_b58check(&fast_withdrawal_contract)?;
@@ -334,39 +330,42 @@ where
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
+            let withdrawal_id = MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
+                .ok_or(SendOutboxError::CustomDecode(
+                    "Negative withdrawal ID".to_string(),
+                ))?;
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
 
             // Build
             let ticketer = Contract::Originated(context.db().ticketer()?);
             let content = MichelsonPair(0.into(), MichelsonOption(None));
-            let withdrawal = prepare_fast_message(
-                target,
+            let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
+            let entrypoint = Entrypoint::try_from(String::from("default")).unwrap(); // Never fails
+            let withdrawal = prepare_message(
+                ticket,
+                MessageInput::Fast {
+                    target,
+                    payload: payload.to_vec(),
+                    timestamp: context.block().timestamp(),
+                    withdrawal_id,
+                    caller: context.tx().caller(),
+                },
+                entrypoint,
                 fast_withdrawal_contract,
-                payload.to_vec(),
-                content,
-                amount,
-                withdrawal_id,
-                context.block().timestamp(),
-                context.tx().caller(),
-                ticketer,
-            )?;
-
-            // Push
+            );
             context.db_mut().push_withdrawal(withdrawal);
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
-                output: Bytes::from(fixed_target),
-            };
-            Ok(result)
+            Bytes::from(fixed_target)
         }
-        // "0xe9f58a77" is the function selector for `push_fa_withdrawal_to_outbox(bytes,uint256,bytes22,bytes)`
-        [0xe9, 0xf5, 0x8a, 0x77, input_data @ ..] => {
+        SendOutboxMessage::SendOutboxMessageCalls::push_fa_withdrawal_to_outbox(
+            SendOutboxMessage::push_fa_withdrawal_to_outboxCall {
+                routing_info,
+                amount,
+                ticketer,
+                content,
+            },
+        ) => {
             // Decode
-            let (routing_info, amount, ticketer, content) =
-                SendFAWithdrawalInput::abi_decode_data(input_data)?;
             let (target, proxy) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) = Contract::nom_read(ticketer.as_slice())?;
             let amount = BigInt::from_bytes_be(
@@ -382,32 +381,24 @@ where
             let fixed_proxy: FixedBytes<22> =
                 FixedBytes::new(proxy.to_bytes()?.try_into()?);
 
-            // Build message
+            // Build
+            let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
             let entrypoint = Entrypoint::try_from(String::from("withdraw")).unwrap(); // Never fails
-            let withdrawal = prepare_standard_message(
-                target, ticketer, content, amount, entrypoint, proxy,
-            )?;
-
-            // Push
-            context.db_mut().push_withdrawal(withdrawal);
-
-            // Build output
-            let routing_info = RoutingInfo {
+            let withdrawal = prepare_message(
+                ticket,
+                MessageInput::Standard { target },
+                entrypoint,
+                proxy,
+            );
+            let routing_info = SendOutboxMessage::RoutingInfo {
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
-                output: Bytes::copy_from_slice(&routing_info.abi_encode()),
-            };
-            Ok(result)
+            context.db_mut().push_withdrawal(withdrawal);
+            Bytes::copy_from_slice(&routing_info.abi_encode())
         }
-        // "0xb27d7fb8" is the function selector for `push_fast_fa_withdrawal_to_outbox(bytes,uint256,bytes22,bytes,string,bytes,uint256)`
-        [0xb2, 0x7d, 0x7f, 0xb8, input_data @ ..] => {
-            // Decode
-            let (
+        SendOutboxMessage::SendOutboxMessageCalls::push_fast_fa_withdrawal_to_outbox(
+            SendOutboxMessage::push_fast_fa_withdrawal_to_outboxCall {
                 routing_info,
                 amount,
                 ticketer,
@@ -415,7 +406,9 @@ where
                 fast_withdrawal_contract_address,
                 payload,
                 withdrawal_id,
-            ) = SendFastFAWithdrawalInput::abi_decode_data(input_data)?;
+            },
+        ) => {
+            // Decode
             let (target, proxy) = parse_l1_routing_info(&routing_info)?;
             let (_, ticketer) = Contract::nom_read(ticketer.as_slice())?;
             let amount = BigInt::from_bytes_be(
@@ -428,40 +421,42 @@ where
             >::nom_read(&content)?;
             let fast_withdrawal_contract =
                 Contract::from_b58check(&fast_withdrawal_contract_address)?;
+            let withdrawal_id = MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
+                .ok_or(SendOutboxError::CustomDecode(
+                    "Negative withdrawal ID".to_string(),
+                ))?;
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
             let fixed_proxy: FixedBytes<22> =
                 FixedBytes::new(proxy.to_bytes()?.try_into()?);
 
-            // Build message
-            let withdrawal = prepare_fast_message(
-                target,
+            // Build
+            let ticket = FA2_1Ticket::new(ticketer, content, amount)?;
+            let entrypoint = Entrypoint::try_from(String::from("default")).unwrap(); // Never fails
+            let withdrawal = prepare_message(
+                ticket,
+                MessageInput::Fast {
+                    target,
+                    payload: payload.to_vec(),
+                    timestamp: context.block().timestamp(),
+                    withdrawal_id,
+                    caller: context.tx().caller(),
+                },
+                entrypoint,
                 fast_withdrawal_contract,
-                payload.to_vec(),
-                content,
-                amount,
-                withdrawal_id,
-                context.block().timestamp(),
-                context.tx().caller(),
-                ticketer,
-            )?;
-
-            // Push
-            context.db_mut().push_withdrawal(withdrawal);
-
-            // Build output
-            let routing_info = RoutingInfo {
+            );
+            let routing_info = SendOutboxMessage::RoutingInfo {
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
-                output: Bytes::copy_from_slice(&routing_info.abi_encode()),
-            };
-            Ok(result)
+            context.db_mut().push_withdrawal(withdrawal);
+            Bytes::copy_from_slice(&routing_info.abi_encode())
         }
-        _ => Ok(revert("unknown selector")),
-    }
+    };
+
+    Ok(InterpreterResult {
+        result: InstructionResult::Return,
+        gas,
+        output,
+    })
 }
