@@ -519,7 +519,12 @@ module Ssh_host = struct
        TODO: support deploying using sudo and remove the "root" user requirement *)
     let user = "root" in
     let proxy_runner =
-      Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+      Runner.create
+        ~ssh_user:user
+        ~ssh_port:port
+        ~address:host
+        ~ssh_id:(Env.ssh_private_key_filename ())
+        ()
     in
     (* Deploys the proxy *)
     let* proxy = deploy_proxy proxy_runner in
@@ -536,7 +541,12 @@ module Ssh_host = struct
           let base_port = 30_050 in
           let range = 50 in
           let runner =
-            Runner.create ~ssh_user:user ~ssh_port:port ~address:host ()
+            Runner.create
+              ~ssh_user:user
+              ~ssh_port:port
+              ~address:host
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
           in
           let publish_ports =
             ( string_of_int (base_port + (i * range)),
@@ -597,7 +607,13 @@ module Ssh_host = struct
       Lwt_list.iter_p
         (fun agent ->
           let name = Agent.name agent in
-          let runner = Runner.create ~ssh_port:port ~address:host () in
+          let runner =
+            Runner.create
+              ~ssh_port:port
+              ~address:host
+              ~ssh_id:(Env.ssh_private_key_filename ())
+              ()
+          in
           let* _ = Docker.rm ~runner name |> Process.check in
           Lwt.return_unit)
         agents
