@@ -199,20 +199,25 @@ let round_of_shell_header shell_header =
 let sign ?timeout ?watermark ~signing_request cctxt secret_key_uri msg =
   let open Lwt_result_syntax in
   let*! result =
-    match timeout with
-    | None ->
-        let*! res = Client_keys.sign cctxt secret_key_uri ?watermark msg in
-        Lwt.return (`Signature_result res)
-    | Some timeout ->
-        Lwt.pick
-          [
-            (let*! () = Lwt_unix.sleep timeout in
-             Lwt.return (`Signature_timeout timeout));
-            (let*! signature =
-               Client_keys.sign cctxt secret_key_uri ?watermark msg
-             in
-             Lwt.return (`Signature_result signature));
-          ]
+    let sign () =
+      match timeout with
+      | None ->
+          let*! res = Client_keys.sign cctxt secret_key_uri ?watermark msg in
+          Lwt.return (`Signature_result res)
+      | Some timeout ->
+          Lwt.pick
+            [
+              (let*! () = Lwt_unix.sleep timeout in
+               Lwt.return (`Signature_timeout timeout));
+              (let*! signature =
+                 Client_keys.sign cctxt secret_key_uri ?watermark msg
+               in
+               Lwt.return (`Signature_result signature));
+            ]
+    in
+    Octez_baking_common.Signing_delay.sign_with_minimum_duration
+      (module Profiler)
+      sign
   in
   match result with
   | `Signature_timeout timeout ->
