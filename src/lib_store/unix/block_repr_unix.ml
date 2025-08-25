@@ -107,7 +107,10 @@ let pread_block fd ~file_offset =
 let raw_pruned_block_length bytes =
   (* Hypothesis: (Int32.to_int total_len + 4 <= Bytes.length bytes) *)
   let offset = 4 in
-  let offset = offset + Block_hash.size (* hash *) in
+  let offset =
+    offset + Block_hash.size
+    (* hash *)
+  in
   let header_length = Bytes.get_int32_be bytes offset in
   let offset = offset + 4 + Int32.to_int header_length in
   let operations_length = Bytes.get_int32_be bytes offset in

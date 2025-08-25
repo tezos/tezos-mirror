@@ -1128,7 +1128,8 @@ let generate_random_transactions =
            verbose_flag,
            debug_flag )
          sources_json
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       let open Lwt_result_syntax in
       (verbosity :=
          match (debug_flag, verbose_flag) with
@@ -1302,8 +1303,8 @@ let estimate_transaction_cost ?smart_contracts
   | Single_result (Manager_operation_result {operation_result; _}) -> (
       match operation_result with
       | Applied
-          (Transaction_result
-            (Transaction_to_contract_result {consumed_gas; _})) ->
+          (Transaction_result (Transaction_to_contract_result {consumed_gas; _}))
+        ->
           return (Gas.Arith.ceil consumed_gas)
       | _ ->
           (match operation_result with
@@ -1787,7 +1788,8 @@ let fund_accounts_from_source : Protocol_client_context.full Tezos_clic.command
            storage_limit,
            fee_parameter )
          source_pkh
-         (cctxt : Protocol_client_context.full) ->
+         (cctxt : Protocol_client_context.full)
+       ->
       let open Lwt_result_syntax in
       let* source_pk, source_sk =
         let* _, src_pk, src_sk = Client_keys.get_key cctxt source_pkh in

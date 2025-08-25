@@ -42,7 +42,8 @@ module Legacy_encodings = struct
              blobGasUsed = _;
              excessBlobGas = _;
              parentBeaconBlockRoot = _;
-           } ->
+           }
+         ->
         ( ( ( number,
               hash,
               parent,
@@ -84,7 +85,8 @@ module Legacy_encodings = struct
                  transactions,
                  uncles,
                  baseFeePerGas ) ),
-             prevRandao ) ->
+             prevRandao )
+         ->
         {
           number;
           hash;
@@ -1483,7 +1485,8 @@ module Transactions = struct
                  type_;
                  status;
                  contract_address;
-               } ) ->
+               } )
+         ->
         Transaction_receipt.
           {
             transactionHash = hash;
@@ -1524,7 +1527,8 @@ module Transactions = struct
                  status;
                  contract_address;
                } )
-           acc ->
+           acc
+         ->
         Transaction_receipt.
           {
             transactionHash = hash;
@@ -1569,7 +1573,8 @@ module Transactions = struct
                    status;
                    contract_address;
                  } )
-             acc ->
+             acc
+           ->
           Transaction_receipt.
             {
               transactionHash = hash;
@@ -1608,7 +1613,8 @@ module Transactions = struct
                from,
                to_,
                Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
-             ) ->
+             )
+           ->
           Ethereum_types.
             {
               blockHash = Some block_hash;
@@ -1706,7 +1712,8 @@ module Blocks = struct
                from,
                to_,
                Transaction_info.{gas; gas_price; input; nonce; value; v; r; s}
-             ) ->
+             )
+           ->
           Ethereum_types.
             {
               blockHash = Some block.hash;

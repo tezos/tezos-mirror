@@ -391,8 +391,7 @@ module Handlers = struct
 
   type launch_error = tztrace
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
    fun w request ->
     let (S state) = Worker.state w in
@@ -400,16 +399,16 @@ module Handlers = struct
 
   let on_launch _w ()
       (Types.P
-        {
-          discovery;
-          config;
-          debug_config;
-          connect_handler;
-          triggers;
-          log;
-          rng;
-          please_maintain;
-        }) =
+         {
+           discovery;
+           config;
+           debug_config;
+           connect_handler;
+           triggers;
+           log;
+           rng;
+           please_maintain;
+         }) =
     let inner_state =
       let bounds =
         bounds

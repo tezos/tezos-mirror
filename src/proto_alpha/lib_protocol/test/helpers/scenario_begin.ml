@@ -53,7 +53,8 @@ let init_constants ?(default = Test) ?(reward_per_block = 0L)
     ?delegate_parameters_activation_delay () =
   let base_total_issued_per_minute = Tez.of_mutez reward_per_block in
   start ~constants:default
-  --> (* default for tests: 12 *)
+  -->
+  (* default for tests: 12 *)
   set_opt S.blocks_per_cycle blocks_per_cycle
   --> set_opt
         S.delegate_parameters_activation_delay

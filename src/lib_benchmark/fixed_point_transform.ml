@@ -100,9 +100,11 @@ let cast_mode_encoding =
 let options_encoding =
   let open Data_encoding in
   conv
-    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution} ->
+    (fun {precision; max_relative_error; cast_mode; inverse_scaling; resolution}
+       ->
       (precision, max_relative_error, cast_mode, inverse_scaling, resolution))
-    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution) ->
+    (fun (precision, max_relative_error, cast_mode, inverse_scaling, resolution)
+       ->
       {precision; max_relative_error; cast_mode; inverse_scaling; resolution})
     (obj5
        (dft "precision" int31 default_options.precision)
@@ -236,7 +238,9 @@ end = struct
      all_bits x = [sign] @ exponent @ mantissa *)
   let all_bits (x : float) : int64 list =
     List.init ~when_negative_length:() 64 (fun i -> bit x i)
-    |> (* 64 >= 0 *) WithExceptions.Result.get_ok ~loc:__LOC__
+    |>
+    (* 64 >= 0 *)
+    WithExceptions.Result.get_ok ~loc:__LOC__
     |> List.rev
 
   (* take n first elements from a list *)

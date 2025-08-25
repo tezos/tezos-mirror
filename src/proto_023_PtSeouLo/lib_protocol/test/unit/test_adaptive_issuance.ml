@@ -156,7 +156,10 @@ let test_compute_bonus () =
     in
     return (bonus :> Q.t)
   in
-  let small_bonus = Q.(1 // 200) (* 0.5% *) in
+  let small_bonus =
+    Q.(1 // 200)
+    (* 0.5% *)
+  in
   (* Test deadzone *)
   let* () =
     assert_eq ~loc:__LOC__ (compute_bonus Q.(48 // 100) small_bonus) small_bonus
@@ -179,7 +182,10 @@ let test_compute_bonus () =
       small_bonus
   in
   (* Test variation amplitude *)
-  let variation = Q.(1 // 10_000) (* 0.01% *) in
+  let variation =
+    Q.(1 // 10_000)
+    (* 0.01% *)
+  in
   let* () =
     assert_eq
       ~loc:__LOC__

@@ -114,7 +114,8 @@ let participation_info_encoding =
              missed_levels;
              remaining_allowed_missed_slots;
              expected_attesting_rewards;
-           } ->
+           }
+       ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
@@ -126,7 +127,8 @@ let participation_info_encoding =
            missed_slots,
            missed_levels,
            remaining_allowed_missed_slots,
-           expected_attesting_rewards ) ->
+           expected_attesting_rewards )
+       ->
       {
         expected_cycle_activity;
         minimal_cycle_activity;
@@ -154,7 +156,8 @@ let dal_participation_info_encoding =
              expected_dal_rewards;
              sufficient_dal_participation;
              denounced;
-           } ->
+           }
+       ->
       ( expected_assigned_shards_per_slot,
         delegate_attested_dal_slots,
         delegate_attestable_dal_slots,
@@ -166,7 +169,8 @@ let dal_participation_info_encoding =
            delegate_attestable_dal_slots,
            expected_dal_rewards,
            sufficient_dal_participation,
-           denounced ) ->
+           denounced )
+       ->
       {
         expected_assigned_shards_per_slot;
         delegate_attested_dal_slots;
@@ -310,13 +314,15 @@ let conv26 ty =
            x22,
            x23,
            x24,
-           x25 ) ->
+           x25 )
+       ->
       ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
         ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
           (x20, x21, x22, x23, x24, x25) ) ))
     (fun ( (x0, x1, x2, x3, x4, x5, x6, x7, x8, x9),
            ( (x10, x11, x12, x13, x14, x15, x16, x17, x18, x19),
-             (x20, x21, x22, x23, x24, x25) ) ) ->
+             (x20, x21, x22, x23, x24, x25) ) )
+       ->
       ( x0,
         x1,
         x2,
@@ -390,7 +396,8 @@ let info_encoding =
            (* Chunked RPCs *)
            stakers;
            delegators;
-         } ->
+         }
+       ->
       ( (* General baking information *)
         deactivated,
         is_forbidden,
@@ -452,7 +459,8 @@ let info_encoding =
            consensus_key,
            (* Chunked RPCs *)
            stakers,
-           delegators ) ->
+           delegators )
+       ->
       {
         (* General baking information *)
         deactivated;

@@ -35,8 +35,8 @@ struct
   open Lang_core
 
   (* vanilla implementation of Schnorr signature using ec-jubjub
-     * general idea based on
-     * https://github.com/dusk-network/schnorr/blob/main/src/key_variants/single_key.rs *)
+   * general idea based on
+   * https://github.com/dusk-network/schnorr/blob/main/src/key_variants/single_key.rs *)
   module P : sig
     type pk = Curve.t
 

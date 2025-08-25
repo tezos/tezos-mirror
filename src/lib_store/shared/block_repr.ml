@@ -108,9 +108,11 @@ let contents_encoding =
               operations;
               block_metadata_hash;
               operations_metadata_hashes;
-            } ->
+            }
+          ->
          (header, operations, block_metadata_hash, operations_metadata_hashes))
-       (fun (header, operations, block_metadata_hash, operations_metadata_hashes) ->
+       (fun (header, operations, block_metadata_hash, operations_metadata_hashes)
+          ->
          {header; operations; block_metadata_hash; operations_metadata_hashes})
        (obj4
           (req "header" (dynamic_size Block_header.encoding))
@@ -130,7 +132,8 @@ let metadata_encoding : metadata Data_encoding.t =
               last_preserved_block_level;
               block_metadata;
               operations_metadata;
-            } ->
+            }
+          ->
          ( message,
            max_operations_ttl,
            last_preserved_block_level,
@@ -140,7 +143,8 @@ let metadata_encoding : metadata Data_encoding.t =
               max_operations_ttl,
               last_preserved_block_level,
               block_metadata,
-              operations_metadata ) ->
+              operations_metadata )
+          ->
          {
            message;
            max_operations_ttl;
@@ -167,7 +171,8 @@ let legacy_metadata_encoding : legacy_metadata Data_encoding.t =
               legacy_last_allowed_fork_level;
               legacy_block_metadata;
               legacy_operations_metadata;
-            } ->
+            }
+          ->
          ( legacy_message,
            legacy_max_operations_ttl,
            legacy_last_allowed_fork_level,
@@ -177,7 +182,8 @@ let legacy_metadata_encoding : legacy_metadata Data_encoding.t =
               legacy_max_operations_ttl,
               legacy_last_allowed_fork_level,
               legacy_block_metadata,
-              legacy_operations_metadata ) ->
+              legacy_operations_metadata )
+          ->
          {
            legacy_message;
            legacy_max_operations_ttl;

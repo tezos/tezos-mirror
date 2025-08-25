@@ -93,7 +93,10 @@ let sleep_before_reconnection ~factor =
     (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
     let delay = reconnection_delay *. (1.5 ** fcount) in
     let delay = min delay 3600. in
-    let randomization_factor = 0.5 (* 50% *) in
+    let randomization_factor =
+      0.5
+      (* 50% *)
+    in
     let delay =
       delay
       +. Random.float (delay *. 2. *. randomization_factor)

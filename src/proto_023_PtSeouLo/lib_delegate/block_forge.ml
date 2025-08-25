@@ -499,7 +499,8 @@ let partition_consensus_operations_on_proposal consensus_operations =
     (fun operation
          ( attestations_aggregate_opt,
            eligible_attestations,
-           remaining_operations ) ->
+           remaining_operations )
+       ->
       let ({shell; protocol_data = Operation_data protocol_data; _} as
            packed_operation) =
         Prioritized_operation.packed operation
@@ -548,7 +549,8 @@ let partition_consensus_operations_on_reproposal consensus_operations =
            eligible_attestations,
            eligible_preattestations,
            other_operations )
-         operation ->
+         operation
+       ->
       let {shell; protocol_data = Operation_data protocol_data} = operation in
       let {contents; signature} = protocol_data in
       match (contents, signature) with
@@ -612,7 +614,8 @@ let filter_best_attestations_per_slot attestations =
   let slot_map =
     List.fold_left
       (fun slot_map
-           (({protocol_data; _} : Kind.attestation operation) as attestation) ->
+           (({protocol_data; _} : Kind.attestation operation) as attestation)
+         ->
         let slot, dal_count =
           match protocol_data.contents with
           | Single (Attestation {consensus_content; dal_content}) ->
@@ -663,7 +666,8 @@ let aggregate_attestations aggregate_opt eligible_attestations =
       let committee, signatures =
         List.fold_left
           (fun ((slots, signatures) as acc)
-               ({protocol_data; _} : Kind.attestation operation) ->
+               ({protocol_data; _} : Kind.attestation operation)
+             ->
             match (protocol_data.contents, protocol_data.signature) with
             | ( Single (Attestation {consensus_content; dal_content}),
                 Some (Bls signature) )
@@ -735,7 +739,8 @@ let aggregate_preattestations_on_reproposal aggregate_opt
       let committee, signatures =
         List.fold_left
           (fun ((slots, signatures) as acc)
-               ({protocol_data; _} : Kind.preattestation operation) ->
+               ({protocol_data; _} : Kind.preattestation operation)
+             ->
             match (protocol_data.contents, protocol_data.signature) with
             | Single (Preattestation consensus_content), Some (Bls signature)
               when not (SlotSet.mem consensus_content.slot aggregated_slots) ->

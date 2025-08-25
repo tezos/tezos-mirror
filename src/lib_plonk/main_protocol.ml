@@ -522,7 +522,7 @@ module Make_impl (PP : Polynomial_protocol.S) = struct
             if pp.common_pp.zk then
               SMap.map
                 (* 3 blinds because the polynomial is evaluated at x and gx *)
-                  (fun f -> fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
+                (fun f -> fst (Poly.blind ~nb_blinds:3 pp.common_pp.n f))
                 zs
             else zs)
         batched_values

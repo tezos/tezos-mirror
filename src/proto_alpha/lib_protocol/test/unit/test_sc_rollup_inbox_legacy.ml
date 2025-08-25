@@ -223,7 +223,8 @@ let fail_with_proof_error_msg errors fail_msg =
             Some msg
         | Environment.Ecoproto_error
             (Sc_rollup_inbox_merkelized_payload_hashes_repr
-             .Merkelized_payload_hashes_proof_error msg) ->
+             .Merkelized_payload_hashes_proof_error
+               msg) ->
             Some msg
         | _ -> None)
       errors

@@ -4665,10 +4665,10 @@ module Kind : sig
   type 'a consensus =
     | Preattestation_kind : preattestation_consensus_kind consensus
     | Attestation_kind : attestation_consensus_kind consensus
-    | Preattestations_aggregate_kind
-        : preattestations_aggregate_consensus_kind consensus
-    | Attestations_aggregate_kind
-        : attestations_aggregate_consensus_kind consensus
+    | Preattestations_aggregate_kind :
+        preattestations_aggregate_consensus_kind consensus
+    | Attestations_aggregate_kind :
+        attestations_aggregate_consensus_kind consensus
 
   type preattestation = preattestation_consensus_kind consensus
 
@@ -4763,8 +4763,8 @@ module Kind : sig
     | Sc_rollup_publish_manager_kind : sc_rollup_publish manager
     | Sc_rollup_refute_manager_kind : sc_rollup_refute manager
     | Sc_rollup_timeout_manager_kind : sc_rollup_timeout manager
-    | Sc_rollup_execute_outbox_message_manager_kind
-        : sc_rollup_execute_outbox_message manager
+    | Sc_rollup_execute_outbox_message_manager_kind :
+        sc_rollup_execute_outbox_message manager
     | Sc_rollup_recover_bond_manager_kind : sc_rollup_recover_bond manager
     | Zk_rollup_origination_manager_kind : zk_rollup_origination manager
     | Zk_rollup_publish_manager_kind : zk_rollup_publish manager
@@ -4776,10 +4776,10 @@ end
 type 'a consensus_operation_type =
   | Attestation : Kind.attestation consensus_operation_type
   | Preattestation : Kind.preattestation consensus_operation_type
-  | Preattestations_aggregate
-      : Kind.preattestations_aggregate consensus_operation_type
-  | Attestations_aggregate
-      : Kind.attestations_aggregate consensus_operation_type
+  | Preattestations_aggregate :
+      Kind.preattestations_aggregate consensus_operation_type
+  | Attestations_aggregate :
+      Kind.attestations_aggregate consensus_operation_type
 
 type consensus_aggregate_content = {
   level : Raw_level.t;

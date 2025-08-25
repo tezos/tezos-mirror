@@ -73,7 +73,8 @@ let consensus_pk_encoding =
            consensus_pkh;
            companion_pk;
            companion_pkh = _;
-         } ->
+         }
+       ->
       let delegate =
         if Signature.Public_key_hash.equal consensus_pkh delegate then None
         else Some delegate

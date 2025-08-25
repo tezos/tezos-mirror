@@ -1588,7 +1588,6 @@ module Make (C : AUTOMATON_CONFIG) :
                introducing good scoring peers that may have been gossiping at
                us. This allows us to get out of sticky situations where we are
                stuck with poor peers and also recover from churn of good peers. *)
-
             (* Compute the median peer score in the mesh. *)
             let median_score =
               let sorted_scores =

@@ -486,7 +486,8 @@ let () =
                        staked_balance;
                        unstaked_frozen_balance;
                        unstaked_finalizable_balance;
-                     } ->
+                     }
+                   ->
                   Format.fprintf
                     fmtr
                     "%s, %Ld, %Ld, %Ld, %Ld, %Ld@."
@@ -527,7 +528,8 @@ let () =
                    _ck,
                    stake,
                    frozen_deposits,
-                   unstake_frozen_deposits ) ->
+                   unstake_frozen_deposits )
+               ->
               Format.fprintf
                 fmtr
                 "%s, %Ld, %Ld, %Ld\n"

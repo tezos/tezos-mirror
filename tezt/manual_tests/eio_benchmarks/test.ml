@@ -218,28 +218,30 @@ let () =
        [@profiler.record
          {verbosity = Notice} (Format.sprintf "task_worker_%d_domains" domains)]) ;
       let eio_task_worker _worker label algo =
-        (let res :
-             ((bool, 'a) result, 'b Tezos_bees.Task_worker.message_error) result
-             list =
-           (fun _worker keys_and_signatures ->
-             Tezos_bees.Task_worker.launch_tasks_and_wait
-               "task_worker_checks"
-               (fun (pk, _sk, msg, signature) ->
-                 Ok (Signature.check pk signature msg))
-               keys_and_signatures)
-           |> compute () label algo
-         in
+        ((let res :
+              ( (bool, 'a) result,
+                'b Tezos_bees.Task_worker.message_error )
+              result
+              list =
+            (fun _worker keys_and_signatures ->
+              Tezos_bees.Task_worker.launch_tasks_and_wait
+                "task_worker_checks"
+                (fun (pk, _sk, msg, signature) ->
+                  Ok (Signature.check pk signature msg))
+                keys_and_signatures)
+            |> compute () label algo
+          in
 
-         let res =
-           List.map
-             (function
-               | Ok (Ok b) -> b
-               | Ok (Error _) -> assert false
-               | Error _ -> assert false)
-             res
-         in
-         assert (List.for_all Fun.id res))
-        [@profiler.aggregate_f {verbosity = Notice} label]
+          let res =
+            List.map
+              (function
+                | Ok (Ok b) -> b
+                | Ok (Error _) -> assert false
+                | Error _ -> assert false)
+              res
+          in
+          assert (List.for_all Fun.id res))
+        [@profiler.aggregate_f {verbosity = Notice} label])
       in
 
       run eio_task_worker () ;

@@ -245,7 +245,8 @@ let encoding =
            constants;
            security_deposit_ramp_up_cycles;
            no_reward_cycles;
-         } ->
+         }
+       ->
       ( ( bootstrap_accounts,
           bootstrap_contracts,
           bootstrap_smart_rollups,
@@ -259,7 +260,8 @@ let encoding =
              commitments,
              security_deposit_ramp_up_cycles,
              no_reward_cycles ),
-           constants ) ->
+           constants )
+       ->
       {
         bootstrap_accounts;
         bootstrap_contracts;

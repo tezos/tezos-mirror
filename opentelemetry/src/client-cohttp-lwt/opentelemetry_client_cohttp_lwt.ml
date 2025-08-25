@@ -129,7 +129,8 @@ end = struct
               let bt = Printexc.get_backtrace () in
               Error
                 (`Failure
-                  (spf "decoding failed with:\n%s\n%s" (Printexc.to_string e) bt))
+                   (spf "decoding failed with:\n%s\n%s" (Printexc.to_string e)
+                      bt))
           in
           Lwt.return r
       ) else (
@@ -143,12 +144,12 @@ end = struct
             let bt = Printexc.get_backtrace () in
             Error
               (`Failure
-                (spf
-                   "httpc: decoding of status (url=%S, code=%d) failed with:\n\
-                    %s\n\
-                    status: %S\n\
-                    %s"
-                   url code (Printexc.to_string e) body bt))
+                 (spf
+                    "httpc: decoding of status (url=%S, code=%d) failed with:\n\
+                     %s\n\
+                     status: %S\n\
+                     %s"
+                    url code (Printexc.to_string e) body bt))
         in
         Lwt.return r
       )

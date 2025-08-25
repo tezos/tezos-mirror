@@ -19,7 +19,7 @@ let env driver_info s =
   (* FOREIGN KEY - Refers to a 32 bits PRIMARY KEY *)
   | `Pgsql, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
   | `Sqlite, "SMALL_PRIMARY_INCREMENTING_INT_REF" -> Caqti_query.L "INTEGER"
-  (*  *)
+  (* *)
   | `Pgsql, "BYTES" -> Caqti_query.L "BYTEA"
   | `Sqlite, "BYTES" -> Caqti_query.L "BLOB"
   | _, _ -> raise Not_found

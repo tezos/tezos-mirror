@@ -147,19 +147,19 @@ module Make (IO : S.IO) (Net : S.Net with module IO = IO) = struct
       Lwt_stream.map_s
         (fun meth ->
           Lwt_mutex.with_lock read_m (fun () ->
-              (Response.read ic >>= function
-               | `Invalid reason ->
-                   Lwt.fail (Failure ("Failed to read response: " ^ reason))
-               | `Eof ->
-                   Lwt.fail (Failure "Server closed connection prematurely.")
-               | `Ok res -> (
-                   match meth with
-                   | `HEAD ->
-                       closefn () ;
-                       Lwt.return (res, `Empty)
-                   | _ ->
-                       let body = read_body ~closefn ic res in
-                       Lwt.return (res, body)))
+              ( Response.read ic >>= function
+                | `Invalid reason ->
+                    Lwt.fail (Failure ("Failed to read response: " ^ reason))
+                | `Eof ->
+                    Lwt.fail (Failure "Server closed connection prematurely.")
+                | `Ok res -> (
+                    match meth with
+                    | `HEAD ->
+                        closefn () ;
+                        Lwt.return (res, `Empty)
+                    | _ ->
+                        let body = read_body ~closefn ic res in
+                        Lwt.return (res, body)) )
               |> fun t ->
               Lwt.on_cancel t closefn ;
               Lwt.on_failure t (fun _exn -> closefn ()) ;

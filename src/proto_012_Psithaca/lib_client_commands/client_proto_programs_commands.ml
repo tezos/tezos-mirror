@@ -268,7 +268,8 @@ let commands () =
            program
            storage
            input
-           cctxt ->
+           cctxt
+         ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
         Lwt.return @@ Micheline_parser.no_parsing_error program
@@ -321,7 +322,8 @@ let commands () =
       (fun (emacs_mode, no_print_source, original_gas, legacy)
            program
            storage
-           cctxt ->
+           cctxt
+         ->
         let setup = (emacs_mode, no_print_source) in
         resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
         handle_parsing_error "size" cctxt setup program @@ fun program ->
@@ -348,7 +350,8 @@ let commands () =
       (prefixes ["typecheck"; "script"] @@ Program.source_param @@ stop)
       (fun (show_types, emacs_mode, no_print_source, original_gas, legacy)
            program
-           cctxt ->
+           cctxt
+         ->
         let setup = (emacs_mode, no_print_source) in
         handle_parsing_error "types" cctxt setup program @@ fun program ->
         resolve_max_gas cctxt cctxt#block original_gas >>=? fun original_gas ->
@@ -486,7 +489,8 @@ let commands () =
       (prefixes ["hash"; "script"] @@ seq_of_param @@ file_or_literal_param ())
       (fun (check, display_names, scriptable)
            expr_strings
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         match expr_strings with
         | [] ->
             cctxt#warning "No scripts were specified on the command line" >|= ok
@@ -681,7 +685,8 @@ let commands () =
            bytes
            (_, (key_locator, _))
            signature
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         Client_keys_v0.check key_locator signature bytes >>=? function
         | false -> cctxt#error "invalid signature"
         | true ->
@@ -772,7 +777,8 @@ let commands () =
            (_, expr_string)
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         (match from_format with
         | `Michelson ->
             let program =
@@ -780,23 +786,23 @@ let commands () =
             in
             Lwt.return @@ Micheline_parser.no_parsing_error program
             >>=? fun program ->
-            (typecheck_program
-               cctxt
-               ~chain:cctxt#chain
-               ~block:cctxt#block
-               ~legacy
-               ~show_types:true
-               program
-             >>= function
-             | Error _ as res ->
-                 print_typecheck_result
-                   ~emacs:false
-                   ~show_types:true
-                   ~print_source_on_error:true
-                   program
-                   res
-                   cctxt
-             | Ok _ -> return_unit)
+            ( typecheck_program
+                cctxt
+                ~chain:cctxt#chain
+                ~block:cctxt#block
+                ~legacy
+                ~show_types:true
+                program
+            >>= function
+              | Error _ as res ->
+                  print_typecheck_result
+                    ~emacs:false
+                    ~show_types:true
+                    ~print_source_on_error:true
+                    program
+                    res
+                    cctxt
+              | Ok _ -> return_unit )
             >>=? fun () -> return program.expanded
         | `JSON -> (
             match Data_encoding.Json.from_string expr_string with
@@ -848,7 +854,8 @@ let commands () =
            (_, data_string)
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let micheline_of_expr expr =
           Micheline_printer.printable
             Michelson_v1_primitives.string_of_prim
@@ -948,7 +955,8 @@ let commands () =
            entrypoint
            (_, contract)
            input
-           cctxt ->
+           cctxt
+         ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
         Client_proto_programs.run_view

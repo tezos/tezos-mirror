@@ -48,8 +48,8 @@ let expand_caddadr original =
         && str.[0] = 'C'
         && str.[len - 1] = 'R'
         && check_letters str 1 (len - 2) (function
-               | 'A' | 'D' -> true
-               | _ -> false)
+             | 'A' | 'D' -> true
+             | _ -> false)
       then
         (match args with
         | [] -> ok ()
@@ -86,8 +86,8 @@ let expand_set_caddadr original =
         && String.sub str 0 5 = "SET_C"
         && str.[len - 1] = 'R'
         && check_letters str 5 (len - 2) (function
-               | 'A' | 'D' -> true
-               | _ -> false)
+             | 'A' | 'D' -> true
+             | _ -> false)
       then
         (match args with
         | [] -> ok ()
@@ -200,8 +200,8 @@ let expand_map_caddadr original =
         && String.sub str 0 5 = "MAP_C"
         && str.[len - 1] = 'R'
         && check_letters str 5 (len - 2) (function
-               | 'A' | 'D' -> true
-               | _ -> false)
+             | 'A' | 'D' -> true
+             | _ -> false)
       then
         (match args with
         | [(Seq _ as code)] -> ok code
@@ -409,8 +409,8 @@ let expand_pappaiir original =
         && str.[0] = 'P'
         && str.[len - 1] = 'R'
         && check_letters str 1 (len - 2) (function
-               | 'P' | 'A' | 'I' -> true
-               | _ -> false)
+             | 'P' | 'A' | 'I' -> true
+             | _ -> false)
       then
         try
           let field_annots, annot = extract_field_annots annot in
@@ -453,8 +453,8 @@ let expand_unpappaiir original =
         && String.sub str 0 3 = "UNP"
         && str.[len - 1] = 'R'
         && check_letters str 3 (len - 2) (function
-               | 'P' | 'A' | 'I' -> true
-               | _ -> false)
+             | 'P' | 'A' | 'I' -> true
+             | _ -> false)
       then
         try
           let unpair car_annot cdr_annot =

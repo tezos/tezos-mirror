@@ -170,7 +170,8 @@ let tracer_config_encoding =
            disable_storage;
            with_logs;
            only_top_call;
-         } ->
+         }
+       ->
       ( enable_return_data,
         enable_memory,
         disable_stack,
@@ -186,7 +187,8 @@ let tracer_config_encoding =
            with_logs,
            only_top_call,
            _,
-           _ ) ->
+           _ )
+       ->
       {
         enable_return_data;
         enable_memory;
@@ -833,7 +835,8 @@ module StructLogger = struct
              depth;
              refund;
              error;
-           } ->
+           }
+         ->
         ( ( pc,
             op,
             gas,
@@ -855,7 +858,8 @@ module StructLogger = struct
                return_data,
                storage,
                depth ),
-             (refund, error) ) ->
+             (refund, error) )
+         ->
         {
           pc;
           op;
@@ -1037,11 +1041,13 @@ module CallTracer = struct
                  error;
                  revert_reason;
                  logs;
-               } ->
+               }
+             ->
             ( (type_, from, to_, value, gas, gas_used),
               (input, output, error, revert_reason, logs, calls) ))
           (fun ( (type_, from, to_, value, gas, gas_used),
-                 (input, output, error, revert_reason, logs, calls) ) ->
+                 (input, output, error, revert_reason, logs, calls) )
+             ->
             {
               calls;
               type_;

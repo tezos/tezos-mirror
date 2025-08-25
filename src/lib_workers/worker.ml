@@ -231,9 +231,10 @@ module Make_internal
     (Name : Worker_intf.NAME)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
-    (Worker_events : Worker_events.S
-                       with type view = Request.view
-                        and type critical_error = tztrace) =
+    (Worker_events :
+      Worker_events.S
+        with type view = Request.view
+         and type critical_error = tztrace) =
 struct
   module Name = Name
   module Request = Request
@@ -726,8 +727,7 @@ struct
         let* () = Worker_events.(emit crashed) [Exn exn] in
         raise exn
 
-  let launch :
-      type kind launch_error.
+  let launch : type kind launch_error.
       kind table ->
       ?timeout:Time.System.Span.t ->
       Name.t ->

@@ -215,16 +215,16 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_transaction_result
       (Transaction_result
-        {
-          balance_updates;
-          consumed_gas;
-          storage;
-          originated_contracts;
-          storage_size;
-          paid_storage_size_diff;
-          lazy_storage_diff;
-          allocated_destination_contract = _;
-        }) =
+         {
+           balance_updates;
+           consumed_gas;
+           storage;
+           originated_contracts;
+           storage_size;
+           paid_storage_size_diff;
+           lazy_storage_diff;
+           allocated_destination_contract = _;
+         }) =
     (match originated_contracts with
     | [] -> ()
     | contracts ->
@@ -261,14 +261,14 @@ let pp_manager_operation_contents_and_result ppf
   in
   let pp_origination_result
       (Origination_result
-        {
-          lazy_storage_diff;
-          balance_updates;
-          consumed_gas;
-          originated_contracts;
-          storage_size;
-          paid_storage_size_diff;
-        }) =
+         {
+           lazy_storage_diff;
+           balance_updates;
+           consumed_gas;
+           originated_contracts;
+           storage_size;
+           paid_storage_size_diff;
+         }) =
     (match originated_contracts with
     | [] -> ()
     | contracts ->
@@ -384,8 +384,8 @@ let pp_manager_operation_contents_and_result ppf
         internal_operation_results) ;
   Format.fprintf ppf "@]"
 
-let rec pp_contents_and_result_list :
-    type kind. Format.formatter -> kind contents_and_result_list -> unit =
+let rec pp_contents_and_result_list : type kind.
+    Format.formatter -> kind contents_and_result_list -> unit =
  fun ppf -> function
   | Single_and_result
       (Seed_nonce_revelation {level; nonce}, Seed_nonce_revelation_result bus)

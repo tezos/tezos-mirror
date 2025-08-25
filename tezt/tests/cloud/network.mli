@@ -9,12 +9,10 @@
 type public =
   [ `Mainnet
   | `Ghostnet
-  | `Nextnet of
-    string
+  | `Nextnet of string
     (* date of the genesis block of the current weeklynet;
        format is YYYYMMDD *)
-  | `Weeklynet of
-    string
+  | `Weeklynet of string
     (* date of the genesis block of the current weeklynet;
        typically it is last wednesday.
        format is YYYY-MM-DD *)

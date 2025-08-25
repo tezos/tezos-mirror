@@ -839,8 +839,8 @@ let start db ~evm_node_endpoint ~rollup_node_endpoint ~l1_node_endpoint =
   let rec loop ?(first = false) () =
     let* () =
       Lwt.catch run (function
-          | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
-          | e -> Lwt.reraise e)
+        | Unix.(Unix_error (ECONNREFUSED, _, _)) when not first -> return_unit
+        | e -> Lwt.reraise e)
     in
     let*! () = Event.(emit ws_reconnection) reconnection_delay in
     let*! () = Lwt_unix.sleep reconnection_delay in

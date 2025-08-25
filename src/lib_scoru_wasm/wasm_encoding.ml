@@ -677,7 +677,8 @@ let module_instance_encoding =
            exports,
            elems,
            datas,
-           allocations ) ->
+           allocations )
+       ->
       {
         Instance.types;
         funcs;
@@ -699,7 +700,8 @@ let module_instance_encoding =
            elems;
            datas;
            allocations;
-         } ->
+         }
+       ->
       ( types,
         funcs,
         tables,

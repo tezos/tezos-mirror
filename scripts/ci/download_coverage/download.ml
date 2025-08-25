@@ -93,7 +93,8 @@ let fetch_pipeline_coverage_from_jobs pipeline =
              job_name = coverage_job_stem
              (* vector parallel *)
              || job_name =~ rex ("^" ^ coverage_job_stem ^ " \\d+/\\d+$")
-             || (* matrix parallel *)
+             ||
+             (* matrix parallel *)
              job_name =~ rex ("^" ^ coverage_job_stem ^ ": \\[.*\\]$"))
            coverage_jobs
     then

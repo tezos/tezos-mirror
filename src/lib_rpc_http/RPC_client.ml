@@ -446,23 +446,23 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
       let {path; _} = to_service service in
       from_path path |> Resto.Path.to_string
     in
-    (let* ans =
-       Client.call_streamed_service
-         accept
-         ?logger
-         ?headers
-         ~base
-         ~on_chunk
-         ~on_close
-         service
-         params
-         query
-         body
-     in
-     handle accept ans)
+    ((let* ans =
+        Client.call_streamed_service
+          accept
+          ?logger
+          ?headers
+          ~base
+          ~on_chunk
+          ~on_close
+          service
+          params
+          query
+          body
+      in
+      handle accept ans)
     [@profiler.span_s
       {verbosity = Notice}
-        ["Call_streamed_service: " ^ Uri.to_string base ^ service_path]]
+        ["Call_streamed_service: " ^ Uri.to_string base ^ service_path]])
 
   let call_service (type p q i o) accept ?logger ?headers ~base
       (service : (_, _, p, q, i, o) Tezos_rpc.Service.t) (params : p)
@@ -473,21 +473,21 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
       let {path; _} = to_service service in
       from_path path |> Resto.Path.to_string
     in
-    (let* ans =
-       Client.call_service
-         ?logger
-         ?headers
-         ~base
-         accept
-         service
-         params
-         query
-         body
-     in
-     handle accept ans)
+    ((let* ans =
+        Client.call_service
+          ?logger
+          ?headers
+          ~base
+          accept
+          service
+          params
+          query
+          body
+      in
+      handle accept ans)
     [@profiler.span_s
       {verbosity = Notice}
-        ["Call_service: " ^ Uri.to_string base ^ service_path]]
+        ["Call_service: " ^ Uri.to_string base ^ service_path]])
 
   type config = {
     media_type : Media_type.Command_line.t;
@@ -528,25 +528,25 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           meth
           uri
 
-      method call_service
-          : 'm 'p 'q 'i 'o.
-            (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-            'p ->
-            'q ->
-            'i ->
-            'o tzresult Lwt.t =
+      method call_service :
+          'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+          'p ->
+          'q ->
+          'i ->
+          'o tzresult Lwt.t =
         fun service params query body ->
           call_service media_types ~logger ~base service params query body
 
-      method call_streamed_service
-          : 'm 'p 'q 'i 'o.
-            (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-            on_chunk:('o -> unit) ->
-            on_close:(unit -> unit) ->
-            'p ->
-            'q ->
-            'i ->
-            (unit -> unit) tzresult Lwt.t =
+      method call_streamed_service :
+          'm 'p 'q 'i 'o.
+          (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+          on_chunk:('o -> unit) ->
+          on_close:(unit -> unit) ->
+          'p ->
+          'q ->
+          'i ->
+          (unit -> unit) tzresult Lwt.t =
         fun service ~on_chunk ~on_close params query body ->
           call_streamed_service
             media_types

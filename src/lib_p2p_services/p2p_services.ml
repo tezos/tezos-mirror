@@ -371,9 +371,11 @@ module Full_stat = struct
       "client_p2p_stat"
       ~description:"Stored statistics about the p2p network."
     @@ conv
-         (fun {stat; incoming_connections; outgoing_connections; peers; points} ->
+         (fun {stat; incoming_connections; outgoing_connections; peers; points}
+            ->
            (stat, incoming_connections, outgoing_connections, peers, points))
-         (fun (stat, incoming_connections, outgoing_connections, peers, points) ->
+         (fun (stat, incoming_connections, outgoing_connections, peers, points)
+            ->
            {stat; incoming_connections; outgoing_connections; peers; points})
          (obj5
             (req "stat" P2p_stat.encoding)

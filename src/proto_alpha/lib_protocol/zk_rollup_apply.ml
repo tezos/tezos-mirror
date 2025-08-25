@@ -277,7 +277,8 @@ let collect_pending_ops_inputs ~zk_rollup ~account ~rev_pi_map
   let* rev_pi_map, new_state, fees, rev_exit_validites =
     List.fold_left_es
       (fun (rev_pi_map, old_state, fees, rev_exit_validites)
-           ((l2_op, _ticket_hash_opt), (name, (sent_pi : op_pi))) ->
+           ((l2_op, _ticket_hash_opt), (name, (sent_pi : op_pi)))
+         ->
         let new_state = sent_pi.new_state in
         let*? () =
           error_unless

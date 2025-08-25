@@ -289,7 +289,7 @@ let test_invalid_accusation_no_dal_content =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_no_dal_content
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -307,7 +307,7 @@ let test_invalid_accusation_slot_not_attested =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_attested
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -325,7 +325,7 @@ let test_invalid_accusation_slot_not_published =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_slot_not_published
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -360,7 +360,7 @@ let test_invalid_accusation_shard_is_not_trap =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_shard_is_not_trap
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit
@@ -378,7 +378,7 @@ let test_invalid_accusation_wrong_shard_owner =
     | [
         Environment.Ecoproto_error
           (Validate_errors.Anonymous.Invalid_accusation_wrong_shard_owner
-            {level; _});
+             {level; _});
       ]
       when Raw_level.to_int32 level = attestation_level ->
         Lwt_result_syntax.return_unit

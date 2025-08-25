@@ -54,8 +54,8 @@ let dbool_of_dand : type a b r. (a, b, r) dand -> r dbool = function
 
 type (_, _) eq = Eq : ('a, 'a) eq
 
-let merge_dand :
-    type a b c1 c2. (a, b, c1) dand -> (a, b, c2) dand -> (c1, c2) eq =
+let merge_dand : type a b c1 c2.
+    (a, b, c1) dand -> (a, b, c2) dand -> (c1, c2) eq =
  fun w1 w2 ->
   match (w1, w2) with
   | NoNo, NoNo -> Eq

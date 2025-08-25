@@ -41,8 +41,8 @@ type compare_comparable_cont =
   | Compare_comparable_return : compare_comparable_cont
 
 let compare_comparable : type a. a comparable_ty -> a -> a -> int =
-  let rec compare_comparable :
-      type a. a comparable_ty -> compare_comparable_cont -> a -> a -> int =
+  let rec compare_comparable : type a.
+      a comparable_ty -> compare_comparable_cont -> a -> a -> int =
    fun kind k x y ->
     match (kind, x, y) with
     | Unit_t, (), () -> (apply [@tailcall]) 0 k

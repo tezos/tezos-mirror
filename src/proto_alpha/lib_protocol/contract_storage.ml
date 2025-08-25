@@ -26,7 +26,8 @@
 
 type error +=
   | (* `Temporary *)
-      Balance_too_low of Contract_repr.t * Tez_repr.t * Tez_repr.t
+      Balance_too_low of
+      Contract_repr.t * Tez_repr.t * Tez_repr.t
   | (* `Temporary *)
       Counter_in_the_past of {
       contract : Contract_repr.t;
@@ -40,9 +41,11 @@ type error +=
       found : Manager_counter_repr.t;
     }
   | (* `Temporary *)
-      Non_existing_contract of Contract_repr.t
+      Non_existing_contract of
+      Contract_repr.t
   | (* `Branch *)
-      Empty_implicit_contract of Signature.Public_key_hash.t
+      Empty_implicit_contract of
+      Signature.Public_key_hash.t
   | (* `Branch *)
       Empty_implicit_delegated_contract of
       Signature.Public_key_hash.t

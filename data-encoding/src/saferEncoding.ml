@@ -202,11 +202,11 @@ let check_case_list cases =
                 encoding =
                   Obj
                     (Req
-                      {
-                        name = kind_field_name_found;
-                        encoding = {encoding = Constant kind; _};
-                        _;
-                      });
+                       {
+                         name = kind_field_name_found;
+                         encoding = {encoding = Constant kind; _};
+                         _;
+                       });
                 _;
               };
             _;

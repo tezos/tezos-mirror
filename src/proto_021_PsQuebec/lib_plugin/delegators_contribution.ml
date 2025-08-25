@@ -224,7 +224,9 @@ let delegator_contribution ctxt ~delegate_pkh delegator =
     | Some {finalizable; unfinalizable} ->
         let* finalizable_sum =
           List.fold_left_e
-            (fun acc (request_delegate, _cycle, (amount : Alpha_context.Tez.t)) ->
+            (fun acc
+                 (request_delegate, _cycle, (amount : Alpha_context.Tez.t))
+               ->
               if Signature.Public_key_hash.(request_delegate <> delegate_pkh)
               then Alpha_context.Tez.(acc +? amount)
               else return acc)

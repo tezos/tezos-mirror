@@ -186,7 +186,8 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       (* We've just imported a rolling snapshot keeping few history.
          To switch to the configured history mode, which may have
          longer history, we need the --force-history-mode-switch
-         option. *) Node.Force_history_mode_switch :: arguments
+         option. *)
+      Node.Force_history_mode_switch :: arguments
     else arguments
   in
   let arguments =

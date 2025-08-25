@@ -49,7 +49,8 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
            dal_attesting_reward_per_shard;
            seed_nonce_revelation_tip;
            vdf_revelation_tip;
-         } ->
+         }
+       ->
       ( cycle,
         baking_reward_fixed_portion,
         baking_reward_bonus_per_slot,
@@ -63,7 +64,8 @@ let expected_rewards_encoding : expected_rewards Data_encoding.t =
            attesting_reward_per_slot,
            seed_nonce_revelation_tip,
            vdf_revelation_tip,
-           dal_attesting_reward_per_shard ) ->
+           dal_attesting_reward_per_shard )
+       ->
       {
         cycle;
         baking_reward_fixed_portion;
@@ -188,7 +190,10 @@ let current_rewards_per_minute ctxt =
   in
   let cycle = (Level.current ctxt).cycle in
   let* f = Delegate.Rewards.For_RPC.get_reward_coeff ctxt ~cycle in
-  let f = Q.mul f q_base_total_issued_per_minute (* rewards per minute *) in
+  let f =
+    Q.mul f q_base_total_issued_per_minute
+    (* rewards per minute *)
+  in
   return f
 
 (* Does the reverse operations of [compute_coeff] in [adaptive_issuance_storage.ml] *)
@@ -198,8 +203,14 @@ let current_yearly_rate_value ~formatter ctxt =
   let* total_supply = Contract.get_total_supply ctxt in
   let q_total_supply = Tez.to_mutez total_supply |> Q.of_int64 in
   let* f = current_rewards_per_minute ctxt in
-  let f = Q.div f q_total_supply (* issuance rate per minute *) in
-  let f = Q.mul f q_min_per_year (* issuance rate per year *) in
+  let f =
+    Q.div f q_total_supply
+    (* issuance rate per minute *)
+  in
+  let f =
+    Q.mul f q_min_per_year
+    (* issuance rate per year *)
+  in
   (* transform into a string *)
   let f = Q.(mul f (100 // 1)) in
   return (formatter f)

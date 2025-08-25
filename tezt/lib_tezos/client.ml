@@ -1912,21 +1912,22 @@ let spawn_stresstest_with_filename ?env ?endpoint ?seed ?fee ?gas_limit
           "--smart-contract-parameters";
           Ezjsonm.value_to_string
             (`O
-              (List.map
-                 (fun ( alias,
-                        {probability; invocation_fee; invocation_gas_limit} ) ->
-                   ( alias,
-                     `O
-                       [
-                         ("probability", Ezjsonm.float probability);
-                         ( "invocation_fee",
-                           Ezjsonm.string
-                             (Int.to_string (Tez.to_mutez invocation_fee)) );
-                         ( "invocation_gas_limit",
-                           Ezjsonm.string (Int.to_string invocation_gas_limit)
-                         );
-                       ] ))
-                 items));
+               (List.map
+                  (fun ( alias,
+                         {probability; invocation_fee; invocation_gas_limit} )
+                     ->
+                    ( alias,
+                      `O
+                        [
+                          ("probability", Ezjsonm.float probability);
+                          ( "invocation_fee",
+                            Ezjsonm.string
+                              (Int.to_string (Tez.to_mutez invocation_fee)) );
+                          ( "invocation_gas_limit",
+                            Ezjsonm.string (Int.to_string invocation_gas_limit)
+                          );
+                        ] ))
+                  items));
         ]
   in
   spawn_command ?env ?endpoint client

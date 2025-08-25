@@ -89,7 +89,8 @@ let test_stresstest_fund_accounts =
     1
     (*reveals*) + (config.batch_size / config.batch_per_block)
     + (config.batch_size mod config.batch_per_block)
-    + (* fund batches*)
+    +
+    (* fund batches*)
     +((config.nb_accounts - config.batch_size)
      / config.batch_size / config.batch_per_block)
     + (config.nb_accounts - config.batch_size)

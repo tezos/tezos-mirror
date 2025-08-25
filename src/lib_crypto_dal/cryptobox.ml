@@ -305,7 +305,8 @@ module Inner = struct
           return x
     in
     fun ({redundancy_factor; slot_size; page_size; number_of_shards} as
-         parameters) ->
+         parameters)
+      ->
       (* The cryptobox is deterministically computed from the DAL parameters and
          this computation takes time (on the order of 10ms) so we cache it. *)
       with_cache (parameters, !initialisation_parameters) @@ fun () ->
@@ -404,7 +405,7 @@ module Inner = struct
     if Bytes.length slot <> t.slot_size then
       Error
         (`Slot_wrong_size
-          (Printf.sprintf "message must be %d bytes long" t.slot_size))
+           (Printf.sprintf "message must be %d bytes long" t.slot_size))
     else
       let offset = ref 0 in
       let coefficients =
@@ -605,9 +606,9 @@ module Inner = struct
     if t.max_polynomial_length / t.shard_length > ShardSet.cardinal shards then
       Error
         (`Not_enough_shards
-          (Printf.sprintf
-             "there must be at least %d shards to decode"
-             (t.max_polynomial_length / t.shard_length)))
+           (Printf.sprintf
+              "there must be at least %d shards to decode"
+              (t.max_polynomial_length / t.shard_length)))
     else if
       ShardSet.exists
         (fun {share; _} -> Array.length share <> t.shard_length)
@@ -615,9 +616,9 @@ module Inner = struct
     then
       Error
         (`Invalid_shard_length
-          (Printf.sprintf
-             "At least one shard of invalid length: expected length %d."
-             t.shard_length))
+           (Printf.sprintf
+              "At least one shard of invalid length: expected length %d."
+              t.shard_length))
     else if
       ShardSet.exists
         (fun {index; _} -> index >= t.number_of_shards || index < 0)
@@ -625,11 +626,11 @@ module Inner = struct
     then
       Error
         (`Shard_index_out_of_range
-          (Printf.sprintf
-             "At least one shard index out of range: expected indices within \
-              the range [%d, %d]."
-             0
-             (t.number_of_shards - 1)))
+           (Printf.sprintf
+              "At least one shard index out of range: expected indices within \
+               the range [%d, %d]."
+              0
+              (t.number_of_shards - 1)))
     else
       (* 1. Computing A(x) = prod_{i=0}^{k-1} (x - x_i).
 
@@ -644,7 +645,6 @@ module Inner = struct
 
          Note that A_i(x_i) != 0 by definition, so it is invertible
          in the [Scalar] field. *)
-
       (* The codewords are split into chunks called shards.
 
          For this purpose, let [t.shard_length=t.n/t.number_of_shards]
@@ -819,10 +819,10 @@ module Inner = struct
         with Kzg.Commitment.SRS_too_short _ ->
           Error
             (`Invalid_degree_strictly_less_than_expected
-              {
-                given = Poly.degree p;
-                expected = Srs_g1.size t.kate_amortized.srs_g1;
-              }))
+               {
+                 given = Poly.degree p;
+                 expected = Srs_g1.size t.kate_amortized.srs_g1;
+               }))
 
   let pp_commit_error fmt = function
     | `Invalid_degree_strictly_less_than_expected {given; expected} ->
@@ -866,7 +866,7 @@ module Inner = struct
         else
           Error
             (`Invalid_degree_strictly_less_than_expected
-              {given = max_polynomial_length; expected = Srs_g2.size srs_g2})
+               {given = max_polynomial_length; expected = Srs_g2.size srs_g2})
 
   (* Verifies that the degree of the committed polynomial is < t.max_polynomial_length *)
   let verify_commitment (t : t) cm proof =
@@ -924,10 +924,10 @@ module Inner = struct
     with Kzg.Commitment.SRS_too_short _ ->
       Error
         (`Invalid_degree_strictly_less_than_expected
-          {
-            given = Srs_g1.size kate_amortized.srs_g1;
-            expected = kate_amortized.max_polynomial_length;
-          })
+           {
+             given = Srs_g1.size kate_amortized.srs_g1;
+             expected = kate_amortized.max_polynomial_length;
+           })
 
   let prove_shards t ~precomputation ~polynomial =
     (* Resizing input polynomial [p] to obtain an array of length [t.max_polynomial_length + 1]. *)
@@ -947,12 +947,12 @@ module Inner = struct
     if shard_index < 0 || shard_index >= t.number_of_shards then
       Error
         (`Shard_index_out_of_range
-          (Printf.sprintf
-             "Shard index out of range: got index %d, expected index within \
-              range [%d, %d]."
-             shard_index
-             0
-             (t.number_of_shards - 1)))
+           (Printf.sprintf
+              "Shard index out of range: got index %d, expected index within \
+               range [%d, %d]."
+              shard_index
+              0
+              (t.number_of_shards - 1)))
     else
       let expected_shard_length = t.shard_length in
       let got_shard_length = Array.length evaluations in
@@ -1057,30 +1057,30 @@ module Inner = struct
         let domain = Domain.build t.page_length_domain in
         let evaluations =
           Array.init t.page_length_domain (function
-              | i when i < t.page_length - 1 ->
-                  (* Parse the [page] by chunks of [Parameters_check.scalar_bytes_amount] bytes.
+            | i when i < t.page_length - 1 ->
+                (* Parse the [page] by chunks of [Parameters_check.scalar_bytes_amount] bytes.
                      These chunks are interpreted as [Scalar.t] elements and stored
                      in [evaluations]. *)
-                  let dst = Bytes.create Parameters_check.scalar_bytes_amount in
-                  Bytes.blit
-                    page
-                    (i * Parameters_check.scalar_bytes_amount)
-                    dst
-                    0
-                    Parameters_check.scalar_bytes_amount ;
-                  Scalar.of_bytes_exn dst
-              | i when i = t.page_length - 1 ->
-                  (* Store the remaining bytes in the last nonzero coefficient
+                let dst = Bytes.create Parameters_check.scalar_bytes_amount in
+                Bytes.blit
+                  page
+                  (i * Parameters_check.scalar_bytes_amount)
+                  dst
+                  0
+                  Parameters_check.scalar_bytes_amount ;
+                Scalar.of_bytes_exn dst
+            | i when i = t.page_length - 1 ->
+                (* Store the remaining bytes in the last nonzero coefficient
                      of evaluations. *)
-                  let dst = Bytes.create t.remaining_bytes in
-                  Bytes.blit
-                    page
-                    (i * Parameters_check.scalar_bytes_amount)
-                    dst
-                    0
-                    t.remaining_bytes ;
-                  Scalar.of_bytes_exn dst
-              | _ -> Scalar.(copy zero))
+                let dst = Bytes.create t.remaining_bytes in
+                Bytes.blit
+                  page
+                  (i * Parameters_check.scalar_bytes_amount)
+                  dst
+                  0
+                  t.remaining_bytes ;
+                Scalar.of_bytes_exn dst
+            | _ -> Scalar.(copy zero))
         in
         let root = Domain.get t.domain_polynomial_length page_index in
         let srs_point = t.srs_verifier.pages in

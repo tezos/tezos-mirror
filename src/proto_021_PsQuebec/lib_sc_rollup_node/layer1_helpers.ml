@@ -263,7 +263,8 @@ let find_last_whitelist_update cctxt rollup_address =
   in
   Option.map
     (fun Protocol.Alpha_context.Sc_rollup.Whitelist.
-           {message_index; outbox_level} ->
+           {message_index; outbox_level}
+       ->
       (message_index, Protocol.Alpha_context.Raw_level.to_int32 outbox_level))
     last_whitelist_update
   |> return

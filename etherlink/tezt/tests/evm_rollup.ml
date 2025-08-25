@@ -35,13 +35,13 @@ module Protocol = struct
 
   let register_test =
     Protocol.register_test ~additional_tags:(function
-        | Alpha -> []
-        | _ -> [Tag.extra])
+      | Alpha -> []
+      | _ -> [Tag.extra])
 
   let register_regression_test =
     Protocol.register_regression_test ~additional_tags:(function
-        | Alpha -> []
-        | _ -> [Tag.extra])
+      | Alpha -> []
+      | _ -> [Tag.extra])
 end
 
 let pvm_kind = "wasm_2_0_0"
@@ -1841,8 +1841,7 @@ let test_rpc_txpool_content =
     ~time_between_blocks:Nothing
     ~enable_tx_queue:(Enable false)
   (*This test does not work for the tx_queue yet. It needs to be adapted *)
-  @@
-  fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
+  @@ fun ~protocol:_ ~evm_setup:{evm_node; produce_block; _} ->
   let get_transaction_field transaction_content field_name =
     transaction_content |> JSON.get field_name |> JSON.as_string_opt
     |> Option.value ~default:"null"
@@ -2127,7 +2126,8 @@ let test_full_blocks =
       List.iteri
         (fun index
              ({blockHash; blockNumber; transactionIndex; _} :
-               Transaction.transaction_object) ->
+               Transaction.transaction_object)
+           ->
           Check.((Some block.hash = blockHash) (option string))
             ~error_msg:
               (sf "The transaction should be in block %%L but found %%R") ;
@@ -2599,18 +2599,20 @@ let test_deposit_and_withdraw =
     ~admin
     ~commitment_period
     ~challenge_window
-  @@ fun ~protocol:_
-             ~evm_setup:
-               {
-                 client;
-                 sc_rollup_address;
-                 l1_contracts;
-                 sc_rollup_node;
-                 endpoint;
-                 evm_node;
-                 produce_block;
-                 _;
-               } ->
+  @@
+  fun ~protocol:_
+      ~evm_setup:
+        {
+          client;
+          sc_rollup_address;
+          l1_contracts;
+          sc_rollup_node;
+          endpoint;
+          evm_node;
+          produce_block;
+          _;
+        }
+    ->
   let {
     bridge;
     admin = _;
@@ -2736,8 +2738,9 @@ let test_withdraw_via_calls =
     ~tags:["evm"; "withdraw"; "call"; "staticcall"; "delegatecall"; "callcode"]
     ~title:"Withdrawal via different kind of calls"
     ~admin
-  @@ fun ~protocol:_
-             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* call_withdrawal = call_withdrawal evm_version in
@@ -4840,10 +4843,12 @@ let test_reboot_gas_limit =
        for a single run"
     ~minimum_base_fee_per_gas:base_fee_for_hardcoded_tx
     ~maximum_gas_per_transaction:250_000L
-  @@ fun ~protocol:_
-             ~evm_setup:
-               ({evm_node; produce_block; sc_rollup_node; node; evm_version; _}
-                as evm_setup) ->
+  @@
+  fun ~protocol:_
+      ~evm_setup:
+        ({evm_node; produce_block; sc_rollup_node; node; evm_version; _} as
+         evm_setup)
+    ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   let* loop_resolved = loop evm_version in
   let* loop_address, _tx = deploy ~contract:loop_resolved ~sender evm_setup in
@@ -5401,8 +5406,9 @@ let test_l2_call_selfdetruct_contract_in_same_transaction_and_separate_transacti
   register_both
     ~tags:["evm"; "l2_call"; "selfdestruct"; "cancun"]
     ~title:"Check SELFDESTRUCT's behavior as stated by Cancun's EIP-6780"
-  @@ fun ~protocol:_
-             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
   let*@ _ = produce_block () in
   let* call_selfdestruct_behavior_resolved =
@@ -5473,8 +5479,9 @@ let test_mcopy_opcode =
   register_both
     ~tags:["evm"; "mcopy"; "cancun"]
     ~title:"Check MCOPY's behavior as stated by Cancun's EIP-5656"
-  @@ fun ~protocol:_
-             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
   let is_pre_cancun = Evm_version.is_pre_cancun evm_version in
   (* MCOPY requires an evm version >=Cancun, to ensure that the test gracefully
@@ -5532,8 +5539,9 @@ let test_transient_storage =
   register_both
     ~tags:["evm"; "transient_storage"; "cancun"]
     ~title:"Check TSTORE/TLOAD behavior as stated by Cancun's EIP-1153"
-  @@ fun ~protocol:_
-             ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:({endpoint; produce_block; evm_version; _} as evm_setup)
     ->
   let is_pre_cancun = Evm_version.is_pre_cancun evm_version in
   let*@ _ = evm_setup.produce_block () in
@@ -5768,9 +5776,10 @@ let test_blockhash_opcode =
     ~max_blueprints_ahead:300
     ~tags:["evm"; "blockhash"; "opcode"]
     ~title:"Check if blockhash opcode returns the actual hash of the block"
-  @@ fun ~protocol:_
-             ~evm_setup:
-               ({produce_block; endpoint; evm_node; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:
+        ({produce_block; endpoint; evm_node; evm_version; _} as evm_setup)
     ->
   let* blockhash_resolved = blockhash evm_version in
   let* address, _tx =
@@ -5824,9 +5833,10 @@ let test_block_constants_opcode =
     ~kernels:[Kernel.Latest]
     ~tags:["evm"; "block"; "opcode"; "constants"]
     ~title:"Check block constants in opcode"
-  @@ fun ~protocol:_
-             ~evm_setup:
-               ({evm_node; produce_block; endpoint; evm_version; _} as evm_setup)
+  @@
+  fun ~protocol:_
+      ~evm_setup:
+        ({evm_node; produce_block; endpoint; evm_version; _} as evm_setup)
     ->
   let sender = Eth_account.bootstrap_accounts.(0) in
   (* Deploy the contracts with the block constants. *)
@@ -5935,8 +5945,10 @@ let test_block_gas_limit =
   register_both
     ~tags:["evm"; "gas_limit"; "block"]
     ~title:"Block gas limit returns 2^50."
-  @@ fun ~protocol:_
-             ~evm_setup:({evm_node; endpoint; evm_version; _} as evm_setup) ->
+  @@
+  fun ~protocol:_
+      ~evm_setup:({evm_node; endpoint; evm_version; _} as evm_setup)
+    ->
   let* gas_limit_contract_resolved = gas_limit_contract evm_version in
   let* contract, _tx =
     deploy
@@ -6242,8 +6254,10 @@ let test_whitelist_is_executed =
     ~title:
       "Check that the kernel submit a whitelist update message when flag is \
        set."
-  @@ fun ~protocol:_
-             ~evm_setup:{sc_rollup_node; client; node; sc_rollup_address; _} ->
+  @@
+  fun ~protocol:_
+      ~evm_setup:{sc_rollup_node; client; node; sc_rollup_address; _}
+    ->
   let get_whitelist () =
     Node.RPC.call node
     @@ RPC.get_chain_block_context_smart_rollups_smart_rollup_whitelist

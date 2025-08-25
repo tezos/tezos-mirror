@@ -242,24 +242,27 @@ module type Sigs = sig
 
         val unfindable_of_hash : hash -> t
       end)
-      (Node : Brassaia.Node.Generic_key.S
-                with type hash = H.t
-                 and type contents_key = Key.t
-                 and type node_key = Key.t) :
+      (Node :
+        Brassaia.Node.Generic_key.S
+          with type hash = H.t
+           and type contents_key = Key.t
+           and type node_key = Key.t) :
     Internal with type hash = H.t and type key = Key.t
 
   module Make
       (H : Brassaia.Hash.S)
       (Key : Brassaia.Key.S with type hash = H.t)
-      (Node : Brassaia.Node.Generic_key.S
-                with type hash = H.t
-                 and type contents_key = Key.t
-                 and type node_key = Key.t)
+      (Node :
+        Brassaia.Node.Generic_key.S
+          with type hash = H.t
+           and type contents_key = Key.t
+           and type node_key = Key.t)
       (Inter : Internal with type hash = H.t and type key = Key.t)
-      (Pack : Indexable.S
-                with type key = Key.t
-                 and type hash = H.t
-                 and type value = Inter.Raw.t) :
+      (Pack :
+        Indexable.S
+          with type key = Key.t
+           and type hash = H.t
+           and type value = Inter.Raw.t) :
     S
       with type 'a t = 'a Pack.t
        and type key = Key.t

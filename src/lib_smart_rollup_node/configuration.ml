@@ -355,9 +355,11 @@ let batcher_encoding =
            min_batch_size;
            max_batch_elements;
            max_batch_size;
-         } ->
+         }
+       ->
       (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size))
-    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size) ->
+    (fun (min_batch_elements, min_batch_size, max_batch_elements, max_batch_size)
+       ->
       let open Result_syntax in
       let error_when c s = if c then Error s else return_unit in
       let* () =
@@ -545,7 +547,8 @@ let encoding default_display : t Data_encoding.t =
            cors;
            bail_on_disagree;
            opentelemetry;
-         } ->
+         }
+       ->
       ( ( ( sc_rollup_address,
             Some etherlink,
             boot_sector_file,
@@ -617,7 +620,8 @@ let encoding default_display : t Data_encoding.t =
                  history_mode,
                  cors,
                  bail_on_disagree,
-                 opentelemetry ) ) ) ) ->
+                 opentelemetry ) ) ) )
+       ->
       {
         sc_rollup_address;
         etherlink =

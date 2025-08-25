@@ -101,11 +101,11 @@ type int_gen_kind = TinyInt | TinyNat | PlainInt | PlainNat
    if it turned out later that ['a Lwt.t = int]).
 *)
 type (_, _, _, _, _, _) ty =
-  | Unit
-      : (* the constructor for the [unit] type *)
+  | Unit :
+      (* the constructor for the [unit] type *)
       (unit, unit, unit, unit, unit, unit) ty
-  | Char
-      : (* the constructor for the [char] type; in the tests, the [char] type is
+  | Char :
+      (* the constructor for the [char] type; in the tests, the [char] type is
            used for the elements of the lists (and other collections) being tested;
            the DSL exports the value [data] for this [Char] constructor *)
       (char, char, char, char, char, char) ty
@@ -115,8 +115,8 @@ type (_, _, _, _, _, _) ty =
          [PlainNat] will only generate non-negative integers) *)
       int_gen_kind
       -> (int, int, int, int, int, int) ty
-  | Bool
-      : (* the constructor for the [bool] type *)
+  | Bool :
+      (* the constructor for the [bool] type *)
       (bool, bool, bool, bool, bool, bool) ty
   | Monads :
       (* the constructor for the monads of Lwtreslib; this is used to describe the
@@ -249,8 +249,8 @@ type (_, _, _, _, _, _) ty =
    ) params
    ]} *)
 and (_, _, _, _, _, _, _, _, _, _) params =
-  | []
-      : (* [[]] is the constructor for zero-parameters lambda; there are no
+  | [] :
+      (* [[]] is the constructor for zero-parameters lambda; there are no
            zero-parameters lambda, instead this constructor simply ties up the
            return-type and the last of the lambda-type ([bool] in the example
            above) *)
@@ -344,8 +344,7 @@ type (_, _, _, _, _) anym =
   | MonR : (_, _, 'r, _, 'r) anym
   | MonSR : (_, _, _, 'sr, 'sr) anym
 
-let rec eq_of_ty :
-    type v s ps r sr psr.
+let rec eq_of_ty : type v s ps r sr psr.
     (v, s, ps, r, sr, psr) ty -> v -> (v, s, r, sr) anyval -> bool =
  fun ty v anyval ->
   match ty with
@@ -480,8 +479,7 @@ let rec eq_of_ty :
               | Error () -> false)
           | Error () -> ( match v with Ok _ -> false | Error () -> true)))
 
-let rec monadify_of_ty :
-    type v s ps r sr psr t.
+let rec monadify_of_ty : type v s ps r sr psr t.
     (v, s, ps, r, sr, psr) ty -> (v, s, r, sr, t) anym -> v -> t =
  fun ty anym v ->
   match (ty, anym) with
@@ -563,9 +561,8 @@ let rec monadify_of_ty :
       | Ok v -> Lwt.return_ok (monadify_of_ty ty MonSR v)
       | Error () -> Lwt.return_error ())
 
-let rec unmonadify_of_ty :
-    type v s ps r sr psr. (v, s, ps, r, sr, psr) ty -> (v, s, r, sr) anyval -> v
-    =
+let rec unmonadify_of_ty : type v s ps r sr psr.
+    (v, s, ps, r, sr, psr) ty -> (v, s, r, sr) anyval -> v =
  fun ty anyval ->
   match ty with
   | Unit -> ()
@@ -660,9 +657,8 @@ let rec unmonadify_of_ty :
 
 (* in order to generate lambdas, we need observables; we only need observable
    for the vanilla variant so that's what this function returns *)
-let rec observable_of_ty :
-    type v s ps r sr psr. (v, s, ps, r, sr, psr) ty -> v QCheck2.Observable.t =
-  function
+let rec observable_of_ty : type v s ps r sr psr.
+    (v, s, ps, r, sr, psr) ty -> v QCheck2.Observable.t = function
   | Unit -> QCheck2.Observable.unit
   | Char -> QCheck2.Observable.char
   | Int _ -> QCheck2.Observable.int
@@ -714,8 +710,7 @@ let rec observable_of_ty :
 
 (* for showing test results and such, we need to be able to pretty-print
    values; we print a monad-neutral summary *)
-let rec pp_of_ty :
-    type v s ps r sr psr.
+let rec pp_of_ty : type v s ps r sr psr.
     (v, s, ps, r, sr, psr) ty -> Format.formatter -> v -> unit =
  fun ty fmt v ->
   match ty with
@@ -784,8 +779,7 @@ let rec seq_split_4 acca accb accc accd = function
 let seq_split_4 l = seq_split_4 [] [] [] [] l
 
 (* QCheck2 generators, derived from [ty] descriptions. *)
-let rec gen_of_ty :
-    type v s ps r sr psr.
+let rec gen_of_ty : type v s ps r sr psr.
     (v, s, ps, r, sr, psr) ty -> (v * s * r * sr) QCheck2.Gen.t =
  fun ty ->
   match ty with
@@ -863,8 +857,7 @@ let rec gen_of_ty :
         (fun (v, s, r, sr) -> (Ok v, Lwt.return_ok s, Ok r, Lwt.return_ok sr))
         (gen_of_ty ty)
 
-and gen_of_params :
-    type vk vr sk sr psr psk rk rr srk srr psrr psrk.
+and gen_of_params : type vk vr sk sr psr psk rk rr srk srr psrr psrk.
     (vk, vr, sk, sr, psk, rk, rr, srk, srr, psrk) params ->
     (vr, sr, psr, rr, srr, psrr) ty ->
     (vk * sk * rk * srk) QCheck2.Gen.t =
@@ -1036,8 +1029,7 @@ and gen_of_params :
    to all different number of variants to be tested (e.g., for when Lwtreslib
    exports both a sequential variant ([_s]) and a concurrent ([_p]) variants of
    a function). This is then hidden via the more precise wrappers below. *)
-let gen_test_of_ty :
-    type vk vr sk psk sr psr rk rr srk psrk srr psrr.
+let gen_test_of_ty : type vk vr sk psk sr psr rk rr srk psrk srr psrr.
     string ->
     (vk, vr, sk, sr, psk, rk, rr, srk, srr, psrk) params ->
     (vr, sr, psr, rr, srr, psrr) ty ->
@@ -1124,7 +1116,8 @@ let gen_test_of_ty :
         (fun ( (va, sa, ra, sra),
                (vb, sb, rb, srb),
                (vc, sc, rc, src),
-               (vd, sd, rd, srd) ) ->
+               (vd, sd, rd, srd) )
+           ->
           let v = vfref va vb vc vd in
           List.for_all (fun vf -> eq_of_ty tyr v (ValV (vf va vb vc vd))) vf
           && List.for_all (fun sf -> eq_of_ty tyr v (ValS (sf sa sb sc sd))) sf

@@ -108,8 +108,8 @@ end
 module MakeAbstract
     (Chain_store : CHAIN_STORE)
     (Proto : Protocol_plugin.T)
-    (Bounding : Prevalidator_bounding.T
-                  with type protocol_operation = Proto.operation) :
+    (Bounding :
+      Prevalidator_bounding.T with type protocol_operation = Proto.operation) :
   T
     with type protocol_operation = Proto.operation
      and type chain_store = Chain_store.chain_store

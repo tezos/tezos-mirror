@@ -29,7 +29,8 @@ module Make (C : Type.S) (H : Type.S) = struct
   let kinded_hash_t =
     let open Type in
     variant "kinded_hash" (fun c n -> function
-      | `Contents h -> c ((), h) | `Node h -> n h)
+      | `Contents h -> c ((), h)
+      | `Node h -> n h)
     |~ case1 "contents" (pair unit hash_t) (fun ((), h) -> `Contents h)
     |~ case1 "node" hash_t (fun h -> `Node h)
     |> sealv
@@ -61,7 +62,8 @@ module Make (C : Type.S) (H : Type.S) = struct
     let open Type in
     variant
       "tree"
-      (fun contents blinded_contents node blinded_node inode extender ->
+      (fun
+        contents blinded_contents node blinded_node inode extender ->
         function
       | Contents c -> contents (c, ())
       | Blinded_contents h -> blinded_contents (h, ())

@@ -30,8 +30,7 @@ let create_handlers (type a) ?on_completion ?on_close ?(slow = false) () =
   (module struct
     type self = a Worker.t
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         self -> (r, request_error) Request.t -> (r, request_error) result =
      fun _w request ->
       let () = if slow then sleep 0.2 else () in

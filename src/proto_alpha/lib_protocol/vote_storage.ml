@@ -170,9 +170,11 @@ let pp_delegate_info ppf info =
 let delegate_info_encoding =
   let open Data_encoding in
   conv
-    (fun {voting_power; current_ballot; current_proposals; remaining_proposals} ->
+    (fun {voting_power; current_ballot; current_proposals; remaining_proposals}
+       ->
       (voting_power, current_ballot, current_proposals, remaining_proposals))
-    (fun (voting_power, current_ballot, current_proposals, remaining_proposals) ->
+    (fun (voting_power, current_ballot, current_proposals, remaining_proposals)
+       ->
       {voting_power; current_ballot; current_proposals; remaining_proposals})
     (obj4
        (opt "voting_power" int64)

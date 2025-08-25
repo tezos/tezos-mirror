@@ -100,7 +100,8 @@ let encoding =
            slack_channel_id;
            slack_bot_token;
            scenario_specific;
-         } ->
+         }
+       ->
       ( ( ( localhost,
             ssh_host,
             monitoring,
@@ -182,7 +183,8 @@ let encoding =
                  binaries_path,
                  log_rotation,
                  slack_channel_id ) ),
-             (slack_bot_token, scenario_specific) ) ) ->
+             (slack_bot_token, scenario_specific) ) )
+       ->
       {
         localhost;
         ssh_host;

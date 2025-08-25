@@ -784,8 +784,7 @@ let find_contract_from_cache ctxt contract_hash =
   | None -> tzfail (Contract.Non_existing_contract (Originated contract_hash))
   | Some (script, script_ir) -> return (ctxt, (cache_key, script, script_ir))
 
-let apply_internal_operation_contents :
-    type kind.
+let apply_internal_operation_contents : type kind.
     context ->
     payer:public_key_hash ->
     sender:Destination.t ->
@@ -984,8 +983,7 @@ let apply_internal_operation_contents :
         in
         (ctxt, IDelegation_result {consumed_gas; balance_updates}, ops)
 
-let apply_manager_operation :
-    type kind.
+let apply_manager_operation : type kind.
     context ->
     source:public_key_hash ->
     chain_id:Chain_id.t ->
@@ -1812,8 +1810,7 @@ let burn_origination_storage_fees ctxt
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
-let burn_manager_storage_fees :
-    type kind.
+let burn_manager_storage_fees : type kind.
     context ->
     kind successful_manager_operation_result ->
     storage_limit:Z.t ->
@@ -1937,8 +1934,7 @@ let burn_manager_storage_fees :
     Returns an updated context, an updated storage limit with the space consumed
     by the operation subtracted, and [smopr] with the relevant balance updates
     included. *)
-let burn_internal_storage_fees :
-    type kind.
+let burn_internal_storage_fees : type kind.
     context ->
     kind successful_internal_operation_result ->
     storage_limit:Z.t ->
@@ -2069,8 +2065,7 @@ type _ fees_updated_contents_list =
       * 'rest Kind.manager fees_updated_contents_list
       -> ('kind * 'rest) Kind.manager fees_updated_contents_list
 
-let rec mark_skipped :
-    type kind.
+let rec mark_skipped : type kind.
     payload_producer:Consensus_key.t ->
     Level.t ->
     kind Kind.manager fees_updated_contents_list ->
@@ -2113,8 +2108,7 @@ let rec mark_skipped :
    [take_fees] cannot return an error. *)
 let take_fees ctxt contents_list =
   let open Lwt_result_syntax in
-  let rec take_fees_rec :
-      type kind.
+  let rec take_fees_rec : type kind.
       context ->
       kind Kind.manager contents_list ->
       (context * kind Kind.manager fees_updated_contents_list) tzresult Lwt.t =
@@ -2144,8 +2138,7 @@ let take_fees ctxt contents_list =
   let*! result = take_fees_rec ctxt contents_list in
   Lwt.return (record_trace Error_while_taking_fees result)
 
-let rec apply_manager_contents_list_rec :
-    type kind.
+let rec apply_manager_contents_list_rec : type kind.
     context ->
     payload_producer:Consensus_key.t ->
     Chain_id.t ->
@@ -2157,7 +2150,8 @@ let rec apply_manager_contents_list_rec :
       ~payload_producer
       chain_id
       ~consume_gas_for_sig_check
-      fees_updated_contents_list ->
+      fees_updated_contents_list
+    ->
     let level = Level.current ctxt in
     match fees_updated_contents_list with
     | FeesUpdatedSingle {contents = Manager_operation _ as op; balance_updates}
@@ -2201,19 +2195,16 @@ let rec apply_manager_contents_list_rec :
             (ctxt_result, Cons_result (result, results)))
 
 let mark_backtracked results =
-  let mark_results :
-      type kind.
+  let mark_results : type kind.
       kind Kind.manager contents_result -> kind Kind.manager contents_result =
    fun results ->
-    let mark_manager_operation_result :
-        type kind.
+    let mark_manager_operation_result : type kind.
         kind manager_operation_result -> kind manager_operation_result =
       function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
       | Applied result -> Backtracked (result, None)
     in
-    let mark_internal_operation_result :
-        type kind.
+    let mark_internal_operation_result : type kind.
         kind internal_operation_result -> kind internal_operation_result =
       function
       | (Failed _ | Skipped _ | Backtracked _) as result -> result
@@ -2235,8 +2226,7 @@ let mark_backtracked results =
                 op.internal_operation_results;
           }
   in
-  let rec traverse_apply_results :
-      type kind.
+  let rec traverse_apply_results : type kind.
       kind Kind.manager contents_result_list ->
       kind Kind.manager contents_result_list = function
     | Single_result res -> Single_result (mark_results res)
@@ -2691,14 +2681,14 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
   | Single
       (Dal_entrapment_evidence {attestation; consensus_slot; slot_index; _}) ->
       let (Single
-            (* Note that since the evidence has been successfully
+             (* Note that since the evidence has been successfully
                validated, [attestation] cannot be a preattestation or
                preattestations aggregate (also [consensus_slot] is
                consistent, and [slot_index] is an attested trap, etc.) *)
-            ( Preattestation {level; _}
-            | Attestation {consensus_content = {level; _}; _}
-            | Preattestations_aggregate {consensus_content = {level; _}; _}
-            | Attestations_aggregate {consensus_content = {level; _}; _} )) =
+             ( Preattestation {level; _}
+             | Attestation {consensus_content = {level; _}; _}
+             | Preattestations_aggregate {consensus_content = {level; _}; _}
+             | Attestations_aggregate {consensus_content = {level; _}; _} )) =
         attestation.protocol_data.contents
       in
       let level = Level.from_raw ctxt level in
@@ -2737,8 +2727,7 @@ let apply_contents_list (type kind) ctxt chain_id (mode : mode)
         Token.transfer
           ctxt
           (`Contract (Contract.Implicit delegate))
-          (`Contract
-            (Contract.Implicit payload_producer.Consensus_key.delegate))
+          (`Contract (Contract.Implicit payload_producer.Consensus_key.delegate))
           fees
       in
       let balance_updates = drain_balance_updates @ fees_balance_updates in
@@ -3011,7 +3000,8 @@ let record_attesting_participation ctxt dal_attestation =
       Slot.Map.fold_es
         (fun initial_slot
              ({consensus_key; attesting_power; dal_power} : Consensus_key.power)
-             ctxt ->
+             ctxt
+           ->
           let participation =
             if Slot.Set.mem initial_slot (Consensus.attestations_seen ctxt) then
               Delegate.Participated

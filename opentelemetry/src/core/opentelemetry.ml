@@ -1212,7 +1212,7 @@ module Metrics_callbacks = struct
   let register f : unit =
     if !cbs_ = [] then
       (* make sure we call [f] (and others) at each tick *)
-      Collector.on_tick (fun () ->
+        Collector.on_tick (fun () ->
           let m = List.map (fun f -> f ()) !cbs_ |> List.flatten in
           Metrics.emit m);
     cbs_ := f :: !cbs_

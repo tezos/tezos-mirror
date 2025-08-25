@@ -330,9 +330,10 @@ module type Proof = sig
 
   module Env
       (Backend : Backend.S)
-      (Proof : S
-                 with type contents := Backend.Contents.Val.t
-                  and type hash := Backend.Hash.t) :
+      (Proof :
+        S
+          with type contents := Backend.Contents.Val.t
+           and type hash := Backend.Hash.t) :
     Env
       with type hash := Backend.Hash.t
        and type contents := Backend.Contents.Val.t

@@ -148,7 +148,10 @@ let rec do_connect ~count ~previous_status
       (* Randomized exponential backoff capped to 1.5h: 1.5^count * delay ± 50% *)
       let delay = delay *. (1.5 ** fcount) in
       let delay = min delay 3600. in
-      let randomization_factor = 0.5 (* 50% *) in
+      let randomization_factor =
+        0.5
+        (* 50% *)
+      in
       let delay =
         delay
         +. Random.float (delay *. 2. *. randomization_factor)
@@ -165,14 +168,16 @@ let rec do_connect ~count ~previous_status
       let heads =
         Lwt_stream.map
           (fun ((hash, Tezos_base.Block_header.{shell = {predecessor; _}; _}) as
-                head) ->
+                head)
+             ->
             Precessor_cache.replace l1_ctxt.cache hash predecessor ;
             head)
           heads
       in
       let consumer =
         Lwt_stream.iter_s
-          (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head) ->
+          (fun ((hash, Tezos_base.Block_header.{shell = {level; _}; _}) as head)
+             ->
             l1_ctxt.last_seen <- Some head ;
             Layer1_event.switched_new_head ~name hash level)
           heads
@@ -482,7 +487,10 @@ let get_tezos_reorg_for_new_head l1_state
     if old_head_level = new_head_level then
       return (old_head, new_head, Reorg.no_reorg)
     else if old_head_level < new_head_level then
-      let max_read = distance + 1 (* reading includes the head *) in
+      let max_read =
+        distance + 1
+        (* reading includes the head *)
+      in
       let+ new_head, new_chain =
         nth_predecessor
           ~get_predecessor:(get_predecessor ~max_read l1_state)
@@ -510,7 +518,10 @@ let get_tezos_reorg_for_new_head l1_state ?get_old_predecessor old_head new_head
       if new_head_level < l then return Reorg.no_reorg
       else
         let distance = Int32.sub new_head_level l |> Int32.to_int in
-        let max_read = distance + 1 (* reading includes the head *) in
+        let max_read =
+          distance + 1
+          (* reading includes the head *)
+        in
         let* _block_at_l, new_chain =
           nth_predecessor
             ~get_predecessor:(get_predecessor ~max_read l1_state)
@@ -561,13 +572,13 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
   object
     inherit Client_context.proxy_context (obj :> Client_context.full)
 
-    method! call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method! call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun service params query body ->
         let trace_name = trace_name service in
         Octez_telemetry.Trace.with_tzresult
@@ -581,15 +592,15 @@ let client_context_with_timeout (obj : #Client_context.full) timeout :
             timeout_promise service timeout;
           ]
 
-    method! call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method! call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) Tezos_rpc.Service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       fun service ~on_chunk ~on_close params query body ->
         let trace_name = trace_name service in
         Octez_telemetry.Trace.with_tzresult

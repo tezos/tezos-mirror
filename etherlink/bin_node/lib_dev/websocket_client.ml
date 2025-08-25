@@ -490,8 +490,8 @@ type (_, _) call =
       * 'input
       -> ('input, 'output) call
 
-let send_jsonrpc :
-    type input output. t -> (input, output) call -> output tzresult Lwt.t =
+let send_jsonrpc : type input output.
+    t -> (input, output) call -> output tzresult Lwt.t =
  fun client (Call ((module M), input)) ->
   let open Lwt_result_syntax in
   let id = new_id client in

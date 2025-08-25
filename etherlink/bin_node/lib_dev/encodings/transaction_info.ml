@@ -111,7 +111,8 @@ let receipt_fields_encoding =
            type_;
            status;
            contract_address;
-         } ->
+         }
+       ->
       ( cumulative_gas_used,
         effective_gas_price,
         gas_used,
@@ -127,7 +128,8 @@ let receipt_fields_encoding =
            logs_bloom,
            type_,
            status,
-           contract_address ) ->
+           contract_address )
+       ->
       {
         cumulative_gas_used;
         effective_gas_price;

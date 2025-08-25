@@ -407,7 +407,8 @@ let find_block_file cemented_store block_level =
               if
                 Compare.Int32.(
                   block_level >= start_level && block_level <= end_level)
-              then (* Found *)
+              then
+                (* Found *)
                 Some res
               else if Compare.Int32.(block_level > end_level) then
                 (* Making sure the pivot is strictly increasing *)
@@ -734,14 +735,16 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
            () [@profiler.aggregate_f {verbosity = Debug} "metadata_writer"])
       in
       let metadata_finalizer () =
-        (let*! () = Lwt_preemptive.detach Zip.close_out out_file in
-         let metadata_file_path =
-           Naming.cemented_blocks_metadata_file cemented_metadata_dir file
-           |> Naming.file_path
-         in
-         let*! () = Lwt_unix.rename tmp_metadata_file_path metadata_file_path in
-         return_unit)
-        [@profiler.aggregate_s {verbosity = Debug} "metadata_finalizer"]
+        ((let*! () = Lwt_preemptive.detach Zip.close_out out_file in
+          let metadata_file_path =
+            Naming.cemented_blocks_metadata_file cemented_metadata_dir file
+            |> Naming.file_path
+          in
+          let*! () =
+            Lwt_unix.rename tmp_metadata_file_path metadata_file_path
+          in
+          return_unit)
+        [@profiler.aggregate_s {verbosity = Debug} "metadata_finalizer"])
       in
       return (metadata_writer, metadata_finalizer)
     else return ((fun _ -> Lwt.return_unit), fun () -> return_unit)

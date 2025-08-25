@@ -33,11 +33,12 @@ open Kzg.Bls
 module SMap = Kzg.SMap
 
 module Make_impl
-    (Main_KZG : Plonk.Main_protocol.S
-                  with type public_inputs = Scalar.t array list)
-    (Main_Pack : Aggregation.Main_protocol.S
-                   with type public_inputs = Scalar.t array list
-                   with module PP.Answers_commitment = Main_KZG.Input_commitment)
+    (Main_KZG :
+      Plonk.Main_protocol.S with type public_inputs = Scalar.t array list)
+    (Main_Pack :
+      Aggregation.Main_protocol.S
+        with type public_inputs = Scalar.t array list
+        with module PP.Answers_commitment = Main_KZG.Input_commitment)
     (PIs : Pi_parameters.S) =
 struct
   module Aggreg_circuit = Circuit.V (Main_Pack)
@@ -524,11 +525,12 @@ module Super_PP =
 module Main_Pack = Aggregation.Main_protocol.Make (Super_PP)
 
 module Make_raw
-    (Main_KZG : Plonk.Main_protocol.S
-                  with type public_inputs = Scalar.t array list)
-    (Main_Pack : Aggregation.Main_protocol.S
-                   with type public_inputs = Scalar.t array list
-                   with module PP.Answers_commitment = Main_KZG.Input_commitment)
+    (Main_KZG :
+      Plonk.Main_protocol.S with type public_inputs = Scalar.t array list)
+    (Main_Pack :
+      Aggregation.Main_protocol.S
+        with type public_inputs = Scalar.t array list
+        with module PP.Answers_commitment = Main_KZG.Input_commitment)
     (PIs : Pi_parameters.S) :
   Plonk.Main_protocol.S
     with module Input_commitment = Main_Pack.Input_commitment

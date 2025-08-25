@@ -168,7 +168,9 @@ let register_signer (module C : M) (cctxt : Client_context.io_wallet)
   let logger =
     (* overriding the logger we might already have with the one from
        module C *)
-    match C.logger with Some logger -> logger | None -> rpc_config.logger
+    match C.logger with
+    | Some logger -> logger
+    | None -> rpc_config.logger
   in
   let other_registrations, signing_version =
     match parsed_config_file with

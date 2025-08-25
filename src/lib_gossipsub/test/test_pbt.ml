@@ -338,10 +338,10 @@ module Test_message_cache = struct
     let open QCheck2.Gen in
     let* peer =
       QCheck2.Gen.bind QCheck2.Gen.bool (function
-          | true ->
-              let* peer in
-              return (Some peer)
-          | false -> return None)
+        | true ->
+            let* peer in
+            return (Some peer)
+        | false -> return None)
     in
     let* message_id in
     let* message in
@@ -1827,7 +1827,8 @@ module Test_handle_graft = struct
                   (* Polymorphic compare should work well enough as
                      none of the variant constructors have arguments. *)
                   expected_output != output
-                  && (* Only check the output if this is the
+                  &&
+                  (* Only check the output if this is the
                         first matched failure case. *)
                   graft_succeeded_before_check
                 then fail @@ `not_expected_output (O output, O expected_output)

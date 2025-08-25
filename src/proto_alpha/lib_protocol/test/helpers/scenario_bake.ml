@@ -107,8 +107,8 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
           let u_rpc =
             List.map
               (fun ({cycle; deposit} :
-                     Plugin.Delegate_services.deposit_per_cycle) ->
-                (cycle, deposit))
+                     Plugin.Delegate_services.deposit_per_cycle)
+                 -> (cycle, deposit))
               u_rpc
           in
           let finalizable_cycle =

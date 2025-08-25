@@ -62,13 +62,12 @@ let encoding : type a. name:string -> a t -> a encoding =
                   These versions are never encoded to
                   (hence [fun _ -> None]) but are safely decoded with
                   the use of the upgrade functions. *)
-          b.
-          (b -> a) -> b t -> (string -> int -> a case) list =
+          b. (b -> a) -> b t -> (string -> int -> a case) list =
        fun upgr -> function
-        | Version_0 e -> [version_case e (fun _ -> None) (fun x -> upgr x)]
-        | Version_S {previous; encoding; upgrade} ->
-            let others = mk_nones (fun x -> upgr (upgrade x)) previous in
-            version_case encoding (fun _ -> None) (fun x -> upgr x) :: others
+         | Version_0 e -> [version_case e (fun _ -> None) (fun x -> upgr x)]
+         | Version_S {previous; encoding; upgrade} ->
+             let others = mk_nones (fun x -> upgr (upgrade x)) previous in
+             version_case encoding (fun _ -> None) (fun x -> upgr x) :: others
       in
       let nones = mk_nones upgrade previous in
       let cases =

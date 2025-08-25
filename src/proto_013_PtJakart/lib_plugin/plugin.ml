@@ -776,8 +776,7 @@ module RPC = struct
       let unparse_stack ctxt (stack, stack_ty) =
         (* We drop the gas limit as this function is only used for debugging/errors. *)
         let ctxt = Gas.set_unlimited ctxt in
-        let rec unparse_stack :
-            type a s.
+        let rec unparse_stack : type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
             Script.expr list tzresult Lwt.t = function
           | Bot_t, (EmptyCell, EmptyCell) -> return_nil
@@ -870,8 +869,7 @@ module RPC = struct
       open Michelson_v1_primitives
       open Script_typed_ir
 
-      let rec unparse_comparable_ty :
-          type a loc.
+      let rec unparse_comparable_ty : type a loc.
           loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
        fun ~loc -> function
         | Unit_t -> Prim (loc, T_unit, [], [])
@@ -904,8 +902,7 @@ module RPC = struct
         let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
         Int (loc, z)
 
-      let rec unparse_ty :
-          type a ac loc.
+      let rec unparse_ty : type a ac loc.
           loc:loc -> (a, ac) ty -> (loc, Script.prim) Micheline.node =
        fun ~loc ty ->
         let return (name, args, annot) = Prim (loc, name, args, annot) in
@@ -1125,8 +1122,8 @@ module RPC = struct
         parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
         Lwt.return
           ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-          >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
-            ->
+          >>?
+          fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _) ->
             Gas_monad.run ctxt
             @@ Script_ir_translator.find_entrypoint
                  ~error_details:Informative
@@ -1207,15 +1204,17 @@ module RPC = struct
             ~entrypoint
             ~parameter
             ~internal:true
-          >|=? fun ( {
-                       script = _;
-                       code_size = _;
-                       Script_interpreter.storage;
-                       operations;
-                       lazy_storage_diff;
-                       ticket_diffs = _;
-                     },
-                     _ ) ->
+          >|=?
+          fun ( {
+                  script = _;
+                  code_size = _;
+                  Script_interpreter.storage;
+                  operations;
+                  lazy_storage_diff;
+                  ticket_diffs = _;
+                },
+                _ )
+            ->
           ( storage,
             Apply_results.contents_of_packed_internal_operations operations,
             lazy_storage_diff )) ;
@@ -1278,16 +1277,18 @@ module RPC = struct
             ~script:{storage; code}
             ~entrypoint
             ~parameter
-          >|=? fun ( ( {
-                         script = _;
-                         code_size = _;
-                         Script_interpreter.storage;
-                         operations;
-                         lazy_storage_diff;
-                         ticket_diffs = _;
-                       },
-                       _ctxt ),
-                     trace ) ->
+          >|=?
+          fun ( ( {
+                    script = _;
+                    code_size = _;
+                    Script_interpreter.storage;
+                    operations;
+                    lazy_storage_diff;
+                    ticket_diffs = _;
+                  },
+                  _ctxt ),
+                trace )
+            ->
           ( storage,
             Apply_results.contents_of_packed_internal_operations operations,
             trace,
@@ -1377,15 +1378,17 @@ module RPC = struct
             ~entrypoint
             ~parameter
             ~internal:true
-          >>=? fun ( {
-                       Script_interpreter.operations;
-                       script = _;
-                       code_size = _;
-                       storage = _;
-                       lazy_storage_diff = _;
-                       ticket_diffs = _;
-                     },
-                     _ctxt ) ->
+          >>=?
+          fun ( {
+                  Script_interpreter.operations;
+                  script = _;
+                  code_size = _;
+                  storage = _;
+                  lazy_storage_diff = _;
+                  ticket_diffs = _;
+                },
+                _ctxt )
+            ->
           View_helpers.extract_parameter_from_operations
             entrypoint
             operations
@@ -1483,15 +1486,17 @@ module RPC = struct
             ~entrypoint:Entrypoint.default
             ~parameter
             ~internal:true
-          >>=? fun ( {
-                       Script_interpreter.operations = _;
-                       script = _;
-                       code_size = _;
-                       storage;
-                       lazy_storage_diff = _;
-                       ticket_diffs = _;
-                     },
-                     _ctxt ) ->
+          >>=?
+          fun ( {
+                  Script_interpreter.operations = _;
+                  script = _;
+                  code_size = _;
+                  storage;
+                  lazy_storage_diff = _;
+                  ticket_diffs = _;
+                },
+                _ctxt )
+            ->
           View_helpers.extract_value_from_storage storage >>?= fun value ->
           return (Micheline.strip_locations value)) ;
       Registration.register0
@@ -1519,17 +1524,19 @@ module RPC = struct
           in
           let code = Script.lazy_expr expr in
           Script_ir_translator.parse_code ~legacy ctxt ~code
-          >>=? fun ( Ex_code
-                       (Code
-                         {
-                           code;
-                           arg_type;
-                           storage_type;
-                           views;
-                           entrypoints;
-                           code_size;
-                         }),
-                     ctxt ) ->
+          >>=?
+          fun ( Ex_code
+                  (Code
+                     {
+                       code;
+                       arg_type;
+                       storage_type;
+                       views;
+                       entrypoints;
+                       code_size;
+                     }),
+                ctxt )
+            ->
           Script_ir_translator.parse_data
             ~legacy
             ~allow_forged:true
@@ -1643,8 +1650,8 @@ module RPC = struct
           parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
             ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
-            >|? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
-              ->
+            >|?
+            fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _) ->
               let unreachable_entrypoint, map =
                 Script_ir_translator.list_entrypoints_uncarbonated
                   arg_type

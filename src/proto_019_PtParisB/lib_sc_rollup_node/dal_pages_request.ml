@@ -113,7 +113,10 @@ module Pages_cache =
   Aches_lwt.Lache.Make (Aches.Rache.Transfer (Aches.Rache.LRU) (Slot_id))
 
 let get_slot_pages =
-  let pages_cache = Pages_cache.create 16 (* 130MB *) in
+  let pages_cache =
+    Pages_cache.create 16
+    (* 130MB *)
+  in
   fun dal_cctxt commitment ->
     Pages_cache.bind_or_put
       pages_cache

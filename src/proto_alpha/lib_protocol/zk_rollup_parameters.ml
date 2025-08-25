@@ -28,8 +28,7 @@ type deposit_parameters = {
   zkru_operation : Alpha_context.Zk_rollup.Operation.t;
 }
 
-let get_deposit_parameters :
-    type a comparable.
+let get_deposit_parameters : type a comparable.
     ( (a Script_typed_ir.ticket, bytes) Script_typed_ir.pair,
       comparable )
     Script_typed_ir.ty ->

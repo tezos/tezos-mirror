@@ -1067,8 +1067,8 @@ let kernel_from_args network kernel =
   Option.either
     kernel
     (Option.bind network (function
-        | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
-        | Testnet -> None))
+      | Mainnet -> Some (In_memory Evm_node_supported_installers.mainnet)
+      | Testnet -> None))
 
 let add_tezlink_to_node_configuration tezlink_chain_id configuration =
   let open Configuration in
@@ -1219,7 +1219,8 @@ let rpc_command =
              preimages,
              preimages_endpoint,
              native_execution_policy ) )
-         () ->
+         ()
+       ->
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
       in
@@ -1501,7 +1502,8 @@ let chunker_command =
            wallet_dir,
            password_filename )
          data
-         () ->
+         ()
+       ->
       let config_file = config_filename ~data_dir config_file in
       let* config = Cli.create_or_read_config ~data_dir config_file in
       let* kind =
@@ -1585,7 +1587,8 @@ let make_sequencer_upgrade_command =
          pool_address
          activation_timestamp
          sequencer_str
-         () ->
+         ()
+       ->
       let config_file = config_filename ~data_dir config_file in
       let* config = Cli.create_or_read_config ~data_dir config_file in
       let wallet_ctxt = register_wallet ~wallet_dir () in
@@ -1618,7 +1621,10 @@ let init_from_rollup_node_command =
     (args3 data_dir_arg config_path_arg omit_delayed_tx_events_arg)
     (prefixes ["init"; "from"; "rollup"; "node"]
     @@ rollup_node_data_dir_param @@ stop)
-    (fun (data_dir, config_file, omit_delayed_tx_events) rollup_node_data_dir () ->
+    (fun (data_dir, config_file, omit_delayed_tx_events)
+         rollup_node_data_dir
+         ()
+       ->
       let open Lwt_result_syntax in
       let config_file = config_filename ~data_dir config_file in
       let* configuration = Cli.create_or_read_config ~data_dir config_file in
@@ -1738,7 +1744,8 @@ let replay_many_command =
            profile,
            disable_da_fees )
          l2_level
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let config_file = config_filename ~data_dir config_file in
       let* configuration =
@@ -1787,7 +1794,8 @@ let replay_command =
            disable_da_fees )
          l2_level
          upto
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let config_file = config_filename ~data_dir config_file in
       let* configuration =
@@ -1957,7 +1965,8 @@ let init_config_command =
              dal_slots,
              network,
              sequencer_sunset_sec ) )
-         () ->
+         ()
+       ->
       let config_file = config_filename ~data_dir config_file in
       Evm_node_lib_dev.Data_dir.use ~data_dir @@ fun () ->
       let* restricted_rpcs =
@@ -2192,7 +2201,8 @@ let make_l2_kernel_config_command =
            l2_chain_id,
            Ex_chain_family l2_chain_family )
          output
-         () ->
+         ()
+       ->
       let* l2_chain_id =
         match l2_chain_id with
         | None ->
@@ -2318,7 +2328,8 @@ let make_kernel_config_command =
              evm_version,
              set_account_code ) )
          output
-         () ->
+         ()
+       ->
       Evm_node_lib_dev.Kernel_config.make
         ~mainnet_compat
         ~eth_bootstrap_balance
@@ -2387,7 +2398,8 @@ let proxy_command =
              finalized_view,
              profiling ),
            (read_only, ignore_block_param, evm_node_endpoint) )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -2524,7 +2536,8 @@ let sequencer_command =
              password_filename,
              dal_slots,
              sunset_sec ) )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -2621,7 +2634,8 @@ let sandbox_command =
                disable_da_fees,
                kernel_verbosity ),
              (network, init_from_snapshot, funded_addresses, main_endpoint) ) )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -2744,7 +2758,8 @@ let tezlink_sandbox_command =
                disable_da_fees,
                kernel_verbosity ),
              tezlink_funded_addresses ) )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let* restricted_rpcs =
         pick_restricted_rpcs restricted_rpcs whitelisted_rpcs blacklisted_rpcs
@@ -2867,7 +2882,8 @@ let observer_command =
              init_from_snapshot,
              history_mode,
              network ) )
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let config_file = config_filename ~data_dir config_file in
       let* restricted_rpcs =
@@ -3177,7 +3193,8 @@ let preemptive_kernel_download_command =
            preimages_endpoint,
            num_download_retries )
          root_hash
-         () ->
+         ()
+       ->
       let open Lwt_result_syntax in
       let config_file = config_filename ~data_dir config_file in
       let* configuration =
@@ -3267,7 +3284,8 @@ let list_events_command =
         (Format.pp_print_list
            ~pp_sep:(fun fmt () -> Format.fprintf fmt "@,")
            (fun fmt
-                Internal_event.Generic.(Definition (section, name, definition)) ->
+                Internal_event.Generic.(Definition (section, name, definition))
+              ->
              let module E = (val definition) in
              Format.fprintf
                fmt

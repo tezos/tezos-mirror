@@ -166,8 +166,8 @@ let test_revelation_early_wrong_right_twice () =
   let*! e = Block.bake ~policy ~operation b in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Nonce_storage.Too_early_revelation -> true
-        | _ -> false)
+      | Nonce_storage.Too_early_revelation -> true
+      | _ -> false)
   in
   (* finish the cycle excluding the committing baker, id *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -183,8 +183,8 @@ let test_revelation_early_wrong_right_twice () =
   let*! e = Block.bake ~operation b in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Nonce_storage.Inconsistent_nonce -> true
-        | _ -> false)
+      | Nonce_storage.Inconsistent_nonce -> true
+      | _ -> false)
   in
   (* reveals correctly *)
   let operation =
@@ -205,8 +205,8 @@ let test_revelation_early_wrong_right_twice () =
   in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Validate_errors.Anonymous.Conflicting_nonce_revelation _ -> true
-        | _ -> false)
+      | Validate_errors.Anonymous.Conflicting_nonce_revelation _ -> true
+      | _ -> false)
   in
   let cycle_for_rewards = Block.current_cycle b in
   let* b = Block.bake ~policy:(Block.By_account baker_pkh) ~operation b in
@@ -241,8 +241,8 @@ let test_revelation_early_wrong_right_twice () =
   in
   let*! e = Block.bake ~operation ~policy b in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Already_revealed_nonce -> true
-      | _ -> false)
+    | Nonce_storage.Already_revealed_nonce -> true
+    | _ -> false)
 
 (** Test that revealing too late produces an error. Note that a
     committer who doesn't reveal at cycle 1 is not punished.*)
@@ -279,8 +279,8 @@ let test_revelation_missing_and_late () =
   let*! e = Block.bake ~operation ~policy b in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Nonce_storage.Too_late_revelation -> true
-        | _ -> false)
+      | Nonce_storage.Too_late_revelation -> true
+      | _ -> false)
   in
   (* finish cycle 1 excluding the committing baker [id] *)
   let* b = Block.bake_until_cycle_end ~policy b in
@@ -293,8 +293,8 @@ let test_revelation_missing_and_late () =
   in
   let*! e = Block.bake ~operation b in
   Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Too_late_revelation -> true
-      | _ -> false)
+    | Nonce_storage.Too_late_revelation -> true
+    | _ -> false)
 
 (** Test that we do not distribute attesting rewards if the nonce was
     not revealed. *)
@@ -473,8 +473,8 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let*! e = Block.bake ~operation b in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Seed_storage.Too_early_revelation -> true
-        | _ -> false)
+      | Seed_storage.Too_early_revelation -> true
+      | _ -> false)
   in
   (* bake until nonce reveal period finishes *)
   let* b = Block.bake_n ~policy nonce_revelation_threshold b in
@@ -483,8 +483,8 @@ let test_early_incorrect_unverified_correct_already_vdf () =
   let*! e = Block.bake ~operation b in
   let* () =
     Assert.proto_error ~loc:__LOC__ e (function
-        | Seed_storage.Unverified_vdf -> true
-        | _ -> false)
+      | Seed_storage.Unverified_vdf -> true
+      | _ -> false)
   in
   let* seed_status = Context.get_seed_computation (B b) in
   match seed_status with
@@ -509,8 +509,8 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       let*! e = Block.bake ~operation b in
       let* () =
         Assert.proto_error ~loc:__LOC__ e (function
-            | Seed_storage.Unverified_vdf -> true
-            | _ -> false)
+          | Seed_storage.Unverified_vdf -> true
+          | _ -> false)
       in
       (* test with correct input *)
       (* compute the VDF solution (the result and the proof ) *)
@@ -531,8 +531,8 @@ let test_early_incorrect_unverified_correct_already_vdf () =
       in
       let* () =
         Assert.proto_error ~loc:__LOC__ e (function
-            | Validate_errors.Anonymous.Conflicting_vdf_revelation _ -> true
-            | _ -> false)
+          | Validate_errors.Anonymous.Conflicting_vdf_revelation _ -> true
+          | _ -> false)
       in
       (* verify the balance was credited following operation inclusion *)
       let cycle_for_rewards = Block.current_cycle b in
@@ -568,8 +568,8 @@ let test_early_incorrect_unverified_correct_already_vdf () =
           let*! e = Block.bake ~operation b in
           let* () =
             Assert.proto_error ~loc:__LOC__ e (function
-                | Seed_storage.Already_accepted -> true
-                | _ -> false)
+              | Seed_storage.Already_accepted -> true
+              | _ -> false)
           in
           (* verify the stored seed has the expected value *)
           let open Data_encoding.Binary in

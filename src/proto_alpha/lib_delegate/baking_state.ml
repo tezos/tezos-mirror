@@ -81,7 +81,8 @@ let block_info_encoding =
            quorum;
            payload;
            grandparent;
-         } ->
+         }
+       ->
       ( hash,
         shell,
         payload_hash,
@@ -99,7 +100,8 @@ let block_info_encoding =
            prequorum,
            quorum,
            payload,
-           grandparent ) ->
+           grandparent )
+       ->
       {
         hash;
         shell;
@@ -638,7 +640,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              operations;
              manager_operations_infos;
              baking_votes;
-           } ->
+           }
+         ->
         ( signed_block_header,
           round,
           delegate,
@@ -650,7 +653,8 @@ let forge_event_encoding_for_logging__cannot_decode =
              delegate,
              operations,
              manager_operations_infos,
-             baking_votes ) ->
+             baking_votes )
+         ->
         {
           signed_block_header;
           round;

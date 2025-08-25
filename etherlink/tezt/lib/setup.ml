@@ -126,7 +126,7 @@ let setup_l1_contracts ?(dictator = Constant.bootstrap2) ~kernel client =
       ~prg:(admin_path ())
       ~burn_cap:Tez.one
       client
-    (* Originates the administrator contract. *)
+  (* Originates the administrator contract. *)
   and* sequencer_governance =
     Client.originate_contract
       ~alias:"evm-sequencer-admin"

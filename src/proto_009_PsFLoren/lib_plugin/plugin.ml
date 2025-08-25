@@ -446,7 +446,8 @@ module RPC = struct
            (fun ( storage,
                   operations,
                   legacy_lazy_storage_diff,
-                  lazy_storage_diff ) ->
+                  lazy_storage_diff )
+              ->
              let lazy_storage_diff =
                match lazy_storage_diff with
                | Some s -> Some s
@@ -488,7 +489,8 @@ module RPC = struct
                   operations,
                   trace,
                   legacy_lazy_storage_diff,
-                  lazy_storage_diff ) ->
+                  lazy_storage_diff )
+              ->
              let lazy_storage_diff =
                match lazy_storage_diff with
                | Some s -> Some s
@@ -734,8 +736,9 @@ module RPC = struct
           ~entrypoint
           ~parameter
           ~internal:true
-        >|=? fun {Script_interpreter.storage; operations; lazy_storage_diff; _}
-          -> (storage, operations, lazy_storage_diff)) ;
+        >|=?
+        fun {Script_interpreter.storage; operations; lazy_storage_diff; _} ->
+        (storage, operations, lazy_storage_diff)) ;
     register0
       trace_code_normalized
       (fun
@@ -762,8 +765,7 @@ module RPC = struct
           let unparse_stack ctxt (stack, stack_ty) =
             (* We drop the gas limit as this function is only used for debugging/errors. *)
             let ctxt = Gas.set_unlimited ctxt in
-            let rec unparse_stack :
-                type a.
+            let rec unparse_stack : type a.
                 a Script_typed_ir.stack_ty * a ->
                 (Script.expr * string option) list
                 Environment.Error_monad.tzresult

@@ -209,7 +209,10 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "storage"; "for"]
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode
+           (_, contract)
+           (cctxt : Protocol_client_context.full)
+         ->
         get_storage
           cctxt
           ~chain:cctxt#chain
@@ -234,7 +237,12 @@ let commands_ro () =
       @@ prefix "in"
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun () key key_type (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun ()
+           key
+           key_type
+           (_, contract)
+           (cctxt : Protocol_client_context.full)
+         ->
         get_contract_big_map_value
           cctxt
           ~chain:cctxt#chain
@@ -280,7 +288,10 @@ let commands_ro () =
       (prefixes ["get"; "contract"; "code"; "for"]
       @@ Contract_alias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)
-      (fun unparsing_mode (_, contract) (cctxt : Protocol_client_context.full) ->
+      (fun unparsing_mode
+           (_, contract)
+           (cctxt : Protocol_client_context.full)
+         ->
         get_script
           cctxt
           ~chain:cctxt#chain

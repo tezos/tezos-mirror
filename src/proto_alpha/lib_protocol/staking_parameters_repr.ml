@@ -73,11 +73,13 @@ let encoding =
     (fun {
            limit_of_staking_over_baking_millionth;
            edge_of_baking_over_staking_billionth;
-         } ->
+         }
+       ->
       ( limit_of_staking_over_baking_millionth,
         edge_of_baking_over_staking_billionth ))
     (fun ( limit_of_staking_over_baking_millionth,
-           edge_of_baking_over_staking_billionth ) ->
+           edge_of_baking_over_staking_billionth )
+       ->
       Result.map_error
         (fun () -> "Invalid staking parameters")
         (make

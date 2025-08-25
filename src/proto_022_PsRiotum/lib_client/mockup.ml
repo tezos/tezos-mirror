@@ -212,7 +212,8 @@ module Protocol_parameters = struct
       (fun ( initial_timestamp,
              bootstrap_accounts,
              bootstrap_contracts,
-             constants ) ->
+             constants )
+         ->
         {initial_timestamp; bootstrap_accounts; bootstrap_contracts; constants})
       (obj4
          (req "initial_timestamp" Time.Protocol.encoding)

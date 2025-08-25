@@ -42,7 +42,8 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         return
           (List.map
              (fun Plugin.RPC.Attestation_rights.
-                    {delegate; first_slot; attestation_power; _} ->
+                    {delegate; first_slot; attestation_power; _}
+                ->
                Consensus_ops.
                  {
                    address =
@@ -67,10 +68,10 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
            contents =
              Single
                (Attestation
-                 {
-                   consensus_content = {slot; level; round; block_payload_hash};
-                   _;
-                 });
+                  {
+                    consensus_content = {slot; level; round; block_payload_hash};
+                    _;
+                  });
            signature = _;
          };
      shell = _;
@@ -229,12 +230,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
         match receipt with
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Preattestation_result
-                      {delegate; consensus_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Preattestation_result
+                        {delegate; consensus_power; _});
+               }) ->
             Consensus_ops.
               {
                 op =
@@ -249,12 +250,12 @@ module Services : Protocol_machinery.PROTOCOL_SERVICES = struct
             :: acc
         | Receipt
             (Protocol.Apply_results.Operation_metadata
-              {
-                contents =
-                  Single_result
-                    (Protocol.Apply_results.Attestation_result
-                      {delegate; consensus_power; _});
-              }) ->
+               {
+                 contents =
+                   Single_result
+                     (Protocol.Apply_results.Attestation_result
+                        {delegate; consensus_power; _});
+               }) ->
             Consensus_ops.
               {
                 op =

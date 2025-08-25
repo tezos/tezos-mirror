@@ -154,9 +154,10 @@ end
 module Of_commit
     (Hash : Brassaia.Hash.S)
     (Key : Brassaia.Key.S with type hash = Hash.t)
-    (Commit : Brassaia.Commit.Generic_key.S
-                with type node_key = Key.t
-                 and type commit_key = Key.t) =
+    (Commit :
+      Brassaia.Commit.Generic_key.S
+        with type node_key = Key.t
+         and type commit_key = Key.t) =
 struct
   module Hash = Brassaia.Hash.Typed (Hash) (Commit)
 

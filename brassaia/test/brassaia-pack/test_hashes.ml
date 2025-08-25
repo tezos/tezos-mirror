@@ -47,10 +47,11 @@ let check_iter iter_type (iter : 'a -> (string -> unit) -> unit) v checks =
 
 module Test
     (Conf : Brassaia_pack.Conf.S)
-    (Schema : Brassaia.Schema.Extended
-                with type Contents.t = bytes
-                 and type Branch.t = string
-                 and module Info = Brassaia.Info.Default) =
+    (Schema :
+      Brassaia.Schema.Extended
+        with type Contents.t = bytes
+         and type Branch.t = string
+         and module Info = Brassaia.Info.Default) =
 struct
   module Store = struct
     module Maker = Brassaia_pack_unix.Maker (Conf)

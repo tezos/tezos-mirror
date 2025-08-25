@@ -426,7 +426,7 @@ struct
             (function
               | View
                   (Confirm_transactions
-                    {confirmed_txs; clear_pending_queue_after}) ->
+                     {confirmed_txs; clear_pending_queue_after}) ->
                   Some ((), List.of_seq confirmed_txs, clear_pending_queue_after)
               | _ -> None)
             (fun _ -> assert false);
@@ -621,8 +621,7 @@ struct
       let* rev_selected = aux validation_state [] in
       return @@ List.rev rev_selected
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =

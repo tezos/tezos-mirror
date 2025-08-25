@@ -1323,8 +1323,8 @@ let patch_config_with_experimental_feature
        ~name:"next_wasm_runtime"
        (`Bool true)
   |> optional_json_put ~name:"rpc_server" rpc_server (function
-         | Resto -> `String "resto"
-         | Dream -> `String "dream")
+       | Resto -> `String "resto"
+       | Dream -> `String "dream")
   |> fun json ->
   let value_json =
     JSON.annotate ~origin:"evm_node.config_patch"
@@ -1379,9 +1379,9 @@ let patch_config_websockets_if_enabled ?max_message_length
 let patch_config_gc ?history_mode json =
   json
   |> optional_json_put ~name:"history" history_mode (function
-         | Archive -> `String "archive"
-         | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
-         | Full retention -> `String (Format.sprintf "full:%d" retention))
+       | Archive -> `String "archive"
+       | Rolling retention -> `String (Format.sprintf "rolling:%d" retention)
+       | Full retention -> `String (Format.sprintf "full:%d" retention))
 
 let init ?patch_config ?name ?runner ?mode ?data_dir ?config_file ?rpc_addr
     ?rpc_port ?restricted_rpcs ?history_mode ?spawn_rpc ?websockets

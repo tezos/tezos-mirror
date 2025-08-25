@@ -188,7 +188,8 @@ let scenario_on_teztnet =
       ?operator_profiles
       ?attester_profiles
       ~main_scenario
-      () ->
+      ()
+    ->
     (* Parse CLI arguments *)
     (* The working-dir option is not mandatory. It allows providing a fix
        directly for nodes and wallet data/base dir. An advantage of this is the

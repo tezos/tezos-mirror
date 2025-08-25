@@ -455,5 +455,8 @@ let () =
       constants
   in
   let*? diff = liquidity_baking_subsidy -? expected_subsidy in
-  let max_diff = 1000 (* mutez *) in
+  let max_diff =
+    1000
+    (* mutez *)
+  in
   Assert.leq_int ~loc:__LOC__ (Int64.to_int (to_mutez diff)) max_diff

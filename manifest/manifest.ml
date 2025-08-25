@@ -4401,27 +4401,29 @@ let list_tests_to_run_after_changes ~(tezt_exe : target)
      this is the special case of [make_tezt_exe]. *)
   let test_files = ref String_set.empty in
   ( Fun.flip String_map.iter !tezt_targets_by_path
-  @@ fun tezt_target_dir
-             {
-               opam = _;
-               lib_deps;
-               exe_deps;
-               dep_globs;
-               dep_globs_rec;
-               dep_files;
-               modules;
-               modes = _;
-               synopsis = _;
-               opam_with_test = _;
-               dune_with_test = _;
-               with_macos_security_framework = _;
-               flags = _;
-               dune = _;
-               tezt_local_test_lib;
-               preprocess;
-               preprocessor_deps;
-               product = _;
-             } ->
+  @@
+  fun tezt_target_dir
+      {
+        opam = _;
+        lib_deps;
+        exe_deps;
+        dep_globs;
+        dep_globs_rec;
+        dep_files;
+        modules;
+        modes = _;
+        synopsis = _;
+        opam_with_test = _;
+        dune_with_test = _;
+        with_macos_security_framework = _;
+        flags = _;
+        dune = _;
+        tezt_local_test_lib;
+        preprocess;
+        preprocessor_deps;
+        product = _;
+      }
+    ->
     if
       List.exists target_option_has_changed lib_deps
       || List.exists target_option_has_changed exe_deps

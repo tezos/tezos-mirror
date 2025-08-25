@@ -448,11 +448,11 @@ module State = struct
         ~native_execution
         evm_state
         (`Inbox
-          [
-            "\254"
-            ^ Bytes.to_string
-                (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
-          ])
+           [
+             "\254"
+             ^ Bytes.to_string
+                 (Evm_events.Delayed_transaction.to_rlp delayed_transaction);
+           ])
     else
       let*! evm_state =
         Evm_state.modify
@@ -2091,8 +2091,7 @@ module Handlers = struct
     State.Transaction.initialize_head_info ctxt ;
     return ctxt
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       self -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
    fun self request ->
     let open Lwt_result_syntax in

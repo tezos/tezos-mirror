@@ -300,8 +300,7 @@ let rec skip n state k =
   k state
 
 (** Main recursive reading function, in continuation passing style. *)
-let rec read_rec :
-    type next ret.
+let rec read_rec : type next ret.
     bool ->
     next Encoding.t ->
     state ->
@@ -487,8 +486,7 @@ and remaining_bytes_for_variable_encoding {remaining_bytes; _} =
       assert false
   | Some len -> len
 
-and read_variable_pair :
-    type left right ret.
+and read_variable_pair : type left right ret.
     left Encoding.t ->
     right Encoding.t ->
     state ->
@@ -516,8 +514,7 @@ and read_variable_pair :
       (* Should be rejected by [Encoding.Kind.combine] *)
       assert false
 
-and read_variable_list :
-    type a ret.
+and read_variable_list : type a ret.
     read_error ->
     int ->
     a Encoding.t ->
@@ -535,8 +532,7 @@ and read_variable_list :
   in
   loop state [] 0 max_length
 
-and read_fixed_list :
-    type a ret.
+and read_fixed_list : type a ret.
     int -> a Encoding.t -> state -> (a list * state -> ret status) -> ret status
     =
  fun exact_length e state k ->
@@ -553,8 +549,7 @@ and read_fixed_list :
   in
   loop state [] exact_length
 
-and read_fixed_array :
-    type a ret.
+and read_fixed_array : type a ret.
     int ->
     a Encoding.t ->
     state ->

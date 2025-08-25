@@ -159,8 +159,7 @@ let destutter equal l =
       in
       loop [i] i l
 
-let rec register_indexed_subcontext :
-    type r a b.
+let rec register_indexed_subcontext : type r a b.
     r t -> list:(r -> a list tzresult Lwt.t) -> (r, a, b) args -> b t =
  fun desc ~list path ->
   let open Lwt_result_syntax in
@@ -216,8 +215,7 @@ let rec register_indexed_subcontext :
                 (RPC_arg.descr inner_arg).name
           | Some RPC_arg.Eq -> subdir))
 
-let register_value :
-    type a b.
+let register_value : type a b.
     a t -> get:(a -> b option tzresult Lwt.t) -> b Data_encoding.t -> unit =
  fun desc ~get encoding ->
   match desc.dir with
@@ -290,8 +288,7 @@ let depth_query =
 let build_directory : type key. key t -> key RPC_directory.t =
  fun dir ->
   let rpc_dir = ref (RPC_directory.empty : key RPC_directory.t) in
-  let register :
-      type ikey.
+  let register : type ikey.
       chunked:bool -> (key, ikey) RPC_path.t -> ikey opt_handler -> unit =
    fun ~chunked path (Opt_handler {encoding; get}) ->
     let service =
@@ -301,8 +298,8 @@ let build_directory : type key. key t -> key RPC_directory.t =
       RPC_directory.opt_register ~chunked !rpc_dir service (fun k q () ->
           get k (q.depth + 1))
   in
-  let rec build_handler :
-      type ikey. ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
+  let rec build_handler : type ikey.
+      ikey t -> (key, ikey) RPC_path.t -> ikey opt_handler =
     let open Lwt_result_syntax in
     fun desc path ->
       match desc.dir with

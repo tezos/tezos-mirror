@@ -145,8 +145,8 @@ module P2p_message_V1 = struct
     let open Data_encoding in
     List.map
       (fun (P2p_params.Encoding
-             {tag; title; encoding; wrap; unwrap; max_length = _}) ->
-        case (Tag tag) ~title encoding unwrap wrap)
+              {tag; title; encoding; wrap; unwrap; max_length = _})
+         -> case (Tag tag) ~title encoding unwrap wrap)
       p2p_message_app_encoding
     |> union
     |> def

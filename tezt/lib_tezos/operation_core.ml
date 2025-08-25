@@ -376,17 +376,17 @@ let make_run_operation_input ?chain_id t client =
   let signature = Tezos_crypto.Signature.zero in
   return
     (`O
-      [
-        ( "operation",
-          `O
-            [
-              ("branch", `String t.branch);
-              ("contents", t.contents);
-              ( "signature",
-                `String (Tezos_crypto.Signature.to_b58check signature) );
-            ] );
-        ("chain_id", `String chain_id);
-      ])
+       [
+         ( "operation",
+           `O
+             [
+               ("branch", `String t.branch);
+               ("contents", t.contents);
+               ( "signature",
+                 `String (Tezos_crypto.Signature.to_b58check signature) );
+             ] );
+         ("chain_id", `String chain_id);
+       ])
 
 let make_preapply_operation_input ~protocol ~signature t =
   let protocol = Protocol.hash protocol in

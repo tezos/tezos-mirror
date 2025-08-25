@@ -106,7 +106,8 @@ let apply_slashes ctxt slashing_history ~unstake_request_cycle amount =
              were computed. *)
           misbehaviour_cycle
           <= add unstake_request_cycle slashable_deposits_period
-          && (* The unstake request is old enough that it already
+          &&
+          (* The unstake request is old enough that it already
                 existed when the misbehaviour was slashed (or will be
                 slashed if it hasn't happened yet). Indeed, unstake
                 requests created after the slashing contain funds that

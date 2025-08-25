@@ -314,7 +314,8 @@ module Term = struct
              block_metadata_size;
              manager_operation_metadata_sizes;
              too_large_operation_metadata;
-           } ->
+           }
+         ->
         ( level,
           block_metadata_size,
           manager_operation_metadata_sizes,
@@ -322,7 +323,8 @@ module Term = struct
       (fun ( level,
              block_metadata_size,
              manager_operation_metadata_sizes,
-             too_large_operation_metadata ) ->
+             too_large_operation_metadata )
+         ->
         {
           level;
           block_metadata_size;
@@ -354,7 +356,8 @@ module Term = struct
              block_metadata_size;
              operation_metadata_size;
              too_large_operation_metadata_count;
-           } ->
+           }
+         ->
         ( name,
           block_count,
           block_stats,
@@ -366,7 +369,8 @@ module Term = struct
              block_stats,
              block_metadata_size,
              operation_metadata_size,
-             too_large_operation_metadata_count ) ->
+             too_large_operation_metadata_count )
+         ->
         {
           name;
           block_count;
@@ -400,7 +404,8 @@ module Term = struct
              block_metadata_size;
              operation_metadata_size;
              too_large_operation_metadata_count;
-           } ->
+           }
+         ->
         ( cycle_stats,
           block_count,
           block_metadata_size,
@@ -410,7 +415,8 @@ module Term = struct
              block_count,
              block_metadata_size,
              operation_metadata_size,
-             too_large_operation_metadata_count ) ->
+             too_large_operation_metadata_count )
+         ->
         {
           cycle_stats;
           block_count;
@@ -450,7 +456,8 @@ module Term = struct
                   operation_metadata_size;
                   too_large_operation_metadata_count;
                 }
-                (metadata_file, cycle) ->
+                (metadata_file, cycle)
+              ->
              let new_cycle_stats =
                List.fold_left
                  (fun {
@@ -461,7 +468,8 @@ module Term = struct
                         operation_metadata_size;
                         too_large_operation_metadata_count;
                       }
-                      (stats : Tezos_store_shared.Store_types.metadata_stat) ->
+                      (stats : Tezos_store_shared.Store_types.metadata_stat)
+                    ->
                    let new_block_stats =
                      {
                        level = stats.block_level;

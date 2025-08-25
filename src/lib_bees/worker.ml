@@ -289,9 +289,10 @@ module Make_internal
     (Name : Worker_intf.NAME)
     (Request : Worker_intf.REQUEST)
     (Types : Worker_intf.TYPES)
-    (Worker_events : Worker_events.S
-                       with type view = Request.view
-                        and type critical_error = tztrace) =
+    (Worker_events :
+      Worker_events.S
+        with type view = Request.view
+         and type critical_error = tztrace) =
 struct
   module Name = Name
   module Request = Request
@@ -455,16 +456,14 @@ struct
     | None, _ -> assert false
     | Some state, _ -> state
 
-  let with_state :
-      type a.
+  let with_state : type a.
       a t ->
       (Types.state -> (unit, 'request_error) result Lwt.t) ->
       (unit, 'request_error) result Lwt.t =
    fun w f ->
     match w.state with None -> Lwt.return (Ok ()) | Some state -> f state
 
-  let with_state_eio :
-      type a.
+  let with_state_eio : type a.
       a t ->
       (Types.state -> (unit, 'request_error) result) ->
       (unit, 'request_error) result =

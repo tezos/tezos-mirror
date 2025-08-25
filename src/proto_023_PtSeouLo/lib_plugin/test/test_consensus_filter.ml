@@ -262,7 +262,8 @@ let test_acceptable_current_level_current_round =
     Generator.(param_acceptable ~rounds:same_rounds ~levels:same_levels ())
     (fun ( config,
            (((op_round, _), (_, op_level)), (proposal_timestamp, now_timestamp))
-         ) ->
+         )
+       ->
       let proposal_level = op_level in
       let proposal_round = op_round in
       no_error
@@ -290,7 +291,8 @@ let test_acceptable_current_level =
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
            ( ((proposal_round, op_round), (_, op_level)),
-             (proposal_timestamp, now_timestamp) ) ) ->
+             (proposal_timestamp, now_timestamp) ) )
+       ->
       let proposal_level = op_level in
       no_error
         (let* expected_time =
@@ -332,7 +334,8 @@ let test_not_acceptable_current_level =
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
            ( ((proposal_round, op_round), (_, op_level)),
-             (proposal_timestamp, now_timestamp) ) ) ->
+             (proposal_timestamp, now_timestamp) ) )
+       ->
       let proposal_level = op_level in
       no_error
         (let* expected_time =
@@ -379,7 +382,8 @@ let test_acceptable_next_level =
     Generator.(param_acceptable ~levels:same_levels ())
     (fun ( config,
            ( ((proposal_round, op_round), (proposal_level, _)),
-             (proposal_timestamp, now_timestamp) ) ) ->
+             (proposal_timestamp, now_timestamp) ) )
+       ->
       let op_level = Raw_level.succ proposal_level in
       no_error
         (let* current_level_start =
@@ -429,7 +433,8 @@ let test_not_acceptable_next_level =
       param_acceptable ~levels:same_levels ~timestamps:successive_timestamp ())
     (fun ( config,
            ( ((proposal_round, op_round), (proposal_level, _)),
-             (proposal_timestamp, now_timestamp) ) ) ->
+             (proposal_timestamp, now_timestamp) ) )
+       ->
       let op_level = Raw_level.succ proposal_level in
       QCheck2.assume
       @@ no_error

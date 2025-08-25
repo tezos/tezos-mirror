@@ -172,9 +172,9 @@ exception Translator_benchmark_error of error_kind
 
 let () =
   Printexc.register_printer (function
-      | Translator_benchmark_error err ->
-          Some (Format.asprintf "%a" pp_error_kind err)
-      | _ -> None)
+    | Translator_benchmark_error err ->
+        Some (Format.asprintf "%a" pp_error_kind err)
+    | _ -> None)
 
 let global_error benchmark_name workload =
   raise (Translator_benchmark_error (Global_error {benchmark_name; workload}))

@@ -749,7 +749,10 @@ let make_test_battery_for_prime_order_field ~domains p =
 let rec make_test_battery_with_random_fields acc n =
   if n = 0 then acc
   else
-    let prime_number = Random.int 0x3FFFFFFF (* max random *) in
+    let prime_number =
+      Random.int 0x3FFFFFFF
+      (* max random *)
+    in
     if not (is_prime_number (Z.of_int prime_number)) then
       make_test_battery_with_random_fields acc n
     else

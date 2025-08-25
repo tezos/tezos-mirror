@@ -100,9 +100,11 @@ type error +=
       commitment_inbox_level : Raw_level_repr.t;
     }
   | (* `Temporary *)
-      Sc_rollup_no_commitment_to_cement of Raw_level_repr.t
+      Sc_rollup_no_commitment_to_cement of
+      Raw_level_repr.t
   | (* `Permanent *)
-      Sc_rollup_double_publish of Sc_rollup_commitment_repr.Hash.t
+      Sc_rollup_double_publish of
+      Sc_rollup_commitment_repr.Hash.t
   | Sc_rollup_empty_whitelist
   | Sc_rollup_whitelist_disabled
   | Sc_rollup_staker_not_in_whitelist

@@ -119,7 +119,8 @@ module Parameters :
     | Refute _ | Timeout _
     (* Refutation game operations don't need to be persisted as they are
        requeued by the node automatically depending on the state of the game on
-       L1 on startup. *) ->
+       L1 on startup. *)
+      ->
         false
     | Add_messages _ | Recover_bond _ | Execute_outbox_message _
     | Publish_dal_commitment _ ->

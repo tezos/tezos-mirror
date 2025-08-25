@@ -203,13 +203,13 @@ let invalid_lazy_bytes : bytes encoding =
    fun (module Repr_f) bytes ->
     Repr_f.repr
       (`O
-        [
-          ( "invalid_lazy_bytes",
-            Repr_f.repr
-              (`String
-                (let (`Hex bytes) = Hex.of_bytes bytes in
-                 bytes)) );
-        ])
+         [
+           ( "invalid_lazy_bytes",
+             Repr_f.repr
+               (`String
+                  (let (`Hex bytes) = Hex.of_bytes bytes in
+                   bytes)) );
+         ])
   in
   let schema =
     let open Json_schema in
@@ -271,7 +271,7 @@ struct
           fun v -> Repr.repr (`O [(n, w v)])
       | Obj
           (Dft
-            {name = n; equal; encoding = t; default = d; construct_default; _})
+             {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           let w v = construct t v in
           let inc_default =
@@ -283,7 +283,8 @@ struct
       | Obj (Opt {name = n; encoding = t; _}) -> (
           let w v = construct t v in
           function
-          | None -> Repr.repr (`O []) | Some v -> Repr.repr (`O [(n, w v)]))
+          | None -> Repr.repr (`O [])
+          | Some v -> Repr.repr (`O [(n, w v)]))
       | Objs (o1, o2) -> (
           let w1 v = construct o1 v in
           let w2 v = construct o2 v in
@@ -336,8 +337,7 @@ struct
   (* NOTE: bson relaxation is only an issue at top-level (see comment in
      interface). Hence, we set it to false on recursive calls that are actually
      nested, no matter its value. *)
-  let rec destruct :
-      type t.
+  let rec destruct : type t.
       ignore_extra_fields:bool ->
       bson_relaxation:bool ->
       t encoding ->
@@ -537,8 +537,7 @@ struct
           in
           do_cases [] cases
 
-  and destruct_tup :
-      type t.
+  and destruct_tup : type t.
       ignore_extra_fields:bool ->
       int ->
       t encoding ->
@@ -562,8 +561,7 @@ struct
     | Describe {encoding; _} -> destruct_tup ~ignore_extra_fields i encoding
     | _ -> invalid_arg "Json_encoding.destruct: consequence of bad merge_tups"
 
-  and destruct_obj :
-      type t.
+  and destruct_obj : type t.
       ignore_extra_fields:bool ->
       t encoding ->
       (string * Repr.value) list ->
@@ -649,8 +647,8 @@ struct
      fun (module Repr_f) repr ->
       read (Json_repr.convert (module Repr_f) (module Repr) repr)
     in
-    let write :
-        type tf. (module Json_repr.Repr with type value = tf) -> 't -> tf =
+    let write : type tf.
+        (module Json_repr.Repr with type value = tf) -> 't -> tf =
      fun (module Repr_f) v ->
       Json_repr.convert (module Repr) (module Repr_f) (write v)
     in
@@ -680,8 +678,7 @@ let schema ?definitions_path encoding =
           l2)
       l1
   in
-  let rec object_schema :
-      type t.
+  let rec object_schema : type t.
       t encoding ->
       ((string * element * bool * Json_repr.any option) list
       * bool
@@ -1259,9 +1256,8 @@ let string_enum cases =
 let def id ?title ?description encoding =
   Describe {id; title; description; encoding}
 
-let assoc :
-    type t. ?definitions_path:string -> t encoding -> (string * t) list encoding
-    =
+let assoc : type t.
+    ?definitions_path:string -> t encoding -> (string * t) list encoding =
  fun ?definitions_path t ->
   Ezjsonm_encoding.custom
     ~is_object:true
@@ -1325,8 +1321,7 @@ let any_ezjson_value =
   Custom ({read; write; is_object = false}, Json_schema.any)
 
 let any_document =
-  let read :
-      type tt.
+  let read : type tt.
       (module Json_repr.Repr with type value = tt) -> tt -> Json_repr.any =
    fun (module Repr) v ->
     match Repr.view v with
@@ -1337,16 +1332,14 @@ let any_document =
   Custom ({read; write; is_object = false}, Json_schema.any)
 
 let any_object =
-  let read :
-      type tt.
+  let read : type tt.
       (module Json_repr.Repr with type value = tt) -> tt -> Json_repr.any =
    fun (module Repr) v ->
     match Repr.view v with
     | `O _ -> Json_repr.repr_to_any (module Repr) v
     | k -> raise @@ unexpected k "object"
   in
-  let write :
-      type tt.
+  let write : type tt.
       (module Json_repr.Repr with type value = tt) -> Json_repr.any -> tt =
    fun (module Repr) v ->
     let r = Json_repr.any_to_repr (module Repr) v in
@@ -1355,8 +1348,7 @@ let any_object =
   Custom ({read; write; is_object = true}, Json_schema.any)
 
 let any_ezjson_object =
-  let read :
-      type tt.
+  let read : type tt.
       (module Json_repr.Repr with type value = tt) -> tt -> Json_repr.ezjsonm =
    fun (module Repr) v ->
     match Repr.view v with
@@ -1646,7 +1638,7 @@ module JsonmLexemeSeq = struct
           fun v -> `Os +< construct_named n t v +> `Oe
       | Obj
           (Dft
-            {name = n; equal; encoding = t; default = d; construct_default; _})
+             {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           fun v ->
             let inc_default =
@@ -1657,7 +1649,8 @@ module JsonmLexemeSeq = struct
             else empty_obj
       | Obj (Opt {name = n; encoding = t; _}) -> (
           function
-          | None -> empty_obj | Some v -> `Os +< construct_named n t v +> `Oe)
+          | None -> empty_obj
+          | Some v -> `Os +< construct_named n t v +> `Oe)
       | Objs (o1, o2) ->
           (* For the objects inside an [Objs] we go to a different state of
              the state-machine: we call the entry-point [construct_obj].
@@ -1669,7 +1662,7 @@ module JsonmLexemeSeq = struct
              popping is more complicated than shifting to a different
              state/entry-point. *)
           fun (v1, v2) ->
-           `Os +< construct_obj o1 v1 +@ construct_obj o2 v2 +> `Oe
+            `Os +< construct_obj o1 v1 +@ construct_obj o2 v2 +> `Oe
       | Tup t -> fun v -> `As +< construct t v +> `Ae
       | Tups (o1, o2) ->
           fun (v1, v2) ->
@@ -1693,8 +1686,8 @@ module JsonmLexemeSeq = struct
       Seq.flat_map (fun v -> construct t v) (Array.to_seq vs)
     and construct_seq_ : type t. t encoding -> t Seq.t -> jsonm_lexeme Seq.t =
      fun t vs -> Seq.flat_map (fun v -> construct t v) vs
-    and construct_named :
-        type t. string -> t encoding -> t -> jsonm_lexeme Seq.t =
+    and construct_named : type t.
+        string -> t encoding -> t -> jsonm_lexeme Seq.t =
      fun n t v -> `Name n ++ construct t v
     and construct_obj
         (* NOTE: we recurse on [construct_obj] (i.e., we stay in the same state
@@ -1703,7 +1696,7 @@ module JsonmLexemeSeq = struct
       | Obj (Req {name = n; encoding = t; _}) -> fun v -> construct_named n t v
       | Obj
           (Dft
-            {name = n; equal; encoding = t; default = d; construct_default; _})
+             {name = n; equal; encoding = t; default = d; construct_default; _})
         ->
           fun v ->
             let inc_default =
@@ -1752,8 +1745,8 @@ module JsonmLexemeSeq = struct
              non-objects in the construction of an [Objs]. *)
           invalid_arg
             "Json_encoding.construct_seq: consequence of bad merge_objs"
-    and construct_tup (* Similar to construct_obj, but for tups *) :
-        type t. t encoding -> t -> jsonm_lexeme Seq.t = function
+    and construct_tup (* Similar to construct_obj, but for tups *) : type t.
+        t encoding -> t -> jsonm_lexeme Seq.t = function
       | Tup t -> fun v -> (construct [@ocaml.tailcall]) t v
       | Tups (o1, o2) ->
           fun (v1, v2) -> construct_tup o1 v1 @ construct_tup o2 v2

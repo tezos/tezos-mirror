@@ -164,16 +164,15 @@ module Make (Encoding : ENCODING) = struct
           (arg, map_directory (fun (x, l) -> f x >|= fun x -> (x, l)) dir)
     | Static dir -> Static (map_static_directory f dir)
 
-  and map_static_directory :
-      type a b. (a -> b Lwt.t) -> b static_directory -> a static_directory =
+  and map_static_directory : type a b.
+      (a -> b Lwt.t) -> b static_directory -> a static_directory =
    fun f t ->
     {
       services = MethMap.map (map_registered_service f) t.services;
       subdirs = map_option (map_static_subdirectories f) t.subdirs;
     }
 
-  and map_static_subdirectories :
-      type a b.
+  and map_static_subdirectories : type a b.
       (a -> b Lwt.t) -> b static_subdirectories -> a static_subdirectories =
    fun f t ->
     match t with
@@ -182,8 +181,7 @@ module Make (Encoding : ENCODING) = struct
         let dir = map_directory (fun (a, x) -> f a >|= fun a -> (a, x)) dir in
         Arg (arg, dir)
 
-  and map_registered_service :
-      type a b.
+  and map_registered_service : type a b.
       (a -> b Lwt.t) ->
       b registered_service_builder ->
       a registered_service_builder =
@@ -193,8 +191,8 @@ module Make (Encoding : ENCODING) = struct
 
   let prefix : type p pr. (pr, p) Path.path -> p directory -> pr directory =
    fun path dir ->
-    let rec prefix :
-        type k pr. (pr, k) Resto.Internal.path -> k directory -> pr directory =
+    let rec prefix : type k pr.
+        (pr, k) Resto.Internal.path -> k directory -> pr directory =
      fun path dir ->
       match path with
       | Root -> dir
@@ -218,8 +216,7 @@ module Make (Encoding : ENCODING) = struct
   (* Merge *)
   (*********)
 
-  let rec merge_loop :
-      type p.
+  let rec merge_loop : type p.
       [`Raise | `Pick_left | `Pick_right] ->
       step list ->
       p directory ->
@@ -252,8 +249,7 @@ module Make (Encoding : ENCODING) = struct
     | Dynamic _, _ | _, Dynamic _ -> conflict path CBuilder
     | DynamicTail _, _ | _, DynamicTail _ -> conflict path CTail
 
-  and select_using_strategy :
-      type p.
+  and select_using_strategy : type p.
       [`Raise | `Pick_left | `Pick_right] ->
       step list ->
       conflict ->
@@ -266,8 +262,7 @@ module Make (Encoding : ENCODING) = struct
     | `Pick_right -> Some right
     | `Pick_left -> Some left
 
-  and merge_static_directory :
-      type p.
+  and merge_static_directory : type p.
       [`Raise | `Pick_left | `Pick_right] ->
       step list ->
       p static_directory ->
@@ -317,8 +312,7 @@ module Make (Encoding : ENCODING) = struct
     in
     {subdirs; services}
 
-  and merge_dynamic_directories :
-      type p.
+  and merge_dynamic_directories : type p.
       [`Raise | `Pick_left | `Pick_right] ->
       step list ->
       string option ->
@@ -348,8 +342,7 @@ module Make (Encoding : ENCODING) = struct
   (* Directory description *)
   (*************************)
 
-  let rec describe_directory :
-      type a.
+  let rec describe_directory : type a.
       recurse:bool ->
       ?arg:a ->
       a directory ->
@@ -368,8 +361,7 @@ module Make (Encoding : ENCODING) = struct
         describe_static_directory recurse dir >>= fun dir ->
         Lwt.return (Static dir : Encoding.schema Description.directory)
 
-  and describe_static_directory :
-      type a.
+  and describe_static_directory : type a.
       bool ->
       a static_directory ->
       Encoding.schema Description.static_directory Lwt.t =
@@ -386,8 +378,7 @@ module Make (Encoding : ENCODING) = struct
     Lwt.return
       ({services; subdirs} : Encoding.schema Description.static_directory)
 
-  and describe_static_subdirectories :
-      type a.
+  and describe_static_subdirectories : type a.
       a static_subdirectories ->
       Encoding.schema Description.static_subdirectories Lwt.t =
    fun dir ->
@@ -409,13 +400,12 @@ module Make (Encoding : ENCODING) = struct
           (Arg (arg.descr, dir)
             : Encoding.schema Description.static_subdirectories)
 
-  and describe_service :
-      type a.
+  and describe_service : type a.
       a registered_service_builder -> Encoding.schema Description.service =
    fun {description; _} -> description
 
-  and describe_query :
-      type a. a Resto.Internal.query -> Description.query_item list =
+  and describe_query : type a.
+      a Resto.Internal.query -> Description.query_item list =
    fun (Fields (fields, _)) ->
     let rec loop : type a b. (a, b) query_fields -> _ = function
       | F0 -> []
@@ -436,8 +426,7 @@ module Make (Encoding : ENCODING) = struct
   type resolved_directory =
     | Dir : 'a static_directory * 'a -> resolved_directory
 
-  let rec resolve :
-      type a.
+  let rec resolve : type a.
       string list ->
       a directory ->
       a ->
@@ -460,7 +449,7 @@ module Make (Encoding : ENCODING) = struct
                   | Error msg ->
                       Error
                         (`Cannot_parse_path
-                          (List.rev (e :: prefix), arg.descr, msg))))
+                           (List.rev (e :: prefix), arg.descr, msg))))
             path
             (Ok (prefix, []))
         with
@@ -479,8 +468,7 @@ module Make (Encoding : ENCODING) = struct
             Lwt.return_error
             @@ `Cannot_parse_path (List.rev (name :: prefix), arg.descr, msg))
 
-  let lookup :
-      type a.
+  let lookup : type a.
       a directory ->
       a ->
       meth ->
@@ -502,8 +490,7 @@ module Make (Encoding : ENCODING) = struct
       : _ -> _ -> _ -> _ -> (_, lookup_error) result Lwt.t
       :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t)
 
-  let rec resolve_uri_desc :
-      type a.
+  let rec resolve_uri_desc : type a.
       string list ->
       a directory ->
       a ->
@@ -525,7 +512,7 @@ module Make (Encoding : ENCODING) = struct
                | Error msg ->
                    Error
                      (`Cannot_parse_path
-                       (List.rev (name :: prefix), arg.descr, msg)))
+                        (List.rev (name :: prefix), arg.descr, msg)))
              path
              (Ok (prefix, []))
         >>=? fun (prefix, xs) -> resolve_uri_desc prefix adir (args, xs) []
@@ -547,8 +534,7 @@ module Make (Encoding : ENCODING) = struct
             Lwt.return_error
             @@ `Cannot_parse_path (List.rev (name :: prefix), arg.descr, msg))
 
-  let lookup_uri_desc :
-      type a.
+  let lookup_uri_desc : type a.
       a directory ->
       a ->
       meth ->
@@ -569,8 +555,7 @@ module Make (Encoding : ENCODING) = struct
       : _ -> _ -> _ -> _ -> (_, lookup_error) result Lwt.t
       :> _ -> _ -> _ -> _ -> (_, [> lookup_error]) result Lwt.t)
 
-  let allowed_methods :
-      type a.
+  let allowed_methods : type a.
       a directory ->
       a ->
       string list ->
@@ -595,8 +580,8 @@ module Make (Encoding : ENCODING) = struct
         builder args >>= fun dir -> build_dynamic_dir dir args
     | _ -> Lwt.return dir
 
-  let rec transparent_resolve :
-      type pr p. pr directory -> (pr, p) path -> p -> p directory option Lwt.t =
+  let rec transparent_resolve : type pr p.
+      pr directory -> (pr, p) path -> p -> p directory option Lwt.t =
    fun dir path rargs ->
     match path with
     | Root -> Lwt.return_some dir
@@ -639,8 +624,7 @@ module Make (Encoding : ENCODING) = struct
             | Empty -> Lwt.return_none
             | Static _ -> Lwt.return_none))
 
-  let transparent_lookup :
-      type prefix params query input output error.
+  let transparent_lookup : type prefix params query input output error.
       prefix directory ->
       (_, prefix, params, query, input, output, error) Service.t ->
       params ->
@@ -679,8 +663,7 @@ module Make (Encoding : ENCODING) = struct
          _ ->
          [> (_, _) Answer.t] Lwt.t)
 
-  let rec describe_rpath :
-      type a b.
+  let rec describe_rpath : type a b.
       Description.path_item list -> (a, b) path -> Description.path_item list =
    fun acc path ->
     match path with
@@ -706,8 +689,7 @@ module Make (Encoding : ENCODING) = struct
 
   let conflict path kind = raise (Conflict (step_of_path path, kind))
 
-  let rec insert :
-      type k rk.
+  let rec insert : type k rk.
       (rk, k) path ->
       rk directory ->
       k directory * (k directory -> rk directory) =
@@ -773,16 +755,14 @@ module Make (Encoding : ENCODING) = struct
         | Dynamic _ -> conflict path CBuilder
         | DynamicTail _ -> conflict path CTail)
 
-  let register :
-      type p q i o e pr.
+  let register : type p q i o e pr.
       pr directory ->
       (_, pr, p, q, i, o, e) Service.t ->
       (p -> q -> i -> (o, e) Answer.t Lwt.t) ->
       pr directory =
    fun root s handler ->
     let s = Service.Internal.to_service s in
-    let register :
-        type k.
+    let register : type k.
         (pr, k) path -> (k -> q -> i -> (o, e) Answer.t Lwt.t) -> pr directory =
      fun path handler ->
       let dir, insert = insert path root in
@@ -829,8 +809,7 @@ module Make (Encoding : ENCODING) = struct
          (_ -> _ -> _ -> [< (_, _) Answer.t] Lwt.t) ->
          _)
 
-  let register_dynamic_directory :
-      type pr a.
+  let register_dynamic_directory : type pr a.
       ?descr:string ->
       pr directory ->
       (pr, a) Path.path ->
@@ -838,8 +817,8 @@ module Make (Encoding : ENCODING) = struct
       pr directory =
    fun ?descr root path builder ->
     let path = Resto.Internal.to_path path in
-    let register :
-        type k. (pr, k) path -> (k -> k directory Lwt.t) -> pr directory =
+    let register : type k.
+        (pr, k) path -> (k -> k directory Lwt.t) -> pr directory =
      fun path builder ->
       let dir, insert = insert path root in
       match dir with
@@ -852,8 +831,7 @@ module Make (Encoding : ENCODING) = struct
     in
     register path builder
 
-  let register_describe_directory_service :
-      type pr.
+  let register_describe_directory_service : type pr.
       pr directory -> (pr, pr, _) Service.description_service -> pr directory =
    fun root service ->
     let dir = ref root in

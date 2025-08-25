@@ -287,9 +287,9 @@ module Description = struct
   let pp_dynamic_tail fmt service =
     List.last_opt service.Resto.Description.path
     |> Option.iter (function
-           | Resto.Description.PDynamicTail {name; _} ->
-               Format.fprintf fmt "(/<%s>)*" name
-           | _ -> ())
+         | Resto.Description.PDynamicTail {name; _} ->
+             Format.fprintf fmt "(/<%s>)*" name
+         | _ -> ())
 
   let rec pp prefix ppf dir =
     let open Resto.Description in

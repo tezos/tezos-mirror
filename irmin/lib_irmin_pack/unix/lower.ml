@@ -161,7 +161,7 @@ module Make_volume (Io : Io.S) (Errs : Io_errors.S with module Io = Io) = struct
           else
             Error
               (`Volume_history_newer_than_archived_data
-                (control.end_offset, first_off))
+                 (control.end_offset, first_off))
     in
     let mapping = Irmin_pack.Layout.V5.Volume.mapping ~root in
     let data = Irmin_pack.Layout.V5.Volume.data ~root in

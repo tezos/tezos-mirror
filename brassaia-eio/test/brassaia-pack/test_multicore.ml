@@ -272,8 +272,8 @@ let test_commit d_mgr =
     List.iter
       (fun op ->
         Store.with_tree_exn ~strategy:`Merge ~info store [] (function
-            | None -> assert false
-            | Some tree -> Some (apply_op tree op)))
+          | None -> assert false
+          | Some tree -> Some (apply_op tree op)))
       patch ;
     let tree = Store.main repo |> Store.Head.get |> Store.Commit.tree in
     check_patch_was_applied patch tree

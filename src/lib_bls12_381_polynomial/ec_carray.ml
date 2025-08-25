@@ -108,9 +108,10 @@ end
 module Make
     (EC_point : Bls12_381.CURVE)
     (EC_point_array : Carray.Carray_sig with type elt = EC_point.t)
-    (Stubs : Stubs_sig
-               with type fr_array = Fr_carray.t
-                and type ec_array = EC_point_array.t) :
+    (Stubs :
+      Stubs_sig
+        with type fr_array = Fr_carray.t
+         and type ec_array = EC_point_array.t) :
   EC_carray_sig
     with type elt = EC_point.t
      and type domain = Domain.t

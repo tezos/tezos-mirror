@@ -134,9 +134,9 @@ let load file =
       | None -> tzfail (Cannot_load_stored_data (file.path, "cannot read file")))
     (function
       | exn ->
-          tzfail
-            (Cannot_load_stored_data
-               (file.path, Format.sprintf "%s" (Printexc.to_string exn))))
+      tzfail
+        (Cannot_load_stored_data
+           (file.path, Format.sprintf "%s" (Printexc.to_string exn))))
 
 let init file ~initial_data =
   let open Lwt_syntax in

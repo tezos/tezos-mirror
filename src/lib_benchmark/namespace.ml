@@ -56,8 +56,9 @@ let hash = Stdlib.Hashtbl.hash
 let of_string s =
   (if String.equal s root_name then [] else String.split_on_char sep s)
   |> List.rev
-  |> (function
-       | h :: t as l -> if String.(equal h empty) then t else l | [] -> [])
+  |> ( function
+  | h :: t as l -> if String.(equal h empty) then t else l
+  | [] -> [] )
   |> List.rev
 
 let append : t -> t -> t = List.append

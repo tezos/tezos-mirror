@@ -83,7 +83,8 @@ let dal_encoding =
            minimal_participation_ratio;
            rewards_ratio;
            traps_fraction;
-         } ->
+         }
+       ->
       ( ( feature_enable,
           incentives_enable,
           number_of_slots,
@@ -101,7 +102,8 @@ let dal_encoding =
              minimal_participation_ratio,
              rewards_ratio,
              traps_fraction ),
-           cryptobox_parameters ) ->
+           cryptobox_parameters )
+       ->
       {
         feature_enable;
         incentives_enable;
@@ -183,7 +185,8 @@ let sc_rollup_reveal_activation_level_encoding :
            metadata,
            dal_page,
            dal_parameters,
-           dal_attested_slots_validity_lag ) ->
+           dal_attested_slots_validity_lag )
+       ->
       {
         raw_data;
         metadata;
@@ -336,7 +339,8 @@ let sc_rollup_encoding =
              sc_rollup_max_number_of_parallel_games,
              sc_rollup_reveal_activation_level,
              sc_rollup_private_enable,
-             sc_rollup_riscv_pvm_enable ) ) ->
+             sc_rollup_riscv_pvm_enable ) )
+       ->
       {
         arith_pvm_enable = sc_rollup_arith_pvm_enable;
         origination_size = sc_rollup_origination_size;
@@ -386,12 +390,14 @@ let zk_rollup_encoding =
             min_pending_to_process;
             max_ticket_payload_size;
           } :
-           zk_rollup) ->
+           zk_rollup)
+       ->
       (enable, origination_size, min_pending_to_process, max_ticket_payload_size))
     (fun ( zk_rollup_enable,
            zk_rollup_origination_size,
            zk_rollup_min_pending_to_process,
-           zk_rollup_max_ticket_payload_size ) ->
+           zk_rollup_max_ticket_payload_size )
+       ->
       {
         enable = zk_rollup_enable;
         origination_size = zk_rollup_origination_size;
@@ -434,7 +440,8 @@ let adaptive_rewards_params_encoding =
            growth_rate;
            center_dz;
            radius_dz;
-         } ->
+         }
+       ->
       ( issuance_ratio_final_min,
         issuance_ratio_final_max,
         issuance_ratio_initial_min,
@@ -454,7 +461,8 @@ let adaptive_rewards_params_encoding =
            max_bonus,
            growth_rate,
            center_dz,
-           radius_dz ) ->
+           radius_dz )
+       ->
       {
         issuance_ratio_final_min;
         issuance_ratio_final_max;
@@ -486,13 +494,15 @@ let adaptive_issuance_encoding =
            global_limit_of_staking_over_baking;
            edge_of_staking_over_delegation;
            adaptive_rewards_params;
-         } ->
+         }
+       ->
       ( global_limit_of_staking_over_baking,
         edge_of_staking_over_delegation,
         adaptive_rewards_params ))
     (fun ( global_limit_of_staking_over_baking,
            edge_of_staking_over_delegation,
-           adaptive_rewards_params ) ->
+           adaptive_rewards_params )
+       ->
       {
         global_limit_of_staking_over_baking;
         edge_of_staking_over_delegation;
@@ -515,7 +525,8 @@ let issuance_weights_encoding =
             vdf_revelation_tip_weight;
             dal_rewards_weight;
           } :
-           issuance_weights) ->
+           issuance_weights)
+       ->
       ( base_total_issued_per_minute,
         baking_reward_fixed_portion_weight,
         baking_reward_bonus_weight,
@@ -529,7 +540,8 @@ let issuance_weights_encoding =
            attesting_reward_weight,
            seed_nonce_revelation_tip_weight,
            vdf_revelation_tip_weight,
-           dal_rewards_weight ) ->
+           dal_rewards_weight )
+       ->
       {
         base_total_issued_per_minute;
         baking_reward_fixed_portion_weight;
@@ -641,7 +653,8 @@ let encoding =
                          ( direct_ticket_spending_enable,
                            aggregate_attestation,
                            allow_tz4_delegate_enable,
-                           all_bakers_attest_activation_level ) ) ) ) ) ) ) ) ) ->
+                           all_bakers_attest_activation_level ) ) ) ) ) ) ) ) )
+       ->
       {
         consensus_rights_delay;
         blocks_preservation_cycles;

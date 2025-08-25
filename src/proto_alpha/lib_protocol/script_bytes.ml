@@ -159,11 +159,17 @@ end = struct
     match Z.compare z Z.zero with
     | 0 -> Bytes.empty
     | 1 ->
-        let nbits = Z.log2up (Z.succ z) + 1 (* The top bit must be 0 *) in
+        let nbits =
+          Z.log2up (Z.succ z) + 1
+          (* The top bit must be 0 *)
+        in
         let nbytes = (nbits + 7) / 8 in
         encode_nat_be nbytes (Some '\000') z
     | _ ->
-        let nbits = Z.log2up Z.(neg z) + 1 (* The top bit must be 1 *) in
+        let nbits =
+          Z.log2up Z.(neg z) + 1
+          (* The top bit must be 1 *)
+        in
         let nbytes = (nbits + 7) / 8 in
         let nbits' = nbytes * 8 in
         let z'' = Z.(add (shift_left one nbits') z) in

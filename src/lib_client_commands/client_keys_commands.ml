@@ -509,7 +509,8 @@ let commands network : Client_context.full Tezos_clic.command list =
           (fun (prefix, ignore_case, force)
                name
                containing
-               (cctxt : Client_context.full) ->
+               (cctxt : Client_context.full)
+             ->
             let* name = Public_key_hash.of_fresh cctxt force name in
             gen_keys_containing
               ~encrypted:true
@@ -545,7 +546,8 @@ let commands network : Client_context.full Tezos_clic.command list =
           (fun (prefix, ignore_case, force, encrypted)
                name
                containing
-               (cctxt : Client_context.full) ->
+               (cctxt : Client_context.full)
+             ->
             let* name = Public_key_hash.of_fresh cctxt force name in
             gen_keys_containing
               ~encrypted

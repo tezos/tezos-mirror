@@ -586,7 +586,8 @@ let check_consensus_operations ?expected_attestations_committee
              preattestations_aggregates,
              attestations,
              preattestations )
-           operation ->
+           operation
+         ->
         let kind =
           JSON.(
             operation |-> "contents" |> as_list |> List.hd |-> "kind"

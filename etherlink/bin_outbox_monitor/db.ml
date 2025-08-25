@@ -137,7 +137,8 @@ let withdrawal_log_encoding =
            blockNumber;
            removed;
            withdrawal;
-         } ->
+         }
+       ->
       ( transactionHash,
         transactionIndex,
         logIndex,
@@ -151,7 +152,8 @@ let withdrawal_log_encoding =
            blockHash,
            blockNumber,
            removed,
-           withdrawal ) ->
+           withdrawal )
+       ->
       {
         transactionHash;
         transactionIndex;

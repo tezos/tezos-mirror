@@ -54,13 +54,14 @@ module type T = Environment_protocol_T_V15.T
    module type [PROTOCOL] of [sigs/v6/updater.mli]. *)
 
 module V0toV15
-    (E : Environment_protocol_T_V0.T
-           with type context := Context.t
-            and type quota := quota
-            and type validation_result := validation_result
-            and type rpc_context := rpc_context
-            and type tztrace := Error_monad.tztrace
-            and type 'a tzresult := 'a Error_monad.tzresult) :
+    (E :
+      Environment_protocol_T_V0.T
+        with type context := Context.t
+         and type quota := quota
+         and type validation_result := validation_result
+         and type rpc_context := rpc_context
+         and type tztrace := Error_monad.tztrace
+         and type 'a tzresult := 'a Error_monad.tzresult) :
   Environment_protocol_T_V15.T
     with type context := Context.t
      and type quota := quota
@@ -323,13 +324,14 @@ end
 
 *)
 module IgnoreCaches
-    (P : T
-           with type context := Context.t
-            and type quota := quota
-            and type validation_result := validation_result
-            and type rpc_context := rpc_context
-            and type tztrace := Error_monad.tztrace
-            and type 'a tzresult := 'a Error_monad.tzresult) =
+    (P :
+      T
+        with type context := Context.t
+         and type quota := quota
+         and type validation_result := validation_result
+         and type rpc_context := rpc_context
+         and type tztrace := Error_monad.tztrace
+         and type 'a tzresult := 'a Error_monad.tzresult) =
 struct
   include P
 

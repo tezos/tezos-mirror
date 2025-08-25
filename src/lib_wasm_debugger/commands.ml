@@ -244,7 +244,8 @@ let rec commands_docs =
     {
       parse =
         (function
-        | "show" :: "memory" :: rest -> parse_memory_commands rest | _ -> None);
+        | "show" :: "memory" :: rest -> parse_memory_commands rest
+        | _ -> None);
       documentation =
         "show memory at <address> for <length> bytes [as string] | show memory \
          at <address> as <kind>: Loads the <length> bytes at <address> in the \

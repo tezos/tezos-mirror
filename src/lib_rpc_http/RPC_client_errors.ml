@@ -126,8 +126,8 @@ let rpc_error_encoding =
           | _ -> None)
         (function
           | (), code, content, media_type ->
-              let code = Cohttp.Code.status_of_code code in
-              Unexpected_status_code {code; content; media_type});
+          let code = Cohttp.Code.status_of_code code in
+          Unexpected_status_code {code; content; media_type});
       case
         (Tag 7)
         ~title:"Unexpected_content_type"
@@ -142,7 +142,7 @@ let rpc_error_encoding =
           | _ -> None)
         (function
           | (), received, acceptable, body ->
-              Unexpected_content_type {received; acceptable; body});
+          Unexpected_content_type {received; acceptable; body});
       case
         (Tag 8)
         ~title:"Unexpected_content"
@@ -157,7 +157,7 @@ let rpc_error_encoding =
           | _ -> None)
         (function
           | (), content, media_type, error ->
-              Unexpected_content {content; media_type; error});
+          Unexpected_content {content; media_type; error});
       case
         (Tag 9)
         ~title:"OCaml_exception"

@@ -886,13 +886,13 @@ module Make (Index : Pack_index.S) = struct
       Control.open_ ~readonly:true ~path ~tmp_path:None
       (* If no control file, then check whether the store is in v1 or v2. *)
       |> Result.map_error (function
-             | `No_such_file_or_directory _ -> (
-                 let pack = Brassaia_pack.Layout.V1_and_v2.pack ~root in
-                 match Io.classify_path pack with
-                 | `File -> `Migration_needed
-                 | `No_such_file_or_directory -> `No_such_file_or_directory pack
-                 | `Directory | `Other -> `Invalid_layout)
-             | error -> error)
+           | `No_such_file_or_directory _ -> (
+               let pack = Brassaia_pack.Layout.V1_and_v2.pack ~root in
+               match Io.classify_path pack with
+               | `File -> `Migration_needed
+               | `No_such_file_or_directory -> `No_such_file_or_directory pack
+               | `Directory | `Other -> `Invalid_layout)
+           | error -> error)
     in
     let Payload.
           {

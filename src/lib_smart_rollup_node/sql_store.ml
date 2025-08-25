@@ -717,8 +717,8 @@ module Protocols = struct
       @@ proj int (fun p -> p.proto_level)
       @@ proj level (fun {level = First_known l | Activation_level l; _} -> l)
       @@ proj bool (function
-             | {level = First_known _; _} -> false
-             | {level = Activation_level _; _} -> true)
+           | {level = First_known _; _} -> false
+           | {level = Activation_level _; _} -> true)
       @@ proj_end
 
     let insert =

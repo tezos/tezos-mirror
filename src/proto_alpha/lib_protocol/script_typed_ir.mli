@@ -1571,8 +1571,8 @@ and ('before, 'after) comb_get_gadt_witness =
 
 and ('value, 'before, 'after) comb_set_gadt_witness =
   | Comb_set_zero : ('value, _, 'value) comb_set_gadt_witness
-  | Comb_set_one
-      : ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
+  | Comb_set_one :
+      ('value, ('hd, 'tl) pair, ('value, 'tl) pair) comb_set_gadt_witness
   | Comb_set_plus_two :
       ('value, 'before, 'after) comb_set_gadt_witness
       -> ('value, ('a, 'before) pair, ('a, 'after) pair) comb_set_gadt_witness

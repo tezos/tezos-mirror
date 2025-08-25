@@ -83,8 +83,7 @@ type ('o, 'e) rest_result = ('o, 'e) rest tzresult
 type generic_call_result =
   [ `Json of (Data_encoding.json, Data_encoding.json option) rest
   | `Binary of (string, string option) rest
-  | `Other of
-    (string * string) option * (string, string option) rest
+  | `Other of (string * string) option * (string, string option) rest
     (* [(string * string) option] corresponds to the content type *) ]
 
 class type generic = object

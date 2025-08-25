@@ -236,7 +236,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              source
              threshold
              keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* alias_name =
             Client_proto_contracts.Raw_contract_alias.of_fresh
@@ -316,7 +317,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              amount
              destination
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
@@ -359,7 +361,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              lambda
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let*? {expanded = lambda; _} =
             Micheline_parser.no_parsing_error
@@ -395,7 +398,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              delegate
              sk
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* prepared_command =
             Client_proto_multisig.prepare_multisig_transaction
@@ -454,7 +458,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              sk
              new_threshold
              new_keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* keys =
             List.map_es
@@ -512,7 +517,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              destination
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
@@ -599,7 +605,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              lambda
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
@@ -673,7 +680,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              delegate
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
@@ -739,7 +747,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
@@ -808,7 +817,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              new_keys
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
@@ -892,7 +902,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              source
              signatures
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           match source with
           | Originated _ ->
@@ -954,7 +965,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              amount
              destination
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let entrypoint =
             Option.value ~default:Entrypoint.default entrypoint
@@ -994,7 +1006,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun bytes_only
              multisig_contract
              lambda
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let*? {expanded = lambda; _} =
             Micheline_parser.no_parsing_error
@@ -1028,7 +1041,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         (fun bytes_only
              multisig_contract
              new_delegate
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* prepared_command =
             Client_proto_multisig.prepare_multisig_transaction
@@ -1055,7 +1069,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
         @@ stop)
         (fun bytes_only
              multisig_contract
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* prepared_command =
             Client_proto_multisig.prepare_multisig_transaction
@@ -1085,7 +1100,8 @@ let commands_rw () : #Protocol_client_context.full Tezos_clic.command list =
              multisig_contract
              new_threshold
              new_keys
-             (cctxt : #Protocol_client_context.full) ->
+             (cctxt : #Protocol_client_context.full)
+           ->
           let open Lwt_result_syntax in
           let* keys =
             List.map_es

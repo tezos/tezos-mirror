@@ -36,7 +36,10 @@ module Block_info = struct
   let max_predecessors = 12
 
   let encoded_list_size =
-    let r = max_predecessors * Block_hash.size (* uint16 *) in
+    let r =
+      max_predecessors * Block_hash.size
+      (* uint16 *)
+    in
     assert (r < 1 lsl 16) ;
     r
 
@@ -144,7 +147,10 @@ module Legacy = struct
     let max_predecessors = 12
 
     let encoded_list_size =
-      let r = max_predecessors * Block_hash.size (* uint16 *) in
+      let r =
+        max_predecessors * Block_hash.size
+        (* uint16 *)
+      in
       assert (r < 1 lsl 16) ;
       r
 

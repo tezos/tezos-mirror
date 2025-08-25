@@ -112,7 +112,8 @@ let encoding =
            secret_key;
            whitelist;
            monitor_all_deposits;
-         } ->
+         }
+       ->
       ( evm_node_endpoint,
         gas_limit,
         max_fee_per_gas,
@@ -126,7 +127,8 @@ let encoding =
            rpc,
            secret_key,
            whitelist,
-           monitor_all_deposits ) ->
+           monitor_all_deposits )
+       ->
       {
         evm_node_endpoint;
         gas_limit;

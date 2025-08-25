@@ -202,7 +202,7 @@ let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 let ocaml_protoc_compiler =
   external_lib "ocaml-protoc-plugin" V.(at_least "4.5.0")
 
-let ocamlformat = opam_only "ocamlformat" V.(exactly "0.26.2")
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.27.0")
 
 let ocamlgraph = external_lib "ocamlgraph" V.True
 

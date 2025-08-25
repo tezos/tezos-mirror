@@ -163,8 +163,8 @@ let test_spending ~direct_ticket_spending_enable ~constructor () =
   else
     let*! res = call_contract ~source:implicit ~contract:consumer ~arg block in
     Assert.proto_error ~loc:__LOC__ res (function
-        | Script_interpreter.Bad_contract_parameter _ -> true
-        | _ -> false)
+      | Script_interpreter.Bad_contract_parameter _ -> true
+      | _ -> false)
 
 let tests =
   [

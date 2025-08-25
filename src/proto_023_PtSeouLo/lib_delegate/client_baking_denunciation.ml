@@ -222,10 +222,11 @@ let process_consensus_op state cctxt chain_id slot (type a)
     (new_op : a Kind.consensus operation) =
   let open Lwt_result_syntax in
   let (Single
-        ( Preattestation {level; round; _}
-        | Attestation {consensus_content = {level; round; _}; _}
-        | Preattestations_aggregate {consensus_content = {level; round; _}; _}
-        | Attestations_aggregate {consensus_content = {level; round; _}; _} )) =
+         ( Preattestation {level; round; _}
+         | Attestation {consensus_content = {level; round; _}; _}
+         | Preattestations_aggregate {consensus_content = {level; round; _}; _}
+         | Attestations_aggregate {consensus_content = {level; round; _}; _} ))
+      =
     new_op.protocol_data.contents
   in
   let op_kind =

@@ -104,8 +104,8 @@ let check_misc block state : unit tzresult Lwt.t =
           let u_rpc =
             List.map
               (fun ({cycle; deposit} :
-                     Plugin.Alpha_services.Delegate.deposit_per_cycle) ->
-                (cycle, deposit))
+                     Plugin.Alpha_services.Delegate.deposit_per_cycle)
+                 -> (cycle, deposit))
               u_rpc
           in
           let finalizable_cycle =
@@ -230,7 +230,8 @@ let attest_all_ =
                consensus_key = _;
                first_slot;
                attestation_power;
-             } ->
+             }
+           ->
           Tezt.Check.(
             (attestation_power > 0)
               int

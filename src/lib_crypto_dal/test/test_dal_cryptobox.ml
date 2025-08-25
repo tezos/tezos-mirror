@@ -122,7 +122,10 @@ module Test = struct
              redundancy_factor,
              number_of_shards,
              padding_threshold,
-             slot ) : parameters ->
+             slot )
+           :
+           parameters
+         ->
         {
           slot_size;
           page_size;
@@ -149,7 +152,8 @@ module Test = struct
                number_of_shards;
                padding_threshold;
                slot;
-             } ->
+             }
+           ->
           ( slot_size,
             page_size,
             redundancy_factor,

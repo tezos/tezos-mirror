@@ -52,35 +52,35 @@ let manager_operation_gen =
 let manager_op_with_fee_and_gas_gen ~fee_in_mutez ~gas =
   let open Alpha_context in
   let open QCheck2.Gen in
-  let rec set_fee_and_gas :
-      type kind. _ -> _ -> kind contents_list -> kind contents_list t =
+  let rec set_fee_and_gas : type kind.
+      _ -> _ -> kind contents_list -> kind contents_list t =
    fun desired_total_fee desired_total_gas -> function
-    | Single (Manager_operation data) ->
-        let fee = Tez.of_mutez_exn (Int64.of_int desired_total_fee) in
-        let gas_limit = Gas.Arith.integral_of_int_exn desired_total_gas in
-        return (Single (Manager_operation {data with fee; gas_limit}))
-    | Cons (Manager_operation data, tail) ->
-        let* local_fee =
-          (* We generate some corner cases where some individual
+     | Single (Manager_operation data) ->
+         let fee = Tez.of_mutez_exn (Int64.of_int desired_total_fee) in
+         let gas_limit = Gas.Arith.integral_of_int_exn desired_total_gas in
+         return (Single (Manager_operation {data with fee; gas_limit}))
+     | Cons (Manager_operation data, tail) ->
+         let* local_fee =
+           (* We generate some corner cases where some individual
              operations in the batch have zero fees. *)
-          let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
-          match r with
-          | `Random -> int_range 0 desired_total_fee
-          | `Zero -> return 0
-          | `All -> return desired_total_fee
-        in
-        let* local_gas = int_range 0 desired_total_gas in
-        let fee = Tez.of_mutez_exn (Int64.of_int local_fee) in
-        let gas_limit = Gas.Arith.integral_of_int_exn local_gas in
-        let* tail =
-          set_fee_and_gas
-            (desired_total_fee - local_fee)
-            (desired_total_gas - local_gas)
-            tail
-        in
-        return (Cons (Manager_operation {data with fee; gas_limit}, tail))
-    | Single _ ->
-        (* This function is only called on a manager operation. *) assert false
+           let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
+           match r with
+           | `Random -> int_range 0 desired_total_fee
+           | `Zero -> return 0
+           | `All -> return desired_total_fee
+         in
+         let* local_gas = int_range 0 desired_total_gas in
+         let fee = Tez.of_mutez_exn (Int64.of_int local_fee) in
+         let gas_limit = Gas.Arith.integral_of_int_exn local_gas in
+         let* tail =
+           set_fee_and_gas
+             (desired_total_fee - local_fee)
+             (desired_total_gas - local_gas)
+             tail
+         in
+         return (Cons (Manager_operation {data with fee; gas_limit}, tail))
+     | Single _ ->
+         (* This function is only called on a manager operation. *) assert false
   in
   (* Generate a random manager operation. *)
   let* batch_size = int_range 1 Operation_generator.max_batch_size in
@@ -104,40 +104,42 @@ let generate_manager_op_with_fee_and_gas ~fee_in_mutez ~gas =
 let set_fee_and_source fee ?source op =
   let open Alpha_context in
   let open QCheck2.Gen in
-  let rec set_fee_contents_list_gen :
-      type kind. int64 -> kind contents_list -> kind contents_list t =
+  let rec set_fee_contents_list_gen : type kind.
+      int64 -> kind contents_list -> kind contents_list t =
    fun desired_total_fee (* in mutez *) -> function
-    | Single (Manager_operation data) ->
-        let fee = Tez.of_mutez_exn desired_total_fee in
-        let contents =
-          match source with
-          | Some source -> Manager_operation {data with fee; source}
-          | None -> Manager_operation {data with fee}
-        in
-        return (Single contents)
-    | Cons (Manager_operation data, tail) ->
-        let* local_fee =
-          (* We generate some corner cases where some individual
+     | Single (Manager_operation data) ->
+         let fee = Tez.of_mutez_exn desired_total_fee in
+         let contents =
+           match source with
+           | Some source -> Manager_operation {data with fee; source}
+           | None -> Manager_operation {data with fee}
+         in
+         return (Single contents)
+     | Cons (Manager_operation data, tail) ->
+         let* local_fee =
+           (* We generate some corner cases where some individual
              operations in the batch have zero fees. *)
-          let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
-          match r with
-          | `Random ->
-              let* n = int_range 0 (Int64.to_int desired_total_fee) in
-              return (Int64.of_int n)
-          | `Zero -> return 0L
-          | `All -> return desired_total_fee
-        in
-        let fee = Tez.of_mutez_exn local_fee in
-        let contents =
-          match source with
-          | Some source -> Manager_operation {data with fee; source}
-          | None -> Manager_operation {data with fee}
-        in
-        let* tail =
-          set_fee_contents_list_gen (Int64.sub desired_total_fee local_fee) tail
-        in
-        return (Cons (contents, tail))
-    | Single _ -> (* see precondition: manager operation *) assert false
+           let* r = frequencyl [(7, `Random); (2, `Zero); (1, `All)] in
+           match r with
+           | `Random ->
+               let* n = int_range 0 (Int64.to_int desired_total_fee) in
+               return (Int64.of_int n)
+           | `Zero -> return 0L
+           | `All -> return desired_total_fee
+         in
+         let fee = Tez.of_mutez_exn local_fee in
+         let contents =
+           match source with
+           | Some source -> Manager_operation {data with fee; source}
+           | None -> Manager_operation {data with fee}
+         in
+         let* tail =
+           set_fee_contents_list_gen
+             (Int64.sub desired_total_fee local_fee)
+             tail
+         in
+         return (Cons (contents, tail))
+     | Single _ -> (* see precondition: manager operation *) assert false
   in
   let {shell = _; protocol_data = Operation_data data} = op in
   let contents = generate1 (set_fee_contents_list_gen fee data.contents) in

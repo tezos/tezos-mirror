@@ -106,9 +106,10 @@ module Make
 
 module Make_with_hash_consing
     (X : Algebraic_signature.S)
-    (Micheline : Micheline_sig.S
-                   with type head = X.t
-                    and type label = Micheline_with_hash_consing.hcons_info)
+    (Micheline :
+      Micheline_sig.S
+        with type head = X.t
+         and type label = Micheline_with_hash_consing.hcons_info)
     (Path : Path.S) : sig
   include
     S with type head = X.t and type path = Path.t and type node = Micheline.node

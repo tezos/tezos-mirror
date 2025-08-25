@@ -98,11 +98,12 @@ let bad_stream_too_short_fmt s fmt =
 
 module Env
     (B : Backend.S)
-    (P : S
-           with type contents := B.Contents.Val.t
-            and type hash := B.Hash.t
-            and type step := B.Node.Val.step
-            and type metadata := B.Node.Val.metadata) =
+    (P :
+      S
+        with type contents := B.Contents.Val.t
+         and type hash := B.Hash.t
+         and type step := B.Node.Val.step
+         and type metadata := B.Node.Val.metadata) =
 struct
   module H = B.Hash
 
@@ -260,7 +261,9 @@ struct
     match !t with
     | Stream (Consume { stream; _ }) -> (
         (* Peek the sequence but do not advance the ref *)
-        match !stream () with Seq.Nil -> true | _ -> false)
+        match !stream () with
+        | Seq.Nil -> true
+        | _ -> false)
     | _ -> false
 
   let set_mode t (kind : kind) mode =

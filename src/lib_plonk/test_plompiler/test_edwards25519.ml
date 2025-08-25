@@ -72,8 +72,9 @@ module Edwards25519 (L : LIB) = struct
 
   let expected =
     (* 0 + 0 = 0 *)
-    MecEd25519.zero :: (* 0 + g = g *)
-                       MecEd25519.one
+    MecEd25519.zero
+    :: (* 0 + g = g *)
+       MecEd25519.one
     :: (* p + q = r *)
        List.map
          (fun (input1, input2) -> MecEd25519.add input1 input2)
@@ -153,8 +154,9 @@ module Edwards25519 (L : LIB) = struct
 
   let expected =
     (* g^0 = 0 *)
-    MecEd25519.zero :: (* g^1 = g *)
-                       MecEd25519.one
+    MecEd25519.zero
+    :: (* g^1 = g *)
+       MecEd25519.one
     :: (* p + q = r *)
        List.map
          (fun (input_p, input_b) ->

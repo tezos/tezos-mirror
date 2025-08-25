@@ -282,8 +282,8 @@ end
     which is the crux for having it easily unit-testable. *)
 module Make_s
     (Proto : Protocol_plugin.T)
-    (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Proto.operation) :
+    (Prevalidation_t :
+      Prevalidation.T with type protocol_operation = Proto.operation) :
   S
     with type config = Prevalidation_t.config
      and type protocol_operation = Proto.operation
@@ -416,54 +416,54 @@ module Make_s
       | Medium -> "classify_operation : voting/anonymous"
       | Low _ -> "classify_operation : manager"
     in
-    (let to_replace =
-       List.filter_map
-         (fun (replaced_oph, new_classification) ->
-           reclassify_replaced_manager_op replaced_oph shell new_classification)
-         replacements
-     in
-     let to_handle = (op, classification) :: to_replace in
-     let validated_operation =
-       match classification with
-       | `Validated ->
-           let is_advertisable =
-             match
-               (status_and_priority.status, status_and_priority.priority)
-             with
-             | Fresh, _ ->
-                 true
-                 [@profiler.mark
-                   {verbosity = Debug} ["freshly validated operation"]]
-             | Reclassified, High ->
-                 true
-                 [@profiler.mark
-                   {verbosity = Debug} ["reclassified high priority operation"]]
-             | Reclassified, Medium ->
-                 false
-                 [@profiler.mark
-                   {verbosity = Debug}
-                     ["reclassified medium priority operation"]]
-             | Reclassified, Low _ ->
-                 (* Reclassified operations with medium and low priority are not
+    ((let to_replace =
+        List.filter_map
+          (fun (replaced_oph, new_classification) ->
+            reclassify_replaced_manager_op replaced_oph shell new_classification)
+          replacements
+      in
+      let to_handle = (op, classification) :: to_replace in
+      let validated_operation =
+        match classification with
+        | `Validated ->
+            let is_advertisable =
+              match
+                (status_and_priority.status, status_and_priority.priority)
+              with
+              | Fresh, _ ->
+                  true
+                  [@profiler.mark
+                    {verbosity = Debug} ["freshly validated operation"]]
+              | Reclassified, High ->
+                  true
+                  [@profiler.mark
+                    {verbosity = Debug} ["reclassified high priority operation"]]
+              | Reclassified, Medium ->
+                  false
+                  [@profiler.mark
+                    {verbosity = Debug}
+                      ["reclassified medium priority operation"]]
+              | Reclassified, Low _ ->
+                  (* Reclassified operations with medium and low priority are not
                     reclassified *)
-                 false
-                 [@profiler.mark
-                   {verbosity = Debug} ["reclassified low priority operation"]]
-           in
-           Some (op.hash, is_advertisable)
-       | `Branch_refused _ ->
-           None
-           [@profiler.mark {verbosity = Debug} ["branch_refused operation"]]
-       | `Branch_delayed _ ->
-           None
-           [@profiler.mark {verbosity = Debug} ["branch_delayed operation"]]
-       | `Refused _ ->
-           None [@profiler.mark {verbosity = Debug} ["refused operation"]]
-       | `Outdated _ ->
-           None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
-     in
-     (validated_operation, to_handle))
-    [@profiler.aggregate_f {verbosity = Info} section]
+                  false
+                  [@profiler.mark
+                    {verbosity = Debug} ["reclassified low priority operation"]]
+            in
+            Some (op.hash, is_advertisable)
+        | `Branch_refused _ ->
+            None
+            [@profiler.mark {verbosity = Debug} ["branch_refused operation"]]
+        | `Branch_delayed _ ->
+            None
+            [@profiler.mark {verbosity = Debug} ["branch_delayed operation"]]
+        | `Refused _ ->
+            None [@profiler.mark {verbosity = Debug} ["refused operation"]]
+        | `Outdated _ ->
+            None [@profiler.mark {verbosity = Debug} ["outdated operation"]]
+      in
+      (validated_operation, to_handle))
+    [@profiler.aggregate_f {verbosity = Info} section])
 
   (** Determine the classification of a given operation in the current
       validation state, i.e. whether it could be included in a block on top of
@@ -566,7 +566,8 @@ module Make_s
              ( acc_validation_state,
                advertisable_mempool,
                validated_mempool,
-               limit ) ->
+               limit )
+           ->
           if limit <= 0 then
             (* Using Error as an early-return mechanism *)
             Lwt.return_error
@@ -1142,25 +1143,25 @@ module Make_s
       let*! new_pending_operations, nb_pending =
         Operation_hash.Map.fold_s
           (fun oph op (pending, nb_pending) ->
-            (let v =
-               pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
-             in
-             match v with
-             | Drop -> Lwt.return (pending, nb_pending)
-             | Priority ((High | Medium | Low _) as priority) ->
-                 (* Here, an operation injected in this node with High priority will
+            ((let v =
+                pre_filter pv ~notifier:(mk_notifier pv.operation_stream) op
+              in
+              match v with
+              | Drop -> Lwt.return (pending, nb_pending)
+              | Priority ((High | Medium | Low _) as priority) ->
+                  (* Here, an operation injected in this node with High priority will
                     now get its appropriate priority. *)
-                 let status =
-                   (* If the operation has not yet been classified we set its
+                  let status =
+                    (* If the operation has not yet been classified we set its
                       status to Fresh *)
-                   if Pending_ops.mem oph pv.shell.pending then
-                     Pending_ops.Fresh
-                   else Reclassified
-                 in
-                 Lwt.return
-                   ( Pending_ops.add op {status; priority} pending,
-                     nb_pending + 1 ))
-            [@profiler.aggregate_s {verbosity = Info} "flushed operations"])
+                    if Pending_ops.mem oph pv.shell.pending then
+                      Pending_ops.Fresh
+                    else Reclassified
+                  in
+                  Lwt.return
+                    ( Pending_ops.add op {status; priority} pending,
+                      nb_pending + 1 ))
+            [@profiler.aggregate_s {verbosity = Info} "flushed operations"]))
           new_pending_operations
           (Pending_ops.empty, 0)
       in
@@ -1254,9 +1255,10 @@ module WorkerGroup = Worker.MakeGroup (Name) (Prevalidator_worker_state.Request)
 module Make
     (Proto : Protocol_plugin.T)
     (Arg : ARG)
-    (Prevalidation_t : Prevalidation.T
-                         with type protocol_operation = Proto.operation
-                          and type chain_store = Store.chain_store) : T = struct
+    (Prevalidation_t :
+      Prevalidation.T
+        with type protocol_operation = Proto.operation
+         and type chain_store = Store.chain_store) : T = struct
   module S = Make_s (Proto) (Prevalidation_t)
   open S
 
@@ -1654,8 +1656,7 @@ module Make
   module Handlers = struct
     type self = worker
 
-    let on_request :
-        type r request_error.
+    let on_request : type r request_error.
         worker ->
         (r, request_error) Request.t ->
         (r, request_error) result Lwt.t =
@@ -2099,18 +2100,17 @@ let rpc_directory : t option Tezos_rpc.Directory.t =
     Tezos_rpc.Directory.empty
     (Block_services.mempool_path Tezos_rpc.Path.open_root)
     (function
-      | None ->
-          Lwt.return
-            (Tezos_rpc.Directory.map
-               (fun _ -> Lwt.return_unit)
-               empty_rpc_directory)
-      | Some t ->
-          let module Prevalidator : T = (val t : T) in
-          let w = Lazy.force Prevalidator.worker in
-          let pv = Prevalidator.Worker.state w in
-          let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
-          Lwt.return
-            (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
+    | None ->
+        Lwt.return
+          (Tezos_rpc.Directory.map
+             (fun _ -> Lwt.return_unit)
+             empty_rpc_directory)
+    | Some t ->
+        let module Prevalidator : T = (val t : T) in
+        let w = Lazy.force Prevalidator.worker in
+        let pv = Prevalidator.Worker.state w in
+        let pv_rpc_dir = Lazy.force (Prevalidator.get_rpc_directory pv) in
+        Lwt.return (Tezos_rpc.Directory.map (fun _ -> Lwt.return pv) pv_rpc_dir))
 
 module Internal_for_tests = struct
   module Tools = Tools

@@ -94,9 +94,10 @@ module type Sigs = sig
       (Dict : Dict.S with module Fm = Fm)
       (Dispatcher : Dispatcher.S with module Fm = Fm)
       (Hash : Irmin.Hash.S with type t = Fm.Index.key)
-      (Val : Pack_value.Persistent
-               with type hash := Hash.t
-                and type key := Hash.t Pack_key.t)
+      (Val :
+        Pack_value.Persistent
+          with type hash := Hash.t
+           and type key := Hash.t Pack_key.t)
       (Errs : Io_errors.S with module Io = Fm.Io) :
     S
       with type key = Hash.t Pack_key.t

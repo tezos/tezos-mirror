@@ -171,8 +171,7 @@ type 'ret continuation = unit -> 'ret tzresult
 
 (* Only a subset of types are supported for rollups.
    This function checks whether or not a type can be used for a rollup. *)
-let rec validate_ty :
-    type a ac ret.
+let rec validate_ty : type a ac ret.
     (a, ac) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
     ret continuation ->
@@ -256,8 +255,7 @@ let rec validate_ty :
         | Chest_key_t -> tzfail Sc_rollup_invalid_parameters_type
         | Lambda_t (_, _, _) -> tzfail Sc_rollup_invalid_parameters_type)
 
-and validate_two_tys :
-    type a ac b bc ret.
+and validate_two_tys : type a ac b bc ret.
     (a, ac) Script_typed_ir.ty ->
     (b, bc) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
@@ -268,8 +266,7 @@ and validate_two_tys :
   (validate_ty [@ocaml.tailcall]) ty1 entrypoints1 (fun () ->
       (validate_ty [@ocaml.tailcall]) ty2 entrypoints2 k)
 
-let validate_parameters_ty :
-    type a ac.
+let validate_parameters_ty : type a ac.
     context ->
     (a, ac) Script_typed_ir.ty ->
     a Script_typed_ir.entrypoints_node ->
@@ -352,7 +349,7 @@ let originate ?whitelist ctxt ~kind ~boot_sector ~parameters_ty =
 
 let to_transaction_operation ctxt rollup
     (Sc_rollup_management_protocol.Transaction
-      {destination; entrypoint; parameters_ty; parameters; unparsed_parameters})
+       {destination; entrypoint; parameters_ty; parameters; unparsed_parameters})
     =
   let open Result_syntax in
   let* ctxt, nonce = fresh_internal_nonce ctxt in
@@ -391,7 +388,8 @@ let transfer_ticket_tokens ctxt ~source_destination ~acc_storage_diff
   let open Lwt_result_syntax in
   List.fold_left_es
     (fun (acc_storage_diff, ctxt)
-         (target_destination, (amount : Script_typed_ir.ticket_amount)) ->
+         (target_destination, (amount : Script_typed_ir.ticket_amount))
+       ->
       let* ctxt, storage_diff =
         Ticket_transfer.transfer_ticket
           ctxt
@@ -512,7 +510,8 @@ let execute_outbox_message_transaction ctxt ~transactions ~rollup =
     List.fold_left_map_es
       (fun ctxt
            Ticket_operations_diff.
-             {ticket_token = ex_token; total_amount; destinations = _} ->
+             {ticket_token = ex_token; total_amount; destinations = _}
+         ->
         let+ ticket_token, ctxt = Ticket_token_unparser.unparse ctxt ex_token in
         (* Here we only show the outgoing (negative) balance wrt to the rollup
            address. The positive balances for the receiving contracts are

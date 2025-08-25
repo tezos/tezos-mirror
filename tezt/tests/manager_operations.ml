@@ -821,8 +821,8 @@ module Illtyped_originations = struct
         ~init_storage:(`Json (`O [("int", `String "-10")]))
         ~code:
           (`File
-            Michelson_script.(
-              find ["mini_scenarios"; "parsable_contract"] protocol |> path))
+             Michelson_script.(
+               find ["mini_scenarios"; "parsable_contract"] protocol |> path))
         nodes.main.client
     in
     unit

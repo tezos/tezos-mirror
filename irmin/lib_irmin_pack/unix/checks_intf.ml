@@ -134,10 +134,11 @@ module type Sigs = sig
 
   module Integrity_checks
       (XKey : Pack_key.S)
-      (X : Irmin.Backend.S
-             with type Commit.key = XKey.t
-              and type Node.key = XKey.t
-              and type Schema.Hash.t = XKey.hash)
+      (X :
+        Irmin.Backend.S
+          with type Commit.key = XKey.t
+           and type Node.key = XKey.t
+           and type Schema.Hash.t = XKey.hash)
       (Index : Pack_index.S) : sig
     val check_always :
       ?ppf:Format.formatter ->

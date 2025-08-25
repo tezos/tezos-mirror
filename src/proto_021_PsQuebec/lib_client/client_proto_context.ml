@@ -726,10 +726,10 @@ type batch_transfer_operation = {
 let batch_transfer_operation_encoding =
   let open Data_encoding in
   conv
-    (fun {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint} ->
-      (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint))
-    (fun (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint) ->
-      {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint})
+    (fun {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint}
+       -> (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint))
+    (fun (destination, fee, gas_limit, storage_limit, amount, arg, entrypoint)
+       -> {destination; fee; gas_limit; storage_limit; amount; arg; entrypoint})
     (obj7
        (req "destination" string)
        (opt "fee" string)

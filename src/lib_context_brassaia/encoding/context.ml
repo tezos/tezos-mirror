@@ -68,10 +68,10 @@ end = struct
     | Error err ->
         Error
           (`Msg
-            (Format.asprintf
-               "Failed to read b58check_encoding data: %a"
-               Error_monad.pp_print_trace
-               err))
+             (Format.asprintf
+                "Failed to read b58check_encoding data: %a"
+                Error_monad.pp_print_trace
+                err))
 
   let short_hash_string = Brassaia.Type.(unstage (short_hash string))
 

@@ -1064,8 +1064,7 @@ let close t =
 
 let root_dir t = t.root_dir
 
-let write_value :
-    type file key value.
+let write_value : type file key value.
     ?override:bool ->
     (file, key, value) t ->
     (file, key, value) file_layout ->
@@ -1077,8 +1076,7 @@ let write_value :
   let layout = file_layout ~root_dir file in
   Files.write ?override files layout key value
 
-let read_value :
-    type file key value.
+let read_value : type file key value.
     (file, key, value) t ->
     (file, key, value) file_layout ->
     file ->
@@ -1088,8 +1086,7 @@ let read_value :
   let layout = file_layout ~root_dir file in
   Files.read files layout key
 
-let value_exists :
-    type file key value.
+let value_exists : type file key value.
     (file, key, value) t ->
     (file, key, value) file_layout ->
     file ->
@@ -1099,8 +1096,7 @@ let value_exists :
   let layout = file_layout ~root_dir file in
   Files.value_exists files layout key
 
-let count_values :
-    type file key value.
+let count_values : type file key value.
     (file, key, value) t ->
     (file, key, value) file_layout ->
     file ->

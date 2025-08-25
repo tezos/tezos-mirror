@@ -283,7 +283,8 @@ let commands () =
            program
            storage
            input
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let*? program = Micheline_parser.no_parsing_error program in
         let show_source = not no_print_source in
@@ -339,7 +340,8 @@ let commands () =
       (fun (emacs_mode, no_print_source, original_gas, legacy)
            program
            storage
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
         let* original_gas = resolve_max_gas cctxt cctxt#block original_gas in
@@ -377,7 +379,8 @@ let commands () =
              legacy,
              display_names )
            expr_strings
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let setup = (emacs_mode, no_print_source) in
         match expr_strings with
@@ -569,7 +572,8 @@ let commands () =
       @@ file_or_literal_with_origin_param ())
       (fun (check, display_names, scriptable)
            expr_strings
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         match expr_strings with
         | [] ->
@@ -846,7 +850,8 @@ let commands () =
            bytes
            (_, (key_locator, _))
            signature
-           (cctxt : #Protocol_client_context.full) ->
+           (cctxt : #Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let* check = Client_keys.check key_locator signature bytes in
         if check then
@@ -950,7 +955,8 @@ let commands () =
            content_with_origin
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let expr_string =
           Client_proto_args.content_of_file_or_text content_with_origin
@@ -1046,7 +1052,8 @@ let commands () =
            data_string
            from_format
            to_format
-           (cctxt : Protocol_client_context.full) ->
+           (cctxt : Protocol_client_context.full)
+         ->
         let open Lwt_result_syntax in
         let micheline_of_expr expr =
           Micheline_printer.printable
@@ -1160,7 +1167,8 @@ let commands () =
            entrypoint
            contract
            input
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_syntax in
         let* res =
           Client_proto_programs.run_view
@@ -1196,7 +1204,8 @@ let commands () =
       (fun (source, payer, gas, unlimited_gas, unparsing_mode, now, level)
            view
            contract
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_result_syntax in
         let*? input =
           Micheline_parser.no_parsing_error
@@ -1243,7 +1252,8 @@ let commands () =
            view
            contract
            input
-           cctxt ->
+           cctxt
+         ->
         let open Lwt_syntax in
         let* res =
           Client_proto_programs.run_script_view

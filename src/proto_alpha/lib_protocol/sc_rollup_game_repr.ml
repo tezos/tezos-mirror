@@ -30,7 +30,8 @@ open Sc_rollup_repr
 
 type error +=
   | (* `Temporary *)
-      Dissection_choice_not_found of Sc_rollup_tick_repr.t
+      Dissection_choice_not_found of
+      Sc_rollup_tick_repr.t
   | (* `Permanent *) Proof_unexpected_section_size of Z.t
   | (* `Temporary *)
       Proof_start_state_hash_mismatch of {
@@ -323,7 +324,8 @@ module V1 = struct
              start_level;
              inbox_level;
              game_state;
-           } ->
+           }
+         ->
         ( turn,
           inbox_snapshot,
           dal_snapshot,
@@ -335,7 +337,8 @@ module V1 = struct
              dal_snapshot,
              start_level,
              inbox_level,
-             game_state ) ->
+             game_state )
+         ->
         {
           turn;
           inbox_snapshot;

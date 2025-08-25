@@ -68,7 +68,10 @@ module Pool = struct
       else Ethereum_types.AddressMap.add address nonce_map acc_address_map
     in
     Pkey_map.fold_e
-      (fun address nonce_tx_map (acc_address_map_pending, acc_address_map_queued) ->
+      (fun address
+           nonce_tx_map
+           (acc_address_map_pending, acc_address_map_queued)
+         ->
         let address_balance, address_nonce = find_balance_and_nonce address in
         let+ pending, queued =
           Nonce_map.fold_e
@@ -541,7 +544,8 @@ let pop_transactions state ~maximum_cumulative_size =
                    transaction_object =
                      {gasPrice = Qty gas_price; gas = Qty gas_limit; value; _};
                    _;
-                 } ->
+                 }
+               ->
               nonce < current_nonce
               || (not (can_prepay ~value ~balance ~gas_price ~gas_limit))
               || transaction_timed_out
@@ -570,7 +574,8 @@ let pop_transactions state ~maximum_cumulative_size =
                      transaction_object = {gasPrice = Qty gas_price; _};
                      raw_tx;
                      _;
-                   } ->
+                   }
+                 ->
                 let check_nonce = nonce = current_nonce in
                 let can_fit =
                   !accumulated_size + String.length raw_tx
@@ -699,8 +704,7 @@ module Handlers = struct
         return_unit
     | Sequencer | Proxy -> return_unit
 
-  let on_request :
-      type r request_error.
+  let on_request : type r request_error.
       worker -> (r, request_error) Request.t -> (r, request_error) result Lwt.t
       =
    fun w request ->

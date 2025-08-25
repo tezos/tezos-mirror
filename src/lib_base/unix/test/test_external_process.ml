@@ -107,8 +107,7 @@ module Processing = struct
     let open Lwt_result_syntax in
     return_unit
 
-  let handle_request :
-      type a.
+  let handle_request : type a.
       Parameters.parameters ->
       state ->
       a Parameters.request ->

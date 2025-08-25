@@ -145,7 +145,8 @@ let pvm_state_encoding =
            last_top_level_call,
            max_nb_ticks,
            maximum_reboots_per_input,
-           output_buffer_parameters ) ->
+           output_buffer_parameters )
+       ->
       {
         last_input_info;
         current_tick;
@@ -181,7 +182,8 @@ let pvm_state_encoding =
            max_nb_ticks;
            maximum_reboots_per_input;
            output_buffer_parameters;
-         } ->
+         }
+       ->
       ( last_input_info,
         current_tick,
         Some reboot_counter,

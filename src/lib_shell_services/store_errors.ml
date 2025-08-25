@@ -1230,7 +1230,8 @@ let () =
               checkpoint,
               head )
       | _ -> None)
-    (fun (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head) ->
+    (fun (genesis, caboose, savepoint, cementing_highwatermark, checkpoint, head)
+       ->
       Bad_ordering_invariant
         {genesis; caboose; savepoint; cementing_highwatermark; checkpoint; head})
 

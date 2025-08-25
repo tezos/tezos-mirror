@@ -273,7 +273,8 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
     let check_attester delegate =
       let attestation_opt =
         List.find
-          (fun (_tb_slot, delegate_opt, _attestation_op, _dal_attestation_opt) ->
+          (fun (_tb_slot, delegate_opt, _attestation_op, _dal_attestation_opt)
+             ->
             match delegate_opt with
             | Some pkh -> Signature.Public_key_hash.equal delegate pkh
             | None -> false)
@@ -296,7 +297,9 @@ let check_attesters_attested node_ctxt parameters ~block_level attestations
           | Some bitset ->
               let attested, not_attested, not_attested_with_traps =
                 List.fold_left
-                  (fun (attested, not_attested, not_attested_with_traps) index ->
+                  (fun (attested, not_attested, not_attested_with_traps)
+                       index
+                     ->
                     if should_be_attested index then
                       if is_attested bitset index then
                         ( index :: attested,

@@ -308,11 +308,11 @@ module CompressedRepresentation = struct
       [
         ( Hex.to_bytes
             (`Hex
-              "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"),
+               "97f1d3a73197d7942695638c4fa9ac0fc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb"),
           G1.to_compressed_bytes G1.one );
         ( Hex.to_bytes
             (`Hex
-              "c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+               "c00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
           G1.to_compressed_bytes G1.zero );
       ]
     in
@@ -331,26 +331,26 @@ module CompressedRepresentation = struct
         ( G1.of_bytes_exn
           @@ Hex.to_bytes
                (`Hex
-                 "0cb0050dcf2f82c75c431f1fd4eb44acc526dbc70842c173bf6e10e48482d54c334b25256e1c619e095443a139c159c715a8f06580d0c818ab623b8a7e31d961c28b8e1ee33ab2e60089ac887db42790f704043d3cb7a5bad69e3b4cf312c1be"),
+                  "0cb0050dcf2f82c75c431f1fd4eb44acc526dbc70842c173bf6e10e48482d54c334b25256e1c619e095443a139c159c715a8f06580d0c818ab623b8a7e31d961c28b8e1ee33ab2e60089ac887db42790f704043d3cb7a5bad69e3b4cf312c1be"),
           Hex.to_bytes
             (`Hex
-              "acb0050dcf2f82c75c431f1fd4eb44acc526dbc70842c173bf6e10e48482d54c334b25256e1c619e095443a139c159c7")
+               "acb0050dcf2f82c75c431f1fd4eb44acc526dbc70842c173bf6e10e48482d54c334b25256e1c619e095443a139c159c7")
         );
         ( G1.of_bytes_exn
           @@ Hex.to_bytes
                (`Hex
-                 "15066d35ee5ff3d2b7c6f56e59770cb74eeb0cec96e964bc06faa95fe9ad43adfd77eed86c79af4bd70fdafab703daf8008b67f7b37d345969daed600bd1f6032ab209b0793dd8029e587aa18f463fe63e2909868fb719eab6fbd659dfb3910a"),
+                  "15066d35ee5ff3d2b7c6f56e59770cb74eeb0cec96e964bc06faa95fe9ad43adfd77eed86c79af4bd70fdafab703daf8008b67f7b37d345969daed600bd1f6032ab209b0793dd8029e587aa18f463fe63e2909868fb719eab6fbd659dfb3910a"),
           Hex.to_bytes
             (`Hex
-              "95066d35ee5ff3d2b7c6f56e59770cb74eeb0cec96e964bc06faa95fe9ad43adfd77eed86c79af4bd70fdafab703daf8")
+               "95066d35ee5ff3d2b7c6f56e59770cb74eeb0cec96e964bc06faa95fe9ad43adfd77eed86c79af4bd70fdafab703daf8")
         );
         ( G1.of_bytes_exn
           @@ Hex.to_bytes
                (`Hex
-                 "12a57cbec8a77a1d2e78397910bfff2c53e2a42add9219ab7282d37d668e7e55573a0195baad77c8c4daab5cb777306812919ee53ce703dc9564a2c60dd43641b4950feec26f6146d69bd00e4d329c8a2db86e294d549dd6a04f00a085880517"),
+                  "12a57cbec8a77a1d2e78397910bfff2c53e2a42add9219ab7282d37d668e7e55573a0195baad77c8c4daab5cb777306812919ee53ce703dc9564a2c60dd43641b4950feec26f6146d69bd00e4d329c8a2db86e294d549dd6a04f00a085880517"),
           Hex.to_bytes
             (`Hex
-              "b2a57cbec8a77a1d2e78397910bfff2c53e2a42add9219ab7282d37d668e7e55573a0195baad77c8c4daab5cb7773068")
+               "b2a57cbec8a77a1d2e78397910bfff2c53e2a42add9219ab7282d37d668e7e55573a0195baad77c8c4daab5cb7773068")
         );
       ]
     in

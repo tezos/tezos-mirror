@@ -435,12 +435,12 @@ let import_from ~force ?history_mode ~data_dir ~snapshot_file () =
       ~cancellable:true
       ~display_progress:
         (`Periodic_event
-          (fun elapsed_time ->
-            if emit_event then
-              Events.import_snapshot_archive_in_progress
-                ~archive_name
-                ~elapsed_time
-            else Lwt.return_unit))
+           (fun elapsed_time ->
+             if emit_event then
+               Events.import_snapshot_archive_in_progress
+                 ~archive_name
+                 ~elapsed_time
+             else Lwt.return_unit))
         (* [progress] modifies the signal handlers, which are necessary for
            [Lwt_exit] to work. As a consequence, if we want to be
            cancellable, we cannot have display bar. *)

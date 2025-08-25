@@ -122,13 +122,13 @@ let error_with s p q =
 
 class ['pr] of_directory (dir : 'pr RPC_directory.t) =
   object
-    method call_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-          'p ->
-          'q ->
-          'i ->
-          'o tzresult Lwt.t =
+    method call_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+        'p ->
+        'q ->
+        'i ->
+        'o tzresult Lwt.t =
       fun s p q i ->
         let open Lwt_syntax in
         let* r = RPC_directory.transparent_lookup dir s p q i in
@@ -160,15 +160,15 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `No_content ->
             error_with s p q
 
-    method call_streamed_service
-        : 'm 'p 'q 'i 'o.
-          (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
-          on_chunk:('o -> unit) ->
-          on_close:(unit -> unit) ->
-          'p ->
-          'q ->
-          'i ->
-          (unit -> unit) tzresult Lwt.t =
+    method call_streamed_service :
+        'm 'p 'q 'i 'o.
+        (([< Resto.meth] as 'm), 'pr, 'p, 'q, 'i, 'o) RPC_service.t ->
+        on_chunk:('o -> unit) ->
+        on_close:(unit -> unit) ->
+        'p ->
+        'q ->
+        'i ->
+        (unit -> unit) tzresult Lwt.t =
       fun s ~on_chunk ~on_close p q i ->
         let open Lwt_syntax in
         let* r = RPC_directory.transparent_lookup dir s p q i in

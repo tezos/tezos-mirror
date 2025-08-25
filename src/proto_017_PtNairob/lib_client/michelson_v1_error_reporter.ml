@@ -140,18 +140,18 @@ type error +=
 
 let enrich_runtime_errors cctxt ~chain ~block ~parsed =
   List.map_s (function
-      | Environment.Ecoproto_error (Runtime_contract_error contract) -> (
-          (* If we know the script already, we don't fetch it *)
-          match parsed with
-          | Some parsed ->
-              Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
-          | None -> (
-              fetch_script cctxt ~chain ~block contract >|= function
-              | Ok script ->
-                  let parsed = Michelson_v1_printer.unparse_toplevel script in
-                  Rich_runtime_contract_error (contract, parsed)
-              | Error err -> Fetch_script_meta_error err))
-      | e -> Lwt.return e)
+    | Environment.Ecoproto_error (Runtime_contract_error contract) -> (
+        (* If we know the script already, we don't fetch it *)
+        match parsed with
+        | Some parsed ->
+            Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
+        | None -> (
+            fetch_script cctxt ~chain ~block contract >|= function
+            | Ok script ->
+                let parsed = Michelson_v1_printer.unparse_toplevel script in
+                Rich_runtime_contract_error (contract, parsed)
+            | Error err -> Fetch_script_meta_error err))
+    | e -> Lwt.return e)
 
 let report_errors ~details ~show_source ?parsed ppf errs =
   let rec print_trace locations errs =
@@ -246,8 +246,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           "@[<hov 0>@[<hov 2>Ill typed %adata:@ %a@]@ @[<hov 2>is not an \
            expression of type@ %a@]@]"
           (fun ppf -> function
-            | None -> ()
-            | Some s -> Format.fprintf ppf "%s " s)
+            | None -> () | Some s -> Format.fprintf ppf "%s " s)
           name
           print_source
           (parsed, hilights)

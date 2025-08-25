@@ -316,13 +316,13 @@ let query_sender_job {query_pipe; process; _} =
     loop ()
   in
   Lwt.catch loop (function
-      (* Buffer was closed by the parent before proceeding an entire message
+    (* Buffer was closed by the parent before proceeding an entire message
          (sigterm, etc.) *)
-      | End_of_file -> return_unit
-      (* Unknown exception *)
-      | exn ->
-          let err = [error_of_exn exn] in
-          Lwt.return (Error err))
+    | End_of_file -> return_unit
+    (* Unknown exception *)
+    | exn ->
+        let err = [error_of_exn exn] in
+        Lwt.return (Error err))
 
 let reply_receiver_job {process; query_store; _} node_context =
   let open Lwt_result_syntax in
@@ -332,7 +332,7 @@ let reply_receiver_job {process; query_store; _} node_context =
   let rec loop () =
     let*! id = Lwt_io.read_int ic in
     let (Query
-          {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
+           {slot_id; commitment; proto_parameters; reconstruction_start_time}) =
       Query_store.find query_store id
     in
     (* Messages queue is unbounded *)
@@ -416,13 +416,13 @@ let reply_receiver_job {process; query_store; _} node_context =
         fail [Amplification_reply_receiver_job "Unexpected message"]
   in
   Lwt.catch loop (function
-      (* Buffer was closed before proceeding an entire message (sigterm, etc.) *)
-      | End_of_file -> return_unit
-      (* Unknown exception *)
-      | exn ->
-          let err = [error_of_exn exn] in
-          let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
-          Lwt.return (Error err))
+    (* Buffer was closed before proceeding an entire message (sigterm, etc.) *)
+    | End_of_file -> return_unit
+    (* Unknown exception *)
+    | exn ->
+        let err = [error_of_exn exn] in
+        let*! () = Event.emit_crypto_process_fatal ~msg:"Unexpected error" in
+        Lwt.return (Error err))
 
 let determine_amplification_delays node_ctxt =
   let open Result_syntax in
@@ -576,8 +576,8 @@ let amplify node_store commitment (slot_id : Types.slot_id)
   let shards =
     Store.Shards.read_all (Store.shards node_store) slot_id ~number_of_shards
     |> Seq_s.filter_map (function
-           | _, index, Ok share -> Some Cryptobox.{index; share}
-           | _ -> None)
+         | _, index, Ok share -> Some Cryptobox.{index; share}
+         | _ -> None)
   in
   let*? shards =
     Seq_s.take

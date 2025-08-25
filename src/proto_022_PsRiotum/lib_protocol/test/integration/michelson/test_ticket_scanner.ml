@@ -70,7 +70,7 @@ let string_list_of_ex_tickets ctxt tickets =
   let open Lwt_result_wrap_syntax in
   let accum (xs, ctxt)
       (Ticket_scanner.Ex_ticket
-        (cty, {Script_typed_ir.ticketer; contents; amount})) =
+         (cty, {Script_typed_ir.ticketer; contents; amount})) =
     let*@ x, ctxt =
       Script_ir_translator.unparse_data
         ctxt

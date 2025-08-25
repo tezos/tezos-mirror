@@ -222,7 +222,10 @@ module Make (X : PARAMETERS) = struct
     | Some [(name, value)] -> Some {name; value; timestamp}
 
   let read_json_event daemon even_input =
-    let max_event_size = 1024 * 1024 (* 1MB *) in
+    let max_event_size =
+      1024 * 1024
+      (* 1MB *)
+    in
     let origin = "event from " ^ daemon.name in
     let buff = Buffer.create 256 in
     let rec loop () =

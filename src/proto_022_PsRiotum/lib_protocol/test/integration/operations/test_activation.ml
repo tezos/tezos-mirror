@@ -486,8 +486,8 @@ let test_invalid_activation_with_no_commitments () =
   let* operation = Op.activation (B blk) account activation_code in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_activation _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_activation _ -> true
+    | _ -> false)
 
 (** Wrong activation: wrong secret given in the operation. *)
 let test_invalid_activation_wrong_secret () =
@@ -502,8 +502,8 @@ let test_invalid_activation_wrong_secret () =
   let* operation = Op.activation (B blk) account activation_code in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_activation _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_activation _ -> true
+    | _ -> false)
 
 (** Invalid pkh activation : expected to fail as the context does not
     contain an associated commitment. *)
@@ -520,8 +520,8 @@ let test_invalid_activation_inexistent_pkh () =
   let* operation = Op.activation (B blk) inexistent_pkh activation_code in
   let*! res = Block.bake ~operation blk in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Invalid_activation _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Invalid_activation _ -> true
+    | _ -> false)
 
 (** Invalid pkh activation : expected to fail as the commitment has
     already been claimed. *)
@@ -537,8 +537,8 @@ let test_invalid_double_activation () =
   let* op' = Op.activation (I inc) account activation_code in
   let*! res = Incremental.add_operation inc op' in
   Assert.proto_error ~loc:__LOC__ res (function
-      | Validate_errors.Anonymous.Conflicting_activation _ -> true
-      | _ -> false)
+    | Validate_errors.Anonymous.Conflicting_activation _ -> true
+    | _ -> false)
 
 (** Transfer from an unactivated commitment account. *)
 let test_invalid_transfer_from_unactivated_account () =

@@ -146,64 +146,66 @@ let connect_gossipsub_with_p2p proto_parameters gs_worker transport_layer
   let shards_handler shards =
     let save_and_notify = Store.Shards.write_all shards in
     fun Types.Message.{share; _}
-        Types.Message_id.{commitment; shard_index; level; slot_index; _} ->
+        Types.Message_id.{commitment; shard_index; level; slot_index; _}
+      ->
       let open Lwt_result_syntax in
       let slot_id : Types.slot_id = {slot_level = level; slot_index} in
-      (let* () =
-         (Seq.return {Cryptobox.share; index = shard_index}
-         |> save_and_notify slot_id |> Errors.to_tzresult)
-         [@profiler.aggregate_s
-           {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
-       in
-       let number_of_shards =
-         proto_parameters.cryptobox_parameters.number_of_shards
-       in
-       (* Introduce a new store read at each received shard. Not sure it can be
-          a problem, though *)
-       let* number_of_already_stored_shards =
-         (Store.Shards.count_values
-            node_store
-            slot_id
+      ((let* () =
+          (Seq.return {Cryptobox.share; index = shard_index}
+          |> save_and_notify slot_id |> Errors.to_tzresult)
           [@profiler.aggregate_s
-            {verbosity = Notice; profiler_module = Profiler} "count_values"])
-       in
-       let slot_metrics =
-         (Dal_metrics.update_timing_shard_received
-            (Node_context.get_cryptobox node_ctxt)
-            shards_timing_table
-            slot_id
-            ~number_of_already_stored_shards
-            ~number_of_shards
-          [@profiler.aggregate_f
-            {verbosity = Notice; profiler_module = Profiler}
-              "update_timing_shard_received"])
-       in
-       match
-         Profile_manager.get_profiles @@ Node_context.get_profile_ctxt node_ctxt
-       with
-       | Controller profile
-         when Controller_profiles.is_observed_slot slot_index profile -> (
-           match amplificator with
-           | None ->
-               let*! () =
-                 if not disable_amplification then
-                   Event.emit_amplificator_uninitialized ()
-                 else Lwt.return_unit
-               in
-               return_unit
-           | Some amplificator ->
-               assert (not disable_amplification) ;
-               Amplificator.try_amplification
-                 commitment
-                 slot_metrics
-                 slot_id
-                 amplificator
-               [@profiler.aggregate_s
-                 {verbosity = Notice; profiler_module = Profiler}
-                   "try_amplification"])
-       | _ -> return_unit)
+            {verbosity = Notice; profiler_module = Profiler} "save_and_notify"]
+        in
+        let number_of_shards =
+          proto_parameters.cryptobox_parameters.number_of_shards
+        in
+        (* Introduce a new store read at each received shard. Not sure it can be
+          a problem, though *)
+        let* number_of_already_stored_shards =
+          (Store.Shards.count_values
+             node_store
+             slot_id
+           [@profiler.aggregate_s
+             {verbosity = Notice; profiler_module = Profiler} "count_values"])
+        in
+        let slot_metrics =
+          (Dal_metrics.update_timing_shard_received
+             (Node_context.get_cryptobox node_ctxt)
+             shards_timing_table
+             slot_id
+             ~number_of_already_stored_shards
+             ~number_of_shards
+           [@profiler.aggregate_f
+             {verbosity = Notice; profiler_module = Profiler}
+               "update_timing_shard_received"])
+        in
+        match
+          Profile_manager.get_profiles
+          @@ Node_context.get_profile_ctxt node_ctxt
+        with
+        | Controller profile
+          when Controller_profiles.is_observed_slot slot_index profile -> (
+            match amplificator with
+            | None ->
+                let*! () =
+                  if not disable_amplification then
+                    Event.emit_amplificator_uninitialized ()
+                  else Lwt.return_unit
+                in
+                return_unit
+            | Some amplificator ->
+                assert (not disable_amplification) ;
+                Amplificator.try_amplification
+                  commitment
+                  slot_metrics
+                  slot_id
+                  amplificator
+                [@profiler.aggregate_s
+                  {verbosity = Notice; profiler_module = Profiler}
+                    "try_amplification"])
+        | _ -> return_unit)
       [@profiler.aggregate_s
-        {verbosity = Notice; profiler_module = Profiler} "shards_handler"]
+        {verbosity = Notice; profiler_module = Profiler} "shards_handler"])
   in
   Lwt.dont_wait
     (fun () ->

@@ -571,7 +571,9 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         let tree =
           (* This is safe as store.Tree will never call any blocking
              functions. *)
-          match Lwt.state tree with Return t -> t | _ -> assert false
+          match Lwt.state tree with
+          | Return t -> t
+          | _ -> assert false
         in
         tree)
       (fun t ->

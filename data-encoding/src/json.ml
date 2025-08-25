@@ -158,7 +158,8 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
           let match_case x = match_case (proj x) in
           let lift
               (Case
-                {title; description; encoding; proj = proj'; inj = inj'; tag}) =
+                 {title; description; encoding; proj = proj'; inj = inj'; tag})
+              =
             Case
               {
                 encoding;
@@ -200,8 +201,7 @@ let rec lift_union : type a. a Encoding.t -> a Encoding.t =
   | Dynamic_size _ | Check_size _ | Delayed _ ->
       e
 
-and lift_union_in_pair :
-    type a b.
+and lift_union_in_pair : type a b.
     pair_builder ->
     Encoding.Kind.t ->
     a Encoding.t ->

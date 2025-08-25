@@ -403,7 +403,8 @@ end = struct
             Table.fold
               (fun key
                    {unrequested_peers; requested_peers; next_request; delay}
-                   (actions, min_next_request, acc) ->
+                   (actions, min_next_request, acc)
+                 ->
                 if Ptime.is_later next_request ~than:now then
                   ( actions,
                     compute_new_min_next_request min_next_request next_request,

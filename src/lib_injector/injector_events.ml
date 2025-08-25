@@ -28,7 +28,8 @@ open Injector_sigs
 
 module Make
     (Parameters : PARAMETERS)
-    (Tags : module type of Injector_tags.Make (Parameters.Tag))
+    (Tags :
+      module type of Injector_tags.Make (Parameters.Tag))
         (Operation : PARAM_OPERATION)
         (Inj_operation : INJECTOR_OPERATION with type operation = Operation.t)
         (Request : module type of Request (Parameters.Tag) (Inj_operation)) =

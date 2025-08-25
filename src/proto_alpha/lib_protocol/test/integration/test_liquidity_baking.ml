@@ -388,7 +388,8 @@ let liquidity_baking_balance_update () =
   let*? credits =
     List.fold_left_e
       (fun accum
-           (Alpha_context.Receipt.Balance_update_item (balance, update, _)) ->
+           (Alpha_context.Receipt.Balance_update_item (balance, update, _))
+         ->
         match Alpha_context.Receipt.token_of_balance balance with
         | Tez -> (
             match update with

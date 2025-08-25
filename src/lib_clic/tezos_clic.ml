@@ -205,8 +205,8 @@ let print_label ppf = function
   | {long; short = None} -> Format.fprintf ppf "--%s" long
   | {long; short = Some short} -> Format.fprintf ppf "-%c --%s" short long
 
-let rec print_options_detailed :
-    type ctx a. Format.formatter -> (a, ctx) options -> unit =
+let rec print_options_detailed : type ctx a.
+    Format.formatter -> (a, ctx) options -> unit =
  fun ppf -> function
   | Arg {label; placeholder; doc; env; _} ->
       let doc =
@@ -307,8 +307,8 @@ let rec has_args : type a ctx. (a, ctx) arg -> bool = function
   | Pair (speca, specb) -> has_args speca || has_args specb
   | Map {spec; _} -> has_args spec
 
-let rec print_options_brief :
-    type ctx a. Format.formatter -> (a, ctx) arg -> unit =
+let rec print_options_brief : type ctx a.
+    Format.formatter -> (a, ctx) arg -> unit =
  fun ppf -> function
   | DefArg {label; placeholder; _} ->
       Format.fprintf ppf "[@{<opt>%a <%s>@}]" print_label label placeholder
@@ -352,47 +352,53 @@ let print_commandline ppf (highlights, options, args) =
   in
   let rec print : type a ctx. Format.formatter -> (a, ctx) params -> unit =
    fun ppf -> function
-    | Stop -> Format.fprintf ppf "@{<full>%a@}" print_options_brief options
-    | Seq (n, _, _) when not (has_args options) ->
-        Format.fprintf ppf "[@{<arg>%s@}...]" n
-    | Seq (n, _, _) ->
-        Format.fprintf
-          ppf
-          "[@{<arg>%s@}...]@{<full>@ %a@}"
-          n
-          print_options_brief
-          options
-    | NonTerminalSeq (n, _, _, suffix, Stop) when not (has_args options) ->
-        Format.fprintf ppf "[@{<arg>%s@}...]@ @{<kwd>%a@}" n print_suffix suffix
-    | NonTerminalSeq (n, _, _, suffix, next) ->
-        Format.fprintf
-          ppf
-          "[@{<arg>%s@}...]@ @{<kwd>%a@}@ %a@{<full>@ %a@}"
-          n
-          print_suffix
-          suffix
-          print
-          next
-          print_options_brief
-          options
-    | Prefix (n, Stop) when not (has_args options) ->
-        Format.fprintf ppf "@{<kwd>%a@}" (print_highlight highlights) n
-    | Prefix (n, next) ->
-        Format.fprintf
-          ppf
-          "@{<kwd>%a@}@ %a"
-          (print_highlight highlights)
-          n
-          print
-          next
-    | Param (n, _, _, Stop) when not (has_args options) ->
-        Format.fprintf ppf "@{<arg>%s@}" n
-    | Param (n, _, _, next) -> Format.fprintf ppf "@{<arg>%s@}@ %a" n print next
+     | Stop -> Format.fprintf ppf "@{<full>%a@}" print_options_brief options
+     | Seq (n, _, _) when not (has_args options) ->
+         Format.fprintf ppf "[@{<arg>%s@}...]" n
+     | Seq (n, _, _) ->
+         Format.fprintf
+           ppf
+           "[@{<arg>%s@}...]@{<full>@ %a@}"
+           n
+           print_options_brief
+           options
+     | NonTerminalSeq (n, _, _, suffix, Stop) when not (has_args options) ->
+         Format.fprintf
+           ppf
+           "[@{<arg>%s@}...]@ @{<kwd>%a@}"
+           n
+           print_suffix
+           suffix
+     | NonTerminalSeq (n, _, _, suffix, next) ->
+         Format.fprintf
+           ppf
+           "[@{<arg>%s@}...]@ @{<kwd>%a@}@ %a@{<full>@ %a@}"
+           n
+           print_suffix
+           suffix
+           print
+           next
+           print_options_brief
+           options
+     | Prefix (n, Stop) when not (has_args options) ->
+         Format.fprintf ppf "@{<kwd>%a@}" (print_highlight highlights) n
+     | Prefix (n, next) ->
+         Format.fprintf
+           ppf
+           "@{<kwd>%a@}@ %a"
+           (print_highlight highlights)
+           n
+           print
+           next
+     | Param (n, _, _, Stop) when not (has_args options) ->
+         Format.fprintf ppf "@{<arg>%s@}" n
+     | Param (n, _, _, next) ->
+         Format.fprintf ppf "@{<arg>%s@}@ %a" n print next
   in
   Format.fprintf ppf "@{<commandline>%a@}" print args
 
-let rec print_params_detailed :
-    type a b ctx. (b, ctx) arg -> Format.formatter -> (a, ctx) params -> unit =
+let rec print_params_detailed : type a b ctx.
+    (b, ctx) arg -> Format.formatter -> (a, ctx) params -> unit =
  fun spec ppf -> function
   | Stop -> Format.fprintf ppf "@{<details>%a@}" print_options_detailed spec
   | Seq (n, desc, _) ->
@@ -429,8 +435,7 @@ let contains_params_args : type a ctx. (a, ctx) params -> (_, ctx) arg -> bool =
   in
   help params
 
-let print_command :
-    type ctx.
+let print_command : type ctx.
     ?prefix:(Format.formatter -> unit -> unit) ->
     ?highlights:string list ->
     Format.formatter ->
@@ -1103,8 +1108,7 @@ let with_env ~default ?env k =
       match Sys.getenv_opt env with Some s -> k env s | None -> return default)
 
 (* Argument parsing *)
-let rec parse_arg :
-    type a ctx.
+let rec parse_arg : type a ctx.
     ?command:_ command ->
     (a, ctx) arg ->
     occurrence list StringMap.t ->
@@ -1208,8 +1212,7 @@ let rec parse_arg :
 
 let empty_args_dict = StringMap.empty
 
-let rec make_arities_dict :
-    type a b.
+let rec make_arities_dict : type a b.
     (a, b) arg ->
     (int list * string) StringMap.t ->
     (int list * string) StringMap.t =
@@ -1283,7 +1286,8 @@ let make_args_dict_consume_for_global_options ?command spec args =
               (* ArgDefSwitch is the only option with an arity
                  different to [0; 1], which is not allowed in global
                  argument. `make_args_dict_consume_for_global_options`
-                 is only used to produce global arg for now. *))
+                 is only used to produce global arg for now. *)
+              )
           | None -> tzfail (Unknown_option (arg, None))
         else return (acc, args)
   in
@@ -1408,8 +1412,7 @@ let exec (type ctx)
     (Command {options = options_spec; params = spec; handler; conv; _} as
      command) (ctx : ctx) params args_dict =
   let open Lwt_result_syntax in
-  let rec exec :
-      type ctx a.
+  let rec exec : type ctx a.
       int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t =
    fun i ctx spec cb params ->
     match (spec, params) with
@@ -1495,13 +1498,13 @@ and 'ctx tree =
   | TNonTerminalSeq : 'ctx non_terminal_seq_level -> 'ctx tree
   | TEmpty : 'ctx tree
 
-let insert_in_dispatch_tree :
-    type ctx. ?enable_argDefSwitch:bool -> ctx tree -> ctx command -> ctx tree =
+let insert_in_dispatch_tree : type ctx.
+    ?enable_argDefSwitch:bool -> ctx tree -> ctx command -> ctx tree =
  fun ?(enable_argDefSwitch = false)
      root
      (Command {params; conv; options; _} as command) ->
-  let rec insert_tree :
-      type a ictx. (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
+  let rec insert_tree : type a ictx.
+      (ctx -> ictx) -> ctx tree -> (a, ictx) params -> ctx tree =
    fun conv t c ->
     let insert_tree t c = insert_tree conv t c in
     let rec suffix_to_params suffix next =
@@ -1732,8 +1735,8 @@ let rec remaining_spec : type a ctx. StringSet.t -> (a, ctx) arg -> string list
 
 let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   let arities = make_arities_dict args_spec StringMap.empty in
-  let rec complete_spec :
-      type a. string -> (a, ctx) arg -> string list option tzresult Lwt.t =
+  let rec complete_spec : type a.
+      string -> (a, ctx) arg -> string list option tzresult Lwt.t =
    fun name ->
     let open Lwt_result_syntax in
     function

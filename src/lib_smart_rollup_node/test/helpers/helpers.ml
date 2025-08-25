@@ -99,7 +99,7 @@ let add_l2_genesis_block (node_ctxt : _ Node_context.t) ~boot_sector =
         hash =
           Block_hash.of_hex_exn
             (`Hex
-              "0000000000000000000000000000000000000000000000000000000000000001");
+               "0000000000000000000000000000000000000000000000000000000000000001");
         level = Int32.pred head.level;
       }
   in

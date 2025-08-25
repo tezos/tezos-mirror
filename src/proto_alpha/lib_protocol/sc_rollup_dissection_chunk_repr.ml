@@ -278,7 +278,8 @@ let () =
     (fun ( dissection_start_tick,
            dissection_stop_tick,
            chunk_start_tick,
-           chunk_stop_tick ) ->
+           chunk_stop_tick )
+       ->
       Dissection_edge_ticks_mismatch
         {
           dissection_start_tick;

@@ -141,7 +141,8 @@ struct
   let value_t =
     let open Type in
     variant "value" (fun n c _ -> function
-      | `Node h -> n h | `Contents h -> c (h, ()))
+      | `Node h -> n h
+      | `Contents h -> c (h, ()))
     |~ case1 "node" node_key_t (fun k -> `Node k)
     |~ case1 "contents" (pair contents_key_t unit) (fun (h, ()) -> `Contents h)
     |~ case1 "contents-x" (pair contents_key_t unit) (fun (h, ()) ->
@@ -412,7 +413,8 @@ struct
       let value_t =
         let open Type in
         variant "Portable.value" (fun c n -> function
-          | `Contents h -> c (h, ()) | `Node h -> n h)
+          | `Contents h -> c (h, ())
+          | `Node h -> n h)
         |~ case1 "contents" (pair hash_t unit) (fun (h, ()) -> `Contents h)
         |~ case1 "node" hash_t (fun h -> `Node h)
         |> sealv
@@ -460,10 +462,9 @@ struct
 
   let () =
     Printexc.register_printer (function
-        | Dangling_hash {context; hash} ->
-            Some
-              (Fmt.str "%s: encountered dangling hash %a" context pp_hash hash)
-        | _ -> None)
+      | Dangling_hash {context; hash} ->
+          Some (Fmt.str "%s: encountered dangling hash %a" context pp_hash hash)
+      | _ -> None)
 end
 
 module Make_generic_key_v2
@@ -491,10 +492,11 @@ module Store_generic_key
     (C : Contents.Store)
     (S : Indexable.S)
     (H : Hash.S with type t = S.hash)
-    (V : S_generic_key
-           with type t = S.value
-            and type contents_key = C.Key.t
-            and type node_key = S.Key.t) =
+    (V :
+      S_generic_key
+        with type t = S.value
+         and type contents_key = C.Key.t
+         and type node_key = S.Key.t) =
 struct
   module Val = struct
     include V
@@ -850,12 +852,12 @@ module V1 (N : Generic_key.S) = struct
         | None, Some n -> `Node n
         | _ -> failwith "invalid node")
     |+ field "contents" (option Contents_key.t) (function
-           | `Contents x -> Some x
-           | _ -> None)
+         | `Contents x -> Some x
+         | _ -> None)
     |+ field "metadata" (option unit) (fun _ -> None)
     |+ field "node" (option Node_key.t) (function
-           | `Node n -> Some n
-           | _ -> None)
+         | `Node n -> Some n
+         | _ -> None)
     |> sealr
 
   let t : t Type.t =

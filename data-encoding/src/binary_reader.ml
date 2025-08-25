@@ -385,8 +385,7 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
       let e = f () in
       read_rec e state
 
-and read_variable_pair :
-    type left right.
+and read_variable_pair : type left right.
     left Encoding.t -> right Encoding.t -> state -> left * right =
  fun e1 e2 state ->
   match (Encoding.classify e1, Encoding.classify e2) with
@@ -408,8 +407,8 @@ and read_variable_pair :
   | `Variable, (`Variable | `Dynamic) -> assert false
 (* Should be rejected by [Encoding.Kind.combine] *)
 
-and read_variable_list :
-    type a. read_error -> int -> a Encoding.t -> state -> a list * int =
+and read_variable_list : type a.
+    read_error -> int -> a Encoding.t -> state -> a list * int =
  fun error max_length e state ->
   let rec loop max_length acc size =
     if state.remaining_bytes = 0 then (List.rev acc, size)

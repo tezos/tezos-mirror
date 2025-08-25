@@ -302,7 +302,7 @@ end = struct
     let consts = Array.concat cs.cs in
     List.for_all
       (* [k] is the current wire (defined by its index) that has to be range-checked. *)
-        (fun (k, l) ->
+      (fun (k, l) ->
         (* [i] corresponds to the position in the wire that has to be range checked. *)
         List.for_all
           (fun (i, nb_bits) ->
@@ -430,7 +430,8 @@ end = struct
     in
     List.fold_left
       (fun (acc_wires, selectors_map, advice_map, pad)
-           {wires; sels; precomputed_advice; label} ->
+           {wires; sels; precomputed_advice; label}
+         ->
         ignore label ;
         let acc_wires = add_wires wires acc_wires in
         let selectors_map = add_selectors sels selectors_map pad in

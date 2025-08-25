@@ -152,15 +152,14 @@ module Context = struct
     | _ -> err_implementation_mismatch ~expected:c.impl_name ~got:t.impl_name
 
   let find_tree
-      (Context
-        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key =
+      (Context {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
+      key =
     let open Lwt_syntax in
     let+ t = Ops.find_tree ctxt key in
     Option.map (fun tree -> Tree {ops; tree; equality_witness; impl_name}) t
 
   let list
-      (Context
-        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
+      (Context {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
       ?offset ?length key =
     let open Lwt_syntax in
     let+ ls = Ops.list ctxt ?offset ?length key in
@@ -174,9 +173,8 @@ module Context = struct
   let length (Context {ops = (module Ops); ctxt; _}) key = Ops.length ctxt key
 
   let fold ?depth
-      (Context
-        {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
-      ~order ~init ~f =
+      (Context {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _})
+      key ~order ~init ~f =
     Ops.fold ?depth ctxt key ~order ~init ~f:(fun k v acc ->
         let v = Tree {ops; tree = v; equality_witness; impl_name} in
         f k v acc)
@@ -193,7 +191,8 @@ module Context = struct
 
     let of_value
         (Context
-          {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v =
+           {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) v
+        =
       let open Lwt_syntax in
       let+ tree = Ops.Tree.of_value ctxt v in
       Tree {ops; tree; equality_witness; impl_name}
@@ -205,7 +204,7 @@ module Context = struct
 
     let empty
         (Context
-          {ops = (module Ops) as ops; equality_witness; ctxt; impl_name; _}) =
+           {ops = (module Ops) as ops; equality_witness; ctxt; impl_name; _}) =
       let empty = Ops.Tree.empty ctxt in
       Tree {ops; equality_witness; tree = empty; impl_name}
 
@@ -257,8 +256,7 @@ module Context = struct
       Ops.Tree.length tree key
 
     let fold ?depth
-        (Tree
-          {ops = (module Ops) as ops; tree = t; equality_witness; impl_name})
+        (Tree {ops = (module Ops) as ops; tree = t; equality_witness; impl_name})
         key ~order ~init ~f =
       Ops.Tree.fold ?depth t key ~order ~init ~f:(fun k v acc ->
           let v = Tree {ops; tree = v; equality_witness; impl_name} in

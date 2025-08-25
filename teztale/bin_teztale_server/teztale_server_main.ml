@@ -120,11 +120,11 @@ let with_data encoding body f =
 
 let with_caqti_error ~logger x f =
   Lwt.bind x (function
-      | Ok x -> f x
-      | Error e ->
-          let body = Caqti_error.show e in
-          Lib_teztale_base.Log.error logger (fun () -> body) ;
-          Cohttp_lwt_unix.Server.respond_error ~body ())
+    | Ok x -> f x
+    | Error e ->
+        let body = Caqti_error.show e in
+        Lib_teztale_base.Log.error logger (fun () -> body) ;
+        Cohttp_lwt_unix.Server.respond_error ~body ())
 
 let reply_json0 ?(status = `OK) ?headers:(headers_arg = []) body =
   let headers =
@@ -547,8 +547,8 @@ let attesting_rights_callback =
                 let rights =
                   List.map
                     (fun Lib_teztale_base.Consensus_ops.
-                           {address; first_slot; power} ->
-                      (level, first_slot, power, address))
+                           {address; first_slot; power}
+                       -> (level, first_slot, power, address))
                     rights
                 in
                 without_cache
@@ -619,7 +619,8 @@ let block_callback =
           {delegate; timestamp; reception_times; round; hash; predecessor; _},
         cycle_info,
         (attestations, preattestations),
-        baking_rights ) ->
+        baking_rights )
+    ->
     let open Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Lwt_result_syntax in
     let level = Int32.of_string (Re.Group.get g 1) in
     let out =
@@ -795,8 +796,8 @@ let operations_callback ~logger conf db_pool g source operations =
                    in
                    List.map
                      (fun (op :
-                            Lib_teztale_base.Consensus_ops.received_operation) ->
-                       format_block_op level delegate op.op)
+                            Lib_teztale_base.Consensus_ops.received_operation)
+                        -> format_block_op level delegate op.op)
                      operations)
                  operations
           in
@@ -889,7 +890,8 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun Lib_teztale_base.Data.Delegate_operations.
-                   {delegate; first_slot; attesting_power; _} ->
+                   {delegate; first_slot; attesting_power; _}
+               ->
               Db.exec
                 Sql_requests.maybe_insert_attesting_right
                 (level, first_slot, attesting_power, delegate))
@@ -910,10 +912,12 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun Lib_teztale_base.Data.Delegate_operations.
-                   {delegate; operations; _} ->
+                   {delegate; operations; _}
+               ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Delegate_operations.
-                       {hash; kind; round; _} ->
+                       {hash; kind; round; _}
+                   ->
                   Db.exec
                     Sql_requests.maybe_insert_operation
                     ( ( level,
@@ -930,7 +934,8 @@ let import_callback ~logger conf db_pool g data =
             (fun block ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Block.
-                       {source; application_time; validation_time} ->
+                       {source; application_time; validation_time}
+                   ->
                   Db.exec
                     Sql_requests.insert_received_block
                     ( application_time,
@@ -944,13 +949,16 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun Lib_teztale_base.Data.Delegate_operations.
-                   {delegate; operations; _} ->
+                   {delegate; operations; _}
+               ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Delegate_operations.
-                       {kind; round; mempool_inclusion; _} ->
+                       {kind; round; mempool_inclusion; _}
+                   ->
                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                     (fun Lib_teztale_base.Data.Delegate_operations.
-                           {source; reception_time; errors} ->
+                           {source; reception_time; errors}
+                       ->
                       Db.exec
                         Sql_requests.insert_received_operation
                         ( ( reception_time,
@@ -966,10 +974,12 @@ let import_callback ~logger conf db_pool g data =
         let* () =
           Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
             (fun Lib_teztale_base.Data.Delegate_operations.
-                   {delegate; operations; _} ->
+                   {delegate; operations; _}
+               ->
               Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                 (fun Lib_teztale_base.Data.Delegate_operations.
-                       {kind; round; block_inclusion; _} ->
+                       {kind; round; block_inclusion; _}
+                   ->
                   Tezos_lwt_result_stdlib.Lwtreslib.Bare.List.iter_es
                     (fun block_hash ->
                       Db.exec
@@ -1185,7 +1195,16 @@ let routes :
       fun _g ~logger ~conf ~admins:_ ~users:_ db_pool _header _meth _body ->
         get_head conf ~logger db_pool );
     ( Re.str "/metrics",
-      fun _g ~logger:_ ~conf:_ ~admins:_ ~users:_ _db_pool _header _meth _body ->
+      fun _g
+          ~logger:_
+          ~conf:_
+          ~admins:_
+          ~users:_
+          _db_pool
+          _header
+          _meth
+          _body
+        ->
         let open Lwt.Syntax in
         let* data = Prometheus.CollectorRegistry.(collect default) in
         let body =

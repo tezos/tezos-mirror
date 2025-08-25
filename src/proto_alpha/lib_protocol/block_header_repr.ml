@@ -77,7 +77,8 @@ let contents_encoding =
              seed_nonce_hash;
              proof_of_work_nonce;
              per_block_votes = {liquidity_baking_vote; adaptive_issuance_vote};
-           } ->
+           }
+         ->
         ( payload_hash,
           payload_round,
           proof_of_work_nonce,
@@ -89,7 +90,8 @@ let contents_encoding =
              proof_of_work_nonce,
              seed_nonce_hash,
              liquidity_baking_vote,
-             adaptive_issuance_vote ) ->
+             adaptive_issuance_vote )
+         ->
         {
           payload_hash;
           payload_round;
@@ -119,7 +121,8 @@ let contents_encoding =
              seed_nonce_hash;
              proof_of_work_nonce;
              per_block_votes;
-           } ->
+           }
+         ->
         ( payload_hash,
           payload_round,
           proof_of_work_nonce,
@@ -129,7 +132,8 @@ let contents_encoding =
              payload_round,
              proof_of_work_nonce,
              seed_nonce_hash,
-             per_block_votes ) ->
+             per_block_votes )
+         ->
         {
           payload_hash;
           payload_round;

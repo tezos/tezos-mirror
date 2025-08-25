@@ -133,19 +133,20 @@ exception
 
 let () =
   Printexc.register_printer (function
-      | Not_enough_outputs {got; expected} ->
-          Some
-            (Printf.sprintf
-               "Function did return less values (%s) than expected (%s)"
-               (Unsigned.Size_t.to_string got)
-               (Unsigned.Size_t.to_string got))
-      | _ -> None)
+    | Not_enough_outputs {got; expected} ->
+        Some
+          (Printf.sprintf
+             "Function did return less values (%s) than expected (%s)"
+             (Unsigned.Size_t.to_string got)
+             (Unsigned.Size_t.to_string got))
+    | _ -> None)
 
 let unpack_outputs results outputs =
   let got = Value_vector.length outputs in
   let expected = Function_type.num_results results in
-  if (* Fewer outputs than expected. *)
-     Unsigned.Size_t.compare got expected < 0
+  if
+    (* Fewer outputs than expected. *)
+    Unsigned.Size_t.compare got expected < 0
   then raise (Not_enough_outputs {got; expected}) ;
   let rec go : type r x. r Function_type.results -> int -> (r -> x) -> x =
    fun params index k ->

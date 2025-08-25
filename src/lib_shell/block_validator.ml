@@ -521,8 +521,7 @@ let on_preapplication_request w
 
 let metrics = Shell_metrics.Block_validator.init Name.base
 
-let on_request :
-    type r request_error.
+let on_request : type r request_error.
     t -> (r, request_error) Request.t -> (r, request_error) result Lwt.t =
  fun w r ->
   Prometheus.Counter.inc_one metrics.worker_counters.worker_request_count ;
@@ -598,8 +597,7 @@ let check_and_quit_on_context_errors errors =
     return_unit
   else return_unit
 
-let on_completion :
-    type a b.
+let on_completion : type a b.
     t -> (a, b) Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
  fun _w request v st ->
   let open Lwt_syntax in

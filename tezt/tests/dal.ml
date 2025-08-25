@@ -8071,7 +8071,10 @@ let scenario_tutorial_dal_baker =
       let blocks_per_cycle =
         JSON.(proto_params |-> "blocks_per_cycle" |> as_int)
       in
-      let num_cycles = 7 (* Value specified in tutorial *) in
+      let num_cycles =
+        7
+        (* Value specified in tutorial *)
+      in
       Log.info
         "Bake for %d cycles for %s to be a baker"
         num_cycles
@@ -9049,7 +9052,8 @@ let check_participation_and_rewards node ~expected_assigned_shards
   in
   let dal_balance_updates =
     extract_dal_balance_updates balance_updates
-    |> (* sort them for proper regression output *)
+    |>
+    (* sort them for proper regression output *)
     List.sort (fun e1 e2 ->
         match (e1, e2) with
         | `Got (d1, a1, _), `Got (d2, a2, _)
@@ -9526,9 +9530,9 @@ let test_inject_accusation_aggregated_attestation nb_attesting_tz4 protocol
     bake_for
       ~delegates:
         (`For
-          (List.map
-             (fun account -> account.Account.public_key_hash)
-             all_other_delegates))
+           (List.map
+              (fun account -> account.Account.public_key_hash)
+              all_other_delegates))
       client
   in
   (* Let's wait 2 levels for the block to be finalized. *)
@@ -9623,7 +9627,7 @@ let test_producer_attester (protocol : Protocol.t)
     bake_for
       ~delegates:
         (`For
-          (map_alias Constant.[bootstrap1; bootstrap3; bootstrap4; bootstrap5]))
+           (map_alias Constant.[bootstrap1; bootstrap3; bootstrap4; bootstrap5]))
       client
   in
   log_step "Bake a few more blocks before calling RPC" ;
@@ -10954,7 +10958,8 @@ let test_dal_rewards_distribution protocol dal_parameters cryptobox node client
        Tenderbake attestation rewards.
      - the participation RPC's result is aligned with the first check. *)
   List.iter
-    (fun (account, bal1, bal2, tb_participation, sufficient_dal_participation) ->
+    (fun (account, bal1, bal2, tb_participation, sufficient_dal_participation)
+       ->
       let dal_participation =
         List.assoc account bootstrap_accounts_participation
       in

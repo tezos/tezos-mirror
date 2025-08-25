@@ -211,10 +211,10 @@ let catch_o ?(catch_only = fun _ -> true) f =
 
 let catch_s ?(catch_only = fun _ -> true) f =
   Lwt.try_bind f Lwt.return_some (function
-      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
-      | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)
+    | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+    | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)
 
 let catch_os ?(catch_only = fun _ -> true) f =
   Lwt.catch f (function
-      | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
-      | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)
+    | (Stack_overflow | Out_of_memory) as e -> Lwt.reraise e
+    | e -> if catch_only e then Lwt.return_none else Lwt.reraise e)

@@ -77,8 +77,8 @@ let step context input expected_outputs =
           (1.1 *. Milliseconds.Span.to_float_s context.heartbeat_span)
   in
   List.iter (function
-      | Out_p2p o -> Queue.push o context.expected_p2p_output
-      | Out_app o -> Queue.push o context.expected_app_output)
+    | Out_p2p o -> Queue.push o context.expected_p2p_output
+    | Out_app o -> Queue.push o context.expected_app_output)
   @@ List.rev expected_outputs ;
   unit
 

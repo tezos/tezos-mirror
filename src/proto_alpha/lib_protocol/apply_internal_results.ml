@@ -286,7 +286,8 @@ module Internal_operation = struct
                  paid_storage_size_diff,
                  allocated_destination_contract,
                  lazy_storage_diff,
-                 address_registry_diff ) ->
+                 address_registry_diff )
+             ->
             Transaction_to_contract_result
               {
                 storage;
@@ -312,7 +313,7 @@ module Internal_operation = struct
             | _ -> None)
           (function
             | consumed_gas, ticket_receipt ->
-                Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
+            Transaction_to_sc_rollup_result {consumed_gas; ticket_receipt});
       ]
 
   let transaction_case =
@@ -433,7 +434,8 @@ module Internal_operation = struct
           | _ -> None);
         select =
           (function
-          | Internal_operation_contents (Event _ as op) -> Some op | _ -> None);
+          | Internal_operation_contents (Event _ as op) -> Some op
+          | _ -> None);
         proj =
           (function
           | Event {ty; tag; payload} ->

@@ -1458,7 +1458,8 @@ let test_kernel_reboot_gen ?hooks ~version ~reboots ~expected_reboots
       reboot_counter_key_length
       reboot_counter_in_memory_offset
       (* `kernel_run` function *)
-      data_offset_start (* == reboot_key's offset *)
+      data_offset_start
+      (* == reboot_key's offset *)
       reboot_key_length
       reboot_flag_in_memory_offset
       reboots

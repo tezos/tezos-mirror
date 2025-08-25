@@ -64,7 +64,8 @@ let reveal_activation_level_encoding =
            dal_page;
            dal_parameters;
            dal_attested_slots_validity_lag;
-         } ->
+         }
+       ->
       ( blake2B,
         metadata,
         dal_page,
@@ -74,7 +75,8 @@ let reveal_activation_level_encoding =
            metadata,
            dal_page,
            dal_parameters,
-           dal_attested_slots_validity_lag ) ->
+           dal_attested_slots_validity_lag )
+       ->
       {
         blake2B;
         metadata;
@@ -110,7 +112,8 @@ let encoding =
                number_of_slots;
                cryptobox_parameters;
              };
-         } ->
+         }
+       ->
       ( minimal_block_delay,
         delay_increment_per_round,
         ( challenge_window_in_blocks,
@@ -130,7 +133,8 @@ let encoding =
            ( feature_enable,
              attestation_lag,
              number_of_slots,
-             cryptobox_parameters ) ) ->
+             cryptobox_parameters ) )
+       ->
       {
         minimal_block_delay;
         delay_increment_per_round;

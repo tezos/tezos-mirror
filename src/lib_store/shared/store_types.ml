@@ -249,7 +249,8 @@ module Protocol_levels = struct
                predecessor_block_metadata_hash;
                predecessor_ops_metadata_hash;
                parents_contexts;
-             } ->
+             }
+           ->
           ( author,
             message,
             test_chain_status,
@@ -263,7 +264,8 @@ module Protocol_levels = struct
                data_merkle_root,
                predecessor_block_metadata_hash,
                predecessor_ops_metadata_hash,
-               parents_contexts ) ->
+               parents_contexts )
+           ->
           {
             author;
             message;

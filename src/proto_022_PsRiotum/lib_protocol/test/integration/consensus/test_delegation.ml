@@ -302,8 +302,8 @@ let delegate_to_bootstrap_by_origination ~fee () =
     (* originated contract has not been created *)
     let*! err = Context.Contract.balance (I i) orig_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
   else
     (* bootstrap is delegate, fee + origination burn have been debited *)
     let* i = Incremental.add_operation i op in
@@ -545,8 +545,8 @@ let test_unregistered_delegate_key_init_origination ~fee () =
     (* originated contract has not been created *)
     let*! err = Context.Contract.balance (I i) orig_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Delegation when delegate key is not assigned. Delegate account is
     initialized. If fees are higher than initial credit (10 tez),
@@ -599,8 +599,8 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
     (* implicit contract has no delegate *)
     let*! err = Context.Contract.delegate (I i) impl_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Re-delegation when a delegate key was already assigned. If fees
     are higher than initial credit (10 tez), [Balance_too_low] is
@@ -701,8 +701,8 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
     in
     let*! err = Context.Contract.balance (I i) orig_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Same as [unregistered_delegate_key_init_delegation] and credits
     the amount [amount] of the implicit contract. *)
@@ -759,8 +759,8 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
     in
     let*! err = Context.Contract.delegate (I i) impl_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Same as in [unregistered_delegate_key_switch_delegation] and
     credits the amount [amount] to the implicit contract. *)
@@ -875,8 +875,8 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     in
     let*! err = Context.Contract.balance (I i) orig_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Same as in [unregistered_delegate_key_init_delegation] but credits
     then debits the amount [amount] to the implicit contract. *)
@@ -945,8 +945,8 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
     in
     let*! err = Context.Contract.delegate (I i) impl_contract in
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
 
 (** Same as in [unregistered_delegate_key_switch_delegation] but
     credits then debits the amount [amount] to the implicit contract. *)
@@ -1143,8 +1143,8 @@ let test_valid_delegate_registration_init_delegation_credit amount () =
   let*! err = Context.Contract.delegate (B b) delegator in
   let* () =
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
   in
   (* delegation to the newly registered key *)
   let* delegation =
@@ -1250,8 +1250,8 @@ let test_valid_delegate_registration_init_delegation_credit_debit amount () =
   let*! err = Context.Contract.delegate (B b) delegator in
   let* () =
     Assert.error ~loc:__LOC__ err (function
-        | Tezos_rpc.Context.Not_found _ -> true
-        | _ -> false)
+      | Tezos_rpc.Context.Not_found _ -> true
+      | _ -> false)
   in
   (* delegation to the newly registered key *)
   let* delegation =

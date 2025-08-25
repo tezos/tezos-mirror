@@ -370,8 +370,8 @@ let test_attestation_with_consensus_key () =
   let*! res = Block.bake ~operation:attestation b in
   let* () =
     Assert.proto_error ~loc:__LOC__ res (function
-        | Operation.Invalid_signature -> true
-        | _ -> false)
+      | Operation.Invalid_signature -> true
+      | _ -> false)
   in
   let* attestation = Op.attestation ~attesting_slot:{slot; consensus_pkh} b in
   let* (_good_block : Block.t) = Block.bake ~operation:attestation b in

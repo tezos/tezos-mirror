@@ -98,7 +98,8 @@ module Info = struct
              private_node;
              local_metadata;
              remote_metadata;
-           } ->
+           }
+         ->
         ( incoming,
           peer_id,
           id_point,
@@ -114,7 +115,8 @@ module Info = struct
              announced_version,
              private_node,
              local_metadata,
-             remote_metadata ) ->
+             remote_metadata )
+         ->
         {
           incoming;
           peer_id;

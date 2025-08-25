@@ -223,8 +223,8 @@ module Block = struct
     Shared.use chain_state (fun {validated_blocks; _} ->
         Option.value ~default:Lwt.return_false
         @@ Block_lru_cache.bind validated_blocks hash (function
-               | None -> Lwt.return_false
-               | Some _ -> Lwt.return_true))
+             | None -> Lwt.return_false
+             | Some _ -> Lwt.return_true))
 
   let is_known chain_store hash =
     let open Lwt_syntax in
@@ -368,14 +368,14 @@ module Block = struct
 
   let check_metadata_list ~block_hash ~operations ~ops_metadata =
     fail_unless
-      (List.for_all2
-         ~when_different_lengths:(`X "unreachable")
-         (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
-         operations
-         ops_metadata
-       |> function
-       | Ok b -> b
-       | _ -> assert false)
+      ( List.for_all2
+          ~when_different_lengths:(`X "unreachable")
+          (fun l1 l2 -> Compare.List_lengths.(l1 = l2))
+          operations
+          ops_metadata
+      |> function
+        | Ok b -> b
+        | _ -> assert false )
       (let to_string l =
          Format.asprintf
            "[%a]"

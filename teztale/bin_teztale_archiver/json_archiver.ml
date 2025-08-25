@@ -109,7 +109,8 @@ let add_inclusion_in_block block_hash validators delegate_operations =
     List.fold_left
       (fun (acc, missing)
            Data.Delegate_operations.(
-             {delegate; first_slot; attesting_power; operations} as delegate_ops) ->
+             {delegate; first_slot; attesting_power; operations} as delegate_ops)
+         ->
         match
           List.partition
             (fun op ->
@@ -353,7 +354,8 @@ let dump_received logger path ?unaccurate level received_ops =
             (fun (acc, missing)
                  Data.Delegate_operations.(
                    {delegate; first_slot; attesting_power; operations} as
-                   delegate_ops) ->
+                   delegate_ops)
+               ->
               match
                 List.partition
                   (fun (right, _) ->
@@ -396,7 +398,8 @@ let dump_received logger path ?unaccurate level received_ops =
                                       op = {hash; kind; round};
                                       errors;
                                       reception_time;
-                                    } ->
+                                    }
+                                ->
                                {
                                  hash;
                                  kind;

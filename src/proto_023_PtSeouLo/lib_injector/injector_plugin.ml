@@ -175,15 +175,15 @@ module Proto_client = struct
   let operation_contents_status (type kind)
       (contents : kind Apply_results.contents_result_list) ~index :
       operation_status tzresult =
-    let rec rec_status :
-        type kind. int -> kind Apply_results.contents_result_list -> _ =
+    let rec rec_status : type kind.
+        int -> kind Apply_results.contents_result_list -> _ =
      fun n -> function
-      | Apply_results.Single_result _ when n <> 0 ->
-          error_with "No operation with index %d" index
-      | Single_result result -> Ok (operation_result_status result)
-      | Cons_result (result, _rest) when n = 0 ->
-          Ok (operation_result_status result)
-      | Cons_result (_result, rest) -> rec_status (n - 1) rest
+       | Apply_results.Single_result _ when n <> 0 ->
+           error_with "No operation with index %d" index
+       | Single_result result -> Ok (operation_result_status result)
+       | Cons_result (result, _rest) when n = 0 ->
+           Ok (operation_result_status result)
+       | Cons_result (_result, rest) -> rec_status (n - 1) rest
     in
     rec_status index contents
 

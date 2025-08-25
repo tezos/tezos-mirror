@@ -655,21 +655,21 @@ let rec process_daemon ({node_ctxt; _} as state) =
   in
   let loop () = daemonize state in
   protect loop ~on_error:(function
-      | ( Rollup_node_errors.(
-            ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
-            | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
-            | Disagree_with_cemented _ | Disagree_with_commitment _
-            | Inconsistent_inbox _ ))
-        | Purpose.Missing_operators _ )
-        :: _ as e ->
-          fatal_error_exit e
-      | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
-          handle_preimage_not_found e
-      | Rollup_node_errors.Exit_bond_recovered_bailout_mode :: [] ->
-          let*! () = Daemon_event.exit_bailout_mode () in
-          let*! _ = Lwt_exit.exit_and_wait 0 in
-          return_unit
-      | e -> error_to_degraded_mode e)
+    | ( Rollup_node_errors.(
+          ( Lost_game _ | Unparsable_boot_sector _ | Invalid_genesis_state _
+          | Operator_not_in_whitelist | Cannot_patch_pvm_of_public_rollup
+          | Disagree_with_cemented _ | Disagree_with_commitment _
+          | Inconsistent_inbox _ ))
+      | Purpose.Missing_operators _ )
+      :: _ as e ->
+        fatal_error_exit e
+    | Rollup_node_errors.Could_not_open_preimage_file _ :: _ as e ->
+        handle_preimage_not_found e
+    | Rollup_node_errors.Exit_bond_recovered_bailout_mode :: [] ->
+        let*! () = Daemon_event.exit_bailout_mode () in
+        let*! _ = Lwt_exit.exit_and_wait 0 in
+        return_unit
+    | e -> error_to_degraded_mode e)
 
 let run ({node_ctxt; configuration; plugin; _} as state) =
   let open Lwt_result_syntax in

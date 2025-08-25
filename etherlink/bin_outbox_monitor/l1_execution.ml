@@ -302,7 +302,8 @@ let mark_executed_outbox_messages db ~(l1_node_rpc : Retrier_context.t)
     List.iter_s
       (fun ( (w : Db.withdrawal_log),
              (_outbox_index : Db.outbox_index),
-             (execution : Db.execution_short_info) ) ->
+             (execution : Db.execution_short_info) )
+         ->
         Event.(emit executed_withdrawal)
           ( w.withdrawal.withdrawal_id,
             w.withdrawal.amount,

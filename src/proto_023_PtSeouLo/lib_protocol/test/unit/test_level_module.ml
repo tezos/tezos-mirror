@@ -213,7 +213,8 @@ let test_level_from_raw () =
                  level_position,
                  cycle,
                  cycle_position,
-                 expected_commitment ) ) ->
+                 expected_commitment ) )
+           ->
           let raw_level =
             Raw_level_repr.of_int32_exn (Int32.of_int input_level)
           in

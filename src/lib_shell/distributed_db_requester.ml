@@ -63,9 +63,8 @@ module Make_raw
     (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
     (Memory_table : Hashtbl.SeededS with type key := Hash.t)
     (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
-    (Probe : Requester.PROBE
-               with type key := Hash.t
-                and type value := Disk_table.value) :
+    (Probe :
+      Requester.PROBE with type key := Hash.t and type value := Disk_table.value) :
   EXTENDED_REQUESTER
     with type key = Hash.t
      and type value = Disk_table.value

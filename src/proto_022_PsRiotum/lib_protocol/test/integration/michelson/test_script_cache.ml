@@ -85,8 +85,8 @@ let find ctxt addr =
   | Some (script, Ex_script ir) ->
       return (ctxt, identifier, script, Ex_script ir)
 
-let value_as_int :
-    type a ac. (a, ac) Script_typed_ir.ty -> a -> Script_int.z Script_int.num =
+let value_as_int : type a ac.
+    (a, ac) Script_typed_ir.ty -> a -> Script_int.z Script_int.num =
  fun ty v -> match ty with Int_t -> v | _ -> Stdlib.failwith "value_as_int"
 
 let path = project_root // Filename.dirname __FILE__

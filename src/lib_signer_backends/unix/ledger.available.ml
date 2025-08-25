@@ -148,7 +148,7 @@ module Ledger_commands = struct
     match res with
     | Error
         (Ledgerwallet.Transport.AppError
-          {status = Ledgerwallet.Status.Incorrect_length_for_ins; msg}) ->
+           {status = Ledgerwallet.Status.Incorrect_length_for_ins; msg}) ->
         tzfail (Ledger_msg_chunk_too_long msg)
     | Error err -> tzfail (LedgerError err)
     | Ok v -> return v
@@ -290,7 +290,7 @@ module Ledger_commands = struct
       | Error
           (LedgerError
              (AppError
-               {status = Ledgerwallet.Status.Referenced_data_not_found; _})
+                {status = Ledgerwallet.Status.Referenced_data_not_found; _})
           :: _) ->
           return `No_baking_authorized
       | Error _ as e -> Lwt.return e
@@ -1246,11 +1246,11 @@ let baking_commands group =
              ~placeholder:"HWM"
              ~default:"ASK-LEDGER"
              (parameter (fun _ -> function
-                | "ASK-LEDGER" -> return_none
-                | s -> (
-                    try return_some (Int32.of_string s)
-                    with _ ->
-                      failwith "Parameter %S should be a 32-bits integer" s)))
+               | "ASK-LEDGER" -> return_none
+               | s -> (
+                   try return_some (Int32.of_string s)
+                   with _ ->
+                     failwith "Parameter %S should be a 32-bits integer" s)))
          in
          args3
            (default_arg
@@ -1259,23 +1259,24 @@ let baking_commands group =
               ~placeholder:"ID"
               ~default:"ASK-NODE"
               (parameter (fun _ -> function
-                 | "ASK-NODE" -> return `Ask_node
-                 | s -> (
-                     try return (`Int32 (Int32.of_string s))
-                     with _ -> (
-                       try return (`Chain_id (Chain_id.of_b58check_exn s))
-                       with _ ->
-                         failwith
-                           "Parameter %S should be a 32-bits integer or a \
-                            Tezos_crypto.Base58 chain-id"
-                           s)))))
+                | "ASK-NODE" -> return `Ask_node
+                | s -> (
+                    try return (`Int32 (Int32.of_string s))
+                    with _ -> (
+                      try return (`Chain_id (Chain_id.of_b58check_exn s))
+                      with _ ->
+                        failwith
+                          "Parameter %S should be a 32-bits integer or a \
+                           Tezos_crypto.Base58 chain-id"
+                          s)))))
            (hwm_arg "main")
            (hwm_arg "test"))
         (prefixes ["setup"; "ledger"; "to"; "bake"; "for"]
         @@ Ledger_uri.ledger_uri_or_alias_param @@ stop)
         (fun (chain_id_opt, main_hwm_opt, test_hwm_opt)
              ledger_uri
-             (cctxt : Client_context.full) ->
+             (cctxt : Client_context.full)
+           ->
           use_ledger_or_fail
             ~ledger_uri
             ~filter:Filter.is_baking
@@ -1347,8 +1348,7 @@ let baking_commands group =
               in
               let* pk =
                 Ledger_commands.public_key_returning_instruction
-                  (`Setup
-                    (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
+                  (`Setup (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
                   hidapi
                   curve
                   path

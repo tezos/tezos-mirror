@@ -297,22 +297,24 @@ end = struct
 
   let () =
     Printexc.register_printer (function
-        | Missing_file_for_free_variable {free_var} ->
-            let error =
-              Format.asprintf
-                "Bug found: variable %a is not associated to any dataset. \
-                 Please report.\n"
-                Free_variable.pp
-                free_var
-            in
-            Some error
-        | _ -> None)
+      | Missing_file_for_free_variable {free_var} ->
+          let error =
+            Format.asprintf
+              "Bug found: variable %a is not associated to any dataset. Please \
+               report.\n"
+              Free_variable.pp
+              free_var
+          in
+          Some error
+      | _ -> None)
 
   type providers_map = Solver.Solved.t list Fv_map.t
 
   let is_ambiguous =
     Fv_map.exists (fun _ -> function
-      | [] -> assert false (* impossible *) | [_] -> false | _ -> true)
+      | [] -> assert false (* impossible *)
+      | [_] -> false
+      | _ -> true)
 
   let warn_ambiguities =
     let open Format in

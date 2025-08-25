@@ -46,7 +46,10 @@ module Selected_distribution_for_cycle = struct
     let* ctxt =
       Storage.Stake.Selected_distribution_for_cycle.init ctxt cycle stakes
     in
-    let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
+    let size =
+      1
+      (* that's symbolic: 1 cycle = 1 entry *)
+    in
     let*? ctxt = Cache.update ctxt id (Some (stakes, size)) in
     return ctxt
 

@@ -58,9 +58,8 @@ module Maker (K : Brassaia.Hash.S) = struct
   type key = K.t
 
   module Make
-      (Val : Brassaia_pack.Pack_value.S
-               with type hash := K.t
-                and type key := K.t) =
+      (Val :
+        Brassaia_pack.Pack_value.S with type hash := K.t and type key := K.t) =
   struct
     (* TODO(craigfe): We could use the keys to skip traversal of the map on
        lookup. This wasn't done originally due to complications with implementing

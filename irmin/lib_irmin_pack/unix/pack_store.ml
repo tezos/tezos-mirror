@@ -36,9 +36,10 @@ module Make_without_close_checks
     (Dict : Dict.S)
     (Dispatcher : Dispatcher.S with module Fm = Fm)
     (Hash : Irmin.Hash.S with type t = Fm.Index.key)
-    (Val : Pack_value.Persistent
-             with type hash := Hash.t
-              and type key := Hash.t Pack_key.t)
+    (Val :
+      Pack_value.Persistent
+        with type hash := Hash.t
+         and type key := Hash.t Pack_key.t)
     (Errs : Io_errors.S with module Io = Fm.Io) =
 struct
   module Tbl = Table (Hash)
@@ -515,9 +516,10 @@ module Make
     (Dict : Dict.S)
     (Dispatcher : Dispatcher.S with module Fm = Fm)
     (Hash : Irmin.Hash.S with type t = Fm.Index.key)
-    (Val : Pack_value.Persistent
-             with type hash := Hash.t
-              and type key := Hash.t Pack_key.t)
+    (Val :
+      Pack_value.Persistent
+        with type hash := Hash.t
+         and type key := Hash.t Pack_key.t)
     (Errs : Io_errors.S with module Io = Fm.Io) =
 struct
   module Inner =
