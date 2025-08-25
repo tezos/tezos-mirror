@@ -298,11 +298,13 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     })
                 }
             }
-            _ => {
-                return Err(ApplyOperationError::UnSupportedOperation(format!(
-                    "Internal operation {:?} is not supported",
-                    operation
+            mir::ast::Operation::SetDelegate(set_delegate) => {
+                return Err(ApplyOperationError::UnSupportedSetDelegate(format!(
+                    "{set_delegate:?}"
                 )));
+            }
+            mir::ast::Operation::Emit(emit) => {
+                return Err(ApplyOperationError::UnSupportedEmit(format!("{emit:?}")));
             }
         };
         log!(

@@ -184,8 +184,10 @@ pub enum ApplyOperationError {
     Transfer(#[from] TransferError),
     #[error("Origination error: {0}")]
     Origination(#[from] OriginationError),
-    #[error("Unsupported operation: {0}")]
-    UnSupportedOperation(String),
+    #[error("Smart-Contract emitted an event, which is unsupported: {0}")]
+    UnSupportedEmit(String),
+    #[error("Set delegate operation is unsupported: {0}")]
+    UnSupportedSetDelegate(String),
     #[error("Internal operation nonce overflow due to {0}")]
     InternalOperationNonceOverflow(String),
 }
