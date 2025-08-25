@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: MIT
 
 use revm::{
-    primitives::{Address, Bytes, B256, KECCAK_EMPTY, U256},
+    primitives::{hex::FromHex, Address, Bytes, FixedBytes, B256, KECCAK_EMPTY, U256},
     state::{AccountInfo, Bytecode},
 };
 use tezos_evm_runtime::runtime::Runtime;
@@ -17,10 +17,18 @@ use tezos_smart_rollup_storage::storage::Storage;
 
 use super::code::CodeStorage;
 use crate::{
-    helpers::legacy::FaDepositWithProxy,
-    helpers::storage::{
-        concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
-        read_u64_le_default, write_u256_le,
+    custom,
+    helpers::{
+        legacy::FaDepositWithProxy,
+        storage::{
+            concat, read_b256_be_default, read_u256_be_default, read_u256_le_default,
+            read_u64_le_default, write_u256_le,
+        },
+    },
+    precompiles::constants::{
+        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
+        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
     },
     Error,
 };
@@ -83,6 +91,18 @@ pub fn account_path(address: &Address) -> Result<OwnedPath, Error> {
 pub fn path_from_u256(index: &U256) -> Result<OwnedPath, Error> {
     let path_string = format!("/{}", hex::encode::<[u8; 32]>(index.to_be_bytes()));
     OwnedPath::try_from(path_string).map_err(|err| Error::Custom(err.to_string()))
+}
+
+#[inline]
+fn bytecode_from_hex_str(hex_str: &str) -> Result<Bytecode, Error> {
+    Ok(Bytecode::new_legacy(
+        Bytes::from_hex(hex_str).map_err(custom)?,
+    ))
+}
+
+struct CodeInfo {
+    code: Option<Bytecode>,
+    code_hash: FixedBytes<32>,
 }
 
 struct Ticket {
@@ -193,12 +213,47 @@ impl StorageAccount {
         }
     }
 
+    fn fetch_optimised_code_info(&self, host: &impl Runtime) -> Result<CodeInfo, Error> {
+        let raw_path = self.path.to_string();
+
+        let code_info = if raw_path.contains(&WITHDRAWAL_SOL_ADDR.to_string()[2..]) {
+            CodeInfo {
+                code: Some(bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT)?),
+                code_hash: WITHDRAWAL_SOL_CODE_HASH,
+            }
+        } else if raw_path.contains(&FA_WITHDRAWAL_SOL_ADDR.to_string()[2..]) {
+            CodeInfo {
+                code: Some(bytecode_from_hex_str(FA_WITHDRAWAL_SOL_CONTRACT)?),
+                code_hash: FA_WITHDRAWAL_SOL_CODE_HASH,
+            }
+        } else if raw_path.contains(&Address::ZERO.to_string()[2..]) {
+            CodeInfo {
+                code: Some(bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT)?),
+                code_hash: INTERNAL_FORWARDER_SOL_CODE_HASH,
+            }
+        } else {
+            let code_hash = self.code_hash(host)?;
+            let code = if code_hash.as_slice() == KECCAK_EMPTY.as_slice() {
+                Some(Bytecode::new())
+            } else {
+                self.code(host)?
+            };
+            CodeInfo { code, code_hash }
+        };
+
+        Ok(code_info)
+    }
+
     pub fn info(&self, host: &impl Runtime) -> Result<AccountInfo, Error> {
+        // Optimisation: we can infer some fields of the account info based on the
+        // targeted address.
+        let CodeInfo { code, code_hash } = self.fetch_optimised_code_info(host)?;
+
         Ok(AccountInfo {
             balance: self.balance(host)?,
             nonce: self.nonce(host)?,
-            code_hash: self.code_hash(host)?,
-            code: self.code(host)?,
+            code_hash,
+            code,
         })
     }
 
@@ -380,4 +435,92 @@ pub type WorldStateHandler = Storage<StorageAccount>;
 pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
     Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH)
         .map_err(|err| Error::Custom(err.to_string()))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::precompiles::constants::{
+        FA_WITHDRAWAL_SOL_ADDR, FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
+        WITHDRAWAL_SOL_ADDR, WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+    };
+
+    use super::{bytecode_from_hex_str, CodeInfo, StorageAccount};
+    use revm::{
+        primitives::{Address, FixedBytes, KECCAK_EMPTY},
+        state::Bytecode,
+    };
+    use tezos_evm_runtime::runtime::{MockKernelHost, Runtime};
+
+    fn check_account_code_info_fetching(
+        host: &impl Runtime,
+        storage_account: StorageAccount,
+        code_voucher: Bytecode,
+        code_hash_voucher: FixedBytes<32>,
+    ) {
+        let CodeInfo { code, code_hash } =
+            storage_account.fetch_optimised_code_info(host).unwrap();
+
+        assert_eq!(Some(code_voucher), code);
+        assert_eq!(code_hash_voucher, code_hash);
+    }
+
+    #[test]
+    fn check_withdrawal_code_info_fetching() {
+        let host = MockKernelHost::default();
+        let storage_account = StorageAccount::from_address(&WITHDRAWAL_SOL_ADDR).unwrap();
+        let code_voucher = bytecode_from_hex_str(WITHDRAWAL_SOL_CONTRACT).unwrap();
+
+        check_account_code_info_fetching(
+            &host,
+            storage_account,
+            code_voucher,
+            WITHDRAWAL_SOL_CODE_HASH,
+        );
+    }
+
+    #[test]
+    fn check_fa_withdrawal_code_info_fetching() {
+        let host = MockKernelHost::default();
+        let storage_account =
+            StorageAccount::from_address(&FA_WITHDRAWAL_SOL_ADDR).unwrap();
+        let code_voucher = bytecode_from_hex_str(FA_WITHDRAWAL_SOL_CONTRACT).unwrap();
+
+        check_account_code_info_fetching(
+            &host,
+            storage_account,
+            code_voucher,
+            FA_WITHDRAWAL_SOL_CODE_HASH,
+        );
+    }
+
+    #[test]
+    fn check_internal_forwarder_code_info_fetching() {
+        let host = MockKernelHost::default();
+        let storage_account = StorageAccount::from_address(&Address::ZERO).unwrap();
+        let code_voucher =
+            bytecode_from_hex_str(INTERNAL_FORWARDER_SOL_CONTRACT).unwrap();
+
+        check_account_code_info_fetching(
+            &host,
+            storage_account,
+            code_voucher,
+            INTERNAL_FORWARDER_SOL_CODE_HASH,
+        );
+    }
+
+    #[test]
+    fn check_empty_account_code_info_fetching() {
+        let host = MockKernelHost::default();
+        let storage_account =
+            StorageAccount::from_address(&Address(FixedBytes::new([1; 20]))).unwrap();
+        let code_voucher = Bytecode::new();
+
+        check_account_code_info_fetching(
+            &host,
+            storage_account,
+            code_voucher,
+            KECCAK_EMPTY,
+        );
+    }
 }
