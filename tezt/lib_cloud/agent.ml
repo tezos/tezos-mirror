@@ -45,6 +45,11 @@ module Configuration = struct
         Lwt.return (Some registry_uri)
     | Octez_release _, `Local_orchestrator_local_agents -> return None
 
+  let docker_image_name docker_image =
+    match (docker_image, Env.mode) with
+    | Types.Agent_configuration.Gcp {alias}, _ -> alias
+    | Octez_release _, _ -> "octez"
+
   let gen_name =
     let cpt = ref (-1) in
     fun () ->

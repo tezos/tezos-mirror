@@ -554,6 +554,21 @@ module Ssh_host = struct
               string_of_int (base_port + (i * range)),
               string_of_int (base_port + ((i + 1) * range) - 1) )
           in
+          let* registry_uri_opt =
+            Agent.Configuration.registry_uri_of_docker_image
+              configuration.vm.docker_image
+          in
+
+          let image_name =
+            Agent.Configuration.docker_image_name configuration.vm.docker_image
+          in
+          let* () =
+            match registry_uri_opt with
+            | Some registry_uri ->
+                Docker.pull ~runner ~image_name ~registry_uri ()
+                |> Process.check
+            | None -> return ()
+          in
           let* () =
             Docker.run
               ~runner
