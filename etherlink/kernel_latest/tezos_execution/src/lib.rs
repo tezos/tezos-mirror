@@ -164,14 +164,22 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     all_internal_receipts: &mut Vec<InternalOperationSum>,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
-    for (index, internal_op) in internal_operations.into_iter().enumerate() {
+    for (index, OperationInfo { operation, counter }) in
+        internal_operations.into_iter().enumerate()
+    {
         log!(
             host,
             Debug,
-            "Executing internal operation: {:?}",
-            internal_op
+            "Executing internal operation {:?} with counter {:?}",
+            operation,
+            counter
         );
-        let internal_receipt = match internal_op.operation {
+        let nonce = counter
+            .try_into()
+            .map_err(|err: std::num::TryFromIntError| {
+                ApplyOperationError::InternalOperationNonceOverflow(err.to_string())
+            })?;
+        let internal_receipt = match operation {
             mir::ast::Operation::TransferTokens(TransferTokens {
                 param,
                 destination_address,
@@ -193,7 +201,6 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         value: encoded_value,
                     }),
                 };
-                let nonce = 0; // Invalid Nonce for now
                 if failed.is_some() {
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -237,7 +244,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
             _ => {
                 return Err(ApplyOperationError::UnSupportedOperation(format!(
                     "Internal operation {:?} is not supported",
-                    internal_op.operation
+                    operation
                 )));
             }
         };
