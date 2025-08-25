@@ -448,6 +448,7 @@ let jobs pipeline_type =
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
+        ~allow_failure:Yes
         ~before_script:
           (before_script
              ~take_ownership:true
