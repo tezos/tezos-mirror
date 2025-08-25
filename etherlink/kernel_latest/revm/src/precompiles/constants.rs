@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2025 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -20,6 +21,24 @@ pub(crate) const FA_WITHDRAWAL_SOL_ADDR: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
 ]));
 
+pub(crate) const WITHDRAWAL_SOL_CODE_HASH: FixedBytes<32> = FixedBytes::new([
+    0x69, 0xfa, 0xbe, 0x88, 0xef, 0x0b, 0xb4, 0xb6, 0xad, 0x13, 0xc5, 0x5f, 0xa2, 0xc6,
+    0x4b, 0xef, 0xd2, 0xc3, 0x5d, 0x5f, 0xa1, 0x43, 0xe5, 0xd6, 0x80, 0x03, 0xe3, 0xfb,
+    0xad, 0x33, 0x41, 0xfb,
+]);
+
+pub(crate) const FA_WITHDRAWAL_SOL_CODE_HASH: FixedBytes<32> = FixedBytes::new([
+    0x26, 0xf2, 0xed, 0x87, 0x5f, 0x3f, 0x6d, 0x6c, 0x8a, 0x22, 0xc6, 0x27, 0x01, 0xc7,
+    0xa0, 0xa0, 0xd1, 0x5f, 0xcd, 0x71, 0x17, 0xd7, 0xe8, 0x5e, 0x9b, 0x57, 0x4e, 0xd9,
+    0x6e, 0x22, 0x27, 0x91,
+]);
+
+pub(crate) const INTERNAL_FORWARDER_SOL_CODE_HASH: FixedBytes<32> = FixedBytes::new([
+    0x63, 0xdb, 0xb2, 0x6e, 0x3a, 0x5e, 0xe3, 0x3c, 0x29, 0x40, 0x51, 0x52, 0x0b, 0x1a,
+    0x14, 0x79, 0x99, 0xa0, 0x3d, 0x04, 0x9d, 0xaa, 0x64, 0x45, 0x70, 0x5f, 0x4e, 0x88,
+    0xe1, 0x15, 0xa8, 0xe3,
+]);
+
 pub(crate) const SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS: Address =
     Address(FixedBytes::new([
         0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -40,3 +59,42 @@ pub(crate) const CUSTOMS: [Address; 4] = [
 
 // TODO: Properly estimate execution cost for table and outbox precompiles
 pub(crate) const PRECOMPILE_BASE_COST: u64 = 2000;
+
+#[cfg(test)]
+mod test {
+    use super::{
+        FA_WITHDRAWAL_SOL_CODE_HASH, FA_WITHDRAWAL_SOL_CONTRACT,
+        INTERNAL_FORWARDER_SOL_CODE_HASH, INTERNAL_FORWARDER_SOL_CONTRACT,
+        WITHDRAWAL_SOL_CODE_HASH, WITHDRAWAL_SOL_CONTRACT,
+    };
+
+    use crate::helpers::storage::bytes_hash;
+    use revm::{
+        primitives::{hex::FromHex, Bytes, FixedBytes},
+        state::Bytecode,
+    };
+
+    fn check_code_hash_validity(code: &str, code_hash_voucher: FixedBytes<32>) {
+        let bytecode = Bytecode::new_legacy(Bytes::from_hex(code).unwrap());
+        let code_hash = bytes_hash(bytecode.original_byte_slice());
+        assert_eq!(code_hash, code_hash_voucher)
+    }
+
+    #[test]
+    fn check_withdrawal_sol_code_hash() {
+        check_code_hash_validity(WITHDRAWAL_SOL_CONTRACT, WITHDRAWAL_SOL_CODE_HASH)
+    }
+
+    #[test]
+    fn check_fa_withdrawal_sol_code_hash() {
+        check_code_hash_validity(FA_WITHDRAWAL_SOL_CONTRACT, FA_WITHDRAWAL_SOL_CODE_HASH)
+    }
+
+    #[test]
+    fn check_internal_forwarder_sol_code_hash() {
+        check_code_hash_validity(
+            INTERNAL_FORWARDER_SOL_CONTRACT,
+            INTERNAL_FORWARDER_SOL_CODE_HASH,
+        )
+    }
+}
