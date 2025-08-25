@@ -324,6 +324,7 @@ type configuration = {
   network : Network.t;
   snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
+  without_dal : bool;
   maintenance_delay : int;
   migration_offset : int option;
   ppx_profiling : bool;
@@ -350,6 +351,7 @@ let configuration_encoding =
            network;
            snapshot;
            stresstest;
+           without_dal;
            maintenance_delay;
            migration_offset;
            ppx_profiling;
@@ -358,25 +360,27 @@ let configuration_encoding =
            fixed_random_seed;
          }
        ->
-      ( stake,
-        network,
-        snapshot,
-        stresstest,
-        maintenance_delay,
-        migration_offset,
-        ppx_profiling,
-        ppx_profiling_backends,
-        signing_delay,
+      ( ( stake,
+          network,
+          snapshot,
+          stresstest,
+          without_dal,
+          maintenance_delay,
+          migration_offset,
+          ppx_profiling,
+          ppx_profiling_backends,
+          signing_delay ),
         fixed_random_seed ))
-    (fun ( stake,
-           network,
-           snapshot,
-           stresstest,
-           maintenance_delay,
-           migration_offset,
-           ppx_profiling,
-           ppx_profiling_backends,
-           signing_delay,
+    (fun ( ( stake,
+             network,
+             snapshot,
+             stresstest,
+             without_dal,
+             maintenance_delay,
+             migration_offset,
+             ppx_profiling,
+             ppx_profiling_backends,
+             signing_delay ),
            fixed_random_seed )
        ->
       {
@@ -384,6 +388,7 @@ let configuration_encoding =
         network;
         snapshot;
         stresstest;
+        without_dal;
         maintenance_delay;
         migration_offset;
         ppx_profiling;
@@ -391,37 +396,45 @@ let configuration_encoding =
         signing_delay;
         fixed_random_seed;
       })
-    (obj10
-       (req "stake" (list int31))
-       (req "network" network_encoding)
-       (req "snapshot" Snapshot_helpers.encoding)
-       (opt "stresstest" stresstest_encoding)
-       (dft
-          "maintenance_delay"
-          int31
-          Scenarios_cli.Layer1_default.default_maintenance_delay)
-       (opt "migration_offset" int31)
-       (dft
-          "ppx_profiling"
-          bool
-          Scenarios_cli.Layer1_default.default_ppx_profiling)
-       (dft
-          "ppx_profiling_backends"
-          (list string)
-          Scenarios_cli.Layer1_default.default_ppx_profiling_backends)
-       (opt "Signing_delay" (tup2 float float))
-       (opt "fixed_random_seed" int31))
+    (merge_objs
+       (obj10
+          (req "stake" (list int31))
+          (req "network" network_encoding)
+          (req "snapshot" Snapshot_helpers.encoding)
+          (opt "stresstest" stresstest_encoding)
+          (dft
+             "without_dal"
+             bool
+             Scenarios_cli.Layer1_default.default_without_dal)
+          (dft
+             "maintenance_delay"
+             int31
+             Scenarios_cli.Layer1_default.default_maintenance_delay)
+          (opt "migration_offset" int31)
+          (dft
+             "ppx_profiling"
+             bool
+             Scenarios_cli.Layer1_default.default_ppx_profiling)
+          (dft
+             "ppx_profiling_backends"
+             (list string)
+             Scenarios_cli.Layer1_default.default_ppx_profiling_backends)
+          (opt "Signing_delay" (tup2 float float)))
+       (obj1 (opt "fixed_random_seed" int31)))
 
 type bootstrap = {
   agent : Agent.t;
   node : Node.t;
   node_p2p_endpoint : string;
+  dal_node : Dal_node.t option;
+  dal_node_p2p_endpoint : string option;
   client : Client.t;
 }
 
 type baker = {
   agent : Agent.t;
   node : Node.t;
+  dal_node : Dal_node.t option;
   baker : Agnostic_baker.t;
   accounts : baker_account list;
 }
@@ -442,7 +455,7 @@ type 'network t = {
 }
 
 let init_baker_i i (configuration : configuration) cloud ~peers
-    (accounts : baker_account list) (agent, node, name) =
+    dal_node_p2p_endpoint (accounts : baker_account list) (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
     toplog "init_baker: Initialize node" ;
@@ -456,6 +469,30 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
       (agent, node, name)
+  in
+  let* dal_node =
+    if configuration.without_dal then Lwt.return_none
+    else
+      let name = name ^ "-dal-node" in
+      let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
+      let attester_profiles =
+        List.map (fun {delegate; _} -> delegate.public_key_hash) accounts
+      in
+      let* () =
+        Dal_node.init_config
+          ~expected_pow:26.
+          ~attester_profiles
+          ~peers:[dal_node_p2p_endpoint |> Option.get]
+          dal_node
+      in
+      let* () =
+        Dal_node.Agent.run
+          ~event_level:`Notice
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          dal_node
+      in
+      Lwt.return_some dal_node
   in
   let* baker =
     toplog "init_baker: Initialize agnostic baker" ;
@@ -477,6 +514,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       | None -> env
       | Some (min, max) -> signing_delay_env min max env
     in
+    let dal_node_rpc_endpoint = Option.map Dal_node.as_rpc_endpoint dal_node in
     let* agnostic_baker =
       Agnostic_baker.Agent.init
         ~env
@@ -485,6 +523,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
           (List.map
              (fun ({consensus; _} : baker_account) -> consensus.public_key_hash)
              accounts)
+        ?dal_node_rpc_endpoint
         ~ppx_profiling:configuration.ppx_profiling
         ~client
         ~allow_fixed_random_seed:
@@ -498,7 +537,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
     toplog "init_baker: %s is ready!" name ;
     Lwt.return agnostic_baker
   in
-  Lwt.return {agent; node; baker; accounts}
+  Lwt.return {agent; node; dal_node; baker; accounts}
 
 let fund_stresstest_accounts ~source client =
   Client.stresstest_fund_accounts_from_source
@@ -541,6 +580,32 @@ let init_network ~peers (configuration : configuration) cloud teztale
       ~migration_offset:configuration.migration_offset
       resources
   in
+  let* dal_node =
+    if configuration.without_dal then Lwt.return_none
+    else
+      let disable_shard_validation = true in
+      let* dal_node =
+        Dal_node.Agent.create
+          ~name:"bootstrap-dal-node"
+          cloud
+          agent
+          ~node
+          ~disable_shard_validation
+      in
+      let* () =
+        Dal_node.init_config ~expected_pow:26. ~bootstrap_profile:true dal_node
+      in
+      let* () = Node.wait_for_ready node in
+      let* () =
+        Dal_node.Agent.run
+          ~event_level:`Notice
+          ~disable_shard_validation
+          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          dal_node
+      in
+      Lwt.return_some dal_node
+  in
   toplog "init_network: Add a Teztale archiver" ;
   let* () =
     Teztale.add_archiver
@@ -551,7 +616,14 @@ let init_network ~peers (configuration : configuration) cloud teztale
       ~node_port:(Node.rpc_port node)
   in
   let bootstrap =
-    {agent; node; node_p2p_endpoint = Node.point_str node; client}
+    {
+      agent;
+      node;
+      node_p2p_endpoint = Node.point_str node;
+      dal_node;
+      dal_node_p2p_endpoint = Option.map Dal_node.point_str dal_node;
+      client;
+    }
   in
   Lwt.return (bootstrap, delegates, rich_account)
 
@@ -780,7 +852,14 @@ let init ~(configuration : configuration) cloud next_agent =
       (fun i accounts ->
         let ((_, node, _) as agent) = List.nth baker_agents i in
         let peers = List.filter (( <> ) (Node.point_str node)) peers in
-        init_baker_i i ~peers configuration cloud accounts agent)
+        init_baker_i
+          i
+          ~peers
+          configuration
+          cloud
+          bootstrap.dal_node_p2p_endpoint
+          accounts
+          agent)
       distribution
   in
   let* stresstesters =
@@ -1026,6 +1105,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     in
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in
+    let without_dal = Cli.without_dal in
     let migration_offset = Cli.migration_offset in
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
@@ -1038,6 +1118,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
           stake = Option.value ~default:conf.stake stake;
           network = Option.value ~default:conf.network network;
           snapshot = Option.value ~default:conf.snapshot snapshot;
+          without_dal = conf.without_dal || without_dal;
           stresstest =
             (if stresstest <> None then stresstest else conf.stresstest);
           maintenance_delay =
@@ -1065,6 +1146,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
               ~default:Scenarios_cli.Layer1_default.default_maintenance_delay
               maintenance_delay;
           snapshot = Option.get snapshot;
+          without_dal;
           migration_offset;
           ppx_profiling;
           ppx_profiling_backends;
