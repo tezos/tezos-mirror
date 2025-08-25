@@ -1004,21 +1004,18 @@ let yes_wallet_exe = Uses.path Constant.yes_wallet
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : configuration =
     let stake = Cli.stake in
-    if stake = Some [] then Test.fail "stake parameter can not be empty" ;
     let network = Cli.network in
     let stresstest =
       Option.map (fun (tps, seed) -> {tps; seed}) Cli.stresstest
     in
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in
-    if snapshot = Some Snapshot_helpers.No_snapshot then
-      Test.fail "snapshot parameter can not be empty" ;
     let migration_offset = Cli.migration_offset in
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
-    match Cli.config with
-    | Some filename ->
-        let conf = parse_conf configuration_encoding filename in
+    match Tezt_cloud_cli.scenario_specific_json with
+    | Some ("LAYER1", json) ->
+        let conf = Data_encoding.Json.destruct configuration_encoding json in
         {
           stake = Option.value ~default:conf.stake stake;
           network = Option.value ~default:conf.network network;
@@ -1035,7 +1032,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
             (if ppx_profiling_backends <> [] then ppx_profiling_backends
              else conf.ppx_profiling_backends);
         }
-    | None ->
+    | _ ->
         {
           stake = Option.get stake;
           network = Option.get network;
@@ -1050,6 +1047,10 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ppx_profiling_backends;
         }
   in
+  if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
+  if configuration.snapshot = Snapshot_helpers.No_snapshot then
+    Test.fail "snapshot parameter cannot be empty" ;
+
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =

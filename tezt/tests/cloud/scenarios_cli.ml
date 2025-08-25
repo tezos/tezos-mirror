@@ -731,8 +731,6 @@ module type Layer1 = sig
 
   val vms_config : string option
 
-  val config : string option
-
   val ppx_profiling : bool
 
   val ppx_profiling_backends : string list
@@ -877,14 +875,6 @@ module Layer1 () = struct
         "Select the backends used by the profiler, bypassing the defaults \
          selection: always `txt` and `json`, and also `prometheus` if \
          `--prometheus` and `opentelemetry` if `--opentelemetry`."
-      ()
-
-  let config =
-    Clap.optional_string
-      ~section
-      ~long:"config"
-      ~description:
-        "JSON file optionally describing options for the test scenario"
       ()
 end
 
