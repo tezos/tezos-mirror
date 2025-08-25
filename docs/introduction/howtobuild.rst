@@ -18,11 +18,22 @@ You can either build all the executables, as illustrated below, or only a subset
 
 and then do:
 
-.. literalinclude:: compile-sources.sh
+.. literalinclude:: compile-sources-setup.sh
   :language: shell
   :start-after: [install packages]
-  :end-before: [test executables]
+  :end-before: [get sources]
 
+
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [get sources]
+  :end-before: [end init opam]
+
+
+.. literalinclude:: compile-sources.sh
+  :language: shell
+  :start-after: [make build-deps]
+  :end-before: [test executables]
 .. warning::
 
   If you rerun the procedure above in an already cloned repository, typically by restarting from ``git checkout $BRANCH`` after upgrading the sources to a new version of Octez, you should do a ``git fetch`` before, to ensure that the tags for the latest release are known to Git. Otherwise, the sources compile perfectly fine but Octez executables may report their version incorrectly (e.g. ``21.2+dev`` instead of ``22.0``).
@@ -47,10 +58,10 @@ additional steps on your side. You can use `rustup
 please avoid installing it from Snapcraft; you can rather follow the
 simple installation process shown below:
 
-.. literalinclude:: compile-sources.sh
+.. literalinclude:: compile-sources-setup.sh
   :language: shell
   :start-after: [install rust]
-  :end-before: [source cargo]
+  :end-before: [get sources]
 
 Once Rust is installed, note that your ``PATH`` environment variable
 (in ``.profile``) may be updated and you will need to restart your session
