@@ -5,7 +5,9 @@ Building Octez from source
 .. _compiling_with_make:
 
 If you plan to contribute to the Octez codebase or if you want to build a version of Octez that is based on the most recent code, the way to go is to set up a complete development environment by cloning the repository and compiling the sources using the provided makefile.
-If you rather want to install prebuilt binaries, refer to :doc:`howtoget`.
+
+Note that setting up a complete development environment requires a powerful machine, and the required resources are increasing in the long run.
+If you are using Octez for production, consider installing forms of prebuilt binaries, refer to :doc:`howtoget`.
 
 You can either build all the executables, as illustrated below, or only a subset of the executables, as detailed in section :ref:`compile_sources`.
 
