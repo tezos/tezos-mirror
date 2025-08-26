@@ -158,3 +158,13 @@ val copy :
   t ->
   source:string ->
   string Lwt.t
+
+(** [scp agent ~is_directory ~source ~destination direction] runs scp to copy a
+    file/directory from or to the agent, depending on the [direction]. *)
+val scp :
+  t ->
+  is_directory:bool ->
+  source:string ->
+  destination:string ->
+  [< `FromRunner | `ToRunner] ->
+  unit Lwt.t
