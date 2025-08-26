@@ -25,6 +25,14 @@ macro_rules! test_b58check {
 // All keys were generated using `octez-client`
 
 test_b58check!(
+    block_hash_decode_encode,
+    BlockHash,
+    "BKiHLREqU3JkXfzEDYAkmmfX48gBDtYhMrpA98s7Aq4SzbUAB6M",
+    "BMa4rETz3gBbgRfTNp1swZL9GbUSSCf2riufwBDav26xEDsEmGe",
+    "BLJWtjDMGwa31xTPsyeTBSCuxzUPBMcXehfXJ4v2aShHm3VYWvm"
+);
+
+test_b58check!(
     kt1_decode_encode,
     ContractKt1Hash,
     "KT18amZmM5W7qDWVt2pH6uj7sCEd3kbzLrHT",

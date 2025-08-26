@@ -42,6 +42,7 @@ macro_rules! bind_hash {
     };
 }
 
+bind_hash!(BlockHash, hash::BlockHash);
 bind_hash!(ContractKt1Hash, hash::ContractKt1Hash);
 bind_hash!(ContractTz1Hash, hash::ContractTz1Hash);
 bind_hash!(ContractTz2Hash, hash::ContractTz2Hash);
