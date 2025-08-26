@@ -93,6 +93,10 @@ let register () =
       (Auto, job_build Build);
       (Manual, job_release_page `test);
     ] ;
+  CI.register_global_publish_release_page_jobs
+    [(Manual, job_release_page `real)] ;
+  CI.register_global_test_publish_release_page_jobs
+    [(Manual, job_release_page `test)] ;
   CI.register_dedicated_release_pipeline
     [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
   CI.register_dedicated_test_release_pipeline
