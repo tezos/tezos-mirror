@@ -61,6 +61,8 @@ FROM base AS full
 # Path where binaries should be stored on the docker container
 ARG BINARIES_DESTINATION_PATH
 COPY ./octez-node $BINARIES_DESTINATION_PATH/octez-node
+COPY ./octez-client $BINARIES_DESTINATION_PATH/octez-client
+COPY ./octez-baker $BINARIES_DESTINATION_PATH/octez-baker
 # Feel free to complete with the binaries you need
 
 #################################################################################
