@@ -256,6 +256,17 @@ module type COMPONENT_API = sig
       It runs in [tezos/tezos]. *)
   val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
 
+  (** Register jobs to be included in the publish release pages pipeline.
+
+      This pipeline is for publishing the updated release pages. *)
+  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
+
+  (** Register jobs to be included in the publish release pages test pipeline.
+
+      This pipeline is for publishing the updated release pages on the test web page. *)
+  val register_global_test_publish_release_page_jobs :
+    (trigger * job) list -> unit
+
   (** Register jobs to be included in the release pipeline of the current component.
 
       This pipeline is for releasing this component separately.
