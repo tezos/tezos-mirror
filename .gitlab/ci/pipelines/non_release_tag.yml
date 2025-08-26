@@ -1250,6 +1250,8 @@ grafazos.release_page:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
+  - eval $(opam env)
+  - sudo apk add aws-cli pandoc
   - ./grafazos/scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
