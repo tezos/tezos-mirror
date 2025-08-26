@@ -1018,6 +1018,7 @@ module Teztale = struct
     agent : Agent.t;
     server : Server.t;
     address : string;
+    artifact_dir : string option;
     mutable archivers : Archiver.t list;
   }
 
@@ -1027,8 +1028,8 @@ module Teztale = struct
 
   let run_server
       ?(path =
-        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ()))) cloud
-      agent =
+        Uses.(path (make ~tag:"codec" ~path:"./octez-teztale-server" ())))
+      ?artifact_dir cloud agent =
     let public_directory = "/tmp/teztale/public" in
     let* () = create_dir public_directory in
     let aliases_filename =
@@ -1057,7 +1058,48 @@ module Teztale = struct
       | None -> "127.0.0.1"
       | Some point -> fst point
     in
-    Lwt.return {agent; server; address; archivers = []}
+    let name = server.conf.name in
+    let metric_name = "service_manager_process_alive" in
+    let on_alive_callback ~alive =
+      Cloud.push_metric
+        cloud
+        ~help:(Format.asprintf "'Process %s is alive'" name)
+        ~typ:`Gauge
+        ~name:metric_name
+        ~labels:
+          [
+            ("agent", Agent.name agent);
+            ("name", name);
+            ("executable", path);
+            ("kind", "alive");
+          ]
+        (if alive then 1.0 else 0.0)
+    in
+    let node = {agent; server; address; artifact_dir; archivers = []} in
+    let on_shutdown =
+      match artifact_dir with
+      | None -> []
+      | Some _dir ->
+          [
+            (fun () ->
+              Lwt_list.iter_s
+                (fun _archiver ->
+                  Log.info
+                    "TODO: Copying archiver configuration and database: %s and \
+                     %s"
+                    server.filenames.conf_filename
+                    server.filenames.db_filename ;
+                  unit)
+                node.archivers);
+          ]
+    in
+    Cloud.service_register
+      ~name
+      ~executable:path
+      ~on_alive_callback
+      ~on_shutdown
+      agent ;
+    Lwt.return node
 
   let wait_server t = Server.wait_for_readiness t.server
 
