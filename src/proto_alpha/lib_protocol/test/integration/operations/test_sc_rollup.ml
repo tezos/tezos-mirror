@@ -2910,7 +2910,7 @@ let test_curfew () =
   let open Lwt_result_syntax in
   let* block, (account1, account2, account3), rollup =
     (* sc_rollup_challenge_window_in_blocks should be at least commitment period *)
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:112 Context.T3
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:150 Context.T3
   in
   let* constants = Context.get_constants (B block) in
   let challenge_window =
@@ -3316,7 +3316,7 @@ let test_conflict_point_on_a_branch () =
 let test_agreeing_stakers_cannot_play () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1351 Context.T2
   in
   let pB_pkh = Account.pkh_of_contract_exn pB in
   (* pA stakes on a whole branch. *)
@@ -3348,7 +3348,7 @@ let test_agreeing_stakers_cannot_play () =
 let test_start_game_on_cemented_commitment () =
   let open Lwt_result_syntax in
   let* block, (pA, pB), rollup =
-    init_and_originate ~sc_rollup_challenge_window_in_blocks:1009 Context.T2
+    init_and_originate ~sc_rollup_challenge_window_in_blocks:1351 Context.T2
   in
   let* constants = Context.get_constants (B block) in
   let pA_pkh = Account.pkh_of_contract_exn pA in
