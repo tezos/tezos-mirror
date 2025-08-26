@@ -367,8 +367,8 @@ Let's try::
   octez-client transfer 1 from alice to bob --dry-run
 
   Fatal error:
-    The operation will burn 0.257 tez which is higher than the configured burn cap (0 tez).
-     Use `--burn-cap 0.257` to emit this operation.
+    The operation will burn 0.06425 tez which is higher than the configured burn cap (0 tez).
+     Use `--burn-cap 0.06425` to emit this operation.
 
 The client asks the node to validate the operation (without sending
 it) and obtains an error.
@@ -378,11 +378,12 @@ Any storage on chain has a cost associated to it which should be
 accounted for either by paying a fee to a baker or by destroying
 (``burning``) some tez.
 This is particularly important to protect the system from spam.
-Because storing an address requires burning 0.257 tez and the client has
+The cost is given by ``origination_size * cost_per_byte``, where the two constants are defined in the protocol's source code (file :src:`default_parameters.ml <src/proto_alpha/lib_parameters/default_parameters.ml>`).
+Because storing an address requires burning 0.06425 tez and the client has
 a default of 0, we need to explicitly set a cap on the amount that we
 allow to burn::
 
-  octez-client transfer 1 from alice to bob --dry-run --burn-cap 0.257
+  octez-client transfer 1 from alice to bob --dry-run --burn-cap 0.06425
 
 This should do it and you should see a rather long receipt being
 produced, here's an excerpt::
@@ -415,7 +416,7 @@ produced, here's an excerpt::
         Balance updates:
           tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ... -ꜩ1
           tz1Rk5HA9SANn3bjo4qMXTZettPjjKMG14Ph ... +ꜩ1
-          tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ... -ꜩ0.257
+          tz1RjtZUVeLhADFHDL8UwDZA6vjWWhojpu5w ... -ꜩ0.06425
 
 The client does a bit of magic to simplify our life and here we see
 that many details were automatically set for us.
@@ -492,7 +493,7 @@ Let's originate our first contract and call it *id*::
 
     octez-client originate contract id transferring 1 from alice \
                  running ./michelson_test_scripts/attic/id.tz \
-                 --init '"hello"' --burn-cap 0.4
+                 --init '"hello"' --burn-cap 0.1
 
 The initial balance is 1 tez, generously provided by user account
 *alice*. The contract stores a Michelson program ``id.tz``
