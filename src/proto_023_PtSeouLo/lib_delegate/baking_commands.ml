@@ -623,10 +623,21 @@ let remote_calls_timeout_arg =
          try return (Q.of_string s)
          with _ -> failwith "remote-calls-timeout expected int or float."))
 
+let allow_signing_delay_arg =
+  Tezos_clic.switch
+    ~long:"allow-signing-delay"
+    ~doc:
+      (Format.sprintf
+         "Allow the use of a signing delay specified with the environment \
+          variable %s for testing purposes. This is insecure and should never \
+          be used in production."
+         Octez_baking_common.Signing_delay.env_var)
+    ()
+
 type baking_mode = Local of {local_data_dir_path : string} | Remote
 
 let baker_args =
-  Tezos_clic.args17
+  Tezos_clic.args18
     pidfile_arg
     node_version_check_bypass_arg
     node_version_allowed_arg
@@ -644,6 +655,7 @@ let baker_args =
     state_recorder_switch_arg
     pre_emptive_forge_time_arg
     remote_calls_timeout_arg
+    allow_signing_delay_arg
 
 (* /*\ DO NOT MODIFY /!\
 
@@ -667,8 +679,11 @@ let run_baker ?(recommend_agnostic_baker = true)
       without_dal,
       state_recorder,
       pre_emptive_forge_time,
-      remote_calls_timeout ) baking_mode sources cctxt =
+      remote_calls_timeout,
+      allow_signing_delay ) baking_mode sources cctxt =
   let open Lwt_result_syntax in
+  Octez_baking_common.Signing_delay.enforce_signing_delay_gating
+    ~allow:allow_signing_delay ;
   Command_run.may_lock_pidfile pidfile @@ fun () ->
   let*! () =
     if recommend_agnostic_baker then Events.(emit recommend_octez_baker ())
