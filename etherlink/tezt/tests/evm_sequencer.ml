@@ -13588,7 +13588,7 @@ let test_eip7702 =
   in
   let* raw_set_eoa = base_tx ~nonce:4 ~authorization:signed_auth in
   let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
-  let* _ = produce_block sequencer in
+  let*@ _ = produce_block sequencer in
   let*@! Transaction.{type_; _} =
     Rpc.get_transaction_receipt ~tx_hash:set_eoa_hash sequencer
   in

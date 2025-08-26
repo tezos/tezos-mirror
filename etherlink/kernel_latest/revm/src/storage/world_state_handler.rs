@@ -196,24 +196,55 @@ impl StorageAccount {
         host: &mut impl Runtime,
         code: Option<Bytecode>,
     ) -> Result<(), Error> {
-        if self.code_exists(host)? {
-            Ok(())
-        } else {
-            let code_hash = match code {
-                // There is nothing to store if there's no code or if the legacy analyzed
-                // bytecode is just the STOP instruction (0x00).
-                None => return Ok(()),
-                Some(Bytecode::LegacyAnalyzed(bytecode))
-                    if bytecode.bytecode() == &Bytes::from_static(&[0]) =>
-                {
-                    return Ok(())
+        let code_hash = match code {
+            // There is nothing to store if there's no code or if the legacy analyzed
+            // bytecode is just the STOP instruction (0x00).
+            None => return Ok(()),
+            Some(Bytecode::LegacyAnalyzed(bytecode))
+                if bytecode.bytecode() == &Bytes::from_static(&[0]) =>
+            {
+                return Ok(())
+            }
+            Some(code) => {
+                if !self.code_exists(host)? {
+                    CodeStorage::add(host, code.original_byte_slice())?
+                } else {
+                    match self.code(host)? {
+                        None => CodeStorage::add(host, code.original_byte_slice())?,
+                        Some(current_code) => {
+                            if code == current_code {
+                                // Nothing to do.
+                                return Ok(());
+                            }
+                            if !code.is_eip7702() {
+                                // Replacement code isn't EIP-7702 and there's actively some
+                                // code under `self` we can't set code.
+                                return Err(Error::Custom(
+                                    "Can't reset code for a non-[EIP-7702] transaction."
+                                        .to_string(),
+                                ));
+                            }
+                            if !current_code.is_eip7702() {
+                                // Current code isn't EIP-7702, it's regular smart contract
+                                // bytecode, we can't reset its code.
+                                return Err(Error::Custom(
+                                    "Can't reset code from a regular smart contract bytecode."
+                                        .to_string(),
+                                ));
+                            }
+                            // If current code is EIP-7702 and the replacement code
+                            // is a re-delegation (also EIP-7702) then we delete the
+                            // current code before adding the new one.
+                            CodeStorage::delete(host, &self.code_hash(host)?)?;
+                            CodeStorage::add(host, code.original_byte_slice())?
+                        }
+                    }
                 }
-                Some(code) => CodeStorage::add(host, code.original_byte_slice())?,
-            };
-            let code_hash_bytes: [u8; 32] = code_hash.into();
-            let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
-            Ok(host.store_write_all(&code_hash_path, &code_hash_bytes)?)
-        }
+            }
+        };
+        let code_hash_bytes: [u8; 32] = code_hash.into();
+        let code_hash_path = concat(&self.path, &CODE_HASH_PATH)?;
+        Ok(host.store_write_all(&code_hash_path, &code_hash_bytes)?)
     }
 
     fn fetch_optimised_code_info(&self, host: &impl Runtime) -> Result<CodeInfo, Error> {
