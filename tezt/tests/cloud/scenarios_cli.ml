@@ -719,7 +719,7 @@ module type Layer1 = sig
 
   val stake : int list option
 
-  val stresstest : (string * string * int * int) option
+  val stresstest : (int * int) option
 
   val default_maintenance_delay : int
 
@@ -734,6 +734,10 @@ module type Layer1 = sig
   val vms_config : string option
 
   val config : string option
+
+  val ppx_profiling : bool
+
+  val ppx_profiling_backends : string list
 end
 
 module Layer1 () = struct
@@ -780,25 +784,23 @@ module Layer1 () = struct
       let parse string =
         try
           match string |> String.split_on_char '/' with
-          | [pkh; pk; n] -> Some (pkh, pk, int_of_string n, Random.int max_int)
-          | [pkh; pk; n; seed] ->
-              Some (pkh, pk, int_of_string n, int_of_string seed)
+          | [n] -> Some (int_of_string n, Random.int 1073741823 (* 2^30 -1 *))
+          | [n; seed] -> Some (int_of_string n, int_of_string seed)
           | _ -> None
-        with _ -> None
+        with exn -> raise exn
       in
-      let show (pkh, pk, tps, seed) =
-        pkh ^ "/" ^ pk ^ "/" ^ string_of_int tps ^ "/" ^ string_of_int seed
-      in
-      Clap.typ ~name:"stresstest" ~dummy:("", "", 0, 0) ~parse ~show
+      let show (tps, seed) = string_of_int tps ^ "/" ^ string_of_int seed in
+      Clap.typ ~name:"stresstest" ~dummy:(0, 0) ~parse ~show
     in
     Clap.optional
       ~section
       ~long:"stresstest"
-      ~placeholder:"pkh/pk/TPS[/seed]"
+      ~placeholder:"TPS[/seed]"
       ~description:
-        "Public key hash / public key of an account used to fund fresh \
-         accounts for reaching TPS stresstest traffic generation. A seed for \
-         stresstest initialization can also be specified."
+        "A Public key hash and its public key are automatically retrieved from \
+         the yes wallet to fund fresh accounts for reaching TPS stresstest \
+         traffic generation. A seed for stresstest initialization can also be \
+         specified."
       typ
       ()
 
@@ -851,6 +853,26 @@ module Layer1 () = struct
       ~description:
         "JSON file optionally describing options for each VM involved in the \
          test"
+      ()
+
+  let ppx_profiling =
+    Clap.flag
+      ~section
+      ~set_long:"ppx-profiling"
+      ~unset_long:"no-ppx-profiling"
+      ~description:
+        "Enable PPX profiling on all components. The level of verbosity is by \
+         default `Debug`. "
+      false
+
+  let ppx_profiling_backends =
+    Clap.list_string
+      ~section
+      ~long:"ppx-profiling-backends"
+      ~description:
+        "Select the backends used by the profiler, bypassing the defaults \
+         selection: always `txt` and `json`, and also `prometheus` if \
+         `--prometheus` and `opentelemetry` if `--opentelemetry`."
       ()
 
   let config =

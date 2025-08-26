@@ -28,9 +28,9 @@
     {[
        wget -O ghostnet.snapshot https://snapshots.tzinit.org/ghostnet/rolling
        dune exec tezt/tests/cloud/main.exe -- cloud l1 -v --log-file /tmp/log \
-         --l1-stake 1,1 \
+         --stake 1,1 \
          --network ghostnet \
-         --l1-stresstest tz1KhnTgwoRRALBX6vRHRnydDGSBFsWtcJxc/edpkuFRauFAdhipQu9s4xmfNJWmtLxPKpoaoG41gYGq5AgUA43Vxqx/100/1 \
+         --stresstest 100/1 \
          --faketime "-$(($(date --utc +%s) - $(date --date $(./octez-node snapshot info --json ./ghostnet.snapshot | jq -r .snapshot_header.timestamp) +%s)))" \
          --tezt-cloud $USER \
          --dockerfile-alias debian \
@@ -43,10 +43,11 @@
     As you can read using the help of [--help], [--l1-stresstest] is:
 
     {v
-      --l1-stresstest pkh/pk/TPS[/seed]
-          Public key hash / public key of an account used to fund fresh accounts
-          for reaching TPS stresstest traffic generation. A seed for stresstest
-          initialization can also be specified.
+      --stresstest TPS[/seed]
+          A Public key hash and its public key are automatically retrieved from \
+          the yes wallet to fund fresh accounts for reaching TPS stresstest \
+          traffic generation. A seed for stresstest initialization can also be \
+          specified.
     v}
 
     On ghostnet, the goto account to use is the faucet account (the one used above).
