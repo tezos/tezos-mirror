@@ -292,45 +292,21 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
     Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
   in
 
-  let* ping_tx_pool, tx_container =
-    match
-      (evm_node_private_endpoint, config.experimental_features.enable_tx_queue)
-    with
-    | Some private_endpoint, _ ->
-        let forward_request =
-          container_forward_request
-            ~chain_family
-            ~keep_alive:config.keep_alive
-            ~public_endpoint:evm_node_endpoint
-            ~private_endpoint
-        in
-
-        return (false, forward_request)
-    | None, Some tx_queue_config ->
+  let* tx_container =
+    match evm_node_private_endpoint with
+    | Some private_endpoint ->
+        return
+          (container_forward_request
+             ~chain_family
+             ~keep_alive:config.keep_alive
+             ~public_endpoint:evm_node_endpoint
+             ~private_endpoint)
+    | None ->
         let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
-          start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
+          start ~config:config.tx_queue ~keep_alive:config.keep_alive ()
         in
-        return (false, tx_container)
-    | None, None ->
-        let*? tx_container = Tx_pool.tx_container ~chain_family in
-        let* () =
-          Tx_pool.start
-            ~tx_pool_parameters:
-              {
-                backend = (module Rpc_backend);
-                smart_rollup_address =
-                  Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-                    ctxt.smart_rollup_address;
-                mode = Relay;
-                tx_timeout_limit = config.tx_pool_timeout_limit;
-                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-                tx_pool_tx_per_addr_limit =
-                  Int64.to_int config.tx_pool_tx_per_addr_limit;
-                chain_family = Ex_chain_family chain_family;
-              }
-        in
-        return (true, tx_container)
+        return tx_container
   in
 
   let* () = set_metrics_level ctxt in
@@ -389,7 +365,6 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
   and* () =
     Blueprints_follower.start
       ~multichain:enable_multichain
-      ~ping_tx_pool
       ~time_between_blocks
       ~evm_node_endpoint
       ~next_blueprint_number

@@ -72,6 +72,9 @@ type mode =
       preimages_dir : string option;
       private_rpc_port : int option;
       rollup_node_endpoint : string;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -86,9 +89,9 @@ type mode =
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
@@ -100,9 +103,9 @@ type mode =
       genesis_timestamp : Client.timestamp option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Tezlink_sandbox of {
       initial_kernel : string;
@@ -113,9 +116,9 @@ type mode =
       genesis_timestamp : Client.timestamp option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Proxy
   | Rpc of mode
@@ -717,6 +720,9 @@ let mode_with_new_private_rpc (mode : mode) =
         preimages_dir;
         private_rpc_port = Some _;
         rollup_node_endpoint;
+        tx_queue_max_lifespan;
+        tx_queue_max_size;
+        tx_queue_tx_per_addr_limit;
       } ->
       Observer
         {
@@ -724,6 +730,9 @@ let mode_with_new_private_rpc (mode : mode) =
           preimages_dir;
           private_rpc_port = Some (Port.fresh ());
           rollup_node_endpoint;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
         }
   | Sequencer
       {
@@ -739,9 +748,9 @@ let mode_with_new_private_rpc (mode : mode) =
         catchup_cooldown;
         max_number_of_chunks;
         wallet_dir;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
+        tx_queue_max_lifespan;
+        tx_queue_max_size;
+        tx_queue_tx_per_addr_limit;
         dal_slots;
         sequencer_sunset_sec;
       } ->
@@ -759,9 +768,9 @@ let mode_with_new_private_rpc (mode : mode) =
           catchup_cooldown;
           max_number_of_chunks;
           wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
           dal_slots;
           sequencer_sunset_sec;
         }
@@ -774,9 +783,9 @@ let mode_with_new_private_rpc (mode : mode) =
         genesis_timestamp;
         max_number_of_chunks;
         wallet_dir;
-        tx_pool_timeout_limit;
-        tx_pool_addr_limit;
-        tx_pool_tx_per_addr_limit;
+        tx_queue_max_lifespan;
+        tx_queue_max_size;
+        tx_queue_tx_per_addr_limit;
       } ->
       Sandbox
         {
@@ -787,9 +796,9 @@ let mode_with_new_private_rpc (mode : mode) =
           genesis_timestamp;
           max_number_of_chunks;
           wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
         }
   | _ -> mode
 
@@ -1062,9 +1071,9 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           catchup_cooldown;
           max_number_of_chunks;
           wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
           dal_slots;
           sequencer_sunset_sec;
         } ->
@@ -1102,22 +1111,19 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             max_number_of_chunks
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
         @ Cli_arg.optional_arg
-            "tx-pool-timeout-limit"
-            string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-tx-per-addr-limit"
-            string_of_int
-            tx_pool_tx_per_addr_limit
-        @ Cli_arg.optional_arg
             "dal-slots"
             (fun l -> String.concat "," (List.map string_of_int l))
             dal_slots
         @ Cli_arg.optional_arg "sunset-sec" string_of_int sequencer_sunset_sec
+        @ Cli_arg.optional_arg
+            "tx-pool-timeout-limit"
+            string_of_int
+            tx_queue_max_lifespan
+        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
+        @ Cli_arg.optional_arg
+            "tx-pool-tx-per-addr-limit"
+            string_of_int
+            tx_queue_tx_per_addr_limit
     | Sandbox
         {
           initial_kernel = _;
@@ -1127,9 +1133,9 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           genesis_timestamp = _;
           max_number_of_chunks;
           wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
         } ->
         [
           (* These two fields are not necessary for the sandbox mode, however,
@@ -1153,15 +1159,12 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         @ Cli_arg.optional_arg
             "tx-pool-timeout-limit"
             string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
+            tx_queue_max_lifespan
+        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
         @ Cli_arg.optional_arg
             "tx-pool-tx-per-addr-limit"
             string_of_int
-            tx_pool_tx_per_addr_limit
+            tx_queue_tx_per_addr_limit
     | Tezlink_sandbox
         {
           initial_kernel = _;
@@ -1172,9 +1175,9 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           genesis_timestamp = _;
           max_number_of_chunks;
           wallet_dir;
-          tx_pool_timeout_limit;
-          tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
         } ->
         [
           (* These two fields are not necessary for the sandbox mode, however,
@@ -1198,21 +1201,21 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         @ Cli_arg.optional_arg
             "tx-pool-timeout-limit"
             string_of_int
-            tx_pool_timeout_limit
-        @ Cli_arg.optional_arg
-            "tx-pool-addr-limit"
-            string_of_int
-            tx_pool_addr_limit
+            tx_queue_max_lifespan
+        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
         @ Cli_arg.optional_arg
             "tx-pool-tx-per-addr-limit"
             string_of_int
-            tx_pool_tx_per_addr_limit
+            tx_queue_tx_per_addr_limit
     | Observer
         {
           preimages_dir;
           initial_kernel = _;
           rollup_node_endpoint;
           private_rpc_port;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
         } ->
         [
           "--evm-node-endpoint";
@@ -1222,6 +1225,15 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
         ]
         @ Cli_arg.optional_arg "preimages-dir" Fun.id preimages_dir
         @ Cli_arg.optional_arg "private-rpc-port" string_of_int private_rpc_port
+        @ Cli_arg.optional_arg
+            "tx-pool-timeout-limit"
+            string_of_int
+            tx_queue_max_lifespan
+        @ Cli_arg.optional_arg "tx-pool-max-txs" string_of_int tx_queue_max_size
+        @ Cli_arg.optional_arg
+            "tx-pool-tx-per-addr-limit"
+            string_of_int
+            tx_queue_tx_per_addr_limit
   in
   spawn_command evm_node @@ ["init"; "config"] @ mode_args @ shared_args
   @ extra_arguments
@@ -1296,18 +1308,10 @@ let update_or_create_json ~origin key f json =
       f json)
     json
 
-type tx_queue_config =
-  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
-  | Enable of bool
-
 let patch_config_with_experimental_feature
     ?(drop_duplicate_when_injection = false)
     ?(blueprints_publisher_order_enabled = false) ?(next_wasm_runtime = true)
-    ?rpc_server
-    ?(enable_tx_queue =
-      Config
-        {max_size = 1000; max_lifespan = 100_000; tx_per_addr_limit = 100_000})
-    ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
+    ?rpc_server ?spawn_rpc ?periodic_snapshot_path ?l2_chains () =
   JSON.update "experimental_features" @@ fun json ->
   conditional_json_put
     drop_duplicate_when_injection
@@ -1325,21 +1329,6 @@ let patch_config_with_experimental_feature
   |> optional_json_put ~name:"rpc_server" rpc_server (function
        | Resto -> `String "resto"
        | Dream -> `String "dream")
-  |> fun json ->
-  let value_json =
-    JSON.annotate ~origin:"evm_node.config_patch"
-    @@
-    match enable_tx_queue with
-    | Config {max_size; max_lifespan; tx_per_addr_limit} ->
-        `O
-          [
-            ("max_size", `Float (Float.of_int max_size));
-            ("max_lifespan", `Float (Float.of_int max_lifespan));
-            ("tx_per_addr_limit", `String (string_of_int tx_per_addr_limit));
-          ]
-    | Enable b -> `Bool b
-  in
-  JSON.put ("enable_tx_queue", value_json) json
   |> optional_json_put spawn_rpc ~name:"spawn_rpc" (fun port ->
          `O [("protected_port", `Float (float_of_int port))])
   |> optional_json_put
@@ -1918,10 +1907,29 @@ let switch_history_mode evm_node history =
   {Runnable.value = process; run}
 
 let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
-  let initial_kernel, preimages_dir, private_rpc_port =
+  let ( initial_kernel,
+        preimages_dir,
+        private_rpc_port,
+        tx_queue_max_lifespan,
+        tx_queue_max_size,
+        tx_queue_tx_per_addr_limit ) =
     match mode old_sequencer with
-    | Sequencer {initial_kernel; preimage_dir; private_rpc_port; _} ->
-        (initial_kernel, preimage_dir, private_rpc_port)
+    | Sequencer
+        {
+          initial_kernel;
+          preimage_dir;
+          private_rpc_port;
+          tx_queue_max_lifespan;
+          tx_queue_max_size;
+          tx_queue_tx_per_addr_limit;
+          _;
+        } ->
+        ( initial_kernel,
+          preimage_dir,
+          private_rpc_port,
+          tx_queue_max_lifespan,
+          tx_queue_max_size,
+          tx_queue_tx_per_addr_limit )
     | _ -> invalid_arg "Evm_node is not a sequencer"
   in
   {
@@ -1937,6 +1945,9 @@ let switch_sequencer_to_observer ~(old_sequencer : t) ~(new_sequencer : t) =
               preimages_dir;
               private_rpc_port;
               rollup_node_endpoint = old_sequencer.persistent_state.endpoint;
+              tx_queue_max_lifespan;
+              tx_queue_max_size;
+              tx_queue_tx_per_addr_limit;
             };
         endpoint = endpoint new_sequencer;
       };

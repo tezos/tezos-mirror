@@ -265,7 +265,9 @@ val find_and_execute_withdrawal :
 val init_sequencer_sandbox :
   ?maximum_gas_per_transaction:int64 ->
   ?genesis_timestamp:Client.timestamp ->
-  ?tx_pool_tx_per_addr_limit:int ->
+  ?tx_queue_max_lifespan:int ->
+  ?tx_queue_max_size:int ->
+  ?tx_queue_tx_per_addr_limit:int ->
   ?set_account_code:(string * string) list ->
   ?da_fee_per_byte:Wei.t ->
   ?minimum_base_fee_per_gas:Wei.t ->

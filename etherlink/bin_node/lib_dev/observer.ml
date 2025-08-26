@@ -123,68 +123,6 @@ let install_finalizer_observer ~rollup_node_tracking
   let* () = Evm_context.shutdown () in
   when_ rollup_node_tracking @@ fun () -> Evm_events_follower.shutdown ()
 
-let container_forward_tx (type f) ~(chain_family : f L2_types.chain_family)
-    ~keep_alive ~evm_node_endpoint :
-    f Services_backend_sig.tx_container tzresult =
-  let (module Tx_container) =
-    (module struct
-      type address = Ethereum_types.address
-
-      type legacy_transaction_object = Ethereum_types.legacy_transaction_object
-
-      type transaction_object = Transaction_object.t
-
-      let nonce ~next_nonce _address = Lwt_result.return next_nonce
-
-      let add ~next_nonce:_ _tx_object ~raw_tx =
-        Injector.send_raw_transaction
-          ~keep_alive
-          ~base:evm_node_endpoint
-          ~raw_tx:(Ethereum_types.hex_to_bytes raw_tx)
-
-      let find _hash = Lwt_result.return None
-
-      let content () =
-        Lwt_result.return
-          {pending = AddressMap.empty; queued = AddressMap.empty}
-
-      let shutdown () = Lwt_result_syntax.return_unit
-
-      let clear () = Lwt_result_syntax.return_unit
-
-      let tx_queue_tick ~evm_node_endpoint:_ = Lwt_result_syntax.return_unit
-
-      let tx_queue_beacon ~evm_node_endpoint:_ ~tick_interval:_ =
-        Lwt_result_syntax.return_unit
-
-      let lock_transactions () = Lwt_result_syntax.return_unit
-
-      let unlock_transactions () = Lwt_result_syntax.return_unit
-
-      let is_locked () = Lwt_result_syntax.return_false
-
-      let confirm_transactions ~clear_pending_queue_after:_ ~confirmed_txs:_ =
-        Lwt_result_syntax.return_unit
-
-      let size_info () =
-        Lwt_result.return
-          Metrics.Tx_pool.{number_of_addresses = 0; number_of_transactions = 0}
-
-      let pop_transactions ~maximum_cumulative_size:_ ~validate_tx:_
-          ~initial_validation_state:_ =
-        Lwt_result_syntax.return_nil
-    end : Services_backend_sig.Tx_container
-      with type address = Ethereum_types.address
-       and type legacy_transaction_object =
-         Ethereum_types.legacy_transaction_object
-       and type transaction_object = Transaction_object.t)
-  in
-  let open Result_syntax in
-  match chain_family with
-  | EVM -> return @@ Services_backend_sig.Evm_tx_container (module Tx_container)
-  | Michelson ->
-      error_with "Observer.container_forward_tx not implemented for Tezlink"
-
 let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
@@ -227,31 +165,10 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~l2_chains:config.experimental_features.l2_chains
   in
 
-  let*? start_tx_container, tx_container, ping_tx_pool =
-    let open Result_syntax in
-    match config.experimental_features.enable_tx_queue with
-    | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family in
-        return
-          ( (fun ~tx_pool_parameters:_ ->
-              start ~config:tx_queue_config ~keep_alive:config.keep_alive ()),
-            tx_container,
-            false )
-    | None ->
-        if config.finalized_view then
-          let* tx_container =
-            container_forward_tx
-              ~chain_family
-              ~keep_alive:config.keep_alive
-              ~evm_node_endpoint
-          in
-          return
-            ( (fun ~tx_pool_parameters:_ -> Lwt_result_syntax.return_unit),
-              tx_container,
-              false )
-        else
-          let* tx_container = Tx_pool.tx_container ~chain_family in
-          return (Tx_pool.start, tx_container, true)
+  let* tx_container =
+    let start, tx_container = Tx_queue.tx_container ~chain_family in
+    let* () = start ~config:config.tx_queue ~keep_alive:config.keep_alive () in
+    return tx_container
   in
 
   let* _loaded =
@@ -286,23 +203,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
   let* enable_multichain = Evm_ro_context.read_enable_multichain_flag ro_ctxt in
   let* l2_chain_id, _chain_family =
     Rpc_backend.single_chain_id_and_family ~config ~enable_multichain
-  in
-
-  let* () =
-    start_tx_container
-      ~tx_pool_parameters:
-        {
-          backend = (module Rpc_backend);
-          smart_rollup_address =
-            Tezos_crypto.Hashed.Smart_rollup_address.to_b58check
-              smart_rollup_address;
-          mode = Relay;
-          tx_timeout_limit = config.tx_pool_timeout_limit;
-          tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit =
-            Int64.to_int config.tx_pool_tx_per_addr_limit;
-          chain_family = Ex_chain_family chain_family;
-        }
   in
 
   let (module Tx_container) =
@@ -405,7 +305,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     let* () =
       Blueprints_follower.start
         ~multichain:enable_multichain
-        ~ping_tx_pool
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number
@@ -415,9 +314,6 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     and* () =
       Drift_monitor.run ~evm_node_endpoint Evm_context.next_blueprint_number
     and* () =
-      let (module Tx_container) =
-        Services_backend_sig.tx_container_module tx_container
-      in
       Tx_container.tx_queue_beacon
         ~evm_node_endpoint:(Rpc evm_node_endpoint)
         ~tick_interval:0.05

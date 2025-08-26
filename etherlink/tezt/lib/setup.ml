@@ -54,6 +54,12 @@ type sequencer_setup = {
   l2_chains : Evm_node.l2_setup list;
 }
 
+type tx_queue_config = {
+  max_lifespan : int;
+  max_size : int;
+  tx_per_addr_limit : int;
+}
+
 let multichain_setup_to_single ~(setup : multichain_sequencer_setup) =
   let observer =
     match setup.observers with [observer] -> observer | _ -> assert false
@@ -187,8 +193,8 @@ let observer_counter =
   ref 0
 
 let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
-    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?enable_tx_queue
-    ?l2_chain evm_node =
+    ~sc_rollup_node ?rpc_server ?websockets ?history_mode ?tx_queue ?l2_chain
+    evm_node =
   let preimages_dir = Evm_node.preimages_dir evm_node in
   let initial_kernel = Evm_node.initial_kernel evm_node in
   let config_file = Temp.file (sf "config-%d.json" !observer_counter) in
@@ -203,9 +209,9 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
     else patch_config
   in
   let patch_config =
-    match (rpc_server, enable_tx_queue) with
-    | None, None -> patch_config
-    | _, _ ->
+    match rpc_server with
+    | None -> patch_config
+    | _ ->
         fun c ->
           Evm_node.patch_config_with_experimental_feature
             ?l2_chains:
@@ -213,7 +219,6 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
               | None -> None
               | Some l2_chain -> Some [l2_chain])
             ?rpc_server
-            ?enable_tx_queue
             ()
           @@ patch_config c
   in
@@ -224,6 +229,12 @@ let run_new_observer_node ?(finalized_view = false) ?(patch_config = Fun.id)
         preimages_dir = Some preimages_dir;
         private_rpc_port = Some (Port.fresh ());
         rollup_node_endpoint = Sc_rollup_node.endpoint sc_rollup_node;
+        tx_queue_max_lifespan =
+          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
+        tx_queue_max_size =
+          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
+        tx_queue_tx_per_addr_limit =
+          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
       }
   in
   let* observer =
@@ -486,8 +497,8 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
     ?(drop_duplicate_when_injection = true)
     ?(blueprints_publisher_order_enabled = true) ?rollup_history_mode
     ~enable_dal ?dal_slots ~enable_multichain ~l2_chains ?rpc_server ?websockets
-    ?history_mode ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path
-    ?(signatory = false) ?(sequencer_sunset_sec = 0) protocol =
+    ?history_mode ?spawn_rpc ?periodic_snapshot_path ?(signatory = false)
+    ?tx_queue ?(sequencer_sunset_sec = 0) protocol =
   let* node, client =
     setup_l1
       ?commitment_period
@@ -613,7 +624,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ?next_wasm_runtime
       ?rpc_server
       ?spawn_rpc
-      ?enable_tx_queue
       (* When adding new experimental feature please make sure it's a
          good idea to activate it for all test or not. *)
       ()
@@ -625,7 +635,6 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_tx_queue
       ?periodic_snapshot_path
       ()
   in
@@ -636,10 +645,10 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
       ~blueprints_publisher_order_enabled
       ?next_wasm_runtime
       ?rpc_server
-      ?enable_tx_queue
       ?periodic_snapshot_path
       ()
   in
+
   let sequencer_mode =
     Evm_node.Sequencer
       {
@@ -655,9 +664,12 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
         catchup_cooldown;
         max_number_of_chunks;
         wallet_dir = Some (Client.base_dir client);
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_queue_max_lifespan =
+          Option.map (fun tx_queue -> tx_queue.max_lifespan) tx_queue;
+        tx_queue_max_size =
+          Option.map (fun tx_queue -> tx_queue.max_size) tx_queue;
+        tx_queue_tx_per_addr_limit =
+          Option.map (fun tx_queue -> tx_queue.tx_per_addr_limit) tx_queue;
         dal_slots;
         sequencer_sunset_sec = Some sequencer_sunset_sec;
       }
@@ -681,7 +693,7 @@ let setup_sequencer_internal ?max_delayed_inbox_blueprint_length
           ?rpc_server
           ?websockets
           ?history_mode
-          ?enable_tx_queue
+          ?tx_queue
           sequencer)
       l2_chains
   in
@@ -733,9 +745,8 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal
     ?drop_duplicate_when_injection ?blueprints_publisher_order_enabled
     ?rollup_history_mode ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
-    ?websockets ?history_mode ?enable_tx_queue ?spawn_rpc
-    ?periodic_snapshot_path ?signatory ?l2_chains ?sequencer_sunset_sec protocol
-    =
+    ?websockets ?history_mode ?spawn_rpc ?periodic_snapshot_path ?signatory
+    ?l2_chains ?sequencer_sunset_sec protocol =
   (* Note that the chain_id is not important (it will become important later) *)
   let l2_chains =
     Option.value
@@ -789,7 +800,6 @@ let setup_sequencer ?max_delayed_inbox_blueprint_length ?next_wasm_runtime
       ~enable_multichain
       ~l2_chains
       ?rpc_server
-      ?enable_tx_queue
       ?spawn_rpc
       ?periodic_snapshot_path
       ?signatory
@@ -813,7 +823,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rollup_history_mode ~enable_dal
     ?(dal_slots = if enable_dal then Some [0; 1; 2; 3] else None)
     ~enable_multichain ~l2_setups ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
+    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory
     ?sequencer_sunset_sec body ~title ~tags protocols =
   let kernel_tag, kernel_use = Kernel.to_uses_and_tags kernel in
   let tags = kernel_tag :: tags in
@@ -879,7 +889,7 @@ let register_multichain_test ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_multichain
         ~l2_chains
         ?rpc_server
-        ?enable_tx_queue
+        ?tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
         ?signatory
@@ -932,7 +942,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?commitment_period
     ?challenge_window ?uses ?additional_uses ?rollup_history_mode ~enable_dal
     ?dal_slots ~enable_multichain ?rpc_server ?websockets ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
+    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
     ?sequencer_sunset_sec body ~title ~tags protocols =
   let body sequencer_setup =
     body (multichain_setup_to_single ~setup:sequencer_setup)
@@ -976,7 +986,7 @@ let register_test ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?rpc_server
     ?websockets
     ?history_mode
-    ?enable_tx_queue
+    ?tx_queue
     ?spawn_rpc
     ?periodic_snapshot_path
     ?signatory
@@ -1000,7 +1010,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?enable_fa_bridge ?rollup_history_mode ?commitment_period ?challenge_window
     ?additional_uses ~enable_dal ?dal_slots ~enable_multichain ?rpc_server
     ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
-    ?enable_tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
+    ?tx_queue ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
     ?sequencer_sunset_sec ~title ~tags body protocols =
   List.iter
     (fun kernel ->
@@ -1042,7 +1052,7 @@ let register_test_for_kernels ~__FILE__ ?max_delayed_inbox_blueprint_length
         ~enable_dal
         ?dal_slots
         ~enable_multichain
-        ?enable_tx_queue
+        ?tx_queue
         ?spawn_rpc
         ?periodic_snapshot_path
         ?signatory
@@ -1087,9 +1097,9 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
     ?commitment_period ?challenge_window ?additional_uses ?rpc_server
     ?websockets ?enable_fast_withdrawal ?enable_fast_fa_withdrawal ?history_mode
     ?(use_dal = default_dal_registration)
-    ?(use_multichain = default_multichain_registration) ?enable_tx_queue
-    ?spawn_rpc ?periodic_snapshot_path ?signatory ?l2_setups
-    ?sequencer_sunset_sec ~title ~tags body protocols =
+    ?(use_multichain = default_multichain_registration) ?tx_queue ?spawn_rpc
+    ?periodic_snapshot_path ?signatory ?l2_setups ?sequencer_sunset_sec ~title
+    ~tags body protocols =
   let register_cases = function
     | Register_both {additional_tags_with; additional_tags_without} ->
         [(false, additional_tags_without); (true, additional_tags_with)]
@@ -1148,7 +1158,7 @@ let register_all ~__FILE__ ?max_delayed_inbox_blueprint_length
             ?rollup_history_mode
             ~enable_dal
             ~enable_multichain
-            ?enable_tx_queue
+            ?tx_queue
             ?spawn_rpc
             ?periodic_snapshot_path
             ?signatory

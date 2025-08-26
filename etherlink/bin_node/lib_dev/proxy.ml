@@ -205,13 +205,12 @@ let main
   let* on_new_head, tx_container =
     match
       ( config.experimental_features.enable_send_raw_transaction,
-        config.proxy.evm_node_endpoint,
-        config.experimental_features.enable_tx_queue )
+        config.proxy.evm_node_endpoint )
     with
-    | true, None, Some tx_queue_config ->
+    | true, None ->
         let start, tx_container = Tx_queue.tx_container ~chain_family in
         let* () =
-          start ~config:tx_queue_config ~keep_alive:config.keep_alive ()
+          start ~config:config.tx_queue ~keep_alive:config.keep_alive ()
         in
         return
         @@ ( Some
@@ -221,24 +220,7 @@ let main
                    ~tx_container
                    ~smart_rollup_address),
              tx_container )
-    | true, None, None ->
-        let* () =
-          Tx_pool.start
-            ~tx_pool_parameters:
-              {
-                backend = (module Rollup_node_rpc);
-                smart_rollup_address;
-                mode = Proxy;
-                tx_timeout_limit = config.tx_pool_timeout_limit;
-                tx_pool_addr_limit = Int64.to_int config.tx_pool_addr_limit;
-                tx_pool_tx_per_addr_limit =
-                  Int64.to_int config.tx_pool_tx_per_addr_limit;
-                chain_family = Ex_chain_family chain_family;
-              }
-        in
-        let*? tx_container = Tx_pool.tx_container ~chain_family in
-        return (Some Tx_pool.pop_and_inject_transactions_lazy, tx_container)
-    | enable_send_raw_transaction, evm_node_endpoint, _ ->
+    | enable_send_raw_transaction, evm_node_endpoint ->
         let evm_node_endpoint =
           if enable_send_raw_transaction then evm_node_endpoint else None
         in

@@ -76,14 +76,16 @@
            EVM node. */ },
   "tx_pool_timeout_limit"?:
     $int64
-    /* Transaction timeout limit inside the transaction pool */,
+    /* Transaction timeout limit inside the transaction pool. DEPRECATED: You
+       should use "tx_pool.max_lifespan" instead. */,
   "tx_pool_addr_limit"?:
     $int64
-    /* Maximum allowed addresses inside the transaction pool. */,
+    /* Maximum allowed addresses inside the transaction pool. DEPRECATED: You
+       should use "tx_pool.max_size" instead. */,
   "tx_pool_tx_per_addr_limit"?:
     $int64
     /* Maximum allowed transactions per user address inside the transaction
-       pool. */,
+       pool. DEPRECATED: You should use "tx_pool.tx_per_addr_limit" instead. */,
   "keep_alive"?:
     boolean
     /* Enable or disable if the EVM node retries HTTP requests on failure. */,
@@ -140,19 +142,6 @@
         /* Some */
         || null
         /* None */,
-      "enable_tx_queue"?:
-        /* Replace the observer tx pool by a tx queue */
-        /* tx queue configuration */
-        { /* Some */
-          "max_size"?: integer ∈ [-2^30, 2^30],
-          "max_transaction_batch_length"?:
-            integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
-          "max_lifespan"?: integer ∈ [-2^30, 2^30],
-          "tx_per_addr_limit"?: $int64 }
-        || null
-        /* None */
-        || boolean
-        /* tx queue enable */,
       "periodic_snapshot_path"?:
         /* Path to the periodic snapshot file */
         $unistring /* Some */ || null /* None */ },
@@ -365,7 +354,14 @@
     || boolean
     /* opentelemetry_boolean */
     || null
-    /* opentelemetry_null */ }
+    /* opentelemetry_null */,
+  "tx_pool"?:
+    { /* Configuration for the tx pool */
+      "max_size"?: integer ∈ [-2^30, 2^30],
+      "max_transaction_batch_length"?:
+        integer ∈ [-2^30, 2^30] /* Some */ || null /* None */,
+      "max_lifespan"?: integer ∈ [-2^30, 2^30],
+      "tx_per_addr_limit"?: $int64 } }
 $bignum:
   /* Big number
      Decimal representation of a big number */

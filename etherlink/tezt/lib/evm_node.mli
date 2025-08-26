@@ -63,6 +63,9 @@ type mode =
       preimages_dir : string option;
       private_rpc_port : int option;  (** Port for private RPC server*)
       rollup_node_endpoint : string;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Sequencer of {
       initial_kernel : string;
@@ -81,14 +84,12 @@ type mode =
       catchup_cooldown : int option;
       max_number_of_chunks : int option;
       wallet_dir : string option;  (** --wallet-dir: client directory. *)
-      tx_pool_timeout_limit : int option;
-          (** --tx-pool-timeout-limit: transaction timeout inside the pool. *)
-      tx_pool_addr_limit : int option;
-          (** --tx-pool-addr-limit: maximum address allowed simultaneously inside
-              the pool. *)
-      tx_pool_tx_per_addr_limit : int option;
-          (** --tx-pool-tx-per-addr-limit: maximum transaction per address allowed
-              simultaneously inside the pool. *)
+      tx_queue_max_lifespan : int option;
+          (** --tx-pool-timeout-limit: transaction timeout inside the queue. *)
+      tx_queue_max_size : int option;
+          (** --tx-pool-max-txs: maximum number of transactions in the queue. *)
+      tx_queue_tx_per_addr_limit : int option;
+          (** --tx-pool-tx-per-addr-limit: maximum number of transactions per address in the queue. *)
       dal_slots : int list option;
       sequencer_sunset_sec : int option;
     }
@@ -100,9 +101,9 @@ type mode =
       genesis_timestamp : Client.timestamp option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Tezlink_sandbox of {
       initial_kernel : string;
@@ -113,9 +114,9 @@ type mode =
       genesis_timestamp : Client.timestamp option;
       max_number_of_chunks : int option;
       wallet_dir : string option;
-      tx_pool_timeout_limit : int option;
-      tx_pool_addr_limit : int option;
-      tx_pool_tx_per_addr_limit : int option;
+      tx_queue_max_lifespan : int option;
+      tx_queue_max_size : int option;
+      tx_queue_tx_per_addr_limit : int option;
     }
   | Proxy
   | Rpc of mode
@@ -313,10 +314,6 @@ val spawn_init_config_minimal :
 
 type rpc_server = Resto | Dream
 
-type tx_queue_config =
-  | Config of {max_size : int; max_lifespan : int; tx_per_addr_limit : int}
-  | Enable of bool
-
 (** [patch_config_with_experimental_feature
     ?drop_duplicate_when_injection ?next_wasm_runtime ?rpc_server
     json_config]
@@ -327,7 +324,6 @@ val patch_config_with_experimental_feature :
   ?blueprints_publisher_order_enabled:bool ->
   ?next_wasm_runtime:bool ->
   ?rpc_server:rpc_server ->
-  ?enable_tx_queue:tx_queue_config ->
   ?spawn_rpc:int ->
   ?periodic_snapshot_path:string ->
   ?l2_chains:l2_setup list ->

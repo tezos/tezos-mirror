@@ -94,7 +94,6 @@ let loop_sequencer (type f) multichain
       let*! head = Evm_context.head_info () in
       Blueprints_follower.start
         ~multichain
-        ~ping_tx_pool:false
         ~time_between_blocks
         ~evm_node_endpoint
         ~next_blueprint_number:head.next_blueprint_number
@@ -219,25 +218,16 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Configuration.retrieve_chain_family
       ~l2_chains:configuration.experimental_features.l2_chains
   in
-  (* The Tx_pool parameters are ignored by the start function when a
-     Tx_queue is configured.
 
-     TODO: simplify start_tx_container when removing the Tx_pool. *)
-  let*? start_tx_container, tx_container =
-    let open Result_syntax in
-    match configuration.experimental_features.enable_tx_queue with
-    | Some tx_queue_config ->
-        let start, tx_container = Tx_queue.tx_container ~chain_family in
-        return
-          ( (fun ~tx_pool_parameters:_ ->
-              start
-                ~config:tx_queue_config
-                ~keep_alive:configuration.keep_alive
-                ()),
-            tx_container )
-    | None ->
-        let* tx_container = Tx_pool.tx_container ~chain_family in
-        return (Tx_pool.start, tx_container)
+  let* tx_container =
+    let start, tx_container = Tx_queue.tx_container ~chain_family in
+    let* () =
+      start
+        ~config:configuration.tx_queue
+        ~keep_alive:configuration.keep_alive
+        ()
+    in
+    return tx_container
   in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
@@ -398,11 +388,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Prevalidator.start
       ~max_number_of_chunks:sequencer_config.max_number_of_chunks
       ~chain_family
-      (* When the tx_queue is enabled the validation is done in the
-         block_producer instead of in the RPC. This allows for a more
-         accurate validation as it's delayed up to when the block is
-         created. *)
-      (if Configuration.is_tx_queue_enabled configuration then Minimal else Full)
+      Minimal
       (module Rpc_backend)
   in
   let* () =
@@ -454,23 +440,6 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     Rpc_backend.single_chain_id_and_family
       ~config:configuration
       ~enable_multichain
-  in
-  let* () =
-    start_tx_container
-      ~tx_pool_parameters:
-        {
-          backend = (module Rpc_backend);
-          smart_rollup_address = smart_rollup_address_b58;
-          mode = Sequencer;
-          tx_timeout_limit = configuration.tx_pool_timeout_limit;
-          tx_pool_addr_limit = Int64.to_int configuration.tx_pool_addr_limit;
-          tx_pool_tx_per_addr_limit =
-            Int64.to_int configuration.tx_pool_tx_per_addr_limit;
-          chain_family = Ex_chain_family chain_family;
-        }
-  in
-  let (module Tx_container) =
-    Services_backend_sig.tx_container_module tx_container
   in
   Metrics.init
     ~mode:"sequencer"

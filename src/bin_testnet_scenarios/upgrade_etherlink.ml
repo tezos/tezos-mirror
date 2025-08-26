@@ -176,9 +176,9 @@ let prepare_and_run_sequencer rollup_node =
              catchup_cooldown = None;
              max_number_of_chunks = None;
              wallet_dir = None;
-             tx_pool_timeout_limit = None;
-             tx_pool_addr_limit = None;
-             tx_pool_tx_per_addr_limit = None;
+             tx_queue_max_lifespan = None;
+             tx_queue_max_size = None;
+             tx_queue_tx_per_addr_limit = None;
              dal_slots = None;
              sequencer_sunset_sec = None;
            })

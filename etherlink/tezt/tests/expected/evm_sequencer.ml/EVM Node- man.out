@@ -35,11 +35,12 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]]
+      [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -75,9 +76,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -147,11 +151,12 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]]
+      [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -186,9 +191,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -241,12 +249,12 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--read-only] [--ignore-block-param]
-      [--evm-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]] [--read-only]
+      [--ignore-block-param] [--evm-node-endpoint <url>]
     Start the EVM node in proxy mode.
     --data-dir <data-dir>: The path to the EVM node data directory.
       Defaults to the value of the environment variable `$EVM_NODE_DATA_DIR`
@@ -272,9 +280,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -304,11 +315,12 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]]
+      [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [--time-between-blocks <10.>]
       [--max-number-of-chunks <10.>] [--private-rpc-port <PORT>]
       [--sequencer-key <edsk...>] [--maximum-blueprints-lag <LAG>]
@@ -344,9 +356,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -405,11 +420,11 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--private-rpc-port <PORT>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]] [--private-rpc-port <PORT>]
       [--evm-node-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
@@ -441,9 +456,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -501,11 +519,11 @@ Run commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--evm-node-endpoint <url>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]] [--evm-node-endpoint <url>]
       [--evm-node-private-endpoint <url>]
       [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
@@ -534,9 +552,12 @@ Run commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.
@@ -589,11 +610,12 @@ Configuration commands:
       [--cors-origins <ALLOWED_ORIGINS>] [--cors-headers <ALLOWED_HEADERS>]
       [--ws [BOOL?]] [--max-number-blocks <100>] [--max-number-logs <1000>]
       [--chunk-size <10>] [-K --keep-alive] [--rollup-node-endpoint <url>]
-      [--tx-pool-timeout-limit <3_600>] [--tx-pool-addr-limit <4_000>]
-      [--tx-pool-tx-per-addr-limit <16>] [-v --verbose]
-      [--restricted-rpcs <regexp>] [--blacklisted-rpcs <blacklist>]
-      [--whitelisted-rpcs <whitelist>] [--finalized-view]
-      [--profiling [BOOL]] [--preimages-dir <_evm_installer_preimages>]
+      [--tx-pool-addr-limit <4_000>] [--tx-pool-timeout-limit <4>]
+      [--tx-pool-max-txs <1_000>] [--tx-pool-tx-per-addr-limit <16>]
+      [-v --verbose] [--restricted-rpcs <regexp>]
+      [--blacklisted-rpcs <blacklist>] [--whitelisted-rpcs <whitelist>]
+      [--finalized-view] [--profiling [BOOL]]
+      [--preimages-dir <_evm_installer_preimages>]
       [--preimages-endpoint <url>] [-n --native-execution-policy <policy>]
       [--time-between-blocks <10.>] [--max-number-of-chunks <10.>]
       [--private-rpc-port <PORT>] [--sequencer-key <edsk...>]
@@ -632,9 +654,12 @@ Configuration commands:
     -K --keep-alive: Keep the EVM node process alive even if the connection
       is lost with the rollup node.
     --rollup-node-endpoint <url>: The address of a rollup node.
-    --tx-pool-timeout-limit <3_600>: Transaction timeout limit inside the
+    --tx-pool-addr-limit <4_000>: DEPRECATED and not used anymore : Use
+      `tx-pool-max-txs` instead. Maximum allowed addresses inside the
+      transaction pool.
+    --tx-pool-timeout-limit <4>: Transaction timeout limit inside the
       transaction pool (in seconds).
-    --tx-pool-addr-limit <4_000>: Maximum allowed addresses inside the
+    --tx-pool-max-txs <1_000>: Maximum allowed transactions inside the
       transaction pool.
     --tx-pool-tx-per-addr-limit <16>: Maximum allowed transactions per user
       address inside the transaction pool.

@@ -224,9 +224,9 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
         genesis_timestamp = None;
         max_number_of_chunks = None;
         wallet_dir = Some wallet_dir;
-        tx_pool_timeout_limit = None;
-        tx_pool_addr_limit = None;
-        tx_pool_tx_per_addr_limit = None;
+        tx_queue_max_lifespan = None;
+        tx_queue_max_size = None;
+        tx_queue_tx_per_addr_limit = None;
       }
   in
   let () = toplog "Launching the sandbox L2 node" in
