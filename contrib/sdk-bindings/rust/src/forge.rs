@@ -66,15 +66,7 @@ pub mod operation {
     };
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Reveal {
-        pub source: PublicKeyHash,
-        pub fee: u64,
-        pub counter: u64,
-        pub gas_limit: u64,
-        pub storage_limit: u64,
-        pub public_key: PublicKey,
-        pub proof: Option<BlsSignature>,
-    }
+    pub struct Reveal(ManagerOperationContent<RevealContent>);
 
     #[uniffi::export]
     impl Reveal {
@@ -89,48 +81,29 @@ pub mod operation {
             public_key: &PublicKey,
             proof: Option<Arc<BlsSignature>>,
         ) -> Self {
-            Self {
-                source: source.clone(),
-                fee,
-                counter,
-                gas_limit,
-                storage_limit,
-                public_key: public_key.clone(),
-                proof: proof.map(|proof| proof.as_ref().clone()),
-            }
+            Self(ManagerOperationContent {
+                source: source.0.clone(),
+                fee: fee.into(),
+                counter: counter.into(),
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
+                operation: RevealContent {
+                    pk: public_key.0.clone(),
+                    proof: proof.map(|proof| proof.0.clone()),
+                },
+            })
         }
 
         #[doc = "Forge the operation."]
         pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            let reveal = OperationContent::Reveal(ManagerOperationContent {
-                source: self.source.0.clone(),
-                fee: self.fee.into(),
-                counter: self.counter.into(),
-                gas_limit: self.gas_limit.into(),
-                storage_limit: self.storage_limit.into(),
-                operation: RevealContent {
-                    pk: self.public_key.0.clone(),
-                    proof: self.proof.clone().map(|proof| proof.0),
-                },
-            });
-            reveal
+            OperationContent::Reveal(self.0.clone())
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
     }
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Transaction {
-        pub source: PublicKeyHash,
-        pub fee: u64,
-        pub counter: u64,
-        pub gas_limit: u64,
-        pub storage_limit: u64,
-        pub amount: u64,
-        pub destination: Contract,
-        pub entrypoint: Entrypoint,
-        pub value: Vec<u8>,
-    }
+    pub struct Transaction(ManagerOperationContent<TransactionContent>);
 
     #[uniffi::export]
     impl Transaction {
@@ -148,67 +121,50 @@ pub mod operation {
             entrypoint: Option<Arc<Entrypoint>>,
             value: Option<Vec<u8>>,
         ) -> Self {
-            Self {
-                source: source.clone(),
-                fee,
-                counter,
-                gas_limit,
-                storage_limit,
-                amount,
-                destination: destination.clone(),
-                entrypoint: entrypoint.map_or_else(Entrypoint::default, |entrypoint| {
-                    entrypoint.as_ref().clone()
-                }),
-                // octez-client convert data "Unit" from Michelson to binary
-                value: value.unwrap_or(vec![0x03, 0x0b]),
-            }
+            Self(ManagerOperationContent {
+                source: source.0.clone(),
+                fee: fee.into(),
+                counter: counter.into(),
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
+                operation: TransactionContent {
+                    amount: amount.into(),
+                    destination: destination.0.clone(),
+                    parameters: Parameters {
+                        entrypoint: entrypoint.map_or_else(
+                            tezos_protocol::entrypoint::Entrypoint::default,
+                            |entrypoint| entrypoint.0.clone(),
+                        ),
+                        // octez-client convert data "Unit" from Michelson to binary
+                        value: value.unwrap_or(vec![0x03, 0x0b]).clone(),
+                    }
+                    .into(),
+                },
+            })
         }
 
         #[doc = "Forge the operation."]
         pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            let transaction = OperationContent::Transaction(ManagerOperationContent {
-                source: self.source.0.clone(),
-                fee: self.fee.into(),
-                counter: self.counter.into(),
-                gas_limit: self.gas_limit.into(),
-                storage_limit: self.storage_limit.into(),
-                operation: TransactionContent {
-                    amount: self.amount.into(),
-                    destination: self.destination.0.clone(),
-                    parameters: Parameters {
-                        entrypoint: self.entrypoint.0.clone(),
-                        value: self.value.clone(),
-                    }
-                    .into(),
-                },
-            });
-            transaction
+            OperationContent::Transaction(self.0.clone())
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
     }
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Origination {
-        pub source: PublicKeyHash,
-        pub fee: u64,
-        pub counter: u64,
-        pub gas_limit: u64,
-        pub storage_limit: u64,
-        pub balance: u64,
-        pub delegate: Option<PublicKeyHash>,
-        // Its script is always as follows:
-        // "script": {
-        //   "code": [],
-        //   "storage": {
-        //     "prim": "unit"
-        //   }
-        // }
-    }
+    pub struct Origination(ManagerOperationContent<OriginationContent>);
 
     #[uniffi::export]
     impl Origination {
-        #[doc = "Build a origination operation."]
+        /// Build a origination operation.
+        ///
+        /// Its script is always as follows:
+        ///   'script': {
+        ///     'code': [],
+        ///     'storage': {
+        ///       'prim': 'unit'
+        ///     }
+        ///   }
         #[uniffi::constructor]
         pub fn new(
             source: &PublicKeyHash,
@@ -219,28 +175,15 @@ pub mod operation {
             balance: u64,
             delegate: Option<Arc<PublicKeyHash>>,
         ) -> Self {
-            Self {
-                source: source.clone(),
-                fee,
-                counter,
-                gas_limit,
-                storage_limit,
-                balance,
-                delegate: delegate.map(|delegate| delegate.as_ref().clone()),
-            }
-        }
-
-        #[doc = "Forge the operation."]
-        pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            let origination = OperationContent::Origination(ManagerOperationContent {
-                source: self.source.0.clone(),
-                fee: self.fee.into(),
-                counter: self.counter.into(),
-                gas_limit: self.gas_limit.into(),
-                storage_limit: self.storage_limit.into(),
+            Self(ManagerOperationContent {
+                source: source.0.clone(),
+                fee: fee.into(),
+                counter: counter.into(),
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
                 operation: OriginationContent {
-                    balance: self.balance.into(),
-                    delegate: self.delegate.clone().map(|delegate| delegate.0),
+                    balance: balance.into(),
+                    delegate: delegate.map(|delegate| delegate.0.clone()),
                     script: Script {
                         // Seq(&[]).encode(),
                         code: vec![0x02, 0x00, 0x00, 0x00, 0x00],
@@ -248,22 +191,19 @@ pub mod operation {
                         storage: vec![0x03, 0x6c],
                     },
                 },
-            });
-            origination
+            })
+        }
+
+        #[doc = "Forge the operation."]
+        pub fn forge(&self) -> Result<Vec<u8>, Error> {
+            OperationContent::Origination(self.0.clone())
                 .to_bytes()
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
     }
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Delegation {
-        pub source: PublicKeyHash,
-        pub fee: u64,
-        pub counter: u64,
-        pub gas_limit: u64,
-        pub storage_limit: u64,
-        pub delegate: Option<PublicKeyHash>,
-    }
+    pub struct Delegation(ManagerOperationContent<DelegationContent>);
 
     #[uniffi::export]
     impl Delegation {
@@ -277,30 +217,22 @@ pub mod operation {
             storage_limit: u64,
             delegate: Option<Arc<PublicKeyHash>>,
         ) -> Self {
-            Self {
-                source: source.clone(),
-                fee,
-                counter,
-                gas_limit,
-                storage_limit,
-                delegate: delegate.map(|delegate| delegate.as_ref().clone()),
-            }
+            Self(ManagerOperationContent {
+                source: source.0.clone(),
+                fee: fee.into(),
+                counter: counter.into(),
+                gas_limit: gas_limit.into(),
+                storage_limit: storage_limit.into(),
+                operation: DelegationContent {
+                    delegate: delegate.map(|delegate| delegate.0.clone()),
+                },
+            })
         }
 
         #[doc = "Forge the operation."]
         pub fn forge(&self) -> Result<Vec<u8>, Error> {
             let mut out = Vec::<u8>::new();
-            let delegation = OperationContent::Delegation(ManagerOperationContent {
-                source: self.source.0.clone(),
-                fee: self.fee.into(),
-                counter: self.counter.into(),
-                gas_limit: self.gas_limit.into(),
-                storage_limit: self.storage_limit.into(),
-                operation: DelegationContent {
-                    delegate: self.delegate.clone().map(|delegate| delegate.0),
-                },
-            });
-            delegation
+            OperationContent::Delegation(self.0.clone())
                 .bin_write(&mut out)
                 .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))?;
             Ok(out)
