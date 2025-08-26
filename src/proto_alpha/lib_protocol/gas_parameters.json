@@ -345,6 +345,8 @@
     "interpreter/N_IFailwith_const": 167.4551906586758,
     "interpreter/N_IGe_alloc_const": 0,
     "interpreter/N_IGe_const": 10,
+    "interpreter/N_IGet_address_index_alloc_const": 0,
+    "interpreter/N_IGet_address_index_const": 526.063429,
     "interpreter/N_IGt_alloc_const": 0,
     "interpreter/N_IGt_const": 10,
     "interpreter/N_IHalt_alloc_const": 0,

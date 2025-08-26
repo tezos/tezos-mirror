@@ -1584,6 +1584,18 @@ let cost_N_IGe_alloc = S.safe_int 10
 (* let time = 10. in let alloc = 0. in max 10 (max time alloc) *)
 let cost_N_IGe_synthesized = S.safe_int 10
 
+(* model interpreter/N_IGet_address_index *)
+(* max 10 526.063429 *)
+let cost_N_IGet_address_index = S.safe_int 530
+
+(* model interpreter/N_IGet_address_index_alloc *)
+(* max 10 0. *)
+let cost_N_IGet_address_index_alloc = S.safe_int 10
+
+(* model interpreter/N_IGet_address_index_synthesized *)
+(* let time = 526.063429 in let alloc = 0. in max 10 (max time alloc) *)
+let cost_N_IGet_address_index_synthesized = S.safe_int 530
+
 (* model interpreter/N_IGt *)
 (* max 10 10. *)
 let cost_N_IGt = S.safe_int 10

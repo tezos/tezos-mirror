@@ -3029,6 +3029,13 @@ module Registration_section = struct
 
     let () =
       simple_time_alloc_benchmark
+        ~name:Interpreter_workload.N_IGet_address_index
+        ~stack_type:(address @$ bot)
+        ~kinstr:(IGet_address_index (dummy_loc, halt))
+        ()
+
+    let () =
+      simple_time_alloc_benchmark
         ~name:Interpreter_workload.N_ICreate_contract
         ~stack_type:(option key_hash @$ mutez @$ unit @$ bot)
         ~kinstr:
