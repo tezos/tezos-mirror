@@ -288,7 +288,11 @@ let scp agent ~is_directory ~source ~destination
       if source <> destination then Process.run "cp" [source; destination]
       else Lwt.return_unit
   | Some runner ->
-      let destination = runner_path runner destination in
+      let source, destination =
+        match direction with
+        | `ToRunner -> (source, runner_path runner destination)
+        | `FromRunner -> (runner_path runner source, destination)
+      in
       let identity =
         Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
       in
