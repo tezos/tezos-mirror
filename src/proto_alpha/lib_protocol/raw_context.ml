@@ -1347,6 +1347,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
                  all_bakers_attest_activation_level;
+                 all_bakers_attest_activation_threshold;
                }
                 : Previous.t) =
             c
@@ -1401,6 +1402,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold;
           }
         in
         let*! ctxt = add_constants ctxt constants in
@@ -1757,6 +1759,8 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
             all_bakers_attest_activation_level;
+            all_bakers_attest_activation_threshold =
+              Ratio_repr.{numerator = 1; denominator = 2};
           }
         in
         let*! ctxt = add_constants ctxt constants in

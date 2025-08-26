@@ -264,6 +264,8 @@ type t = {
   aggregate_attestation : bool;
   allow_tz4_delegate_enable : bool;
   all_bakers_attest_activation_level : Raw_level_repr.t option;
+  (* Portion of tz4 bakers required to activate all bakers attest *)
+  all_bakers_attest_activation_threshold : Ratio_repr.t;
 }
 
 val encoding : t Data_encoding.encoding

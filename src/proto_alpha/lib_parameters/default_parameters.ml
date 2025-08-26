@@ -442,6 +442,9 @@ let constants_mainnet : Constants.Parametric.t =
     aggregate_attestation = true;
     allow_tz4_delegate_enable = true;
     all_bakers_attest_activation_level = None;
+    (* Portion of tz4 bakers required to activate all bakers attest (50%) *)
+    all_bakers_attest_activation_threshold =
+      Ratio.{numerator = 1; denominator = 2};
   }
 
 let constants_sandbox =

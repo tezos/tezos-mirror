@@ -155,3 +155,6 @@ Internal
 
 - Remove obsolete internal field related to Adaptive Issuance
   activation. (MR :gl:`!15789`)
+
+- Added internal field related to All Bakers Attest All Blocks
+  activation. (MR :gl:`!19093`)
