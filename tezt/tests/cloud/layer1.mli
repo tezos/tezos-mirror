@@ -40,7 +40,7 @@
          --snapshot ./ghostnet.snapshot
     ]}
 
-    As you can read using the help of [--help], [--l1-stresstest] is:
+    As you can read using the help of [--help], [--stresstest] is:
 
     {v
       --stresstest TPS[/seed]

@@ -725,6 +725,10 @@ module type Layer1 = sig
 
   val migration_offset : int option
 
+  val signing_delay : (float * float) option
+
+  val fixed_random_seed : int option
+
   val snapshot : Snapshot_helpers.t option
 
   val octez_release : string option
@@ -827,6 +831,40 @@ module Layer1 () = struct
       ~description:
         "After how many levels we will perform a UAU to upgrade to the next \
          protocol."
+      ()
+
+  let signing_delay =
+    let typ =
+      let parse string =
+        try
+          match String.split_on_char ',' string with
+          | [max] -> Some (0., float_of_string max)
+          | [min; max] -> Some (float_of_string min, float_of_string max)
+          | _ -> None
+        with _ -> None
+      in
+      let show (min, max) = Format.sprintf "%f,%f" min max in
+      Clap.typ ~name:"signing-delay" ~dummy:(0., 0.) ~parse ~show
+    in
+    Clap.optional
+      ~section
+      ~long:"signing-delay"
+      ~placeholder:"<min>,<max>"
+      ~description:
+        "Introduce a random signing delay between <min> and <max> seconds. \
+         This is useful when simulating a network with multiple bakers to \
+         avoid having all bakers trying to sign at the same time. If only one \
+         value is provided, the minimum is set to 0."
+      typ
+      ()
+
+  let fixed_random_seed =
+    Clap.optional_int
+      ~section
+      ~long:"fixed-seed"
+      ~description:
+        "Use a fixed seed for the client/baker random number generator. This \
+         can be useful for reproducing an experiment."
       ()
 
   let snapshot =

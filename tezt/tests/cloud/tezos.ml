@@ -909,7 +909,8 @@ module Agnostic_baker = struct
     let init ?(group = "L1") ?env ?name ?event_sections_levels ~delegates
         ?(path = Uses.path Constant.octez_agnostic_baker) ~client
         ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
-        ?(ppx_profiling = false) node cloud agent =
+        ?(ppx_profiling = false) ?allow_fixed_random_seed ?allow_signing_delay
+        ?extra_arguments node cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -930,6 +931,9 @@ module Agnostic_baker = struct
         ~delegates
         ?dal_node_rpc_endpoint
         ?dal_node_timeout_percentage
+        ?allow_fixed_random_seed
+        ?allow_signing_delay
+        ?extra_arguments
         node
         client
   end

@@ -323,6 +323,8 @@ type configuration = {
   migration_offset : int option;
   ppx_profiling : bool;
   ppx_profiling_backends : string list;
+  signing_delay : (float * float) option;
+  fixed_random_seed : int option;
 }
 
 let network_encoding =
@@ -347,6 +349,8 @@ let configuration_encoding =
            migration_offset;
            ppx_profiling;
            ppx_profiling_backends;
+           signing_delay;
+           fixed_random_seed;
          }
        ->
       ( stake,
@@ -356,7 +360,9 @@ let configuration_encoding =
         maintenance_delay,
         migration_offset,
         ppx_profiling,
-        ppx_profiling_backends ))
+        ppx_profiling_backends,
+        signing_delay,
+        fixed_random_seed ))
     (fun ( stake,
            network,
            snapshot,
@@ -364,7 +370,9 @@ let configuration_encoding =
            maintenance_delay,
            migration_offset,
            ppx_profiling,
-           ppx_profiling_backends )
+           ppx_profiling_backends,
+           signing_delay,
+           fixed_random_seed )
        ->
       {
         stake;
@@ -375,8 +383,10 @@ let configuration_encoding =
         migration_offset;
         ppx_profiling;
         ppx_profiling_backends;
+        signing_delay;
+        fixed_random_seed;
       })
-    (obj8
+    (obj10
        (req "stake" (list int31))
        (req "network" network_encoding)
        (req "snapshot" Snapshot_helpers.encoding)
@@ -393,7 +403,9 @@ let configuration_encoding =
        (dft
           "ppx_profiling_backends"
           (list string)
-          Scenarios_cli.Layer1_default.default_ppx_profiling_backends))
+          Scenarios_cli.Layer1_default.default_ppx_profiling_backends)
+       (opt "Signing_delay" (tup2 float float))
+       (opt "fixed_random_seed" int31))
 
 type bootstrap = {
   agent : Agent.t;
@@ -443,13 +455,33 @@ let init_baker_i i (configuration : configuration) cloud ~peers
   let* baker =
     toplog "init_baker: Initialize agnostic baker" ;
     let name = name ^ "-agnostic-baker" in
+    let open Signing_delay in
+    let env = yes_crypto_env in
+    let env =
+      match configuration.fixed_random_seed with
+      | None ->
+          Random.self_init () ;
+          env
+      | Some seed ->
+          Random.init seed ;
+          (* each baker will have a different seed *)
+          fixed_seed_env env
+    in
+    let env =
+      match configuration.signing_delay with
+      | None -> env
+      | Some (min, max) -> signing_delay_env min max env
+    in
     let* agnostic_baker =
       Agnostic_baker.Agent.init
-        ~env:yes_crypto_env
+        ~env
         ~name
         ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
         ~ppx_profiling:configuration.ppx_profiling
         ~client
+        ~allow_fixed_random_seed:
+          (Option.is_some configuration.fixed_random_seed)
+        ~allow_signing_delay:(Option.is_some configuration.signing_delay)
         node
         cloud
         agent
@@ -1013,6 +1045,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let migration_offset = Cli.migration_offset in
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
+    let signing_delay = Cli.signing_delay in
+    let fixed_random_seed = Cli.fixed_random_seed in
     match Tezt_cloud_cli.scenario_specific_json with
     | Some ("LAYER1", json) ->
         let conf = Data_encoding.Json.destruct configuration_encoding json in
@@ -1031,6 +1065,11 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ppx_profiling_backends =
             (if ppx_profiling_backends <> [] then ppx_profiling_backends
              else conf.ppx_profiling_backends);
+          signing_delay =
+            (if signing_delay <> None then signing_delay else conf.signing_delay);
+          fixed_random_seed =
+            (if fixed_random_seed <> None then fixed_random_seed
+             else conf.fixed_random_seed);
         }
     | _ ->
         {
@@ -1045,6 +1084,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
           migration_offset;
           ppx_profiling;
           ppx_profiling_backends;
+          signing_delay;
+          fixed_random_seed;
         }
   in
   if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
