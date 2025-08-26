@@ -2459,6 +2459,9 @@ let get_evm_events_from_rollup_node_state ~omit_delayed_tx_events evm_state =
 let apply_evm_events ?finalized_level events =
   worker_add_request ~request:(Apply_evm_events {finalized_level; events})
 
+let apply_evm_events' ?finalized_level events =
+  worker_wait_for_request (Apply_evm_events {finalized_level; events})
+
 let init_from_rollup_node ~configuration ~omit_delayed_tx_events ~data_dir
     ~rollup_node_data_dir ~tx_container () =
   let open Lwt_result_syntax in
