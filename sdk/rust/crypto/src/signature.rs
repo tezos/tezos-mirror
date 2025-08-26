@@ -60,6 +60,14 @@ impl Signature {
         }
     }
 
+    pub fn from_b58check(data: &str) -> Result<Self, FromBase58CheckError> {
+        Self::from_base58_check(data)
+    }
+
+    pub fn to_b58check(&self) -> String {
+        self.to_base58_check()
+    }
+
     pub fn hash_type(&self) -> HashType {
         match self {
             Self::Ed25519(_) => HashType::Ed25519Signature,
