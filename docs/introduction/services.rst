@@ -9,7 +9,7 @@ However, in these tutorials, daemons are just run in background or left running 
 This page shows how Octez daemons can be safely run from the official binary packages, as Unix services, which can ensure that they are started automatically and restarted in case of failures.
 
 This is a intermediate-level baking howto assuming some familiarity with the previous tutorials mentioned above, on installing, on setting up Octez, and on the notion of baking.
-For a more accessible and detailed step-by-step tutorial on running an Octez baker, including the complete set up of a baking account and thorough manual verifications upon each step, see 
+For a more accessible and detailed step-by-step tutorial on running an Octez baker, including the complete set up of a baking account and thorough manual verifications upon each step, see
 `Run a Tezos node in 5 steps <https://docs.tezos.com/tutorials/join-dal-baker>`__.
 
 Installing Octez
@@ -53,6 +53,9 @@ For more details on configuring the Octez node, see :doc:`../user/setup-node`.
 The default for the octez-node is to connect to ``mainnet``. You may want to
 connect to a test network if your goal is learning, developing, or testing.
 
+
+.. _node_as_service:
+
 Running the Octez node
 ~~~~~~~~~~~~~~~~~~~~~~
 
@@ -87,7 +90,7 @@ If you intend to bake on a testnet, you can simply create a key as follows, fund
    $ sudo su tezos -c "octez-client show address mybaker"
    Hash: tz1Ti8WHvfp3XKsTCKWLFv4TrER2HDofXG39
    Public Key: edpkuGRKH8oZDP2PH2EULw9PGzJHdf5g2zCiHnaYG7tapeePUNAWeC
-   
+
    $ ... # Fund mybaker with > 6000 tez, e.g. at https://faucet.ghostnet.teztnets.com
    $ sudo su tezos -c "octez-client register key mybaker as delegate"
    $ sudo su tezos -c "octez-client stake 6000 for mybaker"
