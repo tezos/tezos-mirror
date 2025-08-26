@@ -1038,7 +1038,8 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun ((consensus_key, companion_key) : Account.key * Account.key option) ->
+        fun ((consensus_key, companion_key) : Account.key * Account.key option)
+          ->
           let* slot =
             get_attestation_slot
               ~level:base_level
@@ -1120,7 +1121,8 @@ let attestations_aggregation_on_reproposal ~remote_mode protocol =
   let* () =
     Lwt_list.iter_s
       Operation.Consensus.(
-        fun ((consensus_key, companion_key) : Account.key * Account.key option) ->
+        fun ((consensus_key, companion_key) : Account.key * Account.key option)
+          ->
           let* slot =
             get_attestation_slot
               ~level:base_level

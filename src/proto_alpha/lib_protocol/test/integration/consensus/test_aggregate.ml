@@ -127,7 +127,8 @@ let check_aggregate_result (type kind) (kind : kind aggregate) ~attesters ~ctxt
                  consensus_key = consensus_pkh;
                  attesting_power;
                  _;
-               } ->
+               }
+             ->
             ( {Alpha_context.Consensus_key.delegate; consensus_pkh},
               attesting_power ))
           attesters

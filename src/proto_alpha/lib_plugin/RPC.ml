@@ -4009,7 +4009,8 @@ module Validators = struct
              rounds;
              attesting_power;
              attestation_slot;
-           } ->
+           }
+         ->
         ( delegate,
           rounds,
           consensus_key,
@@ -4021,7 +4022,8 @@ module Validators = struct
              consensus_key,
              companion_key,
              attesting_power,
-             attestation_slot ) ->
+             attestation_slot )
+         ->
         {
           delegate;
           consensus_key;
