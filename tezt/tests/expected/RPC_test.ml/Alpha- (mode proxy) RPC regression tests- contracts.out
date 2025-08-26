@@ -69,11 +69,11 @@ Fatal error:
   
 
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "99999565", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999554", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4", "revealed": true }
 
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"99999565"
+"99999554"
 
 ./octez-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "4"

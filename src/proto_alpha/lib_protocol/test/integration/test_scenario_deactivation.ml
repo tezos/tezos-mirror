@@ -56,25 +56,6 @@ let check_cannot_bake_next_block ~loc src_name =
 let check_can_bake_next_block ~loc src_name =
   assert_success ~loc (next_block_with_baker src_name)
 
-let check_grace_period ~loc src_name =
-  let open Lwt_result_syntax in
-  exec_unit @@ fun (block, state) ->
-  let src = State.find_account src_name state in
-  let last_seen_activity = Stdlib.Option.get src.last_seen_activity in
-  let grace =
-    Cycle.add
-      last_seen_activity
-      state.State.constants.tolerated_inactivity_period
-  in
-  let* rpc_grace = Context.Delegate.grace_period (B block) src.pkh in
-  Assert.equal
-    ( = )
-    "Grace period is not correct: expected vs RPC"
-    ~loc
-    Cycle.pp
-    grace
-    rpc_grace
-
 (** Test that a delegate gets deactivated after a set period of time
     if it is not baking.
 
@@ -86,8 +67,9 @@ let test_simple_scenario =
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
   --> set_baker "baker"
   --> wait_n_cycles_f (fun (_, state) ->
+          (* at activation, accounts have a low tolerance grace period  *)
           state.State.constants.consensus_rights_delay
-          + state.State.constants.tolerated_inactivity_period)
+          + state.State.constants.tolerated_inactivity_period_low)
   --> check_balance_field "delegate" `Staked (Tez.of_mutez 200_000_000_000L)
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
@@ -113,8 +95,9 @@ let test_baking_deactivation =
   --> begin_test ["delegate"; "baker"]
   --> unstake "delegate" All
   --> wait_n_cycles_f (fun (_, state) ->
+          (* at activation, accounts have a low tolerance grace period  *)
           state.State.constants.consensus_rights_delay
-          + state.State.constants.tolerated_inactivity_period)
+          + state.State.constants.tolerated_inactivity_period_low)
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"
@@ -134,8 +117,7 @@ let test_baking_deactivation =
   --> next_block_with_baker "delegate"
   (* Get deactivated by doing nothing *)
   --> set_baker "baker"
-  --> wait_n_cycles_f (fun (_, state) ->
-          state.State.constants.tolerated_inactivity_period)
+  --> wait_tolerated_inactivity_period "delegate"
   --> check_is_active ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_not_active ~loc:__LOC__ "delegate"
@@ -153,14 +135,14 @@ let test_deactivation_timing =
   --> staked_balance_no_change
   --> (Tag "Delegate is never active" --> set_baker "baker"
        --> wait_n_cycles_f (fun (_, state) ->
+               (* at activation, accounts have a low tolerance grace period  *)
                state.State.constants.consensus_rights_delay
-               + state.State.constants.tolerated_inactivity_period)
+               + state.State.constants.tolerated_inactivity_period_low)
       |+ Tag "Delegate is active for a few cycles" --> set_baker "delegate"
          --> wait_n_cycles_f (fun (_, state) ->
                  state.State.constants.consensus_rights_delay + 1)
          --> set_baker "baker"
-         --> wait_n_cycles_f (fun (_, state) ->
-                 state.State.constants.tolerated_inactivity_period))
+         --> wait_tolerated_inactivity_period "delegate")
   --> exec bake_until_next_cycle_end_but_one
   --> check_is_active ~loc:__LOC__ "delegate"
   --> staked_balance_no_change --> next_block

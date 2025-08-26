@@ -168,7 +168,6 @@
   Nonce_storage
   Seed_storage
   Contract_manager_storage
-  Delegate_activation_storage
   Sapling_storage_costs_generated
   Sapling_storage_costs
   Sapling_storage
@@ -178,6 +177,8 @@
   Cache_repr_costs_generated
   Cache_repr_costs
   Cache_repr
+  Selected_distribution_storage
+  Delegate_activation_storage
   Zk_rollup_storage
   Stake_context
   Adaptive_issuance_costs
@@ -463,7 +464,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -473,6 +473,8 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
@@ -760,7 +762,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -770,6 +771,8 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli
@@ -1041,7 +1044,6 @@
   nonce_storage.ml nonce_storage.mli
   seed_storage.ml seed_storage.mli
   contract_manager_storage.ml contract_manager_storage.mli
-  delegate_activation_storage.ml delegate_activation_storage.mli
   sapling_storage_costs_generated.ml
   sapling_storage_costs.ml
   sapling_storage.ml
@@ -1051,6 +1053,8 @@
   cache_repr_costs_generated.ml
   cache_repr_costs.ml
   cache_repr.ml cache_repr.mli
+  selected_distribution_storage.ml selected_distribution_storage.mli
+  delegate_activation_storage.ml delegate_activation_storage.mli
   zk_rollup_storage.ml zk_rollup_storage.mli
   stake_context.ml stake_context.mli
   adaptive_issuance_costs.ml adaptive_issuance_costs.mli

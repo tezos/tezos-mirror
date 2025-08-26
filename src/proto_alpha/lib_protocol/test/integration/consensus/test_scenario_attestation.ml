@@ -340,8 +340,9 @@ let test_attestations_keep_activation_status =
   --> set_baker ~min_round:1 "baker"
   --> set_payload_round (Some 0)
   --> wait_n_cycles_f (fun (_, state) ->
+          (* at activation, accounts have a low tolerance grace period  *)
           state.State.constants.consensus_rights_delay
-          + state.State.constants.tolerated_inactivity_period + 2)
+          + state.State.constants.tolerated_inactivity_period_low + 2)
   (* Check is still activated *)
   --> exec_unit (fun (block, state) ->
           let src = State.find_account "delegate" state in

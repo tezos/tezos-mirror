@@ -4317,6 +4317,8 @@ let levels_in_current_cycle ctxt ?(offset = 0l) block =
 let consecutive_round_zero ctxt block =
   RPC_context.make_call0 S.consecutive_round_zero ctxt block () ()
 
+let stake_info ctxt block = RPC_context.make_call0 S.stake_info ctxt block () ()
+
 let rpc_services =
   register () ;
   RPC_directory.merge rpc_services !Registration.patched_services

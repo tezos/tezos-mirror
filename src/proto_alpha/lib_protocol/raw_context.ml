@@ -1024,6 +1024,7 @@ type delays = {
   blocks_per_cycle : int32;
   delegate_parameters_activation_delay : int;
   cycles_per_voting_period : int32;
+  tolerated_inactivity_period : int;
   blocks_per_commitment : int32;
   nonce_revelation_threshold : int32;
   vdf_difficulty : int64;
@@ -1070,10 +1071,16 @@ let new_constants_four_hours_cycles ~preserve_duration_in_days
   let cycles_per_voting_period =
     preserve_duration previous_delays.cycles_per_voting_period
   in
+  let tolerated_inactivity_period =
+    Int32.to_int
+    @@ preserve_duration
+         (Int32.of_int previous_delays.tolerated_inactivity_period)
+  in
   {
     blocks_per_cycle;
     delegate_parameters_activation_delay;
     cycles_per_voting_period;
+    tolerated_inactivity_period;
     blocks_per_commitment;
     nonce_revelation_threshold;
     vdf_difficulty;
@@ -1302,7 +1309,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  consensus_rights_delay;
                  blocks_preservation_cycles;
                  delegate_parameters_activation_delay;
-                 tolerated_inactivity_period;
+                 tolerated_inactivity_period_high;
+                 tolerated_inactivity_period_low;
+                 tolerated_inactivity_period_threshold;
                  blocks_per_cycle;
                  blocks_per_commitment;
                  nonce_revelation_threshold;
@@ -1354,7 +1363,9 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
-            tolerated_inactivity_period;
+            tolerated_inactivity_period_high;
+            tolerated_inactivity_period_low;
+            tolerated_inactivity_period_threshold;
             blocks_per_cycle;
             blocks_per_commitment;
             nonce_revelation_threshold;
@@ -1654,6 +1665,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           blocks_per_cycle;
           delegate_parameters_activation_delay;
           cycles_per_voting_period;
+          tolerated_inactivity_period;
           blocks_per_commitment;
           nonce_revelation_threshold;
           vdf_difficulty;
@@ -1663,6 +1675,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               blocks_per_cycle;
               blocks_per_commitment;
               delegate_parameters_activation_delay;
+              tolerated_inactivity_period;
               cycles_per_voting_period;
               nonce_revelation_threshold;
               vdf_difficulty;
@@ -1670,9 +1683,10 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
           in
           if is_new_constants then
             (* we keep the same duration in days for the
-               [cycles_per_voting_period] and
-               [delegate_parameters_activation_delay] protocol
-               constants on mainnet *)
+               [cycles_per_voting_period],
+               [delegate_parameters_activation_delay],
+               [tolerated_inactivity_period] protocol constants on
+               mainnet *)
             let preserve_duration_in_days =
               Compare.Int64.(Period_repr.to_seconds c.minimal_block_delay = 8L)
             in
@@ -1695,13 +1709,17 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
               ~new_blocks_per_commitment:blocks_per_commitment
           else return ctxt
         in
-        let consensus_rights_delay = 1 in
         let constants =
+          let consensus_rights_delay = 1 in
+          let tolerated_inactivity_period_high = tolerated_inactivity_period in
+          let tolerated_inactivity_period_low = 1 in
           {
             Constants_parametric_repr.consensus_rights_delay;
             blocks_preservation_cycles;
             delegate_parameters_activation_delay;
-            tolerated_inactivity_period;
+            tolerated_inactivity_period_high;
+            tolerated_inactivity_period_low;
+            tolerated_inactivity_period_threshold = 10;
             blocks_per_cycle;
             blocks_per_commitment;
             nonce_revelation_threshold;

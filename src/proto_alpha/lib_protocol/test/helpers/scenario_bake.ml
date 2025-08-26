@@ -152,13 +152,8 @@ let check_misc _full_metadata (block, state) : unit tzresult Lwt.t =
             if not (Block.last_block_of_cycle block) then current_cycle
             else Cycle.succ current_cycle
           in
-          let deactivated =
-            match account.last_seen_activity with
-            | None -> assert false (* delegates have a minimum activity cycle *)
-            | Some activity_cycle ->
-                Cycle.(
-                  add activity_cycle state.constants.tolerated_inactivity_period)
-                < ctxt_cycle
+          let* deactivated =
+            Scenario_activity.is_inactive ~block ~state ctxt_cycle account
           in
           let*! r3 =
             Assert.equal_bool ~loc:__LOC__ deactivated deactivated_rpc
@@ -330,11 +325,12 @@ let finalize_block_ : t_incr -> t tzresult Lwt.t =
   let baker = Incremental.delegate i in
   let baker_name, _ = State.find_account_from_pkh baker.pkh state in
   (* Update baker activity *)
-  let state =
+  let* state =
     Scenario_activity.update_activity
-      baker_name
-      state
+      ~block
+      ~state
       (Block.current_cycle block)
+      baker_name
   in
   let* () = check_ai_launch_cycle_is_zero ~loc:__LOC__ block in
   let* state = State.apply_rewards ~baker:baker_name block state in
@@ -599,3 +595,12 @@ let wait_n_cycles_f (n_cycles : t -> int) =
   let open Lwt_result_syntax in
   let n_cycles n = return @@ n_cycles n in
   wait_n_cycles_f_es n_cycles
+
+let wait_tolerated_inactivity_period ?(cycle_offset = 0) name =
+  wait_n_cycles_f_es (fun (block, state) ->
+      let open Lwt_result_syntax in
+      let account = State.find_account name state in
+      let* tolerated_inactivity_period =
+        Scenario_activity.tolerated_inactivity_period ~block ~state account
+      in
+      return @@ (tolerated_inactivity_period + cycle_offset))

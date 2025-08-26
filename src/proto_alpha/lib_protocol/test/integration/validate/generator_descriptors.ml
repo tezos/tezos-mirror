@@ -40,7 +40,6 @@ type state = {
   pred : Block.t option;
   bootstraps : public_key_hash list;
   delegates : (public_key_hash * public_key_hash option) list;
-  voters : Contract.t list;
   seed_nonce_to_reveal : (Raw_level.t * Nonce_hash.t) list;
   commitments : secret_account list;
   protocol_hashes : Protocol_hash.t list;
@@ -78,7 +77,7 @@ let init_dbl_attestation_state =
 
     When adding a new operation kind, if such an initialization is
     required, it should occur here. *)
-let init_state block ~voters ~(bootstraps : Contract.t list) =
+let init_state block ~(bootstraps : Contract.t list) =
   let bootstraps =
     List.map
       (function Contract.Implicit pkh -> pkh | _ -> assert false)
@@ -89,7 +88,6 @@ let init_state block ~voters ~(bootstraps : Contract.t list) =
     pred = None;
     bootstraps;
     delegates = List.map (fun pkh -> (pkh, None)) bootstraps;
-    voters;
     seed_nonce_to_reveal = [];
     commitments = [];
     protocol_hashes = [];
@@ -119,6 +117,11 @@ let voting_context_params params =
   let constants = Parameters.{params.constants with cycles_per_voting_period} in
   {params with constants}
 
+let get_voters state =
+  let open Lwt_result_syntax in
+  let+ voters = Context.Vote.get_listings (B state.block) in
+  List.map (fun (pkh, _) -> Contract.Implicit pkh) voters
+
 let ballot_exploration_prelude state =
   let open Lwt_result_syntax in
   let* ctxt =
@@ -129,8 +132,9 @@ let ballot_exploration_prelude state =
   let rem =
     Int32.rem state.block.Block.header.Block_header.shell.level blocks_per_cycle
   in
+  let* voters = get_voters state in
   if rem = 0l then
-    match state.voters with
+    match voters with
     | voter :: voters ->
         let* prop = Op.proposals (B state.block) voter [get_n protos 0] in
         let* props =
@@ -190,7 +194,8 @@ let ballot_exploration_descriptor =
           let ballot = pick_one ballots in
           Op.ballot (B state.block) contract Protocol_hash.zero ballot
         in
-        List.map_es gen state.voters);
+        let* voters = get_voters state in
+        List.map_es gen voters);
   }
 
 let proposal_descriptor =
@@ -212,7 +217,8 @@ let proposal_descriptor =
           assert (voting_period_info.voting_period.kind = Proposal) ;
           Op.proposals (B state.block) contract [Protocol_hash.zero]
         in
-        List.map_es gen state.voters);
+        let* voters = get_voters state in
+        List.map_es gen voters);
   }
 
 (** [Promotion] is the 4th voting period, it requires 3 voting period
@@ -254,12 +260,13 @@ let ballot_promotion_descriptor =
                 state.block.Block.header.Block_header.shell.level
                 blocks_per_cycle
             in
+            let* voters = get_voters state in
             if rem = 0l then
               let* ops =
                 List.map_es
                   (fun voter ->
                     Op.ballot (B state.block) voter Protocol_hash.zero Vote.Yay)
-                  state.voters
+                  voters
               in
               return (ops, state)
             else return ([], state) );
@@ -274,7 +281,8 @@ let ballot_promotion_descriptor =
           let ballot = Stdlib.List.hd ballots in
           Op.ballot (B state.block) contract Protocol_hash.zero ballot
         in
-        List.map_es gen state.voters);
+        let* voters = get_voters state in
+        List.map_es gen voters);
   }
 
 let seed_nonce_descriptor =

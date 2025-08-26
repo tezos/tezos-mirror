@@ -149,7 +149,6 @@
         "Nonce_storage",
         "Seed_storage",
         "Contract_manager_storage",
-        "Delegate_activation_storage",
         "Sapling_storage_costs_generated",
         "Sapling_storage_costs",
         "Sapling_storage",
@@ -159,6 +158,8 @@
         "Cache_repr_costs_generated",
         "Cache_repr_costs",
         "Cache_repr",
+        "Selected_distribution_storage",
+        "Delegate_activation_storage",
 
         "Zk_rollup_storage",
 

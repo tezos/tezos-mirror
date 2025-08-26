@@ -163,10 +163,6 @@ let init nb_accounts descrs =
   let* initial_block, bootstraps =
     Context.init_with_parameters_n setup.params nb_accounts
   in
-  let* voters = Context.Vote.get_listings (B initial_block) in
-  let* initial_voters =
-    List.map_es (fun (c, _) -> return (Contract.Implicit c)) voters
-  in
   let my_bake selected_preludes_for_cycle state =
     let* state, operations =
       List.fold_left_es
@@ -205,7 +201,7 @@ let init nb_accounts descrs =
   let* state =
     List.fold_left_es
       (fun state cycle -> my_bake_until_cycle_end cycle state)
-      (init_state initial_block ~voters:initial_voters ~bootstraps)
+      (init_state initial_block ~bootstraps)
       (Stdlib.List.init setup.nb_cycles Fun.id)
   in
   let my_bake_n_default n state =

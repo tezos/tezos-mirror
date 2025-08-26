@@ -2187,69 +2187,78 @@ let test_tolerated_inactivity_period () =
           in
 
           (* Migration at the end of C3:
-             - D0, D1, D2 are deactivated at the end of C4 -> C6
-             - D3 is deactivated at the end of C5 -> C7
+             - D0, D1, D2 are deactivated at the end of C4 -> C5
+             - D3 is deactivated at the end of C5 -> C6
              -------------------------[proto migration]
-             - D4 is deactivated at the end of C6 -> C7
-             - D5 is deactivated at the end of C7
-             - D6 is deactivated at the end of C8
-             - D7 is deactivated at the end of C9
+             - D4 is deactivated at the end of C5 -> C6
+             - D5 is deactivated at the end of C6
+             - D6 is deactivated at the end of C7
+             - D7 is deactivated at the end of C8
 
              Migration at the end of C4:
              - D0, D1, D2 are deactivated at the end of C4
-             - D3 is deactivated at the end of C5 -> C7
-             - D4 is deactivated at the end of C6 -> C8
+             - D3 is deactivated at the end of C5 -> C6
+             - D4 is deactivated at the end of C6 -> C7
              -------------------------[proto migration]
-             - D5 is deactivated at the end of C7 -> C8
-             - D6 is deactivated at the end of C8
-             - D7 is deactivated at the end of C9
+             - D5 is deactivated at the end of C6 -> C7
+             - D6 is deactivated at the end of C7
+             - D7 is deactivated at the end of C8
 
              Migration at the end of C5:
              - D0, D1, D2 are deactivated at the end of C4
              - D3 is deactivated at the end of C5
-             - D4 is deactivated at the end of C6 -> C8
-             - D5 is deactivated at the end of C7 -> C9
+             - D4 is deactivated at the end of C6 -> C7
+             - D5 is deactivated at the end of C7 -> C8
              -------------------------[proto migration]
-             - D6 is deactivated at the end of C8 -> C9
-             - D7 is deactivated at the end of C9
+             - D6 is deactivated at the end of C7 -> C8
+             - D7 is deactivated at the end of C8
           *)
           let expected_list =
             match target_cycle with
             | 3 | 4 -> all_activated
             | 5 ->
+                (* Deactivated at the end of C4. Migration at the end of
+                   - [migration_cycle = 4] C3: None
+                   - [migration_cycle = 5] C4: D0, D1, D2
+                   - [migration_cycle = 6] C5: D0, D1, D2 *)
                 let is_deactivated i =
                   if i <= 2 then migration_cycle >= 5 else false
                 in
                 List.init 8 is_deactivated
             | 6 ->
-                let is_deactivated i =
-                  if i <= 2 then migration_cycle >= 5
-                  else if i = 3 then migration_cycle >= 6
-                  else false
-                in
-                List.init 8 is_deactivated
-            | 7 ->
+                (* Deactivated at the end of C5. Migration at the end of
+                   - [migration_cycle = 4] C3: D0, D1, D2
+                   - [migration_cycle = 5] C4: D0, D1, D2
+                   - [migration_cycle = 6] C5: D0, D1, D2, D3 *)
                 let is_deactivated i =
                   if i <= 2 then true
                   else if i = 3 then migration_cycle >= 6
                   else false
                 in
                 List.init 8 is_deactivated
-            | 8 ->
+            | 7 ->
+                (* Deactivated at the end of C6. Migration at the end of
+                   - [migration_cycle = 4] C3: D0, D1, D2, D3, D4, D5
+                   - [migration_cycle = 5] C4: D0, D1, D2, D3
+                   - [migration_cycle = 6] C5: D0, D1, D2, D3 *)
                 let is_deactivated i =
                   if i <= 3 then true
                   else if i = 4 || i = 5 then migration_cycle = 4
                   else false
                 in
                 List.init 8 is_deactivated
-            | 9 ->
+            | 8 ->
+                (* Deactivated at the end of C7. Migration at the end of
+                   - [migration_cycle = 4] C3: D0, D1, D2, D3, D4, D5, D6
+                   - [migration_cycle = 5] C4: D0, D1, D2, D3, D4, D5, D6
+                   - [migration_cycle = 6] C5: D0, D1, D2, D3, D4 *)
                 let is_deactivated i =
-                  if i = 5 || i = 6 then migration_cycle <= 5
-                  else if i = 7 then false
-                  else true
+                  if i <= 4 then true
+                  else if i = 5 || i = 6 then migration_cycle <= 5
+                  else false
                 in
                 List.init 8 is_deactivated
-            | 10 -> all_deactivated
+            | 9 | 10 -> all_deactivated
             | _ -> failwith "unexpected input"
           in
           (* [default_baker] must be always active *)

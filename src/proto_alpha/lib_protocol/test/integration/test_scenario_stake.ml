@@ -609,8 +609,7 @@ let test_deactivation_after_unstake_all =
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   (* We already waited for [consensus_rights_delay] + 1 cycles since 0 stake,
      we must wait for [tolerated_inactivity_period - 1] more. *)
-  --> wait_n_cycles_f (fun (_, state) ->
-          state.State.constants.tolerated_inactivity_period - 1)
+  --> wait_tolerated_inactivity_period ~cycle_offset:(-1) "delegate"
   --> check_is_not_deactivated ~loc:__LOC__ "delegate"
   --> next_cycle
   --> check_is_deactivated ~loc:__LOC__ "delegate"

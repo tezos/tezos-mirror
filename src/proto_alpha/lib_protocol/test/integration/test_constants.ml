@@ -193,12 +193,22 @@ let () =
     ~duration:(Days 5l)
 
 let () =
-  register_test ~title:"tolerated inactivity period is 8 hours" @@ fun () ->
+  register_test ~title:"tolerated inactivity period is 2 days for small bakers"
+  @@ fun () ->
   let constants = Default_parameters.constants_mainnet in
   check_protocol_time_correlation
     ~constants
-    ~cycles:(Int32.of_int constants.tolerated_inactivity_period)
-    ~duration:(Hours 8l)
+    ~cycles:(Int32.of_int constants.tolerated_inactivity_period_high)
+    ~duration:(Days 2l)
+
+let () =
+  register_test ~title:"tolerated inactivity period is 4 hours for big bakers"
+  @@ fun () ->
+  let constants = Default_parameters.constants_mainnet in
+  check_protocol_time_correlation
+    ~constants
+    ~cycles:(Int32.of_int constants.tolerated_inactivity_period_low)
+    ~duration:(Hours 4l)
 
 let () =
   register_test ~title:"Nonce commitment per cycle is above 128" @@ fun () ->

@@ -272,8 +272,21 @@ let constants_mainnet : Constants.Parametric.t =
        first [consensus_rights_delay] cycles, so of course the chain
        will not witness any activity from it then.
 
-       Last updated in protocol R. *)
-    tolerated_inactivity_period = 2;
+       [tolerated_inactivity_period] depends on the delegate's stake
+       ratio over the total active stake. If the ratio is greater than
+       the [tolerated_inactivity_period_threshold] (expressed in 'per
+       thousand'), we apply a low tolerance
+       [tolerated_inactivity_period_low]. Otherwise, we apply a high
+       tolerance [tolerated_inactivity_period_high]. If the stake is
+       unknown, we apply a low tolerance (e.g., after the delegate's
+       registration, reactivation, or decreasing its stake below
+       [minimal_stake]).
+
+       Last updated in protocol T. *)
+    tolerated_inactivity_period_high = 12;
+    tolerated_inactivity_period_low = 1;
+    (* threshold is in per thousand *)
+    tolerated_inactivity_period_threshold = 10;
     (* [blocks_per_cycle] is the duration of a cycle in number of
        blocks. Multiply it by [minimal_block_delay] to get the minimal
        duration of a cycle in seconds.

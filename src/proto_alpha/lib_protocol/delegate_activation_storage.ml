@@ -23,6 +23,68 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Tolerated inactivity period depends on the delegate's stake ratio
+    over the total active stake.
+
+    If the stake is unknown, it means that the baker had no staking
+    rights for the current cycle. In this case, the call to
+    [set_active] is subsequent to a delegate registration or
+    reactivation. As we do not know its future weight in the
+    consensus, we take a conservative approach and assign it a low
+    tolerance [tolerated_inactivity_period_low].
+
+    If the ratio is greater than the threshold (expressed in 'per
+    thousand'), we apply a low tolerance. Otherwise, we apply a high
+    tolerance. *)
+let tolerated_inactivity_period ctxt delegate =
+  let open Lwt_result_syntax in
+  let tolerance_threshold =
+    Constants_storage.tolerated_inactivity_period_threshold ctxt
+  in
+  let tolerance_low = Constants_storage.tolerated_inactivity_period_low ctxt in
+  let tolerance_high =
+    Constants_storage.tolerated_inactivity_period_high ctxt
+  in
+  let current_cycle = Cycle_storage.current ctxt in
+  if Cycle_repr.(current_cycle = root) then
+    (* There is no selected distribution at chain initialisation, so
+       we give a low tolerance *)
+    return tolerance_low
+  else
+    let* delegates_stakes =
+      Selected_distribution_storage.get_selected_distribution ctxt current_cycle
+    in
+    match
+      List.assoc
+        ~equal:Signature.Public_key_hash.equal
+        delegate
+        delegates_stakes
+    with
+    | None ->
+        (* There is no stake registered at
+           - a first delegate registration
+           - a delegate reactivation
+           - after decreasing its stake below [minimal_stake]
+           so we give a low tolerance *)
+        return tolerance_low
+    | Some delegate_stake ->
+        let+ total_stake =
+          Selected_distribution_storage.get_total_active_stake
+            ctxt
+            current_cycle
+        in
+        let compare_stake_ratio_with_threshold =
+          Int64.(
+            compare
+              (div
+                 (mul 1000L (Stake_repr.staking_weight delegate_stake))
+                 (Stake_repr.staking_weight total_stake))
+              (of_int tolerance_threshold))
+        in
+        if Compare.Int.(compare_stake_ratio_with_threshold > 0) then
+          tolerance_low
+        else tolerance_high
+
 let is_inactive ctxt delegate =
   let open Lwt_result_syntax in
   let*! inactive =
@@ -32,12 +94,12 @@ let is_inactive ctxt delegate =
   in
   if inactive then Lwt.return_ok inactive
   else
-    let+ cycle_opt =
+    let* cycle_opt =
       Storage.Contract.Delegate_last_cycle_before_deactivation.find
         ctxt
         (Contract_repr.Implicit delegate)
     in
-    let tolerance = Constants_storage.tolerated_inactivity_period ctxt in
+    let+ tolerance = tolerated_inactivity_period ctxt delegate in
     match cycle_opt with
     | Some last_active_cycle ->
         let ({Level_repr.cycle = current_cycle; _} : Level_repr.t) =
@@ -51,7 +113,7 @@ let is_inactive ctxt delegate =
 
 let last_cycle_before_deactivation ctxt delegate =
   let open Lwt_result_syntax in
-  let tolerance = Constants_storage.tolerated_inactivity_period ctxt in
+  let* tolerance = tolerated_inactivity_period ctxt delegate in
   let contract = Contract_repr.Implicit delegate in
   let+ cycle =
     Storage.Contract.Delegate_last_cycle_before_deactivation.get ctxt contract
