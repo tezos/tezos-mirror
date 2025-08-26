@@ -82,36 +82,18 @@ module Logs = struct
     | None ->
         Log.warn "Cannot retrieve logs for %s: no runner for agent" agent_name ;
         Lwt.return_unit
-    | Some runner ->
-        let identity =
-          Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
-        in
-        let port =
-          Option.fold
-            ~none:[]
-            ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
-            runner.Runner.ssh_port
-        in
-        let source =
-          Format.sprintf
-            "%s%s:%s"
-            (Option.fold
-               ~none:""
-               ~some:(fun u -> Format.sprintf "%s@" u)
-               runner.Runner.ssh_user)
-            runner.address
-            tezt_root_path
-        in
+    | Some _runner ->
         let local_path =
           local_path [destination_root; agent_name; daemon_name]
         in
         Lwt.catch
           (fun () ->
-            Process.run
-              "scp"
-              (Ssh.scp_options @ ["-r"] @ identity @ port
-              @ [source // daemon_name // "daily_logs"]
-              @ [local_path // "daily_logs"]))
+            Agent.scp
+              agent
+              ~is_directory:true
+              ~source:(tezt_root_path // daemon_name // "daily_logs")
+              ~destination:(local_path // "daily_logs")
+              `FromRunner)
           (fun exn ->
             Log.warn
               "Cannot retrieve log from %s: %s"
