@@ -26,6 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -w -32-34
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_016_PtMumbai
@@ -286,6 +287,7 @@
   tezos-protocol-016-PtMumbai.protocol.raw)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Protocol Tezos_protocol_016_PtMumbai))
 
@@ -560,7 +562,8 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34 -warn-error +a .)))
 
 (library
  (name tezos_protocol_016_PtMumbai_lifted)
@@ -572,6 +575,7 @@
   tezos-protocol-016-PtMumbai.protocol)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives
   -open Tezos_protocol_016_PtMumbai)
  (modules Lifted_protocol))
@@ -590,6 +594,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Functor))
 
@@ -860,6 +865,9 @@
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -w -32-34)
  (modules Registerer))
 
 (rule

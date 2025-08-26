@@ -1056,9 +1056,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd4cd089c13c7b174949b3a159b2e218db912f9867003fed717c156816ced0d8"
+checksum = "7f1b5dc3fe14b42b881b5a861b3e50f969512c1d8c8ba8cddde020ba96ebb23d"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",

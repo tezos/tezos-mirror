@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_013_PtJakart
@@ -223,7 +223,7 @@
   tezos-protocol-013-PtJakart.protocol.raw)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives)
  (modules Protocol Tezos_protocol_013_PtJakart))
 
@@ -430,7 +430,8 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warning -51 -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34-51 -warn-error +a .)))
 
 (library
  (name tezos_protocol_013_PtJakart_lifted)
@@ -442,7 +443,7 @@
   tezos-protocol-013-PtJakart.protocol)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives
   -open Tezos_protocol_013_PtJakart)
  (modules Lifted_protocol))
@@ -461,7 +462,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
-  -w -51
+  -w -32-34-51
   -nopervasives)
  (modules Functor))
 
@@ -666,7 +667,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -51)
+  -w -32-34-51)
  (modules Registerer))
 
 (rule

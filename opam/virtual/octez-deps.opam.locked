@@ -168,8 +168,8 @@ depends: [
   "multipart_form" {= "0.6.0"}
   "multipart_form-lwt" {= "0.6.0"}
   "num" {= "1.5-1"}
-  "ocaml" {= "5.2.1"}
-  "ocaml-base-compiler" {= "5.2.1"}
+  "ocaml" {= "5.3.0"}
+  "ocaml-base-compiler" {= "5.3.0"}
   "ocaml-compiler-libs" {= "v0.17.0"}
   "ocaml-config" {= "3"}
   "ocaml-options-vanilla" {= "1"}

@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_004_Pt24m4xi
@@ -112,7 +112,7 @@
   tezos-protocol-004-Pt24m4xi.protocol.raw)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Protocol Tezos_protocol_004_Pt24m4xi))
 
@@ -210,7 +210,7 @@
  (action
   (run
    %{bin:octez-protocol-compiler}
-   -warning -6-7-9-16-29-32-51-68
+   -warning -6-7-9-16-29-32-34-51-68
    -warn-error +a
    .)))
 
@@ -224,7 +224,7 @@
   tezos-protocol-004-Pt24m4xi.protocol)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives
   -open Tezos_protocol_004_Pt24m4xi)
  (modules Lifted_protocol))
@@ -243,7 +243,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Functor))
 
@@ -336,7 +336,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68)
+  -w -6-7-9-16-29-32-34-51-68)
  (modules Registerer))
 
 (rule

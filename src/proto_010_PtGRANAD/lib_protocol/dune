@@ -26,7 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_010_PtGRANAD
@@ -128,7 +128,7 @@
   tezos-protocol-010-PtGRANAD.protocol.raw)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Protocol Tezos_protocol_010_PtGRANAD))
 
@@ -242,7 +242,7 @@
  (action
   (run
    %{bin:octez-protocol-compiler}
-   -warning -6-7-9-16-29-32-51-68
+   -warning -6-7-9-16-29-32-34-51-68
    -warn-error +a
    .)))
 
@@ -256,7 +256,7 @@
   tezos-protocol-010-PtGRANAD.protocol)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives
   -open Tezos_protocol_010_PtGRANAD)
  (modules Lifted_protocol))
@@ -275,7 +275,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68
+  -w -6-7-9-16-29-32-34-51-68
   -nopervasives)
  (modules Functor))
 
@@ -384,7 +384,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
-  -w -6-7-9-16-29-32-51-68)
+  -w -6-7-9-16-29-32-34-51-68)
  (modules Registerer))
 
 (rule
