@@ -481,11 +481,15 @@ impl ChainConfigTrait for MichelsonChainConfig {
             // Retrieve the next operation in the VecDequeue
             let operation = operations.pop_front().ok_or(error::Error::Reboot)?;
 
+            // Compute the hash of the operation
+            let hash = operation.hash()?;
+
             // Try to apply the operation with the tezos_execution crate, return a receipt
             // on whether it failed or not
             let receipt = match tezos_execution::validate_and_apply_operation(
                 host,
                 &context,
+                hash.clone(),
                 operation.clone(),
             ) {
                 Ok(receipt) => receipt,
@@ -502,9 +506,6 @@ impl ChainConfigTrait for MichelsonChainConfig {
                     return Err(err.into());
                 }
             };
-
-            // Compute the hash of the operation
-            let hash = operation.hash()?;
 
             let operations = zip_operations(operation.clone(), receipt);
 

@@ -69,7 +69,7 @@ impl TryFrom<U256> for BlockNumber {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct OperationHash(pub H256);
 
 impl NomReader<'_> for OperationHash {
