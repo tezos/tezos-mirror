@@ -2086,6 +2086,190 @@ let test_consensus_rights_delay_shortening () =
     unit
   done
 
+let test_tolerated_inactivity_period () =
+  (* Given that [grace_period] for the current scenario is equal to 4
+     cycles, we check a protocol migration near that cycle.
+
+     In proto T, we update the Delegate_last_cycle_before_deactivation
+     table with the actual last activity cycle without doing a
+     stitching during the protocol migration. It means that the
+     [grace_period] is off by:
+
+     - 2 cycles for the delegates with the last activity in the last
+     cycle or last but one cycle of proto S
+
+     - 1 cycle for the delegates with the last activity in the first
+     cycle of proto T *)
+  let migrate_from = Option.get Protocol.(previous_protocol Alpha) in
+  let migrate_to = Protocol.Alpha in
+
+  for migration_cycle = 4 to 6 do
+    Test.register
+      ~__FILE__
+      ~title:
+        (Printf.sprintf
+           "protocol migration for tolerated_inactivity_period at the end of \
+            cycle %d"
+           (migration_cycle - 1))
+      ~tags:[team; "protocol"; "migration"; "tolerated_inactivity_period"]
+    @@ fun () ->
+    let parameter_file = Protocol.parameter_file migrate_from in
+    let parameters = JSON.parse_file parameter_file in
+    let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+    let migration_level = migration_cycle * blocks_per_cycle in
+    let () = Local_helpers.print_parameters ~parameter_file ~migration_level in
+
+    let* client, _node =
+      Local_helpers.activate_protocol
+        ~parameter_file
+        ~migrate_from
+        ~migrate_to
+        ~migration_level
+    in
+    let bake_until_cycle_with_and_check =
+      Local_helpers.bake_until_cycle_with_and_check
+        ~migration_level
+        ~migrate_from
+        ~migrate_to
+        ~blocks_per_cycle
+    in
+    (* [default_baker] never gets deactivated *)
+    let default_baker = Constant.bootstrap1.alias in
+    (* [funder] is used to fund all new accounts *)
+    let funder = Constant.bootstrap2.alias in
+
+    (* [delegate_i] stops participating in cycle (i + 1) *)
+    let* delegates =
+      Local_helpers.create_delegates_and_stake
+        ~baker:default_baker
+        ~giver:funder
+        ~delegates:
+          (List.init 8 (fun i ->
+               ("delegate_" ^ Int.to_string i, Tez.of_int 300_000)))
+        client
+    in
+    let delegates_array = Array.of_list delegates in
+    let all_activated = List.init 8 (fun _i -> false) in
+    let all_deactivated = List.init 8 (fun _i -> true) in
+
+    let check_deactivated_list expected_status_for_delegates =
+      Lwt_list.iteri_s
+        (fun i expected ->
+          let* () =
+            Local_helpers.check_deactivated delegates_array.(i) ~expected client
+          in
+          unit)
+        expected_status_for_delegates
+    in
+
+    let* () =
+      Local_helpers.check_current_level_and_cycle ~level:4 ~cycle:0 client
+    in
+    (* grace_period = tolerated_inactivity_period + consensus_rights_delay = 2 + 2 = 4 *)
+    (* all delegates are marked as active with [grace_period] = 4 *)
+    let* () = check_deactivated_list all_activated in
+
+    let* () =
+      Lwt_list.iter_s
+        (fun target_cycle ->
+          let delegates_i_and_higher i =
+            List.init (8 - i) (fun x -> delegates_array.(x + i).alias)
+          in
+          (* [delegate_i] cannot bake during cycle_{0,1,2} as they
+             have no baking rights, so we wait for cycle 3 to start
+             baking with new delegates; delegate_{0,1,2} never bake in
+             this testing scenario *)
+          let bakers, delegate =
+            if 3 <= target_cycle && target_cycle <= 7 then
+              ( delegates_i_and_higher target_cycle,
+                delegates_array.(target_cycle).alias )
+            else ([], default_baker)
+          in
+
+          (* Migration at the end of C3:
+             - D0, D1, D2 are deactivated at the end of C4 -> C6
+             - D3 is deactivated at the end of C5 -> C7
+             -------------------------[proto migration]
+             - D4 is deactivated at the end of C6 -> C7
+             - D5 is deactivated at the end of C7
+             - D6 is deactivated at the end of C8
+             - D7 is deactivated at the end of C9
+
+             Migration at the end of C4:
+             - D0, D1, D2 are deactivated at the end of C4
+             - D3 is deactivated at the end of C5 -> C7
+             - D4 is deactivated at the end of C6 -> C8
+             -------------------------[proto migration]
+             - D5 is deactivated at the end of C7 -> C8
+             - D6 is deactivated at the end of C8
+             - D7 is deactivated at the end of C9
+
+             Migration at the end of C5:
+             - D0, D1, D2 are deactivated at the end of C4
+             - D3 is deactivated at the end of C5
+             - D4 is deactivated at the end of C6 -> C8
+             - D5 is deactivated at the end of C7 -> C9
+             -------------------------[proto migration]
+             - D6 is deactivated at the end of C8 -> C9
+             - D7 is deactivated at the end of C9
+          *)
+          let expected_list =
+            match target_cycle with
+            | 3 | 4 -> all_activated
+            | 5 ->
+                let is_deactivated i =
+                  if i <= 2 then migration_cycle >= 5 else false
+                in
+                List.init 8 is_deactivated
+            | 6 ->
+                let is_deactivated i =
+                  if i <= 2 then migration_cycle >= 5
+                  else if i = 3 then migration_cycle >= 6
+                  else false
+                in
+                List.init 8 is_deactivated
+            | 7 ->
+                let is_deactivated i =
+                  if i <= 2 then true
+                  else if i = 3 then migration_cycle >= 6
+                  else false
+                in
+                List.init 8 is_deactivated
+            | 8 ->
+                let is_deactivated i =
+                  if i <= 3 then true
+                  else if i = 4 || i = 5 then migration_cycle = 4
+                  else false
+                in
+                List.init 8 is_deactivated
+            | 9 ->
+                let is_deactivated i =
+                  if i = 5 || i = 6 then migration_cycle <= 5
+                  else if i = 7 then false
+                  else true
+                in
+                List.init 8 is_deactivated
+            | 10 -> all_deactivated
+            | _ -> failwith "unexpected input"
+          in
+          (* [default_baker] must be always active *)
+          let bakers = default_baker :: bakers in
+          let* () =
+            bake_until_cycle_with_and_check
+              ~bakers
+              ~target_cycle
+              ~delegate
+              ~check_last_block:(fun () -> check_deactivated_list expected_list)
+              ~check_next_block:(fun _ -> unit)
+              client
+          in
+          unit)
+        (* From cycle 3 to 10 *)
+        (List.init 8 (fun i -> i + 3))
+    in
+    unit
+  done
+
 let register ~migrate_from ~migrate_to =
   test_migration_for_whole_cycle ~migrate_from ~migrate_to ;
   test_migration_with_bakers ~migrate_from ~migrate_to () ;
@@ -2097,4 +2281,5 @@ let register ~migrate_from ~migrate_to =
   test_reveal_migration () ;
   test_tz4_manager_operation ~with_empty_mempool:true ;
   test_tz4_manager_operation ~with_empty_mempool:false ;
-  test_consensus_rights_delay_shortening ()
+  test_consensus_rights_delay_shortening () ;
+  test_tolerated_inactivity_period ()

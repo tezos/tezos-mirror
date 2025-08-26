@@ -560,52 +560,6 @@ let current_total_frozen_deposits_with_limits account_state =
       account_state.parameters.limit_of_staking_over_baking
     account_state.frozen_deposits
 
-let update_activity constants current_cycle account =
-  match account.last_seen_activity with
-  | None ->
-      {
-        account with
-        last_seen_activity =
-          Some
-            (Cycle.add
-               current_cycle
-               constants
-                 .Protocol.Alpha_context.Constants.Parametric
-                  .consensus_rights_delay);
-      }
-  | Some activity_cycle ->
-      if
-        (* When a delegate is initialized or reactivated (either from
-           [set_delegate] or participating in the consensus again), we put
-           extra [consensus_rights_delay] cycles in the future to account
-           for its extended grace period *)
-        Cycle.(
-          add
-            activity_cycle
-            constants
-              .Protocol.Alpha_context.Constants.Parametric
-               .tolerated_inactivity_period
-          < current_cycle)
-      then
-        {
-          account with
-          last_seen_activity =
-            Some
-              Cycle.(
-                max
-                  activity_cycle
-                  (add
-                     current_cycle
-                     constants
-                       .Protocol.Alpha_context.Constants.Parametric
-                        .consensus_rights_delay));
-        }
-      else
-        {
-          account with
-          last_seen_activity = Some Cycle.(max activity_cycle current_cycle);
-        }
-
 let assert_balance_evolution ~loc ~for_accounts ~part ~name ~old_balance
     ~new_balance compare =
   let open Lwt_result_syntax in
