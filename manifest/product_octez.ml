@@ -5847,6 +5847,25 @@ let _octez_scoru_wasm_fast_tests =
       ]
     ~preprocess:(staged_pps [ppx_import; ppx_deriving_show])
 
+let octez_baking_common_lib =
+  let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
+  public_lib
+    "octez-baking-common-lib"
+    ~path:"src/lib_baking_common"
+    ~internal_name:"octez_baking_common"
+    ~synopsis:
+      "Common Library for protocol-dependent bakers and protocol-agnostic baker"
+    ~preprocess
+    ~preprocessor_deps
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        tree_encoding;
+        octez_base_unix |> open_;
+        octez_client_base_unix |> open_;
+        octez_profiler |> open_;
+      ]
+
 let octez_agnostic_baker_lib =
   let (PPX {preprocess; preprocessor_deps}) = ppx_profiler in
   public_lib
@@ -5870,6 +5889,7 @@ let octez_agnostic_baker_lib =
         octez_shell_services |> open_;
         octez_dal_node_services;
         octez_dal_node_lib;
+        octez_baking_common_lib;
       ]
 
 (* PROTOCOL PACKAGES *)
@@ -7435,6 +7455,7 @@ let hash = Protocol.hash
             uri;
             memtrace;
             octez_agnostic_baker_lib |> open_;
+            octez_baking_common_lib;
           ]
         ~linkall:true
         ~all_modules_except:

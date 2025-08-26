@@ -1236,7 +1236,7 @@ opam:all_6:
       - tezos-protocol-demo-noops
       - tezos-protocol-demo-counter
       - tezos-protocol-alpha
-      - tezos-dal-node-services
+      - tezos-protocol-023-PtSeouLo
       - tezos-benchmark
       - octez-shell-libs
       - octez-riscv-pvm
@@ -1628,7 +1628,6 @@ opam:all_4:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-008-PtEdo2Zk
       - tezos-protocol-007-PsDELPH1
       - tezos-protocol-006-PsCARTHA
       - tezos-protocol-005-PsBabyM1
@@ -1643,6 +1642,7 @@ opam:all_4:
       - tezos-client-demo-counter
       - octez-node-config
       - octez-crawler
+      - octez-baking-common-lib
 
 opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1768,7 +1768,6 @@ opam:all_5:
   parallel:
     matrix:
     - package:
-      - tezos-protocol-023-PtSeouLo
       - tezos-protocol-022-PsRiotum
       - tezos-protocol-021-PsQuebec
       - tezos-protocol-020-PsParisC
@@ -1784,6 +1783,7 @@ opam:all_5:
       - tezos-protocol-010-PtGRANAD
       - tezos-protocol-009-PsFLoren
       - tezos-protocol-008-PtEdoTez
+      - tezos-protocol-008-PtEdo2Zk
 
 opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1843,6 +1843,7 @@ opam:all_7:
     - package:
       - tezt-tezos
       - tezos-openapi
+      - tezos-dal-node-services
       - octez-rustzcash-deps
       - octez-rust-tezos-context
       - octez-rust-deps

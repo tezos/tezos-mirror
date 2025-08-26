@@ -1,0 +1,21 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name octez_baking_common)
+ (public_name octez-baking-common-lib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  octez-libs.base
+  octez-libs.tree-encoding
+  octez-libs.base.unix
+  octez-shell-libs.client-base-unix
+  octez-libs.octez-profiler)
+ (preprocess (pps octez-libs.ppx_profiler))
+ (preprocessor_deps (env_var TEZOS_PPX_PROFILER))
+ (flags
+  (:standard)
+  -open Tezos_base.TzPervasives
+  -open Tezos_base_unix
+  -open Tezos_client_base_unix
+  -open Tezos_profiler))

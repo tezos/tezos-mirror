@@ -9,6 +9,7 @@ octez-baker	exec	1
 octez-baker-PsRiotum	exec	1
 octez-baker-PtSeouLo	exec	1
 octez-baker-lib	all	2
+octez-baking-common-lib	all	4
 octez-client	exec	1
 octez-codec	exec	1
 octez-crawler	all	4
@@ -76,7 +77,7 @@ tezos-benchmark	all	6
 tezos-client-demo-counter	all	4
 tezos-client-genesis	all	4
 tezos-dal-node-lib	all	4
-tezos-dal-node-services	all	6
+tezos-dal-node-services	all	7
 tezos-openapi	all	7
 tezos-protocol-000-Ps9mPmXa	all	4
 tezos-protocol-001-PtCJ7pwo	all	4
@@ -87,7 +88,7 @@ tezos-protocol-005-PsBABY5H	all	4
 tezos-protocol-005-PsBabyM1	all	4
 tezos-protocol-006-PsCARTHA	all	4
 tezos-protocol-007-PsDELPH1	all	4
-tezos-protocol-008-PtEdo2Zk	all	4
+tezos-protocol-008-PtEdo2Zk	all	5
 tezos-protocol-008-PtEdoTez	all	5
 tezos-protocol-009-PsFLoren	all	5
 tezos-protocol-010-PtGRANAD	all	5
@@ -103,7 +104,7 @@ tezos-protocol-019-PtParisB	all	5
 tezos-protocol-020-PsParisC	all	5
 tezos-protocol-021-PsQuebec	all	5
 tezos-protocol-022-PsRiotum	all	5
-tezos-protocol-023-PtSeouLo	all	5
+tezos-protocol-023-PtSeouLo	all	6
 tezos-protocol-alpha	all	6
 tezos-protocol-demo-counter	all	6
 tezos-protocol-demo-noops	all	6

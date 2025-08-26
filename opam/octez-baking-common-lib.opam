@@ -11,12 +11,7 @@ depends: [
   "dune" { >= "3.11.1" }
   "ocaml" { >= "4.14" }
   "octez-libs" { = version }
-  "bls12-381" { = version }
   "octez-shell-libs" { = version }
-  "octez-node-config" { = version }
-  "tezos-dal-node-services" { = version }
-  "tezos-dal-node-lib" { = version }
-  "octez-baking-common-lib" { = version }
 ]
 build: [
   ["rm" "-r" "vendors" "contrib"]
@@ -24,4 +19,4 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 available: os-family != "windows"
-synopsis: "Octez: library for Agnostic Baker"
+synopsis: "Common Library for protocol-dependent bakers and protocol-agnostic baker"

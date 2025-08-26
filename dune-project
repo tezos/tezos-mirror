@@ -27,6 +27,7 @@
 (package (name octez-baker-PtSeouLo))
 (package (name octez-baker-alpha))
 (package (name octez-baker-lib))
+(package (name octez-baking-common-lib))
 (package (name octez-client))
 (package (name octez-codec))
 (package (name octez-codec-kaitai))
