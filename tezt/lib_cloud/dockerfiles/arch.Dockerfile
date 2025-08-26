@@ -10,7 +10,7 @@ RUN echo "Server = https://mirror.osbeck.com/archlinux/\$repo/os/\$arch" > /etc/
 
 # Update package database and install dependencies
 
-RUN pacman -Sy --noconfirm --noprogressbar\
+RUN pacman -Syu --noconfirm --noprogressbar\
     python \
     openssh \
     curl libev hidapi \
