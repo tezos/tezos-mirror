@@ -6,7 +6,8 @@ use crate::{
     bindings,
     host::Host,
     runtime::{self, InputsBuffer, RunStatus},
-    types::{ContextHash, EvmTree, OCamlString, SmartRollupAddress},
+    telemetry::Span,
+    types::{ContextHash, EvmTree, OCamlString, OpenTelemetryScope, SmartRollupAddress},
 };
 use log::trace;
 use ocaml::{Error, List, Pointer, Value};
@@ -120,7 +121,7 @@ pub fn wasm_runtime_new_context() -> Pointer<Context> {
 
 #[ocaml::func]
 #[ocaml::sig(
-    "context -> string -> string option -> bool -> string -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
+    "context -> string -> string option -> bool -> string -> Wasm_runtime_callbacks.scope -> Irmin_context.tree -> bytes -> int32 -> string list -> Irmin_context.tree"
 )]
 pub fn wasm_runtime_run(
     mut ctxt: Pointer<Context>,
@@ -128,6 +129,7 @@ pub fn wasm_runtime_run(
     preimages_endpoint: Option<OCamlString>,
     native_execution: bool,
     entrypoint: OCamlString,
+    otel_scope: OpenTelemetryScope,
     mut tree: EvmTree,
     rollup_address: SmartRollupAddress,
     level: u32,
@@ -135,6 +137,7 @@ pub fn wasm_runtime_run(
 ) -> Result<EvmTree, Error> {
     let ctxt = ctxt.as_mut();
     let mut inputs_buffer = InputsBuffer::new(level, inputs.into_vec());
+    let span = Span::start(otel_scope, "wasm_runtime_run")?;
 
     loop {
         let host = Host::new(
@@ -152,7 +155,7 @@ pub fn wasm_runtime_run(
             native_execution,
         )?;
 
-        match runtime.run()? {
+        match runtime.run(&span)? {
             RunStatus::Done(evm_tree) => return Ok(evm_tree),
             RunStatus::PendingKernelUpgrade(new_tree, remaining_inputs) => {
                 tree = new_tree;

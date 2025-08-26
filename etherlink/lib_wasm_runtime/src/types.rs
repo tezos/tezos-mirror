@@ -105,3 +105,18 @@ unsafe impl FromValue for SmartRollupAddress {
         SmartRollupAddress(FromValue::from_value(value))
     }
 }
+
+#[derive(Clone)]
+pub struct OpenTelemetryScope(Value);
+
+unsafe impl ToValue for OpenTelemetryScope {
+    fn to_value(&self, _gc: &Runtime) -> Value {
+        self.0.clone()
+    }
+}
+
+unsafe impl FromValue for OpenTelemetryScope {
+    fn from_value(value: Value) -> Self {
+        OpenTelemetryScope(value)
+    }
+}

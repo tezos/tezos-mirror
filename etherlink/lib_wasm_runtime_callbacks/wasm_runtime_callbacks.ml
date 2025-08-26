@@ -5,6 +5,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type scope =
+  | Root of Opentelemetry.Scope.t option
+  | Started of {
+      parent : Opentelemetry.Span_id.t option;
+      scope : Opentelemetry.Scope.t;
+      name : string;
+      start_time : Opentelemetry.Timestamp_ns.t;
+    }
+
+let root_scope () = Root (Opentelemetry.Scope.get_ambient_scope ())
+
 module Key_parser = struct
   let max_key_length = 250 - String.length "/durable" - String.length "/@"
 
@@ -180,6 +191,42 @@ module Impl = struct
         match resp.status with
         | `OK -> return body_str
         | #Cohttp.Code.status_code -> raise Not_found)
+
+  let open_span parent span_name =
+    let trace_id, parent =
+      match parent with
+      | Root None -> (Opentelemetry.Trace_id.create (), None)
+      | Root (Some scope) | Started {scope; _} ->
+          (scope.trace_id, Some scope.span_id)
+    in
+    let span_id = Opentelemetry.Span_id.create () in
+    let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
+    Started
+      {
+        parent;
+        scope;
+        name = span_name;
+        start_time = Opentelemetry.Timestamp_ns.now_unix_ns ();
+      }
+
+  let close_span scope =
+    match scope with
+    | Root _ -> (* No started scope to close *) ()
+    | Started {parent; scope; name; start_time} ->
+        let end_time = Opentelemetry.Timestamp_ns.now_unix_ns () in
+        let span, _ =
+          Opentelemetry.Span.create
+            ~links:(Opentelemetry.Scope.links scope)
+            ~attrs:(Opentelemetry.Scope.attrs scope)
+            ~events:(Opentelemetry.Scope.events scope)
+            ?parent
+            ~id:scope.span_id
+            ~trace_id:scope.trace_id
+            ~start_time
+            ~end_time
+            name
+        in
+        Opentelemetry.Trace.emit ~service_name:"Wasm_runtime" [span]
 end
 
 include Impl
@@ -203,7 +250,11 @@ let register () =
   Callback.register "layer2_store__store_value_size" store_value_size ;
   Callback.register "layer2_store__store_read" store_read ;
   Callback.register "layer2_store__store_write" store_write ;
-  Callback.register "layer2_store__store_write_all" store_write_all
+  Callback.register "layer2_store__store_write_all" store_write_all ;
+
+  (* Opentelemetry *)
+  Callback.register "open_span" open_span ;
+  Callback.register "close_span" close_span
 
 module Internal_for_tests = struct
   include Impl

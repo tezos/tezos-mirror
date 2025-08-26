@@ -11,6 +11,7 @@ use crate::{
     bindings,
     constants::KERNEL,
     host::RuntimeVersion,
+    telemetry::Span,
     types::{ContextHash, EvmTree},
 };
 pub use env::Env;
@@ -30,7 +31,7 @@ pub trait Runtime {
 
     fn call(&mut self) -> Result<(), Error>;
 
-    fn run(&mut self) -> Result<RunStatus, Error> {
+    fn run(&mut self, span: &Span) -> Result<RunStatus, Error> {
         // If the initial state was computed by the WASM PVM, then the reboot flag is set (because
         // the first “reboot” is used to collect the shared inbox messages to fill the inputs
         // buffer. We don’t need this in our case, but in order to remain compatible, (1) we assume
@@ -39,6 +40,7 @@ pub trait Runtime {
         let _ = self.mut_host().reboot_requested()?;
 
         loop {
+            let _s = span.new("run")?;
             self.call()?;
 
             if self.host().needs_kernel_reload() {
