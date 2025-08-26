@@ -181,6 +181,9 @@ impl StorageAccount {
             }
             Err(RuntimeError::PathNotFound) => {
                 let code_hash = self.code_hash(host)?;
+                if B256::from(code_hash) == KECCAK_EMPTY {
+                    return Ok(Some(Bytecode::new()));
+                };
                 let code_storage = CodeStorage::new(&code_hash)?;
                 Ok(Some(code_storage.get_code(host)?))
             }
@@ -233,7 +236,7 @@ impl StorageAccount {
             }
         } else {
             let code_hash = self.code_hash(host)?;
-            let code = if code_hash.as_slice() == KECCAK_EMPTY.as_slice() {
+            let code = if B256::from(code_hash) == KECCAK_EMPTY {
                 Some(Bytecode::new())
             } else {
                 self.code(host)?
