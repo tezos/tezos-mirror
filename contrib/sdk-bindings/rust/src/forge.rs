@@ -66,13 +66,13 @@ pub mod operation {
     };
 
     #[derive(uniffi::Object, Debug)]
-    pub struct Reveal(ManagerOperationContent<RevealContent>);
+    pub struct Operation(OperationContent);
 
     #[uniffi::export]
-    impl Reveal {
-        #[doc = "Build a reveal operation."]
+    impl Operation {
+        /// Build a reveal operation.
         #[uniffi::constructor(default(proof = None))]
-        pub fn new(
+        pub fn reveal(
             source: &PublicKeyHash,
             fee: u64,
             counter: u64,
@@ -81,7 +81,7 @@ pub mod operation {
             public_key: &PublicKey,
             proof: Option<Arc<BlsSignature>>,
         ) -> Self {
-            Self(ManagerOperationContent {
+            Self(OperationContent::Reveal(ManagerOperationContent {
                 source: source.0.clone(),
                 fee: fee.into(),
                 counter: counter.into(),
@@ -91,26 +91,13 @@ pub mod operation {
                     pk: public_key.0.clone(),
                     proof: proof.map(|proof| proof.0.clone()),
                 },
-            })
+            }))
         }
 
-        #[doc = "Forge the operation."]
-        pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            OperationContent::Reveal(self.0.clone())
-                .to_bytes()
-                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
-        }
-    }
-
-    #[derive(uniffi::Object, Debug)]
-    pub struct Transaction(ManagerOperationContent<TransactionContent>);
-
-    #[uniffi::export]
-    impl Transaction {
         #[allow(clippy::too_many_arguments)]
-        #[doc = "Build a transaction operation."]
+        /// Build a transaction operation.
         #[uniffi::constructor(default(entrypoint = None, value = None))]
-        pub fn new(
+        pub fn transaction(
             source: &PublicKeyHash,
             fee: u64,
             counter: u64,
@@ -121,7 +108,7 @@ pub mod operation {
             entrypoint: Option<Arc<Entrypoint>>,
             value: Option<Vec<u8>>,
         ) -> Self {
-            Self(ManagerOperationContent {
+            Self(OperationContent::Transaction(ManagerOperationContent {
                 source: source.0.clone(),
                 fee: fee.into(),
                 counter: counter.into(),
@@ -140,22 +127,9 @@ pub mod operation {
                     }
                     .into(),
                 },
-            })
+            }))
         }
 
-        #[doc = "Forge the operation."]
-        pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            OperationContent::Transaction(self.0.clone())
-                .to_bytes()
-                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
-        }
-    }
-
-    #[derive(uniffi::Object, Debug)]
-    pub struct Origination(ManagerOperationContent<OriginationContent>);
-
-    #[uniffi::export]
-    impl Origination {
         /// Build a origination operation.
         ///
         /// Its script is always as follows:
@@ -166,7 +140,7 @@ pub mod operation {
         ///     }
         ///   }
         #[uniffi::constructor]
-        pub fn new(
+        pub fn origination(
             source: &PublicKeyHash,
             fee: u64,
             counter: u64,
@@ -175,7 +149,7 @@ pub mod operation {
             balance: u64,
             delegate: Option<Arc<PublicKeyHash>>,
         ) -> Self {
-            Self(ManagerOperationContent {
+            Self(OperationContent::Origination(ManagerOperationContent {
                 source: source.0.clone(),
                 fee: fee.into(),
                 counter: counter.into(),
@@ -191,25 +165,12 @@ pub mod operation {
                         storage: vec![0x03, 0x6c],
                     },
                 },
-            })
+            }))
         }
 
-        #[doc = "Forge the operation."]
-        pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            OperationContent::Origination(self.0.clone())
-                .to_bytes()
-                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
-        }
-    }
-
-    #[derive(uniffi::Object, Debug)]
-    pub struct Delegation(ManagerOperationContent<DelegationContent>);
-
-    #[uniffi::export]
-    impl Delegation {
-        #[doc = "Build a delegation operation."]
+        /// Build a delegation operation.
         #[uniffi::constructor]
-        pub fn new(
+        pub fn delegation(
             source: &PublicKeyHash,
             fee: u64,
             counter: u64,
@@ -217,7 +178,7 @@ pub mod operation {
             storage_limit: u64,
             delegate: Option<Arc<PublicKeyHash>>,
         ) -> Self {
-            Self(ManagerOperationContent {
+            Self(OperationContent::Delegation(ManagerOperationContent {
                 source: source.0.clone(),
                 fee: fee.into(),
                 counter: counter.into(),
@@ -226,16 +187,14 @@ pub mod operation {
                 operation: DelegationContent {
                     delegate: delegate.map(|delegate| delegate.0.clone()),
                 },
-            })
+            }))
         }
 
         #[doc = "Forge the operation."]
         pub fn forge(&self) -> Result<Vec<u8>, Error> {
-            let mut out = Vec::<u8>::new();
-            OperationContent::Delegation(self.0.clone())
-                .bin_write(&mut out)
-                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))?;
-            Ok(out)
+            self.0
+                .to_bytes()
+                .map_err(|err| Error::Forge(ForgingError::ToBytes(err)))
         }
     }
 }
@@ -304,7 +263,7 @@ mod tests {
                 .unwrap();
         let source = PublicKeyHash::from_b58check("tz1QFD9WqLWZmmAuqnnTPPUjfauitYEWdshv").unwrap();
         let (fee, counter, gas_limit, storage_limit) = (274, 43947, 169, 0);
-        let reveal = Reveal::new(
+        let reveal = Operation::reveal(
             &source,
             fee,
             counter,
@@ -345,7 +304,7 @@ mod tests {
         let source = PublicKeyHash::from_b58check("tz4AebqGUAFk8rTwiS7EpbY8dA3zHmmxiFPT").unwrap();
         let proof = BlsSignature::from_b58check("BLsigAw3bp2QZL8YCWptYYYE1zQr4vidqE7WT4jctre5HpAdjVYmXnGeqYfASAzPB2pWaDCdiRBApWY5Y4V7WJapj3GFHBHnTZh6eoxCduu2FfXuNmSKN1NQLiztAt6nBWytrR1xAzZDg9").unwrap();
         let (fee, counter, gas_limit, storage_limit) = (469, 3, 2169, 277);
-        let reveal = Reveal::new(
+        let reveal = Operation::reveal(
             &source,
             fee,
             counter,
@@ -393,7 +352,7 @@ mod tests {
         let destination = Contract::from_b58check("KT1G4D3W9cf86dzAmZBN9nwUn7sYh4DYMRb4").unwrap();
         let entrypoint = Entrypoint::new("foo").unwrap();
         let value = hex::decode("07070001010000000161").unwrap();
-        let transaction = Transaction::new(
+        let transaction = Operation::transaction(
             &source,
             fee,
             counter,
@@ -439,7 +398,7 @@ mod tests {
         let (fee, counter, gas_limit, storage_limit, amount) = (332, 24, 4631, 11, 0);
         let destination = Contract::from_b58check("KT1S5cQmS4wXjG7JubRUCWzH3DaU7S2XfeFT").unwrap();
         let entrypoint = Entrypoint::new("stake").unwrap();
-        let transaction = Transaction::new(
+        let transaction = Operation::transaction(
             &source,
             fee,
             counter,
@@ -479,7 +438,7 @@ mod tests {
         let source = PublicKeyHash::from_b58check("tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif").unwrap();
         let (fee, counter, gas_limit, storage_limit, amount) = (99, 1401, 1, 0, 200);
         let destination = Contract::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
-        let transaction = Transaction::new(
+        let transaction = Operation::transaction(
             &source,
             fee,
             counter,
@@ -523,7 +482,7 @@ mod tests {
     fn origination_forging() {
         let source = PublicKeyHash::from_b58check("tz4Quq6VcCeJVmCknjzTX5kcrhUzcMruoavF").unwrap();
         let (balance, fee, counter, gas_limit, storage_limit) = (0, 0, 812, 74, 98);
-        let origination = Origination::new(
+        let origination = Operation::origination(
             &source,
             fee,
             counter,
@@ -566,7 +525,7 @@ mod tests {
     fn origination_delegated_contract_forging() {
         let source = PublicKeyHash::from_b58check("tz1SUWNMC3hUdBRzzrbTbiuGPH1KFVifTQw7").unwrap();
         let (balance, fee, counter, gas_limit, storage_limit) = (1_000_000, 1722, 461, 67_000, 1);
-        let origination = Origination::new(
+        let origination = Operation::origination(
             &source,
             fee,
             counter,
@@ -605,7 +564,7 @@ mod tests {
             PublicKeyHash::from_b58check("tz3NGKzVp8ezNnu5qx8mY3iioSUXKfC1d8Yc").unwrap();
         let source = PublicKeyHash::from_b58check("tz1SMHZCpzRUoaoz9gA18pNUghpyYY4N6fif").unwrap();
         let (fee, counter, gas_limit, storage_limit) = (13, 66, 271, 128);
-        let delegation = Delegation::new(
+        let delegation = Operation::delegation(
             &source,
             fee,
             counter,
@@ -639,7 +598,8 @@ mod tests {
     fn remove_delegate_forging() {
         let source = PublicKeyHash::from_b58check("tz2GNQB7rXjNXBX6msePzQ2nBWYUUGutYy5p").unwrap();
         let (fee, counter, gas_limit, storage_limit) = (609, 7, 12, 11);
-        let delegation = Delegation::new(&source, fee, counter, gas_limit, storage_limit, None);
+        let delegation =
+            Operation::delegation(&source, fee, counter, gas_limit, storage_limit, None);
         let raw_delegation = delegation.forge().expect(&format!(
             "Forging operation {:?} should succeed",
             delegation

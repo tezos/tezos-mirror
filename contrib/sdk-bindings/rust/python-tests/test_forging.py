@@ -4,10 +4,7 @@
 
 from tezos import (
     forge_message,
-    Reveal,
-    Transaction,
-    Origination,
-    Delegation,
+    Operation,
     PublicKey,
     PublicKeyHash,
     BlsSignature,
@@ -41,7 +38,7 @@ def test_reveal_forging():
     public_key = PublicKey.from_b58check("BLpk1nco14hJwGiTzrRp2FBCxZz6ZJ19QRAoh8hyaNMeVARFyuvTGZQgmrPTT5ZkXfS5yKuEupPN")
     source = PublicKeyHash.from_b58check("tz4HWRiWnefpPHKUmjTfJhHG74q7fEmS5euR")
     proof = BlsSignature.from_b58check("BLsigAy1Lc4y9kagjUjPFRb5avizhuXSYQyeSsGAsWbiLBwAEHZvQMxrNrH11Bm9SfHpBbCb9RjnucX2FEZbTZ6it7Z7UGFf3mo7uUdi8V2DX5SmaqqwyzyD12E3rUKxgwHkaSyEiMKcTB")
-    reveal = Reveal(
+    reveal = Operation.reveal(
         source=source,
         fee=3,
         counter=718,
@@ -70,7 +67,7 @@ def test_transaction_forging():
     """
     source = PublicKeyHash.from_b58check("tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8")
     destination = Contract.from_b58check("tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn")
-    transaction = Transaction(
+    transaction = Operation.transaction(
         source=source,
         fee=1000000000,
         counter=123456,
@@ -103,7 +100,7 @@ def test_origination_forging():
     }'
     """
     source = PublicKeyHash.from_b58check("tz3S6P2LccJNrejt27KvJRb3BcuS5vGghkP8")
-    origination = Origination(
+    origination = Operation.origination(
         source=source,
         fee=2,
         counter=603,
@@ -131,7 +128,7 @@ def test_delegation_forging():
     """
     delegate = PublicKeyHash.from_b58check("tz2PbzLDYrPAZS38BteBY7gqtnZfsTqHF2xu")
     source = PublicKeyHash.from_b58check("tz3hqqamVC1G22LACFoMgcJeFKZgoGMFSfSn")
-    delegation = Delegation(
+    delegation = Operation.delegation(
         source=source,
         fee=3141,
         counter=24006,
