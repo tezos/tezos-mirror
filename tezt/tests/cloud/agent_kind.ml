@@ -63,6 +63,15 @@ let name_of_daemon = function
   | Etherlink_producer_node name -> Format.asprintf "etherlink-%s-node" name
 
 module Logs = struct
+  let local_path path =
+    List.fold_left
+      (fun prefix subdir ->
+        let prefix = prefix // subdir in
+        if not (Sys.file_exists prefix) then Sys.mkdir prefix 0o755 ;
+        prefix)
+      ""
+      path
+
   let scp_logs ~destination_root ~daemon_name agent =
     let agent_name = Agent.name agent in
     (* This is not compatible with the --proxy mode as the Agent's location of
@@ -73,43 +82,18 @@ module Logs = struct
     | None ->
         Log.warn "Cannot retrieve logs for %s: no runner for agent" agent_name ;
         Lwt.return_unit
-    | Some runner ->
-        let identity =
-          Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
-        in
-        let port =
-          Option.fold
-            ~none:[]
-            ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
-            runner.Runner.ssh_port
-        in
-        let source =
-          Format.sprintf
-            "%s%s:%s"
-            (Option.fold
-               ~none:""
-               ~some:(fun u -> Format.sprintf "%s@" u)
-               runner.Runner.ssh_user)
-            runner.address
-            tezt_root_path
-        in
+    | Some _runner ->
         let local_path =
-          let local_path_root = destination_root // agent_name in
-          if not (Sys.file_exists destination_root) then
-            Sys.mkdir destination_root 0o755 ;
-          if not (Sys.file_exists local_path_root) then
-            Sys.mkdir local_path_root 0o755 ;
-          let local_path = local_path_root // daemon_name in
-          let () = Sys.mkdir local_path 0o755 in
-          local_path
+          local_path [destination_root; agent_name; daemon_name]
         in
         Lwt.catch
           (fun () ->
-            Process.run
-              "scp"
-              (Ssh.scp_options @ ["-r"] @ identity @ port
-              @ [source // daemon_name // "daily_logs"]
-              @ [local_path // "daily_logs"]))
+            Agent.scp
+              agent
+              ~is_directory:true
+              ~source:(tezt_root_path // daemon_name // "daily_logs")
+              ~destination:(local_path // "daily_logs")
+              `FromRunner)
           (fun exn ->
             Log.warn
               "Cannot retrieve log from %s: %s"

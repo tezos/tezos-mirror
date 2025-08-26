@@ -271,6 +271,45 @@ let docker_run_command ?name agent ?(detach = false) cmd args =
       in
       Process.spawn ?name ~runner cmd args
 
+let scp agent ~is_directory ~source ~destination
+    (direction : [< `ToRunner | `FromRunner]) =
+  let runner_path runner path =
+    Format.sprintf
+      "%s%s:%s"
+      (Option.fold
+         ~none:""
+         ~some:(fun u -> Format.sprintf "%s@" u)
+         runner.Runner.ssh_user)
+      runner.address
+      path
+  in
+  match agent.runner with
+  | None ->
+      if source <> destination then Process.run "cp" [source; destination]
+      else Lwt.return_unit
+  | Some runner ->
+      let source, destination =
+        match direction with
+        | `ToRunner -> (source, runner_path runner destination)
+        | `FromRunner -> (runner_path runner source, destination)
+      in
+      let identity =
+        Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
+      in
+      let port =
+        Option.fold
+          ~none:[]
+          ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
+          runner.Runner.ssh_port
+      in
+      let* () =
+        Process.run
+          "scp"
+          ((if is_directory then ["-r"] else [])
+          @ Ssh.scp_options @ identity @ port @ [source] @ [destination])
+      in
+      Lwt.return_unit
+
 let copy agent ~consistency_check ~is_directory ~source ~destination =
   let* exists =
     let process = docker_run_command agent "ls" [destination] in
@@ -313,38 +352,7 @@ let copy agent ~consistency_check ~is_directory ~source ~destination =
     | _ -> Lwt.return_false
   in
   if exists then Lwt.return_unit
-  else
-    match agent.runner with
-    | None ->
-        if source <> destination then Process.run "cp" [source; destination]
-        else Lwt.return_unit
-    | Some runner ->
-        let destination =
-          Format.sprintf
-            "%s%s:%s"
-            (Option.fold
-               ~none:""
-               ~some:(fun u -> Format.sprintf "%s@" u)
-               runner.Runner.ssh_user)
-            runner.address
-            destination
-        in
-        let identity =
-          Option.fold ~none:[] ~some:(fun i -> ["-i"; i]) runner.Runner.ssh_id
-        in
-        let port =
-          Option.fold
-            ~none:[]
-            ~some:(fun p -> ["-P"; Format.sprintf "%d" p])
-            runner.Runner.ssh_port
-        in
-        let* () =
-          Process.run
-            "scp"
-            ((if is_directory then ["-r"] else [])
-            @ Ssh.scp_options @ identity @ port @ [source] @ [destination])
-        in
-        Lwt.return_unit
+  else scp agent ~is_directory ~source ~destination `ToRunner
 
 (** [is_binary file] checks using the `file` Linux command if the [file] is
     binary. The command returns an output of the form `file: <file_type> ...`;
