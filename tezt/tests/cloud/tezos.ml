@@ -1079,17 +1079,33 @@ module Teztale = struct
     let on_shutdown =
       match artifact_dir with
       | None -> []
-      | Some _dir ->
+      | Some dir ->
           [
             (fun () ->
               Lwt_list.iter_s
                 (fun _archiver ->
-                  Log.info
-                    "TODO: Copying archiver configuration and database: %s and \
-                     %s"
-                    server.filenames.conf_filename
-                    server.filenames.db_filename ;
-                  unit)
+                  let db_destination =
+                    Agent_kind.Logs.local_path
+                      [dir; Filename.basename server.filenames.db_filename]
+                  in
+                  let* () =
+                    Agent.scp
+                      agent
+                      ~is_directory:false
+                      ~source:server.filenames.db_filename
+                      ~destination:db_destination
+                      `FromRunner
+                  in
+                  let conf_destination =
+                    Agent_kind.Logs.local_path
+                      [dir; Filename.basename server.filenames.conf_filename]
+                  in
+                  Agent.scp
+                    agent
+                    ~is_directory:false
+                    ~source:server.filenames.conf_filename
+                    ~destination:conf_destination
+                    `FromRunner)
                 node.archivers);
           ]
     in
