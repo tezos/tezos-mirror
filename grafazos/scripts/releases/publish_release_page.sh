@@ -2,8 +2,6 @@
 
 set -e
 
-script_dir="$(cd "$(dirname "$0")" && pwd -P)"
-
 REGION="${REGION:-eu-west-1}"
 
 if [ -z "${S3_BUCKET:-}" ]; then
@@ -74,10 +72,21 @@ else
   echo "No tag found. No asset will be added to the release page."
 fi
 
-"${script_dir}"/create_release_page.sh "$versions_list_filename"
+echo "Syncing $versions_list_filename to remote s3 bucket"
+if aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}/grafazos/" --region "${REGION}"; then
+  echo "Deployment of ${versions_list_filename} successful!"
+else
+  echo "Deployment of ${versions_list_filename} failed. Please check the configuration and try again."
+  exit 1
+fi
+
+echo "Building release page"
+dune exec ./ci/bin_release_page/release_page.exe -- --component 'grafazos' \
+  --title 'Grafazos releases' --bucket "${S3_BUCKET}" --url "${URL:-${S3_BUCKET}}" --path \
+  "${BUCKET_PATH:-}" dashboards
 
 echo "Syncing files to remote s3 bucket"
-if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/grafazos/" --region "${REGION}" && aws s3 cp "./$versions_list_filename" "s3://${S3_BUCKET}/grafazos/" --region "${REGION}"; then
+if aws s3 cp "./docs/release_page/style.css" "s3://${S3_BUCKET}/" --region "${REGION}" && aws s3 cp "./index.html" "s3://${S3_BUCKET}/grafazos/" --region "${REGION}"; then
   echo "Deployment successful!"
 else
   echo "Deployment failed. Please check the configuration and try again."
