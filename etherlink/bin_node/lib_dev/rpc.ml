@@ -268,7 +268,7 @@ let main ~data_dir ~evm_node_endpoint ?evm_node_private_endpoint
       ~service_namespace:"evm_node"
       ~service_name:"rpc"
       ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
-      config.opentelemetry
+      config.opentelemetry.config
   in
   let* time_between_blocks =
     Evm_services.get_time_between_blocks

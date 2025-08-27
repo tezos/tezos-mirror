@@ -16,6 +16,7 @@ type t = {
   finalized_view : bool;
   block_storage_sqlite3 : bool;
   execution_pool : Lwt_domain.pool;
+  trace_host_funs : bool;
 }
 
 let get_evm_state ctxt hash =
@@ -127,6 +128,7 @@ let load ~pool ?network ?smart_rollup_address ~data_dir
       block_storage_sqlite3 = not legacy_mode;
       finalized_view = configuration.finalized_view;
       execution_pool = pool;
+      trace_host_funs = configuration.opentelemetry.trace_host_functions;
     }
   in
 
@@ -329,6 +331,7 @@ struct
           ?preimage_endpoint:Ctxt.ctxt.preimages_endpoint
           ~kernel_debug:false
           ~destination:Ctxt.ctxt.smart_rollup_address
+          ~trace_host_funs:Ctxt.ctxt.trace_host_funs
           ()
       in
       let* simulate_state =
@@ -436,6 +439,7 @@ let pvm_config ctxt =
     ?preimage_endpoint:ctxt.preimages_endpoint
     ~kernel_debug:true
     ~destination:ctxt.smart_rollup_address
+    ~trace_host_funs:ctxt.trace_host_funs
     ()
 
 let execution_gas ~base_fee_per_gas ~da_fee_per_byte receipt object_ =

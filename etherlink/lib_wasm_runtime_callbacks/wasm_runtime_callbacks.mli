@@ -7,7 +7,7 @@
 
 type scope
 
-val root_scope : trace_host_funs:bool -> Opentelemetry.Scope.t option -> scope
+val root_scope : ?trace_host_funs:bool -> Opentelemetry.Scope.t option -> scope
 
 val register : unit -> unit
 

@@ -31,3 +31,8 @@ val default : t
 
 (** Encoding, to be used in configuration files. *)
 val encoding : t Data_encoding.t
+
+val extended_encoding : 'a Data_encoding.t -> 'a -> (t * 'a) Data_encoding.t
+
+(** Set enable field. *)
+val enable : t -> bool -> t

@@ -18,6 +18,7 @@ val config :
   ?kernel_debug:bool ->
   ?flamecharts_directory:string ->
   ?timings_file:string ->
+  ?trace_host_funs:bool ->
   unit ->
   config
 

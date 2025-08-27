@@ -15,7 +15,7 @@ type scope =
       trace_host_funs : bool;
     }
 
-let root_scope ~trace_host_funs scope = Root {scope; trace_host_funs}
+let root_scope ?(trace_host_funs = false) scope = Root {scope; trace_host_funs}
 
 let prepare_new_span = function
   | Root {scope = None; trace_host_funs} ->

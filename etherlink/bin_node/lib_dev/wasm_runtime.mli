@@ -17,6 +17,7 @@ type kernel_input = [`Inbox of string trace | `Skip_stage_one]
 *)
 val run :
   pool:Lwt_domain.pool ->
+  ?trace_host_funs:bool ->
   ?l1_timestamp:Time.Protocol.t ->
   preimages_dir:string ->
   ?preimages_endpoint:Uri.t ->
