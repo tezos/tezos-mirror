@@ -64,6 +64,7 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
       ~level:1l
       ~predecessor_timestamp:timestamp
       ~timestamp
+      ~all_bakers_attest_first_level:None
   in
   Lwt.return @@ Environment.wrap_tzresult result
 

@@ -308,6 +308,7 @@ type back = {
   sc_rollup_current_messages : Sc_rollup_inbox_merkelized_payload_hashes_repr.t;
   dal : Raw_dal.t;
   address_registry_diff_rev : Raw_address_registry.diff list;
+  all_bakers_attest_first_level : Level_repr.t option;
 }
 
 (*
@@ -381,6 +382,9 @@ let[@inline] reward_coeff_for_current_cycle ctxt =
 
 let[@inline] dal ctxt = ctxt.back.dal
 
+let[@inline] all_bakers_attest_first_level ctxt =
+  ctxt.back.all_bakers_attest_first_level
+
 let[@inline] update_back ctxt back = {ctxt with back}
 
 let[@inline] update_remaining_block_gas ctxt remaining_block_gas =
@@ -430,6 +434,9 @@ let[@inline] update_reward_coeff_for_current_cycle ctxt
   update_back ctxt {ctxt.back with reward_coeff_for_current_cycle}
 
 let[@inline] update_dal ctxt dal = update_back ctxt {ctxt.back with dal}
+
+let[@inline] set_all_bakers_attest_first_level ctxt level =
+  update_back ctxt {ctxt.back with all_bakers_attest_first_level = Some level}
 
 type error += Too_many_internal_operations (* `Permanent *)
 
@@ -892,7 +899,8 @@ let check_cycle_eras (cycle_eras : Level_repr.cycle_eras)
     Compare.Int32.(
       current_era.blocks_per_commitment = constants.blocks_per_commitment))
 
-let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
+let prepare ~level ~predecessor_timestamp ~timestamp
+    ~all_bakers_attest_first_level ctxt =
   let open Lwt_result_syntax in
   let*? level = Raw_level_repr.of_int32 level in
   let* () = check_inited ctxt in
@@ -940,6 +948,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
           Raw_dal.init
             ~number_of_slots:
               constants.Constants_parametric_repr.dal.number_of_slots;
+        all_bakers_attest_first_level;
         address_registry_diff_rev = [];
       };
   }
@@ -1767,7 +1776,14 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
         return (ctxt, Some c)
     (* End of alpha predecessor stitching. Comment used for automatic snapshot *)
   in
-  let+ ctxt = prepare ctxt ~level ~predecessor_timestamp:timestamp ~timestamp in
+  let+ ctxt =
+    prepare
+      ctxt
+      ~level
+      ~predecessor_timestamp:timestamp
+      ~timestamp
+      ~all_bakers_attest_first_level:None
+  in
   (previous_proto, previous_proto_constants, ctxt)
 
 let activate ctxt h =

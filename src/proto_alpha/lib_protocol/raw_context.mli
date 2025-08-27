@@ -89,6 +89,7 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
+  all_bakers_attest_first_level:Level_repr.t option ->
   Context.t ->
   t tzresult Lwt.t
 
@@ -341,6 +342,13 @@ val reward_coeff_for_current_cycle : t -> Q.t
     This update should only be called once per cycle. It is done in
     [Adaptive_issuance_storage] *)
 val update_reward_coeff_for_current_cycle : t -> Q.t -> t
+
+(** Returns the first level at which all bakers attest is active.
+    Returns [None] if it is not set to activate yet. *)
+val all_bakers_attest_first_level : t -> Level_repr.t option
+
+(** Set the feature flag of all bakers attest. *)
+val set_all_bakers_attest_first_level : t -> Level_repr.t -> t
 
 module Internal_for_tests : sig
   val add_level : t -> int -> t

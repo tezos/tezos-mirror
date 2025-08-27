@@ -289,6 +289,9 @@ let all_bakers_attest_activation_level c =
 let all_bakers_attest_activation_threshold c =
   (Raw_context.constants c).all_bakers_attest_activation_threshold
 
+let all_bakers_attest_first_level c =
+  Raw_context.all_bakers_attest_first_level c
+
 let round_durations ctxt = Raw_context.round_durations ctxt
 
 let all ctxt = Constants_repr.all_of_parametric (parametric ctxt)

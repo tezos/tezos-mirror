@@ -57,6 +57,7 @@ let dummy_context () =
       ~timestamp:Time.Protocol.epoch
       (* ~fitness:[] *)
       (block.context : Tezos_protocol_environment.Context.t)
+      ~all_bakers_attest_first_level:None
   in
   return ctxt
 

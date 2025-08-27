@@ -49,6 +49,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let module H = Tezos_sapling.Core.Client.Hash in
     let cm = H.uncommitted ~height:0 in
@@ -92,6 +93,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -125,6 +127,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -183,6 +186,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -227,6 +231,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id_one_by_one =
       Lazy_storage_diff.fresh
@@ -308,6 +313,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -329,6 +335,7 @@ module Raw_context_tests = struct
               ~predecessor_timestamp:b.header.shell.timestamp
               ~timestamp:b.header.shell.timestamp
               (Raw_context.recover ctx)
+              ~all_bakers_attest_first_level:None
           in
           (ctx, Int32.succ cnt))
         (ctx, 0l)
@@ -380,6 +387,7 @@ module Raw_context_tests = struct
         ~level:b.header.shell.level
         ~predecessor_timestamp:b.header.shell.timestamp
         ~timestamp:b.header.shell.timestamp
+        ~all_bakers_attest_first_level:None
     in
     let*@ ctx, id =
       Lazy_storage_diff.fresh
@@ -1068,6 +1076,7 @@ module Interpreter_tests = struct
           ~level:block.header.shell.level
           ~predecessor_timestamp:block.header.shell.timestamp
           ~timestamp:block.header.shell.timestamp
+          ~all_bakers_attest_first_level:None
       in
       let*@ result = Sapling_storage.Roots.mem raw_ctx id root in
       return result

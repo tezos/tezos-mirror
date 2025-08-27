@@ -112,8 +112,14 @@ let patch_script ctxt (address, hash, patched_code) =
 let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
   let open Lwt_result_syntax in
   let* ctxt =
-    Raw_context.prepare ~level ~predecessor_timestamp ~timestamp ctxt
+    Raw_context.prepare
+      ~level
+      ~predecessor_timestamp
+      ~timestamp
+      ~all_bakers_attest_first_level:None
+      ctxt
   in
+  (* TMP TODO ABAAB: set all bakers attest enable *)
   Storage.Pending_migration.remove ctxt
 
 (* Start of code to remove at next automatic protocol snapshot *)
