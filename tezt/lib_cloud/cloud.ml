@@ -677,7 +677,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
           ~next_available_port
           ~vm_name:None
           ~process_monitor
-          ~daily_logs_dir:Env.retrieve_daily_logs
+          ~artifacts_dir:Env.artifacts_dir
           ()
       in
       f
@@ -789,7 +789,7 @@ let agents t =
               ~next_available_port
               ~vm_name:(Some (Format.asprintf "%s-orchestrator" Env.tezt_cloud))
               ~process_monitor
-              ~daily_logs_dir:Env.retrieve_daily_logs
+              ~artifacts_dir:Env.artifacts_dir
               ()
           in
           [default_agent]

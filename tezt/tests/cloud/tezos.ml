@@ -390,7 +390,7 @@ module Node = struct
           receiver
       in
       let on_shutdown =
-        match Agent.daily_logs_dir agent with
+        match Agent.artifacts_dir agent with
         | None -> []
         | Some destination_root ->
             [
@@ -608,7 +608,7 @@ module Dal_node = struct
           receiver
       in
       let on_shutdown =
-        match Agent.daily_logs_dir agent with
+        match Agent.artifacts_dir agent with
         | None -> []
         | Some destination_root ->
             [
