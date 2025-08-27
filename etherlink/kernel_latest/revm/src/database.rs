@@ -39,7 +39,7 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// We need this guard to change if there's an unrecoverable
     /// error and we need to revert the changes made to the durable
     /// storage.
-    commit_status: &'a mut bool,
+    commit_status: bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
     /// HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
@@ -58,14 +58,13 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         host: &'a mut Host,
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
-        commit_status: &'a mut bool,
         caller: Address,
     ) -> Self {
         EtherlinkVMDB {
             host,
             block,
             world_state_handler,
-            commit_status,
+            commit_status: true,
             withdrawals: vec![],
             caller,
         }
@@ -108,7 +107,7 @@ macro_rules! abort_on_error {
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     pub fn commit_status(&self) -> bool {
-        *self.commit_status
+        self.commit_status
     }
 
     pub fn initialize_storage(&mut self) -> Result<(), Error> {
@@ -130,7 +129,7 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 
     fn abort(&mut self) {
-        *self.commit_status = false;
+        self.commit_status = false;
     }
 
     fn update_account(&mut self, address: Address, account_state: AccountState) {
