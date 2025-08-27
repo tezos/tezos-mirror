@@ -737,6 +737,8 @@ module type Layer1 = sig
 
   val without_dal : bool
 
+  val dal_producers_slot_indices : int list option
+
   val ppx_profiling : bool
 
   val ppx_profiling_backends : string list
@@ -907,6 +909,16 @@ module Layer1 () = struct
         "Disable running DAL nodes on bootstrap and bakers nodes. It is set to \
          `false` by default."
       Layer1_default.default_without_dal
+
+  let dal_producers_slot_indices =
+    Clap.optional
+      ~section
+      ~long:"producer-slot-indices"
+      ~description:
+        "Specify the slot indices for DAL producers to run. The number of DAL \
+         producers run is the size of the list."
+      (Clap.list_of_int ~dummy:[] "producer_slot_indices")
+      ()
 
   let ppx_profiling =
     Clap.flag

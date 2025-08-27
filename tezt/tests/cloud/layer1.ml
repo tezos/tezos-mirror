@@ -158,8 +158,8 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ?stresstest ~ppx_profiling ~peers ~snapshot ~network
-      ~migration_offset (agent, node, name) =
+  let init_bootstrap_node ?stresstest ?dal_node_producers ~ppx_profiling ~peers
+      ~snapshot ~network ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_bootstrap_node_from_snapshot
@@ -175,9 +175,11 @@ module Node = struct
     let* _filename =
       Yes_wallet.create_from_context
         ?rich_accounts:
-          (match stresstest with
-        | None -> None
-        | Some _ -> Some (1, 1_000_000))
+          (match (stresstest, dal_node_producers) with
+        | None, None -> None
+        | Some _, Some l -> Some (List.length l + 1, 1_000_000)
+        | Some _, None -> Some (1, 1_000_000)
+        | None, Some l -> Some (List.length l, 1_000_000))
           (* If the stresstest argument is set we try to find an account with at least 1M tez *)
         ~node
         ~client
@@ -188,11 +190,11 @@ module Node = struct
       let* known_addresses = Client.list_known_addresses client in
       let get_account alias = Client.show_address ~alias client in
       (Lwt_list.fold_left_s
-         (fun (delegates, consensus_keys, rich_account_opt) (alias, _pkh) ->
+         (fun (delegates, consensus_keys, rich_accounts) (alias, _pkh) ->
            if alias =~ rex "rich_" then
              (* if the alias match "rich_n" *)
              let* rich_account = get_account alias in
-             return (delegates, consensus_keys, Some rich_account)
+             return (delegates, consensus_keys, rich_account :: rich_accounts)
            else
              match alias =~* rex "(\\w+)_consensus_key" with
              | None ->
@@ -201,7 +203,7 @@ module Node = struct
                  return
                    ( String_map.add alias delegate_account delegates,
                      consensus_keys,
-                     rich_account_opt )
+                     rich_accounts )
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
                  let* consensus_account = get_account alias in
@@ -211,8 +213,8 @@ module Node = struct
                        consensus_key_alias
                        consensus_account
                        consensus_keys,
-                     rich_account_opt )))
-        (String_map.empty, String_map.empty, None)
+                     rich_accounts )))
+        (String_map.empty, String_map.empty, [])
         (List.rev known_addresses)
     in
     let delegates_with_consensus_keys =
@@ -325,6 +327,7 @@ type configuration = {
   snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
   without_dal : bool;
+  dal_node_producers : int list option;
   maintenance_delay : int;
   migration_offset : int option;
   ppx_profiling : bool;
@@ -352,6 +355,7 @@ let configuration_encoding =
            snapshot;
            stresstest;
            without_dal;
+           dal_node_producers;
            maintenance_delay;
            migration_offset;
            ppx_profiling;
@@ -365,23 +369,23 @@ let configuration_encoding =
           snapshot,
           stresstest,
           without_dal,
+          dal_node_producers,
           maintenance_delay,
           migration_offset,
           ppx_profiling,
-          ppx_profiling_backends,
-          signing_delay ),
-        fixed_random_seed ))
+          ppx_profiling_backends ),
+        (signing_delay, fixed_random_seed) ))
     (fun ( ( stake,
              network,
              snapshot,
              stresstest,
              without_dal,
+             dal_node_producers,
              maintenance_delay,
              migration_offset,
              ppx_profiling,
-             ppx_profiling_backends,
-             signing_delay ),
-           fixed_random_seed )
+             ppx_profiling_backends ),
+           (signing_delay, fixed_random_seed) )
        ->
       {
         stake;
@@ -389,6 +393,7 @@ let configuration_encoding =
         snapshot;
         stresstest;
         without_dal;
+        dal_node_producers;
         maintenance_delay;
         migration_offset;
         ppx_profiling;
@@ -406,6 +411,7 @@ let configuration_encoding =
              "without_dal"
              bool
              Scenarios_cli.Layer1_default.default_without_dal)
+          (opt "dal_node_producers" (list int31))
           (dft
              "maintenance_delay"
              int31
@@ -418,9 +424,10 @@ let configuration_encoding =
           (dft
              "ppx_profiling_backends"
              (list string)
-             Scenarios_cli.Layer1_default.default_ppx_profiling_backends)
-          (opt "Signing_delay" (tup2 float float)))
-       (obj1 (opt "fixed_random_seed" int31)))
+             Scenarios_cli.Layer1_default.default_ppx_profiling_backends))
+       (obj2
+          (opt "Signing_delay" (tup2 float float))
+          (opt "fixed_random_seed" int31)))
 
 type bootstrap = {
   agent : Agent.t;
@@ -451,6 +458,7 @@ type 'network t = {
   cloud : Cloud.t;
   bootstrap : bootstrap;
   bakers : baker list;
+  producers : Dal_node_helpers.producer list;
   stresstesters : stresstester list;
 }
 
@@ -539,6 +547,52 @@ let init_baker_i i (configuration : configuration) cloud ~peers
   in
   Lwt.return {agent; node; dal_node; baker; accounts}
 
+let init_producer_i i (configuration : configuration) slot_index
+    (account : Account.key) cloud ~peers dal_node_p2p_endpoint
+    (agent, node, name) =
+  let delay = i * configuration.maintenance_delay in
+  let () = toplog "Initializing the DAL producer %s" name in
+  let* client =
+    let name = name ^ "-node" in
+    Node.init_baker_node
+      ~accounts:[]
+      ~delay
+      ~peers
+      ~ppx_profiling:configuration.ppx_profiling
+      ~snapshot:configuration.snapshot
+      ~network:configuration.network
+      ~migration_offset:configuration.migration_offset
+      (agent, node, name)
+  in
+  let* () =
+    Client.import_public_key
+      ~alias:account.public_key_hash
+      ~public_key:account.public_key
+      client
+  in
+  let* dal_node =
+    let name = name ^ "-dal-node" in
+    let* dal_node = Dal_node.Agent.create ~name cloud agent ~node in
+    let* () =
+      Dal_node.init_config
+        ~expected_pow:26.
+        ~observer_profiles:[slot_index]
+        ~peers:[dal_node_p2p_endpoint |> Option.get]
+        dal_node
+    in
+    let* () =
+      Dal_node.Agent.run
+        ~event_level:`Notice
+        ~ppx_profiling:configuration.ppx_profiling
+        ~ppx_profiling_backends:configuration.ppx_profiling_backends
+        dal_node
+    in
+    Lwt.return dal_node
+  in
+  Lwt.return
+    ({client; node; dal_node; account; is_ready = Lwt.return_unit; slot_index}
+      : Dal_node_helpers.producer)
+
 let fund_stresstest_accounts ~source client =
   Client.stresstest_fund_accounts_from_source
     ~batch_size:150
@@ -573,6 +627,7 @@ let init_network ~peers (configuration : configuration) cloud teztale
   let* client, delegates, rich_account =
     Node.init_bootstrap_node
       ?stresstest:configuration.stresstest
+      ?dal_node_producers:configuration.dal_node_producers
       ~peers
       ~ppx_profiling:configuration.ppx_profiling
       ~snapshot:configuration.snapshot
@@ -769,6 +824,18 @@ let init ~(configuration : configuration) cloud next_agent =
         |> Lwt_list.map_s @@ fun i ->
            agent_and_node next_agent cloud ~name:(sf "stresstest-%d" i)
   in
+  let* producers_agents =
+    Lwt_list.map_s
+      (fun slot_index ->
+        let* agent =
+          agent_and_node
+            next_agent
+            cloud
+            ~name:(sf "dal-node-producer-%d" slot_index)
+        in
+        return (agent, slot_index))
+      (Option.value ~default:[] configuration.dal_node_producers)
+  in
   let* baker_agents =
     let* n =
       if configuration.stake = [] then
@@ -796,10 +863,16 @@ let init ~(configuration : configuration) cloud next_agent =
   let peers : string list =
     List.map
       (fun (_, node, _) -> Node.point_str node)
-      (stresstest_agents @ baker_agents)
+      (stresstest_agents @ List.map fst producers_agents @ baker_agents)
   in
-  let* bootstrap, baker_accounts, stresstest_rich_account_opt =
+  let* bootstrap, baker_accounts, rich_accounts =
     init_network ~peers configuration cloud teztale bootstrap
+  in
+  let stresstest_rich_account_opt, producer_accounts =
+    match configuration.stresstest with
+    | None -> (None, rich_accounts)
+    | Some _ -> (
+        match rich_accounts with a :: l -> (Some a, l) | _ -> assert false)
   in
   let peers = Node.point_str bootstrap_node :: peers in
   let* bakers =
@@ -862,6 +935,23 @@ let init ~(configuration : configuration) cloud next_agent =
           agent)
       distribution
   in
+  let () =
+    toplog "Init: initializing %d DAL producers" (List.length producer_accounts)
+  in
+  let* producers =
+    Lwt_list.mapi_p
+      (fun i ((agent, slot_index), account) ->
+        init_producer_i
+          i
+          (configuration : configuration)
+          slot_index
+          account
+          cloud
+          ~peers
+          bootstrap.dal_node_p2p_endpoint
+          agent)
+      (List.combine producers_agents producer_accounts)
+  in
   let* stresstesters =
     match (configuration.stresstest, stresstest_rich_account_opt) with
     | None, _ -> Lwt.return_nil
@@ -869,7 +959,8 @@ let init ~(configuration : configuration) cloud next_agent =
         Test.fail
           "Stresstest argument was provided but no rich account was found in \
            the yes wallet"
-    | Some {tps; seed}, Some {public_key = pk; public_key_hash = pkh; _} ->
+    | ( Some {tps; seed},
+        Some ({public_key = pk; public_key_hash = pkh; _} : Account.key) ) ->
         let tps = tps / nb_stresstester configuration.network tps in
         let* stresstesters =
           (* init stresstest: init node and create accounts *)
@@ -956,7 +1047,7 @@ let init ~(configuration : configuration) cloud next_agent =
         add_prometheus_source ~node cloud agent (Agent.name agent))
       stresstesters
   in
-  Lwt.return {cloud; configuration; bootstrap; bakers; stresstesters}
+  Lwt.return {cloud; configuration; bootstrap; bakers; producers; stresstesters}
 
 let on_new_level =
   let push_level t level =
@@ -1046,17 +1137,21 @@ let vm_conf_encoding =
 type vms_conf = {
   bootstrap : vm_conf option;
   bakers : vm_conf list option;
+  producers : vm_conf list option;
   stresstester : vm_conf option;
 }
 
 let vms_conf_encoding =
   let open Data_encoding in
   conv
-    (fun {bootstrap; bakers; stresstester} -> (bootstrap, bakers, stresstester))
-    (fun (bootstrap, bakers, stresstester) -> {bootstrap; bakers; stresstester})
-    (obj3
+    (fun {bootstrap; bakers; producers; stresstester} ->
+      (bootstrap, bakers, producers, stresstester))
+    (fun (bootstrap, bakers, producers, stresstester) ->
+      {bootstrap; bakers; producers; stresstester})
+    (obj4
        (opt "bootstrap" vm_conf_encoding)
        (opt "bakers" @@ list vm_conf_encoding)
+       (opt "producers" @@ list vm_conf_encoding)
        (opt "stresstester" vm_conf_encoding))
 
 (** Copy/paste from teztale_server_main.ml *)
@@ -1103,6 +1198,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let stresstest =
       Option.map (fun (tps, seed) -> {tps; seed}) Cli.stresstest
     in
+    let dal_node_producers = Cli.dal_producers_slot_indices in
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in
     let without_dal = Cli.without_dal in
@@ -1121,6 +1217,9 @@ let register (module Cli : Scenarios_cli.Layer1) =
           without_dal = conf.without_dal || without_dal;
           stresstest =
             (if stresstest <> None then stresstest else conf.stresstest);
+          dal_node_producers =
+            (if dal_node_producers <> None then dal_node_producers
+             else conf.dal_node_producers);
           maintenance_delay =
             Option.value ~default:conf.maintenance_delay maintenance_delay;
           migration_offset =
@@ -1147,6 +1246,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
               maintenance_delay;
           snapshot = Option.get snapshot;
           without_dal;
+          dal_node_producers;
           migration_offset;
           ppx_profiling;
           ppx_profiling_backends;
@@ -1157,6 +1257,15 @@ let register (module Cli : Scenarios_cli.Layer1) =
   if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
   if configuration.snapshot = Snapshot_helpers.No_snapshot then
     Test.fail "snapshot parameter cannot be empty" ;
+  let with_dal_producers =
+    match configuration.dal_node_producers with
+    | None | Some [] -> false
+    | _ -> true
+  in
+  if configuration.without_dal && with_dal_producers then
+    Test.fail
+      "Dal producer indices provided but DAL network disabled with \
+       `--without-dal`" ;
 
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
@@ -1166,6 +1275,10 @@ let register (module Cli : Scenarios_cli.Layer1) =
     (match configuration.stake with
     | [n] -> List.init n (fun i -> `Baker i)
     | stake -> List.mapi (fun i _ -> `Baker i) stake)
+    @ (match configuration.dal_node_producers with
+      | Some dal_node_producers ->
+          List.map (fun i -> `Producer i) dal_node_producers
+      | None -> [])
     @
     match configuration.stresstest with
     | None -> []
@@ -1213,7 +1326,13 @@ let register (module Cli : Scenarios_cli.Layer1) =
                make_vm_conf ~name:(Format.sprintf "baker-%d" i)
                @@ Option.bind vms_conf (function
                     | {bakers = Some bakers; _} -> List.nth_opt bakers i
-                    | {bakers = None; _} -> None))
+                    | {bakers = None; _} -> None)
+           | `Producer i ->
+               make_vm_conf ~name:(Format.sprintf "dal-node-producer-%d" i)
+               @@ Option.bind vms_conf (function
+                    | {producers = Some producers; _} ->
+                        List.nth_opt producers i
+                    | {producers = None; _} -> None))
   in
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries
@@ -1241,10 +1360,42 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   let* t = init ~configuration cloud next_agent in
   toplog "Starting main loop" ;
+  let produce_slot (t : 'network t) level =
+    Lwt_list.iter_p
+      (fun (producer : Dal_node_helpers.producer) ->
+        let index = producer.slot_index in
+        let content =
+          Format.asprintf "%d:%d" level index
+          |> Dal_common.Helpers.make_slot ~padding:false ~slot_size:131072
+        in
+        let* _ = Node.wait_for_level producer.node level in
+        let fee = 800 in
+        let* _commitment =
+          (* A dry-run of the "publish dal commitment" command for each tz kinds outputs:
+             - tz1: fees of 513µtz and 1333 gas consumed
+             - tz2: fees of 514µtz and 1318 gas consumed
+             - tz3: fees of 543µtz and 1607 gas consumed
+             - tz4: fees of 700µtz and 2837 gas consumed
+             We added a (quite small) margin to it. *)
+          Dal_common.Helpers.publish_and_store_slot
+            ~fee
+            ~gas_limit:3000
+            ~dont_wait:true
+            producer.client
+            producer.dal_node
+            producer.account
+            ~force:true
+            ~index
+            content
+        in
+        Lwt.return_unit)
+      t.producers
+  in
   Lwt.bind
     (Network.get_level (Node.as_rpc_endpoint t.bootstrap.node))
     (let rec loop level =
        let level = succ level in
+       let* () = produce_slot t level in
        let* () = on_new_level t level in
        loop level
      in
