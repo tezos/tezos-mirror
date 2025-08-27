@@ -148,7 +148,7 @@ val binaries_path : string
 val log_rotation : int
 
 (* Daily log path retrieval if set. *)
-val retrieve_daily_logs : string option
+val retrieve_daily_logs : bool
 
 (** Boundaries used for setting a random network latency on docker containers. *)
 val tc_delay : (float * float) option

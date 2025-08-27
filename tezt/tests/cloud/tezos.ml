@@ -391,8 +391,7 @@ module Node = struct
       in
       let on_shutdown =
         match Agent.artifacts_dir agent with
-        | None -> []
-        | Some destination_root ->
+        | Some destination_root when Tezt_cloud_cli.retrieve_daily_logs ->
             [
               (fun () ->
                 Agent_kind.Logs.scp_logs
@@ -400,6 +399,7 @@ module Node = struct
                   ~daemon_name:name
                   agent);
             ]
+        | None | Some _ -> []
       in
       Cloud.service_register
         ~name:node_name
@@ -609,8 +609,7 @@ module Dal_node = struct
       in
       let on_shutdown =
         match Agent.artifacts_dir agent with
-        | None -> []
-        | Some destination_root ->
+        | Some destination_root when Tezt_cloud_cli.retrieve_daily_logs ->
             [
               (fun () ->
                 Agent_kind.Logs.scp_logs
@@ -618,6 +617,7 @@ module Dal_node = struct
                   ~daemon_name:name
                   agent);
             ]
+        | None | Some _ -> []
       in
       Cloud.service_register
         ~name
