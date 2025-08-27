@@ -286,7 +286,7 @@ let rec loop n =
 let register (module Cli : Scenarios_cli.Tezlink) =
   let () = toplog "Parsing CLI done" in
   let name = "tezlink-sequencer" in
-  let vms = return [Agent.Configuration.make ~name ()] in
+  let vms () = return [Agent.Configuration.make ~name ()] in
   Cloud.register
   (* docker images are pushed before executing the test in case binaries are modified locally. This way we always use the latest ones. *)
     ~vms

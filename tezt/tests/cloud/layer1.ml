@@ -1350,7 +1350,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries
      are modified locally. This way we always use the latest ones. *)
-    ~vms:(return vms)
+    ~vms:(fun () -> return vms)
     ~proxy_files:
       ([yes_wallet_exe]
       @
