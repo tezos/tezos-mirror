@@ -1050,6 +1050,8 @@ module type Tezlink = sig
   val tzkt_api_port : int option
 
   val tzkt : bool
+
+  val verbose : bool
 end
 
 module Tezlink () : Tezlink = struct
@@ -1092,5 +1094,13 @@ module Tezlink () : Tezlink = struct
       ~set_long:"tzkt"
       ~unset_long:"no-tzkt"
       ~description:"Run the TzKT indexer and API"
+      true
+
+  let verbose =
+    Clap.flag
+      ~section
+      ~set_long:"verbose-node"
+      ~unset_long:"discreet-node"
+      ~description:"Make the EVM node verbose"
       true
 end
