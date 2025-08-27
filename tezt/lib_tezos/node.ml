@@ -249,8 +249,9 @@ let pid node =
 
 let path node = node.path
 
-let spawn_command node =
+let spawn_command ?env node =
   Process.spawn
+    ?env
     ?runner:node.persistent_state.runner
     ~name:node.name
     ~color:node.color
@@ -636,9 +637,10 @@ let spawn_snapshot_info ?(json = false) node file =
 let snapshot_info ?json node file =
   spawn_snapshot_info ?json node file |> Process.check_and_read_stdout
 
-let spawn_snapshot_import ?(force = false) ?(no_check = false)
+let spawn_snapshot_import ?env ?(force = false) ?(no_check = false)
     ?(reconstruct = false) node file =
   spawn_command
+    ?env
     node
     (["snapshot"; "import"; "--data-dir"; node.persistent_state.data_dir]
     @ (if reconstruct then ["--reconstruct"] else [])
@@ -646,8 +648,9 @@ let spawn_snapshot_import ?(force = false) ?(no_check = false)
     @ (if force then ["--force"] else [])
     @ [file])
 
-let snapshot_import ?force ?no_check ?reconstruct node file =
-  spawn_snapshot_import ?force ?no_check ?reconstruct node file |> Process.check
+let snapshot_import ?env ?force ?no_check ?reconstruct node file =
+  spawn_snapshot_import ?env ?force ?no_check ?reconstruct node file
+  |> Process.check
 
 let spawn_reconstruct node =
   spawn_command
