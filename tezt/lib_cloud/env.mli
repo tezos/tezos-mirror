@@ -152,6 +152,9 @@ val tc_delay : (float * float) option
 (** Equivalent to [Cli.tc_jitter] *)
 val tc_jitter : (float * float) option
 
+(** Equivalent to [Cli.artifacts_dir] *)
+val artifacts_dir : string option
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 

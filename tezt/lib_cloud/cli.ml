@@ -55,6 +55,7 @@ type config = {
   scenario_specific : (string * Data_encoding.Json.t) option;
   tc_delay : (float * float) option;
   tc_jitter : (float * float) option;
+  artifacts_dir : string option;
 }
 
 let encoding =
@@ -106,6 +107,7 @@ let encoding =
            scenario_specific;
            tc_delay;
            tc_jitter;
+           artifacts_dir;
          }
        ->
       ( ( ( localhost,
@@ -152,7 +154,8 @@ let encoding =
             retrieve_daily_logs,
             scenario_specific,
             tc_delay,
-            tc_jitter ) ) ))
+            tc_jitter,
+            artifacts_dir ) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -197,7 +200,8 @@ let encoding =
                retrieve_daily_logs,
                scenario_specific,
                tc_delay,
-               tc_jitter ) ) )
+               tc_jitter,
+               artifacts_dir ) ) )
        ->
       {
         localhost;
@@ -242,6 +246,7 @@ let encoding =
         slack_channel_id;
         slack_bot_token;
         retrieve_daily_logs;
+        artifacts_dir;
         scenario_specific;
         tc_delay;
         tc_jitter;
@@ -294,12 +299,13 @@ let encoding =
                 (opt "binaries_path" string)
                 (opt "log_rotation" int31)
                 (opt "slack_channel_id" string)))
-          (obj5
+          (obj6
              (opt "slack_bot_token" string)
              (opt "retrieve_daily_logs" string)
              (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding))
              (opt "tc_delay" (tup2 float float))
-             (opt "tc_jitter" (tup2 float float)))))
+             (opt "tc_jitter" (tup2 float float))
+             (opt "artifacts_dir" string))))
 
 let section =
   Clap.section
@@ -768,6 +774,21 @@ let dir_typ ~name ~cli_parameter : string option Clap.typ =
         Some None)
       else Some (Some s))
     ~show:(function Some s -> s | None -> "empty")
+
+let artifacts_dir =
+  let long = "artifacts-dir" in
+  let from_cli =
+    Clap.default
+      ~section
+      ~long
+      ~description:
+        "Directory where the artifacts are retrieved (configuration files, \
+         logs, etc). This can represent quite a huge quantity of data. \
+         Disabled by default."
+      (dir_typ ~name:"artifacts" ~cli_parameter:long)
+      None
+  in
+  Option.fold ~none:config.artifacts_dir ~some from_cli
 
 let retrieve_daily_logs =
   let long = "retrieve-daily-logs" in

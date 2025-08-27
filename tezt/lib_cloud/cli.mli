@@ -156,6 +156,9 @@ val tc_delay : (float * float) option
 (** Boundaries used for setting a random network jitter on docker containers. *)
 val tc_jitter : (float * float) option
 
+(* Artifact path retrieval if set. *)
+val artifacts_dir : string option
+
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
 

@@ -266,6 +266,8 @@ module Tezt_cloud_cli : sig
 
   (** Equivalent to [Cli.retrieve_daily_logs] *)
   val retrieve_daily_logs : string option
+
+  val artifacts_dir : string option
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
