@@ -5,7 +5,6 @@ stages:
 - start
 - images
 - build
-- test
 
 oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -49,24 +48,6 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation.rst-check:
-  image: ${ci_image_name_protected}/test:amd64--master
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - . $HOME/.venv/bin/activate
-  - make --silent -C docs sphinx-check
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: build
@@ -98,7 +79,7 @@ documentation.odoc:
   - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
   - opam update
   - opam install --yes odoc.2.4.4
-  - make -C docs odoc-lite
+  - make -C docs odoc
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -112,54 +93,3 @@ documentation.odoc:
     - docs/_build/api/odoc/
     - docs/odoc.log
     when: always
-
-documentation.install_python_bookworm:
-  image: debian:bookworm
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-documentation.install_python_jammy:
-  image: public.ecr.aws/lts/ubuntu:22.04_stable
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-documentation.install_python_noble:
-  image: public.ecr.aws/lts/ubuntu:24.04_stable
-  stage: test
-  tags:
-  - gcp
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  interruptible: true
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

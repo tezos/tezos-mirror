@@ -1964,7 +1964,13 @@ let jobs pipeline_type =
       in
       let dependencies = dependencies_needs_start in
       let job_odoc =
-        Documentation.job_odoc ~rules ~dependencies ~lite:true ()
+        (* Dummy job to remove in a commit later in this MR. *)
+        Tezos_ci.job
+          ~__POS__
+          ~stage:Tezos_ci.Stages.start
+          ~name:"documentation:odoc"
+          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+          []
       in
       let job_manuals =
         Documentation.job_manuals

@@ -3650,50 +3650,21 @@ tezt-riscv-slow-sequential:
   retry: 2
 
 documentation:odoc:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - when: always
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export OPAMFETCH='wget'
-  - opam remote add default https://opam.ocaml.org/
-  - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
-  - opam update
-  - opam install --yes odoc.2.4.4
-  - make -C docs odoc-lite
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
   artifacts:
-    expire_in: 4 hours
     paths:
-    - docs/_build/api/odoc/
-    - docs/odoc.log
-    when: always
+    - dummy
 
 documentation:manuals:
   image: ${ci_image_name}/test:${ci_image_tag}

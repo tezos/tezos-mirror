@@ -1232,40 +1232,6 @@ module Documentation = struct
       jobs
       dependencies
 
-  (** Create an odoc job.
-
-      The job will build the target [odoc] (resp. [odoc-lite]) in the
-      directory [docs] if lite is [false] (resp. [true]), which is the
-      default.
-
-      This job is one of the prerequisites to {!job_build_all}. *)
-  let job_odoc ?(lite = false) ?rules ?dependencies () : tezos_job =
-    let target = if lite then "odoc-lite" else "odoc" in
-    job
-      ~__POS__
-      ~name:"documentation:odoc"
-      ~image:Images.CI.test
-      ~stage:Stages.build
-      ?dependencies
-      ?rules
-      ~before_script:(before_script ~eval_opam:true [])
-      ~artifacts:
-        (artifacts
-           ~when_:Always
-           ~expire_in:(Duration (Hours 4))
-           (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
-           ["docs/_build/api/odoc/"; "docs/odoc.log"])
-      [
-        "export OPAMFETCH='wget'";
-        "opam remote add default https://opam.ocaml.org/";
-        "opam repo add archive \
-         git+https://github.com/ocaml/opam-repository-archive";
-        "opam update";
-        "opam install --yes odoc.2.4.4";
-        "make -C docs " ^ target;
-      ]
-    |> enable_cargo_cache |> enable_sccache
-
   (** Create the manuals job.
 
       This job builds the command-line interface manuals (i.e [man])
