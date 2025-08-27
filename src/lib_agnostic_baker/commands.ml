@@ -267,7 +267,11 @@ module Baker = struct
         ~verbose_rpc_error_diagnostics:false
     in
     let* parsed, _remaining =
-      C.parse_config_args full (Array.to_list Sys.argv)
+      C.parse_config_args
+        full
+        (match Array.to_list Sys.argv with
+        | _ :: original_args -> original_args
+        | [] -> [])
     in
     let parsed_config_file = parsed.Client_config.parsed_config_file in
     let parsed_args = parsed.Client_config.parsed_args in
