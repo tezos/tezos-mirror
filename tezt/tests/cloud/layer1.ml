@@ -22,8 +22,8 @@ open Scenarios_helpers
 open Tezos
 open Yes_crypto
 
-(** A baker account is its public key (pk) and its hash (pkh) *)
-type baker_account = {pk : string; pkh : string}
+(** A baker account is its delegate account and its consensus key account *)
+type baker_account = {delegate : Account.key; consensus : Account.key}
 
 let wait_next_level ?(offset = 1) node =
   Lwt.bind
@@ -186,39 +186,41 @@ module Node = struct
     in
     let* delegates, consensus_keys, rich_account_opt =
       let* known_addresses = Client.list_known_addresses client in
-      let get_pk alias =
-        let* account = Client.show_address ~alias client in
-        return account.public_key
-      in
+      let get_account alias = Client.show_address ~alias client in
       (Lwt_list.fold_left_s
-         (fun (delegates, consensus_keys, rich_account_opt) (alias, pkh) ->
+         (fun (delegates, consensus_keys, rich_account_opt) (alias, _pkh) ->
            if alias =~ rex "rich_" then
              (* if the alias match "rich_n" *)
-             let* pk = get_pk alias in
-             return (delegates, consensus_keys, Some {pkh; pk})
+             let* rich_account = get_account alias in
+             return (delegates, consensus_keys, Some rich_account)
            else
              match alias =~* rex "(\\w+)_consensus_key" with
              | None ->
                  (* if the alias does not contain "_consensus_key" *)
-                 let* pk = get_pk alias in
+                 let* delegate_account = get_account alias in
                  return
-                   ( String_map.add alias {pkh; pk} delegates,
+                   ( String_map.add alias delegate_account delegates,
                      consensus_keys,
                      rich_account_opt )
              | Some consensus_key_alias ->
                  (* if the alias match "baker_n_consensus_key" *)
-                 let* pk = get_pk alias in
+                 let* consensus_account = get_account alias in
                  return
                    ( delegates,
-                     String_map.add consensus_key_alias {pkh; pk} consensus_keys,
+                     String_map.add
+                       consensus_key_alias
+                       consensus_account
+                       consensus_keys,
                      rich_account_opt )))
         (String_map.empty, String_map.empty, None)
         (List.rev known_addresses)
     in
     let delegates_with_consensus_keys =
       String_map.mapi
-        (fun alias address_and_pk ->
-          (address_and_pk, String_map.find_opt alias consensus_keys))
+        (fun alias delegate ->
+          match String_map.find_opt alias consensus_keys with
+          | None -> {delegate; consensus = delegate}
+          | Some consensus -> {delegate; consensus})
         delegates
     in
     let* () = Client.forget_all_keys client in
@@ -245,8 +247,11 @@ module Node = struct
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
-        (fun {pkh = alias; pk = public_key} ->
-          Client.import_public_key ~alias ~public_key client)
+        (fun {consensus; _} ->
+          Client.import_public_key
+            ~alias:consensus.public_key_hash
+            ~public_key:consensus.public_key
+            client)
         accounts
     in
     let* () = Yes_wallet.convert_wallet_inplace ~client yes_wallet in
@@ -418,14 +423,14 @@ type baker = {
   agent : Agent.t;
   node : Node.t;
   baker : Agnostic_baker.t;
-  accounts : string list;
+  accounts : baker_account list;
 }
 
 type stresstester = {
   agent : Agent.t;
   node : Node.t;
   client : Client.t;
-  accounts : string list;
+  accounts : Account.key list;
 }
 
 type 'network t = {
@@ -476,7 +481,10 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       Agnostic_baker.Agent.init
         ~env
         ~name
-        ~delegates:(List.map (fun ({pkh; _} : baker_account) -> pkh) accounts)
+        ~delegates:
+          (List.map
+             (fun ({consensus; _} : baker_account) -> consensus.public_key_hash)
+             accounts)
         ~ppx_profiling:configuration.ppx_profiling
         ~client
         ~allow_fixed_random_seed:
@@ -490,13 +498,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
     toplog "init_baker: %s is ready!" name ;
     Lwt.return agnostic_baker
   in
-  Lwt.return
-    {
-      agent;
-      node;
-      baker;
-      accounts = List.map (fun ({pkh; _} : baker_account) -> pkh) accounts;
-    }
+  Lwt.return {agent; node; baker; accounts}
 
 let fund_stresstest_accounts ~source client =
   Client.stresstest_fund_accounts_from_source
@@ -524,7 +526,6 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
       (agent, node, name)
       ~tps
   in
-  let accounts = List.map (fun a -> a.Account.public_key_hash) accounts in
   Lwt.return {agent; node; client; accounts}
 
 let init_network ~peers (configuration : configuration) cloud teztale
@@ -737,15 +738,8 @@ let init ~(configuration : configuration) cloud next_agent =
       in
       match configuration.stake with
       | [] ->
-          let res =
-            List.map
-              (fun (baker_account, consensus_key_opt) ->
-                match consensus_key_opt with
-                | None -> [baker_account]
-                | Some consensus_key -> [consensus_key])
-              baker_accounts
-          in
-          Lwt.return res
+          Lwt.return
+            (List.map (fun baker_account -> [baker_account]) baker_accounts)
       | [x] ->
           if List.compare_length_with baker_accounts x != 0 then
             Test.fail
@@ -753,23 +747,14 @@ let init ~(configuration : configuration) cloud next_agent =
                bakers (%d) retrieved in the yes wallet "
               x
               (List.length baker_accounts) ;
-          let res =
-            List.map
-              (fun (baker_account, consensus_key_opt) ->
-                match consensus_key_opt with
-                | None -> [baker_account]
-                | Some consensus_key -> [consensus_key])
-              baker_accounts
-          in
-          Lwt.return res
+          Lwt.return
+            (List.map (fun baker_account -> [baker_account]) baker_accounts)
       | stake ->
           let* accounts =
             toplog
               "init_network: Fetching baker accounts baking power from client" ;
             Lwt_list.map_s
-              (fun ( (baker_account : baker_account),
-                     (consensus_key_opt : baker_account option) )
-                 ->
+              (fun (baker_account : baker_account) ->
                 let* power =
                   Client.(
                     rpc
@@ -781,15 +766,10 @@ let init ~(configuration : configuration) cloud next_agent =
                         "head";
                         "context";
                         "delegates";
-                        baker_account.pkh;
+                        baker_account.delegate.public_key_hash;
                         "current_baking_power";
                       ]
                       bootstrap.client)
-                in
-                let baker_account =
-                  match consensus_key_opt with
-                  | None -> baker_account
-                  | Some consenusus_key -> consenusus_key
                 in
                 Lwt.return (baker_account, power |> JSON.as_int))
               baker_accounts
@@ -810,7 +790,7 @@ let init ~(configuration : configuration) cloud next_agent =
         Test.fail
           "Stresstest argument was provided but no rich account was found in \
            the yes wallet"
-    | Some {tps; seed}, Some {pkh; pk} ->
+    | Some {tps; seed}, Some {public_key = pk; public_key_hash = pkh; _} ->
         let tps = tps / nb_stresstester configuration.network tps in
         let* stresstesters =
           (* init stresstest: init node and create accounts *)
@@ -832,7 +812,7 @@ let init ~(configuration : configuration) cloud next_agent =
           Lwt_list.iter_p
             (fun {client; accounts; node; _} ->
               Lwt_list.iter_s
-                (fun pkh ->
+                (fun ({public_key_hash = pkh; _} : Account.key) ->
                   (* For some reason, [try ... with ...] will make the scenario fail when a exception is raised  *)
                   let* need_reveal_operation =
                     RPC.get_chain_block_context_contract_manager_key ~id:pkh ()
@@ -855,7 +835,11 @@ let init ~(configuration : configuration) cloud next_agent =
                    copy it the the agent,
                    and pass the filename to stresstest invocation directly *)
                 let sources =
-                  `A (List.map (fun pkh -> `O [("pkh", `String pkh)]) accounts)
+                  `A
+                    (List.map
+                       (fun ({public_key_hash = pkh; _} : Account.key) ->
+                         `O [("pkh", `String pkh)])
+                       accounts)
                 in
                 (* As we run in parrallel, and as Temp.file does not return a unique file name,
                    we need a different base filename name for each stresstester *)
