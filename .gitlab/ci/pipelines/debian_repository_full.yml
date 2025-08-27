@@ -21,7 +21,7 @@ stages:
 - publish
 - publishing_tests
 
-datadog_pipeline_trace:
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -41,7 +41,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.docker-systemd_tests_debian:
+fresh-cache.oc.docker-systemd_tests_debian:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -76,7 +76,7 @@ oc.docker-systemd_tests_debian:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-systemd_tests_ubuntu:
+fresh-cache.oc.docker-systemd_tests_ubuntu:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -111,7 +111,7 @@ oc.docker-systemd_tests_ubuntu:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-build-debian-dependencies:
+fresh-cache.oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -146,13 +146,13 @@ oc.docker-build-debian-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-debian:
+fresh-cache.oc.build-debian:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - fresh-cache.oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -192,13 +192,13 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-data_packages:
+fresh-cache.oc.build-data_packages:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - fresh-cache.oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -222,17 +222,17 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
-apt_repo_debian:
+fresh-cache.apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-debian
-  - oc.build-data_packages
+  - fresh-cache.oc.build-debian
+  - fresh-cache.oc.build-data_packages
   dependencies:
-  - oc.build-debian
-  - oc.build-data_packages
+  - fresh-cache.oc.build-debian
+  - fresh-cache.oc.build-data_packages
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -255,7 +255,7 @@ apt_repo_debian:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.docker-build-ubuntu-dependencies:
+fresh-cache.oc.docker-build-ubuntu-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -290,13 +290,13 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-ubuntu:
+fresh-cache.oc.build-ubuntu:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-ubuntu-dependencies
+  - fresh-cache.oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -336,17 +336,17 @@ oc.build-ubuntu:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-apt_repo_ubuntu:
+fresh-cache.apt_repo_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-ubuntu
-  - oc.build-data_packages
+  - fresh-cache.oc.build-ubuntu
+  - fresh-cache.oc.build-data_packages
   dependencies:
-  - oc.build-ubuntu
-  - oc.build-data_packages
+  - fresh-cache.oc.build-ubuntu
+  - fresh-cache.oc.build-data_packages
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -369,15 +369,15 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.lintian_debian:
+fresh-cache.oc.lintian_debian:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.build-debian
+  - fresh-cache.oc.build-debian
   dependencies:
-  - oc.build-debian
+  - fresh-cache.oc.build-debian
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -394,13 +394,13 @@ oc.lintian_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_debian_bookworm:
+fresh-cache.oc.install_bin_debian_bookworm:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_debian
+  - fresh-cache.apt_repo_debian
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -415,14 +415,14 @@ oc.install_bin_debian_bookworm:
   variables:
     PREFIX: ""
 
-oc.install_bin_debian_bookworm_systemd_test:
+fresh-cache.oc.install_bin_debian_bookworm_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
-  - apt_repo_debian
+  - fresh-cache.oc.docker-systemd_tests_debian
+  - fresh-cache.apt_repo_debian
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -448,14 +448,14 @@ oc.install_bin_debian_bookworm_systemd_test:
     DISTRIBUTION: debian
     RELEASE: bookworm
 
-oc.install_bin_debian_bookworm_systemd_custom_datadir:
+fresh-cache.oc.install_bin_debian_bookworm_systemd_custom_datadir:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
-  - apt_repo_debian
+  - fresh-cache.oc.docker-systemd_tests_debian
+  - fresh-cache.apt_repo_debian
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -482,14 +482,14 @@ oc.install_bin_debian_bookworm_systemd_custom_datadir:
     RELEASE: bookworm
     DATADIR: /custom/.tezos-node
 
-oc.install_bin_debian_bookworm_systemd_agnostic_baker:
+fresh-cache.oc.install_bin_debian_bookworm_systemd_agnostic_baker:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
-  - apt_repo_debian
+  - fresh-cache.oc.docker-systemd_tests_debian
+  - fresh-cache.apt_repo_debian
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -516,14 +516,14 @@ oc.install_bin_debian_bookworm_systemd_agnostic_baker:
     RELEASE: bookworm
     AGNOSTIC_BAKER: "true"
 
-oc.upgrade_bin_debian_bookworm-systemd:
+fresh-cache.oc.upgrade_bin_debian_bookworm-systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_debian
-  - apt_repo_debian
+  - fresh-cache.oc.docker-systemd_tests_debian
+  - fresh-cache.apt_repo_debian
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -549,15 +549,15 @@ oc.upgrade_bin_debian_bookworm-systemd:
     DISTRIBUTION: debian
     RELEASE: bookworm
 
-oc.lintian_ubuntu:
+fresh-cache.oc.lintian_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.build-ubuntu
+  - fresh-cache.oc.build-ubuntu
   dependencies:
-  - oc.build-ubuntu
+  - fresh-cache.oc.build-ubuntu
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -574,13 +574,13 @@ oc.lintian_ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables: {}
 
-oc.install_bin_ubunty_jammy:
+fresh-cache.oc.install_bin_ubunty_jammy:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:jammy
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
+  - fresh-cache.apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -595,13 +595,13 @@ oc.install_bin_ubunty_jammy:
   variables:
     PREFIX: ""
 
-oc.install_bin_ubunty_noble:
+fresh-cache.oc.install_bin_ubunty_noble:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - apt_repo_ubuntu
+  - fresh-cache.apt_repo_ubuntu
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -616,14 +616,14 @@ oc.install_bin_ubunty_noble:
   variables:
     PREFIX: ""
 
-oc.install_bin_ubuntu_noble_systemd:
+fresh-cache.oc.install_bin_ubuntu_noble_systemd:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_ubuntu
-  - apt_repo_ubuntu
+  - fresh-cache.oc.docker-systemd_tests_ubuntu
+  - fresh-cache.apt_repo_ubuntu
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -649,14 +649,14 @@ oc.install_bin_ubuntu_noble_systemd:
     DISTRIBUTION: ubuntu
     RELEASE: noble
 
-oc.upgrade_bin_ubuntu_jammy_systemd_test:
+fresh-cache.oc.upgrade_bin_ubuntu_jammy_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_ubuntu
-  - apt_repo_ubuntu
+  - fresh-cache.oc.docker-systemd_tests_ubuntu
+  - fresh-cache.apt_repo_ubuntu
   dependencies: []
   allow_failure: true
   timeout: 60 minutes
@@ -682,14 +682,14 @@ oc.upgrade_bin_ubuntu_jammy_systemd_test:
     DISTRIBUTION: ubuntu
     RELEASE: jammy
 
-oc.upgrade_bin_ubuntu_noble_systemd_test:
+fresh-cache.oc.upgrade_bin_ubuntu_noble_systemd_test:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publishing_tests
   tags:
   - gcp
   needs:
-  - oc.docker-systemd_tests_ubuntu
-  - apt_repo_ubuntu
+  - fresh-cache.oc.docker-systemd_tests_ubuntu
+  - fresh-cache.apt_repo_ubuntu
   dependencies: []
   allow_failure: true
   timeout: 60 minutes

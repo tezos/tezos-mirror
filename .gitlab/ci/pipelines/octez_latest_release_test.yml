@@ -5,7 +5,7 @@ stages:
 - start
 - publish
 
-datadog_pipeline_trace:
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -25,7 +25,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-docker:promote_to_latest:
+fresh-cache.docker:promote_to_latest:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:

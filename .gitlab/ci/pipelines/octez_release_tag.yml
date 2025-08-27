@@ -7,33 +7,7 @@ stages:
 - build
 - publish
 
-oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-oc.docker:ci:arm64:
+fresh-cache.oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -63,7 +37,33 @@ oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-datadog_pipeline_trace:
+fresh-cache.oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -83,15 +83,15 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build:static-x86_64-linux-binaries:
+fresh-cache.oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
   needs:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -133,15 +133,15 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-arm64-linux-binaries:
+fresh-cache.oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp_arm64
   needs:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -183,15 +183,15 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.docker:amd64:
+fresh-cache.oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -212,15 +212,15 @@ oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables
 
-oc.docker:arm64:
+fresh-cache.oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: build
   tags:
   - gcp_arm64
   needs:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -241,7 +241,7 @@ oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables
 
-oc.install-release-homebrew:
+fresh-cache.oc.install-release-homebrew:
   image: debian:bookworm
   stage: build
   tags:
@@ -269,14 +269,14 @@ oc.install-release-homebrew:
     - public/homebrew/*
     when: on_success
 
-docker:merge_manifests:
+fresh-cache.docker:merge_manifests:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.docker:amd64
-  - oc.docker:arm64
+  - fresh-cache.oc.docker:amd64
+  - fresh-cache.oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -296,20 +296,20 @@ docker:merge_manifests:
     CI_DOCKER_HUB: "true"
   retry: 0
 
-gitlab:release:
+fresh-cache.gitlab:release:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - docker:merge_manifests
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
-  - oc.install-release-homebrew
+  - fresh-cache.docker:merge_manifests
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.build:static-arm64-linux-binaries
+  - fresh-cache.oc.install-release-homebrew
   dependencies:
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
-  - oc.install-release-homebrew
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.build:static-arm64-linux-binaries
+  - fresh-cache.oc.install-release-homebrew
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -342,7 +342,7 @@ trigger:octez_monitoring:
     include: .gitlab/ci/pipelines/octez_monitoring.yml
     strategy: depend
 
-oc.docker-build-debian-dependencies:
+fresh-cache.oc.docker-build-debian-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -377,13 +377,13 @@ oc.docker-build-debian-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-debian:
+fresh-cache.oc.build-debian:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - fresh-cache.oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -423,13 +423,13 @@ oc.build-debian:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-data_packages:
+fresh-cache.oc.build-data_packages:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-debian-dependencies
+  - fresh-cache.oc.docker-build-debian-dependencies
   dependencies: []
   timeout: 60 minutes
   before_script:
@@ -453,17 +453,17 @@ oc.build-data_packages:
     paths:
     - packages/$DISTRIBUTION/$RELEASE
 
-apt_repo_debian:
+fresh-cache.apt_repo_debian:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/debian:bookworm
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-debian
-  - oc.build-data_packages
+  - fresh-cache.oc.build-debian
+  - fresh-cache.oc.build-data_packages
   dependencies:
-  - oc.build-debian
-  - oc.build-data_packages
+  - fresh-cache.oc.build-debian
+  - fresh-cache.oc.build-data_packages
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -486,7 +486,7 @@ apt_repo_debian:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.docker-build-ubuntu-dependencies:
+fresh-cache.oc.docker-build-ubuntu-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -521,13 +521,13 @@ oc.docker-build-ubuntu-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-ubuntu:
+fresh-cache.oc.build-ubuntu:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-ubuntu-dependencies
+  - fresh-cache.oc.docker-build-ubuntu-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -567,17 +567,17 @@ oc.build-ubuntu:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-apt_repo_ubuntu:
+fresh-cache.apt_repo_ubuntu:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/ubuntu:noble
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-ubuntu
-  - oc.build-data_packages
+  - fresh-cache.oc.build-ubuntu
+  - fresh-cache.oc.build-data_packages
   dependencies:
-  - oc.build-ubuntu
-  - oc.build-data_packages
+  - fresh-cache.oc.build-ubuntu
+  - fresh-cache.oc.build-data_packages
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -600,7 +600,7 @@ apt_repo_ubuntu:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.docker-build-rockylinux-dependencies:
+fresh-cache.oc.docker-build-rockylinux-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -634,7 +634,7 @@ oc.docker-build-rockylinux-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-systemd-tests-rpm-rockylinux:
+fresh-cache.oc.docker-systemd-tests-rpm-rockylinux:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -668,13 +668,13 @@ oc.docker-systemd-tests-rpm-rockylinux:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-rockylinux:
+fresh-cache.oc.build-rockylinux:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-rockylinux-dependencies
+  - fresh-cache.oc.docker-build-rockylinux-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -717,13 +717,13 @@ oc.build-rockylinux:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-rockylinux-data:
+fresh-cache.oc.build-rockylinux-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-rockylinux-dependencies
+  - fresh-cache.oc.docker-build-rockylinux-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -766,17 +766,17 @@ oc.build-rockylinux-data:
       - gcp_very_high_cpu
       - gcp_arm64
 
-rpm_repo_rockylinux:
+fresh-cache.rpm_repo_rockylinux:
   image: rockylinux:9.3
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-rockylinux
-  - oc.build-rockylinux-data
+  - fresh-cache.oc.build-rockylinux
+  - fresh-cache.oc.build-rockylinux-data
   dependencies:
-  - oc.build-rockylinux
-  - oc.build-rockylinux-data
+  - fresh-cache.oc.build-rockylinux
+  - fresh-cache.oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -798,7 +798,7 @@ rpm_repo_rockylinux:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-oc.docker-build-fedora-dependencies:
+fresh-cache.oc.docker-build-fedora-dependencies:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -833,7 +833,7 @@ oc.docker-build-fedora-dependencies:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.docker-systemd-tests-rpm-fedora:
+fresh-cache.oc.docker-systemd-tests-rpm-fedora:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -868,13 +868,13 @@ oc.docker-systemd-tests-rpm-fedora:
       - gcp_very_high_cpu
       - gcp_arm64
 
-oc.build-fedora:
+fresh-cache.oc.build-fedora:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-fedora-dependencies
+  - fresh-cache.oc.docker-build-fedora-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -918,13 +918,13 @@ oc.build-fedora:
       - gcp_very_high_cpu_ramfs
       - gcp_arm64
 
-oc.build-fedora-data:
+fresh-cache.oc.build-fedora-data:
   image: $DEP_IMAGE:${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
   stage: build
   tags:
   - $TAGS
   needs:
-  - oc.docker-build-fedora-dependencies
+  - fresh-cache.oc.docker-build-fedora-dependencies
   dependencies: []
   timeout: 60 minutes
   cache:
@@ -968,17 +968,17 @@ oc.build-fedora-data:
       - gcp_very_high_cpu
       - gcp_arm64
 
-rpm_repo_fedora:
+fresh-cache.rpm_repo_fedora:
   image: fedora:39
   stage: publish
   tags:
   - gcp_not_interruptible
   needs:
-  - oc.build-fedora
-  - oc.build-fedora-data
+  - fresh-cache.oc.build-fedora
+  - fresh-cache.oc.build-fedora-data
   dependencies:
-  - oc.build-fedora
-  - oc.build-fedora-data
+  - fresh-cache.oc.build-fedora
+  - fresh-cache.oc.build-fedora-data
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
@@ -1000,13 +1000,13 @@ rpm_repo_fedora:
       aud: https://iam.googleapis.com/projects/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROJECT_ID}/locations/global/workloadIdentityPools/${GCP_WORKLOAD_IDENTITY_FEDERATION_POOL_ID}/providers/${GCP_WORKLOAD_IDENTITY_FEDERATION_PROVIDER_ID}
   retry: 0
 
-opam:release:
+fresh-cache.opam:release:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -1020,7 +1020,7 @@ opam:release:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
 
-publish:release-page:
+fresh-cache.publish:release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
@@ -1029,13 +1029,13 @@ publish:release-page:
   - when: manual
     allow_failure: true
   needs:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.build:static-arm64-linux-binaries
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build:static-x86_64-linux-binaries
-  - oc.build:static-arm64-linux-binaries
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.build:static-arm64-linux-binaries
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

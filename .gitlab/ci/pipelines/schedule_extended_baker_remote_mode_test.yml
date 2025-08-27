@@ -7,7 +7,32 @@ stages:
 - build
 - test
 
-oc.docker:ci:amd64:
+fresh-cache.oc.docker:rust-toolchain:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
+
+fresh-cache.oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -33,50 +58,25 @@ oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
-
-tezt:
+fresh-cache.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -124,25 +124,25 @@ tezt:
   retry: 2
   parallel: 50
 
-tezt-time-sensitive:
+fresh-cache.tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -189,25 +189,25 @@ tezt-time-sensitive:
     when: always
   retry: 2
 
-tezt-slow:
+fresh-cache.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -255,25 +255,25 @@ tezt-slow:
   retry: 2
   parallel: 20
 
-tezt-extra:
+fresh-cache.tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -321,25 +321,25 @@ tezt-extra:
   retry: 2
   parallel: 10
 
-tezt-flaky:
+fresh-cache.tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
   - gcp_tezt
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.tezt:fetch-records
   allow_failure: true
   timeout: 60 minutes
   interruptible: false
@@ -387,13 +387,13 @@ tezt-flaky:
     when: always
   retry: 2
 
-oc.build_x86_64-released:
+fresh-cache.oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -441,13 +441,13 @@ oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-oc.build_amd64-extra-dev:
+fresh-cache.oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -502,13 +502,13 @@ oc.build_amd64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_amd64-extra-exp:
+fresh-cache.oc.build_amd64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -563,13 +563,13 @@ oc.build_amd64-extra-exp:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_kernels:
+fresh-cache.oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: kernels-sccache
@@ -611,13 +611,13 @@ oc.build_kernels:
     - dal_echo_kernel.wasm
     when: on_success
 
-oc.tezt:fetch-records:
+fresh-cache.oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
   - gcp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
   interruptible: false
@@ -643,7 +643,7 @@ oc.tezt:fetch-records:
     - tezt/records/*.json.broken
     when: always
 
-datadog_pipeline_trace:
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:

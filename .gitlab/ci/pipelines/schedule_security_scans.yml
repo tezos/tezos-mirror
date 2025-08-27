@@ -6,7 +6,7 @@ stages:
 - images
 - test
 
-oc.docker:ci:amd64:
+fresh-cache.oc.docker:ci:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -32,7 +32,7 @@ oc.docker:ci:amd64:
     reports:
       dotenv: ci_image_tag.env
 
-datadog_pipeline_trace:
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -52,7 +52,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-container_scanning_tezos-tezos-latest:
+fresh-cache.container_scanning_tezos-tezos-latest:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -83,7 +83,7 @@ container_scanning_tezos-tezos-latest:
     paths:
     - gl-container-scanning-report-tezos-tezos-latest.json
 
-container_scanning_tezos-tezos-octez-evm-node-latest:
+fresh-cache.container_scanning_tezos-tezos-octez-evm-node-latest:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -114,7 +114,7 @@ container_scanning_tezos-tezos-octez-evm-node-latest:
     paths:
     - gl-container-scanning-report-tezos-tezos-octez-evm-node-latest.json
 
-container_scanning_tezos-tezos-master:
+fresh-cache.container_scanning_tezos-tezos-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -145,7 +145,7 @@ container_scanning_tezos-tezos-master:
     paths:
     - gl-container-scanning-report-tezos-tezos-master.json
 
-container_scanning_tezos-debian-unstable-master:
+fresh-cache.container_scanning_tezos-debian-unstable-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -176,7 +176,7 @@ container_scanning_tezos-debian-unstable-master:
     paths:
     - gl-container-scanning-report-tezos-debian-unstable-master.json
 
-container_scanning_tezos-debian-bookworm-master:
+fresh-cache.container_scanning_tezos-debian-bookworm-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -207,7 +207,7 @@ container_scanning_tezos-debian-bookworm-master:
     paths:
     - gl-container-scanning-report-tezos-debian-bookworm-master.json
 
-container_scanning_tezos-ubuntu-noble-master:
+fresh-cache.container_scanning_tezos-ubuntu-noble-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -238,7 +238,7 @@ container_scanning_tezos-ubuntu-noble-master:
     paths:
     - gl-container-scanning-report-tezos-ubuntu-noble-master.json
 
-container_scanning_tezos-ubuntu-jammy-master:
+fresh-cache.container_scanning_tezos-ubuntu-jammy-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -269,7 +269,7 @@ container_scanning_tezos-ubuntu-jammy-master:
     paths:
     - gl-container-scanning-report-tezos-ubuntu-jammy-master.json
 
-container_scanning_tezos-fedora-39-master:
+fresh-cache.container_scanning_tezos-fedora-39-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -300,7 +300,7 @@ container_scanning_tezos-fedora-39-master:
     paths:
     - gl-container-scanning-report-tezos-fedora-39-master.json
 
-container_scanning_tezos-fedora-42-master:
+fresh-cache.container_scanning_tezos-fedora-42-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -331,7 +331,7 @@ container_scanning_tezos-fedora-42-master:
     paths:
     - gl-container-scanning-report-tezos-fedora-42-master.json
 
-container_scanning_tezos-rockylinux-9.6-master:
+fresh-cache.container_scanning_tezos-rockylinux-9.6-master:
   image: aquasec/trivy:latest
   stage: test
   tags:
@@ -362,35 +362,35 @@ container_scanning_tezos-rockylinux-9.6-master:
     paths:
     - gl-container-scanning-report-tezos-rockylinux-9.6-master.json
 
-container_scanning_merge_reports:
+fresh-cache.container_scanning_merge_reports:
   image: ${ci_image_name}/monitoring:${ci_image_tag}
   stage: test
   tags:
   - gcp
   needs:
-  - oc.docker:ci:amd64
-  - container_scanning_tezos-tezos-latest
-  - container_scanning_tezos-tezos-octez-evm-node-latest
-  - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-master
-  - container_scanning_tezos-debian-bookworm-master
-  - container_scanning_tezos-ubuntu-noble-master
-  - container_scanning_tezos-ubuntu-jammy-master
-  - container_scanning_tezos-fedora-39-master
-  - container_scanning_tezos-fedora-42-master
-  - container_scanning_tezos-rockylinux-9.6-master
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.container_scanning_tezos-tezos-latest
+  - fresh-cache.container_scanning_tezos-tezos-octez-evm-node-latest
+  - fresh-cache.container_scanning_tezos-tezos-master
+  - fresh-cache.container_scanning_tezos-debian-unstable-master
+  - fresh-cache.container_scanning_tezos-debian-bookworm-master
+  - fresh-cache.container_scanning_tezos-ubuntu-noble-master
+  - fresh-cache.container_scanning_tezos-ubuntu-jammy-master
+  - fresh-cache.container_scanning_tezos-fedora-39-master
+  - fresh-cache.container_scanning_tezos-fedora-42-master
+  - fresh-cache.container_scanning_tezos-rockylinux-9.6-master
   dependencies:
-  - oc.docker:ci:amd64
-  - container_scanning_tezos-tezos-latest
-  - container_scanning_tezos-tezos-octez-evm-node-latest
-  - container_scanning_tezos-tezos-master
-  - container_scanning_tezos-debian-unstable-master
-  - container_scanning_tezos-debian-bookworm-master
-  - container_scanning_tezos-ubuntu-noble-master
-  - container_scanning_tezos-ubuntu-jammy-master
-  - container_scanning_tezos-fedora-39-master
-  - container_scanning_tezos-fedora-42-master
-  - container_scanning_tezos-rockylinux-9.6-master
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.container_scanning_tezos-tezos-latest
+  - fresh-cache.container_scanning_tezos-tezos-octez-evm-node-latest
+  - fresh-cache.container_scanning_tezos-tezos-master
+  - fresh-cache.container_scanning_tezos-debian-unstable-master
+  - fresh-cache.container_scanning_tezos-debian-bookworm-master
+  - fresh-cache.container_scanning_tezos-ubuntu-noble-master
+  - fresh-cache.container_scanning_tezos-ubuntu-jammy-master
+  - fresh-cache.container_scanning_tezos-fedora-39-master
+  - fresh-cache.container_scanning_tezos-fedora-42-master
+  - fresh-cache.container_scanning_tezos-rockylinux-9.6-master
   timeout: 60 minutes
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)

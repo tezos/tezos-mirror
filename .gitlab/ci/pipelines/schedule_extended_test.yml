@@ -9,83 +9,7 @@ stages:
 - test
 - packaging
 
-oc.docker:ci:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 90 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./images/ci_create_ci_images.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-    ARCH: amd64
-  artifacts:
-    reports:
-      dotenv: ci_image_tag.env
-
-oc.docker:client-libs-dependencies:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_client_libs_dependencies_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: client_libs_dependencies_image_tag.env
-
-oc.docker:rust-toolchain:amd64:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
-  stage: images
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - SCRIPT_STEP_BEGIN=$(date +%s)
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./scripts/ci/docker_rust_toolchain_build.sh
-  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  services:
-  - docker:${DOCKER_VERSION}-dind
-  variables:
-    DOCKER_VERSION: 24.0.7
-    CI_DOCKER_HUB: "false"
-  artifacts:
-    reports:
-      dotenv: rust_toolchain_image_tag.env
-
-oc.docker:rust-sdk-bindings:amd64:
+fresh-cache.oc.docker:rust-sdk-bindings:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -111,7 +35,57 @@ oc.docker:rust-sdk-bindings:amd64:
     reports:
       dotenv: rust_sdk_bindings_image_tag.env
 
-oc.docker:ci:arm64:
+fresh-cache.oc.docker:client-libs-dependencies:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_client_libs_dependencies_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: client_libs_dependencies_image_tag.env
+
+fresh-cache.oc.docker:rust-toolchain:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 60 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./scripts/ci/docker_rust_toolchain_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+  artifacts:
+    reports:
+      dotenv: rust_toolchain_image_tag.env
+
+fresh-cache.oc.docker:ci:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: images
   tags:
@@ -141,7 +115,33 @@ oc.docker:ci:arm64:
     when:
     - runner_system_failure
 
-datadog_pipeline_trace:
+fresh-cache.oc.docker:ci:amd64:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
+  stage: images
+  tags:
+  - gcp
+  dependencies: []
+  timeout: 90 minutes
+  before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  services:
+  - docker:${DOCKER_VERSION}-dind
+  variables:
+    DOCKER_VERSION: 24.0.7
+    CI_DOCKER_HUB: "false"
+    ARCH: amd64
+  artifacts:
+    reports:
+      dotenv: ci_image_tag.env
+
+fresh-cache.datadog_pipeline_trace:
   image: datadog/ci:v2.44.0
   stage: start
   tags:
@@ -162,7 +162,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-sanity_ci:
+fresh-cache.sanity_ci:
   image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
@@ -184,7 +184,7 @@ sanity_ci:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-docker:hadolint:
+fresh-cache.docker:hadolint:
   image: hadolint/hadolint:2.12.0-alpine
   stage: sanity
   tags:
@@ -206,7 +206,7 @@ docker:hadolint:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.ocaml_fmt:
+fresh-cache.oc.ocaml_fmt:
   image: ${ci_image_name_protected}/build:amd64--master
   stage: sanity
   tags:
@@ -242,7 +242,7 @@ oc.ocaml_fmt:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
-oc.semgrep:
+fresh-cache.oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: sanity
   tags:
@@ -265,7 +265,7 @@ oc.semgrep:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.misc_checks:
+fresh-cache.oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
   stage: sanity
   tags:
@@ -294,7 +294,7 @@ oc.misc_checks:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-check_jsonnet:
+fresh-cache.check_jsonnet:
   image: ${jsonnet_image_name_protected}:master
   stage: sanity
   tags:
@@ -319,7 +319,7 @@ check_jsonnet:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-check_rust_fmt:
+fresh-cache.check_rust_fmt:
   image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
@@ -340,7 +340,7 @@ check_rust_fmt:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.build_arm64-released:
+fresh-cache.oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -348,7 +348,7 @@ oc.build_arm64-released:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -395,7 +395,7 @@ oc.build_arm64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-oc.build_arm64-extra-dev:
+fresh-cache.oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -403,7 +403,7 @@ oc.build_arm64-extra-dev:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -457,7 +457,7 @@ oc.build_arm64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_arm64-extra-exp:
+fresh-cache.oc.build_arm64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -465,7 +465,7 @@ oc.build_arm64-extra-exp:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -519,7 +519,7 @@ oc.build_arm64-extra-exp:
     - etherlink-governance-observer
     when: on_success
 
-oc.build:static-x86_64-linux-binaries:
+fresh-cache.oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -527,7 +527,7 @@ oc.build:static-x86_64-linux-binaries:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -569,7 +569,7 @@ oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build:static-arm64-linux-binaries:
+fresh-cache.oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -577,7 +577,7 @@ oc.build:static-arm64-linux-binaries:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -619,7 +619,7 @@ oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
 
-oc.build_x86_64-released:
+fresh-cache.oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -627,7 +627,7 @@ oc.build_x86_64-released:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -675,7 +675,7 @@ oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
 
-oc.build_amd64-extra-dev:
+fresh-cache.oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -683,7 +683,7 @@ oc.build_amd64-extra-dev:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -747,7 +747,7 @@ oc.build_amd64-extra-dev:
     - etherlink-governance-observer
     when: on_success
 
-oc.build_amd64-extra-exp:
+fresh-cache.oc.build_amd64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -755,7 +755,7 @@ oc.build_amd64-extra-exp:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -819,7 +819,7 @@ oc.build_amd64-extra-exp:
     - etherlink-governance-observer
     when: on_success
 
-wasm-runtime-check:
+fresh-cache.wasm-runtime-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -827,7 +827,7 @@ wasm-runtime-check:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -858,7 +858,7 @@ wasm-runtime-check:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-oc.build_kernels:
+fresh-cache.oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
@@ -866,7 +866,7 @@ oc.build_kernels:
   rules:
   - when: on_success
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: kernels-sccache
@@ -908,7 +908,7 @@ oc.build_kernels:
     - dal_echo_kernel.wasm
     when: on_success
 
-oc.build_dsn_node:
+fresh-cache.oc.build_dsn_node:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: build
   tags:
@@ -916,7 +916,7 @@ oc.build_dsn_node:
   rules:
   - when: on_success
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: sccache-$CI_JOB_NAME_SLUG
@@ -952,7 +952,7 @@ oc.build_dsn_node:
     - octez-dsn-node
     when: on_success
 
-oc.tezt:fetch-records:
+fresh-cache.oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -960,7 +960,7 @@ oc.tezt:fetch-records:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
   interruptible: false
@@ -986,7 +986,7 @@ oc.tezt:fetch-records:
     - tezt/records/*.json.broken
     when: always
 
-build_octez_source:
+fresh-cache.build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -994,7 +994,7 @@ build_octez_source:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1032,7 +1032,7 @@ build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
 
-etherlink.build:static-x86_64:
+fresh-cache.etherlink.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -1040,7 +1040,7 @@ etherlink.build:static-x86_64:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1084,7 +1084,7 @@ etherlink.build:static-x86_64:
     - etherlink-*
     when: on_success
 
-etherlink.build:static-arm64:
+fresh-cache.etherlink.build:static-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -1092,7 +1092,7 @@ etherlink.build:static-arm64:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1136,7 +1136,7 @@ etherlink.build:static-arm64:
     - etherlink-*
     when: on_success
 
-build-layer1-profiling:
+fresh-cache.build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: build
   tags:
@@ -1144,7 +1144,7 @@ build-layer1-profiling:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -1187,7 +1187,7 @@ build-layer1-profiling:
     - ./octez-binaries/x86_64/octez-node
     - ./octez-binaries/x86_64/octez-client
 
-opam:prepare:
+fresh-cache.opam:prepare:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1196,7 +1196,7 @@ opam:prepare:
   - when: delayed
     start_in: 1 minute
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -1216,7 +1216,7 @@ opam:prepare:
     paths:
     - _opam-repo-for-release/
 
-opam:all_6:
+fresh-cache.opam:all_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1225,11 +1225,11 @@ opam:all_6:
   - when: delayed
     start_in: 6 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1289,7 +1289,7 @@ opam:all_6:
       - efunc_core
       - dal_node_migrations
 
-opam:exec_6:
+fresh-cache.opam:exec_6:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1298,11 +1298,11 @@ opam:exec_6:
   - when: delayed
     start_in: 6 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1350,7 +1350,7 @@ opam:exec_6:
       - octez-version
       - octez-protocol-compiler
 
-opam:all_2:
+fresh-cache.opam:all_2:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1359,11 +1359,11 @@ opam:all_2:
   - when: delayed
     start_in: 2 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1425,7 +1425,7 @@ opam:all_2:
       - octez-injector
       - octez-baker-lib
 
-opam:all_1:
+fresh-cache.opam:all_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1434,11 +1434,11 @@ opam:all_1:
   - when: delayed
     start_in: 1 minute
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1489,7 +1489,7 @@ opam:all_1:
       - octez-protocol-023-PtSeouLo-libs
       - octez-protocol-022-PsRiotum-libs
 
-opam:all_3:
+fresh-cache.opam:all_3:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1498,11 +1498,11 @@ opam:all_3:
   - when: delayed
     start_in: 3 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1564,7 +1564,7 @@ opam:all_3:
       - octez-protocol-002-PsYLVpVv-libs
       - octez-protocol-001-PtCJ7pwo-libs
 
-opam:exec_4:
+fresh-cache.opam:exec_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1573,11 +1573,11 @@ opam:exec_4:
   - when: delayed
     start_in: 4 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1624,7 +1624,7 @@ opam:exec_4:
     - package:
       - octez-signer
 
-opam:all_4:
+fresh-cache.opam:all_4:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1633,11 +1633,11 @@ opam:all_4:
   - when: delayed
     start_in: 4 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1698,7 +1698,7 @@ opam:all_4:
       - octez-crawler
       - octez-baking-common-lib
 
-opam:exec_1:
+fresh-cache.opam:exec_1:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1707,11 +1707,11 @@ opam:exec_1:
   - when: delayed
     start_in: 1 minute
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1768,7 +1768,7 @@ opam:exec_1:
       - octez-accuser-PsRiotum
       - octez-accuser
 
-opam:all_5:
+fresh-cache.opam:all_5:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1777,11 +1777,11 @@ opam:all_5:
   - when: delayed
     start_in: 5 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1843,7 +1843,7 @@ opam:all_5:
       - tezos-protocol-008-PtEdoTez
       - tezos-protocol-008-PtEdo2Zk
 
-opam:all_7:
+fresh-cache.opam:all_7:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: packaging
   tags:
@@ -1852,11 +1852,11 @@ opam:all_7:
   - when: delayed
     start_in: 7 minutes
   needs:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   dependencies:
-  - oc.docker:ci:amd64
-  - opam:prepare
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.opam:prepare
   timeout: 90 minutes
   cache:
   - key: opam-sccache
@@ -1962,7 +1962,7 @@ trigger:base_images:
     include: .gitlab/ci/pipelines/base_images.yml
     strategy: depend
 
-kaitai_checks:
+fresh-cache.kaitai_checks:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -1970,7 +1970,7 @@ kaitai_checks:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2007,7 +2007,7 @@ kaitai_checks:
     - _build/default/client-libs/bin_codec_kaitai/codec.exe
     when: on_success
 
-kaitai_e2e_checks:
+fresh-cache.kaitai_e2e_checks:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
   stage: test
   tags:
@@ -2015,11 +2015,11 @@ kaitai_e2e_checks:
   rules:
   - when: always
   needs:
-  - oc.docker:client-libs-dependencies
-  - kaitai_checks
+  - fresh-cache.oc.docker:client-libs-dependencies
+  - fresh-cache.kaitai_checks
   dependencies:
-  - oc.docker:client-libs-dependencies
-  - kaitai_checks
+  - fresh-cache.oc.docker:client-libs-dependencies
+  - fresh-cache.kaitai_checks
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2035,7 +2035,7 @@ kaitai_e2e_checks:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.check_lift_limits_patch:
+fresh-cache.oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2043,7 +2043,7 @@ oc.check_lift_limits_patch:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2076,7 +2076,7 @@ oc.check_lift_limits_patch:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-oc.python_check:
+fresh-cache.oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -2084,7 +2084,7 @@ oc.python_check:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2100,7 +2100,7 @@ oc.python_check:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.integration:compiler-rejections:
+fresh-cache.oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2108,12 +2108,12 @@ oc.integration:compiler-rejections:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2143,7 +2143,7 @@ oc.integration:compiler-rejections:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-oc.script:test-gen-genesis:
+fresh-cache.oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2151,7 +2151,7 @@ oc.script:test-gen-genesis:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2165,7 +2165,7 @@ oc.script:test-gen-genesis:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.script:snapshot_alpha_and_link:
+fresh-cache.oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2173,7 +2173,7 @@ oc.script:snapshot_alpha_and_link:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2213,7 +2213,7 @@ oc.script:snapshot_alpha_and_link:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
-oc.script:test_octez_release_versions:
+fresh-cache.oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2221,12 +2221,12 @@ oc.script:test_octez_release_versions:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2242,7 +2242,7 @@ oc.script:test_octez_release_versions:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.script:b58_prefix:
+fresh-cache.oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -2250,7 +2250,7 @@ oc.script:b58_prefix:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2267,7 +2267,7 @@ oc.script:b58_prefix:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.test-liquidity-baking-scripts:
+fresh-cache.oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2275,15 +2275,15 @@ oc.test-liquidity-baking-scripts:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2298,13 +2298,13 @@ oc.test-liquidity-baking-scripts:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc:scripts:release_script_values:
+fresh-cache.oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
   stage: test
   tags:
   - gcp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -2317,7 +2317,7 @@ oc:scripts:release_script_values:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-mir_unit:
+fresh-cache.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -2325,7 +2325,7 @@ mir_unit:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -2345,7 +2345,7 @@ mir_unit:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-mir_tzt:
+fresh-cache.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -2353,7 +2353,7 @@ mir_tzt:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
     key: cargo-$CI_JOB_NAME_SLUG
@@ -2373,7 +2373,7 @@ mir_tzt:
   variables:
     CARGO_NET_OFFLINE: "false"
 
-test_sdk_rust:
+fresh-cache.test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2381,7 +2381,7 @@ test_sdk_rust:
   rules:
   - when: on_success
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2410,7 +2410,7 @@ test_sdk_rust:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_sdk_bindings:
+fresh-cache.test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
   stage: test
   tags:
@@ -2418,7 +2418,7 @@ test_sdk_bindings:
   rules:
   - when: on_success
   dependencies:
-  - oc.docker:rust-sdk-bindings:amd64
+  - fresh-cache.oc.docker:rust-sdk-bindings:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2448,7 +2448,7 @@ test_sdk_bindings:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_kernels:
+fresh-cache.test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2456,10 +2456,10 @@ test_kernels:
   rules:
   - when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
+  - fresh-cache.oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.build_kernels
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2490,7 +2490,7 @@ test_kernels:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_etherlink_kernel:
+fresh-cache.test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2498,10 +2498,10 @@ test_etherlink_kernel:
   rules:
   - when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
+  - fresh-cache.oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.build_kernels
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2532,7 +2532,7 @@ test_etherlink_kernel:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_etherlink_firehose:
+fresh-cache.test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2540,10 +2540,10 @@ test_etherlink_firehose:
   rules:
   - when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
+  - fresh-cache.oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.build_kernels
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2573,7 +2573,7 @@ test_etherlink_firehose:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-audit_riscv_deps:
+fresh-cache.audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
   stage: sanity
   tags:
@@ -2611,7 +2611,7 @@ audit_riscv_deps:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-check_riscv_kernels:
+fresh-cache.check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2619,9 +2619,9 @@ check_riscv_kernels:
   rules:
   - when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2652,7 +2652,7 @@ check_riscv_kernels:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-test_evm_compatibility:
+fresh-cache.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
   stage: test
   tags:
@@ -2660,10 +2660,10 @@ test_evm_compatibility:
   rules:
   - when: on_success
   needs:
-  - oc.docker:rust-toolchain:amd64
-  - oc.build_kernels
+  - fresh-cache.oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.build_kernels
   dependencies:
-  - oc.docker:rust-toolchain:amd64
+  - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2697,7 +2697,7 @@ test_evm_compatibility:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-ocaml-check:
+fresh-cache.ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2705,7 +2705,7 @@ ocaml-check:
   rules:
   - when: always
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
     key: dune_cache-$CI_JOB_NAME_SLUG
@@ -2732,7 +2732,7 @@ ocaml-check:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
 
-oc.unit:non-proto-x86_64:
+fresh-cache.oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -2740,12 +2740,12 @@ oc.unit:non-proto-x86_64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2800,7 +2800,7 @@ oc.unit:non-proto-x86_64:
     when: always
   retry: 2
 
-oc.unit:etherlink-x86_64:
+fresh-cache.oc.unit:etherlink-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2808,12 +2808,12 @@ oc.unit:etherlink-x86_64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2868,7 +2868,7 @@ oc.unit:etherlink-x86_64:
     when: always
   retry: 2
 
-oc.unit:other-x86_64:
+fresh-cache.oc.unit:other-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2876,12 +2876,12 @@ oc.unit:other-x86_64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -2936,7 +2936,7 @@ oc.unit:other-x86_64:
     when: always
   retry: 2
 
-oc.unit:proto-x86_64:
+fresh-cache.oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -2944,12 +2944,12 @@ oc.unit:proto-x86_64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -3004,7 +3004,7 @@ oc.unit:proto-x86_64:
     when: always
   retry: 2
 
-oc.unit:non-proto-arm64:
+fresh-cache.oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3012,12 +3012,12 @@ oc.unit:non-proto-arm64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:arm64
-  - oc.build_arm64-released
-  - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - fresh-cache.oc.docker:ci:arm64
+  - fresh-cache.oc.build_arm64-released
+  - fresh-cache.oc.build_arm64-extra-dev
+  - fresh-cache.oc.build_arm64-extra-exp
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -3061,7 +3061,7 @@ oc.unit:non-proto-arm64:
   retry: 2
   parallel: 2
 
-oc.unit:webassembly-x86_64:
+fresh-cache.oc.unit:webassembly-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3069,12 +3069,12 @@ oc.unit:webassembly-x86_64:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 20 minutes
   interruptible: false
   before_script:
@@ -3089,7 +3089,7 @@ oc.unit:webassembly-x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.unit:protocol_compiles:
+fresh-cache.oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: test
   tags:
@@ -3097,12 +3097,12 @@ oc.unit:protocol_compiles:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
   - key: cargo-$CI_JOB_NAME_SLUG
@@ -3132,7 +3132,7 @@ oc.unit:protocol_compiles:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
 
-de.unit:x86_64:
+fresh-cache.de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3140,12 +3140,12 @@ de.unit:x86_64:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3159,7 +3159,7 @@ de.unit:x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-de.unit:arm64:
+fresh-cache.de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3167,12 +3167,12 @@ de.unit:arm64:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:arm64
-  - oc.build_arm64-released
-  - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - fresh-cache.oc.docker:ci:arm64
+  - fresh-cache.oc.build_arm64-released
+  - fresh-cache.oc.build_arm64-extra-dev
+  - fresh-cache.oc.build_arm64-extra-exp
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3186,7 +3186,7 @@ de.unit:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-resto.unit:x86_64:
+fresh-cache.resto.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3194,12 +3194,12 @@ resto.unit:x86_64:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_amd64-extra-exp
   dependencies:
-  - oc.docker:ci:amd64
+  - fresh-cache.oc.docker:ci:amd64
   timeout: 10 minutes
   interruptible: false
   before_script:
@@ -3213,7 +3213,7 @@ resto.unit:x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-resto.unit:arm64:
+fresh-cache.resto.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
   stage: test
   tags:
@@ -3221,12 +3221,12 @@ resto.unit:arm64:
   rules:
   - when: always
   needs:
-  - oc.docker:ci:arm64
-  - oc.build_arm64-released
-  - oc.build_arm64-extra-dev
-  - oc.build_arm64-extra-exp
+  - fresh-cache.oc.docker:ci:arm64
+  - fresh-cache.oc.build_arm64-released
+  - fresh-cache.oc.build_arm64-extra-dev
+  - fresh-cache.oc.build_arm64-extra-exp
   dependencies:
-  - oc.docker:ci:arm64
+  - fresh-cache.oc.docker:ci:arm64
   timeout: 10 minutes
   interruptible: false
   before_script:
@@ -3240,7 +3240,7 @@ resto.unit:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-oc.install_opam_noble:
+fresh-cache.oc.install_opam_noble:
   image: ocaml/opam:ubuntu-24.04
   stage: test
   tags:
@@ -3263,7 +3263,7 @@ oc.install_opam_noble:
   variables:
     OPAMJOBS: "4"
 
-oc.compile_sources_doc_deps:
+fresh-cache.oc.compile_sources_doc_deps:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
   stage: test
   tags:
@@ -3291,7 +3291,7 @@ oc.compile_sources_doc_deps:
       - debian:bookworm
       - ubuntu:noble
 
-oc.compile_sources_doc:
+fresh-cache.oc.compile_sources_doc:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
   stage: test
   tags:
@@ -3319,7 +3319,7 @@ oc.compile_sources_doc:
       - build-debian-bookworm:master
       - build-ubuntu-noble:master
 
-tezt:
+fresh-cache.tezt:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3327,21 +3327,21 @@ tezt:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 40 minutes
   interruptible: false
   before_script:
@@ -3393,7 +3393,7 @@ tezt:
   retry: 2
   parallel: 50
 
-tezt-time-sensitive:
+fresh-cache.tezt-time-sensitive:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3401,21 +3401,21 @@ tezt-time-sensitive:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3466,7 +3466,7 @@ tezt-time-sensitive:
     when: always
   retry: 2
 
-tezt-slow:
+fresh-cache.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3474,21 +3474,21 @@ tezt-slow:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3537,7 +3537,7 @@ tezt-slow:
   retry: 2
   parallel: 20
 
-tezt-extra:
+fresh-cache.tezt-extra:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3545,21 +3545,21 @@ tezt-extra:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3607,7 +3607,7 @@ tezt-extra:
   retry: 2
   parallel: 10
 
-tezt-flaky:
+fresh-cache.tezt-flaky:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3615,21 +3615,21 @@ tezt-flaky:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   allow_failure: true
   timeout: 60 minutes
   interruptible: false
@@ -3681,7 +3681,7 @@ tezt-flaky:
     when: always
   retry: 2
 
-tezt:static-binaries:
+fresh-cache.tezt:static-binaries:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3689,17 +3689,17 @@ tezt:static-binaries:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build:static-x86_64-linux-binaries
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build:static-x86_64-linux-binaries
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build:static-x86_64-linux-binaries
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
@@ -3746,7 +3746,7 @@ tezt:static-binaries:
       junit: $JUNIT
     when: always
 
-tezt-riscv-slow-sequential:
+fresh-cache.tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
   stage: test
   tags:
@@ -3754,21 +3754,21 @@ tezt-riscv-slow-sequential:
   rules:
   - when: on_success
   needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-exp
-  - oc.build_amd64-extra-dev
-  - oc.build_kernels
-  - oc.build_dsn_node
-  - oc.tezt:fetch-records
+  - fresh-cache.oc.docker:ci:amd64
+  - fresh-cache.oc.build_x86_64-released
+  - fresh-cache.oc.build_amd64-extra-exp
+  - fresh-cache.oc.build_amd64-extra-dev
+  - fresh-cache.oc.build_kernels
+  - fresh-cache.oc.build_dsn_node
+  - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
   interruptible: false
   before_script:
