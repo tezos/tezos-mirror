@@ -328,16 +328,19 @@ type stresstest_conf = {tps : int; seed : int}
     - [snapshot]: local path or URL of the snapshot to use for the experiment.
       local path implies to [scp] the snapshot to all the vms.
 
-    - [stake]: stake repartition between baking node, numbers are relatives.
+    - [stake]: stake repartition between baking nodes, numbers are relatives.
 
-      e.g.: [2,1,1] runs 3 bakers, aggregate delegates from the network,
+      [Manual [2,1,1]] runs 3 bakers, aggregate delegates from the network,
       spreading them in 3 pools representing roughly 50%, 25% and 25% of the
       total stake of the network. The same stake repartition using the same
       snapshot will result in the same delegate repartition.
 
       There is a special case using a single number instead of a list, which
-      must match the number of delegates. This scenario will launch one node
-      per delegate (i.e. more than 300 nodes if testing on mainnet).
+      gives the number of bakers to use. Delegates will be distributed as
+      evenly as possible between these bakers.
+
+      [Auto] will spawn one baker per delegate, and the list of delegates will
+      be automatically retrieved from the provided snapshot.
 
     - [maintenance_delay]: number of level which will be multiplied by the
       position in the list of the bakers to define the store merge delay.
@@ -353,7 +356,7 @@ type stresstest_conf = {tps : int; seed : int}
     - [stresstest]: See the description of [stresstest_conf]
   *)
 type configuration = {
-  stake : int list;
+  stake : Scenarios_cli.stake;
   network : Network.t;
   snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
@@ -373,6 +376,24 @@ let stresstest_encoding =
     (fun {tps; seed} -> (tps, seed))
     (fun (tps, seed) -> {tps; seed})
     (obj2 (req "tps" int31) (req "seed" int31))
+
+let stake_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"auto"
+        empty
+        (function Scenarios_cli.Auto -> Some () | _ -> None)
+        (fun () -> Scenarios_cli.Auto);
+      case
+        (Tag 1)
+        ~title:"manual"
+        (list int31)
+        (function Scenarios_cli.Manual d -> Some d | _ -> None)
+        (fun d -> Manual d);
+    ]
 
 let configuration_encoding =
   let open Data_encoding in
@@ -431,7 +452,7 @@ let configuration_encoding =
       })
     (merge_objs
        (obj10
-          (req "stake" (list int31))
+          (dft "stake" stake_encoding Scenarios_cli.(Manual [1]))
           (req "network" Network.encoding)
           (req "snapshot" Snapshot_helpers.encoding)
           (opt "stresstest" stresstest_encoding)
@@ -848,19 +869,9 @@ let init ~(configuration : configuration) cloud =
         String_map.fold (fun _alias a acc -> a :: acc) baker_accounts []
       in
       match configuration.stake with
-      | [] ->
-          Lwt.return
-            (List.map (fun baker_account -> [baker_account]) baker_accounts)
-      | [x] ->
-          if List.compare_length_with baker_accounts x != 0 then
-            Test.fail
-              "The number of agents (%d) is not the same as the number of \
-               bakers (%d) retrieved in the yes wallet "
-              x
-              (List.length baker_accounts) ;
-          Lwt.return
-            (List.map (fun baker_account -> [baker_account]) baker_accounts)
-      | stake ->
+      | Auto -> Lwt.return (List.map (fun x -> [x]) baker_accounts)
+      | Manual [] -> Lwt.return_nil
+      | Manual stake ->
           let* accounts =
             toplog
               "init_network: Fetching baker accounts baking power from client" ;
@@ -1162,6 +1173,47 @@ let parse_conf encoding file =
 
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* snapshot =
+    let open Snapshot_helpers in
+    match snapshot with
+    | Local_file path -> Lwt.return path
+    | Docker_embedded path ->
+        toplog "Using locally stored snapshot file: %s" path ;
+        Lwt.return path
+    | Url url ->
+        let path = Temp.file "snapshot_file" in
+        download_snapshot ~path ~url ~name:"host" ()
+    | No_snapshot ->
+        toplog
+          "No snapshot provided. Downloading one for network %s"
+          (Network.to_string network) ;
+        download_snapshot
+          ~url:(Network.snapshot_service @@ Network.to_public network)
+          ~name:"host"
+          ()
+  in
+  let node =
+    let name = "tmp-node" in
+    let data_dir = Temp.dir name in
+    Node.create ~data_dir ~name []
+  in
+  let* () =
+    Node.config_init
+      node
+      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
+  in
+  let* () = Node.snapshot_import ~no_check:true node snapshot in
+  let* () = Node.run node (Node_helpers.isolated_args []) in
+  let* () = Node.wait_for_ready node in
+  let* n =
+    RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
+    |> RPC_core.call_json (Node.as_rpc_endpoint node)
+    |> Lwt.map (fun {RPC_core.body; _} -> JSON.(body |> as_list |> List.length))
+  in
+  let* () = Node.terminate node in
+  Lwt.return n
+
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : configuration =
     let stake = Cli.stake in
@@ -1208,7 +1260,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
         }
     | _ ->
         {
-          stake = Option.get stake;
+          stake = Option.value ~default:(Manual [1]) stake;
           network = Option.get network;
           stresstest;
           maintenance_delay =
@@ -1225,7 +1277,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
           fixed_random_seed;
         }
   in
-  if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
   if configuration.snapshot = Snapshot_helpers.No_snapshot then
     Test.fail "snapshot parameter cannot be empty" ;
   let with_dal_producers =
@@ -1266,25 +1317,31 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ()
   in
   let vms () =
-    let vms =
+    let* vms =
       let init n = List.init n (fun i -> `Baker i) in
-      let bakers =
+      let* bakers =
         match configuration.stake with
-        | [n] -> init n
-        | stake -> init (List.length stake)
+        | Scenarios_cli.Auto ->
+            Lwt.map
+              init
+              (number_of_bakers
+                 ~snapshot:configuration.snapshot
+                 ~network:configuration.network)
+        | Scenarios_cli.Manual stake -> Lwt.return (init (List.length stake))
       in
-      `Bootstrap
-      :: (bakers
-         @ (match configuration.dal_node_producers with
-           | Some dal_node_producers ->
-               List.map (fun i -> `Producer i) dal_node_producers
-           | None -> [])
-         @
-         match configuration.stresstest with
-         | None -> []
-         | Some {tps; _} ->
-             let n = nb_stresstester configuration.network tps in
-             List.init n (fun i -> `Stresstest i))
+      Lwt.return
+      @@ `Bootstrap
+         :: (bakers
+            @ (match configuration.dal_node_producers with
+              | Some dal_node_producers ->
+                  List.map (fun i -> `Producer i) dal_node_producers
+              | None -> [])
+            @
+            match configuration.stresstest with
+            | None -> []
+            | Some {tps; _} ->
+                let n = nb_stresstester configuration.network tps in
+                List.init n (fun i -> `Stresstest i))
     in
     Lwt.return
     @@ List.map
@@ -1326,10 +1383,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;
-  (* We give to the [init] function a sequence of agents. We set their name
-     only if the number of agents is the computed one. Otherwise, the user
-     has mentioned explicitly a reduced number of agents and it is not
-     clear how to give them proper names. *)
   let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
   let produce_slot (t : 'network t) level =
