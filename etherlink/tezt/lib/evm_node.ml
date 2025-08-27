@@ -895,7 +895,14 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Tezlink_sandbox
-        {initial_kernel; genesis_timestamp; wallet_dir; funded_addresses; verbose; _} ->
+        {
+          initial_kernel;
+          genesis_timestamp;
+          wallet_dir;
+          funded_addresses;
+          verbose;
+          _;
+        } ->
         ["run"; "tezlink"; "sandbox"; "--kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
