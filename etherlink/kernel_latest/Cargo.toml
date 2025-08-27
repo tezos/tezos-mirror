@@ -108,6 +108,10 @@ mir = { path = "../../contrib/mir", default-features = false }
 # miscs
 format_no_std = "1.2.0"
 
+# kernel execution profiling
+nop-macros = { version = "0.2.0" }
+tracing = { version = "0.1.41", features = ["attributes"]}
+
 [profile.release]
 # Will apply heavy LTO which attempts to perform optimizations across all crates
 # within the dependency graph.

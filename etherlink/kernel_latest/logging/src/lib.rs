@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2023-2025 Nomadic Labs <contact@nomadic-labs.com>
 //
 // SPDX-License-Identifier: MIT
 
@@ -62,4 +62,40 @@ macro_rules! log {
             $crate::debug_str!($host, &msg);
         }
     };
+}
+
+// When the `tracing` feature is enabled, export tracing macros
+#[cfg(feature = "tracing")]
+pub mod tracing {
+    pub use tracing::instrument;
+
+    // Spans are not exported when the `tracing` feature is disabled, so their
+    // use must be guarded by a feature check.
+    pub use tracing::Span;
+
+    // Spans are not exported when the `tracing` feature is disabled, so their
+    // use must be guarded by a feature check.
+    pub use tracing::info_span;
+
+    /// Execute the given function in the context of a new [`Span`]
+    #[macro_export]
+    macro_rules! trace {
+        ($name:expr, $f:expr) => {{
+            tracing::info_span!($name).in_scope(|| $f)
+        }};
+    }
+}
+
+// When the `tracing` feature is disabled, export dummy tracing macros
+#[cfg(not(feature = "tracing"))]
+pub mod tracing {
+    pub use nop_macros::nop as instrument;
+
+    /// Execute the given function in the context of a new [`Span`]
+    #[macro_export]
+    macro_rules! trace {
+        ($name:expr, $f:expr) => {{
+            $f
+        }};
+    }
 }
