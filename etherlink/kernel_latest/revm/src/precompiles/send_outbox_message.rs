@@ -31,7 +31,7 @@ use crate::{
     helpers::storage::u256_to_bigint,
     precompiles::{
         constants::{
-            FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST,
+            FA_WITHDRAWAL_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, WITHDRAWAL_SOL_ADDR,
         },
         provider::revert,
@@ -317,7 +317,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
                 output: Bytes::from(fixed_target),
             };
             Ok(result)
@@ -357,7 +357,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
                 output: Bytes::from(fixed_target),
             };
             Ok(result)
@@ -399,7 +399,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
                 output: Bytes::copy_from_slice(&routing_info.abi_encode()),
             };
             Ok(result)
@@ -457,7 +457,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - SEND_OUTBOX_MESSAGE_BASE_COST),
                 output: Bytes::copy_from_slice(&routing_info.abi_encode()),
             };
             Ok(result)
