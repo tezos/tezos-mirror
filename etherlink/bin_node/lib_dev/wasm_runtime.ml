@@ -53,7 +53,7 @@ let run ~pool ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
     pool
     (fun () ->
       wasm_runtime_run
-        ~scope:(Wasm_runtime_callbacks.root_scope scope)
+        ~scope:(Wasm_runtime_callbacks.root_scope ~trace_host_funs:true scope)
         ~context:static_context
         ~preimages_dir
         ?preimages_endpoint:(Option.map Uri.to_string preimages_endpoint)

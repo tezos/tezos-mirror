@@ -6,15 +6,30 @@
 (*****************************************************************************)
 
 type scope =
-  | Root of Opentelemetry.Scope.t option
+  | Root of {scope : Opentelemetry.Scope.t option; trace_host_funs : bool}
   | Started of {
       parent : Opentelemetry.Span_id.t option;
       scope : Opentelemetry.Scope.t;
       name : string;
       start_time : Opentelemetry.Timestamp_ns.t;
+      trace_host_funs : bool;
     }
 
-let root_scope scope = Root scope
+let root_scope ~trace_host_funs scope = Root {scope; trace_host_funs}
+
+let prepare_new_span = function
+  | Root {scope = None; trace_host_funs} ->
+      (Opentelemetry.Trace_id.create (), None, trace_host_funs)
+  | Root {scope = Some scope; trace_host_funs}
+  | Started {scope; trace_host_funs; _} ->
+      (scope.trace_id, Some scope.span_id, trace_host_funs)
+
+let prepare_span_for_host_function = function
+  | Root {scope = None; _} -> None
+  | Root {trace_host_funs = false; _} | Started {trace_host_funs = false; _} ->
+      None
+  | Root {scope = Some scope; _} | Started {scope; _} ->
+      Some (scope.trace_id, scope.span_id)
 
 module Key_parser = struct
   let max_key_length = 250 - String.length "/durable" - String.length "/@"
@@ -52,21 +67,18 @@ end
 
 module Impl = struct
   let otel_trace name scope key f =
-    let trace_id, parent =
-      match scope with
-      | Root None -> (Opentelemetry.Trace_id.create (), None)
-      | Root (Some scope) | Started {scope; _} ->
-          (scope.trace_id, Some scope.span_id)
-    in
-    Opentelemetry_lwt.Trace.with_
-      ~trace_id
-      ?parent
-      ~service_name:"Host_funs"
-      name
-    @@ fun scope ->
-    Opentelemetry.Scope.add_attrs scope (fun () ->
-        [("key", `String (String.concat "/" ("" :: key)))]) ;
-    f scope
+    match prepare_span_for_host_function scope with
+    | None -> f None
+    | Some (trace_id, parent) ->
+        Opentelemetry_lwt.Trace.with_
+          ~trace_id
+          ~parent
+          ~service_name:"Host_funs"
+          name
+        @@ fun scope ->
+        Opentelemetry.Scope.add_attrs scope (fun () ->
+            [("durable_storage.key", `String (String.concat "/" ("" :: key)))]) ;
+        f (Some scope)
 
   let read_durable_value tree key =
     let open Lwt_result_syntax in
@@ -219,12 +231,7 @@ module Impl = struct
         | #Cohttp.Code.status_code -> raise Not_found)
 
   let open_span parent span_name =
-    let trace_id, parent =
-      match parent with
-      | Root None -> (Opentelemetry.Trace_id.create (), None)
-      | Root (Some scope) | Started {scope; _} ->
-          (scope.trace_id, Some scope.span_id)
-    in
+    let trace_id, parent, trace_host_funs = prepare_new_span parent in
     let span_id = Opentelemetry.Span_id.create () in
     let scope = Opentelemetry.Scope.make ~trace_id ~span_id () in
     Started
@@ -233,12 +240,13 @@ module Impl = struct
         scope;
         name = span_name;
         start_time = Opentelemetry.Timestamp_ns.now_unix_ns ();
+        trace_host_funs;
       }
 
   let close_span scope =
     match scope with
     | Root _ -> (* No started scope to close *) ()
-    | Started {parent; scope; name; start_time} ->
+    | Started {parent; scope; name; start_time; _} ->
         let end_time = Opentelemetry.Timestamp_ns.now_unix_ns () in
         let span, _ =
           Opentelemetry.Span.create
