@@ -170,10 +170,6 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_security_scans
     when: always
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
-    variables:
-      PIPELINE_TYPE: schedule_documentation
-    when: always
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCKER_FRESH_IMAGE_BUILD"
     variables:
       PIPELINE_TYPE: schedule_docker_build_pipeline
@@ -392,10 +388,6 @@ include:
 - local: .gitlab/ci/pipelines/schedule_security_scans.yml
   rules:
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "SECURITY_SCANS"
-    when: always
-- local: .gitlab/ci/pipelines/schedule_documentation.yml
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "DOCUMENTATION"
     when: always
 - local: .gitlab/ci/pipelines/schedule_docker_build_pipeline.yml
   rules:

@@ -263,6 +263,25 @@ let job_linkcheck =
       "make -C docs linkcheck";
     ]
 
+let job_publish =
+  CI.job
+    "publish"
+    ~__POS__
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Publish
+    ~description:"Publish the documentation to octez.com/docs."
+    ~needs:[(Artifacts, job_build_all `full `static)]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      "eval $(opam env)";
+      ". $HOME/.venv/bin/activate";
+      {|echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519|};
+      {|echo "${CI_KH}" > ~/.ssh/known_hosts|};
+      "chmod 400 ~/.ssh/id_ed25519";
+      "./scripts/ci/doc_publish.sh";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -289,5 +308,5 @@ let register () =
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
     ~legacy_jobs:[Master_branch.job_static_x86_64]
-    [(Auto, job_build_all `full `static)] ;
+    [(Auto, job_publish)] ;
   ()

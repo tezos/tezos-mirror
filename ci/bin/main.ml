@@ -475,16 +475,6 @@ let () =
       "Scheduled pipeline for various security scans. Currently scanning for \
        vulnerabilities in Docker images" ;
   register
-    "schedule_documentation"
-    schedule_documentation
-    ~jobs:
-      (Tezos_ci.job_datadog_pipeline_trace :: Master_branch.job_static_x86_64
-       :: Master_branch.jobs_documentation
-      |> List.map (with_interruptible false))
-    ~description:
-      "Scheduled pipeline that updates the octez.com/docs documentation \
-       without being interrupted." ;
-  register
     "schedule_docker_build_pipeline"
     schedule_docker_build
     ~jobs:
