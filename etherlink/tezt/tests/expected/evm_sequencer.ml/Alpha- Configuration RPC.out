@@ -74,7 +74,8 @@
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1
-    }
+    },
+    "trace_host_functions": false
   },
   "tx_pool": {
     "max_size": 1000,
@@ -160,7 +161,8 @@
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1
-    }
+    },
+    "trace_host_functions": false
   },
   "tx_pool": {
     "max_size": 1000,
@@ -251,7 +253,8 @@
     "gc_telemetry": {
       "enable": false,
       "min_duration_ms": 1
-    }
+    },
+    "trace_host_functions": false
   },
   "tx_pool": {
     "max_size": 1000,
