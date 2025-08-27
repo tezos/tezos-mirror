@@ -117,7 +117,7 @@ let digestif = external_lib "digestif" V.(at_least "0.9.0")
 
 let domainslib = external_lib "domainslib" V.(at_least "0.5.2")
 
-let dream = external_lib "dream" V.(at_least "1.0.0~alpha7")
+let dream = external_lib "dream" V.(at_least "1.0.0~alpha8-octez")
 
 let dune_configurator = external_lib "dune-configurator" V.True
 

@@ -31,7 +31,7 @@ depends: [
   "octez-protocol-000-Ps9mPmXa-libs"
   "octez-shell-libs"
   "lwt-watcher" { = "0.2" }
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "octez-connpool"
   "octez-version"
   "lwt-exit"

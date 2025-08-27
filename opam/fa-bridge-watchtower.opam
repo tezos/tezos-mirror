@@ -19,7 +19,7 @@ depends: [
   "re" { >= "1.10.0" }
   "octez-l2-libs"
   "efunc_core"
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "tezos-openapi"
 ]
 build: [

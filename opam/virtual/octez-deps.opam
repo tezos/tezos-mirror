@@ -46,7 +46,7 @@ depends: [
   "digestif" { >= "0.9.0" }
   "dmap"
   "domainslib" { >= "0.5.2" }
-  "dream" { >= "1.0.0~alpha7" }
+  "dream" { >= "1.0.0~alpha8-octez" }
   "dune-configurator"
   "eio"
   "eio_main"
