@@ -13566,6 +13566,84 @@ let test_eip7702 =
     "0xef0100" ^ String.(lowercase_ascii @@ sub eip7702_contract 2 40)
   in
   Check.((code = expected_code) string) ~error_msg:"Expected code of %R, got %L" ;
+  (* Another property of EIP-7702 is allowing an EOA to re-delegate its code to
+     another address. *)
+  let* redelegation_contract =
+    Solidity_contracts.eip2930_storage_access evm_version
+  in
+  let* redelegation_contract_address, _ =
+    send_transaction_to_sequencer
+      (Eth_cli.deploy
+         ~source_private_key:whale.private_key
+         ~endpoint:(Evm_node.endpoint sequencer)
+         ~abi:redelegation_contract.abi
+         ~bin:redelegation_contract.bin)
+      sequencer
+  in
+  let* signed_auth =
+    Cast.wallet_sign_auth
+      ~authorization:redelegation_contract_address
+      ~private_key:sponsored.private_key
+      ~endpoint
+  in
+  let* raw_set_eoa = base_tx ~nonce:4 ~authorization:signed_auth in
+  let*@ set_eoa_hash = Rpc.send_raw_transaction ~raw_tx:raw_set_eoa sequencer in
+  let*@ _ = produce_block sequencer in
+  let*@! Transaction.{type_; _} =
+    Rpc.get_transaction_receipt ~tx_hash:set_eoa_hash sequencer
+  in
+  (* Type 4 = EIP-7702 *)
+  Check.((type_ = Int32.of_int 4) int32)
+    ~error_msg:"Expected tx.type of %R, got %L" ;
+  (* We can retrieve the authorization list from the transaction object: *)
+  let*@! Transaction.{authorizationList; _} =
+    Rpc.get_transaction_by_hash ~transaction_hash:set_eoa_hash sequencer
+  in
+  (match authorizationList with
+  | Some [{address; _}] ->
+      Check.(
+        (String.lowercase_ascii address
+        = String.lowercase_ascii redelegation_contract_address)
+          string)
+        ~error_msg:"Expected msg.sender of %R, got %L"
+  | Some _ -> failwith "Authorization list should only contain one element."
+  | None -> failwith "Authorization list should not be empty.") ;
+  let expected_storage_slot = 2 in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let* raw_call_eoa_hash =
+    Cast.craft_tx
+      ~signature:"setValue(uint256)"
+      ~source_private_key:whale.private_key
+      ~chain_id:1337
+      ~nonce:5
+      ~gas:100_000
+      ~gas_price
+      ~value:Wei.zero
+      ~access_list:[]
+      ~address:sponsored.address
+      ~arguments:["2"]
+      ~legacy:false
+      ()
+  in
+  let*@ call_eoa_hash =
+    Rpc.send_raw_transaction ~raw_tx:raw_call_eoa_hash sequencer
+  in
+  let*@ _ = produce_block sequencer in
+  let*@! Transaction.{blockNumber; _} =
+    Rpc.get_transaction_receipt ~tx_hash:call_eoa_hash sequencer
+  in
+  let*@ storage_slot =
+    Rpc.get_storage_at
+      ~address:sponsored.address
+      ~pos:"0x0"
+      ~block:
+        (Block_number
+           {number = Int32.to_int blockNumber; require_canonical = false})
+      sequencer
+  in
+  Check.((storage_slot = Printf.sprintf "0x%064x" expected_storage_slot) string)
+    ~error_msg:"Expected storage slot of %R, got %L" ;
   unit
 
 let test_eip2537 =
