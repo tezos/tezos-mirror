@@ -503,19 +503,21 @@ let () =
     "publish_test_release_page"
     If.(api_release_page && not_on_tezos_namespace)
     ~jobs:
-      [
-        Tezos_ci.job_datadog_pipeline_trace;
-        Release_tag.job_release_page ~test:true ();
-      ]
+      ([
+         Tezos_ci.job_datadog_pipeline_trace;
+         Release_tag.job_update_release_page ~test:true ();
+       ]
+      @ !Hooks.global_test_publish_release_page)
     ~description:"Pipeline that updates and publishes the test release page." ;
   register
     "publish_release_page"
     If.(api_release_page && on_tezos_namespace)
     ~jobs:
-      [
-        Tezos_ci.job_datadog_pipeline_trace;
-        Release_tag.job_release_page ~test:false ();
-      ]
+      ([
+         Tezos_ci.job_datadog_pipeline_trace;
+         Release_tag.job_update_release_page ~test:false ();
+       ]
+      @ !Hooks.global_publish_release_page)
     ~description:"Pipeline that updates and publishes the release page."
 
 (** {2 Entry point of the generator binary} *)
