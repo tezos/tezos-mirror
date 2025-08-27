@@ -15,7 +15,7 @@ use crate::{
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
     precompiles::{
         constants::{
-            FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BASE_COST, TABLE_PRECOMPILE_ADDRESS,
+            FA_WITHDRAWAL_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
         },
         provider::revert,
     },
@@ -90,7 +90,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -115,7 +115,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)
@@ -153,7 +153,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
                 output,
             };
             Ok(result)
@@ -175,7 +175,7 @@ where
 
             let result = InterpreterResult {
                 result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - PRECOMPILE_BASE_COST),
+                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
                 output: Bytes::new(),
             };
             Ok(result)

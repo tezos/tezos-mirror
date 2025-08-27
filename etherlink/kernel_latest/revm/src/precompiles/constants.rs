@@ -57,8 +57,13 @@ pub(crate) const CUSTOMS: [Address; 4] = [
     TABLE_PRECOMPILE_ADDRESS,
 ];
 
-// TODO: Properly estimate execution cost for table and outbox precompiles
-pub(crate) const PRECOMPILE_BASE_COST: u64 = 2000;
+// Rationale regarding the cost:
+// A few decoding/encoding functions.
+pub(crate) const SEND_OUTBOX_MESSAGE_BASE_COST: u64 = 500;
+
+// Rationale regarding the cost:
+// Covers the cost of 2 r/w access on cold keys.
+pub(crate) const TICKET_TABLE_BASE_COST: u64 = 5000;
 
 #[cfg(test)]
 mod test {
