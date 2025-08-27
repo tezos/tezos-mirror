@@ -577,8 +577,8 @@ fn originate_contract<Host: Runtime>(
         // These are probably not the right values for storage_size and
         // paid_storage_size_diff, but having something different than 0
         // participates in having the TzKT front-end not crash when originating.
-        storage_size: total_size.clone(),
-        paid_storage_size_diff: total_size,
+        storage_size: total_size.clone().into(),
+        paid_storage_size_diff: total_size.into(),
         lazy_storage_diff: None,
     };
     Ok(dummy_origination_sucess)
