@@ -312,6 +312,10 @@ module Cycle : sig
 
   (** See {!Cycle_storage.greatest_unstake_finalizable_cycle}. *)
   val greatest_unstake_finalizable_cycle : context -> cycle option
+
+  module For_RPC : sig
+    val of_repr : Cycle_repr.t -> cycle
+  end
 end
 
 (** This module re-exports definitions from {!Round_repr}. *)

@@ -83,9 +83,9 @@
       "radius_dz": { "numerator": "1", "denominator": "50" } },
   "direct_ticket_spending_enable": false, "aggregate_attestation": true,
   "allow_tz4_delegate_enable": true,
-  "all_bakers_attest_activation_level": null,
-  "issuance_modification_delay": 1, "consensus_key_activation_delay": 1,
-  "unstake_finalization_delay": 2 }
+  "all_bakers_attest_activation_threshold":
+    { "numerator": 1, "denominator": 2 }, "issuance_modification_delay": 1,
+  "consensus_key_activation_delay": 1, "unstake_finalization_delay": 2 }
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
 [ { "level": 2, "delegate": "[PUBLIC_KEY_HASH]",
@@ -147,3 +147,6 @@
 
 ./octez-client --mode light rpc get /chains/main/blocks/head/helpers/total_baking_power
 "7333333333330"
+
+./octez-client --mode light rpc get /chains/main/blocks/head/helpers/tz4_staker_number_ratio
+"0.00%"

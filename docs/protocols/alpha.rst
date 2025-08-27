@@ -58,7 +58,7 @@ Breaking Changes
 
 - Updated ``GET /chains/<chain_id>/blocks/<block_id>/context/issuance/expected_issuance``,
   changing ``baking_reward_bonus_per_slot`` with ``baking_reward_bonus_per_block``, and
-  ``attesting_reward_per_slot`` with ``ættesting_reward_per_block``. (MR :gl:`!18959`)
+  ``attesting_reward_per_slot`` with ``attesting_reward_per_block``. (MR :gl:`!18959`)
 
 
 RPC Changes
@@ -72,6 +72,11 @@ RPC Changes
   which returns the index of the given destination (e.g. tz1, Smart Rollup
   addresses, etc.) or ``null`` if the destination has not been indexed by
   the opcode ``INDEX_ADDRESS`` yet. (MR :gl:`!18944`)
+- Added ``GET
+  /chains/<chain_id>/blocks/<block_id>/helpers/tz4_staker_number_ratio?cycle=<cycle>``
+  which returns the portion of active delegates that sign with a BLS key.
+  The ``cycle`` argument, if omitted, defaults to the current
+  cycle. (MR :gl:`!19093`)
 
 Operation receipts
 ------------------
