@@ -6451,7 +6451,7 @@ end = struct
           [
             ("liquidity_baking_pbt", true);
             ("saturation_fuzzing", true);
-            ("test_merkle_list", N.(number >= 013));
+            ("test_merkle_list", N.(number >= 013 && number <= 023));
             ("test_gas_properties", true);
             ("test_sampler", N.(number >= 012));
             ("test_script_comparison", true);
@@ -6516,7 +6516,7 @@ end = struct
             ("test_global_constants_storage", true);
             ("test_level_module", true);
             ("test_liquidity_baking_repr", true);
-            ("test_merkle_list", true);
+            ("test_merkle_list", N.(number <= 023));
             ("test_operation_repr", true);
             ("test_qty", true);
             ("test_receipt", true);

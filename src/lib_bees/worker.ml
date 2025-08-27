@@ -718,8 +718,7 @@ struct
   let create_table buffer_kind =
     {buffer_kind; last_id = 0; instances = Nametbl.create ~random:true 10}
 
-  let init (type kind launch_error) (table : kind table) ?timeout name
-      parameters =
+  let init (type kind) (table : kind table) ?timeout name parameters =
     let buffer : kind buffer =
       match table.buffer_kind with
       | Queue -> Queue_buffer (Eio.Stream.create max_int)

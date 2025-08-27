@@ -53,7 +53,6 @@
   test_global_constants_storage
   test_level_module
   test_liquidity_baking_repr
-  test_merkle_list
   test_operation_repr
   test_qty
   test_receipt
