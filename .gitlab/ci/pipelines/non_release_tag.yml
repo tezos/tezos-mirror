@@ -1232,7 +1232,7 @@ grafazos.gitlab_release:
   retry: 0
 
 grafazos.release_page:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
@@ -1240,8 +1240,10 @@ grafazos.release_page:
   - when: manual
     allow_failure: true
   needs:
+  - oc.docker:ci:amd64
   - grafazos.build
   dependencies:
+  - oc.docker:ci:amd64
   - grafazos.build
   timeout: 60 minutes
   interruptible: false
