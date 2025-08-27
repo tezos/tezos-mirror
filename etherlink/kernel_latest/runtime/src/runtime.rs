@@ -18,7 +18,7 @@ use crate::{
     internal_runtime::{ExtendedRuntime, InternalHost, InternalRuntime},
     mock_internal::MockInternal,
 };
-use tezos_evm_logging::{Level, Verbosity};
+use tezos_evm_logging::{tracing::instrument, Level, Verbosity};
 use tezos_smart_rollup_core::PREIMAGE_HASH_SIZE;
 use tezos_smart_rollup_encoding::smart_rollup::SmartRollupAddress;
 use tezos_smart_rollup_host::{
@@ -87,11 +87,18 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow_mut().read_input()
     }
 
+    #[instrument(skip(self), fields(res))]
     #[inline(always)]
     fn store_has<T: Path>(&self, path: &T) -> Result<Option<ValueType>, RuntimeError> {
-        self.host.borrow().store_has(path)
+        let res = self.host.borrow().store_has(path)?;
+
+        #[cfg(feature = "tracing")]
+        tracing::Span::current().record("res", res.is_some());
+
+        Ok(res)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_read<T: Path>(
         &self,
@@ -102,6 +109,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow().store_read(path, from_offset, max_bytes)
     }
 
+    #[instrument(skip(self, buffer, from_offset))]
     #[inline(always)]
     fn store_read_slice<T: Path>(
         &self,
@@ -114,11 +122,18 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
             .store_read_slice(path, from_offset, buffer)
     }
 
+    #[instrument(skip(self), fields(size), err)]
     #[inline(always)]
     fn store_read_all(&self, path: &impl Path) -> Result<Vec<u8>, RuntimeError> {
-        self.host.borrow().store_read_all(path)
+        let res = self.host.borrow().store_read_all(path)?;
+
+        #[cfg(feature = "tracing")]
+        tracing::Span::current().record("size", res.len());
+
+        Ok(res)
     }
 
+    #[instrument(skip(self, src))]
     #[inline(always)]
     fn store_write<T: Path>(
         &mut self,
@@ -129,30 +144,38 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow_mut().store_write(path, src, at_offset)
     }
 
+    #[instrument(skip(self, src), fields(size))]
     #[inline(always)]
     fn store_write_all<T: Path>(
         &mut self,
         path: &T,
         src: &[u8],
     ) -> Result<(), RuntimeError> {
+        #[cfg(feature = "tracing")]
+        tracing::Span::current().record("size", src.len());
+
         self.host.borrow_mut().store_write_all(path, src)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_delete<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         self.host.borrow_mut().store_delete(path)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_delete_value<T: Path>(&mut self, path: &T) -> Result<(), RuntimeError> {
         self.host.borrow_mut().store_delete_value(path)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_count_subkeys<T: Path>(&self, prefix: &T) -> Result<u64, RuntimeError> {
         self.host.borrow().store_count_subkeys(prefix)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_move(
         &mut self,
@@ -162,6 +185,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow_mut().store_move(from_path, to_path)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_copy(
         &mut self,
@@ -180,6 +204,7 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime> S
         self.host.borrow().reveal_preimage(hash, destination)
     }
 
+    #[instrument(skip(self))]
     #[inline(always)]
     fn store_value_size(&self, path: &impl Path) -> Result<usize, RuntimeError> {
         self.host.borrow().store_value_size(path)

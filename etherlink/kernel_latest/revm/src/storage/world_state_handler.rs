@@ -8,6 +8,7 @@ use revm::{
     primitives::{hex::FromHex, Address, Bytes, FixedBytes, B256, KECCAK_EMPTY, U256},
     state::{AccountInfo, Bytecode},
 };
+use tezos_evm_logging::tracing::instrument;
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::{
     path::{OwnedPath, RefPath},
@@ -475,6 +476,7 @@ impl From<OwnedPath> for StorageAccount {
 
 pub type WorldStateHandler = Storage<StorageAccount>;
 
+#[instrument]
 pub fn new_world_state_handler() -> Result<WorldStateHandler, Error> {
     Storage::<StorageAccount>::init(&EVM_ACCOUNTS_PATH)
         .map_err(|err| Error::Custom(err.to_string()))

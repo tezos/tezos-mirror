@@ -22,7 +22,7 @@ use revm::{
     Database, Inspector,
 };
 use rlp::{Encodable, RlpStream};
-use tezos_evm_logging::{log, Level::Debug};
+use tezos_evm_logging::{log, tracing::instrument, Level::Debug};
 use tezos_evm_runtime::runtime::Runtime;
 
 use super::{
@@ -161,6 +161,7 @@ impl StructLogger {
         }
     }
 
+    #[instrument(skip_all)]
     pub fn store_outcome<Host: Runtime>(
         host: &mut Host,
         is_success: bool,

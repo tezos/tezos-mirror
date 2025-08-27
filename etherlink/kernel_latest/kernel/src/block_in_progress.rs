@@ -28,7 +28,7 @@ use tezos_ethereum::transaction::{
     TransactionStatus, TRANSACTION_HASH_SIZE,
 };
 use tezos_ethereum::Bloom;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_encoding::timestamp::Timestamp;
 use tezos_smart_rollup_host::path::{concat, RefPath};
@@ -327,6 +327,7 @@ impl EthBlockInProgress {
         self.delayed_txs.push(hash);
     }
 
+    #[instrument(skip_all)]
     pub fn register_valid_transaction<Host: Runtime>(
         &mut self,
         transaction: &Transaction,
