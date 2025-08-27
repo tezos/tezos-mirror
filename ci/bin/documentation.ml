@@ -238,12 +238,38 @@ let job_build_all =
       "make -C docs -j _build/octezdoc.txt";
     ]
 
+let job_linkcheck =
+  Cacio.parameterize @@ fun mode executables_to_use ->
+  CI.job
+    "linkcheck"
+    ~__POS__
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Test
+    ~description:"Check links in the documentation."
+    ~only_if_changed:Files.odoc
+    ~force_if_label:["ci--docs"]
+    ~needs:
+      [
+        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_docgen);
+        (Artifacts, job_build_all mode executables_to_use);
+      ]
+    ~allow_failure:Yes
+    [
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      ". $HOME/.venv/bin/activate";
+      "make -C docs redirectcheck";
+      "make -C docs linkcheck";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);
       (Auto, job_build_all `lite `dynamic);
+      (Manual, job_linkcheck `lite `dynamic);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -255,6 +281,7 @@ let register () =
       (Auto, job_install_python `ubuntu_jammy `master);
       (Auto, job_install_python `debian_bookworm `master);
       (Auto, job_build_all `lite `static);
+      (Auto, job_linkcheck `lite `static);
     ] ;
   CI.register_scheduled_pipeline
     "update"

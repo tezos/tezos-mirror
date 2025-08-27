@@ -1232,34 +1232,6 @@ module Documentation = struct
       jobs
       dependencies
 
-  (** Create a [documentation:linkcheck] job. *)
-  let job_linkcheck ~job_manuals ~job_docgen ~job_build_all ?dependencies ?rules
-      () : tezos_job =
-    let dependencies =
-      mk_artifact_dependencies
-        ?dependencies
-        [job_manuals; job_docgen; job_build_all]
-    in
-    job
-      ~__POS__
-      ~name:"documentation:linkcheck"
-      ~image:Images.CI.test
-      ~stage:Stages.test
-      ~dependencies
-        (* Warning: the [documentation:linkcheck] job must have at least the same
-           restrictions in the rules as [documentation:build_all], otherwise the CI
-           may complain that [documentation:linkcheck] depends on [documentation:build_all]
-           which does not exist. *)
-      ?rules
-      ~allow_failure:Yes
-      ~before_script:
-        (before_script
-           ~source_version:true
-           ~eval_opam:true
-           ~init_python_venv:true
-           [])
-      ["make -C docs redirectcheck"; "make -C docs linkcheck"]
-
   (** Create a [publish:documentation] job.
 
       This job, for inclusion on [master_branch] pipelines, publishes

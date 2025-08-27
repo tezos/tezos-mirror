@@ -266,6 +266,36 @@ documentation.build_all:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
 
+documentation.linkcheck:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs redirectcheck
+  - make -C docs linkcheck
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
 documentation.install_python_bookworm:
   image: debian:bookworm
   stage: test

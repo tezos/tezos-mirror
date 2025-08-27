@@ -4131,124 +4131,6 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-documentation:odoc:
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script: []
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    paths:
-    - dummy
-
-documentation:manuals:
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script: []
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    paths:
-    - dummy
-
-documentation:docgen:
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script: []
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    paths:
-    - dummy
-
-documentation:build_all:
-  stage: start
-  tags:
-  - gcp
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script: []
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    paths:
-    - dummy
-
-documentation:linkcheck:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
-  - documentation:build_all
-  dependencies:
-  - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
-  - documentation:build_all
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs redirectcheck
-  - make -C docs linkcheck
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 trigger:homebrew:
   stage: manual
   variables:
@@ -4702,6 +4584,60 @@ documentation.build_all:
     paths:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
+
+documentation.linkcheck:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: manual
+    allow_failure: true
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs redirectcheck
+  - make -C docs linkcheck
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 documentation.install_python_bookworm:
   image: debian:bookworm

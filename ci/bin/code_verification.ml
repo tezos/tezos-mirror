@@ -1956,69 +1956,6 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
 
-  (* Doc jobs *)
-  let doc =
-    let jobs_documentation : tezos_job list =
-      let job_odoc =
-        (* Dummy job to remove in a commit later in this MR. *)
-        Tezos_ci.job
-          ~__POS__
-          ~stage:Tezos_ci.Stages.start
-          ~name:"documentation:odoc"
-          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
-          []
-      in
-      let job_manuals =
-        (* Dummy job to remove in a commit later in this MR. *)
-        Tezos_ci.job
-          ~__POS__
-          ~stage:Tezos_ci.Stages.start
-          ~name:"documentation:manuals"
-          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
-          []
-      in
-      let job_docgen =
-        (* Dummy job to remove in a commit later in this MR. *)
-        Tezos_ci.job
-          ~__POS__
-          ~stage:Tezos_ci.Stages.start
-          ~name:"documentation:docgen"
-          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
-          []
-      in
-      let job_build_all =
-        (* Dummy job to remove in a commit later in this MR. *)
-        Tezos_ci.job
-          ~__POS__
-          ~stage:Tezos_ci.Stages.start
-          ~name:"documentation:build_all"
-          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
-          []
-      in
-      let job_documentation_linkcheck : tezos_job =
-        Documentation.job_linkcheck
-          ~job_manuals
-          ~job_docgen
-          ~job_build_all
-          ~rules:
-            (make_rules
-               ~dependent:true
-               ~label:"ci--docs"
-               ~manual:(On_changes changeset_octez_docs)
-               ())
-          ()
-      in
-      [
-        job_odoc;
-        job_manuals;
-        job_docgen;
-        job_build_all;
-        job_documentation_linkcheck;
-      ]
-    in
-    jobs_documentation
-  in
-
   (* Manual jobs *)
   let manual =
     (* On scheduled pipelines we build and test the full packages test matrix.
@@ -2144,4 +2081,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual
+  start_stage @ sanity @ build @ packaging @ test @ coverage @ manual
