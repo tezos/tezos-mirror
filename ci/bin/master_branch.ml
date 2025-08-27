@@ -46,7 +46,6 @@ let job_static_x86_64 =
     ()
 
 let jobs_documentation : tezos_job list =
-  let dependencies = Dependent [] in
   let job_odoc =
     (* Dummy job to remove in a commit later in this MR. *)
     Tezos_ci.job
@@ -65,7 +64,15 @@ let jobs_documentation : tezos_job list =
       ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
       []
   in
-  let job_docgen = Documentation.job_docgen ~dependencies () in
+  let job_docgen =
+    (* Dummy job to remove in a commit later in this MR. *)
+    Tezos_ci.job
+      ~__POS__
+      ~stage:Tezos_ci.Stages.start
+      ~name:"documentation:docgen"
+      ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+      []
+  in
   let job_build_all =
     Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ()
   in

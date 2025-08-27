@@ -4163,71 +4163,20 @@ documentation:manuals:
     - dummy
 
 documentation:docgen:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
+  dependencies: []
   timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C docs -j docexes-gen
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
   artifacts:
-    expire_in: 1 week
     paths:
-    - docs/alpha/rpc.rst
-    - docs/shell/rpc.rst
-    - docs/user/default-acl.json
-    - docs/api/errors.rst
-    - docs/shell/p2p_api.rst
+    - dummy
 
 documentation:build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -4482,6 +4431,71 @@ documentation.rst-check:
   - make --silent -C docs sphinx-check
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.docgen:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - eval $(opam env)
+  - make -C docs -j docexes-gen
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/alpha/rpc.rst
+    - docs/shell/rpc.rst
+    - docs/user/default-acl.json
+    - docs/api/errors.rst
+    - docs/shell/p2p_api.rst
 
 documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}

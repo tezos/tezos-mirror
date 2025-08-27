@@ -1232,35 +1232,6 @@ module Documentation = struct
       jobs
       dependencies
 
-  (** Create the docgen job.
-
-      This job builds various generated reference material, for
-      inclusion in the documentation. This includes the RPC, P2p and
-      error reference.
-
-      This job is one of the prerequisites to {!job_build_all}. *)
-  let job_docgen ?rules ?dependencies () : tezos_job =
-    job
-      ~__POS__
-      ~name:"documentation:docgen"
-      ~image:Images.CI.test
-      ~stage:Stages.build
-      ?dependencies
-      ?rules
-      ~before_script:(before_script ~eval_opam:true [])
-      ~artifacts:
-        (artifacts
-           ~expire_in:(Duration (Weeks 1))
-           [
-             "docs/alpha/rpc.rst";
-             "docs/shell/rpc.rst";
-             "docs/user/default-acl.json";
-             "docs/api/errors.rst";
-             "docs/shell/p2p_api.rst";
-           ])
-      ["make -C docs -j docexes-gen"]
-    |> enable_cargo_cache |> enable_sccache
-
   (** Create the [documentation:build_all] job.
 
       This jobs builds the RST sources in docs, which will include the

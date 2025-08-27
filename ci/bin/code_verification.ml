@@ -1959,10 +1959,6 @@ let jobs pipeline_type =
   (* Doc jobs *)
   let doc =
     let jobs_documentation : tezos_job list =
-      let rules =
-        make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
-      in
-      let dependencies = dependencies_needs_start in
       let job_odoc =
         (* Dummy job to remove in a commit later in this MR. *)
         Tezos_ci.job
@@ -1981,7 +1977,15 @@ let jobs pipeline_type =
           ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
           []
       in
-      let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
+      let job_docgen =
+        (* Dummy job to remove in a commit later in this MR. *)
+        Tezos_ci.job
+          ~__POS__
+          ~stage:Tezos_ci.Stages.start
+          ~name:"documentation:docgen"
+          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+          []
+      in
       let job_build_all =
         Documentation.job_build_all
           ~job_odoc

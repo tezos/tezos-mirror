@@ -183,6 +183,31 @@ let job_manuals =
     | `dynamic -> ["make -C docs -j octez-gen"]
     | `static -> ["scripts/ci/documentation:manuals_static.sh"]))
 
+let job_docgen =
+  CI.job
+    "docgen"
+    ~__POS__
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Build
+    ~description:
+      "Build various generated reference material. This includes the RPC, P2P \
+       and error reference."
+    ~only_if_changed:Files.odoc
+    ~force_if_label:["ci--docs"]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Weeks 1))
+         [
+           "docs/alpha/rpc.rst";
+           "docs/shell/rpc.rst";
+           "docs/user/default-acl.json";
+           "docs/api/errors.rst";
+           "docs/shell/p2p_api.rst";
+         ])
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ["eval $(opam env)"; "make -C docs -j docexes-gen"]
+
 let register () =
   CI.register_before_merging_jobs
     [
@@ -190,6 +215,7 @@ let register () =
       (Auto, job_install_python `debian_bookworm `current_branch);
       (Auto, job_odoc `lite);
       (Auto, job_manuals `dynamic);
+      (Auto, job_docgen);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -202,6 +228,7 @@ let register () =
       (Auto, job_install_python `debian_bookworm `master);
       (Auto, job_odoc `lite);
       (Auto, job_manuals `static);
+      (Auto, job_docgen);
     ] ;
   CI.register_scheduled_pipeline
     "update"
@@ -209,5 +236,5 @@ let register () =
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
     ~legacy_jobs:[Master_branch.job_static_x86_64]
-    [(Auto, job_odoc `full); (Auto, job_manuals `static)] ;
+    [(Auto, job_odoc `full); (Auto, job_manuals `static); (Auto, job_docgen)] ;
   ()
