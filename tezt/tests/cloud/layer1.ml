@@ -313,8 +313,6 @@ type stresstest_conf = {tps : int; seed : int}
       upgrade will be performed via a UAU.
 
     - [stresstest]: See the description of [stresstest_conf]
-
-    - [daily_logs_destination]: daemons daily logs retrieval folder, if set.
   *)
 type configuration = {
   stake : int list;
@@ -325,17 +323,6 @@ type configuration = {
   migration_offset : int option;
   ppx_profiling : bool;
   ppx_profiling_backends : string list;
-  daily_logs_destination : string option;
-}
-
-(** A version of the [configuration] partially defined. *)
-type partial_configuration = {
-  stake : int list option;
-  network : Network.t option;
-  snapshot : Snapshot_helpers.t option;
-  stresstest : stresstest_conf option;
-  maintenance_delay : int option;
-  migration_offset : int option;
 }
 
 let network_encoding =
@@ -358,15 +345,26 @@ let configuration_encoding =
            stresstest;
            maintenance_delay;
            migration_offset;
+           ppx_profiling;
+           ppx_profiling_backends;
          }
        ->
-      (stake, network, snapshot, stresstest, maintenance_delay, migration_offset))
+      ( stake,
+        network,
+        snapshot,
+        stresstest,
+        maintenance_delay,
+        migration_offset,
+        ppx_profiling,
+        ppx_profiling_backends ))
     (fun ( stake,
            network,
            snapshot,
            stresstest,
            maintenance_delay,
-           migration_offset )
+           migration_offset,
+           ppx_profiling,
+           ppx_profiling_backends )
        ->
       {
         stake;
@@ -375,14 +373,27 @@ let configuration_encoding =
         stresstest;
         maintenance_delay;
         migration_offset;
+        ppx_profiling;
+        ppx_profiling_backends;
       })
-    (obj6
-       (opt "stake" @@ list int31)
-       (opt "network" network_encoding)
-       (opt "snapshot" Snapshot_helpers.encoding)
+    (obj8
+       (req "stake" (list int31))
+       (req "network" network_encoding)
+       (req "snapshot" Snapshot_helpers.encoding)
        (opt "stresstest" stresstest_encoding)
-       (opt "maintenance_delay" int31)
-       (opt "migration_offset" int31))
+       (dft
+          "maintenance_delay"
+          int31
+          Scenarios_cli.Layer1_default.default_maintenance_delay)
+       (opt "migration_offset" int31)
+       (dft
+          "ppx_profiling"
+          bool
+          Scenarios_cli.Layer1_default.default_ppx_profiling)
+       (dft
+          "ppx_profiling_backends"
+          (list string)
+          Scenarios_cli.Layer1_default.default_ppx_profiling_backends))
 
 type bootstrap = {
   agent : Agent.t;
@@ -991,7 +1002,7 @@ let parse_conf encoding file =
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
 let register (module Cli : Scenarios_cli.Layer1) =
-  let configuration0 : partial_configuration =
+  let configuration : configuration =
     let stake = Cli.stake in
     let network = Cli.network in
     let stresstest =
@@ -1000,50 +1011,59 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in
     let migration_offset = Cli.migration_offset in
-    match Cli.config with
-    | Some filename ->
-        let conf = parse_conf configuration_encoding filename in
+    let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_backends = Cli.ppx_profiling_backends in
+    match Tezt_cloud_cli.scenario_specific_json with
+    | Some ("LAYER1", json) ->
+        let conf = Data_encoding.Json.destruct configuration_encoding json in
         {
-          stake = (if stake <> None then stake else conf.stake);
-          network = (if network <> None then network else conf.network);
-          snapshot = (if snapshot <> None then snapshot else conf.snapshot);
+          stake = Option.value ~default:conf.stake stake;
+          network = Option.value ~default:conf.network network;
+          snapshot = Option.value ~default:conf.snapshot snapshot;
           stresstest =
             (if stresstest <> None then stresstest else conf.stresstest);
           maintenance_delay =
-            (if maintenance_delay <> None then maintenance_delay
-             else conf.maintenance_delay);
+            Option.value ~default:conf.maintenance_delay maintenance_delay;
           migration_offset =
             (if migration_offset <> None then migration_offset
              else conf.migration_offset);
+          ppx_profiling = ppx_profiling || conf.ppx_profiling;
+          ppx_profiling_backends =
+            (if ppx_profiling_backends <> [] then ppx_profiling_backends
+             else conf.ppx_profiling_backends);
         }
-    | None ->
+    | _ ->
         {
-          stake;
-          network;
+          stake = Option.get stake;
+          network = Option.get network;
           stresstest;
-          maintenance_delay;
-          snapshot;
+          maintenance_delay =
+            Option.value
+              ~default:Scenarios_cli.Layer1_default.default_maintenance_delay
+              maintenance_delay;
+          snapshot = Option.get snapshot;
           migration_offset;
+          ppx_profiling;
+          ppx_profiling_backends;
         }
   in
+  if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
+  if configuration.snapshot = Snapshot_helpers.No_snapshot then
+    Test.fail "snapshot parameter cannot be empty" ;
+
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
   let vms =
     `Bootstrap
     ::
-    (match configuration0.stake with
-    | Some [n] -> List.init n (fun i -> `Baker i)
-    | Some stake -> List.mapi (fun i _ -> `Baker i) stake
-    | None -> [])
+    (match configuration.stake with
+    | [n] -> List.init n (fun i -> `Baker i)
+    | stake -> List.mapi (fun i _ -> `Baker i) stake)
     @
-    match configuration0.stresstest with
+    match configuration.stresstest with
     | None -> []
     | Some {tps; _} ->
-        let n =
-          match configuration0.network with
-          | Some network -> nb_stresstester network tps
-          | None -> tps / stresstest_max_tps_pre_node
-        in
+        let n = nb_stresstester configuration.network tps in
         List.init n (fun i -> `Stresstest i)
   in
   let default_docker_image =
@@ -1095,43 +1115,13 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~proxy_files:
       ([yes_wallet_exe]
       @
-      match configuration0.snapshot with
-      | Some snapshot -> (
-          match snapshot with Local_file snapshot -> [snapshot] | _ -> [])
+      match configuration.snapshot with
+      | Local_file snapshot -> [snapshot]
       | _ -> [])
     ~__FILE__
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
-  let configuration : configuration =
-    let stake = Option.get configuration0.stake in
-    let network = Option.get configuration0.network in
-    let snapshot = Option.get configuration0.snapshot in
-    let stresstest = configuration0.stresstest in
-    let maintenance_delay =
-      Option.value
-        ~default:Cli.default_maintenance_delay
-        configuration0.maintenance_delay
-    in
-    let migration_offset = configuration0.migration_offset in
-    if stake = [] then Test.fail "stake parameter can not be empty" ;
-    if snapshot = Snapshot_helpers.No_snapshot then
-      Test.fail "snapshot parameter can not be empty" ;
-    let daily_logs_destination = Tezt_cloud_cli.retrieve_daily_logs in
-    let ppx_profiling = Cli.ppx_profiling in
-    let ppx_profiling_backends = Cli.ppx_profiling_backends in
-    {
-      stake;
-      network;
-      snapshot;
-      stresstest;
-      maintenance_delay;
-      migration_offset;
-      ppx_profiling;
-      ppx_profiling_backends;
-      daily_logs_destination;
-    }
-  in
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;

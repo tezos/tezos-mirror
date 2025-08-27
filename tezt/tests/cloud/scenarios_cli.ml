@@ -721,8 +721,6 @@ module type Layer1 = sig
 
   val stresstest : (int * int) option
 
-  val default_maintenance_delay : int
-
   val maintenance_delay : int option
 
   val migration_offset : int option
@@ -733,11 +731,17 @@ module type Layer1 = sig
 
   val vms_config : string option
 
-  val config : string option
-
   val ppx_profiling : bool
 
   val ppx_profiling_backends : string list
+end
+
+module Layer1_default = struct
+  let default_maintenance_delay = 1
+
+  let default_ppx_profiling = false
+
+  let default_ppx_profiling_backends = []
 end
 
 module Layer1 () = struct
@@ -804,8 +808,6 @@ module Layer1 () = struct
       typ
       ()
 
-  let default_maintenance_delay = 1
-
   let maintenance_delay =
     Clap.optional_int
       ~section
@@ -815,7 +817,7 @@ module Layer1 () = struct
         (sf
            "Each baker has maintenance delayed by (position in the list * N). \
             Default is %d. Use 0 for disabling mainteance delay"
-           default_maintenance_delay)
+           Layer1_default.default_maintenance_delay)
       ()
 
   let migration_offset =
@@ -873,14 +875,6 @@ module Layer1 () = struct
         "Select the backends used by the profiler, bypassing the defaults \
          selection: always `txt` and `json`, and also `prometheus` if \
          `--prometheus` and `opentelemetry` if `--opentelemetry`."
-      ()
-
-  let config =
-    Clap.optional_string
-      ~section
-      ~long:"config"
-      ~description:
-        "JSON file optionally describing options for the test scenario"
       ()
 end
 
