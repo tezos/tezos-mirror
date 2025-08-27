@@ -121,15 +121,17 @@ teztale.release_page:
   retry: 0
 
 grafazos.release_page:
-  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
   - gcp_not_interruptible
   rules:
   - when: manual
     allow_failure: true
-  needs: []
-  dependencies: []
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   interruptible: false
   before_script:
