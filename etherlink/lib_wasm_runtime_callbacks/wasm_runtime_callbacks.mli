@@ -7,7 +7,7 @@
 
 type scope
 
-val root_scope : unit -> scope
+val root_scope : Opentelemetry.Scope.t option -> scope
 
 val register : unit -> unit
 

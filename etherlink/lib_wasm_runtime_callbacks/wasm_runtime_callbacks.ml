@@ -14,7 +14,7 @@ type scope =
       start_time : Opentelemetry.Timestamp_ns.t;
     }
 
-let root_scope () = Root (Opentelemetry.Scope.get_ambient_scope ())
+let root_scope scope = Root scope
 
 module Key_parser = struct
   let max_key_length = 250 - String.length "/durable" - String.length "/@"
