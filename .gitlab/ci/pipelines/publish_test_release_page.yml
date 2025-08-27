@@ -52,7 +52,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-publish:update-release-page:
+publish:release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
@@ -66,16 +66,11 @@ publish:update-release-page:
   before_script:
   - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
+  - sudo apk add aws-cli pandoc
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - sudo apk add aws-cli pandoc
-  - dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' --title
-    'Octez releases' --bucket ${S3_BUCKET} --path '${BUCKET_PATH:-}' changelog binaries
-    packages
-  - aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/"
-  - aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths
-    "/*"
+  - ./scripts/releases/publish_release_page.sh
   - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
@@ -88,8 +83,9 @@ publish:update-release-page:
   artifacts:
     expire_in: 1 day
     paths:
-    - index.md
+    - ./index.md
     - index.html
+  retry: 0
 
 teztale.release_page:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
