@@ -119,6 +119,7 @@ type mode =
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
+      verbose : bool;
     }
   | Proxy
   | Rpc of mode
@@ -894,7 +895,7 @@ let run_args evm_node =
             genesis_timestamp
         @ Cli_arg.optional_arg "wallet-dir" Fun.id wallet_dir
     | Tezlink_sandbox
-        {initial_kernel; genesis_timestamp; wallet_dir; funded_addresses; _} ->
+        {initial_kernel; genesis_timestamp; wallet_dir; funded_addresses; verbose; _} ->
         ["run"; "tezlink"; "sandbox"; "--kernel"; initial_kernel]
         @ Cli_arg.optional_arg
             "genesis-timestamp"
@@ -906,6 +907,7 @@ let run_args evm_node =
             (fun acc pk -> Cli_arg.optional_arg "fund" Fun.id (Some pk) @ acc)
             []
             funded_addresses
+        @ Cli_arg.optional_switch "verbose" verbose
     | Observer {initial_kernel; _} ->
         ["run"; "observer"; "--initial-kernel"; initial_kernel]
     | Rpc _ -> ["experimental"; "run"; "rpc"]
@@ -1178,6 +1180,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
           tx_queue_max_lifespan;
           tx_queue_max_size;
           tx_queue_tx_per_addr_limit;
+          verbose;
         } ->
         [
           (* These two fields are not necessary for the sandbox mode, however,
@@ -1207,6 +1210,7 @@ let spawn_init_config ?(extra_arguments = []) evm_node =
             "tx-pool-tx-per-addr-limit"
             string_of_int
             tx_queue_tx_per_addr_limit
+        @ Cli_arg.optional_switch "verbose" verbose
     | Observer
         {
           preimages_dir;
