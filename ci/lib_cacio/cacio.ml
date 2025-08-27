@@ -75,6 +75,7 @@ type job = {
   artifacts : Gitlab_ci.Types.artifacts option;
   cargo_cache : bool;
   sccache : sccache_config option;
+  allow_failure : Gitlab_ci.Types.allow_failure_job option;
 }
 
 type trigger = Auto | Immediate | Manual
@@ -338,6 +339,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                     artifacts;
                     cargo_cache;
                     sccache;
+                    allow_failure;
                   };
                 trigger;
                 only_if;
@@ -430,6 +432,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                 ?retry
                 ?variables
                 ?artifacts
+                ?allow_failure
                 script
               |> (if cargo_cache then Tezos_ci.Cache.enable_cargo_cache
                   else Fun.id)
@@ -498,6 +501,7 @@ module type COMPONENT_API = sig
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
     job
@@ -539,7 +543,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
   let job ~__POS__:source_location ~stage ~description ?provider ?arch ?cpu
       ?storage ~image ?only_if_changed ?(force_if_label = []) ?(needs = [])
       ?(needs_legacy = []) ?variables ?artifacts ?(cargo_cache = false) ?sccache
-      name script =
+      ?allow_failure name script =
     let name = Component.name ^ "." ^ name in
     (* Check that no dependency is in an ulterior stage. *)
     ( Fun.flip List.iter needs @@ fun (_, dep) ->
@@ -578,6 +582,7 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       artifacts;
       cargo_cache;
       sccache;
+      allow_failure;
     }
 
   let register_before_merging_jobs jobs =

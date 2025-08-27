@@ -206,6 +206,7 @@ module type COMPONENT_API = sig
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
     job
