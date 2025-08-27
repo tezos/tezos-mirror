@@ -1355,7 +1355,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                  direct_ticket_spending_enable;
                  aggregate_attestation = _;
                  allow_tz4_delegate_enable = _;
-                 all_bakers_attest_activation_level;
                  all_bakers_attest_activation_threshold;
                }
                 : Previous.t) =
@@ -1410,7 +1409,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
             all_bakers_attest_activation_threshold;
           }
         in
@@ -1653,7 +1651,7 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
                direct_ticket_spending_enable;
                aggregate_attestation = _;
                allow_tz4_delegate_enable = _;
-               all_bakers_attest_activation_level;
+               all_bakers_attest_activation_level = _;
              }
               : Previous.t) =
           c
@@ -1767,7 +1765,6 @@ let prepare_first_block ~level ~timestamp chain_id ctxt =
             direct_ticket_spending_enable;
             aggregate_attestation = true;
             allow_tz4_delegate_enable = true;
-            all_bakers_attest_activation_level;
             all_bakers_attest_activation_threshold =
               Ratio_repr.{numerator = 1; denominator = 2};
           }

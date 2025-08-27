@@ -969,7 +969,6 @@ module Constants : sig
       direct_ticket_spending_enable : bool;
       aggregate_attestation : bool;
       allow_tz4_delegate_enable : bool;
-      all_bakers_attest_activation_level : Raw_level_repr.t option;
       all_bakers_attest_activation_threshold : Ratio.t;
     }
 
@@ -1114,8 +1113,6 @@ module Constants : sig
   val aggregate_attestation : context -> bool
 
   val allow_tz4_delegate_enable : context -> bool
-
-  val all_bakers_attest_activation_level : context -> Raw_level_repr.t option
 
   (** All constants: fixed and parametric and derived. *)
   type t = private {
