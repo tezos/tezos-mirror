@@ -81,7 +81,9 @@ module Node = struct
         ]
       in
       let* () = Node.config_init node config in
-      let* () = import_snapshot ~no_check:true ~name node snapshot in
+      let* () =
+        import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+      in
       let* () =
         (* When bootstrapping from the real network, we want to use the real time. *)
         let env = String_map.(add "FAKETIME" "+0" empty) in
@@ -131,7 +133,9 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let* () = import_snapshot ~no_check:true ~name node snapshot in
+    let* () =
+      import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+    in
     let arguments = Node_helpers.isolated_args peers in
     let synchronisation_waiter =
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
@@ -791,7 +795,12 @@ let number_of_bakers ~snapshot ~network ~ppx_profiling ~ppx_profiling_backends:_
       (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () =
-    Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
+    Snapshot_helpers.import_snapshot
+      ~env:yes_crypto_env
+      ~no_check:true
+      ~name
+      node
+      snapshot
   in
   let* () =
     Node.Agent.run node (Node_helpers.isolated_args []) ~ppx_profiling

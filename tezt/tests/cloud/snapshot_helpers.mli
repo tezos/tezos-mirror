@@ -57,10 +57,11 @@ val ensure_snapshot_opt :
   agent:Agent.t -> name:string -> t -> string option Lwt.t
 
 (** [import_snapshot ?delete_snapshot_file ~no_check ~name node snapshot_path] imports
-    a snapshot into a Tezos [node] at [snapshot_path], using [~name] for logging purposes. 
+    a snapshot into a Tezos [node] at [snapshot_path], using [~name] for logging purposes.
     [~no_check] can be set to skip validity checks during import. If [?delete_snapshot_file]
     is [true], it deletes the snapshot file afterwards. *)
 val import_snapshot :
+  ?env:string String_map.t ->
   ?delete_snapshot_file:bool ->
   no_check:bool ->
   name:string ->

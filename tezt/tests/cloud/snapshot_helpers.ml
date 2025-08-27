@@ -139,12 +139,12 @@ let ensure_snapshot ~agent ~name ~network = function
       let* path = ensure_snapshot_opt ~agent ~name snapshot in
       Lwt.return @@ Option.get path
 
-let import_snapshot ?(delete_snapshot_file = false) ~no_check ~name node
+let import_snapshot ?env ?(delete_snapshot_file = false) ~no_check ~name node
     snapshot_file_path =
   toplog "Importing the snapshot for %s" name ;
   let* () =
     try
-      let* () = Node.snapshot_import ~no_check node snapshot_file_path in
+      let* () = Node.snapshot_import ?env ~no_check node snapshot_file_path in
       let () = toplog "Snapshot import succeeded for %s." name in
       let* () =
         if delete_snapshot_file then (
