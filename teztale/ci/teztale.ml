@@ -61,6 +61,7 @@ let job_gitlab_release =
 
 let job_release_page =
   Cacio.parameterize @@ fun pipeline_type ->
+  Cacio.parameterize @@ fun needs ->
   CI.job
     "release_page"
     ~__POS__
@@ -72,10 +73,13 @@ let job_release_page =
        Otherwise they are pushed in [site.prod.octez.tezos.com]. Then its \
        [index.html] is updated accordingly."
     ~needs:
-      [
-        (Artifacts, job_build `release Amd64);
-        (Artifacts, job_build `release Arm64);
-      ]
+      (match needs with
+      | `build_dependencies ->
+          [
+            (Artifacts, job_build `release Amd64);
+            (Artifacts, job_build `release Arm64);
+          ]
+      | `no_build_dependencies -> [])
     ~artifacts:
       (Gitlab_ci.Util.artifacts
          ~expire_in:(Duration (Days 1))
@@ -105,26 +109,48 @@ let register () =
     ~description:"Daily tests to run for Teztale."
     [(Auto, job_build `test Amd64); (Auto, job_build `test Arm64)] ;
   CI.register_global_release_jobs
-    [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
+    [
+      (Auto, job_gitlab_release);
+      (Manual, job_release_page `real `build_dependencies);
+    ] ;
   CI.register_global_test_release_jobs
-    [(Auto, job_gitlab_release); (Manual, job_release_page `test)] ;
+    [
+      (Auto, job_gitlab_release);
+      (Manual, job_release_page `test `build_dependencies);
+    ] ;
   CI.register_global_publish_release_page_jobs
-    [(Manual, job_release_page `real)] ;
+    [
+      ( Manual,
+        (* [no_build_dependencies] because we don't want the build job to run
+           as their artifacts are not needed to update the release page. *)
+        job_release_page `real `no_build_dependencies );
+    ] ;
   CI.register_global_test_publish_release_page_jobs
-    [(Manual, job_release_page `test)] ;
+    [
+      ( Manual,
+        (* [no_build_dependencies] because we don't want the build job to run
+           as their artifacts are not needed to update the release page. *)
+        job_release_page `test `no_build_dependencies );
+    ] ;
   CI.register_global_scheduled_test_release_jobs
     [
       (* Explicitly include the build jobs so that they have trigger [Auto]. *)
       (Auto, job_build `release Amd64);
       (Auto, job_build `release Arm64);
-      (Manual, job_release_page `test);
+      (Manual, job_release_page `test `build_dependencies);
     ] ;
   (* Remove this [if false then] to allow dedicated releases of Teztale.
      At the time Teztale was migrated to Cacio, it didn't have them.
      (But it did have dedicated test releases.) *)
   if false then
     CI.register_dedicated_release_pipeline
-      [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
+      [
+        (Auto, job_gitlab_release);
+        (Manual, job_release_page `real `build_dependencies);
+      ] ;
   CI.register_dedicated_test_release_pipeline
-    [(Auto, job_gitlab_release); (Manual, job_release_page `test)] ;
+    [
+      (Auto, job_gitlab_release);
+      (Manual, job_release_page `test `build_dependencies);
+    ] ;
   ()
