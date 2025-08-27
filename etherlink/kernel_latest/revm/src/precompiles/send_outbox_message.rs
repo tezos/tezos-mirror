@@ -468,7 +468,7 @@ where
     let mut gas = Gas::new(gas_limit);
 
     if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return revert("base cost is not covered");
+        return revert("OutOfGas");
     }
 
     match send_outbox_methods(input, context) {
