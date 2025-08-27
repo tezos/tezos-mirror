@@ -1987,17 +1987,13 @@ let jobs pipeline_type =
           []
       in
       let job_build_all =
-        Documentation.job_build_all
-          ~job_odoc
-          ~job_manuals
-          ~job_docgen
-          ~rules:
-            (make_rules
-               ~dependent:true
-               ~changes:changeset_octez_docs
-               ~label:"ci--docs"
-               ())
-          ()
+        (* Dummy job to remove in a commit later in this MR. *)
+        Tezos_ci.job
+          ~__POS__
+          ~stage:Tezos_ci.Stages.start
+          ~name:"documentation:build_all"
+          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+          []
       in
       let job_documentation_linkcheck : tezos_job =
         Documentation.job_linkcheck

@@ -213,3 +213,36 @@ documentation.odoc:
     - docs/_build/api/odoc/
     - docs/odoc.log
     when: always
+
+documentation.build_all:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  needs:
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs -j sphinx
+  - make -C docs -j _build/octezdoc.txt
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols

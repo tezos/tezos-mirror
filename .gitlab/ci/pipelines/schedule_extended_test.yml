@@ -3701,39 +3701,21 @@ documentation:docgen:
     - dummy
 
 documentation:build_all:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
-  dependencies:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j sphinx
-  - make -C docs -j _build/octezdoc.txt
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    expire_in: 1 week
     paths:
-    - docs/_build/
-    expose_as: Documentation - excluding old protocols
+    - dummy
 
 documentation:linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}

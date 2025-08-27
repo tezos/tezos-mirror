@@ -4180,60 +4180,20 @@ documentation:docgen:
     - dummy
 
 documentation:build_all:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
-  dependencies:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j sphinx
-  - make -C docs -j _build/octezdoc.txt
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    expire_in: 1 week
     paths:
-    - docs/_build/
-    expose_as: Documentation - excluding old protocols
+    - dummy
 
 documentation:linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -4526,7 +4486,6 @@ documentation.docgen:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4591,7 +4550,6 @@ documentation.manuals:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   - oc.build_x86_64-released
   - oc.build_amd64-extra-dev
   - oc.build_amd64-extra-exp
@@ -4651,7 +4609,6 @@ documentation.odoc:
     when: on_success
   needs:
   - oc.docker:ci:amd64
-  - trigger
   dependencies:
   - oc.docker:ci:amd64
   timeout: 60 minutes
@@ -4690,6 +4647,61 @@ documentation.odoc:
     - docs/_build/api/odoc/
     - docs/odoc.log
     when: always
+
+documentation.build_all:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs -j sphinx
+  - make -C docs -j _build/octezdoc.txt
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols
 
 documentation.install_python_bookworm:
   image: debian:bookworm

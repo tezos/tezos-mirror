@@ -74,7 +74,13 @@ let jobs_documentation : tezos_job list =
       []
   in
   let job_build_all =
-    Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ()
+    (* Dummy job to remove in a commit later in this MR. *)
+    Tezos_ci.job
+      ~__POS__
+      ~stage:Tezos_ci.Stages.start
+      ~name:"documentation:build_all"
+      ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+      []
   in
   let job_publish_documentation : tezos_job =
     Documentation.job_publish_documentation ~job_build_all ()

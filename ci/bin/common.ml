@@ -1232,33 +1232,6 @@ module Documentation = struct
       jobs
       dependencies
 
-  (** Create the [documentation:build_all] job.
-
-      This jobs builds the RST sources in docs, which will include the
-      the material from the prerequisite jobs: {!job_odoc},
-      {!job_manuals}, {!job_docgen}, on whose artifacts the
-      [documentation:build_all] job will depend. *)
-  let job_build_all ~job_odoc ~job_manuals ~job_docgen ?dependencies ?rules () :
-      tezos_job =
-    let dependencies =
-      mk_artifact_dependencies ?dependencies [job_odoc; job_manuals; job_docgen]
-    in
-    job
-      ~__POS__
-      ~name:"documentation:build_all"
-      ~image:Images.CI.test
-      ~stage:Stages.build
-      ~dependencies
-      ?rules
-      ~before_script:(before_script ~eval_opam:true ~init_python_venv:true [])
-      ~artifacts:
-        (artifacts
-           ~expose_as:"Documentation - excluding old protocols"
-           ~expire_in:(Duration (Weeks 1))
-           (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
-           ["docs/_build/"])
-      ["make -C docs -j sphinx"; "make -C docs -j _build/octezdoc.txt"]
-
   (** Create a [documentation:linkcheck] job. *)
   let job_linkcheck ~job_manuals ~job_docgen ~job_build_all ?dependencies ?rules
       () : tezos_job =

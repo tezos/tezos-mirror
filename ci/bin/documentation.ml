@@ -208,14 +208,42 @@ let job_docgen =
     ~sccache:(Cacio.sccache ())
     ["eval $(opam env)"; "make -C docs -j docexes-gen"]
 
+let job_build_all =
+  Cacio.parameterize @@ fun mode ->
+  Cacio.parameterize @@ fun executables_to_use ->
+  CI.job
+    "build_all"
+    ~__POS__
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Build
+    ~description:"Build the RSTs. Include material from previous build jobs."
+    ~only_if_changed:Files.odoc
+    ~force_if_label:["ci--docs"]
+    ~needs:
+      [
+        (Artifacts, job_odoc mode);
+        (Artifacts, job_manuals executables_to_use);
+        (Artifacts, job_docgen);
+      ]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expose_as:"Documentation - excluding old protocols"
+         ~expire_in:(Duration (Weeks 1))
+         (* Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706) *)
+         ["docs/_build/"])
+    [
+      "eval $(opam env)";
+      ". $HOME/.venv/bin/activate";
+      "make -C docs -j sphinx";
+      "make -C docs -j _build/octezdoc.txt";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);
-      (Auto, job_odoc `lite);
-      (Auto, job_manuals `dynamic);
-      (Auto, job_docgen);
+      (Auto, job_build_all `lite `dynamic);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -226,9 +254,7 @@ let register () =
       (Auto, job_install_python `ubuntu_noble `master);
       (Auto, job_install_python `ubuntu_jammy `master);
       (Auto, job_install_python `debian_bookworm `master);
-      (Auto, job_odoc `lite);
-      (Auto, job_manuals `static);
-      (Auto, job_docgen);
+      (Auto, job_build_all `lite `static);
     ] ;
   CI.register_scheduled_pipeline
     "update"
@@ -236,5 +262,5 @@ let register () =
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
     ~legacy_jobs:[Master_branch.job_static_x86_64]
-    [(Auto, job_odoc `full); (Auto, job_manuals `static); (Auto, job_docgen)] ;
+    [(Auto, job_build_all `full `static)] ;
   ()
