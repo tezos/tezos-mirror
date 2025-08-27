@@ -113,6 +113,10 @@ let log_rotation = Cli.log_rotation
 
 let retrieve_daily_logs = Cli.retrieve_daily_logs
 
+let tc_delay = Cli.tc_delay
+
+let tc_jitter = Cli.tc_jitter
+
 let init () =
   if tezt_cloud = "" then
     Test.fail

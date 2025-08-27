@@ -52,6 +52,8 @@ type config = {
   slack_channel_id : string option;
   slack_bot_token : string option;
   scenario_specific : (string * Data_encoding.Json.t) option;
+  tc_delay : (float * float) option;
+  tc_jitter : (float * float) option;
 }
 
 let encoding =
@@ -100,6 +102,8 @@ let encoding =
            slack_channel_id;
            slack_bot_token;
            scenario_specific;
+           tc_delay;
+           tc_jitter;
          }
        ->
       ( ( ( localhost,
@@ -142,7 +146,7 @@ let encoding =
               binaries_path,
               log_rotation,
               slack_channel_id ) ),
-          (slack_bot_token, scenario_specific) ) ))
+          (slack_bot_token, scenario_specific, tc_delay, tc_jitter) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -183,7 +187,7 @@ let encoding =
                  binaries_path,
                  log_rotation,
                  slack_channel_id ) ),
-             (slack_bot_token, scenario_specific) ) )
+             (slack_bot_token, scenario_specific, tc_delay, tc_jitter) ) )
        ->
       {
         localhost;
@@ -228,6 +232,8 @@ let encoding =
         slack_channel_id;
         slack_bot_token;
         scenario_specific;
+        tc_delay;
+        tc_jitter;
       })
     (merge_objs
        (merge_objs
@@ -277,9 +283,11 @@ let encoding =
                 (opt "binaries_path" string)
                 (opt "log_rotation" int31)
                 (opt "slack_channel_id" string)))
-          (obj2
+          (obj4
              (opt "slack_bot_token" string)
-             (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding)))))
+             (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding))
+             (opt "tc_delay" (tup2 float float))
+             (opt "tc_jitter" (tup2 float float)))))
 
 let section =
   Clap.section
@@ -758,6 +766,38 @@ let retrieve_daily_logs =
        huge quantity of data. Set to [false] by default."
     daily_logs_typ
     None
+
+let float_float =
+  let parse string =
+    try Scanf.sscanf string "%f,%f" (fun min max -> Some (min, max))
+    with _ -> None
+  in
+  let show (min, max) = Printf.sprintf "%f,%f" min max in
+  Clap.typ ~name:"float*float" ~dummy:(0., 0.) ~parse ~show
+
+let tc_delay : (float * float) option =
+  Option.fold ~none:config.tc_delay ~some
+  @@ Clap.optional
+       ~section
+       ~long:"tc-delay"
+       ~placeholder:"MIN,MAX"
+       ~description:
+         "Add random network delay to outgoing messages (between MIN and MAX \
+          seconds)."
+       float_float
+       ()
+
+let tc_jitter : (float * float) option =
+  Option.fold ~none:config.tc_jitter ~some
+  @@ Clap.optional
+       ~section
+       ~long:"tc-jitter"
+       ~placeholder:"MIN,MAX"
+       ~description:
+         "Add random network jitter to outgoing messages, (between MIN and MAX \
+          seconds)."
+       float_float
+       ()
 
 let section =
   Clap.section

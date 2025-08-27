@@ -150,6 +150,12 @@ val log_rotation : int
 (* Daily log path retrieval if set. *)
 val retrieve_daily_logs : string option
 
+(** Boundaries used for setting a random network latency on docker containers. *)
+val tc_delay : (float * float) option
+
+(** Boundaries used for setting a random network jitter on docker containers. *)
+val tc_jitter : (float * float) option
+
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
 

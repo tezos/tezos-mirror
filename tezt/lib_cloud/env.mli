@@ -146,6 +146,12 @@ val log_rotation : int
 (** Equivalent to [Cli.retrieve_daily_logs] *)
 val retrieve_daily_logs : string option
 
+(** Equivalent to [Cli.tc_delay] *)
+val tc_delay : (float * float) option
+
+(** Equivalent to [Cli.tc_jitter] *)
+val tc_jitter : (float * float) option
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 
