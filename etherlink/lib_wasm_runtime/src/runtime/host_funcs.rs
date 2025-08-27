@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: 2024 Nomadic Labs <contact@nomadic-labs.com>
+// SPDX-FileCopyrightText: 2025 Functori <contact@functori.com>
 
 //! Implementations of the host functions defined by the PVM, and used by the kernel when executed
 //! with Wasmer.
@@ -144,7 +145,8 @@ fn store_has(env: FunctionEnvMut<Env>, key_ptr: u32, key_len: u32) -> Result<i32
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_has({})", key.as_str());
 
-    match bindings::store_has(&runtime_env.host().tree(), key) {
+    let host = runtime_env.host();
+    match bindings::store_has(host.scope(), host.tree(), key) {
         Ok(i) => Ok(i as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -162,7 +164,8 @@ fn store_delete(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_delete({})", key.as_str());
 
-    match bindings::store_delete(&runtime_env.host().tree(), key, false) {
+    let host = runtime_env.host();
+    match bindings::store_delete(host.scope(), &host.tree(), key, false) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -183,7 +186,8 @@ fn store_delete_value(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_delete_value({})", key.as_str());
 
-    match bindings::store_delete(&runtime_env.host().tree(), key, true) {
+    let host = runtime_env.host();
+    match bindings::store_delete(host.scope(), &host.tree(), key, true) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -212,7 +216,8 @@ fn store_copy(
         runtime_env.mut_host().request_kernel_reload();
     }
 
-    match bindings::store_copy(&runtime_env.host().tree(), from, to) {
+    let host = runtime_env.host();
+    match bindings::store_copy(host.scope(), host.tree(), from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -241,7 +246,8 @@ fn store_move(
         runtime_env.mut_host().request_kernel_reload();
     }
 
-    match bindings::store_move(&runtime_env.host().tree(), from, to) {
+    let host = runtime_env.host();
+    match bindings::store_move(host.scope(), host.tree(), from, to) {
         Ok(evm_tree) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(0)
@@ -265,7 +271,8 @@ fn store_get_hash(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_get_hash({})", key.as_str());
 
-    match bindings::store_get_hash(&runtime_env.host().tree(), &key) {
+    let host = runtime_env.host();
+    match bindings::store_get_hash(host.tree(), &key) {
         Ok(hash) => {
             let hash_bytes = hash.as_bytes();
             let to_write = std::cmp::min(hash_bytes.len(), max_size as usize);
@@ -289,7 +296,8 @@ fn store_list_size(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_list_size({})", key.as_str());
 
-    match bindings::store_list_size(&runtime_env.host().tree(), key) {
+    let host = runtime_env.host();
+    match bindings::store_list_size(host.scope(), host.tree(), key) {
         Ok(res) => Ok(res as i64),
         Err(err) => i64_result_from_binding_error(err),
     }
@@ -308,7 +316,8 @@ fn store_value_size(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_value_size({})", key.as_str());
 
-    match bindings::store_value_size(&runtime_env.host().tree(), key) {
+    let host = runtime_env.host();
+    match bindings::store_value_size(host.scope(), host.tree(), key) {
         Ok(res) => Ok(res as i32),
         Err(err) => result_from_binding_error(err),
     }
@@ -329,8 +338,10 @@ fn store_read(
     let key = read_from_memory(&memory_view, key_ptr, key_len)?;
     trace!("store_read({})", key.as_str());
 
+    let host = runtime_env.host();
     match bindings::store_read(
-        runtime_env.host().tree(),
+        host.scope(),
+        host.tree(),
         key,
         offset as usize,
         max_bytes as usize,
@@ -359,7 +370,8 @@ fn store_write(
     trace!("store_write({})", key.as_str());
     let buffer = read_from_memory(&memory_view, src_ptr, src_len)?;
 
-    match bindings::store_write(runtime_env.host().tree(), key, offset as usize, &buffer) {
+    let host = runtime_env.host();
+    match bindings::store_write(host.scope(), host.tree(), key, offset as usize, &buffer) {
         Ok((evm_tree, res)) => {
             runtime_env.mut_host().set_tree(evm_tree);
             Ok(res as i32)

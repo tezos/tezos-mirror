@@ -54,14 +54,15 @@ let run ~pool ?l1_timestamp ~preimages_dir ?preimages_endpoint ~native_execution
     (fun () ->
       wasm_runtime_run
         ~scope:(Wasm_runtime_callbacks.root_scope scope)
+        ~context:static_context
         ~preimages_dir
         ?preimages_endpoint:(Option.map Uri.to_string preimages_endpoint)
         ~native_execution
         ~entrypoint
-        static_context
-        tree
-        (Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address)
-        0l
+        ~tree
+        ~rollup_address:
+          (Tezos_crypto.Hashed.Smart_rollup_address.to_bytes rollup_address)
+        ~level:0l
         (match inbox with
         | `Skip_stage_one -> []
         | `Inbox inbox -> Shared_inbox.(wrap ?l1_timestamp inbox)))

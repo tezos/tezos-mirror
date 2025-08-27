@@ -51,6 +51,23 @@ module Key_parser = struct
 end
 
 module Impl = struct
+  let otel_trace name scope key f =
+    let trace_id, parent =
+      match scope with
+      | Root None -> (Opentelemetry.Trace_id.create (), None)
+      | Root (Some scope) | Started {scope; _} ->
+          (scope.trace_id, Some scope.span_id)
+    in
+    Opentelemetry_lwt.Trace.with_
+      ~trace_id
+      ?parent
+      ~service_name:"Host_funs"
+      name
+    @@ fun scope ->
+    Opentelemetry.Scope.add_attrs scope (fun () ->
+        [("key", `String (String.concat "/" ("" :: key)))]) ;
+    f scope
+
   let read_durable_value tree key =
     let open Lwt_result_syntax in
     Key_parser.with_key key @@ fun key ->
@@ -59,18 +76,20 @@ module Impl = struct
     let*! bytes = Vector.load_all vec in
     return (Bytes.unsafe_of_string bytes)
 
-  let store_delete tree key is_value =
+  let store_delete scope tree key is_value =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main (fun () ->
+        otel_trace "store_delete" scope key @@ fun _ ->
         let open Lwt_syntax in
         let key = if is_value then key @ ["@"] else key in
         let+ tree = Irmin_context.Tree.remove tree key in
         Ok tree)
 
-  let store_copy tree key1 key2 =
+  let store_copy scope tree key1 key2 =
     Key_parser.with_key key1 @@ fun key1 ->
     Key_parser.with_key key2 @@ fun key2 ->
     Lwt_domain.run_in_main (fun () ->
+        otel_trace "store_copy" scope key1 @@ fun _ ->
         let open Lwt_syntax in
         let* subtree = Irmin_context.Tree.find_tree tree key1 in
         match subtree with
@@ -79,10 +98,11 @@ module Impl = struct
             Ok tree
         | None -> return (Error Error_code.store_not_a_node))
 
-  let store_move tree key1 key2 =
+  let store_move scope tree key1 key2 =
     Key_parser.with_key key1 @@ fun key1 ->
     Key_parser.with_key key2 @@ fun key2 ->
     Lwt_domain.run_in_main (fun () ->
+        otel_trace "store_move" scope key1 @@ fun _ ->
         let open Lwt_syntax in
         let* subtree = Irmin_context.Tree.find_tree tree key1 in
         match subtree with
@@ -107,9 +127,10 @@ module Impl = struct
 
   let store_has_value_and_subtrees = 3
 
-  let store_has tree key =
+  let store_has scope tree key =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main (fun () ->
+        otel_trace "store_has" scope key @@ fun _ ->
         let open Lwt_syntax in
         let* value_exists = Irmin_context.Tree.mem_tree tree (key @ ["@"]) in
         let* num_subtrees = Irmin_context.Tree.length tree key in
@@ -129,39 +150,44 @@ module Impl = struct
     | Some tree -> Ok (Irmin_context.Tree.hash tree |> Context_hash.to_bytes)
     | None -> Error Error_code.store_not_a_node
 
-  let store_list_size tree key =
+  let store_list_size scope tree key =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main (fun () ->
+        otel_trace "store_list_size" scope key @@ fun _ ->
         let open Lwt_syntax in
         let+ len = Irmin_context.Tree.length tree key in
         Ok len)
 
-  let store_value_size tree key =
+  let store_value_size scope tree key =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main @@ fun () ->
+    otel_trace "store_value_size" scope key @@ fun _ ->
     let open Lwt_result_syntax in
     let* vec = Vector.get tree key in
     Vector.length vec
 
-  let store_read tree key offset num_bytes =
+  let store_read scope tree key offset num_bytes =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main @@ fun () ->
+    otel_trace "store_read" scope key @@ fun _ ->
     let open Lwt_result_syntax in
     let* vector = Vector.get tree key in
     Vector.load_bytes vector ~offset ~num_bytes
 
-  let store_write (tree : Irmin_context.tree) key offset bytes =
+  let store_write scope (tree : Irmin_context.tree) key offset bytes =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main @@ fun () ->
+    otel_trace "store_write" scope key @@ fun _ ->
     let open Lwt_result_syntax in
     let* vector = Vector.get ~create_if_absent:true tree key in
     let* vector = Vector.write_bytes vector offset bytes in
     let*! tree = Vector.add_in_tree tree key vector in
     return (tree, Bytes.length bytes)
 
-  let store_write_all (tree : Irmin_context.tree) key bytes =
+  let store_write_all scope (tree : Irmin_context.tree) key bytes =
     Key_parser.with_key key @@ fun key ->
     Lwt_domain.run_in_main @@ fun () ->
+    otel_trace "store_write_all" scope key @@ fun _ ->
     let open Lwt_result_syntax in
     let*! vector = Vector.empty () in
     let* vector = Vector.write_bytes vector 0 bytes in
