@@ -296,7 +296,7 @@ val sampler_for_cycle :
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
 
-(** [init_stake_info_for_cycle ctxt cycle total_stake stakes_pk] caches the stakes
+(** [init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk] caches the stakes
     of the active delegates for [cycle] in memory for quick access.
 
     @return [Error Stake_info_already_set] if the info was already
@@ -304,7 +304,7 @@ val sampler_for_cycle :
 val init_stake_info_for_cycle :
   t ->
   Cycle_repr.t ->
-  Stake_repr.t ->
+  total_stake:Int64.t ->
   (consensus_pk * Int64.t) list ->
   t tzresult
 

@@ -2110,13 +2110,12 @@ let sort_stakes_pk_for_stake_info stakes_pk =
         consensus_pk2.delegate)
     stakes_pk
 
-let init_stake_info_for_cycle ctxt cycle total_stake stakes_pk =
+let init_stake_info_for_cycle ctxt cycle ~total_stake stakes_pk =
   let open Result_syntax in
   let map = stake_info ctxt in
   if Cycle_repr.Map.mem cycle map then tzfail (Stake_info_already_set cycle)
   else
     let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
-    let total_stake = Stake_repr.staking_weight total_stake in
     let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
     let ctxt = update_stake_info ctxt map in
     return ctxt
