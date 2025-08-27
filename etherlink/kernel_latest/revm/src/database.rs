@@ -257,12 +257,12 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        let storage_account = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            address,
-        )?;
-        let account_info = storage_account.info(self.host)?;
+        let storage_account =
+            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
+        let account_info = match storage_account {
+            Some(storage_account) => storage_account.info(self.host)?,
+            None => AccountInfo::default(),
+        };
 
         if self.caller == Address::ZERO && address == Address::ZERO {
             // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
@@ -292,12 +292,12 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         address: Address,
         index: StorageKey,
     ) -> Result<StorageValue, Self::Error> {
-        let storage_account = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            address,
-        )?;
-        let storage_value = storage_account.get_storage(self.host, &index)?;
+        let storage_account =
+            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
+        let storage_value = match storage_account {
+            Some(storage_account) => storage_account.get_storage(self.host, &index)?,
+            None => StorageValue::default(),
+        };
 
         Ok(storage_value)
     }

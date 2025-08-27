@@ -115,6 +115,16 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
+    pub fn get_account(
+        host: &impl Runtime,
+        world_state_handler: &mut Storage<Self>,
+        address: Address,
+    ) -> Result<Option<StorageAccount>, Error> {
+        world_state_handler
+            .get(host, &account_path(&address)?)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+
     pub fn get_or_create_account(
         host: &impl Runtime,
         world_state_handler: &mut Storage<Self>,
