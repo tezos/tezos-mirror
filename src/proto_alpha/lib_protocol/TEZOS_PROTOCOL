@@ -162,6 +162,7 @@
 
         "Zk_rollup_storage",
 
+	"All_bakers_attest_activation_storage",
         "Stake_context",
         "Adaptive_issuance_costs",
         "Contract_delegate_storage",

@@ -119,7 +119,9 @@ let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
       ~all_bakers_attest_first_level:None
       ctxt
   in
-  (* TMP TODO ABAAB: set all bakers attest enable *)
+  let* ctxt =
+    All_bakers_attest_activation_storage.set_all_bakers_attest_first_level ctxt
+  in
   Storage.Pending_migration.remove ctxt
 
 (* Start of code to remove at next automatic protocol snapshot *)
