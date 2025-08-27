@@ -108,7 +108,7 @@ let loop_sequencer (type f) multichain
                 ~kernel_upgrade:blueprint.kernel_upgrade
                 ~sequencer_upgrade:blueprint.sequencer_upgrade
             in
-            let* () = Evm_context.apply_evm_events events in
+            let* () = Evm_context.apply_evm_events' events in
             let*? all_txns =
               Blueprint_decoder.transactions blueprint.blueprint.payload
             in
