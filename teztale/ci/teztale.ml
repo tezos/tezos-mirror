@@ -108,6 +108,10 @@ let register () =
     [(Auto, job_gitlab_release); (Manual, job_release_page `real)] ;
   CI.register_global_test_release_jobs
     [(Auto, job_gitlab_release); (Manual, job_release_page `test)] ;
+  CI.register_global_publish_release_page_jobs
+    [(Manual, job_release_page `real)] ;
+  CI.register_global_test_publish_release_page_jobs
+    [(Manual, job_release_page `test)] ;
   CI.register_global_scheduled_test_release_jobs
     [
       (* Explicitly include the build jobs so that they have trigger [Auto]. *)
