@@ -507,7 +507,11 @@ module type COMPONENT_API = sig
   val register_master_jobs : (trigger * job) list -> unit
 
   val register_scheduled_pipeline :
-    description:string -> string -> (trigger * job) list -> unit
+    description:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    string ->
+    (trigger * job) list ->
+    unit
 
   val register_global_release_jobs : (trigger * job) list -> unit
 
@@ -618,11 +622,11 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       (full_pipeline_name name)
       rules
 
-  let register_scheduled_pipeline ~description name jobs =
+  let register_scheduled_pipeline ~description ?(legacy_jobs = []) name jobs =
     register_pipeline
       name
       ~description
-      ~jobs:(convert_jobs ~with_condition:false jobs)
+      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (full_pipeline_name name)))
