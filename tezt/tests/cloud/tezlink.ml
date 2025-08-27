@@ -227,6 +227,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
         tx_queue_max_lifespan = None;
         tx_queue_max_size = None;
         tx_queue_tx_per_addr_limit = None;
+        verbose = false;
       }
   in
   let () = toplog "Launching the sandbox L2 node" in
