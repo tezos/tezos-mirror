@@ -3667,44 +3667,21 @@ documentation:odoc:
     - dummy
 
 documentation:manuals:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - when: always
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
+  dependencies: []
   timeout: 60 minutes
   interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j octez-gen
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    expire_in: 1 week
     paths:
-    - docs/*/octez-*.html
-    - docs/api/octez-*.txt
-    - docs/developer/metrics.csv
-    - docs/developer/rollup_metrics.csv
-    - docs/user/node-config.json
+    - dummy
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}

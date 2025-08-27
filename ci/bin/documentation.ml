@@ -119,27 +119,95 @@ let job_odoc =
       "make -C docs " ^ target;
     ]
 
+let job_manuals =
+  Cacio.parameterize @@ fun executables_to_use ->
+  CI.job
+    "manuals"
+    ~__POS__
+    ~image:Tezos_ci.Images.CI.test
+    ~stage:Build
+    ~description:
+      "Build the command-line interface manuals (man pages) of Octez \
+       executables."
+    ~needs_legacy:
+      (match executables_to_use with
+      | `dynamic ->
+          (* The legacy build jobs are defined deep in code_verification.ml
+             and it is not easy to extract them.
+             For now, we thus define a dummy job with the same name,
+             since CIAO only cares about the name of the dependency.
+             Note that CIAO will still check that those dependencies are in the pipeline.
+             -
+             This trick only works for global pipelines that already have those jobs.
+             Scheduled pipelines registered by Cacio
+             (such as documentation.daily and documentation.update)
+             would need to include them with [~legacy_jobs].
+             Which would bring us back to the original issue which is that those jobs
+             are defined deep in code_verification.ml.
+             -
+             Fortunately, for this job (documentation.manuals), we can depend on
+             the job that builds static executables instead.
+             This job is already defined at toplevel as [Master_branch.job_static_x86_64].
+             So it is easy to include it with [~legacy_jobs].
+             -
+             However, the static build job is slower than the regular build jobs.
+             This is not an issue in scheduled pipelines, but for merge request pipelines,
+             being fast matters. Hence the dummy job trick, which works because
+             merge request pipelines already include the regular build jobs. *)
+          let dummy name =
+            Tezos_ci.job ~name ~stage:Tezos_ci.Stages.build ~__POS__ []
+          in
+          [
+            (Artifacts, dummy "oc.build_x86_64-released");
+            (Artifacts, dummy "oc.build_amd64-extra-dev");
+            (Artifacts, dummy "oc.build_amd64-extra-exp");
+            (Artifacts, dummy "oc.build_kernels");
+            (Artifacts, dummy "oc.build_dsn_node");
+          ]
+      | `static -> [(Artifacts, Master_branch.job_static_x86_64)])
+    ~only_if_changed:Files.odoc
+    ~force_if_label:["ci--docs"]
+    ~artifacts:
+      (Gitlab_ci.Util.artifacts
+         ~expire_in:(Duration (Weeks 1))
+         [
+           "docs/*/octez-*.html";
+           "docs/api/octez-*.txt";
+           "docs/developer/metrics.csv";
+           "docs/developer/rollup_metrics.csv";
+           "docs/user/node-config.json";
+         ])
+    ("eval $(opam env)"
+    ::
+    (match executables_to_use with
+    | `dynamic -> ["make -C docs -j octez-gen"]
+    | `static -> ["scripts/ci/documentation:manuals_static.sh"]))
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Immediate, job_rst_check);
       (Auto, job_install_python `debian_bookworm `current_branch);
       (Auto, job_odoc `lite);
+      (Auto, job_manuals `dynamic);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
     ~description:"Daily tests to run for the documentation."
+    ~legacy_jobs:[Master_branch.job_static_x86_64]
     [
       (Auto, job_rst_check);
       (Auto, job_install_python `ubuntu_noble `master);
       (Auto, job_install_python `ubuntu_jammy `master);
       (Auto, job_install_python `debian_bookworm `master);
       (Auto, job_odoc `lite);
+      (Auto, job_manuals `static);
     ] ;
   CI.register_scheduled_pipeline
     "update"
     ~description:
       "Generate and push the documentation to octez.com/docs without being \
        interrupted."
-    [(Auto, job_odoc `full)] ;
+    ~legacy_jobs:[Master_branch.job_static_x86_64]
+    [(Auto, job_odoc `full); (Auto, job_manuals `static)] ;
   ()

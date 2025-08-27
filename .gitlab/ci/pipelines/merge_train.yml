@@ -4147,65 +4147,20 @@ documentation:odoc:
     - dummy
 
 documentation:manuals:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
+  stage: start
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
+  dependencies: []
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j octez-gen
+  script: []
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
-    expire_in: 1 week
     paths:
-    - docs/*/octez-*.html
-    - docs/api/octez-*.txt
-    - docs/developer/metrics.csv
-    - docs/developer/rollup_metrics.csv
-    - docs/user/node-config.json
+    - dummy
 
 documentation:docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -4527,6 +4482,66 @@ documentation.rst-check:
   - make --silent -C docs sphinx-check
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.manuals:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
+  - oc.build_kernels
+  - oc.build_dsn_node
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
+  - oc.build_kernels
+  - oc.build_dsn_node
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - make -C docs -j octez-gen
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/developer/rollup_metrics.csv
+    - docs/user/node-config.json
 
 documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}

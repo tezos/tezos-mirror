@@ -1973,19 +1973,13 @@ let jobs pipeline_type =
           []
       in
       let job_manuals =
-        Documentation.job_manuals
-          ~rules
-          ~use_static_executables:false
-          ~dependencies:
-            (Dependent
-               [
-                 Artifacts job_build_x86_64_release;
-                 Artifacts job_build_x86_64_extra_dev;
-                 Artifacts job_build_x86_64_extra_exp;
-                 Artifacts job_build_kernels;
-                 Artifacts job_build_dsn_node;
-               ])
-          ()
+        (* Dummy job to remove in a commit later in this MR. *)
+        Tezos_ci.job
+          ~__POS__
+          ~stage:Tezos_ci.Stages.start
+          ~name:"documentation:manuals"
+          ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+          []
       in
       let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
       let job_build_all =

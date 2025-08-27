@@ -1232,35 +1232,6 @@ module Documentation = struct
       jobs
       dependencies
 
-  (** Create the manuals job.
-
-      This job builds the command-line interface manuals (i.e [man])
-      of octez binaries, for inclusion in the documentation.
-
-      This job is one of the prerequisites to {!job_build_all}. *)
-  let job_manuals ?rules ?dependencies ~use_static_executables () : tezos_job =
-    job
-      ~__POS__
-      ~name:"documentation:manuals"
-      ~image:Images.CI.test
-      ~stage:Stages.build
-      ?dependencies
-      ?rules
-      ~before_script:(before_script ~eval_opam:true [])
-      ~artifacts:
-        (artifacts
-           ~expire_in:(Duration (Weeks 1))
-           [
-             "docs/*/octez-*.html";
-             "docs/api/octez-*.txt";
-             "docs/developer/metrics.csv";
-             "docs/developer/rollup_metrics.csv";
-             "docs/user/node-config.json";
-           ])
-      (if use_static_executables then
-         ["scripts/ci/documentation:manuals_static.sh"]
-       else ["make -C docs -j octez-gen"])
-
   (** Create the docgen job.
 
       This job builds various generated reference material, for

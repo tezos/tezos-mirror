@@ -21,6 +21,10 @@ open Gitlab_ci.Util
 open Tezos_ci
 open Tezos_ci.Cache
 
+(* Without this, Dune's dependency analysis is wrong:
+   it thinks Documentation is the new module that uses Cacio. *)
+module Documentation = Common.Documentation
+
 let rules_always = [job_rule ~when_:Always ()]
 
 (* static binaries *)
@@ -53,10 +57,13 @@ let jobs_documentation : tezos_job list =
       []
   in
   let job_manuals =
-    Documentation.job_manuals
-      ~dependencies:(Dependent [Artifacts job_static_x86_64])
-      ~use_static_executables:true
-      ()
+    (* Dummy job to remove in a commit later in this MR. *)
+    Tezos_ci.job
+      ~__POS__
+      ~stage:Tezos_ci.Stages.start
+      ~name:"documentation:manuals"
+      ~artifacts:(Gitlab_ci.Util.artifacts ["dummy"])
+      []
   in
   let job_docgen = Documentation.job_docgen ~dependencies () in
   let job_build_all =
