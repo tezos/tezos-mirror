@@ -45,7 +45,7 @@ class virtual common pid channels =
 
     initializer
       (* Ensure the channels are closed *)
-      List.iter (fun c -> ignore (Lwt_io.close c)) channels
+      List.iter (Gc.finalise (fun c -> ignore (Lwt_io.close c))) channels
   end
 
 let open_process_full (p_name, args) : Lwt_process.process_full Lwt.t =
