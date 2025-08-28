@@ -157,6 +157,10 @@ pub enum OriginationError {
     CantInitContract,
     #[error("Can't originate an empty smart contract")]
     CantOriginateEmptyContract,
+    #[error("Mir failed to typecheck the contract with {0}")]
+    MirTypecheckingError(String),
+    #[error("Failed because of micheline decoding {0}")]
+    MichelineDecodeError(String),
 }
 
 impl From<mir::serializer::DecodeError> for TransferError {
