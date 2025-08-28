@@ -85,8 +85,7 @@ let test_check_signature =
   let* () = Process.check bake3 in
   let* () = Process.check transfer2 in
 
-  Log.info
-    "Check that running a node with only environement variable is refused" ;
+  Log.info "Check that running a node with only environment variable is refused" ;
   let* () = Node.terminate node in
   let* () = Node.run ~env node [] in
   let* () =

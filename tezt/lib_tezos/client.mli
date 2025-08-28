@@ -3450,3 +3450,8 @@ val share_bls_secret_key :
 (** Run [octez-client threshold bls signatures <id_signatures>]. *)
 val threshold_bls_signatures :
   pk:string -> msg:string -> t -> (int * string) list -> string Lwt.t
+
+(* Environment variable names for experimental client/baker features *)
+val signing_delay_env_var : string
+
+val fixed_seed_env_var : string

@@ -4880,3 +4880,8 @@ let threshold_bls_signatures ~pk ~msg client id_signatures =
     |> Process.check_and_read_stdout
   in
   return (String.trim s)
+
+(* Environment variable names for experimental client/baker features *)
+let signing_delay_env_var = "TEZOS_SIGN_DELAY_I_KNOW_WHAT_I_AM_DOING"
+
+let fixed_seed_env_var = "TEZOS_CLIENT_FIXED_RANDOM_SEED"

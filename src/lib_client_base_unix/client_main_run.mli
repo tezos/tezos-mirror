@@ -134,3 +134,11 @@ val lwt_run :
   ?disable_logging:bool ->
   unit ->
   int Lwt.t
+
+module Events : sig
+  include module type of Internal_event.Simple
+
+  val rand_seed_is_set : int t
+
+  val rand_seed_is_not_an_int : string t
+end

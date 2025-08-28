@@ -163,8 +163,11 @@ let run_baker (module Plugin : Protocol_plugin_sig.S)
         state_recorder;
         pre_emptive_forge_time;
         remote_calls_timeout;
+        allow_signing_delay;
       } baking_mode sources cctxt =
   let open Lwt_result_syntax in
+  Octez_baking_common.Signing_delay.enforce_signing_delay_gating
+    ~allow:allow_signing_delay ;
   may_lock_pidfile pidfile @@ fun () ->
   let* () =
     check_node_version cctxt node_version_check_bypass node_version_allowed

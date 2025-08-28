@@ -57,7 +57,8 @@ val run :
   unit Lwt.t
 
 (** Spawn [octez-baker run] similarly to {!run} but returns the process. *)
-val spawn_run : ?env:string String_map.t -> t -> Process.t
+val spawn_run :
+  ?env:string String_map.t -> ?extra_arguments:string list -> t -> Process.t
 
 (** Liquidity baking vote values. *)
 type liquidity_baking_vote = Off | On | Pass
@@ -142,6 +143,8 @@ val create :
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
   Node.t ->
   Client.t ->
   t
@@ -182,6 +185,8 @@ val create_from_uris :
   node_data_dir:string ->
   node_rpc_endpoint:Endpoint.t ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
   unit ->
   t
 
@@ -242,6 +247,9 @@ val init :
   ?node_version_check_bypass:bool ->
   ?node_version_allowed:string ->
   ?keep_alive:bool ->
+  ?allow_fixed_random_seed:bool ->
+  ?allow_signing_delay:bool ->
+  ?extra_arguments:string list ->
   Node.t ->
   Client.t ->
   t Lwt.t
