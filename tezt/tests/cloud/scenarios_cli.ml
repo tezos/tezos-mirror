@@ -9,15 +9,40 @@
 module Clap = struct
   include Clap
 
+  let parse_list ~sep parse str =
+    try str |> String.split_on_char sep |> List.map parse |> Option.some
+    with _ -> None
+
+  let show_list ~sep show l =
+    l |> List.map show |> String.concat (String.make 1 sep)
+
   let list ?(sep = ',') ?(dummy = []) ~name parse show =
-    let parse str =
-      try str |> String.split_on_char sep |> List.map parse |> Option.some
-      with _ -> None
-    in
-    let show l = l |> List.map show |> String.concat (String.make 1 sep) in
+    let parse str = parse_list ~sep parse str in
+    let show = show_list ~sep show in
     Clap.typ ~name ~dummy ~parse ~show
 
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
+
+  let list_of_list ?(sep_out = ',') ?(sep_in = ';') ?(dummy = []) ~name
+      parse_elm show_elm =
+    let parse_inner str =
+      let trimmed =
+        let str = String.trim str in
+        let len = String.length str in
+        if String.get str 0 = '[' && String.get str (len - 1) = ']' then
+          String.sub str 1 (len - 2)
+        else str
+      in
+      match parse_list ~sep:sep_in parse_elm trimmed with
+      | Some l -> l
+      | None -> raise (Invalid_argument str)
+    in
+    let show_inner = function
+      | [] -> "[]"
+      | [e] -> show_elm e
+      | l -> "[" ^ show_list ~sep:sep_in show_elm l
+    in
+    list ~sep:sep_out ~dummy ~name parse_inner show_inner
 end
 
 let network_typ : Network.t Clap.typ =
