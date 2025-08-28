@@ -15,7 +15,7 @@ open Yes_crypto
 type observer = {
   node : Node.t;
   dal_node : Dal_node.t;
-  topic : [`Slot_index of int | `Pkh of string];
+  topic : [`Slot_indexes of int list | `Pkh of string];
 }
 
 type producer = {
@@ -398,10 +398,10 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
   in
   let* () =
     match topic with
-    | `Slot_index slot_index ->
+    | `Slot_indexes slot_indexes ->
         Dal_node.init_config
           ~expected_pow:(Network.expected_pow network)
-          ~observer_profiles:[slot_index]
+          ~observer_profiles:slot_indexes
           ~peers:(Option.to_list dal_node_p2p_endpoint)
           dal_node
     | `Pkh pkh ->

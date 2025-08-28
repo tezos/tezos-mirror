@@ -19,7 +19,7 @@ type t =
   | Baker of int
       (** A node responsible for block production, identified by index. *)
   | Producer of int  (** A DAL slot producer node, identified by index. *)
-  | Observer of [`Index of int | `Pkh of string]
+  | Observer of [`Indexes of int list | `Pkh of string]
       (** A DAL observer node, either indexed or associated with a public key hash. *)
   | Reverse_proxy
       (** A reverse proxy between rollup nodes and multiple DAL nodes. *)
@@ -40,7 +40,7 @@ val rex_baker_index : rex
 
 val rex_producer_index : rex
 
-val rex_observer_index : rex
+val rex_observer_indexes : rex
 
 val rex_observer_pkh : rex
 

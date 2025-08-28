@@ -849,9 +849,9 @@ let init ~(configuration : configuration) etherlink_configuration cloud
   let* observers_slot_index_agents =
     Lwt_list.map_s
       (fun slot_index ->
-        let name = name_of (Observer (`Index slot_index)) in
+        let name = name_of (Observer (`Indexes [slot_index])) in
         let* agent = next_agent ~name in
-        return (`Slot_index slot_index, agent))
+        return (`Slot_indexes [slot_index], agent))
       configuration.observer_slot_indices
   in
   let* observers_bakers_agents =
@@ -1358,7 +1358,7 @@ let register (module Cli : Scenarios_cli.Dal) =
            List.init baker_daemon_count (fun i -> Baker i);
            List.map (fun i -> Producer i) configuration.dal_node_producers;
            List.map
-             (fun index -> Observer (`Index index))
+             (fun index -> Observer (`Indexes [index]))
              configuration.observer_slot_indices;
            List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
            (if etherlink_configuration <> None then [Etherlink_operator] else []);

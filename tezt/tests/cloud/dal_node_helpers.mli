@@ -17,7 +17,7 @@
 type observer = {
   node : Node.t;
   dal_node : Dal_node.t;
-  topic : [`Pkh of string | `Slot_index of int];
+  topic : [`Pkh of string | `Slot_indexes of int list];
 }
 
 type producer = {
@@ -109,7 +109,7 @@ val init_observer :
   node_p2p_endpoint:string ->
   dal_node_p2p_endpoint:string option ->
   Tezos.Teztale.t option ->
-  topic:[`Pkh of string | `Slot_index of int] ->
+  topic:[`Pkh of string | `Slot_indexes of int list] ->
   int ->
   Agent.t ->
   observer Lwt.t
