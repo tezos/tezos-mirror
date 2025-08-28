@@ -13,7 +13,7 @@
 ## This script is also sourced in the Makefile, as such it should be compatible
 ## with both make and sh syntaxes
 
-export ocaml_version=5.2.1
+export ocaml_version=5.3.0
 # Used for sanity check in Makefile.
 export opam_version_major=2
 # The recommended rust version should equal the version set in the

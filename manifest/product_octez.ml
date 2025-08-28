@@ -1865,7 +1865,7 @@ let octez_base =
       V.(
         (* TODO: https://gitlab.com/tezos/tezos/-/issues/6112
            Should be in sync with scripts/version.sh *)
-        at_least "5.2.1" && less_than "5.3.0")
+        at_least "5.3.0" && less_than "5.4.0")
     ~license:"Apache-2.0"
 
 let octez_base_unix =
@@ -6657,9 +6657,10 @@ end = struct
         | Other | Dev -> []
         (* [V _] protocols can't be edited to accomodate warnings, we need to disable warnings instead. *)
         | V _ as number ->
-            if N.(number >= 014) then []
-            else if N.(number >= 011) then [51]
-            else [6; 7; 9; 16; 29; 32; 51; 68]
+            if N.(number >= 024) then []
+            else if N.(number >= 014) then [32; 34]
+            else if N.(number >= 011) then [32; 34; 51]
+            else [6; 7; 9; 16; 29; 32; 34; 51; 68]
       in
       let environment =
         tezos_protocol_sub_lib

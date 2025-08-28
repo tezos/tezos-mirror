@@ -3366,9 +3366,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8394aaacbc45064f50520133c81918ed19127d128e10b43db52212420f21ad5a"
+checksum = "7f1b5dc3fe14b42b881b5a861b3e50f969512c1d8c8ba8cddde020ba96ebb23d"
 dependencies = [
  "ocaml-boxroot-sys",
  "ocaml-derive",
@@ -3377,9 +3377,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml-boxroot-sys"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "541b4c121093aa5bfb1b0e0d6f8ca00c807b156445bc4f4e19683421f6d26208"
+checksum = "0f3c2664a427c8046d334bf3a50fc466170a3dc53c65bc926a9be31a8e8debd1"
 dependencies = [
  "cc",
 ]
@@ -3408,9 +3408,9 @@ dependencies = [
 
 [[package]]
 name = "ocaml-sys"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "791a59e8b9aa8b2e345433d34cd1c5f16ef6a0c703cc0e4fe9e20df87d2ef63d"
+checksum = "14e0db66a4df18164b2318518bea3891b6fd05526253a71023267f8955dbaefa"
 dependencies = [
  "cc",
  "cty",
@@ -6389,7 +6389,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

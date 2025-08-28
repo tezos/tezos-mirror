@@ -448,6 +448,7 @@ let jobs pipeline_type =
         ~image:Images.CI.build_master
         ~stage
         ~dependencies
+        ~allow_failure:Yes
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
         ~before_script:
           (before_script

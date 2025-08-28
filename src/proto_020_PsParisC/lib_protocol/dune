@@ -26,6 +26,7 @@
  (library_flags (:standard -linkall))
  (flags
   (:standard)
+  -w -32-34
   -nostdlib
   -nopervasives
   -open Tezos_protocol_environment_020_PsParisC
@@ -303,6 +304,7 @@
   tezos-protocol-020-PsParisC.protocol.raw)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Protocol Tezos_protocol_020_PsParisC))
 
@@ -593,7 +595,8 @@
   alpha_services.ml alpha_services.mli
   main.ml main.mli
   (:src_dir TEZOS_PROTOCOL))
- (action (run %{bin:octez-protocol-compiler} -warn-error +a .)))
+ (action
+  (run %{bin:octez-protocol-compiler} -warning -32-34 -warn-error +a .)))
 
 (library
  (name tezos_protocol_020_PsParisC_lifted)
@@ -605,6 +608,7 @@
   tezos-protocol-020-PsParisC.protocol)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives
   -open Tezos_protocol_020_PsParisC)
  (modules Lifted_protocol))
@@ -623,6 +627,7 @@
   octez-proto-libs.protocol-environment.sigs)
  (flags
   (:standard)
+  -w -32-34
   -nopervasives)
  (modules Functor))
 
@@ -909,6 +914,9 @@
   octez-shell-libs.protocol-updater
   octez-proto-libs.protocol-environment)
  (library_flags (:standard -linkall))
+ (flags
+  (:standard)
+  -w -32-34)
  (modules Registerer))
 
 (rule
