@@ -515,6 +515,11 @@ module type COMPONENT_API = sig
 
   val register_global_scheduled_test_release_jobs : (trigger * job) list -> unit
 
+  val register_global_publish_release_page_jobs : (trigger * job) list -> unit
+
+  val register_global_test_publish_release_page_jobs :
+    (trigger * job) list -> unit
+
   val register_dedicated_release_pipeline : (trigger * job) list -> unit
 
   val register_dedicated_test_release_pipeline : (trigger * job) list -> unit
@@ -635,6 +640,16 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
     let jobs = convert_jobs ~with_condition:false jobs in
     Tezos_ci.Hooks.global_scheduled_test_release :=
       jobs @ !Tezos_ci.Hooks.global_scheduled_test_release
+
+  let register_global_publish_release_page_jobs jobs =
+    let jobs = convert_jobs ~with_condition:false jobs in
+    Tezos_ci.Hooks.global_publish_release_page :=
+      jobs @ !Tezos_ci.Hooks.global_publish_release_page
+
+  let register_global_test_publish_release_page_jobs jobs =
+    let jobs = convert_jobs ~with_condition:false jobs in
+    Tezos_ci.Hooks.global_test_publish_release_page :=
+      jobs @ !Tezos_ci.Hooks.global_test_publish_release_page
 
   (* Use this function to get the release tag regular expression,
      as it makes sure that it is registered with [Hooks.release_tags] only once. *)

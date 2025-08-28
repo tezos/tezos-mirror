@@ -721,6 +721,12 @@ module Hooks : sig
   (** Jobs to add to the global scheduled test release pipeline. *)
   val global_scheduled_test_release : tezos_job list ref
 
+  (** Jobs to add to the release page update pipeline. *)
+  val global_publish_release_page : tezos_job list ref
+
+  (** Jobs to add to the release page update test pipeline. *)
+  val global_test_publish_release_page : tezos_job list ref
+
   (** Regular expressions that match release tags.
 
       Used by [ci/bin/main.ml] to define the [non_release_tag]

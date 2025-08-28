@@ -48,7 +48,7 @@ datadog_pipeline_trace:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-publish:release-page:
+publish:update-release-page:
   image: ${ci_image_name}/build:${ci_image_tag}
   stage: publish
   tags:
@@ -61,14 +61,80 @@ publish:release-page:
   timeout: 60 minutes
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
-  - sudo apk add aws-cli pandoc
   - eval $(opam env)
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
-  - ./scripts/releases/publish_release_page.sh
+  - sudo apk add aws-cli pandoc
+  - dune exec ./ci/bin_release_page/release_page.exe -- --component 'octez' --title
+    'Octez releases' --bucket ${S3_BUCKET} --path '${BUCKET_PATH:-}' changelog binaries
+    packages
+  - aws s3 cp "./index.html" "s3://${S3_BUCKET}${BUCKET_PATH}/"
+  - aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths
+    "/*"
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - cp /tmp/release_page*/index.md ./index.md
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - index.md
+    - index.html
+
+teztale.release_page:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./teztale/scripts/releases/publish_release_page.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  variables:
+    S3_BUCKET: release-page-test.nomadic-labs.com
+    DISTRIBUTION_ID: E19JF46UG3Z747
+    AWS_ACCESS_KEY_ID: ${AWS_KEY_RELEASE_PUBLISH}
+    AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_RELEASE_PUBLISH}
+  artifacts:
+    expire_in: 1 day
+    paths:
+    - ./index.md
+    - index.html
+  retry: 0
+
+grafazos.release_page:
+  image: ${GCP_REGISTRY}/tezos/docker-images/ci-release:v1.8.0
+  stage: publish
+  tags:
+  - gcp_not_interruptible
+  rules:
+  - when: manual
+    allow_failure: true
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: false
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./grafazos/scripts/releases/publish_release_page.sh
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     S3_BUCKET: release-page-test.nomadic-labs.com
     DISTRIBUTION_ID: E19JF46UG3Z747
