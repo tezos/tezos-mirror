@@ -11,8 +11,9 @@ use revm::{
 };
 
 use crate::{
-    database::PrecompileDatabase,
+    database::DatabasePrecompileStateChanges,
     helpers::legacy::{h160_to_alloy, u256_to_alloy},
+    journal::Journal,
     precompiles::{
         constants::{
             FA_WITHDRAWAL_SOL_ADDR, TABLE_PRECOMPILE_ADDRESS, TICKET_TABLE_BASE_COST,
@@ -51,7 +52,7 @@ sol! {
     }
 }
 
-pub(crate) fn table_precompile<CTX>(
+pub(crate) fn table_precompile<CTX, DB>(
     input: &[u8],
     context: &mut CTX,
     is_static: bool,
@@ -59,8 +60,8 @@ pub(crate) fn table_precompile<CTX>(
     gas_limit: u64,
 ) -> Result<InterpreterResult, Error>
 where
-    CTX: ContextTr,
-    CTX::Db: PrecompileDatabase,
+    DB: DatabasePrecompileStateChanges,
+    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
     if transfer.target_address != TABLE_PRECOMPILE_ADDRESS {
         return Ok(revert("invalid transfer target address"));
@@ -91,16 +92,13 @@ where
             owner,
             amount,
         }) => {
-            let Ok(added) =
+            if let Err(err) =
                 context
-                    .db_mut()
-                    .ticket_balance_add(&ticket_hash, &owner, amount)
-            else {
-                return Ok(revert(format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}")));
+                    .journal_mut()
+                    .ticket_balance_add(ticket_hash, owner, amount)
+            {
+                return Ok(revert(format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}, err: {err}")));
             };
-            if !added {
-                return Ok(revert("ticket balance overflow"));
-            }
             None
         }
         Table::TableCalls::ticket_balance_remove(Table::ticket_balance_removeCall {
@@ -108,21 +106,18 @@ where
             owner,
             amount,
         }) => {
-            let Ok(removed) =
+            if let Err(err) =
                 context
-                    .db_mut()
-                    .ticket_balance_remove(&ticket_hash, &owner, amount)
-            else {
-                return Ok(revert(format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}")));
+                    .journal_mut()
+                    .ticket_balance_remove(ticket_hash, owner, amount)
+            {
+                return Ok(revert(format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}, err: {err}")));
             };
-            if !removed {
-                return Ok(revert("insufficient ticket balance"));
-            }
             None
         }
         Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
             // Only internal error is emitted here
-            let Some(deposit) = context.db_mut().read_deposit_from_queue(&deposit_id)?
+            let Some(deposit) = context.journal().find_deposit_in_queue(&deposit_id)?
             else {
                 return Ok(revert(format!(
                     "fetching deposit with id {deposit_id} failed"
@@ -145,8 +140,8 @@ where
         }
         Table::TableCalls::remove_deposit(Table::remove_depositCall { deposit_id }) => {
             if context
-                .db_mut()
-                .remove_deposit_from_queue(&deposit_id)
+                .journal_mut()
+                .remove_deposit_from_queue(deposit_id)
                 .is_err()
             {
                 return Ok(revert(format!(

@@ -13,7 +13,8 @@ use revm::{
 };
 
 use crate::{
-    database::PrecompileDatabase,
+    database::DatabasePrecompileStateChanges,
+    journal::Journal,
     precompiles::{
         constants::{
             CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
@@ -44,7 +45,7 @@ impl EtherlinkPrecompiles {
         CUSTOMS.contains(address) || self.builtins.contains(address)
     }
 
-    fn run_custom_precompile<CTX>(
+    fn run_custom_precompile<CTX, DB>(
         &mut self,
         context: &mut CTX,
         address: &Address,
@@ -53,8 +54,8 @@ impl EtherlinkPrecompiles {
         gas_limit: u64,
     ) -> Result<Option<InterpreterResult>, Error>
     where
-        CTX: ContextTr,
-        CTX::Db: PrecompileDatabase,
+        DB: DatabasePrecompileStateChanges,
+        CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
     {
         // NIT: can probably do this more efficiently by keeping an immutable
         // reference on the slice but next mutable call makes it nontrivial
@@ -100,10 +101,10 @@ impl EtherlinkPrecompiles {
     }
 }
 
-impl<CTX> PrecompileProvider<CTX> for EtherlinkPrecompiles
+impl<CTX, DB> PrecompileProvider<CTX> for EtherlinkPrecompiles
 where
-    CTX: ContextTr,
-    CTX::Db: PrecompileDatabase,
+    DB: DatabasePrecompileStateChanges,
+    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
     type Output = InterpreterResult;
 

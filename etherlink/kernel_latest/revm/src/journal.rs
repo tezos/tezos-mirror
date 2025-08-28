@@ -13,35 +13,59 @@ use revm::{
     },
     inspector::JournalExt,
     primitives::{
-        hardfork::SpecId, Address, HashSet, Log, StorageKey, StorageValue, B256, U256,
+        hardfork::SpecId, Address, HashMap, HashSet, Log, StorageKey, StorageValue, B256,
+        U256,
     },
     state::{Account, EvmState},
     JournalEntry,
 };
 use std::vec::Vec;
 
+use crate::{
+    database::{DatabaseCommitPrecompileStateChanges, DatabasePrecompileStateChanges},
+    helpers::legacy::FaDepositWithProxy,
+    layered_state::LayeredState,
+    precompiles::send_outbox_message::Withdrawal,
+    Error,
+};
+
+type TicketBalanceKey = (Address, U256);
+
+#[derive(Debug, PartialEq, Eq, Default)]
+pub struct PrecompileStateChanges {
+    pub ticket_balances: HashMap<TicketBalanceKey, U256>,
+    pub removed_deposits: HashSet<U256>,
+    pub withdrawals: Vec<Withdrawal>,
+}
+
 /// A journal of state changes internal to the EVM
 ///
 /// On each additional call, the depth of the journaled state is increased (`depth`) and a new journal is added.
 ///
 /// The journal contains every state change that happens within that call, making it possible to revert changes made in a specific call.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Journal<DB> {
     /// Database
     pub database: DB,
+
+    /// Layered state for state changes not managed by REVM
+    /// (i.e. induced by Etherlink-specific precompiles)
+    pub layered_state: LayeredState,
 
     /// Inner journal state.
     pub inner: JournalInner<JournalEntry>,
 }
 
 /// The implementation is only calling the underline REVM object which is the same as the REVM journal one.
-impl<DB: Database> JournalTr for Journal<DB> {
+/// The only changes are the invocation of `LayeredDB` methods in some functions.
+impl<DB: Database + DatabaseCommitPrecompileStateChanges> JournalTr for Journal<DB> {
     type Database = DB;
     type State = EvmState;
 
     fn new(database: DB) -> Journal<DB> {
         Self {
             inner: JournalInner::new(),
+            layered_state: LayeredState::new(),
             database,
         }
     }
@@ -202,16 +226,21 @@ impl<DB: Database> JournalTr for Journal<DB> {
 
     #[inline]
     fn checkpoint(&mut self) -> JournalCheckpoint {
+        self.layered_state.checkpoint();
         self.inner.checkpoint()
     }
 
     #[inline]
     fn checkpoint_commit(&mut self) {
+        self.layered_state.checkpoint_commit();
         self.inner.checkpoint_commit()
     }
 
     #[inline]
     fn checkpoint_revert(&mut self, checkpoint: JournalCheckpoint) {
+        // Following the doc of REVM it's safe to consider that `checkpoint` is always the latest created.
+        // https://github.com/bluealloy/revm/blob/a8916288952ca65ead1b0fd7aae20341e396b1c6/crates/context/src/journal/inner.rs#L465
+        self.layered_state.checkpoint_revert();
         self.inner.checkpoint_revert(checkpoint)
     }
 
@@ -250,6 +279,7 @@ impl<DB: Database> JournalTr for Journal<DB> {
     /// Clear current journal resetting it to initial state and return changes state.
     #[inline]
     fn finalize(&mut self) -> Self::State {
+        self.database.commit(self.layered_state.finalize());
         self.inner.finalize()
     }
 }
@@ -273,5 +303,54 @@ impl<DB> JournalExt for Journal<DB> {
     #[inline]
     fn evm_state_mut(&mut self) -> &mut EvmState {
         &mut self.inner.state
+    }
+}
+
+impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
+    pub fn ticket_balance_add(
+        &mut self,
+        ticket_hash: U256,
+        owner: Address,
+        amount: U256,
+    ) -> Result<(), Error> {
+        self.layered_state.ticket_balance_add(
+            &ticket_hash,
+            &owner,
+            amount,
+            &self.database,
+        )
+    }
+
+    pub fn ticket_balance_remove(
+        &mut self,
+        ticket_hash: U256,
+        owner: Address,
+        amount: U256,
+    ) -> Result<(), Error> {
+        self.layered_state.ticket_balance_remove(
+            &ticket_hash,
+            &owner,
+            amount,
+            &self.database,
+        )
+    }
+
+    pub fn remove_deposit_from_queue(&mut self, deposit_id: U256) -> Result<(), Error> {
+        self.layered_state
+            .remove_deposit(&deposit_id, &self.database)
+    }
+
+    pub fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
+        self.layered_state.push_withdrawal(withdrawal)
+    }
+
+    pub fn find_deposit_in_queue(
+        &self,
+        deposit_id: &U256,
+    ) -> Result<Option<FaDepositWithProxy>, Error> {
+        if self.layered_state.is_deposit_removed(deposit_id) {
+            return Ok(None);
+        }
+        self.database.deposit_in_queue(deposit_id)
     }
 }

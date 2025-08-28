@@ -9,7 +9,7 @@ use revm::primitives::{Address, U256};
 use rlp::{Decodable, Rlp, RlpDecodable};
 
 #[derive(Debug, RlpDecodable)]
-pub(crate) struct FaDepositWithProxy {
+pub struct FaDepositWithProxy {
     pub amount: PU256,
     pub receiver: H160,
     pub proxy: H160,

@@ -3,10 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{
-    database::PrecompileDatabase, journal::Journal,
-    precompiles::send_outbox_message::Withdrawal,
-};
+use crate::{journal::Journal, precompiles::send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
@@ -37,6 +34,7 @@ use thiserror::Error;
 
 pub mod inspectors;
 pub mod journal;
+pub mod layered_state;
 pub mod precompiles;
 pub mod storage;
 
@@ -310,22 +308,15 @@ pub fn run_transaction<'a, Host: Runtime>(
             spec_id,
         );
 
-        evm.db_mut().initialize_storage()?;
-
         let execution_result = evm.transact_commit(&tx)?;
-
         let withdrawals = evm.db_mut().take_withdrawals();
 
         if !evm.db_mut().commit_status() {
-            // If something went wrong while commiting we drop the state changes
-            // made to the durable storage to avoid ending up in inconsistent state.
-            evm.db_mut().drop_storage()?;
-
+            // No need to revert the possible database changes because
+            // we are in a safe storage.
             return Err(EVMError::Custom(
                 "Comitting ended up in an incorrect state change: reverting.".to_owned(),
             ));
-        } else {
-            evm.db_mut().commit_storage()?;
         }
 
         Ok(ExecutionOutcome {
