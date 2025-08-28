@@ -1107,6 +1107,7 @@ let jobs pipeline_type =
           [
             ("ARCH", arch_string);
             ("MAKE_TARGETS", String.concat " " make_targets);
+            ("DUNE_ARGS", "-j 12");
           ]
         in
 
