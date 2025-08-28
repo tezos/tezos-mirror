@@ -70,31 +70,40 @@ module Node = struct
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
     let* () =
-      let toplog s = toplog "/!\\ %s /!\\" s in
-      toplog "Bootstrapping node using the real world" ;
-      let config =
-        [
-          Network Network.(to_octez_network_options @@ to_public network);
-          Expected_pow 26;
-          Cors_origin "*";
-          Synchronisation_threshold 0;
-        ]
-      in
-      let* () = Node.config_init node config in
-      let* () = import_snapshot ~no_check:true ~name node snapshot in
-      let* () =
-        (* When bootstrapping from the real network, we want to use the real time. *)
-        let env = String_map.(add "FAKETIME" "+0" empty) in
-        run ~env node [Synchronisation_threshold 0]
-      in
-      let* () = wait_for_ready node in
-      let* _new_level = wait_next_level ~offset:2 node in
-      let* () = terminate node in
-      Lwt.return_unit
+      let* version = get_snapshot_info_version node snapshot in
+      if version >= 9 then
+        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let* () = Node.config_init node config in
+        let* () =
+          import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+        in
+        Lwt.return_unit
+      else
+        let toplog s = toplog "/!\\ %s /!\\" s in
+        toplog "Bootstrapping node using the real world" ;
+        let config =
+          [
+            Network Network.(to_octez_network_options @@ to_public network);
+            Expected_pow 26;
+            Cors_origin "*";
+            Synchronisation_threshold 0;
+          ]
+        in
+        let* () = Node.config_init node config in
+        let* () = import_snapshot ~no_check:true ~name node snapshot in
+        let* () =
+          (* When bootstrapping from the real network, we want to use the real time. *)
+          let env = String_map.(add "FAKETIME" "+0" empty) in
+          run ~env node [Synchronisation_threshold 0]
+        in
+        let* () = wait_for_ready node in
+        let* _new_level = wait_next_level ~offset:2 node in
+        let* () = terminate node in
+        toplog "Reset node config for private a yes-crypto network" ;
+        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let* () = Node.config_reset node config in
+        Lwt.return_unit
     in
-    toplog "Reset node config for private a yes-crypto network" ;
-    let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
-    let* () = Node.config_reset node config in
     let* () =
       Node_helpers.may_add_migration_offset_to_config
         node
@@ -131,7 +140,9 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let* () = import_snapshot ~no_check:true ~name node snapshot in
+    let* () =
+      import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
+    in
     let arguments = Node_helpers.isolated_args peers in
     let synchronisation_waiter =
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
@@ -791,7 +802,12 @@ let number_of_bakers ~snapshot ~network ~ppx_profiling ~ppx_profiling_backends:_
       (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
   in
   let* () =
-    Snapshot_helpers.import_snapshot ~no_check:true ~name node snapshot
+    Snapshot_helpers.import_snapshot
+      ~env:yes_crypto_env
+      ~no_check:true
+      ~name
+      node
+      snapshot
   in
   let* () =
     Node.Agent.run node (Node_helpers.isolated_args []) ~ppx_profiling

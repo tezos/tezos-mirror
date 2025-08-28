@@ -90,6 +90,11 @@ let get_snapshot_info_network node snapshot_path =
   | "TEZOS" | _ -> "sandbox")
   |> Lwt.return
 
+let get_snapshot_info_version node snapshot_path =
+  let* info = Node.snapshot_info node ~json:true snapshot_path in
+  let json = JSON.parse ~origin:"snapshot_info" info in
+  Lwt.return JSON.(json |-> "snapshot_header" |-> "version" |> as_int)
+
 let download_snapshot ~agent ~url ~name =
   let downloaded_snapshot_file_path = "snapshot_file" in
   toplog "Trying to download snapshot for %s from %s" name url ;
@@ -139,12 +144,12 @@ let ensure_snapshot ~agent ~name ~network = function
       let* path = ensure_snapshot_opt ~agent ~name snapshot in
       Lwt.return @@ Option.get path
 
-let import_snapshot ?(delete_snapshot_file = false) ~no_check ~name node
+let import_snapshot ?env ?(delete_snapshot_file = false) ~no_check ~name node
     snapshot_file_path =
   toplog "Importing the snapshot for %s" name ;
   let* () =
     try
-      let* () = Node.snapshot_import ~no_check node snapshot_file_path in
+      let* () = Node.snapshot_import ?env ~no_check node snapshot_file_path in
       let () = toplog "Snapshot import succeeded for %s." name in
       let* () =
         if delete_snapshot_file then (
