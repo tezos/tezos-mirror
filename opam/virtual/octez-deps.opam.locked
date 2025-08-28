@@ -84,8 +84,8 @@ depends: [
   "domain-local-await" {= "1.0.1"}
   "domain-name" {= "0.4.1"}
   "domainslib" {= "0.5.2"}
-  "dream" {= "1.0.0~alpha7"}
-  "dream-httpaf" {= "1.0.0~alpha3"}
+  "dream" {= "1.0.0~alpha8-octez"}
+  "dream-httpaf" {= "1.0.0~alpha4-octez"}
   "dream-pure" {= "1.0.0~alpha2"}
   "dune" {= "3.19.1"}
   "dune-build-info" {= "3.19.1"}
@@ -110,6 +110,9 @@ depends: [
   "graphql" {= "0.14.0"}
   "graphql-lwt" {= "0.14.0"}
   "graphql_parser" {= "0.14.0"}
+  "h2" {= "0.13.0"}
+  "h2-lwt" {= "0.13.0"}
+  "h2-lwt-unix" {= "0.13.0"}
   "hacl-star" {= "0.7.2"}
   "hacl-star-raw" {= "0.7.2"}
   "hashcons" {= "1.4.0"}
@@ -301,6 +304,16 @@ conflicts: [
 available: os-family != "windows"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 pin-depends: [
-  "base.v0.16.4"
-  "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
+  [
+    "base.v0.16.4"
+    "git+https://github.com/vch9/base.git#1d0cdedec2a8c63608d3c34531565903d5918ff6"
+  ]
+  [
+    "dream.1.0.0~alpha8-octez"
+    "git+https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee"
+  ]
+  [
+    "dream-httpaf.1.0.0~alpha4-octez"
+    "git+https://github.com/lthms/dream.git#c29c883a8a314bdb5dc90db865797e32cd4f5eee"
+  ]
 ]

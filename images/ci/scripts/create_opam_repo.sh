@@ -33,6 +33,12 @@ echo "Add package: octez-deps"
 mkdir -p opam-repository/packages/octez-deps/octez-deps.dev
 cp octez-deps.opam.locked opam-repository/packages/octez-deps/octez-deps.dev/opam
 
+echo "Add packages: dream-httpaf, dream"
+mkdir -p 'opam-repository/packages/dream-httpaf/dream-httpaf.1.0.0~alpha4-octez'
+cp dream-httpaf.opam.locked 'opam-repository/packages/dream-httpaf/dream-httpaf.1.0.0~alpha4-octez/opam'
+mkdir -p 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez'
+cp dream.opam.locked 'opam-repository/packages/dream/dream.1.0.0~alpha8-octez/opam'
+
 echo "Add package: dummy-tezos"
 # This package adds some constraints to the solution found by the opam solver.
 dummy_pkg=octez-dummy
