@@ -90,6 +90,11 @@ let get_snapshot_info_network node snapshot_path =
   | "TEZOS" | _ -> "sandbox")
   |> Lwt.return
 
+let get_snapshot_info_version node snapshot_path =
+  let* info = Node.snapshot_info node ~json:true snapshot_path in
+  let json = JSON.parse ~origin:"snapshot_info" info in
+  Lwt.return JSON.(json |-> "snapshot_header" |-> "version" |> as_int)
+
 let download_snapshot ~agent ~url ~name =
   let downloaded_snapshot_file_path = "snapshot_file" in
   toplog "Trying to download snapshot for %s from %s" name url ;

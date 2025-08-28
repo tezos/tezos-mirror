@@ -37,6 +37,9 @@ val get_snapshot_info_level : Node.t -> string -> int Lwt.t
 (** Extract the network name associated with a snapshot file. *)
 val get_snapshot_info_network : Node.t -> string -> string Lwt.t
 
+(** Extract the version associated with a snapshot file. *)
+val get_snapshot_info_version : Node.t -> string -> int Lwt.t
+
 (** [download_snapshot ~agent ~url ~name] downloads a snapshot from a given [~url]
     onto an [~agent]. The file is saved in the agent's working directory under [~name]. *)
 val download_snapshot :
