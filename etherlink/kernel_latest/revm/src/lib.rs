@@ -328,6 +328,7 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
+    use alloy_sol_types::SolCall;
     use alloy_sol_types::{ContractError, Revert, RevertReason, SolInterface};
     use nom::AsBytes;
     use primitive_types::H256;
@@ -410,7 +411,7 @@ mod test {
             }
 
             contract FAWithdrawal {
-                function claim(uint256 withdrawal_id) external payable nonReentrant;
+                function claim(uint256 deposit_id) external payable;
             }
         }
     }
@@ -871,7 +872,7 @@ mod test {
 
         // Prepare call to FAWithdrawal claim function
         let calldata = FAWithdrawal::FAWithdrawalCalls::claim(FAWithdrawal::claimCall {
-            withdrawal_id: id,
+            deposit_id: id,
         })
         .abi_encode();
         let call_and_revert_call =
@@ -947,5 +948,73 @@ mod test {
                 .balance,
             default_ticket_balance
         );
+    }
+
+    #[test]
+    fn test_store_and_claim_fa_deposit_wrong_id() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = block_constants_with_no_fees();
+
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+
+        // Initialize dummy deposit, store it in the deposits table with id 1
+
+        let dummy_deposit = FaDepositWithProxy::default();
+
+        let deposit_id = U256::ONE;
+
+        let mut system = world_state_handler
+            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
+            .unwrap();
+
+        system
+            .write_deposit(&mut host, dummy_deposit, deposit_id)
+            .unwrap();
+
+        // Initialize caller with infinite balance to claim deposit
+
+        let initial_balance = U256::MAX;
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: initial_balance,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+
+        let mut caller_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+
+        caller_account.set_info(&mut host, caller_info).unwrap();
+
+        // Claim deposit with id 2 (wrong id), revert is expected
+
+        run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(FA_WITHDRAWAL_SOL_ADDR),
+            FAWithdrawal::claimCall {
+                deposit_id: U256::from(2),
+            }
+            .abi_encode()
+            .into(),
+            30_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            vec![],
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(initial_balance, caller_account.balance(&host).unwrap());
     }
 }
