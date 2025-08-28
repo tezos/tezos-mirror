@@ -8,7 +8,7 @@ use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{Address, U256};
 use rlp::{Decodable, Rlp, RlpDecodable};
 
-#[derive(Debug, RlpDecodable)]
+#[derive(Debug, RlpDecodable, Default)]
 pub struct FaDepositWithProxy {
     pub amount: PU256,
     pub receiver: H160,

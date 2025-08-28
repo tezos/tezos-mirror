@@ -196,3 +196,61 @@ impl LayeredState {
         mem::take(&mut self.etherlink_data)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use revm::primitives::{Address, U256};
+    use tezos_crypto_rs::hash::ContractKt1Hash;
+
+    use crate::{
+        database::DatabasePrecompileStateChanges, helpers::legacy::FaDepositWithProxy,
+        layered_state::LayeredState, Error,
+    };
+
+    struct DummyDB;
+
+    impl DatabasePrecompileStateChanges for DummyDB {
+        fn ticket_balance(
+            &self,
+            _ticket_hash: &U256,
+            _owner: &Address,
+        ) -> Result<U256, Error> {
+            Ok(U256::ZERO)
+        }
+
+        fn deposit_in_queue(
+            &self,
+            _deposit_id: &U256,
+        ) -> Result<Option<FaDepositWithProxy>, Error> {
+            Ok(Some(FaDepositWithProxy::default()))
+        }
+
+        fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
+            ContractKt1Hash::from_base58_check("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")
+                .map_err(|e| Error::Custom(format!("Invalid ticketer address: {e}")))
+        }
+    }
+
+    #[test]
+    fn test_layered_state() {
+        let mut layered_state = LayeredState::new();
+        let dummy_db = DummyDB;
+        let ticket_hash = U256::from(1);
+        let owner = Address::ZERO;
+        let amount = U256::from(3);
+        layered_state.checkpoint();
+        layered_state
+            .ticket_balance_add(&ticket_hash, &owner, amount, &dummy_db)
+            .unwrap();
+        layered_state.checkpoint();
+        layered_state
+            .ticket_balance_add(&ticket_hash, &owner, U256::from(5), &dummy_db)
+            .unwrap();
+        layered_state.checkpoint_revert();
+        let etherlink_data = layered_state.finalize();
+        assert_eq!(
+            etherlink_data.ticket_balances.get(&(owner, ticket_hash)),
+            Some(&amount)
+        );
+    }
+}
