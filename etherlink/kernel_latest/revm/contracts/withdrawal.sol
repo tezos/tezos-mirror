@@ -4,7 +4,11 @@
 
 pragma solidity ^0.8.24;
 
-contract XTZWithdrawal {
+import "./constants.sol";
+import "./interfaces.sol";
+import "./reentrancy_safe.sol";
+
+contract XTZWithdrawal is ReentrancySafe {
     uint256 public withdrawalCounter;
     bool private locked;
 
@@ -24,18 +28,10 @@ contract XTZWithdrawal {
         address l2Caller
     );
 
-    modifier nonReentrant() {
-        require(!locked, "Reentrancy is not allowed");
-        locked = true;
-        _;
-        locked = false;
-    }
-
     // Convert wei to mutez (1 mutez = 10^12 Wei)
     function mutez_from_wei(uint256 weiAmount) private pure returns (uint256) {
-        uint256 factor = 1e12;
-        uint256 mutezAmount = weiAmount / factor;
-        uint256 remainder = weiAmount % factor;
+        uint256 mutezAmount = weiAmount / Constants.mutezFactor;
+        uint256 remainder = weiAmount % Constants.mutezFactor;
 
         require(weiAmount > 0, "Amount is zero");
         require(
@@ -45,27 +41,27 @@ contract XTZWithdrawal {
         return mutezAmount;
     }
 
+    /// @notice Perform a standard XTZ withdrawal using a Base58-encoded target.
+    /// @param target The Base58-encoded recipient or destination address.
     function withdraw_base58(
         string memory target
     ) external payable nonReentrant {
-        // Outbox precompile is known
-        address outboxSender = 0xFF00000000000000000000000000000000000003;
-
         // Retrieve withdrawn value
         uint256 weiAmount = msg.value;
         uint256 mutezAmount = mutez_from_wei(weiAmount);
 
         // Call push_withdrawal_to_outbox
-        bytes memory outboxData = abi.encodeWithSignature(
-            "push_withdrawal_to_outbox(string,uint256)",
-            target,
-            mutezAmount
+        bytes memory outboxData = abi.encodeCall(
+            IOutbox.push_withdrawal_to_outbox,
+            (target, mutezAmount)
         );
-        (bool ok, bytes memory receiver) = outboxSender.call(outboxData);
-        require(ok, "Call to the outbox sender failed");
+        (bool outboxSuccess, bytes memory receiver) = Constants
+            .outboxSender
+            .call(outboxData);
+        require(outboxSuccess, "Call to the outbox sender failed");
 
-        // Burn (send to address(0))
-        (bool sent, ) = address(0).call{value: weiAmount}("");
+        // Burn (send to burnAddress)
+        (bool sent, ) = Constants.burnAddress.call{value: weiAmount}("");
         require(sent, "Failed to burn");
 
         // Emit withdrawal event
@@ -80,32 +76,37 @@ contract XTZWithdrawal {
         withdrawalCounter++;
     }
 
+    /// @notice Perform a fast XTZ withdrawal using a Base58-encoded target and contract.
+    /// @param target The Base58-encoded recipient or destination address.
+    /// @param fastWithdrawalContract The Base58-encoded fast withdrawal lending contract to interact with.
+    /// @param payload Arbitrary payload data to send to the fast withdrawal contract.
     function fast_withdraw_base58(
         string memory target,
         string memory fastWithdrawalContract,
         bytes memory payload
     ) external payable nonReentrant {
-        // Outbox precompile is known
-        address outboxSender = 0xFF00000000000000000000000000000000000003;
-
         // Retrieve withdrawn value
         uint256 weiAmount = msg.value;
         uint256 mutezAmount = mutez_from_wei(weiAmount);
 
         // Call push_fast_withdrawal_to_outbox
-        bytes memory outboxData = abi.encodeWithSignature(
-            "push_fast_withdrawal_to_outbox(string,string,bytes,uint256,uint256)",
-            target,
-            fastWithdrawalContract,
-            payload,
-            mutezAmount,
-            withdrawalCounter
+        bytes memory outboxData = abi.encodeCall(
+            IOutbox.push_fast_withdrawal_to_outbox,
+            (
+                target,
+                fastWithdrawalContract,
+                payload,
+                mutezAmount,
+                withdrawalCounter
+            )
         );
-        (bool ok, bytes memory receiver) = outboxSender.call(outboxData);
-        require(ok, "Call to the outbox sender failed");
+        (bool outboxSuccess, bytes memory receiver) = Constants
+            .outboxSender
+            .call(outboxData);
+        require(outboxSuccess, "Call to the outbox sender failed");
 
-        // Burn (send to address(0))
-        (bool sent, ) = address(0).call{value: weiAmount}("");
+        // Burn (send to burnAddress)
+        (bool sent, ) = Constants.burnAddress.call{value: weiAmount}("");
         require(sent, "Failed to burn");
 
         // Emit fast withdrawal event
