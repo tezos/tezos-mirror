@@ -78,6 +78,12 @@ Operations
   key)<tz4_accounts>`. This results in an increase of gas cost
   per reveal of a tz4 public key. (MR :gl:`!18095`)
 
+.. warning::
+
+   Introduction of this new optional field might still lead to breaking changes
+   for tool providers see :doc:`breaking changes
+   <../introduction/breaking_changes>`.
+
 - The optional ``proof`` field of the ``Update_consensus_key``
   operation is now required if (and only if) the new consensus key is
   a :ref:`tz4 (BLS key)<tz4_accounts>`. Its encoding now

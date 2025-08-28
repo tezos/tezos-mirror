@@ -43,6 +43,11 @@ Version 23 contains client commands and node RPCs that support `Tz4 delegates <h
 
 See https://forum.tezosagora.org/t/heads-up-native-multisig-accounts-in-protocol-proposal-s/6805 to learn more
 
+.. warning::
+
+   Introduction of this feature needed some breaking changes for tool providers see :doc:`breaking
+   changes <../introduction/breaking_changes>`.
+
 .. _snapshot_v23:
 
 Snapshot version
