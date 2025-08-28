@@ -735,6 +735,10 @@ module type Layer1 = sig
 
   val vms_config : string option
 
+  val without_dal : bool
+
+  val dal_producers_slot_indices : int list option
+
   val ppx_profiling : bool
 
   val ppx_profiling_backends : string list
@@ -746,6 +750,8 @@ module Layer1_default = struct
   let default_ppx_profiling = false
 
   let default_ppx_profiling_backends = []
+
+  let default_without_dal = false
 end
 
 module Layer1 () = struct
@@ -893,6 +899,25 @@ module Layer1 () = struct
       ~description:
         "JSON file optionally describing options for each VM involved in the \
          test"
+      ()
+
+  let without_dal =
+    Clap.flag
+      ~section
+      ~set_long:"without-dal"
+      ~description:
+        "Disable running DAL nodes on bootstrap and bakers nodes. It is set to \
+         `false` by default."
+      Layer1_default.default_without_dal
+
+  let dal_producers_slot_indices =
+    Clap.optional
+      ~section
+      ~long:"producer-slot-indices"
+      ~description:
+        "Specify the slot indices for DAL producers to run. The number of DAL \
+         producers run is the size of the list."
+      (Clap.list_of_int ~dummy:[] "producer_slot_indices")
       ()
 
   let ppx_profiling =
