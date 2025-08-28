@@ -258,12 +258,16 @@ end
 
 (** Expose the elements of [Cli] which are useful for the scenario. *)
 module Tezt_cloud_cli : sig
+  module Types : module type of Cli.Types
+
   val prometheus : bool
 
   val scenario_specific_json : (string * Data_encoding.Json.t) option
 
   (** Equivalent to [Cli.retrieve_daily_logs] *)
-  val retrieve_daily_logs : string option
+  val retrieve_daily_logs : bool
+
+  val artifacts_dir : string option
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

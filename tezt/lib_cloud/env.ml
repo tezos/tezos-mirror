@@ -117,6 +117,8 @@ let tc_delay = Cli.tc_delay
 
 let tc_jitter = Cli.tc_jitter
 
+let artifacts_dir = Cli.artifacts_dir
+
 let init () =
   if tezt_cloud = "" then
     Test.fail

@@ -148,13 +148,16 @@ val binaries_path : string
 val log_rotation : int
 
 (* Daily log path retrieval if set. *)
-val retrieve_daily_logs : string option
+val retrieve_daily_logs : bool
 
 (** Boundaries used for setting a random network latency on docker containers. *)
 val tc_delay : (float * float) option
 
 (** Boundaries used for setting a random network jitter on docker containers. *)
 val tc_jitter : (float * float) option
+
+(* Artifact path retrieval if set. *)
+val artifacts_dir : string option
 
 (** The hostname of the host accessed by ssh on which to deploy *)
 val ssh_host : string option
@@ -167,3 +170,7 @@ val slack_channel_id : string option
 
 (** Slack authentication token to allow publication *)
 val slack_bot_token : string option
+
+module Types : sig
+  val dir_typ : name:string -> cli_parameter:string -> string option Clap.typ
+end

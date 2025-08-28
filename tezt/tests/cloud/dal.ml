@@ -1336,7 +1336,9 @@ let register (module Cli : Scenarios_cli.Dal) =
     let ppx_profiling = Cli.ppx_profiling in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
-    let daily_logs_destination = Tezt_cloud_cli.retrieve_daily_logs in
+    let daily_logs_destination =
+      Option.map (fun dir -> dir // "daily_logs") Tezt_cloud_cli.artifacts_dir
+    in
     let t =
       {
         with_dal;

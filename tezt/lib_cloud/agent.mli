@@ -51,7 +51,7 @@ module Configuration : sig
 end
 
 (** [make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
-    ~daily_logs_dir ()] creates an [agent] from the given parameters.
+    ~artifacts_dir ()] creates an [agent] from the given parameters.
     [~next_available_port] should always provide an available port or raise
     [Not_found] otherwise. [~vm_name] is the name of the VM. [?ssh_id] and
     [?point] are used to potentially create a [runner] for the [agent].
@@ -64,7 +64,7 @@ val make :
   next_available_port:(unit -> int) ->
   vm_name:string option ->
   process_monitor:Process_monitor.t option ->
-  daily_logs_dir:string option ->
+  artifacts_dir:string option ->
   unit ->
   t
 
@@ -90,8 +90,8 @@ val runner : t -> Runner.t option
 (** [configuration t] the configuration of the agent. *)
 val configuration : t -> Configuration.t
 
-(** [daily_logs_dir agent] daily logs directory associated to the agent. *)
-val daily_logs_dir : t -> string option
+(** [artifacts_dir agent] artifacts directory associated to the agent. *)
+val artifacts_dir : t -> string option
 
 (** A wrapper to run a command on the VM of the agent. *)
 val cmd_wrapper : t -> Gcloud.cmd_wrapper option

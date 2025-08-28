@@ -69,7 +69,7 @@ type t = {
   configuration : Configuration.t;
   process_monitor : Process_monitor.t option;
   service_manager : Service_manager.t option;
-  daily_logs_dir : string option;
+  artifacts_dir : string option;
   mutable on_shutdown : (unit -> unit Lwt.t) list;
 }
 
@@ -89,7 +89,7 @@ let encoding =
            configuration;
            process_monitor;
            service_manager = _;
-           daily_logs_dir;
+           artifacts_dir;
            on_shutdown = _;
          }
        ->
@@ -99,14 +99,14 @@ let encoding =
         next_available_port (),
         configuration,
         process_monitor,
-        daily_logs_dir ))
+        artifacts_dir ))
     (fun ( vm_name,
            zone,
            point,
            next_available_port,
            configuration,
            process_monitor,
-           daily_logs_dir )
+           artifacts_dir )
        ->
       let next_available_port =
         let current_port = ref (next_available_port - 1) in
@@ -147,7 +147,7 @@ let encoding =
         configuration;
         process_monitor;
         service_manager = None;
-        daily_logs_dir;
+        artifacts_dir;
         on_shutdown =
           [] (* As of now, this encoding is only used when reattaching *);
       })
@@ -158,7 +158,7 @@ let encoding =
        (req "next_available_port" int31)
        (req "configuration" Configuration.encoding)
        (opt "process_monitor" Process_monitor.encoding)
-       (opt "daily_logs_dir" string))
+       (opt "artifacts_dir" string))
 
 (* Getters *)
 
@@ -174,10 +174,10 @@ let runner {runner; _} = runner
 
 let configuration {configuration; _} = configuration
 
-let daily_logs_dir {daily_logs_dir; _} = daily_logs_dir
+let artifacts_dir {artifacts_dir; _} = artifacts_dir
 
 let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
-    ~process_monitor ~daily_logs_dir () =
+    ~process_monitor ~artifacts_dir () =
   let ssh_user = "root" in
   let runner =
     match (point, ssh_id) with
@@ -203,7 +203,7 @@ let make ?zone ?ssh_id ?point ~configuration ~next_available_port ~vm_name
     zone;
     process_monitor;
     service_manager = Service_manager.init () |> Option.some;
-    daily_logs_dir;
+    artifacts_dir;
     on_shutdown = [];
   }
 
