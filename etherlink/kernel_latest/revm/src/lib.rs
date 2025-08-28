@@ -3,7 +3,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{database::PrecompileDatabase, precompiles::send_outbox_message::Withdrawal};
+use crate::{
+    database::PrecompileDatabase, journal::Journal,
+    precompiles::send_outbox_message::Withdrawal,
+};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
@@ -24,7 +27,7 @@ use revm::{
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
-    Context, ExecuteCommitEvm, InspectEvm, Journal, MainBuilder,
+    Context, ExecuteCommitEvm, InspectEvm, MainBuilder,
 };
 use storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::block::BlockConstants;
@@ -33,6 +36,7 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
 pub mod inspectors;
+pub mod journal;
 pub mod precompiles;
 pub mod storage;
 
@@ -166,8 +170,13 @@ fn get_inspector_from(
     }
 }
 
-type EVMInnerContext<'a, Host> =
-    Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>;
+type EVMInnerContext<'a, Host> = Context<
+    &'a BlockEnv,
+    &'a TxEnv,
+    CfgEnv,
+    EtherlinkVMDB<'a, Host>,
+    Journal<EtherlinkVMDB<'a, Host>>,
+>;
 
 type EvmContext<'a, Host> = Evm<
     EVMInnerContext<'a, Host>,
