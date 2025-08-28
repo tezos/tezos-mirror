@@ -25,7 +25,12 @@ Backward compatibility
 
 Most of the changes in the encodings of existing operations are either purely added operations (e.g. ``update_companion_key``) or optional fields that should not break (e.g., for operations ``reveal`` and ``update_consensus_key``).
 
-However, tool providers who do not use encodings but rather :doc:`p2p message format <../shell/p2p_api>`, may experience some issues.
+.. warning::
+
+  However, tool providers which do not use encodings but rather :doc:`p2p message
+  format <../shell/p2p_api>` may experience some issues. For example, the ``reveal``
+  operation has a new boolean field to mark the presence of the optional ``proof`` for
+  tz4 revelation.
 
 Breaking changes
 ~~~~~~~~~~~~~~~~
