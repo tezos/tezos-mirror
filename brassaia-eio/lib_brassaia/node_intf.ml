@@ -130,12 +130,12 @@ module type Core = sig
       well). *)
 
   (** The type for read effects. *)
-  type effect := expected_depth:int -> node_key -> t option
+  type read_effect := expected_depth:int -> node_key -> t option
 
   (** [with_handler f] replace the current effect handler [h] by [f h]. [f h]
       will be called for all the recursive read effects that are required by
       recursive operations on nodes. .*)
-  val with_handler : (effect -> effect) -> t -> t
+  val with_handler : (read_effect -> read_effect) -> t -> t
 
   type head :=
     [`Node of (Path.step * value) list | `Inode of int * (int * hash) list]

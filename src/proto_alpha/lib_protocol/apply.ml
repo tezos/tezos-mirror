@@ -2563,8 +2563,8 @@ let punish_double_signing ctxt ~operation_hash delegate level misbehaviour
   in
   return (ctxt, contents_result)
 
-let punish_double_consensus_operation (type kind) ctxt ~operation_hash
-    ~payload_producer contents =
+let punish_double_consensus_operation ctxt ~operation_hash ~payload_producer
+    contents =
   let open Lwt_result_syntax in
   let (Double_consensus_operation_evidence {slot; op1; op2 = _}) = contents in
   let misbehaviour =
