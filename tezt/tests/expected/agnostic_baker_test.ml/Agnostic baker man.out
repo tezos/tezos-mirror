@@ -50,6 +50,9 @@ Global options (must come before the command):
     node
   --log-coloring <true|false>: Enable or disable light coloring in default
     stdout logs. Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified
+    with TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is
+    insecure and should never be used in production.
 
 ./octez-baker --help
 Usage:
@@ -102,6 +105,9 @@ Global options (must come before the command):
     node
   --log-coloring <true|false>: Enable or disable light coloring in default
     stdout logs. Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified
+    with TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is
+    insecure and should never be used in production.
 
 ./octez-baker man
 Usage:
@@ -154,6 +160,9 @@ Global options (must come before the command):
     node
   --log-coloring <true|false>: Enable or disable light coloring in default
     stdout logs. Coloring is enabled by default.
+  --allow-fixed-random-seed: Allow the use of a fixed random seed specified
+    with TEZOS_CLIENT_FIXED_RANDOM_SEED for testing purposes. This is
+    insecure and should never be used in production.
 
 Access the documentation:
 
