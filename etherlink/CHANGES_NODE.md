@@ -12,6 +12,8 @@
   average time to process these requests by up to 5 times. (!18989)
 - Delays broadcasting blueprints through the `/evm/messages` streamed RPC until
   after the blueprints have been committed to disk. (!18989)
+- Remove fallback for `/evm/v2/blueprint/` and `/evm/v2/blueprints/range` making
+  version 0.30 deprecated.
 
 ### Metrics changes
 
