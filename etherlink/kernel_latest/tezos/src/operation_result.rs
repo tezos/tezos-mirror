@@ -14,6 +14,7 @@ use tezos_data_encoding::enc as tezos_enc;
 use tezos_data_encoding::nom as tezos_nom;
 use tezos_data_encoding::nom::error::DecodeError;
 use tezos_data_encoding::types::Narith;
+use tezos_data_encoding::types::Zarith;
 use tezos_enc::BinWriter;
 use tezos_nom::NomReader;
 use tezos_smart_rollup::types::Contract;
@@ -375,8 +376,8 @@ pub struct OriginationSuccess {
     #[encoding(dynamic, list)]
     pub originated_contracts: Vec<Originated>,
     pub consumed_gas: Narith,
-    pub storage_size: Narith,
-    pub paid_storage_size_diff: Narith,
+    pub storage_size: Zarith,
+    pub paid_storage_size_diff: Zarith,
     // TODO: Placeholder for lazy storage diff issue : #8018
     pub lazy_storage_diff: Option<()>,
 }
@@ -393,8 +394,8 @@ pub struct TransferSuccess {
     #[encoding(dynamic, bytes)]
     pub originated_contracts: Vec<u8>,
     pub consumed_gas: Narith,
-    pub storage_size: Narith,
-    pub paid_storage_size_diff: Narith,
+    pub storage_size: Zarith,
+    pub paid_storage_size_diff: Zarith,
     pub allocated_destination_contract: bool,
     // TODO: Placeholder for lazy storage diff issue : #8018
     pub lazy_storage_diff: Option<()>,

@@ -82,6 +82,30 @@ impl From<&Zarith> for BigInt {
     }
 }
 
+impl From<i32> for Zarith {
+    fn from(value: i32) -> Self {
+        Zarith(value.into())
+    }
+}
+
+impl From<u64> for Zarith {
+    fn from(value: u64) -> Self {
+        Zarith(value.into())
+    }
+}
+
+impl From<num_bigint::BigUint> for Zarith {
+    fn from(from: num_bigint::BigUint) -> Self {
+        Zarith(num_bigint::BigInt::from(from))
+    }
+}
+
+impl From<Narith> for Zarith {
+    fn from(from: Narith) -> Self {
+        Zarith(num_bigint::BigInt::from(from.0))
+    }
+}
+
 has_encoding!(Zarith, ZARITH_ENCODING, { Encoding::Z });
 
 /// Mutez number
