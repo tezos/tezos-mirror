@@ -23,6 +23,7 @@ module DAL = struct
     producer_machine_type : string option;
     observer_slot_indices : int list;
     observers_multi_slot_indices : int list list;
+    archivers_slot_indices : int list list;
     observer_pkhs : string list;
     protocol : Protocol.t option;
     data_dir : string option;
@@ -80,6 +81,7 @@ module DAL = struct
              producer_machine_type;
              observer_slot_indices;
              observers_multi_slot_indices;
+             archivers_slot_indices;
              observer_pkhs;
              protocol;
              data_dir;
@@ -127,6 +129,7 @@ module DAL = struct
                   producer_machine_type,
                   observer_slot_indices,
                   observers_multi_slot_indices,
+                  archivers_slot_indices,
                   observer_pkhs ),
                 (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
             ( ( etherlink_producers,
@@ -166,6 +169,7 @@ module DAL = struct
                      producer_machine_type,
                      observer_slot_indices,
                      observers_multi_slot_indices,
+                     archivers_slot_indices,
                      observer_pkhs ),
                    (protocol, data_dir, etherlink, etherlink_sequencer) ) ),
                ( ( etherlink_producers,
@@ -207,6 +211,7 @@ module DAL = struct
           producer_machine_type;
           observer_slot_indices;
           observers_multi_slot_indices;
+          archivers_slot_indices;
           observer_pkhs;
           protocol;
           data_dir;
@@ -252,13 +257,14 @@ module DAL = struct
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
                (merge_objs
-                  (obj7
+                  (obj8
                      (dft "dal_producers_slot_indices" (list int31) [])
                      (opt "producers" int31)
                      (opt "producers_delay" int31)
                      (opt "producer_machine_type" string)
                      (dft "observer_slot_indices" (list int31) [])
                      (dft "observers_multi_slot_indices" (list (list int31)) [])
+                     (dft "archivers_slot_indices" (list (list int31)) [])
                      (dft "observer_pkhs" (list string) []))
                   (obj4
                      (opt "protocol" Protocol.encoding)

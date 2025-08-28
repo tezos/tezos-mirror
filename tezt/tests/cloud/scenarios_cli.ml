@@ -99,6 +99,8 @@ module type Dal = sig
 
   val observers_multi_slot_indices : int list list
 
+  val archivers_slot_indices : int list list
+
   val observer_pkhs : string list
 
   val protocol : Protocol.t
@@ -403,6 +405,17 @@ module Dal () : Dal = struct
         ~description:
           "For each list of slots, an observer will be created to observe them."
         (Clap.list_of_list_of_int "observer_multi_slot_indices")
+        []
+
+  let archivers_slot_indices =
+    config.archivers_slot_indices
+    @ Clap.default
+        ~section
+        ~long:"archivers-slot-indices"
+        ~placeholder:"[<slot_index>;..],[<slot_index>;...],..."
+        ~description:
+          "For each list of slots, an operator will be created to observe them."
+        (Clap.list_of_list_of_int "archivers_slot_indices")
         []
 
   let observer_pkhs =

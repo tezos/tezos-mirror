@@ -22,6 +22,7 @@ type configuration = {
   dal_node_producers : int list; (* slot indices *)
   observer_slot_indices : int list;
   observers_multi_slot_indices : int list list;
+  archivers_slot_indices : int list list;
   observer_pkhs : string list;
   protocol : Protocol.t;
   producer_machine_type : string option;
@@ -77,6 +78,7 @@ type t = {
   producers : Dal_node_helpers.producer list;
       (* NOTE: they have the observer profile*)
   observers : Dal_node_helpers.observer list;
+  archivers : Dal_node_helpers.archiver list;
   etherlink : Etherlink_helpers.etherlink option;
   echo_rollups : Echo_rollup.operator list;
   time_between_blocks : int;
@@ -816,16 +818,18 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
 let obtain_some_node_rpc_endpoint agent network (bootstrap : bootstrap)
     (bakers : Baker_helpers.baker list)
     (producers : Dal_node_helpers.producer list)
-    (observers : Dal_node_helpers.observer list) etherlink =
+    (observers : Dal_node_helpers.observer list)
+    (archivers : Dal_node_helpers.archiver list) etherlink =
   match (agent, network) with
   | None, #Network.public -> (
-      match (bakers, producers, observers, etherlink) with
-      | baker :: _, _, _, _ -> Node.as_rpc_endpoint baker.node
-      | [], producer :: _, _, _ -> Node.as_rpc_endpoint producer.node
-      | [], [], observer :: _, _ -> Node.as_rpc_endpoint observer.node
-      | [], [], [], Some etherlink ->
+      match (bakers, producers, observers, archivers, etherlink) with
+      | baker :: _, _, _, _, _ -> Node.as_rpc_endpoint baker.node
+      | [], producer :: _, _, _, _ -> Node.as_rpc_endpoint producer.node
+      | [], [], observer :: _, _, _ -> Node.as_rpc_endpoint observer.node
+      | [], [], [], archiver :: _, _ -> Node.as_rpc_endpoint archiver.node
+      | [], [], [], [], Some etherlink ->
           Node.as_rpc_endpoint etherlink.Etherlink_helpers.operator.node
-      | [], [], [], None -> bootstrap.node_rpc_endpoint)
+      | [], [], [], [], None -> bootstrap.node_rpc_endpoint)
   | _ -> bootstrap.node_rpc_endpoint
 
 let init ~(configuration : configuration) etherlink_configuration cloud
@@ -862,6 +866,14 @@ let init ~(configuration : configuration) etherlink_configuration cloud
         let* agent = next_agent ~name in
         return (`Slot_indexes slot_indexes, agent))
       configuration.observers_multi_slot_indices
+  in
+  let* archivers_slot_index_agents =
+    Lwt_list.map_s
+      (fun slot_indexes ->
+        let name = name_of (Archiver (`Indexes slot_indexes)) in
+        let* agent = next_agent ~name in
+        return (`Slot_indexes slot_indexes, agent))
+      configuration.archivers_slot_indices
   in
   let* observers_bakers_agents =
     Lwt_list.map_s
@@ -959,6 +971,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~disable_shard_validation:configuration.disable_shard_validation
+            (* TODO one shot stuff, do a proper config *)
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
           ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
           teztale
@@ -967,6 +980,28 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           agent)
       (observers_slot_index_agents @ observers_multi_slot_index_agents
      @ observers_bakers_agents)
+  and* archivers =
+    Lwt_list.mapi_p
+      (fun i (topic, agent) ->
+        Dal_node_helpers.init_archiver
+          cloud
+          ~data_dir:configuration.data_dir
+          ~simulate_network:configuration.simulate_network
+          ~external_rpc:configuration.external_rpc
+          ~network:configuration.network
+          ~snapshot:configuration.snapshot
+          ~memtrace:configuration.memtrace
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+          ~ppx_profiling_backends:configuration.ppx_profiling_backends
+          ~disable_shard_validation:configuration.disable_shard_validation
+            (* TODO one shot stuff, do a proper config *)
+          ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
+          ~dal_node_p2p_endpoint:bootstrap.dal_node_p2p_endpoint
+          teztale
+          ~topic
+          i
+          agent)
+      archivers_slot_index_agents
   in
   let () = toplog "Init: all producers and observers have been initialized" in
   let* echo_rollups =
@@ -1016,6 +1051,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       bakers
       producers
       observers
+      archivers
       etherlink
   in
   let* constants =
@@ -1068,6 +1104,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       bakers;
       producers;
       observers;
+      archivers;
       echo_rollups;
       etherlink;
       time_between_blocks;
@@ -1249,6 +1286,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     in
     let observer_slot_indices = Cli.observer_slot_indices in
     let observers_multi_slot_indices = Cli.observers_multi_slot_indices in
+    let archivers_slot_indices = Cli.archivers_slot_indices in
     let observer_pkhs = Cli.observer_pkhs in
     let protocol = Cli.protocol in
     let producer_machine_type = Cli.producer_machine_type in
@@ -1316,6 +1354,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         dal_node_producers;
         observer_slot_indices;
         observers_multi_slot_indices;
+        archivers_slot_indices;
         observer_pkhs;
         protocol;
         producer_machine_type;
@@ -1372,6 +1411,9 @@ let register (module Cli : Scenarios_cli.Dal) =
            List.map
              (fun index -> Observer (`Indexes [index]))
              configuration.observer_slot_indices;
+           List.map
+             (fun indexes -> Archiver (`Indexes indexes))
+             configuration.archivers_slot_indices;
            List.map (fun pkh -> Observer (`Pkh pkh)) configuration.observer_pkhs;
            (if etherlink_configuration <> None then [Etherlink_operator] else []);
            (match etherlink_configuration with
@@ -1424,8 +1466,8 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Producer _ ->
                let machine_type = configuration.producer_machine_type in
                Agent.Configuration.make ?docker_image ?machine_type ~name ()
-           | Observer _ | Etherlink_dal_operator | Etherlink_dal_observer _
-           | Echo_rollup_dal_observer _ ->
+           | Observer _ | Archiver _ | Etherlink_dal_operator
+           | Etherlink_dal_observer _ | Echo_rollup_dal_observer _ ->
                Agent.Configuration.make ?docker_image ~name ()
            | Echo_rollup_operator _ -> default_vm_configuration ~name
            | Etherlink_operator -> default_vm_configuration ~name

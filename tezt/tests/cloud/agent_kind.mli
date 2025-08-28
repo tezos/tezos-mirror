@@ -21,6 +21,8 @@ type t =
   | Producer of int  (** A DAL slot producer node, identified by index. *)
   | Observer of [`Indexes of int list | `Pkh of string]
       (** A DAL observer node, either indexed or associated with a public key hash. *)
+  | Archiver of [`Indexes of int list]
+      (** A DAL archiver node, identified by indexes. *)
   | Reverse_proxy
       (** A reverse proxy between rollup nodes and multiple DAL nodes. *)
   | Etherlink_operator  (** The main Etherlink rollup operator node. *)
@@ -43,6 +45,8 @@ val rex_producer_index : rex
 val rex_observer_indexes : rex
 
 val rex_observer_pkh : rex
+
+val rex_archiver_indexes : rex
 
 val rex_reverse_proxy : rex
 
@@ -80,6 +84,8 @@ type daemon =
   | Producer_dal_node of int
   | Observer_l1_node of int
   | Observer_dal_node of int
+  | Archiver_l1_node of int
+  | Archiver_dal_node of int
   | Echo_rollup_node of string
   | Etherlink_sc_rollup_node of string
   | Etherlink_evm_node of string
