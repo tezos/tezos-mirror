@@ -53,12 +53,23 @@ let pk_json (alias, _pkh, pk, _ck) =
    ed25519 pk sk : 32+1 bytes
 *)
 
-let sk_of_pk (pk_s : string) : string =
+let fake_sk_of_pk (pk_s : string) : string =
   let open Tezos_crypto.Signature.V_latest in
   let pk = Public_key.of_b58check_exn pk_s in
   let pk_b = Data_encoding.Binary.to_bytes_exn Public_key.encoding pk in
-  let sk_b = Bytes.sub pk_b 0 33 in
-  let sk = Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b in
+  let sk : Signature.Secret_key.t =
+    match pk with
+    | Ed25519 _ | Secp256k1 _ | P256 _ ->
+        let sk_b = Bytes.sub pk_b 0 33 in
+        (* Extracting fake secret key from the associated public key.*)
+        Data_encoding.Binary.of_bytes_exn Secret_key.encoding sk_b
+    | Bls _ ->
+        (* For BLS we cannot easily encode secret key from public key bytes. It
+           is simpler to generate a new random secret key with the public key as
+           seed. *)
+        let sk = Bls12_381_signature.generate_sk pk_b in
+        Bls sk
+  in
   let sk_s = Secret_key.to_b58check sk in
   sk_s
 
@@ -66,7 +77,8 @@ let sk_json (alias, _pkh, pk, _ck) =
   Ezjsonm.(
     dict
       [
-        ("name", string alias); ("value", string @@ "unencrypted:" ^ sk_of_pk pk);
+        ("name", string alias);
+        ("value", string @@ "unencrypted:" ^ fake_sk_of_pk pk);
       ])
 
 let ck_json (alias, pkh, _pk, ck) =
