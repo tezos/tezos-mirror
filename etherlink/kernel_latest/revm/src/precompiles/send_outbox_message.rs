@@ -112,7 +112,7 @@ pub enum Withdrawal {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum SendOutboxError {
+pub enum SendOutboxRevertReason {
     #[error("Custom decode error: {0}")]
     CustomDecode(String),
 
@@ -138,15 +138,15 @@ pub enum SendOutboxError {
     DatabaseAccess(#[from] crate::Error),
 }
 
-impl<'a> From<nom::Err<DecodeError<&'a [u8]>>> for SendOutboxError {
+impl<'a> From<nom::Err<DecodeError<&'a [u8]>>> for SendOutboxRevertReason {
     fn from(e: nom::Err<DecodeError<&'a [u8]>>) -> Self {
-        SendOutboxError::GenericContractDecode(e.to_string())
+        SendOutboxRevertReason::GenericContractDecode(e.to_string())
     }
 }
 
-impl From<Vec<u8>> for SendOutboxError {
+impl From<Vec<u8>> for SendOutboxRevertReason {
     fn from(e: Vec<u8>) -> Self {
-        SendOutboxError::IntoFixedInvalidSize(e.len())
+        SendOutboxRevertReason::IntoFixedInvalidSize(e.len())
     }
 }
 
@@ -234,18 +234,18 @@ fn prepare_message(
 
 fn parse_l1_routing_info(
     routing_info: &[u8],
-) -> Result<(Contract, Contract), SendOutboxError> {
+) -> Result<(Contract, Contract), SendOutboxRevertReason> {
     let (rest, receiver) = Contract::nom_read(routing_info)?;
     let (rest, proxy) = Contract::nom_read(rest)?;
 
     if let Contract::Implicit(_) = proxy {
-        return Err(SendOutboxError::CustomDecode(
+        return Err(SendOutboxRevertReason::CustomDecode(
             "Proxy address must be an originated contract".to_string(),
         ));
     }
 
     if !rest.is_empty() {
-        return Err(SendOutboxError::CustomDecode(
+        return Err(SendOutboxRevertReason::CustomDecode(
             "Remaining bytes after routing info consumer".to_string(),
         ));
     }
@@ -253,39 +253,15 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-pub(crate) fn send_outbox_message_precompile<CTX>(
+fn send_outbox_methods<CTX>(
     input: &[u8],
     context: &mut CTX,
-    is_static: bool,
-    transfer: &InputsImpl,
-    gas_limit: u64,
-) -> Result<InterpreterResult, SendOutboxError>
+) -> Result<Bytes, SendOutboxRevertReason>
 where
     CTX: ContextTr,
     CTX::Db: PrecompileDatabase,
 {
-    if transfer.target_address != SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS {
-        return Ok(revert("invalid transfer target address"));
-    }
-
-    if is_static {
-        return Ok(revert("static calls are not allowed"));
-    }
-
-    if !matches!(
-        transfer.caller_address,
-        WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
-    ) {
-        return Ok(revert("unauthorized caller"));
-    }
-
-    let mut gas = Gas::new(gas_limit);
-
-    if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
-        return Ok(revert("base cost is not covered"));
-    }
-
-    let output = match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
+    match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
             SendOutboxMessage::push_withdrawal_to_outboxCall { target, amount },
         ) => {
@@ -295,6 +271,8 @@ where
                 Sign::Plus,
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
+
+            // Previous parsing step prevents failure on returned values
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
 
@@ -311,7 +289,7 @@ where
                 destination,
             );
             context.db_mut().push_withdrawal(withdrawal);
-            Bytes::from(fixed_target)
+            Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_withdrawal_to_outbox(
             SendOutboxMessage::push_fast_withdrawal_to_outboxCall {
@@ -331,9 +309,11 @@ where
                 &amount.to_be_bytes::<{ U256::BYTES }>(),
             );
             let withdrawal_id = MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
-                .ok_or(SendOutboxError::CustomDecode(
+                .ok_or(SendOutboxRevertReason::CustomDecode(
                     "Negative withdrawal ID".to_string(),
                 ))?;
+
+            // Previous parsing step prevents failure on returned values
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
 
@@ -355,7 +335,7 @@ where
                 fast_withdrawal_contract,
             );
             context.db_mut().push_withdrawal(withdrawal);
-            Bytes::from(fixed_target)
+            Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fa_withdrawal_to_outbox(
             SendOutboxMessage::push_fa_withdrawal_to_outboxCall {
@@ -376,6 +356,8 @@ where
                 MichelsonNat,
                 MichelsonOption<MichelsonBytes>,
             >::nom_read(&content)?;
+
+            // Previous parsing step prevents failure on returns values
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
             let fixed_proxy: FixedBytes<22> =
@@ -395,7 +377,7 @@ where
                 proxy: fixed_proxy,
             };
             context.db_mut().push_withdrawal(withdrawal);
-            Bytes::copy_from_slice(&routing_info.abi_encode())
+            Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_fa_withdrawal_to_outbox(
             SendOutboxMessage::push_fast_fa_withdrawal_to_outboxCall {
@@ -422,9 +404,11 @@ where
             let fast_withdrawal_contract =
                 Contract::from_b58check(&fast_withdrawal_contract_address)?;
             let withdrawal_id = MichelsonNat::new(Zarith(u256_to_bigint(withdrawal_id)))
-                .ok_or(SendOutboxError::CustomDecode(
+                .ok_or(SendOutboxRevertReason::CustomDecode(
                     "Negative withdrawal ID".to_string(),
                 ))?;
+
+            // Previous parsing step prevents failure on returned values
             let fixed_target: FixedBytes<22> =
                 FixedBytes::new(target.to_bytes()?.try_into()?);
             let fixed_proxy: FixedBytes<22> =
@@ -450,13 +434,49 @@ where
                 proxy: fixed_proxy,
             };
             context.db_mut().push_withdrawal(withdrawal);
-            Bytes::copy_from_slice(&routing_info.abi_encode())
+            Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
-    };
+    }
+}
 
-    Ok(InterpreterResult {
-        result: InstructionResult::Return,
-        gas,
-        output,
-    })
+pub(crate) fn send_outbox_message_precompile<CTX>(
+    input: &[u8],
+    context: &mut CTX,
+    is_static: bool,
+    transfer: &InputsImpl,
+    gas_limit: u64,
+) -> InterpreterResult
+where
+    CTX: ContextTr,
+    CTX::Db: PrecompileDatabase,
+{
+    if transfer.target_address != SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS {
+        return revert("invalid transfer target address");
+    }
+
+    if is_static {
+        return revert("static calls are not allowed");
+    }
+
+    if !matches!(
+        transfer.caller_address,
+        WITHDRAWAL_SOL_ADDR | FA_WITHDRAWAL_SOL_ADDR
+    ) {
+        return revert("unauthorized caller");
+    }
+
+    let mut gas = Gas::new(gas_limit);
+
+    if !gas.record_cost(SEND_OUTBOX_MESSAGE_BASE_COST) {
+        return revert("base cost is not covered");
+    }
+
+    match send_outbox_methods(input, context) {
+        Ok(output) => InterpreterResult {
+            result: InstructionResult::Return,
+            gas,
+            output,
+        },
+        Err(reason) => revert(reason),
+    }
 }
