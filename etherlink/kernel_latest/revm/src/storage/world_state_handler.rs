@@ -115,6 +115,26 @@ pub struct StorageAccount {
 }
 
 impl StorageAccount {
+    pub fn get_account(
+        host: &impl Runtime,
+        world_state_handler: &mut Storage<Self>,
+        address: Address,
+    ) -> Result<Option<StorageAccount>, Error> {
+        world_state_handler
+            .get(host, &account_path(&address)?)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    pub fn get_or_create_account(
+        host: &impl Runtime,
+        world_state_handler: &mut Storage<Self>,
+        address: Address,
+    ) -> Result<StorageAccount, Error> {
+        world_state_handler
+            .get_or_create(host, &account_path(&address)?)
+            .map_err(|err| Error::Custom(err.to_string()))
+    }
+
     pub fn from_address(address: &Address) -> Result<Self, Error> {
         let path = concat(&EVM_ACCOUNTS_PATH, &account_path(address)?)?;
         Ok(path.into())

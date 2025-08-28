@@ -12,7 +12,7 @@ use crate::{
         block::{get_block_hash, BLOCKS_STORED},
         code::CodeStorage,
         world_state_handler::{
-            account_path, StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
+            StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
         },
     },
     Error,
@@ -39,7 +39,7 @@ pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// We need this guard to change if there's an unrecoverable
     /// error and we need to revert the changes made to the durable
     /// storage.
-    commit_status: &'a mut bool,
+    commit_status: bool,
     /// Withdrawals accumulated by the current execution and consumed at the end of it
     withdrawals: Vec<Withdrawal>,
     /// HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
@@ -58,14 +58,13 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
         host: &'a mut Host,
         block: &'a BlockConstants,
         world_state_handler: &'a mut WorldStateHandler,
-        commit_status: &'a mut bool,
         caller: Address,
     ) -> Self {
         EtherlinkVMDB {
             host,
             block,
             world_state_handler,
-            commit_status,
+            commit_status: true,
             withdrawals: vec![],
             caller,
         }
@@ -73,7 +72,6 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
 }
 
 pub(crate) trait PrecompileDatabase: Database {
-    fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error>;
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn push_withdrawal(&mut self, withdrawal: Withdrawal);
     fn take_withdrawals(&mut self) -> Vec<Withdrawal>;
@@ -90,7 +88,7 @@ pub(crate) trait PrecompileDatabase: Database {
         amount: U256,
     ) -> Result<bool, Error>;
     fn read_deposit_from_queue(
-        &self,
+        &mut self,
         deposit_id: &U256,
     ) -> Result<Option<FaDepositWithProxy>, Error>;
     fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
@@ -108,7 +106,7 @@ macro_rules! abort_on_error {
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     pub fn commit_status(&self) -> bool {
-        *self.commit_status
+        self.commit_status
     }
 
     pub fn initialize_storage(&mut self) -> Result<(), Error> {
@@ -130,11 +128,15 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 
     fn abort(&mut self) {
-        *self.commit_status = false;
+        self.commit_status = false;
     }
 
     fn update_account(&mut self, address: Address, account_state: AccountState) {
-        match self.get_or_create_account(address) {
+        match StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            address,
+        ) {
             Ok(mut storage_account) => match account_state {
                 AccountState::Touched((info, storage)) => {
                     abort_on_error!(
@@ -186,12 +188,6 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 }
 
 impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
-    fn get_or_create_account(&self, address: Address) -> Result<StorageAccount, Error> {
-        self.world_state_handler
-            .get_or_create(self.host, &account_path(&address)?)
-            .map_err(|err| Error::Custom(err.to_string()))
-    }
-
     // This is only used by native withdrawals for backwards compatibility
     fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
         let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
@@ -213,7 +209,11 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         owner: &Address,
         amount: U256,
     ) -> Result<bool, Error> {
-        let mut account_zero = self.get_or_create_account(Address::ZERO)?;
+        let mut account_zero = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        )?;
         account_zero.ticket_balance_add(self.host, ticket_hash, owner, amount)
     }
 
@@ -223,20 +223,32 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         owner: &Address,
         amount: U256,
     ) -> Result<bool, Error> {
-        let mut account_zero = self.get_or_create_account(Address::ZERO)?;
+        let mut account_zero = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        )?;
         account_zero.ticket_balance_remove(self.host, ticket_hash, owner, amount)
     }
 
     fn read_deposit_from_queue(
-        &self,
+        &mut self,
         deposit_id: &U256,
     ) -> Result<Option<FaDepositWithProxy>, Error> {
-        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        let account_zero = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        )?;
         account_zero.read_deposit_from_queue(self.host, deposit_id)
     }
 
     fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error> {
-        let account_zero = self.get_or_create_account(Address::ZERO)?;
+        let account_zero = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        )?;
         account_zero.remove_deposit_from_queue(self.host, deposit_id)
     }
 }
@@ -245,8 +257,12 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
     type Error = Error;
 
     fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
-        let storage_account = self.get_or_create_account(address)?;
-        let account_info = storage_account.info(self.host)?;
+        let storage_account =
+            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
+        let account_info = match storage_account {
+            Some(storage_account) => storage_account.info(self.host)?,
+            None => AccountInfo::default(),
+        };
 
         if self.caller == Address::ZERO && address == Address::ZERO {
             // HACK: [PRECOMPILE_ZERO_ADDRESS_AND_SIMULATION]
@@ -276,8 +292,12 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
         address: Address,
         index: StorageKey,
     ) -> Result<StorageValue, Self::Error> {
-        let storage_account = self.get_or_create_account(address)?;
-        let storage_value = storage_account.get_storage(self.host, &index)?;
+        let storage_account =
+            StorageAccount::get_account(self.host, self.world_state_handler, address)?;
+        let storage_value = match storage_account {
+            Some(storage_account) => storage_account.get_storage(self.host, &index)?,
+            None => StorageValue::default(),
+        };
 
         Ok(storage_value)
     }

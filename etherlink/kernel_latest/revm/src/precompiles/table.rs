@@ -126,7 +126,7 @@ where
                 .map_err(|e| e.to_string())?;
 
             let Some(deposit) = context
-                .db()
+                .db_mut()
                 .read_deposit_from_queue(&deposit_id)
                 .map_err(|e| e.to_string())?
             else {

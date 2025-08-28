@@ -209,7 +209,6 @@ impl CallTracer {
 
     #[inline]
     fn set_initial_gas(&mut self, tx: impl Transaction) {
-        // TODO: When Prague is enabled, investigate `floor_gas`.
         let InitialAndFloorGas { initial_gas, .. } =
             calculate_initial_tx_gas_for_tx(tx, self.spec_id);
         self.initial_gas = initial_gas;

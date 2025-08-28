@@ -243,7 +243,6 @@ pub fn run_transaction<'a, Host: Runtime>(
     authorization_list: Vec<SignedAuthorization>,
     tracer_input: Option<TracerInput>,
 ) -> Result<ExecutionOutcome, EVMError<Error>> {
-    let mut commit_status = true;
     let block_env = block_env(block_constants)?;
     let tx = tx_env(
         host,
@@ -259,13 +258,7 @@ pub fn run_transaction<'a, Host: Runtime>(
         block_constants.chain_id.as_u64(),
     )?;
 
-    let db = EtherlinkVMDB::new(
-        host,
-        block_constants,
-        world_state_handler,
-        &mut commit_status,
-        caller,
-    );
+    let db = EtherlinkVMDB::new(host, block_constants, world_state_handler, caller);
 
     if let Some(tracer_input) = tracer_input {
         let inspector = get_inspector_from(tracer_input, precompiles.clone(), spec_id);
