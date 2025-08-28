@@ -15,10 +15,12 @@ oc.docker:ci:amd64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -39,10 +41,12 @@ oc.docker:rust-toolchain:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -76,6 +80,7 @@ tezt:
   timeout: 40 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -95,6 +100,7 @@ tezt:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -140,6 +146,7 @@ tezt-time-sensitive:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -159,6 +166,7 @@ tezt-time-sensitive:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -203,6 +211,7 @@ tezt-slow:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -221,6 +230,7 @@ tezt-slow:
     --junit-tag 'dd_tags[tezt-tag.extra]=extra' --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure'
     --junit-tag 'dd_tags[tezt-tag.layer1]=layer1' --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2'
     --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink' --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -267,6 +277,7 @@ tezt-extra:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -286,6 +297,7 @@ tezt-extra:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -332,6 +344,7 @@ tezt-flaky:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -351,6 +364,7 @@ tezt-flaky:
     --junit-tag 'dd_tags[tezt-tag.infrastructure]=infrastructure' --junit-tag 'dd_tags[tezt-tag.layer1]=layer1'
     --junit-tag 'dd_tags[tezt-tag.tezos2]=tezos2' --junit-tag 'dd_tags[tezt-tag.etherlink]=etherlink'
     --junit-tag 'dd_tags[tezt-tag.memory_hungry]=memory_hungry'
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -396,6 +410,7 @@ oc.build_x86_64-released:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -404,6 +419,7 @@ oc.build_x86_64-released:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -448,6 +464,7 @@ oc.build_amd64-extra-dev:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -456,6 +473,7 @@ oc.build_amd64-extra-dev:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -507,6 +525,7 @@ oc.build_amd64-extra-exp:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -515,6 +534,7 @@ oc.build_amd64-extra-exp:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -562,12 +582,14 @@ oc.build_kernels:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk build
   - make -f etherlink.mk evm_kernel.wasm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -600,6 +622,7 @@ oc.tezt:fetch-records:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -608,6 +631,7 @@ oc.tezt:fetch-records:
   script:
   - dune exec scripts/ci/update_records/update.exe -- --log-file tezt-fetch-records.log
     --from last-successful-schedule-extended-test --info
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/filter_corrupted_records.sh
@@ -629,11 +653,13 @@ datadog_pipeline_trace:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
