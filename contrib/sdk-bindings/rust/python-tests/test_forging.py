@@ -4,11 +4,13 @@
 
 from tezos import (
     forge_message,
+    forge_operation,
     Operation,
     PublicKey,
     PublicKeyHash,
     BlsSignature,
     Contract,
+    BlockHash,
 )
 
 def test_message_forging():
@@ -139,3 +141,54 @@ def test_delegation_forging():
     raw_delegation = delegation.forge()
     expected_bytes = bytes.fromhex('6e02ebfd1371b542831b4be730161d08885c5312e442c518c6bb015a01ff01a7b4ff0f28869d9f9c27d653c73aee41bd7fc777')
     assert raw_delegation == expected_bytes
+
+
+def test_operation_forging():
+    """
+    jq -n '{
+      "branch": "BKuGrbLSk7bBwh3x9PAXtao3bLJBtSFN5syraP4mz414BAeSxaT",
+      "contents": [range(1024) | {
+        "kind": "transaction",
+        "source": "tz3bCBLYQUspvznkeq8cZrM1dnd1mpNqNyTF",
+        "fee": "806",
+        "counter": "160",
+        "gas_limit": "614",
+        "storage_limit": "407",
+        "amount": "42",
+        "destination": "tz4MFCwVMrN89ymtDsPMAXpdgug5SmGcLLJt"
+      }]
+    }' > /tmp/tezos-sdk-bindings-tests-many-operations.json
+    octez-codec encode "023-PtSeouLo.operation.unsigned" from /tmp/tezos-sdk-bindings-tests-many-operations.json
+    """
+    NB_TX = 1024
+    transaction = Operation.transaction(
+        source=PublicKeyHash.from_b58check("tz3bCBLYQUspvznkeq8cZrM1dnd1mpNqNyTF"),
+        fee=806,
+        counter=160,
+        gas_limit=614,
+        storage_limit=407,
+        amount=42,
+        destination=Contract.from_b58check("tz4MFCwVMrN89ymtDsPMAXpdgug5SmGcLLJt"),
+    )
+
+    branch = BlockHash.from_b58check("BKuGrbLSk7bBwh3x9PAXtao3bLJBtSFN5syraP4mz414BAeSxaT")
+    operations = [transaction] * NB_TX
+
+    forged_operation = forge_operation(branch, operations)
+
+    expected_bytes = bytes.fromhex(
+        # octez-codec encode "operation.shell_header" from '{ "branch": "BKuGrbLSk7bBwh3x9PAXtao3bLJBtSFN5syraP4mz414BAeSxaT" }'
+        "18f543ab7d89ffceddb0704543a1909fe5d29ab091379d34a04252867e40e84c" +
+        # octez-codec encode "023-PtSeouLo.operation.contents" from '{
+        #   "kind": "transaction",
+        #   "source": "tz3bCBLYQUspvznkeq8cZrM1dnd1mpNqNyTF",
+        #   "fee": "806",
+        #   "counter": "160",
+        #   "gas_limit": "614",
+        #   "storage_limit": "407",
+        #   "amount": "42",
+        #   "destination": "tz4MFCwVMrN89ymtDsPMAXpdgug5SmGcLLJt"
+        # }'
+        "6c02a30d014fbe864d819e0efe698f1ebeb762a8dbc2a606a001e60497032a00038645200f1586a6c8d291fed4e57aa07da82ec59400" * NB_TX
+    )
+    assert forged_operation == expected_bytes
