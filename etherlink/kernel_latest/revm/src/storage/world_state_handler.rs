@@ -32,6 +32,8 @@ use crate::{
     },
     Error,
 };
+#[cfg(test)]
+use rlp::Encodable;
 
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
@@ -427,6 +429,17 @@ impl StorageAccount {
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
             &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
         )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn write_deposit(
+        &mut self,
+        host: &mut impl Runtime,
+        deposit: FaDepositWithProxy,
+        id: U256,
+    ) -> Result<(), Error> {
+        let deposit_path = self.deposit_path(&id)?;
+        Ok(host.store_write_all(&deposit_path, &deposit.rlp_bytes())?)
     }
 
     pub(crate) fn read_deposit_from_queue(

@@ -6,12 +6,17 @@
 use crate::{custom, Error};
 use primitive_types::{H160, H256, U256 as PU256};
 use revm::primitives::{Address, U256};
+#[cfg(test)]
+use rlp::RlpEncodable;
 use rlp::{Decodable, Rlp, RlpDecodable};
 
 #[derive(Debug, RlpDecodable, Default)]
+#[cfg_attr(test, derive(RlpEncodable))]
 pub struct FaDepositWithProxy {
     pub amount: PU256,
     pub receiver: H160,
+    // If proxy doesn't have code it will still be used as
+    // ticket owner.
     pub proxy: H160,
     pub ticket_hash: H256,
     pub inbox_level: u32,
