@@ -391,15 +391,27 @@ module Node = struct
       in
       let on_shutdown =
         match Agent.artifacts_dir agent with
-        | Some destination_root when Tezt_cloud_cli.retrieve_daily_logs ->
-            [
-              (fun () ->
-                Agent_kind.Logs.scp_logs
-                  ~destination_root
-                  ~daemon_name:name
-                  agent);
-            ]
-        | None | Some _ -> []
+        | Some destination_root ->
+            (if Tezt_cloud_cli.retrieve_daily_logs then
+               [
+                 (fun () ->
+                   Agent_kind.Logs.scp_logs
+                     ~destination_root
+                     ~daemon_name:name
+                     agent);
+               ]
+             else [])
+            @
+            if Tezt_cloud_cli.retrieve_ppx_profiling_traces then
+              [
+                (fun () ->
+                  Agent_kind.Logs.scp_profiling
+                    ~destination_root
+                    ~daemon_name:name
+                    agent);
+              ]
+            else []
+        | None -> []
       in
       Cloud.service_register
         ~name:node_name

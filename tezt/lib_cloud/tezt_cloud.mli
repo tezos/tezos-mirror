@@ -267,6 +267,9 @@ module Tezt_cloud_cli : sig
   (** Equivalent to [Cli.retrieve_daily_logs] *)
   val retrieve_daily_logs : bool
 
+  (** Equivalent to [Cli.retrieve_ppx_profiling_traces] *)
+  val retrieve_ppx_profiling_traces : bool
+
   val artifacts_dir : string option
 
   val teztale_artifacts : bool

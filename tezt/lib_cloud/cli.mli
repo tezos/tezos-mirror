@@ -150,6 +150,9 @@ val log_rotation : int
 (* Daily log path retrieval if set. *)
 val retrieve_daily_logs : bool
 
+(* Ppx profiling traces retrieval if set. *)
+val retrieve_ppx_profiling_traces : bool
+
 (** Boundaries used for setting a random network latency on docker containers. *)
 val tc_delay : (float * float) option
 

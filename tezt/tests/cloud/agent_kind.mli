@@ -65,10 +65,13 @@ module Logs : sig
   (** [scp_logs ~destination_root ~daemon_name agent] uses scp to copy the
       `daily_logs` directory from the VM hosting the [agent]'s actor given by
       [~daemon_name] into [~destination_root/<agent-name>/~daemon_name/daily_logs].
-      
+
       If the agent has no SSH runner or the copying process fails, the function is
       a no-op (with a corresponding warning). Any missing directory is automatically
       created. *)
   val scp_logs :
+    destination_root:string -> daemon_name:string -> Agent.t -> unit Lwt.t
+
+  val scp_profiling :
     destination_root:string -> daemon_name:string -> Agent.t -> unit Lwt.t
 end

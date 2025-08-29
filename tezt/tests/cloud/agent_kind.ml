@@ -72,6 +72,54 @@ module Logs = struct
       ""
       path
 
+  let scp_profiling ~destination_root ~daemon_name agent =
+    let agent_name = Agent.name agent in
+    (* This is not compatible with the --proxy mode as the Agent's location of
+       the proxy might differ from the localhost one. *)
+    let tezt_root_path = Agent.temp_execution_path () in
+    Log.info "Retrieving profiling from %s" daemon_name ;
+    match Agent.runner agent with
+    | None ->
+        Log.warn
+          "Cannot retrieve profiling for %s: no runner for agent"
+          agent_name ;
+        Lwt.return_unit
+    | Some _runner ->
+        let runner_local_path =
+          local_path [destination_root; agent_name; daemon_name]
+        in
+        let process =
+          Agent.docker_run_command agent "ls" [tezt_root_path // daemon_name]
+        in
+        let* output = process |> Process.check_and_read_stdout in
+        let files = String.split_on_char '\n' output in
+        let profiling_files =
+          List.filter
+            (fun s ->
+              Option.is_some
+                (s =~* Tezt.Base.rex "^(.+)_profiling\\.(txt|json)$"))
+            files
+        in
+        Lwt_list.iter_s
+          (fun file ->
+            let local_path = local_path [runner_local_path; "profiling"] in
+            Lwt.catch
+              (fun () ->
+                Agent.scp
+                  agent
+                  ~is_directory:false
+                  ~source:(tezt_root_path // daemon_name // file)
+                  ~destination:local_path
+                  `FromRunner)
+              (fun exn ->
+                Log.warn
+                  "Cannot retrieve profiling trace (%s) from %s: %s"
+                  file
+                  agent_name
+                  (Printexc.to_string exn) ;
+                Lwt.return_unit))
+          profiling_files
+
   let scp_logs ~destination_root ~daemon_name agent =
     let agent_name = Agent.name agent in
     (* This is not compatible with the --proxy mode as the Agent's location of

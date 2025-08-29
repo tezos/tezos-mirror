@@ -309,6 +309,8 @@ module Tezt_cloud_cli = struct
 
   let retrieve_daily_logs = Cli.retrieve_daily_logs
 
+  let retrieve_ppx_profiling_traces = Cli.retrieve_ppx_profiling_traces
+
   let artifacts_dir = Cli.artifacts_dir
 
   let teztale_artifacts = Cli.teztale_artifacts
