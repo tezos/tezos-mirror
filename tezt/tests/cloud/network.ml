@@ -172,8 +172,14 @@ let default_protocol : t -> Protocol.t = function
 
 let block_time : t -> int = function
   | `Mainnet -> 8
-  | `Ghostnet -> 5
-  | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
+  | `Ghostnet -> 4
+  | `Rionet -> 4
+  | `Seoulnet -> 4
+  | network ->
+      failwith
+        (Format.sprintf
+           "Block time not available for this network: %s."
+           (to_string network))
 
 let next_protocol : t -> Protocol.t = function
   | `Mainnet | `Ghostnet | `Rionet -> S023
