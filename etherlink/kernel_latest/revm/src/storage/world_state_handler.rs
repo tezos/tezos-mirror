@@ -32,6 +32,8 @@ use crate::{
     },
     Error,
 };
+#[cfg(test)]
+use rlp::Encodable;
 
 /// Path where EVM accounts are stored.
 pub const EVM_ACCOUNTS_PATH: RefPath =
@@ -105,9 +107,9 @@ struct CodeInfo {
     code_hash: FixedBytes<32>,
 }
 
-struct Ticket {
-    path: OwnedPath,
-    balance: U256,
+pub(crate) struct Ticket {
+    pub(crate) path: OwnedPath,
+    pub(crate) balance: U256,
 }
 
 pub struct StorageAccount {
@@ -127,7 +129,7 @@ impl StorageAccount {
 
     pub fn get_or_create_account(
         host: &impl Runtime,
-        world_state_handler: &mut Storage<Self>,
+        world_state_handler: &Storage<Self>,
         address: Address,
     ) -> Result<StorageAccount, Error> {
         world_state_handler
@@ -392,7 +394,7 @@ impl StorageAccount {
         Ok(())
     }
 
-    fn read_ticket_balance(
+    pub(crate) fn read_ticket_balance(
         &self,
         host: &impl Runtime,
         ticket_hash: &U256,
@@ -409,46 +411,17 @@ impl StorageAccount {
         Ok(Ticket { path, balance })
     }
 
-    pub fn ticket_balance_add(
+    pub fn write_ticket_balance(
         &mut self,
         host: &mut impl Runtime,
         ticket_hash: &U256,
         owner: &Address,
         amount: U256,
-    ) -> Result<bool, Error> {
-        if amount.is_zero() {
-            return Ok(false);
-        }
-
-        let Ticket { path, balance } =
+    ) -> Result<(), Error> {
+        let Ticket { path, balance: _ } =
             self.read_ticket_balance(host, ticket_hash, owner)?;
-        if let Some(new_balance) = balance.checked_add(amount) {
-            write_u256_le(host, &path, new_balance)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
-    }
-
-    pub fn ticket_balance_remove(
-        &mut self,
-        host: &mut impl Runtime,
-        ticket_hash: &U256,
-        owner: &Address,
-        amount: U256,
-    ) -> Result<bool, Error> {
-        if amount.is_zero() {
-            return Ok(false);
-        }
-
-        let Ticket { path, balance } =
-            self.read_ticket_balance(host, ticket_hash, owner)?;
-        if let Some(new_balance) = balance.checked_sub(amount) {
-            write_u256_le(host, &path, new_balance)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        write_u256_le(host, &path, amount)?;
+        Ok(())
     }
 
     fn deposit_path(&self, withdrawal_id: &U256) -> Result<OwnedPath, Error> {
@@ -456,6 +429,17 @@ impl StorageAccount {
             &concat(&self.path, &DEPOSIT_QUEUE_TABLE)?,
             &RefPath::assert_from(format!("/{withdrawal_id}").as_bytes()),
         )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn write_deposit(
+        &mut self,
+        host: &mut impl Runtime,
+        deposit: FaDepositWithProxy,
+        id: U256,
+    ) -> Result<(), Error> {
+        let deposit_path = self.deposit_path(&id)?;
+        Ok(host.store_write_all(&deposit_path, &deposit.rlp_bytes())?)
     }
 
     pub(crate) fn read_deposit_from_queue(

@@ -27,8 +27,9 @@ use tezos_smart_rollup_encoding::{
 };
 
 use crate::{
-    database::PrecompileDatabase,
+    database::DatabasePrecompileStateChanges,
     helpers::storage::u256_to_bigint,
+    journal::Journal,
     precompiles::{
         constants::{
             FA_WITHDRAWAL_SOL_ADDR, SEND_OUTBOX_MESSAGE_BASE_COST,
@@ -105,7 +106,7 @@ pub type FastWithdrawalInterface = MichelsonPair<
 
 /// Outbox messages that implements the different withdrawal interfaces,
 /// ready to be encoded and posted.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Withdrawal {
     Standard(OutboxMessage<RouterInterface>),
     Fast(OutboxMessage<FastWithdrawalInterface>),
@@ -253,13 +254,13 @@ fn parse_l1_routing_info(
     Ok((receiver, proxy))
 }
 
-fn send_outbox_methods<CTX>(
+fn send_outbox_methods<CTX, DB>(
     input: &[u8],
     context: &mut CTX,
 ) -> Result<Bytes, SendOutboxRevertReason>
 where
-    CTX: ContextTr,
-    CTX::Db: PrecompileDatabase,
+    DB: DatabasePrecompileStateChanges,
+    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
 {
     match SendOutboxMessage::SendOutboxMessageCalls::abi_decode(input)? {
         SendOutboxMessage::SendOutboxMessageCalls::push_withdrawal_to_outbox(
@@ -288,7 +289,7 @@ where
                 entrypoint,
                 destination,
             );
-            context.db_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal);
             Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_withdrawal_to_outbox(
@@ -334,7 +335,7 @@ where
                 entrypoint,
                 fast_withdrawal_contract,
             );
-            context.db_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal);
             Ok(Bytes::from(fixed_target))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fa_withdrawal_to_outbox(
@@ -376,7 +377,7 @@ where
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-            context.db_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal);
             Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
         SendOutboxMessage::SendOutboxMessageCalls::push_fast_fa_withdrawal_to_outbox(
@@ -433,13 +434,13 @@ where
                 target: fixed_target,
                 proxy: fixed_proxy,
             };
-            context.db_mut().push_withdrawal(withdrawal);
+            context.journal_mut().push_withdrawal(withdrawal);
             Ok(Bytes::copy_from_slice(&routing_info.abi_encode()))
         }
     }
 }
 
-pub(crate) fn send_outbox_message_precompile<CTX>(
+pub(crate) fn send_outbox_message_precompile<CTX, DB>(
     input: &[u8],
     context: &mut CTX,
     is_static: bool,
@@ -448,7 +449,8 @@ pub(crate) fn send_outbox_message_precompile<CTX>(
 ) -> InterpreterResult
 where
     CTX: ContextTr,
-    CTX::Db: PrecompileDatabase,
+    CTX: ContextTr<Db = DB, Journal = Journal<DB>>,
+    DB: DatabasePrecompileStateChanges,
 {
     if transfer.target_address != SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS {
         return revert("invalid transfer target address");

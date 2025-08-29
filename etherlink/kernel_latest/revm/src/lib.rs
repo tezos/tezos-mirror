@@ -3,7 +3,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use crate::{database::PrecompileDatabase, precompiles::send_outbox_message::Withdrawal};
+use crate::{journal::Journal, precompiles::send_outbox_message::Withdrawal};
 use database::EtherlinkVMDB;
 use helpers::storage::u256_to_le_bytes;
 use inspectors::{
@@ -24,7 +24,7 @@ use revm::{
     handler::{instructions::EthInstructions, EthFrame},
     interpreter::interpreter::EthInterpreter,
     primitives::{hardfork::SpecId, Address, Bytes, FixedBytes, TxKind, U256},
-    Context, ExecuteCommitEvm, InspectEvm, Journal, MainBuilder,
+    Context, ExecuteCommitEvm, InspectEvm, MainBuilder,
 };
 use storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::block::BlockConstants;
@@ -33,6 +33,8 @@ use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
 
 pub mod inspectors;
+pub mod journal;
+pub mod layered_state;
 pub mod precompiles;
 pub mod storage;
 
@@ -166,8 +168,13 @@ fn get_inspector_from(
     }
 }
 
-type EVMInnerContext<'a, Host> =
-    Context<&'a BlockEnv, &'a TxEnv, CfgEnv, EtherlinkVMDB<'a, Host>>;
+type EVMInnerContext<'a, Host> = Context<
+    &'a BlockEnv,
+    &'a TxEnv,
+    CfgEnv,
+    EtherlinkVMDB<'a, Host>,
+    Journal<EtherlinkVMDB<'a, Host>>,
+>;
 
 type EvmContext<'a, Host> = Evm<
     EVMInnerContext<'a, Host>,
@@ -301,22 +308,15 @@ pub fn run_transaction<'a, Host: Runtime>(
             spec_id,
         );
 
-        evm.db_mut().initialize_storage()?;
-
         let execution_result = evm.transact_commit(&tx)?;
-
         let withdrawals = evm.db_mut().take_withdrawals();
 
         if !evm.db_mut().commit_status() {
-            // If something went wrong while commiting we drop the state changes
-            // made to the durable storage to avoid ending up in inconsistent state.
-            evm.db_mut().drop_storage()?;
-
+            // No need to revert the possible database changes because
+            // we are in a safe storage.
             return Err(EVMError::Custom(
                 "Comitting ended up in an incorrect state change: reverting.".to_owned(),
             ));
-        } else {
-            evm.db_mut().commit_storage()?;
         }
 
         Ok(ExecutionOutcome {
@@ -328,6 +328,9 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
+    use alloy_sol_types::{ContractError, Revert, RevertReason, SolInterface};
+    use nom::AsBytes;
+    use primitive_types::H256;
     use revm::{
         context::{
             result::{ExecutionResult, Output},
@@ -343,10 +346,19 @@ mod test {
     };
 
     use crate::{
-        precompiles::constants::{PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR},
-        precompiles::initializer::init_precompile_bytecodes,
+        helpers::legacy::FaDepositWithProxy,
+        precompiles::{
+            constants::{
+                FA_WITHDRAWAL_SOL_ADDR, PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR,
+            },
+            initializer::init_precompile_bytecodes,
+        },
         storage::world_state_handler::{
-            new_world_state_handler, WITHDRAWALS_TICKETER_PATH,
+            new_world_state_handler, StorageAccount, WITHDRAWALS_TICKETER_PATH,
+        },
+        test::utilities::{
+            CallAndRevert::{self, callAndRevertCall},
+            FAWithdrawal,
         },
     };
     use crate::{
@@ -355,6 +367,7 @@ mod test {
     };
 
     mod utilities {
+        use alloy_sol_types::sol;
         use primitive_types::{H160 as PH160, U256 as PU256};
         use revm::primitives::hardfork::SpecId;
         use tezos_ethereum::block::{BlockConstants, BlockFees};
@@ -385,6 +398,20 @@ mod test {
                 30_000_000,
                 PH160::zero(),
             )
+        }
+
+        sol! {
+            contract CallAndRevert {
+                function callAndRevert(address target, bytes callArgs) public {
+                    (bool success, bytes memory data) = target.call(callArgs);
+                    require(success, "Call failed");
+                    revert("Reverting");
+                }
+            }
+
+            contract FAWithdrawal {
+                function claim(uint256 withdrawal_id) external payable nonReentrant;
+            }
         }
     }
 
@@ -773,5 +800,152 @@ mod test {
             }) => (),
             other => panic!("ERROR: ended up in {other:?}"),
         };
+    }
+
+    /// Test the revert behavior of the precompile state changes.
+    #[test]
+    fn test_revert_precompile_state_changes() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        let block_constants = block_constants_with_no_fees();
+        let deploy_call_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506103ba8061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c8063b1755bc81461002d575b5f5ffd5b610047600480360381019061004291906101f3565b610049565b005b5f5f8473ffffffffffffffffffffffffffffffffffffffff16848460405161007292919061028c565b5f604051808303815f865af19150503d805f81146100ab576040519150601f19603f3d011682016040523d82523d5f602084013e6100b0565b606091505b5091509150816100f5576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100ec906102fe565b60405180910390fd5b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161012790610366565b60405180910390fd5b5f5ffd5b5f5ffd5b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61016182610138565b9050919050565b61017181610157565b811461017b575f5ffd5b50565b5f8135905061018c81610168565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f83601f8401126101b3576101b2610192565b5b8235905067ffffffffffffffff8111156101d0576101cf610196565b5b6020830191508360018202830111156101ec576101eb61019a565b5b9250929050565b5f5f5f6040848603121561020a57610209610130565b5b5f6102178682870161017e565b935050602084013567ffffffffffffffff81111561023857610237610134565b5b6102448682870161019e565b92509250509250925092565b5f81905092915050565b828183375f83830152505050565b5f6102738385610250565b935061028083858461025a565b82840190509392505050565b5f610298828486610268565b91508190509392505050565b5f82825260208201905092915050565b7f43616c6c206661696c65640000000000000000000000000000000000000000005f82015250565b5f6102e8600b836102a4565b91506102f3826102b4565b602082019050919050565b5f6020820190508181035f830152610315816102dc565b9050919050565b7f526576657274696e6700000000000000000000000000000000000000000000005f82015250565b5f6103506009836102a4565b915061035b8261031c565b602082019050919050565b5f6020820190508181035f83015261037d81610344565b905091905056fea264697066735822122054a37109eed5c973161a962f99e7485f344af2bc66af38eed5ef05d1c30561ea64736f6c634300081e0033").unwrap();
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        // Deploy the CallAndRevert contract
+        let result_create = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            None,
+            deploy_call_and_revert_bytecode,
+            30_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            vec![],
+            None,
+        );
+
+        let revert_contract_address = match result_create {
+            Ok(ExecutionOutcome {
+                result:
+                    ExecutionResult::Success {
+                        output: Output::Create(_, Some(address)),
+                        ..
+                    },
+                ..
+            }) => address,
+            other => panic!("ERROR: ended up in {other:?}"),
+        };
+
+        // Initialize storage with values useful for FAWithdrawal
+        let owner = primitive_types::H160(caller.as_bytes().try_into().unwrap());
+        let ticket_hash = H256::zero();
+        let default_ticket_balance = U256::from(1);
+        let deposit = FaDepositWithProxy {
+            amount: primitive_types::U256::from(1000),
+            proxy: owner,
+            ticket_hash,
+            ..Default::default()
+        };
+        let id = U256::ZERO;
+        let mut account_zero = StorageAccount::get_or_create_account(
+            &host,
+            &world_state_handler,
+            Address::ZERO,
+        )
+        .unwrap();
+        account_zero.write_deposit(&mut host, deposit, id).unwrap();
+        account_zero
+            .write_ticket_balance(
+                &mut host,
+                &U256::from_be_bytes(ticket_hash.0),
+                &caller,
+                default_ticket_balance,
+            )
+            .unwrap();
+
+        // Prepare call to FAWithdrawal claim function
+        let calldata = FAWithdrawal::FAWithdrawalCalls::claim(FAWithdrawal::claimCall {
+            withdrawal_id: id,
+        })
+        .abi_encode();
+        let call_and_revert_call =
+            CallAndRevert::CallAndRevertCalls::callAndRevert(callAndRevertCall {
+                callArgs: Bytes::from(calldata),
+                target: FA_WITHDRAWAL_SOL_ADDR,
+            });
+
+        // Insert account information
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        let caller_info = AccountInfo {
+            balance: U256::MAX,
+            nonce: 0,
+            code_hash: Default::default(),
+            code: None,
+        };
+        let mut storage_account = world_state_handler
+            .get_or_create(&host, &account_path(&caller).unwrap())
+            .unwrap();
+        storage_account.set_info(&mut host, caller_info).unwrap();
+
+        // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let ExecutionOutcome {
+            result,
+            withdrawals: _,
+        } = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(revert_contract_address),
+            Bytes::from(call_and_revert_call.abi_encode()),
+            10_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            vec![],
+            None,
+        )
+        .unwrap();
+
+        // Check for revert reason match the one from CallAndRevert
+        match result {
+            ExecutionResult::Revert { output, .. } => {
+                assert_eq!(
+                    RevertReason::decode(&output).unwrap(),
+                    RevertReason::ContractError(ContractError::Revert(Revert {
+                        reason: "Reverting".into()
+                    }))
+                );
+            }
+            other => panic!("ERROR: ended up in {other:?}"),
+        }
+
+        let storage_account = StorageAccount::get_or_create_account(
+            &host,
+            &world_state_handler,
+            Address::ZERO,
+        )
+        .unwrap();
+
+        // Should still be present because reverting cancelled the usage of this deposit
+        storage_account.read_deposit_from_queue(&host, &id).unwrap();
+
+        // Check that ticket balance didn't increased
+        assert_eq!(
+            storage_account
+                .read_ticket_balance(&host, &U256::from_be_bytes(ticket_hash.0), &caller)
+                .unwrap()
+                .balance,
+            default_ticket_balance
+        );
     }
 }

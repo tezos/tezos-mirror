@@ -6,4 +6,4 @@ pub mod constants;
 pub mod initializer;
 pub mod provider;
 pub mod send_outbox_message;
-mod table;
+pub mod table;

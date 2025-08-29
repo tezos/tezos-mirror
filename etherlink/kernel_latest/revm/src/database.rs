@@ -3,10 +3,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-use std::mem;
-
 use crate::{
     helpers::legacy::FaDepositWithProxy,
+    journal::PrecompileStateChanges,
     precompiles::send_outbox_message::Withdrawal,
     storage::{
         block::{get_block_hash, BLOCKS_STORED},
@@ -71,27 +70,17 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
     }
 }
 
-pub(crate) trait PrecompileDatabase: Database {
+pub trait DatabasePrecompileStateChanges {
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
-    fn push_withdrawal(&mut self, withdrawal: Withdrawal);
-    fn take_withdrawals(&mut self) -> Vec<Withdrawal>;
-    fn ticket_balance_add(
-        &mut self,
-        ticket_hash: &U256,
-        owner: &Address,
-        amount: U256,
-    ) -> Result<bool, Error>;
-    fn ticket_balance_remove(
-        &mut self,
-        ticket_hash: &U256,
-        owner: &Address,
-        amount: U256,
-    ) -> Result<bool, Error>;
-    fn read_deposit_from_queue(
-        &mut self,
+    fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error>;
+    fn deposit_in_queue(
+        &self,
         deposit_id: &U256,
     ) -> Result<Option<FaDepositWithProxy>, Error>;
-    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error>;
+}
+
+pub(crate) trait DatabaseCommitPrecompileStateChanges {
+    fn commit(&mut self, etherlink_data: PrecompileStateChanges);
 }
 
 macro_rules! abort_on_error {
@@ -125,6 +114,10 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
         self.world_state_handler
             .rollback_transaction(self.host)
             .map_err(|err| Error::Custom(err.to_string()))
+    }
+
+    pub fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
+        std::mem::take(&mut self.withdrawals)
     }
 
     fn abort(&mut self) {
@@ -187,52 +180,20 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
     }
 }
 
-impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
-    // This is only used by native withdrawals for backwards compatibility
-    fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
-        let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
-        let kt1_b58 = String::from_utf8(ticketer.to_vec()).unwrap();
-        Ok(ContractKt1Hash::from_b58check(&kt1_b58).unwrap())
-    }
-
-    fn push_withdrawal(&mut self, withdrawal: Withdrawal) {
-        self.withdrawals.push(withdrawal);
-    }
-
-    fn take_withdrawals(&mut self) -> Vec<Withdrawal> {
-        mem::take(&mut self.withdrawals)
-    }
-
-    fn ticket_balance_add(
-        &mut self,
-        ticket_hash: &U256,
-        owner: &Address,
-        amount: U256,
-    ) -> Result<bool, Error> {
-        let mut account_zero = StorageAccount::get_or_create_account(
+impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+    fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error> {
+        let account_zero = StorageAccount::get_or_create_account(
             self.host,
             self.world_state_handler,
             Address::ZERO,
         )?;
-        account_zero.ticket_balance_add(self.host, ticket_hash, owner, amount)
+        account_zero
+            .read_ticket_balance(self.host, ticket_hash, owner)
+            .map(|ticket| ticket.balance)
     }
 
-    fn ticket_balance_remove(
-        &mut self,
-        ticket_hash: &U256,
-        owner: &Address,
-        amount: U256,
-    ) -> Result<bool, Error> {
-        let mut account_zero = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        )?;
-        account_zero.ticket_balance_remove(self.host, ticket_hash, owner, amount)
-    }
-
-    fn read_deposit_from_queue(
-        &mut self,
+    fn deposit_in_queue(
+        &self,
         deposit_id: &U256,
     ) -> Result<Option<FaDepositWithProxy>, Error> {
         let account_zero = StorageAccount::get_or_create_account(
@@ -243,13 +204,10 @@ impl<Host: Runtime> PrecompileDatabase for EtherlinkVMDB<'_, Host> {
         account_zero.read_deposit_from_queue(self.host, deposit_id)
     }
 
-    fn remove_deposit_from_queue(&mut self, deposit_id: &U256) -> Result<(), Error> {
-        let account_zero = StorageAccount::get_or_create_account(
-            self.host,
-            self.world_state_handler,
-            Address::ZERO,
-        )?;
-        account_zero.remove_deposit_from_queue(self.host, deposit_id)
+    fn ticketer(&self) -> Result<ContractKt1Hash, Error> {
+        let ticketer = self.host.store_read_all(&WITHDRAWALS_TICKETER_PATH)?;
+        let kt1_b58 = String::from_utf8(ticketer.to_vec()).unwrap();
+        Ok(ContractKt1Hash::from_b58check(&kt1_b58).unwrap())
     }
 }
 
@@ -313,6 +271,39 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
                 get_block_hash(self.host, number)
             }
             _ => Ok(B256::ZERO),
+        }
+    }
+}
+impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+    fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
+        self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
+        let Ok(mut address_zero) = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        ) else {
+            log!(self.host, LogError, "DatabaseCommitPrecompileStateChanges `get_or_create_account` error for address zero");
+            self.abort();
+            return;
+        };
+        for ((owner, ticket_hash), amount) in etherlink_data.ticket_balances {
+            abort_on_error!(
+                self,
+                address_zero.write_ticket_balance(
+                    self.host,
+                    &ticket_hash,
+                    &owner,
+                    amount
+                ),
+                "DatabaseCommitPrecompileStateChanges `write_ticket_balance`"
+            );
+        }
+        for deposit_id in etherlink_data.removed_deposits {
+            abort_on_error!(
+                self,
+                address_zero.remove_deposit_from_queue(self.host, &deposit_id),
+                "DatabaseCommitPrecompileStateChanges `remove_deposit_from_queue`"
+            );
         }
     }
 }
