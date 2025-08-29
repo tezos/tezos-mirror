@@ -265,7 +265,7 @@ impl<'a> TryFrom<Vec<TztEntity<'a>>> for TztTest<'a> {
                 )
                 .hash,
             ),
-            None => None
+            None => None,
         };
 
         let other_contracts = match m_other_contracts {
