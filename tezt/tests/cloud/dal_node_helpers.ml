@@ -27,12 +27,6 @@ type producer = {
   slot_index : int;
 }
 
-type dal_status =
-  | With_DAL of Z.t
-  | Without_DAL
-  | Out_of_committee
-  | Expected_to_DAL_attest
-
 let may_copy_dal_node_identity_file agent node = function
   | None -> Lwt.return_unit
   | Some source ->
@@ -225,20 +219,40 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
   in
   Lwt.return {client; node; dal_node; account; is_ready; slot_index}
 
-let ensure_enough_funds ~client ~fee ~producers ~network ~producer_key
+let ensure_enough_funds cloud ~client ~fee ~producers ~network ~producer_key
     ~some_node_rpc_endpoint i =
+  let alert_if_balance_is_close_to_zero pkh balance =
+    (* [is_just_under ~balance ~limit] is true if the [balance] is under the [limit],
+       but by at most one publication cost, since we do not want to spam the Slack channel when uder the threshold.*)
+    let is_just_under ~balance ~limit =
+      balance < Tez.of_mutez_int limit
+      && balance >= Tez.of_mutez_int (limit - fee)
+    in
+    if
+      List.exists
+        (fun limit -> is_just_under ~balance ~limit)
+        [100_000; 50_000; 10_000]
+    then
+      Monitoring_app.Alert.report_funds_are_getting_short
+        ~cloud
+        ~network
+        ~fee
+        ~pkh
+        ~balance:(Tez.to_mutez balance)
+    else Lwt.return_unit
+  in
   let producer = List.nth producers i in
   match (network, producer_key) with
   | `Sandbox, _ -> (* Producer has enough money *) Lwt.return_unit
   | _, Some _ ->
+      let id = producer.account.public_key_hash in
       (* Producer key is assumed to have enough money. We simply check that it is the case,
          but do not refund it. *)
       let* balance =
         RPC_core.call some_node_rpc_endpoint
-        @@ RPC.get_chain_block_context_contract_balance
-             ~id:producer.account.public_key_hash
-             ()
+        @@ RPC.get_chain_block_context_contract_balance ~id ()
       in
+      let* () = alert_if_balance_is_close_to_zero id balance in
       if balance < Tez.of_mutez_int fee then
         Lwt.fail_with
           "Producer key has not enough money anymore to publish slots"
@@ -254,6 +268,14 @@ let ensure_enough_funds ~client ~fee ~producers ~network ~producer_key
       let random = Random.int 5_000_000 + 10_000 in
       if balance < Tez.of_mutez_int random then
         let* fundraiser = Client.show_address ~alias:"fundraiser" client in
+        let fundraiser_pkh = fundraiser.public_key_hash in
+        let* fundraiser_balance =
+          RPC_core.call some_node_rpc_endpoint
+          @@ RPC.get_chain_block_context_contract_balance ~id:fundraiser_pkh ()
+        in
+        let* () =
+          alert_if_balance_is_close_to_zero fundraiser_pkh fundraiser_balance
+        in
         let* _op_hash =
           Operation.Manager.transfer
             ~amount:10_000_000
@@ -266,7 +288,7 @@ let ensure_enough_funds ~client ~fee ~producers ~network ~producer_key
         Lwt.return_unit
       else Lwt.return_unit
 
-let produce_slot ~client ~producers ~network ~producer_key
+let produce_slot cloud ~client ~producers ~network ~producer_key
     ~some_node_rpc_endpoint ~producers_delay ~slot_size level i =
   if level mod producers_delay = 0 then (
     let all_start = Unix.gettimeofday () in
@@ -278,6 +300,7 @@ let produce_slot ~client ~producers ~network ~producer_key
     let fee = 800 in
     let* () =
       ensure_enough_funds
+        cloud
         ~client
         ~fee
         ~producers

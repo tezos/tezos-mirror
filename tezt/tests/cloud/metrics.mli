@@ -14,10 +14,28 @@ type public_key_hash = PKH of string
 (** Information about a single published DAL commitment. *)
 type commitment_info = {commitment : string; publisher_pkh : string}
 
+(** "Status" of an attester at some level.
+    There are 5 cases:
+    - The attester is in the DAL committee and sent a dal_attestation -> With_DAL
+    - The attester is in the DAL committee and sent an attestation without DAL -> Without_DAL
+    - The attester is in the DAL committee and sent no attestation -> Expected_to_DAL_attest
+    - The attester is out of the DAL committee (but in the Tenderbake committee) and
+      sent an attestation -> Out_of_committee
+    - The attester is out of the DAL committee and did not send an attestation
+      (this case can happen either because they are out of the Tenderbake committee or
+      because their baker had an issue at this level) -> Those bakers will not be in the
+      `attestations` field of the `per_level_infos` crafted at the current level.
+*)
+type dal_status =
+  | With_DAL of Z.t
+  | Without_DAL
+  | Out_of_committee
+  | Expected_to_DAL_attest
+
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, Dal_node_helpers.dal_status) Hashtbl.t;
+  attestations : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
 }

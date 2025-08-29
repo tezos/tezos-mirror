@@ -101,7 +101,6 @@ type t = {
 }
 
 let get_infos_per_level t ~level ~metadata =
-  let open Dal_node_helpers in
   let open Metrics in
   let client = t.bootstrap.client in
   let endpoint = t.some_node_rpc_endpoint in
@@ -1159,6 +1158,7 @@ let rec loop t level =
       |> Seq.take (List.length t.configuration.dal_node_producers)
       |> Seq.map (fun i ->
              Dal_node_helpers.produce_slot
+               t.cloud
                ~client:t.bootstrap.client
                ~producers:t.producers
                ~network:t.configuration.network

@@ -43,4 +43,12 @@ module Alert : sig
     level:int ->
     metadata:JSON.t ->
     unit Lwt.t
+
+  val report_funds_are_getting_short :
+    cloud:Cloud.t ->
+    network:Network.t ->
+    fee:int ->
+    pkh:string ->
+    balance:int ->
+    unit Lwt.t
 end

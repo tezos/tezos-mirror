@@ -10,10 +10,16 @@ type public_key_hash = PKH of string
 
 type commitment_info = {commitment : string; publisher_pkh : string}
 
+type dal_status =
+  | With_DAL of Z.t
+  | Without_DAL
+  | Out_of_committee
+  | Expected_to_DAL_attest
+
 type per_level_info = {
   level : int;
   published_commitments : (int, commitment_info) Hashtbl.t;
-  attestations : (public_key_hash, Dal_node_helpers.dal_status) Hashtbl.t;
+  attestations : (public_key_hash, dal_status) Hashtbl.t;
   attested_commitments : Z.t;
   etherlink_operator_balance_sum : Tez.t;
 }
@@ -491,7 +497,7 @@ let update_ratio_attested_commitments_per_baker ~first_level ~infos
                ( public_key_hash,
                  match status with
                  (* The baker is in the DAL committee and sent an attestation_with_dal. *)
-                 | Dal_node_helpers.With_DAL attestation_bitset ->
+                 | With_DAL attestation_bitset ->
                      Baker_helpers.
                        {
                          attestable_slots;

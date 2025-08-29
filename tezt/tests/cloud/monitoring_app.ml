@@ -1014,4 +1014,37 @@ module Alert = struct
            error: '%s'"
           (Printexc.to_string exn) ;
         unit)
+
+  let report_funds_are_getting_short ~cloud ~network ~fee ~pkh ~balance =
+    match Cloud.notifier cloud with
+    | Notifier_null -> unit
+    | Notifier_slack {slack_channel_id; slack_bot_token; _} ->
+        let data =
+          let content =
+            Format.sprintf
+              "*[producer-is-getting-broke]* On network `%s`, producer `%s` \
+               only has %dµꜩ remaining. With current price of %dµꜩ per slot \
+               produced, it can only publish %d more slots before being left \
+               speechless."
+              (Network.to_string network)
+              pkh
+              balance
+              fee
+              (balance / fee)
+          in
+          Format_app.section [content] ()
+        in
+        let* _ts = post_message ~slack_channel_id ~slack_bot_token data in
+        Lwt.return_unit
+
+  let report_funds_are_getting_short ~cloud ~network ~fee ~pkh ~balance =
+    Lwt.catch
+      (fun () ->
+        report_funds_are_getting_short ~cloud ~network ~fee ~pkh ~balance)
+      (fun exn ->
+        Log.warn
+          "Monitor_app.Alert.report_funds_are_getting_short: unexpected error: \
+           '%s'"
+          (Printexc.to_string exn) ;
+        unit)
 end
