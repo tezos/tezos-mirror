@@ -2272,7 +2272,6 @@ pub(crate) fn typecheck_contract_address<'a>(
                 Err(TcError::UnexpectedImplicitAccountType(typ.clone()))
             }
         }
-        #[cfg(feature = "runtime_entrypoint_verification")]
         AddressHash::Kt1(_) | AddressHash::Sr1(_) => {
             // Check if we have a contract at the address_hash of the given address.
             // and we have found a valid entrypoint to use.
@@ -2295,11 +2294,6 @@ pub(crate) fn typecheck_contract_address<'a>(
                 hash: address.hash,
             })
         }
-        #[cfg(not(feature = "runtime_entrypoint_verification"))]
-        AddressHash::Kt1(_) | AddressHash::Sr1(_) => Ok(Address {
-            entrypoint,
-            hash: address.hash,
-        }),
     }
 }
 
