@@ -343,7 +343,7 @@ mod test {
     };
 
     use crate::{
-        precompiles::constants::WITHDRAWAL_SOL_ADDR,
+        precompiles::constants::{PRECOMPILE_BURN_ADDRESS, WITHDRAWAL_SOL_ADDR},
         precompiles::initializer::init_precompile_bytecodes,
         storage::world_state_handler::{
             new_world_state_handler, WITHDRAWALS_TICKETER_PATH,
@@ -686,7 +686,7 @@ mod test {
             .unwrap();
         assert_eq!(created_account.balance(&host).unwrap(), U256::ZERO);
         let zero_account = world_state_handler
-            .get_or_create(&host, &account_path(&Address::ZERO).unwrap())
+            .get_or_create(&host, &account_path(&PRECOMPILE_BURN_ADDRESS).unwrap())
             .unwrap();
         assert_eq!(zero_account.balance(&host).unwrap(), withdrawn_amount);
         let raw_expected_withdrawals = r#"[Standard(AtomicTransactionBatch(OutboxMessageTransactionBatch { batch: [OutboxMessageTransaction { parameters: MichelsonPair(MichelsonContract(Implicit(Ed25519(ContractTz1Hash("tz1fp5ncDmqYwYC568fREYz9iwQTgGQuKZqX")))), Ticket(MichelsonPair(MichelsonContract(Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4"))), MichelsonPair(MichelsonPair(MichelsonNat(Zarith(0)), MichelsonOption(None)), MichelsonInt(Zarith(1)))))), destination: Originated(ContractKt1Hash("KT1BjtrJYcknDALNGhUqtdHwbrFW1AcsUJo4")), entrypoint: Entrypoint { name: "burn" } }] }))]"#;
