@@ -119,6 +119,8 @@ let tc_jitter = Cli.tc_jitter
 
 let artifacts_dir = Cli.artifacts_dir
 
+let teztale_artifacts = Cli.teztale_artifacts
+
 let init () =
   if tezt_cloud = "" then
     Test.fail

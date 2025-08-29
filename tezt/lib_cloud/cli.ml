@@ -56,6 +56,7 @@ type config = {
   tc_delay : (float * float) option;
   tc_jitter : (float * float) option;
   artifacts_dir : string option;
+  teztale_artifacts : bool option;
 }
 
 let encoding =
@@ -108,6 +109,7 @@ let encoding =
            tc_delay;
            tc_jitter;
            artifacts_dir;
+           teztale_artifacts;
          }
        ->
       ( ( ( localhost,
@@ -155,7 +157,8 @@ let encoding =
             scenario_specific,
             tc_delay,
             tc_jitter,
-            artifacts_dir ) ) ))
+            artifacts_dir,
+            teztale_artifacts ) ) ))
     (fun ( ( ( localhost,
                ssh_host,
                monitoring,
@@ -201,7 +204,8 @@ let encoding =
                scenario_specific,
                tc_delay,
                tc_jitter,
-               artifacts_dir ) ) )
+               artifacts_dir,
+               teztale_artifacts ) ) )
        ->
       {
         localhost;
@@ -250,6 +254,7 @@ let encoding =
         scenario_specific;
         tc_delay;
         tc_jitter;
+        teztale_artifacts;
       })
     (merge_objs
        (merge_objs
@@ -299,13 +304,14 @@ let encoding =
                 (opt "binaries_path" string)
                 (opt "log_rotation" int31)
                 (opt "slack_channel_id" string)))
-          (obj6
+          (obj7
              (opt "slack_bot_token" string)
              (opt "daily_logs_artifacts" bool)
              (opt "scenario_specific" (tup2 string Data_encoding.Json.encoding))
              (opt "tc_delay" (tup2 float float))
              (opt "tc_jitter" (tup2 float float))
-             (opt "artifacts_dir" string))))
+             (opt "artifacts_dir" string)
+             (opt "teztale_artifacts" bool))))
 
 let section =
   Clap.section
@@ -810,6 +816,17 @@ let retrieve_daily_logs =
        Set to [false] by default."
     (Option.value ~default:false config.retrieve_daily_logs)
   |> check_artifact_option "daily-logs"
+
+let teztale_artifacts =
+  Clap.flag
+    ~section
+    ~set_long:"teztale-artifacts"
+    ~unset_long:"no-teztale-artifacts"
+    ~description:
+      "Retrieves the Teztale database if `--artifacts-dir <dir>` is set, and \
+       stores them in <dir>. Set to [false] by default."
+    (Option.value ~default:false config.teztale_artifacts)
+  |> check_artifact_option "teztale"
 
 let float_float =
   let parse string =

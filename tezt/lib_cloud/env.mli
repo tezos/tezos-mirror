@@ -155,6 +155,9 @@ val tc_jitter : (float * float) option
 (** Equivalent to [Cli.artifacts_dir] *)
 val artifacts_dir : string option
 
+(** Equivalent to [Cli.teztale_artifacts] *)
+val teztale_artifacts : bool
+
 (** Notification backend, slack_channel_id and slack_bot_token *)
 val notifier : Types.notifier
 
