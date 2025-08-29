@@ -157,7 +157,7 @@ let wait_for_receipt ~rpc_endpoint ?to_ ?value ?data ~gas_limit ~infos ~from ()
         @@ Result_syntax.tzfail
              (error_of_fmt
                 "Could not get the transaction receipt: transaction was \
-                 refused]") ;
+                 dropped]") ;
         return_unit
     | `Accepted hash ->
         txn_hash := hash ;
