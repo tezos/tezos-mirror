@@ -2643,50 +2643,6 @@ fn validate_u10(n: &BigInt) -> Result<u16, TcError> {
     Ok(res)
 }
 
-/// An iterator that ensures the keys to be in strictly ascending order.
-/// (where you specify a getter to obtain the key from an element).
-///
-/// Also charges gas for this check.
-struct OrderValidatingIterator<'a, 'b, T: Iterator<Item = Result<I, TcError>>, I> {
-    it: std::iter::Peekable<T>,
-    to_key: fn(&I) -> &TypedValue,
-    container_ty: &'a Type,
-    ctx: &'a std::cell::RefCell<&'a mut Ctx<'b>>,
-}
-
-impl<T, I> Iterator for OrderValidatingIterator<'_, '_, T, I>
-where
-    T: Iterator<Item = Result<I, TcError>>,
-{
-    type Item = Result<I, TcError>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.it.next().map(|cur| {
-            let cur = cur?;
-            if let Some(Ok(next)) = self.it.peek() {
-                let mut ctx = self.ctx.borrow_mut();
-                let cur_key = (self.to_key)(&cur);
-                let next_key = (self.to_key)(next);
-                ctx.gas
-                    .consume(gas::interpret_cost::compare(cur_key, next_key)?)?;
-                match cur_key.cmp(next_key) {
-                    std::cmp::Ordering::Less => (),
-                    std::cmp::Ordering::Equal => {
-                        Err(TcError::DuplicateElements(self.container_ty.clone()))?
-                    }
-                    std::cmp::Ordering::Greater => {
-                        Err(TcError::ElementsNotSorted(self.container_ty.clone()))?
-                    }
-                }
-            }
-            Ok(cur)
-        })
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.it.size_hint()
-    }
-}
-
 fn typecheck_set<'a>(
     ctx: &mut Ctx,
     set_ty: &Type,
@@ -2697,66 +2653,29 @@ fn typecheck_set<'a>(
         elem_ty.size_for_gas(),
         vs.len(),
     )?)?;
-    let ctx_cell = std::cell::RefCell::new(ctx);
-    // See the same concern about constructing from ordered sequence as in [typecheck_map]
-    OrderValidatingIterator {
-        it: vs
-            .iter()
-            .map(|v| typecheck_value(v, *ctx_cell.borrow_mut(), elem_ty))
-            .peekable(),
-        container_ty: set_ty,
-        to_key: |x| x,
-        ctx: &ctx_cell,
-    }
-    .collect::<Result<_, TcError>>()
-}
 
-// A helper function that handles the common map-typechecking logic.
-fn typecheck_map_common<'a, V, F>(
-    ctx: &mut Ctx,
-    map_ty: &Type,
-    key_type: &Type,
-    vs: &[Micheline<'a>],
-    check_parse_value: F,
-) -> Result<BTreeMap<TypedValue<'a>, V>, TcError>
-where
-    F: Fn(&Micheline<'a>, &mut Ctx) -> Result<V, TcError>,
-{
-    ctx.gas.consume(gas::tc_cost::construct_map(
-        key_type.size_for_gas(),
-        vs.len(),
-    )?)?;
+    let mut prev_elt = None;
+    let mut set = BTreeSet::new();
 
-    let ctx_cell = std::cell::RefCell::new(ctx);
-    let tc_elt =
-        |mich: &Micheline<'a>, local_ctx: &mut Ctx| -> Result<(TypedValue<'a>, V), TcError> {
-            match mich {
-                Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
-                    let k = typecheck_value(k_expr, local_ctx, key_type)?;
-                    let v = check_parse_value(v_expr, local_ctx)?;
-                    Ok((k, v))
+    for elt in vs.iter() {
+        let elt = typecheck_value(elt, ctx, elem_ty)?;
+        if let Some(prev_elt) = prev_elt {
+            ctx.gas
+                .consume(gas::interpret_cost::compare(&prev_elt, &elt)?)?;
+            match prev_elt.cmp(&elt) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(set_ty.clone()))
                 }
-                _ => Err(TcError::InvalidEltForMap(
-                    format!("{mich:?}"),
-                    map_ty.clone(),
-                )),
-            }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(set_ty.clone()))
+                }
+            };
         };
-
-    // Unfortunately, `BTreeMap` doesn't expose methods to build from an already-sorted
-    // slice/vec/iterator. FWIW, Rust docs claim that its sorting algorithm is "designed to
-    // be very fast in cases where the slice is nearly sorted", so hopefully it doesn't add
-    // too much overhead.
-    OrderValidatingIterator {
-        it: vs
-            .iter()
-            .map(|v| tc_elt(v, *ctx_cell.borrow_mut()))
-            .peekable(),
-        container_ty: map_ty,
-        to_key: |(k, _)| k,
-        ctx: &ctx_cell,
+        prev_elt = Some(elt.clone());
+        set.insert(elt);
     }
-    .collect()
+    Ok(set)
 }
 
 fn typecheck_map<'a>(
@@ -2766,10 +2685,45 @@ fn typecheck_map<'a>(
     value_type: &Type,
     vs: &[Micheline<'a>],
 ) -> Result<BTreeMap<TypedValue<'a>, TypedValue<'a>>, TcError> {
-    // Here, parse_value simply calls `typecheck_value` on the value expression.
-    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
-        typecheck_value(val_expr, local_ctx, value_type)
-    })
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+
+    let mut prev_key = None;
+    let mut map = BTreeMap::new();
+
+    for mich in vs.iter() {
+        let (key, val) = match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, ctx, key_type)?;
+                let v = typecheck_value(v_expr, ctx, value_type)?;
+                (k, v)
+            }
+            _ => {
+                return Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                ))
+            }
+        };
+        if let Some(prev_key) = prev_key {
+            ctx.gas
+                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
+            match prev_key.cmp(&key) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(map_ty.clone()))
+                }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
+                }
+            };
+        };
+        prev_key = Some(key.clone());
+        map.insert(key, val);
+    }
+    Ok(map)
 }
 
 fn typecheck_big_map<'a>(
@@ -2780,23 +2734,61 @@ fn typecheck_big_map<'a>(
     vs: &[Micheline<'a>],
     diff: bool,
 ) -> Result<BTreeMap<TypedValue<'a>, Option<TypedValue<'a>>>, TcError> {
-    typecheck_map_common(ctx, map_ty, key_type, vs, |val_expr, local_ctx| {
-        if diff {
-            match val_expr {
-                Micheline::App(Prim::Some, [inner_val], _) => {
-                    let v = typecheck_value(inner_val, local_ctx, value_type)?;
-                    Ok(Some(v))
-                }
-                Micheline::App(Prim::None, [], _) => Ok(None),
-                _ => Err(TcError::InvalidEltForMap(
-                    format!("{val_expr:?}"),
-                    map_ty.clone(),
-                )),
+    ctx.gas.consume(gas::tc_cost::construct_map(
+        key_type.size_for_gas(),
+        vs.len(),
+    )?)?;
+
+    let mut prev_key = None;
+    let mut map = BTreeMap::new();
+
+    for mich in vs.iter() {
+        let (key, val) = match mich {
+            Micheline::App(Prim::Elt, [k_expr, v_expr], _) => {
+                let k = typecheck_value(k_expr, ctx, key_type)?;
+                let v = if diff {
+                    match v_expr {
+                        Micheline::App(Prim::Some, [inner_val], _) => {
+                            let v = typecheck_value(inner_val, ctx, value_type)?;
+                            Some(v)
+                        }
+                        Micheline::App(Prim::None, [], _) => None,
+                        _ => {
+                            return Err(TcError::InvalidEltForMap(
+                                format!("{v_expr:?}"),
+                                map_ty.clone(),
+                            ))
+                        }
+                    }
+                } else {
+                    Some(typecheck_value(v_expr, ctx, value_type)?)
+                };
+                (k, v)
             }
-        } else {
-            typecheck_value(val_expr, local_ctx, value_type).map(Some)
-        }
-    })
+            _ => {
+                return Err(TcError::InvalidEltForMap(
+                    format!("{mich:?}"),
+                    map_ty.clone(),
+                ))
+            }
+        };
+        if let Some(prev_key) = prev_key {
+            ctx.gas
+                .consume(gas::interpret_cost::compare(&prev_key, &key)?)?;
+            match prev_key.cmp(&key) {
+                std::cmp::Ordering::Less => (),
+                std::cmp::Ordering::Equal => {
+                    return Err(TcError::DuplicateElements(map_ty.clone()))
+                }
+                std::cmp::Ordering::Greater => {
+                    return Err(TcError::ElementsNotSorted(map_ty.clone()))
+                }
+            };
+        };
+        prev_key = Some(key.clone());
+        map.insert(key, val);
+    }
+    Ok(map)
 }
 
 /// Ensures type stack is at least of the required length, otherwise returns
