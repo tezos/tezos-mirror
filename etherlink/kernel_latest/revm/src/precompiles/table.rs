@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-use alloy_sol_types::{sol, SolEvent, SolValue};
+use alloy_sol_types::{sol, SolInterface, SolValue};
 use primitive_types::U256;
 use revm::{
     context::ContextTr,
@@ -19,30 +19,35 @@ use crate::{
         },
         provider::revert,
     },
+    Error,
 };
 
 sol! {
-    event TicketTableInput (
-        uint256 ticket_hash,
-        address owner,
-        uint256 amount,
-    );
-}
+    contract Table {
+        function ticket_balance_add(
+            uint256 ticket_hash,
+            address owner,
+            uint256 amount,
+        ) external;
 
-sol! {
-    event DepositTableInput (
-        uint256 deposit_id
-    );
-}
+        function ticket_balance_remove(
+            uint256 ticket_hash,
+            address owner,
+            uint256 amount,
+        ) external;
 
-sol! {
-    struct SolFaDepositWithProxy {
-        uint256 amount;
-        address receiver;
-        address proxy;
-        uint256 ticket_hash;
-        uint256 inbox_level;
-        uint256 inbox_msg_id;
+        function find_deposit(uint256 deposit_id) external;
+
+        function remove_deposit(uint256 deposit_id) external;
+
+        struct SolFaDepositWithProxy {
+            uint256 amount;
+            address receiver;
+            address proxy;
+            uint256 ticket_hash;
+            uint256 inbox_level;
+            uint256 inbox_msg_id;
+        }
     }
 }
 
@@ -52,7 +57,7 @@ pub(crate) fn table_precompile<CTX>(
     is_static: bool,
     transfer: &InputsImpl,
     gas_limit: u64,
-) -> Result<InterpreterResult, String>
+) -> Result<InterpreterResult, Error>
 where
     CTX: ContextTr,
     CTX::Db: PrecompileDatabase,
@@ -69,13 +74,23 @@ where
         return Ok(revert("unauthorized caller"));
     }
 
-    match input {
-        // "0xf9d70f69" is the function selector for `ticket_balance_add(uint256,address,uint256)`
-        [0xf9, 0xd7, 0x0f, 0x69, input_data @ ..] => {
-            let (ticket_hash, owner, amount) =
-                TicketTableInput::abi_decode_data(input_data)
-                    .map_err(|e| e.to_string())?;
+    let mut gas = Gas::new(gas_limit);
 
+    if !gas.record_cost(TICKET_TABLE_BASE_COST) {
+        return Ok(revert("OutOfGas"));
+    }
+
+    let interface = match Table::TableCalls::abi_decode(input) {
+        Ok(data) => data,
+        Err(e) => return Ok(revert(e)),
+    };
+
+    let output = match interface {
+        Table::TableCalls::ticket_balance_add(Table::ticket_balance_addCall {
+            ticket_hash,
+            owner,
+            amount,
+        }) => {
             let Ok(added) =
                 context
                     .db_mut()
@@ -83,24 +98,16 @@ where
             else {
                 return Ok(revert(format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}")));
             };
-
             if !added {
                 return Ok(revert("ticket balance overflow"));
             }
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
-                output: Bytes::new(),
-            };
-            Ok(result)
+            None
         }
-        // "0xd93ad063" is the function selector for `ticket_balance_remove(uint256,address,uint256)`
-        [0xd9, 0x3a, 0xd0, 0x63, input_data @ ..] => {
-            let (ticket_hash, owner, amount) =
-                TicketTableInput::abi_decode_data(input_data)
-                    .map_err(|e| e.to_string())?;
-
+        Table::TableCalls::ticket_balance_remove(Table::ticket_balance_removeCall {
+            ticket_hash,
+            owner,
+            amount,
+        }) => {
             let Ok(removed) =
                 context
                     .db_mut()
@@ -108,34 +115,20 @@ where
             else {
                 return Ok(revert(format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}")));
             };
-
             if !removed {
                 return Ok(revert("insufficient ticket balance"));
             }
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
-                output: Bytes::new(),
-            };
-            Ok(result)
+            None
         }
-        // "0x15b0773a" is the function selector for `find_deposit(uint256)`
-        [0x15, 0xb0, 0x77, 0x3a, input_data @ ..] => {
-            let (deposit_id,) = DepositTableInput::abi_decode_data(input_data)
-                .map_err(|e| e.to_string())?;
-
-            let Some(deposit) = context
-                .db_mut()
-                .read_deposit_from_queue(&deposit_id)
-                .map_err(|e| e.to_string())?
+        Table::TableCalls::find_deposit(Table::find_depositCall { deposit_id }) => {
+            // Only internal error is emitted here
+            let Some(deposit) = context.db_mut().read_deposit_from_queue(&deposit_id)?
             else {
                 return Ok(revert(format!(
                     "fetching deposit with id {deposit_id} failed"
                 )));
             };
-
-            let sol_deposit = SolFaDepositWithProxy {
+            let sol_deposit = Table::SolFaDepositWithProxy {
                 amount: u256_to_alloy(&deposit.amount).unwrap_or_default(),
                 receiver: h160_to_alloy(&deposit.receiver),
                 proxy: h160_to_alloy(&deposit.proxy),
@@ -148,21 +141,9 @@ where
                 ))
                 .unwrap_or_default(),
             };
-
-            let output = Bytes::copy_from_slice(&sol_deposit.abi_encode_params());
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
-                output,
-            };
-            Ok(result)
+            Some(Bytes::copy_from_slice(&sol_deposit.abi_encode_params()))
         }
-        // "0x14db7b18" is the function selector for `remove_deposit(uint256)`
-        [0x14, 0xdb, 0x7b, 0x18, input_data @ ..] => {
-            let (deposit_id,) = DepositTableInput::abi_decode_data(input_data)
-                .map_err(|e| e.to_string())?;
-
+        Table::TableCalls::remove_deposit(Table::remove_depositCall { deposit_id }) => {
             if context
                 .db_mut()
                 .remove_deposit_from_queue(&deposit_id)
@@ -172,14 +153,13 @@ where
                     "removing deposit with id {deposit_id} failed"
                 )));
             }
-
-            let result = InterpreterResult {
-                result: InstructionResult::Return,
-                gas: Gas::new(gas_limit - TICKET_TABLE_BASE_COST),
-                output: Bytes::new(),
-            };
-            Ok(result)
+            None
         }
-        _ => Ok(revert("unknown selector")),
-    }
+    };
+
+    Ok(InterpreterResult {
+        result: InstructionResult::Return,
+        gas,
+        output: output.unwrap_or_default(),
+    })
 }

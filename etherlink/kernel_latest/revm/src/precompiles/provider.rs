@@ -14,11 +14,14 @@ use revm::{
 
 use crate::{
     database::PrecompileDatabase,
-    precompiles::constants::{
-        CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+    precompiles::{
+        constants::{
+            CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+        },
+        send_outbox_message::send_outbox_message_precompile,
+        table::table_precompile,
     },
-    precompiles::send_outbox_message::send_outbox_message_precompile,
-    precompiles::table::table_precompile,
+    Error,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -48,7 +51,7 @@ impl EtherlinkPrecompiles {
         inputs: &InputsImpl,
         is_static: bool,
         gas_limit: u64,
-    ) -> Result<Option<InterpreterResult>, String>
+    ) -> Result<Option<InterpreterResult>, Error>
     where
         CTX: ContextTr,
         CTX::Db: PrecompileDatabase,
@@ -116,8 +119,9 @@ where
         is_static: bool,
         gas_limit: u64,
     ) -> Result<Option<Self::Output>, String> {
-        if let Some(custom_result) =
-            self.run_custom_precompile(context, address, inputs, is_static, gas_limit)?
+        if let Some(custom_result) = self
+            .run_custom_precompile(context, address, inputs, is_static, gas_limit)
+            .map_err(|e| e.to_string())?
         {
             return Ok(Some(custom_result));
         }
