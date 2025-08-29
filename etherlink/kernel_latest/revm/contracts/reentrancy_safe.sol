@@ -5,16 +5,12 @@
 pragma solidity ^0.8.24;
 
 contract ReentrancySafe {
+    bool private transient locked;
+
     modifier nonReentrant() {
-        assembly {
-            if tload(0) {
-                revert(0, 0)
-            }
-            tstore(0, 1)
-        }
+        require(!locked, "Reentrancy is not allowed");
+        locked = true;
         _;
-        assembly {
-            tstore(0, 0)
-        }
+        locked = false;
     }
 }
