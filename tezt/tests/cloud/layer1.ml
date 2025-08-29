@@ -43,6 +43,26 @@ let nb_stresstester network tps =
   let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
   max 1 (max n1 n2)
 
+let agent_name_bootstrap : rex = rex "bootstrap-(\\d+)"
+
+let agent_name_stresstest : rex = rex "stresstest-(\\d+)"
+
+let agent_name_baker : rex = rex "baker-(\\d+)"
+
+let agent_name_dal_producer : rex = rex "dal-node-producer-(\\d+)"
+
+let extract_agent_index (r : rex) agent =
+  match Agent.name agent =~* r with
+  | None ->
+      Test.fail "Failed to extract index from agent name %s" (Agent.name agent)
+  | Some i -> int_of_string i
+
+let match_agent_name r agent = Agent.name agent =~ r
+
+let make_agent_name =
+  let index = rex "\\(\\\\d\\+\\)" in
+  fun r i -> replace_string index ~by:(string_of_int i) (show_rex r)
+
 module Node = struct
   open Snapshot_helpers
   include Node
@@ -308,16 +328,19 @@ type stresstest_conf = {tps : int; seed : int}
     - [snapshot]: local path or URL of the snapshot to use for the experiment.
       local path implies to [scp] the snapshot to all the vms.
 
-    - [stake]: stake repartition between baking node, numbers are relatives.
+    - [stake]: stake repartition between baking nodes, numbers are relatives.
 
-      e.g.: [2,1,1] runs 3 bakers, aggregate delegates from the network,
+      [Manual [2,1,1]] runs 3 bakers, aggregate delegates from the network,
       spreading them in 3 pools representing roughly 50%, 25% and 25% of the
       total stake of the network. The same stake repartition using the same
       snapshot will result in the same delegate repartition.
 
       There is a special case using a single number instead of a list, which
-      must match the number of delegates. This scenario will launch one node
-      per delegate (i.e. more than 300 nodes if testing on mainnet).
+      gives the number of bakers to use. Delegates will be distributed as
+      evenly as possible between these bakers.
+
+      [Auto] will spawn one baker per delegate, and the list of delegates will
+      be automatically retrieved from the provided snapshot.
 
     - [maintenance_delay]: number of level which will be multiplied by the
       position in the list of the bakers to define the store merge delay.
@@ -333,7 +356,7 @@ type stresstest_conf = {tps : int; seed : int}
     - [stresstest]: See the description of [stresstest_conf]
   *)
 type configuration = {
-  stake : int list;
+  stake : Scenarios_cli.stake;
   network : Network.t;
   snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
@@ -353,6 +376,24 @@ let stresstest_encoding =
     (fun {tps; seed} -> (tps, seed))
     (fun (tps, seed) -> {tps; seed})
     (obj2 (req "tps" int31) (req "seed" int31))
+
+let stake_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"auto"
+        empty
+        (function Scenarios_cli.Auto -> Some () | _ -> None)
+        (fun () -> Scenarios_cli.Auto);
+      case
+        (Tag 1)
+        ~title:"manual"
+        (list int31)
+        (function Scenarios_cli.Manual d -> Some d | _ -> None)
+        (fun d -> Manual d);
+    ]
 
 let configuration_encoding =
   let open Data_encoding in
@@ -411,7 +452,7 @@ let configuration_encoding =
       })
     (merge_objs
        (obj10
-          (req "stake" (list int31))
+          (dft "stake" stake_encoding Scenarios_cli.(Manual [1]))
           (req "network" Network.encoding)
           (req "snapshot" Snapshot_helpers.encoding)
           (opt "stresstest" stresstest_encoding)
@@ -691,8 +732,8 @@ let init_network ~peers (configuration : configuration) cloud teztale
   Lwt.return (bootstrap, delegates, rich_account)
 
 (** Reserves resources for later usage. *)
-let agent_and_node next_agent cloud ~name =
-  let* agent = next_agent ~name in
+let create_node agent cloud =
+  let name = Agent.name agent in
   let* node = Node.Agent.create ~metadata_size_limit:false ~name cloud agent in
   Lwt.return (agent, node, name)
 
@@ -781,102 +822,35 @@ let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let number_of_bakers ~snapshot ~network ~ppx_profiling ~ppx_profiling_backends:_
-    cloud agent name =
-  let* node =
-    Node.Agent.create ~metadata_size_limit:false ~name:"tmp-node" cloud agent
-  in
-  let* snapshot =
-    Snapshot_helpers.ensure_snapshot
-      ~agent
-      ~name
-      ~network:(Network.to_public network)
-      snapshot
-  in
-  let* () =
-    Node.config_init
-      node
-      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
-  in
-  let* () =
-    Snapshot_helpers.import_snapshot
-      ~env:yes_crypto_env
-      ~no_check:true
-      ~name
-      node
-      snapshot
-  in
-  let* () =
-    Node.Agent.run node (Node_helpers.isolated_args []) ~ppx_profiling
-  in
-  let* () = Node.wait_for_ready node in
-  let* client =
-    Client.Agent.create ~name:"tmp-client" ~endpoint:(Node node) agent
-  in
-  let* n =
-    Client.(
-      rpc GET ["chains"; "main"; "blocks"; "head"; "context"; "delegates"])
-      client
-    |> Lwt.map (fun json -> JSON.(json |> as_list |> List.length))
-  in
-  let* () = Node.Agent.terminate node in
-  Lwt.return n
-
-let init ~(configuration : configuration) cloud next_agent =
+let init ~(configuration : configuration) cloud =
   let () = toplog "Init" in
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
   let* ((bootstrap_agent, bootstrap_node, bootstrap_name) as bootstrap) =
-    agent_and_node next_agent cloud ~name:"bootstrap"
-  in
-  let* stresstest_agents =
-    match configuration.stresstest with
-    | None -> Lwt.return_nil
-    | Some {tps; _} ->
-        List.init (nb_stresstester configuration.network tps) (fun i -> i)
-        |> Lwt_list.map_s @@ fun i ->
-           agent_and_node next_agent cloud ~name:(sf "stresstest-%d" i)
-  in
-  let* producers_agents =
-    Lwt_list.map_s
-      (fun slot_index ->
-        let* agent =
-          agent_and_node
-            next_agent
-            cloud
-            ~name:(sf "dal-node-producer-%d" slot_index)
-        in
-        return (agent, slot_index))
-      (Option.value ~default:[] configuration.dal_node_producers)
-  in
-  let* baker_agents =
-    let* n =
-      if configuration.stake = [] then
-        number_of_bakers
-          ~snapshot:configuration.snapshot
-          ~network:configuration.network
-          ~ppx_profiling:configuration.ppx_profiling
-          ~ppx_profiling_backends:configuration.ppx_profiling_backends
-          cloud
-          bootstrap_agent
-          bootstrap_name
-      else
-        Lwt.return
-          (match configuration.stake with
-          | [n] -> n
-          | _ -> List.length configuration.stake)
+    let agent =
+      List.find
+        (fun a -> match_agent_name agent_name_bootstrap a)
+        (Cloud.agents cloud)
     in
-    let () = toplog "Preparing agents for bakers (%d)" n in
-    List.init n (fun i -> i)
-    |> Lwt_list.map_s @@ fun i ->
-       agent_and_node next_agent cloud ~name:(sf "baker-%d" i)
+    create_node agent cloud
   in
+  let create_nodes fmt =
+    Lwt_list.filter_map_s
+      (fun agent ->
+        if match_agent_name fmt agent then
+          create_node agent cloud |> Lwt.map Option.some
+        else Lwt.return_none)
+      (Cloud.agents cloud)
+  in
+  let* stresstest_agents = create_nodes agent_name_stresstest in
+  let* baker_agents = create_nodes agent_name_baker in
+  let* producers_agents = create_nodes agent_name_dal_producer in
   let* teztale = init_teztale cloud bootstrap_agent in
   let* () = init_explorus cloud bootstrap_node in
   let peers : string list =
     List.map
       (fun (_, node, _) -> Node.point_str node)
-      (stresstest_agents @ List.map fst producers_agents @ baker_agents)
+      (stresstest_agents @ baker_agents @ producers_agents)
   in
   let* bootstrap, baker_accounts, rich_accounts =
     init_network ~peers configuration cloud teztale bootstrap
@@ -895,19 +869,9 @@ let init ~(configuration : configuration) cloud next_agent =
         String_map.fold (fun _alias a acc -> a :: acc) baker_accounts []
       in
       match configuration.stake with
-      | [] ->
-          Lwt.return
-            (List.map (fun baker_account -> [baker_account]) baker_accounts)
-      | [x] ->
-          if List.compare_length_with baker_accounts x != 0 then
-            Test.fail
-              "The number of agents (%d) is not the same as the number of \
-               bakers (%d) retrieved in the yes wallet "
-              x
-              (List.length baker_accounts) ;
-          Lwt.return
-            (List.map (fun baker_account -> [baker_account]) baker_accounts)
-      | stake ->
+      | Auto -> Lwt.return (List.map (fun x -> [x]) baker_accounts)
+      | Manual [] -> Lwt.return_nil
+      | Manual stake ->
           let* accounts =
             toplog
               "init_network: Fetching baker accounts baking power from client" ;
@@ -953,7 +917,8 @@ let init ~(configuration : configuration) cloud next_agent =
   in
   let* producers =
     Lwt_list.mapi_p
-      (fun i ((agent, slot_index), account) ->
+      (fun i (((agent, _, _) as producer_info), account) ->
+        let slot_index = extract_agent_index agent_name_dal_producer agent in
         init_producer_i
           i
           (configuration : configuration)
@@ -962,7 +927,7 @@ let init ~(configuration : configuration) cloud next_agent =
           cloud
           ~peers
           bootstrap.dal_node_p2p_endpoint
-          agent)
+          producer_info)
       (List.combine producers_agents producer_accounts)
   in
   let* stresstesters =
@@ -1046,7 +1011,11 @@ let init ~(configuration : configuration) cloud next_agent =
         Lwt.return stresstesters
   in
   let* () =
-    add_prometheus_source ~node:bootstrap_node cloud bootstrap_agent "bootstrap"
+    add_prometheus_source
+      ~node:bootstrap_node
+      cloud
+      bootstrap_agent
+      bootstrap_name
   in
   let* () =
     Lwt_list.iter_s
@@ -1204,6 +1173,47 @@ let parse_conf encoding file =
 
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
+let number_of_bakers ~snapshot ~(network : Network.t) =
+  let* snapshot =
+    let open Snapshot_helpers in
+    match snapshot with
+    | Local_file path -> Lwt.return path
+    | Docker_embedded path ->
+        toplog "Using locally stored snapshot file: %s" path ;
+        Lwt.return path
+    | Url url ->
+        let path = Temp.file "snapshot_file" in
+        download_snapshot ~path ~url ~name:"host" ()
+    | No_snapshot ->
+        toplog
+          "No snapshot provided. Downloading one for network %s"
+          (Network.to_string network) ;
+        download_snapshot
+          ~url:(Network.snapshot_service @@ Network.to_public network)
+          ~name:"host"
+          ()
+  in
+  let node =
+    let name = "tmp-node" in
+    let data_dir = Temp.dir name in
+    Node.create ~data_dir ~name []
+  in
+  let* () =
+    Node.config_init
+      node
+      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
+  in
+  let* () = Node.snapshot_import ~no_check:true node snapshot in
+  let* () = Node.run node (Node_helpers.isolated_args []) in
+  let* () = Node.wait_for_ready node in
+  let* n =
+    RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
+    |> RPC_core.call_json (Node.as_rpc_endpoint node)
+    |> Lwt.map (fun {RPC_core.body; _} -> JSON.(body |> as_list |> List.length))
+  in
+  let* () = Node.terminate node in
+  Lwt.return n
+
 let register (module Cli : Scenarios_cli.Layer1) =
   let configuration : configuration =
     let stake = Cli.stake in
@@ -1250,7 +1260,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
         }
     | _ ->
         {
-          stake = Option.get stake;
+          stake = Option.value ~default:(Manual [1]) stake;
           network = Option.get network;
           stresstest;
           maintenance_delay =
@@ -1267,7 +1277,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
           fixed_random_seed;
         }
   in
-  if configuration.stake = [] then Test.fail "stake parameter cannot be empty" ;
   if configuration.snapshot = Snapshot_helpers.No_snapshot then
     Test.fail "snapshot parameter cannot be empty" ;
   let with_dal_producers =
@@ -1279,26 +1288,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
     Test.fail
       "Dal producer indices provided but DAL network disabled with \
        `--without-dal`" ;
-
   let vms_conf = Option.map (parse_conf vms_conf_encoding) Cli.vms_config in
   toplog "Parsing CLI done" ;
-  let vms =
-    `Bootstrap
-    ::
-    (match configuration.stake with
-    | [n] -> List.init n (fun i -> `Baker i)
-    | stake -> List.mapi (fun i _ -> `Baker i) stake)
-    @ (match configuration.dal_node_producers with
-      | Some dal_node_producers ->
-          List.map (fun i -> `Producer i) dal_node_producers
-      | None -> [])
-    @
-    match configuration.stresstest with
-    | None -> []
-    | Some {tps; _} ->
-        let n = nb_stresstester configuration.network tps in
-        List.init n (fun i -> `Stresstest i)
-  in
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
@@ -1325,18 +1316,45 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ~name
           ()
   in
-  let vms =
-    vms
-    |> List.map (fun kind ->
+  let vms () =
+    let* vms =
+      let init n = List.init n (fun i -> `Baker i) in
+      let* bakers =
+        match configuration.stake with
+        | Scenarios_cli.Auto ->
+            Lwt.map
+              init
+              (number_of_bakers
+                 ~snapshot:configuration.snapshot
+                 ~network:configuration.network)
+        | Scenarios_cli.Manual stake -> Lwt.return (init (List.length stake))
+      in
+      Lwt.return
+      @@ `Bootstrap
+         :: (bakers
+            @ (match configuration.dal_node_producers with
+              | Some dal_node_producers ->
+                  List.map (fun i -> `Producer i) dal_node_producers
+              | None -> [])
+            @
+            match configuration.stresstest with
+            | None -> []
+            | Some {tps; _} ->
+                let n = nb_stresstester configuration.network tps in
+                List.init n (fun i -> `Stresstest i))
+    in
+    Lwt.return
+    @@ List.map
+         (fun kind ->
            match kind with
            | `Bootstrap ->
-               make_vm_conf ~name:"bootstrap"
+               make_vm_conf ~name:(make_agent_name agent_name_bootstrap 0)
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
            | `Stresstest j ->
-               make_vm_conf ~name:(Format.sprintf "stresstest-%d" j)
+               make_vm_conf ~name:(make_agent_name agent_name_stresstest j)
                @@ Option.bind vms_conf (fun {stresstester; _} -> stresstester)
            | `Baker i ->
-               make_vm_conf ~name:(Format.sprintf "baker-%d" i)
+               make_vm_conf ~name:(make_agent_name agent_name_baker i)
                @@ Option.bind vms_conf (function
                     | {bakers = Some bakers; _} -> List.nth_opt bakers i
                     | {bakers = None; _} -> None)
@@ -1346,11 +1364,12 @@ let register (module Cli : Scenarios_cli.Layer1) =
                     | {producers = Some producers; _} ->
                         List.nth_opt producers i
                     | {producers = None; _} -> None))
+         vms
   in
   Cloud.register
   (* Docker images are pushed before executing the test in case binaries
      are modified locally. This way we always use the latest ones. *)
-    ~vms:(return vms)
+    ~vms
     ~proxy_files:
       ([yes_wallet_exe]
       @
@@ -1364,14 +1383,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;
-  (* We give to the [init] function a sequence of agents. We set their name
-     only if the number of agents is the computed one. Otherwise, the user
-     has mentioned explicitly a reduced number of agents and it is not
-     clear how to give them proper names. *)
-  let next_agent ~name =
-    List.find (fun agent -> Agent.name agent = name) agents |> Lwt.return
-  in
-  let* t = init ~configuration cloud next_agent in
+  let* t = init ~configuration cloud in
   toplog "Starting main loop" ;
   let produce_slot (t : 'network t) level =
     Lwt_list.iter_p

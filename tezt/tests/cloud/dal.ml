@@ -1429,7 +1429,7 @@ let register (module Cli : Scenarios_cli.Dal) =
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image ~name ()
   in
-  let vms =
+  let vms () =
     let* vms in
     return
     @@ List.map

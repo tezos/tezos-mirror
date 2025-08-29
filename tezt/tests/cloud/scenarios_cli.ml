@@ -714,10 +714,12 @@ module Dal () : Dal = struct
       (Option.value ~default:false config.enable_network_health_monitoring)
 end
 
+type stake = Auto | Manual of int list
+
 module type Layer1 = sig
   val network : Network.t option
 
-  val stake : int list option
+  val stake : stake option
 
   val stresstest : (int * int) option
 
@@ -776,21 +778,37 @@ module Layer1 () = struct
       network_typ
       ()
 
-  let stake =
+  let stake : stake option =
+    let typ =
+      let parse = function
+        | "AUTO" | "auto" -> Some Auto
+        | string -> (
+            try
+              match string |> String.split_on_char ',' with
+              | [n] -> Some (Manual (List.init (int_of_string n) (fun _ -> 1)))
+              | distribution ->
+                  Some (Manual (List.map int_of_string distribution))
+            with exn -> raise exn)
+      in
+      let show = function
+        | Auto -> "AUTO"
+        | Manual dist -> List.map string_of_int dist |> String.concat ","
+      in
+      Clap.typ ~name:"stake" ~dummy:(Manual [1]) ~parse ~show
+    in
     Clap.optional
       ~section
       ~long:"stake"
-      ~placeholder:"<integer>,<integer>,<integer>,..."
+      ~placeholder:"AUTO|<nb_of_bakers>|<stake1>,<stake2>,...,<stakeN>"
       ~description:
-        "By default, each delegate will run its own baker node. If that is \
-         what you want, --stake option only takes one integer that is the \
-         number of active bakers on the network (you need to know that number \
-         before starting the experiment). If you want to aggregate delegates \
-         into pools, use a comma-separated list of integers representing \
-         relative weights defining the expected stake repartition. Delegates \
-         will be distributed amongst pools in order to (approximately) respect \
-         the given stake distribution."
-      (Clap.list_of_int ~dummy:[] "stake")
+        "With AUTO, each delegate will run its own baker node. With only one \
+         integer, you give the number of bakers to run, and stake will be \
+         distributed as evenly as possible among all these bakers. Otherwise, \
+         you can specify the stake distribution you want to achieve by giving \
+         a list of relative weight. Delegates will be distributed amongst \
+         pools in order to (approximately) respect the given stake \
+         distribution."
+      typ
       ()
 
   let stresstest =

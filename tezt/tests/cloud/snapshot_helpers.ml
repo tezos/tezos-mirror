@@ -95,14 +95,14 @@ let get_snapshot_info_version node snapshot_path =
   let json = JSON.parse ~origin:"snapshot_info" info in
   Lwt.return JSON.(json |-> "snapshot_header" |-> "version" |> as_int)
 
-let download_snapshot ~agent ~url ~name =
-  let downloaded_snapshot_file_path = "snapshot_file" in
+let download_snapshot ?agent ?(path = "snapshot_file") ~url ~name () =
   toplog "Trying to download snapshot for %s from %s" name url ;
   let* exit_status =
     Process.spawn
-      ?runner:(Agent.runner agent)
+      ?runner:
+        (match agent with None -> None | Some agent -> Agent.runner agent)
       "wget"
-      ["-O"; downloaded_snapshot_file_path; sf "%s/rolling" url]
+      ["-O"; path; sf "%s/rolling" url]
     |> Process.wait
   in
   let* () =
@@ -122,7 +122,7 @@ let download_snapshot ~agent ~url ~name =
         | Error (`Invalid_status reason) ->
             failwith @@ Format.sprintf "wget: %s" reason)
   in
-  Lwt.return downloaded_snapshot_file_path
+  Lwt.return path
 
 let ensure_snapshot_opt ~agent ~name = function
   | Docker_embedded path ->
@@ -133,13 +133,13 @@ let ensure_snapshot_opt ~agent ~name = function
       let* path = Tezt_cloud.Agent.copy agent ~destination:path ~source:path in
       Lwt.return_some path
   | Url url ->
-      let* path = download_snapshot ~agent ~url ~name in
+      let* path = download_snapshot ~agent ~url ~name () in
       Lwt.return_some path
   | No_snapshot -> Lwt.return_none
 
 let ensure_snapshot ~agent ~name ~network = function
   | No_snapshot ->
-      download_snapshot ~agent ~url:(Network.snapshot_service network) ~name
+      download_snapshot ~agent ~url:(Network.snapshot_service network) ~name ()
   | snapshot ->
       let* path = ensure_snapshot_opt ~agent ~name snapshot in
       Lwt.return @@ Option.get path

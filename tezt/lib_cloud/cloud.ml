@@ -620,9 +620,7 @@ let register ?proxy_files ?proxy_args ?vms ~__FILE__ ~title ~tags ?seed ?alerts
   let* vms =
     match vms with
     | None -> Lwt.return_none
-    | Some vms ->
-        let* vms in
-        Lwt.return_some vms
+    | Some vms -> Lwt.map Option.some (vms ())
   in
   let vms =
     match (vms, Env.vms) with
