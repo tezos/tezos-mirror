@@ -353,6 +353,25 @@ let evm_node_lib_dev =
         lwt_domain;
       ]
 
+let floodgate_lib =
+  private_lib
+    "floodgate_lib"
+    ~path:"etherlink/bin_floodgate/lib_floodgate"
+    ~opam:"floodgate"
+    ~deps:
+      [
+        octez_base |> open_ ~m:"TzPervasives";
+        octez_base_unix;
+        efunc_core;
+        octez_rpc_http |> open_;
+        octez_rpc_http_client_unix;
+        octez_clic;
+        evm_node_lib_dev |> open_;
+        evm_node_lib_dev_encoding |> open_;
+        evm_node_config |> open_;
+        octez_workers;
+      ]
+
 let _octez_evm_node_tests =
   tests
     [
@@ -539,15 +558,8 @@ let _floodgate_bin =
       [
         bls12_381_archive;
         octez_base |> open_ ~m:"TzPervasives";
-        octez_base_unix;
-        efunc_core;
-        octez_rpc_http |> open_;
-        octez_rpc_http_client_unix;
-        octez_clic;
-        evm_node_lib_dev |> open_;
-        evm_node_lib_dev_encoding |> open_;
         evm_node_config |> open_;
-        octez_workers;
+        floodgate_lib |> open_;
       ]
 
 let _outbox_monitor =
