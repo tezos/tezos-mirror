@@ -1289,7 +1289,7 @@ fn interpret_one<'a>(
                 // the protocol deliberately uses map costs for the overlay
                 ctx.gas
                     .consume(interpret_cost::map_mem(&key, map.overlay.len())?)?;
-                let result = map.mem(&key, ctx.big_map_storage.as_ref())?;
+                let result = map.mem(&key, &ctx.big_map_storage)?;
                 stack.push(V::Bool(result));
             }
         },
@@ -1307,7 +1307,7 @@ fn interpret_one<'a>(
                 // the protocol intentionally uses map costs for the overlay
                 ctx.gas
                     .consume(interpret_cost::map_get(&key, map.overlay.len())?)?;
-                let result = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                let result = map.get(arena, &key, &ctx.big_map_storage)?;
                 stack.push(V::new_option(result));
             }
         },
@@ -1371,7 +1371,7 @@ fn interpret_one<'a>(
                 // the protocol intentionally uses map costs for the overlay
                 ctx.gas
                     .consume(interpret_cost::map_get_and_update(&key, map.overlay.len())?)?;
-                let opt_old_val = map.get(arena, &key, ctx.big_map_storage.as_ref())?;
+                let opt_old_val = map.get(arena, &key, &ctx.big_map_storage)?;
                 map.update(key, opt_new_val.map(|x| *x));
                 stack.push(V::new_option(opt_old_val));
             }
@@ -1835,7 +1835,7 @@ mod interpreter_tests {
 
     use super::*;
     use super::{Lambda, Or};
-    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorageBulkUpdate};
+    use crate::ast::big_map::{InMemoryLazyStorage, LazyStorage, LazyStorageBulkUpdate};
     use crate::ast::michelson_address as addr;
     use crate::ast::or::Or::Left;
     #[cfg(feature = "bls")]
@@ -3544,7 +3544,7 @@ mod interpreter_tests {
         // overlay semantics are tested in big_map module, here we only check
         // the interpreter works
         let mut ctx = Ctx::default();
-        ctx.big_map_storage = Box::new(InMemoryLazyStorage::new());
+        ctx.big_map_storage = InMemoryLazyStorage::new();
         let big_map_id = ctx
             .big_map_storage
             .big_map_new(&Type::Int, &Type::String)

@@ -24,7 +24,7 @@ pub mod type_props;
 use type_props::TypeProperty;
 
 use crate::ast::annotations::{AnnotationError, NO_ANNS};
-use crate::ast::big_map::{BigMap, BigMapId, LazyStorageError};
+use crate::ast::big_map::{BigMap, BigMapId, LazyStorage, LazyStorageError};
 use crate::ast::micheline::{
     micheline_fields, micheline_instructions, micheline_literals, micheline_types,
     micheline_unsupported_instructions, micheline_unsupported_types, micheline_values,
