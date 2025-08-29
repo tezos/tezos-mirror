@@ -81,7 +81,7 @@ where
                     .db_mut()
                     .ticket_balance_add(&ticket_hash, &owner, amount)
             else {
-                return Ok(revert(&format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}")));
+                return Ok(revert(format!("adding {amount} balance to {owner} failed, ref. ticket hash: {ticket_hash}")));
             };
 
             if !added {
@@ -106,7 +106,7 @@ where
                     .db_mut()
                     .ticket_balance_remove(&ticket_hash, &owner, amount)
             else {
-                return Ok(revert(&format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}")));
+                return Ok(revert(format!("removing {amount} balance from {owner} failed, ref. ticket hash: {ticket_hash}")));
             };
 
             if !removed {
@@ -130,7 +130,7 @@ where
                 .read_deposit_from_queue(&deposit_id)
                 .map_err(|e| e.to_string())?
             else {
-                return Ok(revert(&format!(
+                return Ok(revert(format!(
                     "fetching deposit with id {deposit_id} failed"
                 )));
             };
@@ -168,7 +168,7 @@ where
                 .remove_deposit_from_queue(&deposit_id)
                 .is_err()
             {
-                return Ok(revert(&format!(
+                return Ok(revert(format!(
                     "removing deposit with id {deposit_id} failed"
                 )));
             }
