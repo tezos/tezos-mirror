@@ -146,6 +146,27 @@ module Get_delegates = struct
       |> Lwt.map Environment.wrap_tzresult
     in
     ctxt
+
+  let value_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
+      ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
+    let open Lwt_result_syntax in
+    let r =
+      Protocol.value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
+      |> Lwt.map Environment.wrap_tzresult
+    in
+    Lwt_result.map
+      (fun cache_key ->
+        fun key ->
+         let*! toto = cache_key key in
+         Lwt.return @@ Environment.wrap_tzresult toto)
+      r
 end
 
 let () = Known_protocols.register (module Get_delegates)

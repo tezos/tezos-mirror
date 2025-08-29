@@ -157,6 +157,19 @@ module type PROTOCOL = sig
     predecessor_timestamp:Time.Protocol.t ->
     timestamp:Time.Protocol.t ->
     context tzresult Lwt.t
+
+  val value_of_key :
+    chain_id:Chain_id.t ->
+    predecessor_context:Tezos_protocol_environment.Context.t ->
+    predecessor_timestamp:Time.Protocol.t ->
+    predecessor_level:int32 ->
+    predecessor_fitness:bytes trace ->
+    predecessor:Block_hash.t ->
+    timestamp:Time.Protocol.t ->
+    (Tezos_protocol_environment.Context.cache_key ->
+    Tezos_protocol_environment.Context.cache_value Error_monad.tzresult Lwt.t)
+    tzresult
+    Lwt.t
 end
 
 type protocol = (module PROTOCOL)
