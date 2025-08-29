@@ -14,6 +14,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
+use std::collections::HashMap;
 use tezos_crypto_rs::{
     hash::{ChainId, ContractKt1Hash},
     PublicKeyWithHash,
@@ -450,6 +451,37 @@ pub fn transfer<'a, Host: Runtime>(
             })
         }
     }
+}
+
+fn _get_contract_entrypoint(
+    host: &impl Runtime,
+    context: &context::Context,
+    address: &AddressHash,
+) -> Option<HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+    let contract = contract_from_address(address.clone()).ok()?;
+    let contract_account =
+        TezlinkOriginatedAccount::from_contract(context, &contract).ok()?;
+    let code = contract_account.code(host).ok()?;
+    let parser = Parser::new();
+    let micheline = Micheline::decode_raw(&parser.arena, &code).ok()?;
+    // Note: to typecheck a script, MIR only uses the ctx argument to
+    // consume gas, so it's not a problem to use default values here
+    // except the gas field which should be propagated here.
+    // TODO (Linear issue L2-383): handle gas consumption here.
+    let typechecked = micheline
+        .typecheck_script(&mut mir::context::Ctx::default())
+        .ok()?;
+    let entrypoints_annotations = typechecked.annotations;
+    // Cast  the entry_points_annotations to the expected type
+    let entrypoints = entrypoints_annotations
+        .into_iter()
+        .filter_map(|(field_annotation, (_, ty))| {
+            mir::ast::Entrypoint::try_from(field_annotation)
+                .ok()
+                .map(|entrypoint| (entrypoint, ty.clone()))
+        })
+        .collect();
+    Some(entrypoints)
 }
 
 // Handles manager transfer operations.
