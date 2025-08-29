@@ -1158,6 +1158,7 @@ let rec loop t level =
       |> Seq.take (List.length t.configuration.dal_node_producers)
       |> Seq.map (fun i ->
              Dal_node_helpers.produce_slot
+               t.cloud
                ~client:t.bootstrap.client
                ~producers:t.producers
                ~network:t.configuration.network

@@ -78,6 +78,7 @@ val init_producer :
     attempts to produce and publish a DAL slot commitment for the given [level]
     and producer [index]. *)
 val produce_slot :
+  Cloud.t ->
   client:Client.t ->
   producers:producer list ->
   network:Network.t ->
