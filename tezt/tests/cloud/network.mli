@@ -9,6 +9,7 @@
 type public =
   [ `Mainnet
   | `Ghostnet
+  | `Shadownet
   | `Nextnet of string
     (* date of the genesis block of the current weeklynet;
        format is YYYYMMDD *)
@@ -21,7 +22,7 @@ type public =
 
 type t = [public | `Sandbox]
 
-(** ["mainnet" | "ghostnet" | "rionet" | "seoulnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
+(** ["mainnet" | "ghostnet" | "shadownet" | "rionet" | "seoulnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : [< t] -> string
 
 val public_encoding : public Data_encoding.t
