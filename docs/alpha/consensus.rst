@@ -237,7 +237,7 @@ The concrete values for rewards depend on the issuance which is dynamically adju
 For each block it issues an amount ``total_rewards`` of rewarded tez, that varies with
 the total amount of tez at stake on the chain.
 To obtain some concrete values, we will use as an example the issuance before Adaptive Issuance,
-which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 8s``, this corresponds to a ``total_rewards`` per level of 10.67 tez.
+which was ``80`` tez per minute. With ``MINIMAL_BLOCK_DELAY = 6s``, this corresponds to a ``total_rewards`` per level of 8 tez.
 We define:
 
 - ``baking_reward_fixed_portion := baking_reward_ratio * total_rewards``
@@ -249,33 +249,33 @@ where:
 - ``baking_reward_ratio`` to ``1 / 4``,
 - ``bonus_ratio`` to ``1 / 3``.
 
-Thus, we obtain ``baking_reward_fixed_portion = 2.67`` tez,
-(maximum) ``bonus = 2.67`` tez, and ``attesting_reward = 5.33`` tez.
+Thus, we obtain ``baking_reward_fixed_portion = 2`` tez,
+(maximum) ``bonus = 2`` tez, and ``attesting_reward = 4`` tez.
 The bonus per additional attestation slot is in turn ``bonus /
 (CONSENSUS_COMMITTEE_SIZE / 3)`` (because there are at most
 ``CONSENSUS_COMMITTEE_SIZE / 3`` validator slots corresponding to the
 additional attestations included in a block). The rewards per
 attestation slot are ``attesting_reward / CONSENSUS_COMMITTEE_SIZE``.
 Assuming ``CONSENSUS_COMMITTEE_SIZE = 7000``, we obtain a bonus per slot of
-``2.67 / (7000 / 3) = 0.001143`` tez and an attesting
-rewards per slot of ``5.33 / 7000 = 0.000761`` tez.
+``2 / (7000 / 3) = 0.0008571`` tez and an attesting
+rewards per slot of ``4 / 7000 = 0.000571`` tez.
 
 Let's take an example. Say a block has round 1, is proposed by
 delegate B, and contains the payload from round 0 produced by delegate
 A. Also, B includes attestations with attesting power ``5251``. Then A receives
-the fees and 10 tez (the ``baking_reward_fixed_portion``) as a reward for
+the fees and 2 tez (the ``baking_reward_fixed_portion``) as a reward for
 producing the block's payload. Concerning the bonus, given that
 ``CONSENSUS_COMMITTEE_SIZE = 7000``, the minimum required validator slots is ``4667``, and there are ``2333 = 7000 - 4667`` additional validator slots.
-Therefore B receives the bonus ``(5251 - 4667) * 0.001143 = 0.667512`` tez. (Note
+Therefore B receives the bonus ``(5251 - 4667) * 0.0008571 = 0.5005464`` tez. (Note
 that B only included attestations corresponding to ``584 = 5251 - 4667`` additional validator slots, about a quarter of the
 maximum ``2333`` extra attestations it could have theoretically included.) Finally, consider some
 delegate C, whose baking power at some cycle is 1% of the total stake. Note that
 his expected number of validator slots for that cycle is
-``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 1800 * 7000 = 126,000``
+``1/100 * BLOCKS_PER_CYCLE * CONSENSUS_COMMITTEE_SIZE = 1/100 * 2400 * 7000 = 168,000``
 slots. Assume also that the attesting power of C's attestations
-included during that cycle has been ``91,456`` slots. Given that this number is
-bigger than the minimum required (``126,000 * 2 / 3``), it receives an attesting
-reward of ``126,000 * 0.000761 = 95.886`` tez for that cycle.
+included during that cycle has been ``112,456`` slots. Given that this number is
+bigger than the minimum required (``168,000 * 2 / 3``), it receives an attesting
+reward of ``168,000 * 0.000571 = 95.928`` tez for that cycle.
 
 .. _slashing_alpha:
 
@@ -384,11 +384,11 @@ Consensus related protocol parameters
    * - ``DENUNCIATION_PERIOD``
      - 1 cycle
    * - ``MINIMAL_BLOCK_DELAY``
-     - 8s
+     - 6s
    * - ``BLOCKS_PER_CYCLE``
-     - 1800
+     - 2400
    * - ``DELAY_INCREMENT_PER_ROUND``
-     - 4s
+     - 3s
    * - ``CONSENSUS_RIGHTS_DELAY``
      - 1 cycle
    * - ``GLOBAL_LIMIT_OF_STAKING_OVER_BAKING``
