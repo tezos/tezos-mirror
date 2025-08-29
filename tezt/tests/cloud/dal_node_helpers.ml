@@ -27,12 +27,6 @@ type producer = {
   slot_index : int;
 }
 
-type dal_status =
-  | With_DAL of Z.t
-  | Without_DAL
-  | Out_of_committee
-  | Expected_to_DAL_attest
-
 let may_copy_dal_node_identity_file agent node = function
   | None -> Lwt.return_unit
   | Some source ->

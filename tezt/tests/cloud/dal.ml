@@ -101,7 +101,6 @@ type t = {
 }
 
 let get_infos_per_level t ~level ~metadata =
-  let open Dal_node_helpers in
   let open Metrics in
   let client = t.bootstrap.client in
   let endpoint = t.some_node_rpc_endpoint in

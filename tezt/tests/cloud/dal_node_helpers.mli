@@ -29,24 +29,6 @@ type producer = {
   slot_index : int;
 }
 
-(** "Status" of an attester at some level.
-    There are 5 cases:
-    - The attester is in the DAL committee and sent a dal_attestation -> With_DAL
-    - The attester is in the DAL committee and sent an attestation without DAL -> Without_DAL
-    - The attester is in the DAL committee and sent no attestation -> Expected_to_DAL_attest
-    - The attester is out of the DAL committee (but in the Tenderbake committee) and
-      sent an attestation -> Out_of_committee
-    - The attester is out of the DAL committee and did not send an attestation
-      (this case can happen either because they are out of the Tenderbake committee or
-      because their baker had an issue at this level) -> Those bakers will not be in the
-      `attestations` field of the `per_level_infos` crafted at the current level.
-*)
-type dal_status =
-  | With_DAL of Z.t
-  | Without_DAL
-  | Out_of_committee
-  | Expected_to_DAL_attest
-
 (** [may_copy_dal_node_identity_file agent dal_node identity_file_opt]
     copies the identity file to the DAL node if a source path is provided. *)
 val may_copy_dal_node_identity_file :
