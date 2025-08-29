@@ -72,7 +72,7 @@ module DAL : sig
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
     ignore_pkhs : string list;
-    ppx_profiling : bool option;
+    ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     enable_network_health_monitoring : bool option;
     tezlink : bool option;

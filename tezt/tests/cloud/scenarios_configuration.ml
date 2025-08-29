@@ -83,7 +83,7 @@ module DAL = struct
     proxy_localhost : bool option;
     disable_shard_validation : bool option;
     ignore_pkhs : string list;
-    ppx_profiling : bool option;
+    ppx_profiling_verbosity : string option;
     ppx_profiling_backends : string list;
     enable_network_health_monitoring : bool option;
     tezlink : bool option;
@@ -129,7 +129,7 @@ module DAL = struct
              proxy_localhost;
              disable_shard_validation;
              ignore_pkhs;
-             ppx_profiling;
+             ppx_profiling_verbosity;
              ppx_profiling_backends;
              enable_network_health_monitoring;
              tezlink;
@@ -171,7 +171,7 @@ module DAL = struct
               proxy_localhost,
               disable_shard_validation,
               ignore_pkhs,
-              ppx_profiling,
+              ppx_profiling_verbosity,
               ppx_profiling_backends,
               enable_network_health_monitoring,
               tezlink ) ) ))
@@ -211,7 +211,7 @@ module DAL = struct
                  proxy_localhost,
                  disable_shard_validation,
                  ignore_pkhs,
-                 ppx_profiling,
+                 ppx_profiling_verbosity,
                  ppx_profiling_backends,
                  enable_network_health_monitoring,
                  tezlink ) ) )
@@ -253,7 +253,7 @@ module DAL = struct
           proxy_localhost;
           disable_shard_validation;
           ignore_pkhs;
-          ppx_profiling;
+          ppx_profiling_verbosity;
           ppx_profiling_backends;
           enable_network_health_monitoring;
           tezlink;
@@ -301,7 +301,7 @@ module DAL = struct
                (opt "proxy_localhost" bool)
                (opt "disable_shard_validation" bool)
                (dft "ignore_pkhs" (list string) [])
-               (opt "ppx_profiling" bool)
+               (opt "ppx_profiling_verbosity" string)
                (dft "ppx_profiling_backends" (list string) [])
                (opt "enable_network_health_monitoring" bool)
                (opt "tezlink" bool))))

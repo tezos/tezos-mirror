@@ -112,9 +112,9 @@ let init_producer_accounts ~client ~producer_key ~dal_node_producers =
              which data are produced.")
 
 let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
-    ~snapshot ~memtrace ~ppx_profiling ~ppx_profiling_backends ~ignore_pkhs
-    ~disable_shard_validation ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale
-    account i slot_index agent =
+    ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
+    ~ignore_pkhs ~disable_shard_validation ~node_p2p_endpoint
+    ~dal_node_p2p_endpoint teztale account i slot_index agent =
   let name = name_of_daemon (Producer_l1_node i) in
   let () = toplog "Initializing the DAL producer %s" name in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
@@ -130,7 +130,8 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
       network
       ~with_yes_crypto
       ~snapshot
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
       cloud
       agent
   in
@@ -201,7 +202,7 @@ let init_producer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~event_level:`Notice
       ~disable_shard_validation
       ?ignore_pkhs
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
       ~ppx_profiling_backends
       dal_node
   in
@@ -366,7 +367,7 @@ let producers_not_ready ~producers =
 (* Observer functions *)
 
 let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
-    ~snapshot ~memtrace ~ppx_profiling ~ppx_profiling_backends
+    ~snapshot ~memtrace ~ppx_profiling_verbosity ~ppx_profiling_backends
     ~disable_shard_validation ~node_p2p_endpoint ~dal_node_p2p_endpoint teztale
     ~topic i agent =
   let name = name_of_daemon (Observer_l1_node i) in
@@ -382,7 +383,8 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
       network
       ~with_yes_crypto
       ~snapshot
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
       cloud
       agent
   in
@@ -425,7 +427,7 @@ let init_observer cloud ~data_dir ~simulate_network ~external_rpc ~network
       ~memtrace
       ~event_level:`Notice
       ~disable_shard_validation
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
       ~ppx_profiling_backends
       dal_node
   in

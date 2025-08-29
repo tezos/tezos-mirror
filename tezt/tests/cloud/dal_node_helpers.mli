@@ -60,7 +60,7 @@ val init_producer :
   network:Network.t ->
   snapshot:Snapshot_helpers.t ->
   memtrace:bool ->
-  ppx_profiling:bool ->
+  ppx_profiling_verbosity:string option ->
   ppx_profiling_backends:string list ->
   ignore_pkhs:string list ->
   disable_shard_validation:bool ->
@@ -103,7 +103,7 @@ val init_observer :
   network:Network.t ->
   snapshot:Snapshot_helpers.t ->
   memtrace:bool ->
-  ppx_profiling:bool ->
+  ppx_profiling_verbosity:string option ->
   ppx_profiling_backends:string list ->
   disable_shard_validation:bool ->
   node_p2p_endpoint:string ->

@@ -27,7 +27,7 @@ let init_echo_rollup_account ~client ~echo_rollup ~alias_prefix =
   else Lwt.return_none
 
 let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
-    ~snapshot ~ppx_profiling ~ppx_profiling_backends ~memtrace
+    ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
     ~node_p2p_endpoint ~dal_node_p2p_endpoint operator dal_slots next_agent =
   let name = name_of Echo_rollup_operator in
   let* agent = next_agent ~name in
@@ -43,6 +43,8 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
       network
       ~snapshot
       ~with_yes_crypto
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
       cloud
       agent
   in
@@ -84,7 +86,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
         let* () =
           Dal_node.Agent.run
             ?otel
-            ~ppx_profiling
+            ~ppx_profiling_verbosity
             ~ppx_profiling_backends
             dal_node
         in
@@ -95,7 +97,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
             ~external_rpc
             ~network
             ~snapshot
-            ~ppx_profiling
+            ~ppx_profiling_verbosity
             ~ppx_profiling_backends
             ~memtrace
             ~simulate_network
@@ -185,7 +187,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
   return operator
 
 let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
-    ~snapshot ~ppx_profiling ~ppx_profiling_backends ~memtrace
+    ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
     ~node_p2p_endpoint ~dal_node_p2p_endpoint ~next_agent producers
     echo_rollup_key =
   match echo_rollup_key with
@@ -201,7 +203,7 @@ let init_echo_rollup cloud ~data_dir ~simulate_network ~external_rpc ~network
           ~external_rpc
           ~network
           ~snapshot
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
           ~memtrace
           ~node_p2p_endpoint
