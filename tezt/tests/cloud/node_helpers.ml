@@ -32,7 +32,7 @@ let isolated_config ~peers ~network ~delay =
       No_bootstrap_peers;
       Connections (List.length peers);
       Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
-      Network Network.(to_octez_network_options @@ to_public network);
+      Network Network.(to_octez_network_options network);
       Expected_pow 0;
       Cors_origin "*";
       Storage_maintenance_delay (string_of_int delay);
@@ -155,7 +155,7 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
   in
   let arguments =
     if is_public network then
-      Node.Network (to_octez_network_options @@ to_public network) :: arguments
+      Node.Network (to_octez_network_options network) :: arguments
     else arguments
   in
   toplog "Creating the agent %s." name ;

@@ -83,7 +83,7 @@ module Node = struct
         toplog "Bootstrapping node using the real world" ;
         let config =
           [
-            Network Network.(to_octez_network_options @@ to_public network);
+            Network Network.(to_octez_network_options network);
             Expected_pow 26;
             Cors_origin "*";
             Synchronisation_threshold 0;
@@ -194,7 +194,7 @@ module Node = struct
           (* If the stresstest argument is set we try to find an account with at least 1M tez *)
         ~node
         ~client
-        ~network:(Network.to_string network)
+        ~network:(Network.to_octez_network_options network)
         yes_wallet
     in
     let* delegates, consensus_keys, rich_account_opt =
@@ -347,9 +347,6 @@ type configuration = {
   fixed_random_seed : int option;
 }
 
-let network_encoding =
-  Data_encoding.string_enum [("Mainnet", `Mainnet); ("Ghostnet", `Ghostnet)]
-
 let stresstest_encoding =
   let open Data_encoding in
   conv
@@ -415,7 +412,7 @@ let configuration_encoding =
     (merge_objs
        (obj10
           (req "stake" (list int31))
-          (req "network" network_encoding)
+          (req "network" Network.encoding)
           (req "snapshot" Snapshot_helpers.encoding)
           (opt "stresstest" stresstest_encoding)
           (dft

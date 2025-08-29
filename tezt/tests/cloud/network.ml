@@ -16,95 +16,57 @@ type public =
 
 type t = [`Sandbox | public]
 
+let is_public = function #public -> true | _ -> false
+
+let to_public = function
+  | `Sandbox -> failwith "Sandbox is not public"
+  | #public as p -> p
+
+let to_string = function
+  | `Mainnet -> "mainnet"
+  | `Ghostnet -> "ghostnet"
+  | `Nextnet date -> sf "nextnet-%s" date
+  | `Weeklynet date -> sf "weeklynet-%s" date
+  | `Sandbox -> "sandbox"
+  | `Rionet -> "rionet"
+  | `Seoulnet -> "seoulnet"
+
+let parse = function
+  | "mainnet" -> Some `Mainnet
+  | "ghostnet" -> Some `Ghostnet
+  | "rionet" -> Some `Rionet
+  | "seoulnet" -> Some `Seoulnet
+  | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
+      (* format: weeklynet-2025-01-29 (with dashes) *)
+      let date = String.sub s 10 10 in
+      Some (`Weeklynet date)
+  | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
+      (* format: nextnet-20250203 (without dashes) *)
+      let date = String.sub s 8 8 in
+      Some (`Nextnet date)
+  | "sandbox" -> Some `Sandbox
+  | _ -> None
+
 let public_encoding =
   let open Data_encoding in
-  union
-    [
-      case
-        (Tag 2)
-        ~title:"mainnet"
-        empty
-        (function `Mainnet -> Some () | _ -> None)
-        (fun () -> `Mainnet);
-      case
-        (Tag 3)
-        ~title:"ghostnet"
-        empty
-        (function `Ghostnet -> Some () | _ -> None)
-        (fun () -> `Ghostnet);
-      case
-        (Tag 4)
-        ~title:"nextnet"
-        string
-        (function `Nextnet date -> Some date | _ -> None)
-        (fun date -> `Nextnet date);
-      case
-        (Tag 5)
-        ~title:"weeklynet"
-        string
-        (function `Weeklynet date -> Some date | _ -> None)
-        (fun date -> `Weeklynet date);
-      case
-        (Tag 6)
-        ~title:"rionet"
-        empty
-        (function `Rionet -> Some () | _ -> None)
-        (fun () -> `Rionet);
-      case
-        (Tag 7)
-        ~title:"seoulnet"
-        empty
-        (function `Seoulnet -> Some () | _ -> None)
-        (fun () -> `Seoulnet);
-    ]
+  conv
+    (fun (p : public) -> to_string p)
+    (fun s ->
+      match parse s with
+      | Some (#public as p) -> p
+      | Some `Sandbox -> invalid_arg "public_encoding: sandbox is not public"
+      | None -> invalid_arg ("public_encoding: invalid network: " ^ s))
+    string
 
 let encoding =
   let open Data_encoding in
-  union
-    [
-      case
-        (Tag 1)
-        ~title:"sandbox"
-        empty
-        (function `Sandbox -> Some () | _ -> None)
-        (fun () -> `Sandbox);
-      case
-        (Tag 2)
-        ~title:"mainnet"
-        empty
-        (function `Mainnet -> Some () | _ -> None)
-        (fun () -> `Mainnet);
-      case
-        (Tag 3)
-        ~title:"ghostnet"
-        empty
-        (function `Ghostnet -> Some () | _ -> None)
-        (fun () -> `Ghostnet);
-      case
-        (Tag 4)
-        ~title:"nextnet"
-        string
-        (function `Nextnet date -> Some date | _ -> None)
-        (fun date -> `Nextnet date);
-      case
-        (Tag 5)
-        ~title:"weeklynet"
-        string
-        (function `Weeklynet date -> Some date | _ -> None)
-        (fun date -> `Weeklynet date);
-      case
-        (Tag 6)
-        ~title:"rionet"
-        empty
-        (function `Rionet -> Some () | _ -> None)
-        (fun () -> `Rionet);
-      case
-        (Tag 7)
-        ~title:"seoulnet"
-        empty
-        (function `Seoulnet -> Some () | _ -> None)
-        (fun () -> `Seoulnet);
-    ]
+  conv
+    to_string
+    (fun s ->
+      match parse s with
+      | Some v -> v
+      | None -> invalid_arg ("Network.encoding: invalid network: " ^ s))
+    string
 
 type stake_repartition =
   | Custom of int list
@@ -130,37 +92,6 @@ let stake_repartition_encoding =
         (fun (network, max_nb_bakers) -> Mimic {network; max_nb_bakers});
     ]
 
-let is_public = function #public -> true | _ -> false
-
-let to_public = function
-  | `Sandbox -> failwith "Sandbox is not public"
-  | #public as p -> p
-
-let to_string = function
-  | `Mainnet -> "mainnet"
-  | `Ghostnet -> "ghostnet"
-  | `Nextnet _ -> "nextnet"
-  | `Weeklynet date -> sf "weeklynet-%s" date
-  | `Sandbox -> "sandbox"
-  | `Rionet -> "rionet"
-  | `Seoulnet -> "seoulnet"
-
-let parse = function
-  | "mainnet" -> Some `Mainnet
-  | "ghostnet" -> Some `Ghostnet
-  | "rionet" -> Some `Rionet
-  | "seoulnet" -> Some `Seoulnet
-  | s when String.length s = 20 && String.sub s 0 10 = "weeklynet-" ->
-      (* format: weeklynet-2025-01-29 (with dashes) *)
-      let date = String.sub s 10 10 in
-      Some (`Weeklynet date)
-  | s when String.length s = 16 && String.sub s 0 8 = "nextnet-" ->
-      (* format: nextnet-20250203 (without dashes) *)
-      let date = String.sub s 8 8 in
-      Some (`Nextnet date)
-  | "sandbox" -> Some `Sandbox
-  | _ -> None
-
 let default_protocol : t -> Protocol.t = function
   | `Mainnet -> R022
   | `Ghostnet -> R022
@@ -172,8 +103,14 @@ let default_protocol : t -> Protocol.t = function
 
 let block_time : t -> int = function
   | `Mainnet -> 8
-  | `Ghostnet -> 5
-  | _ -> failwith "Block times are only available for Mainnet and Ghostnet."
+  | `Ghostnet -> 4
+  | `Rionet -> 4
+  | `Seoulnet -> 4
+  | network ->
+      failwith
+        (Format.sprintf
+           "Block time not available for this network: %s."
+           (to_string network))
 
 let next_protocol : t -> Protocol.t = function
   | `Mainnet | `Ghostnet | `Rionet -> S023
@@ -205,6 +142,7 @@ let snapshot_service = function
 let to_octez_network_options = function
   | `Mainnet -> "mainnet"
   | `Ghostnet -> "ghostnet"
+  | `Sandbox -> "sandbox"
   | `Nextnet date -> sf "https://teztnets.com/nextnet-%s" date
   | `Weeklynet date -> sf "https://teztnets.com/weeklynet-%s" date
   | `Rionet -> "https://teztnets.com/rionet"

@@ -55,7 +55,7 @@ val public_rpc_endpoint : public -> Endpoint.t
 val snapshot_service : public -> string
 
 (** Argument to give to the --network option of `octez-node config init`. *)
-val to_octez_network_options : public -> string
+val to_octez_network_options : t -> string
 
 (** Some node to connect to when bootstrapping your node *)
 val default_bootstrap : public -> string
