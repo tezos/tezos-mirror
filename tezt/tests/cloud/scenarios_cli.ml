@@ -167,7 +167,7 @@ module type Dal = sig
 
   val ignore_pkhs : string list
 
-  val ppx_profiling : bool
+  val ppx_profiling_verbosity : string option
 
   val ppx_profiling_backends : string list
 
@@ -683,25 +683,34 @@ module Dal () : Dal = struct
            will not publish the associated shards."
         ()
 
-  let ppx_profiling =
-    Clap.flag
-      ~section
-      ~set_long:"ppx-profiling"
-      ~description:
-        "Enable PPX profiling on all components. The level of verbosity is by \
-         default `Debug` and the format of the output is `txt`. "
-      (Option.value ~default:false config.ppx_profiling)
+  let ppx_profiling_verbosity =
+    Option.fold ~none:config.ppx_profiling_verbosity ~some:Option.some
+    @@ Clap.optional_string
+         ~section
+         ~long:"ppx-profiling-verbosity"
+         ~description:
+           "Enable PPX profiling on all components, with the given level of \
+            verbosity. "
+         ()
 
   let ppx_profiling_backends =
-    config.ppx_profiling_backends
-    @ Clap.list_string
+    let default = config.ppx_profiling_backends in
+    let from_cli =
+      Clap.list_string
         ~section
         ~long:"ppx-profiling-backends"
         ~description:
-          "Select the backends used by the profiler, bypassing the defaults \
-           selection: always `txt` and `json`, and also `prometheus` if \
-           `--prometheus` and `opentelemetry` if `--opentelemetry`."
+          (sf
+             "Select the backends used by the profiler, bypassing the defaults \
+              selection: `%s`, and also `prometheus` if `--prometheus` and \
+              `opentelemetry` if `--opentelemetry`."
+             (String.concat "," default))
         ()
+    in
+    Option.fold
+      ~none:default
+      ~some:Fun.id
+      (match from_cli with [] -> None | _ -> Some from_cli)
 
   let enable_network_health_monitoring =
     Clap.flag
@@ -741,7 +750,7 @@ module type Layer1 = sig
 
   val dal_producers_slot_indices : int list option
 
-  val ppx_profiling : bool
+  val ppx_profiling_verbosity : string option
 
   val ppx_profiling_backends : string list
 end
@@ -749,9 +758,7 @@ end
 module Layer1_default = struct
   let default_maintenance_delay = 1
 
-  let default_ppx_profiling = false
-
-  let default_ppx_profiling_backends = []
+  let default_ppx_profiling_backends = ["txt"]
 
   let default_without_dal = false
 end
@@ -938,25 +945,33 @@ module Layer1 () = struct
       (Clap.list_of_int ~dummy:[] "producer_slot_indices")
       ()
 
-  let ppx_profiling =
-    Clap.flag
+  let ppx_profiling_verbosity =
+    Clap.optional_string
       ~section
-      ~set_long:"ppx-profiling"
-      ~unset_long:"no-ppx-profiling"
+      ~long:"ppx-profiling-verbosity"
       ~description:
-        "Enable PPX profiling on all components. The level of verbosity is by \
-         default `Debug`. "
-      false
+        "Enable PPX profiling on all components, with the given level of \
+         verbosity. "
+      ()
 
   let ppx_profiling_backends =
-    Clap.list_string
-      ~section
-      ~long:"ppx-profiling-backends"
-      ~description:
-        "Select the backends used by the profiler, bypassing the defaults \
-         selection: always `txt` and `json`, and also `prometheus` if \
-         `--prometheus` and `opentelemetry` if `--opentelemetry`."
-      ()
+    let default = Layer1_default.default_ppx_profiling_backends in
+    let from_cli =
+      Clap.list_string
+        ~section
+        ~long:"ppx-profiling-backends"
+        ~description:
+          (sf
+             "Select the backends used by the profiler, bypassing the defaults \
+              selection: `%s`, and also `prometheus` if `--prometheus` and \
+              `opentelemetry` if `--opentelemetry`."
+             (String.concat "," default))
+        ()
+    in
+    Option.fold
+      ~none:default
+      ~some:Fun.id
+      (match from_cli with [] -> None | _ -> Some from_cli)
 end
 
 module type Tezlink = sig

@@ -84,8 +84,9 @@ module Node = struct
      That's why the bootstrap node first syncs for few levels before being
      disconnected from the real network.
   *)
-  let init_bootstrap_node_from_snapshot ~peers ~ppx_profiling
-      (agent, node, name) snapshot network migration_offset =
+  let init_bootstrap_node_from_snapshot ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends (agent, node, name) snapshot network
+      migration_offset =
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
@@ -137,7 +138,8 @@ module Node = struct
         ~env:yes_crypto_env
         node
         (Synchronisation_threshold 0 :: arguments)
-        ~ppx_profiling
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
     in
     wait_for_ready node
 
@@ -146,8 +148,9 @@ module Node = struct
       - import the relevant snapshot
       - run it with yes-crypto enabled and allowed peer lists
   *)
-  let init_node_from_snapshot ~delay ~peers ~ppx_profiling ~snapshot ~network
-      ~migration_offset (agent, node, name) =
+  let init_node_from_snapshot ~delay ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends ~snapshot ~network ~migration_offset
+      (agent, node, name) =
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
@@ -170,7 +173,8 @@ module Node = struct
     let* () =
       Node.Agent.run
         ~env:yes_crypto_env
-        ~ppx_profiling
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         node
         (Synchronisation_threshold 0 :: arguments)
     in
@@ -189,13 +193,15 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
   *)
-  let init_bootstrap_node ?stresstest ?dal_node_producers ~ppx_profiling ~peers
-      ~snapshot ~network ~migration_offset (agent, node, name) =
+  let init_bootstrap_node ?stresstest ?dal_node_producers
+      ~ppx_profiling_verbosity ~ppx_profiling_backends ~peers ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_bootstrap_node_from_snapshot
         ~peers
-        ~ppx_profiling
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         (agent, node, name)
         snapshot
         network
@@ -263,14 +269,16 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
     *)
-  let init_baker_node ?(delay = 0) ~accounts ~peers ~ppx_profiling ~snapshot
-      ~network ~migration_offset (agent, node, name) =
+  let init_baker_node ?(delay = 0) ~accounts ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends ~snapshot ~network ~migration_offset
+      (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
-        ~ppx_profiling
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         ~snapshot
         ~network
         ~migration_offset
@@ -291,13 +299,15 @@ module Node = struct
     Lwt.return client
 
   (** Prerequisite: the chain is running (i.e. bakers are baking blocks) *)
-  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~ppx_profiling ~snapshot
-      ~network ~migration_offset ~tps (agent, node, name) =
+  let init_stresstest_node ?(delay = 0) ~pkh ~pk ~peers ~ppx_profiling_verbosity
+      ~ppx_profiling_backends ~snapshot ~network ~migration_offset ~tps
+      (agent, node, name) =
     let* () =
       init_node_from_snapshot
         ~delay
         ~peers
-        ~ppx_profiling
+        ~ppx_profiling_verbosity
+        ~ppx_profiling_backends
         ~snapshot
         ~network
         ~migration_offset
@@ -364,7 +374,7 @@ type configuration = {
   dal_node_producers : int list option;
   maintenance_delay : int;
   migration_offset : int option;
-  ppx_profiling : bool;
+  ppx_profiling_verbosity : string option;
   ppx_profiling_backends : string list;
   signing_delay : (float * float) option;
   fixed_random_seed : int option;
@@ -407,7 +417,7 @@ let configuration_encoding =
            dal_node_producers;
            maintenance_delay;
            migration_offset;
-           ppx_profiling;
+           ppx_profiling_verbosity;
            ppx_profiling_backends;
            signing_delay;
            fixed_random_seed;
@@ -421,7 +431,7 @@ let configuration_encoding =
           dal_node_producers,
           maintenance_delay,
           migration_offset,
-          ppx_profiling,
+          ppx_profiling_verbosity,
           ppx_profiling_backends ),
         (signing_delay, fixed_random_seed) ))
     (fun ( ( stake,
@@ -432,7 +442,7 @@ let configuration_encoding =
              dal_node_producers,
              maintenance_delay,
              migration_offset,
-             ppx_profiling,
+             ppx_profiling_verbosity,
              ppx_profiling_backends ),
            (signing_delay, fixed_random_seed) )
        ->
@@ -445,7 +455,7 @@ let configuration_encoding =
         dal_node_producers;
         maintenance_delay;
         migration_offset;
-        ppx_profiling;
+        ppx_profiling_verbosity;
         ppx_profiling_backends;
         signing_delay;
         fixed_random_seed;
@@ -466,10 +476,7 @@ let configuration_encoding =
              int31
              Scenarios_cli.Layer1_default.default_maintenance_delay)
           (opt "migration_offset" int31)
-          (dft
-             "ppx_profiling"
-             bool
-             Scenarios_cli.Layer1_default.default_ppx_profiling)
+          (opt "ppx_profiling_verbosity" string)
           (dft
              "ppx_profiling_backends"
              (list string)
@@ -521,7 +528,8 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       ~accounts
       ~delay
       ~peers
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -545,7 +553,7 @@ let init_baker_i i (configuration : configuration) cloud ~peers
       let* () =
         Dal_node.Agent.run
           ~event_level:`Notice
-          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
@@ -581,7 +589,8 @@ let init_baker_i i (configuration : configuration) cloud ~peers
              (fun ({consensus; _} : baker_account) -> consensus.public_key_hash)
              accounts)
         ?dal_node_rpc_endpoint
-        ~ppx_profiling:configuration.ppx_profiling
+        ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+        ~ppx_profiling_backends:configuration.ppx_profiling_backends
         ~client
         ~allow_fixed_random_seed:
           (Option.is_some configuration.fixed_random_seed)
@@ -607,7 +616,8 @@ let init_producer_i i (configuration : configuration) slot_index
       ~accounts:[]
       ~delay
       ~peers
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -632,7 +642,7 @@ let init_producer_i i (configuration : configuration) slot_index
     let* () =
       Dal_node.Agent.run
         ~event_level:`Notice
-        ~ppx_profiling:configuration.ppx_profiling
+        ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
         ~ppx_profiling_backends:configuration.ppx_profiling_backends
         dal_node
     in
@@ -661,7 +671,8 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
       ~pkh
       ~delay
       ~peers
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -678,7 +689,8 @@ let init_network ~peers (configuration : configuration) cloud teztale
       ?stresstest:configuration.stresstest
       ?dal_node_producers:configuration.dal_node_producers
       ~peers
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~snapshot:configuration.snapshot
       ~network:configuration.network
       ~migration_offset:configuration.migration_offset
@@ -704,7 +716,7 @@ let init_network ~peers (configuration : configuration) cloud teztale
         Dal_node.Agent.run
           ~event_level:`Notice
           ~disable_shard_validation
-          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_node
       in
@@ -1226,7 +1238,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let snapshot = Cli.snapshot in
     let without_dal = Cli.without_dal in
     let migration_offset = Cli.migration_offset in
-    let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let signing_delay = Cli.signing_delay in
     let fixed_random_seed = Cli.fixed_random_seed in
@@ -1248,7 +1260,9 @@ let register (module Cli : Scenarios_cli.Layer1) =
           migration_offset =
             (if migration_offset <> None then migration_offset
              else conf.migration_offset);
-          ppx_profiling = ppx_profiling || conf.ppx_profiling;
+          ppx_profiling_verbosity =
+            (if ppx_profiling_verbosity <> None then ppx_profiling_verbosity
+             else conf.ppx_profiling_verbosity);
           ppx_profiling_backends =
             (if ppx_profiling_backends <> [] then ppx_profiling_backends
              else conf.ppx_profiling_backends);
@@ -1271,7 +1285,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
           without_dal;
           dal_node_producers;
           migration_offset;
-          ppx_profiling;
+          ppx_profiling_verbosity;
           ppx_profiling_backends;
           signing_delay;
           fixed_random_seed;

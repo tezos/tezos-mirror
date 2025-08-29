@@ -41,7 +41,7 @@ val init_bakers :
   external_rpc:bool ->
   network:Network.t ->
   snapshot:Snapshot_helpers.t ->
-  ppx_profiling:bool ->
+  ppx_profiling_verbosity:string option ->
   ppx_profiling_backends:string list ->
   memtrace:bool ->
   with_dal:bool ->

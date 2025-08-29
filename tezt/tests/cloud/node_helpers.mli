@@ -56,7 +56,8 @@ val init :
   Network.t ->
   with_yes_crypto:bool ->
   snapshot:Snapshot_helpers.t ->
-  ?ppx_profiling:bool ->
+  ppx_profiling_verbosity:string option ->
+  ppx_profiling_backends:string list ->
   Cloud.t ->
   Agent.t ->
   Node.t Lwt.t

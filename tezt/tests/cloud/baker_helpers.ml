@@ -33,9 +33,10 @@ type per_baker_dal_summary = {
 }
 
 let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
-    ~external_rpc ~network ~snapshot ~ppx_profiling ~ppx_profiling_backends
-    ~memtrace ~with_dal ~disable_shard_validation ~node_p2p_endpoint
-    ~dal_node_p2p_endpoint cloud teztale ~baker_accounts i agent =
+    ~external_rpc ~network ~snapshot ~ppx_profiling_verbosity
+    ~ppx_profiling_backends ~memtrace ~with_dal ~disable_shard_validation
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint cloud teztale ~baker_accounts i
+    agent =
   (* Use the consensus keys when available. *)
   let baking_keys =
     List.map
@@ -73,7 +74,8 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
       network
       ~with_yes_crypto
       ~snapshot
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
       cloud
       agent
   in
@@ -109,7 +111,7 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
           ~memtrace
           ~event_level:`Notice
           ~disable_shard_validation
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
           dal_node
       in
@@ -169,7 +171,8 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
       ~delegates
       ~client
       ?dal_node_rpc_endpoint
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
       node
       cloud
       agent
@@ -185,8 +188,8 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
   Lwt.return {node; dal_node; baker; accounts = baker_accounts; stake}
 
 let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
-    ~network ~snapshot ~ppx_profiling ~ppx_profiling_backends ~memtrace
-    ~with_dal ~disable_shard_validation ~node_p2p_endpoint
+    ~network ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends
+    ~memtrace ~with_dal ~disable_shard_validation ~node_p2p_endpoint
     ~dal_node_p2p_endpoint cloud teztale ~baker_accounts next_agent =
   let* stake in
   let* attesters_agents =
@@ -240,7 +243,7 @@ let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
             ~external_rpc
             ~network
             ~snapshot
-            ~ppx_profiling
+            ~ppx_profiling_verbosity
             ~ppx_profiling_backends
             ~memtrace
             ~with_dal
@@ -264,7 +267,7 @@ let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
               ~external_rpc
               ~network
               ~snapshot
-              ~ppx_profiling
+              ~ppx_profiling_verbosity
               ~ppx_profiling_backends
               ~memtrace
               ~with_dal
@@ -302,7 +305,7 @@ let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
               ~external_rpc
               ~network
               ~snapshot
-              ~ppx_profiling
+              ~ppx_profiling_verbosity
               ~ppx_profiling_backends
               ~memtrace
               ~with_dal

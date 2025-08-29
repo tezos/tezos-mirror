@@ -36,8 +36,6 @@ module Env = struct
     | Some (_ :: _) -> add Dal_node.ignore_topics_environment_variable "yes" env
     | _ -> env
 
-  let default_profiling_verbosity = "Debug"
-
   let txt_profiler_backend = "txt"
 
   let json_profiler_backed = "json"
@@ -64,17 +62,17 @@ module Env = struct
     in
     "\"" ^ String.concat ";" profiling_backends ^ "\""
 
-  let ppx_profiler_env ?prometheus ?otel enable selected_backends env =
-    let profiling_backends =
-      ppx_profiling_backends ?prometheus ?otel selected_backends
-    in
-    env
-    |> may_add enable "PROFILING" default_profiling_verbosity
-    |> may_add enable "PROFILING_BACKENDS" profiling_backends
+  let ppx_profiler_env ?prometheus ?otel verbosity backends env =
+    match verbosity with
+    | None | Some "" -> env
+    | Some verbosity ->
+        let backends = ppx_profiling_backends ?prometheus ?otel backends in
+        env |> add "PROFILING" verbosity |> add "PROFILING_BACKENDS" backends
 
   let initialize_env ~memtrace ~memtrace_output_filename
       ~disable_shard_validation ~prometheus ~otel_endpoint ~service_name
-      ~ignore_pkhs ~ppx_profiling ~ppx_profiling_backends =
+      ~ignore_pkhs ~(ppx_profiling_verbosity : string option)
+      ~(ppx_profiling_backends : string list) =
     empty
     |> memtrace_env memtrace memtrace_output_filename
     |> otel_env otel_endpoint service_name
@@ -83,22 +81,17 @@ module Env = struct
     |> ppx_profiler_env
          ?prometheus
          ?otel:otel_endpoint
-         ppx_profiling
+         ppx_profiling_verbosity
          ppx_profiling_backends
 end
 
-let may_add_profiling_to_env ~ppx_profiling = function
-  | None ->
-      if ppx_profiling then
-        Some
-          (Env.ppx_profiler_env
-             ppx_profiling
-             Env.default_profiling_backends
-             Env.empty)
-      else None
-  | Some env ->
-      Some
-        (Env.ppx_profiler_env ppx_profiling Env.default_profiling_backends env)
+let may_add_profiling_to_env ~ppx_profiling_verbosity:verbosity
+    ~ppx_profiling_backends:backends = function
+  | Some env -> Some (Env.ppx_profiler_env verbosity backends env)
+  | None -> (
+      match verbosity with
+      | None | Some "" -> None
+      | Some _ -> Some (Env.ppx_profiler_env verbosity backends Env.empty))
 
 let create_dir ?runner dir =
   let* () = Process.spawn ?runner "rm" ["-rf"; dir] |> Process.check in
@@ -472,11 +465,15 @@ module Node = struct
         arguments
 
     let run ?env ?patch_config ?on_terminate ?event_level ?event_sections_levels
-        ?(ppx_profiling = false) node args =
+        ~ppx_profiling_verbosity ~ppx_profiling_backends node args =
       let name = name node in
       let* () =
         run
-          ?env:(may_add_profiling_to_env ~ppx_profiling env)
+          ?env:
+            (may_add_profiling_to_env
+               ~ppx_profiling_verbosity
+               ~ppx_profiling_backends
+               env)
           ?patch_config
           ?on_terminate
           ?event_level
@@ -652,7 +649,7 @@ module Dal_node = struct
 
     let run ?prometheus ?otel ?(memtrace = false) ?event_level
         ?(disable_shard_validation = false) ?ignore_pkhs
-        ?(ppx_profiling = false) ?(ppx_profiling_backends = []) dal_node =
+        ~ppx_profiling_verbosity ~ppx_profiling_backends dal_node =
       let service_name = name dal_node in
       let memtrace_output_filename =
         Format.asprintf "%s/%s-trace.ctf" Path.tmp_dir service_name
@@ -666,7 +663,7 @@ module Dal_node = struct
           ~otel_endpoint:otel
           ~service_name
           ~ignore_pkhs
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
       in
       let* () = run ~env ?event_level dal_node in
@@ -921,8 +918,9 @@ module Agnostic_baker = struct
     let init ?(group = "L1") ?env ?name ?event_sections_levels ~delegates
         ?(path = Uses.path Constant.octez_agnostic_baker) ~client
         ?dal_node_rpc_endpoint ?dal_node_timeout_percentage
-        ?(ppx_profiling = false) ?allow_fixed_random_seed ?allow_signing_delay
-        ?extra_arguments node cloud agent =
+        ~ppx_profiling_verbosity ~ppx_profiling_backends
+        ?allow_fixed_random_seed ?allow_signing_delay ?extra_arguments node
+        cloud agent =
       let* path = Agent.copy agent ~source:path in
       let* () =
         Cloud.register_binary
@@ -934,7 +932,11 @@ module Agnostic_baker = struct
       in
       let runner = Agent.runner agent in
       init
-        ?env:(may_add_profiling_to_env ~ppx_profiling env)
+        ?env:
+          (may_add_profiling_to_env
+             ~ppx_profiling_verbosity
+             ~ppx_profiling_backends
+             env)
         ?event_sections_levels
         ?name
         ~event_level:`Notice

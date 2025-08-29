@@ -169,9 +169,9 @@ let init_reverse_proxy cloud ~next_agent ~default_endpoint
   return dal_node
 
 let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
-    ~ppx_profiling ~ppx_profiling_backends ~memtrace ~simulate_network ~name_of
-    ~default_endpoint ~node_p2p_endpoint ~dal_node_p2p_endpoint ~dal_slots
-    ~next_agent ~otel ~cloud =
+    ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
+    ~name_of ~default_endpoint ~node_p2p_endpoint ~dal_node_p2p_endpoint
+    ~dal_slots ~next_agent ~otel ~cloud =
   if dal_slots = [] then failwith "Expected at least a DAL slot." ;
   let* dal_slots_and_nodes =
     dal_slots
@@ -189,9 +189,11 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
                    refutation_game_minimal_rolling_history_mode;
                  ]
                ~rpc_external:external_rpc
-               network
                ~with_yes_crypto
                ~snapshot
+               ~ppx_profiling_verbosity
+               ~ppx_profiling_backends
+               network
                cloud
                agent
            in
@@ -207,7 +209,7 @@ let init_dal_reverse_proxy_observers ~external_rpc ~network ~snapshot
              Dal_node.Agent.run
                ?otel
                ~memtrace
-               ~ppx_profiling
+               ~ppx_profiling_verbosity
                ~ppx_profiling_backends
                dal_node
            in

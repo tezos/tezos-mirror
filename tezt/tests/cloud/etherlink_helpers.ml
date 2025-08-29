@@ -62,9 +62,10 @@ let init_etherlink_operators ~client = function
       in
       return (etherlink_rollup_operator_key, etherlink_batching_operator_keys)
 
-let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
-    ~ppx_profiling_backends ~memtrace ~simulate_network ~node_p2p_endpoint
-    ~dal_node_p2p_endpoint ~dal_slots ~next_agent ~otel ~cloud =
+let init_etherlink_dal_node ~external_rpc ~network ~snapshot
+    ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint ~dal_slots ~next_agent ~otel
+    ~cloud =
   match dal_slots with
   | [] ->
       toplog "Etherlink will run without DAL support" ;
@@ -87,9 +88,11 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
               refutation_game_minimal_rolling_history_mode;
             ]
           ~rpc_external:external_rpc
-          network
           ~with_yes_crypto
           ~snapshot
+          ~ppx_profiling_verbosity
+          ~ppx_profiling_backends
+          network
           cloud
           agent
       in
@@ -102,7 +105,11 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
           dal_node
       in
       let* () =
-        Dal_node.Agent.run ?otel ~ppx_profiling ~ppx_profiling_backends dal_node
+        Dal_node.Agent.run
+          ?otel
+          ~ppx_profiling_verbosity
+          ~ppx_profiling_backends
+          dal_node
       in
       some dal_node
   | _ :: _ :: _ ->
@@ -131,9 +138,11 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
               refutation_game_minimal_rolling_history_mode;
             ]
           ~rpc_external:external_rpc
-          network
           ~with_yes_crypto
           ~snapshot
+          ~ppx_profiling_verbosity
+          ~ppx_profiling_backends
+          network
           cloud
           agent
       in
@@ -148,7 +157,7 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
         Dal_node.Agent.run
           ?otel
           ~memtrace
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
           default_dal_node
       in
@@ -158,7 +167,7 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
           ~external_rpc
           ~network
           ~snapshot
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
           ~memtrace
           ~simulate_network
@@ -175,9 +184,10 @@ let init_etherlink_dal_node ~external_rpc ~network ~snapshot ~ppx_profiling
       some reverse_proxy_dal_node
 
 let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
-    ~snapshot ~ppx_profiling ~ppx_profiling_backends ~memtrace ~simulate_network
-    etherlink_configuration name ~node_p2p_endpoint ~dal_node_p2p_endpoint
-    ~dal_slots ~tezlink account batching_operators agent next_agent =
+    ~snapshot ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
+    ~simulate_network etherlink_configuration name ~node_p2p_endpoint
+    ~dal_node_p2p_endpoint ~dal_slots ~tezlink account batching_operators agent
+    next_agent =
   let chain_id = Option.value ~default:1 etherlink_configuration.chain_id in
   let is_sequencer = etherlink_configuration.etherlink_sequencer in
   let data_dir = data_dir |> Option.map (fun data_dir -> data_dir // name) in
@@ -190,9 +200,11 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
       ~arguments:
         [Peer node_p2p_endpoint; refutation_game_minimal_rolling_history_mode]
       ~rpc_external:external_rpc
-      network
       ~with_yes_crypto
       ~snapshot
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
+      network
       cloud
       agent
   in
@@ -266,7 +278,7 @@ let init_etherlink_operator_setup cloud ~data_dir ~external_rpc ~network
       ~external_rpc
       ~network
       ~snapshot
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
       ~ppx_profiling_backends
       ~memtrace
       ~simulate_network
@@ -530,7 +542,7 @@ let init_etherlink_producer_setup operator name ~node_p2p_endpoint ~rpc_external
   Lwt.return_unit
 
 let init_etherlink cloud ~data_dir ~external_rpc ~network ~snapshot
-    ~ppx_profiling ~ppx_profiling_backends ~memtrace ~simulate_network
+    ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace ~simulate_network
     etherlink_configuration ~node_p2p_endpoint ~dal_node_p2p_endpoint
     etherlink_rollup_operator_key batching_operators ~dal_slots ~tezlink
     next_agent =
@@ -544,7 +556,7 @@ let init_etherlink cloud ~data_dir ~external_rpc ~network ~snapshot
       ~external_rpc
       ~network
       ~snapshot
-      ~ppx_profiling
+      ~ppx_profiling_verbosity
       ~ppx_profiling_backends
       ~memtrace
       ~simulate_network
@@ -582,9 +594,9 @@ let init_etherlink cloud ~data_dir ~external_rpc ~network ~snapshot
   return {configuration = etherlink_configuration; operator; accounts}
 
 let init_etherlink ~data_dir ~simulate_network ~external_rpc ~network ~snapshot
-    ~ppx_profiling ~ppx_profiling_backends ~memtrace ~node_p2p_endpoint
-    ~dal_node_p2p_endpoint ~next_agent ~cloud etherlink_rollup_operator_key
-    etherlink_batching_operator_keys = function
+    ~ppx_profiling_verbosity ~ppx_profiling_backends ~memtrace
+    ~node_p2p_endpoint ~dal_node_p2p_endpoint ~next_agent ~cloud
+    etherlink_rollup_operator_key etherlink_batching_operator_keys = function
   | Some etherlink_configuration ->
       let () = toplog "Init: initializing Etherlink" in
       let () = toplog "Init: Getting Etherlink operator key" in
@@ -608,7 +620,7 @@ let init_etherlink ~data_dir ~simulate_network ~external_rpc ~network ~snapshot
           ~external_rpc
           ~network
           ~snapshot
-          ~ppx_profiling
+          ~ppx_profiling_verbosity
           ~ppx_profiling_backends
           ~memtrace
           ~simulate_network

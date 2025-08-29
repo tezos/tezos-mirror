@@ -58,7 +58,7 @@ type configuration = {
   external_rpc : bool;
   disable_shard_validation : bool;
   ignore_pkhs : string list;
-  ppx_profiling : bool;
+  ppx_profiling_verbosity : string option;
   ppx_profiling_backends : string list;
   network_health_monitoring : bool;
   daily_logs_destination : string option;
@@ -289,7 +289,8 @@ let init_public_network cloud (configuration : configuration)
             configuration.network
             ~with_yes_crypto
             ~snapshot:configuration.snapshot
-            ~ppx_profiling:configuration.ppx_profiling
+            ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+            ~ppx_profiling_backends:configuration.ppx_profiling_backends
             cloud
             agent
         in
@@ -328,7 +329,7 @@ let init_public_network cloud (configuration : configuration)
                 ~memtrace:configuration.memtrace
                 ~event_level:`Notice
                 ~disable_shard_validation
-                ~ppx_profiling:configuration.ppx_profiling
+                ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
                 ~ppx_profiling_backends:configuration.ppx_profiling_backends
                 dal_node
             in
@@ -476,7 +477,8 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
       configuration.network
       ~with_yes_crypto
       ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
+      ~ppx_profiling_backends:configuration.ppx_profiling_backends
       cloud
       agent
   in
@@ -742,7 +744,7 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
           ~memtrace:configuration.memtrace
           ~event_level:`Notice
           ~disable_shard_validation:configuration.disable_shard_validation
-          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           dal_bootstrap_node
   in
@@ -862,7 +864,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       ~external_rpc:configuration.external_rpc
       ~network:configuration.network
       ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~memtrace:configuration.memtrace
       ~with_dal:configuration.with_dal
@@ -886,7 +888,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~network:configuration.network
           ~snapshot:configuration.snapshot
           ~memtrace:configuration.memtrace
-          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~ignore_pkhs:configuration.ignore_pkhs
           ~disable_shard_validation:configuration.disable_shard_validation
@@ -909,7 +911,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
           ~network:configuration.network
           ~snapshot:configuration.snapshot
           ~memtrace:configuration.memtrace
-          ~ppx_profiling:configuration.ppx_profiling
+          ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
           ~ppx_profiling_backends:configuration.ppx_profiling_backends
           ~disable_shard_validation:configuration.disable_shard_validation
           ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
@@ -929,7 +931,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       ~external_rpc:configuration.external_rpc
       ~network:configuration.network
       ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~memtrace:configuration.memtrace
       ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
@@ -945,7 +947,7 @@ let init ~(configuration : configuration) etherlink_configuration cloud
       ~external_rpc:configuration.external_rpc
       ~network:configuration.network
       ~snapshot:configuration.snapshot
-      ~ppx_profiling:configuration.ppx_profiling
+      ~ppx_profiling_verbosity:configuration.ppx_profiling_verbosity
       ~ppx_profiling_backends:configuration.ppx_profiling_backends
       ~memtrace:configuration.memtrace
       ~node_p2p_endpoint:bootstrap.node_p2p_endpoint
@@ -1108,7 +1110,7 @@ let on_new_level t level ~metadata =
                 ~prometheus:Tezt_cloud_cli.prometheus
                 ?otel:t.otel
                 ~memtrace:t.configuration.memtrace
-                ~ppx_profiling:t.configuration.ppx_profiling
+                ~ppx_profiling_verbosity:t.configuration.ppx_profiling_verbosity
                 ~ppx_profiling_backends:t.configuration.ppx_profiling_backends
                 dal_node)
         in
@@ -1333,7 +1335,7 @@ let register (module Cli : Scenarios_cli.Dal) =
     let bakers = Cli.bakers in
     let external_rpc = Cli.node_external_rpc_server in
     let disable_shard_validation = Cli.disable_shard_validation in
-    let ppx_profiling = Cli.ppx_profiling in
+    let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let network_health_monitoring = Cli.enable_network_health_monitoring in
     let daily_logs_destination =
@@ -1368,7 +1370,7 @@ let register (module Cli : Scenarios_cli.Dal) =
         external_rpc;
         disable_shard_validation;
         ignore_pkhs;
-        ppx_profiling;
+        ppx_profiling_verbosity;
         ppx_profiling_backends;
         network_health_monitoring;
         daily_logs_destination;

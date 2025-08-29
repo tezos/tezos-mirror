@@ -142,7 +142,7 @@ let may_init_from_snapshot node ?data_dir ?dal_config ~network ~snapshot
 
 let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
     ?migration_offset ~rpc_external ~name network ~with_yes_crypto ~snapshot
-    ?ppx_profiling cloud agent =
+    ~ppx_profiling_verbosity ~ppx_profiling_backends cloud agent =
   toplog "Initializing an L1 node for %s" name ;
   let net_addr =
     if is_public network then
@@ -202,7 +202,14 @@ let init ?(arguments = []) ?data_dir ?identity_file ?dal_config ?env
       @ yes_crypto_arg @ arguments
   in
   toplog "Launching the node %s." name ;
-  let* () = Node.Agent.run ?ppx_profiling ?env node arguments in
+  let* () =
+    Node.Agent.run
+      ~ppx_profiling_verbosity
+      ~ppx_profiling_backends
+      ?env
+      node
+      arguments
+  in
   toplog "Waiting for the node %s to be ready." name ;
   let* () = Node.wait_for_ready node in
   toplog "Node %s is ready." name ;
