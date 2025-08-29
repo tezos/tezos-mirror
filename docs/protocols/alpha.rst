@@ -93,8 +93,8 @@ Protocol parameters
 -------------------
 
 - Lowered the number of blocks per cycle (``blocks_per_cycle``) from
-  10800 (~1 day) to 1800 (~4 hours) on mainnet (with 8-second minimal
-  block time). (MR :gl:`!17583`)
+  10800 (~1 day) to 2400 (~4 hours) on mainnet (with 6-second minimal
+  block time). (MRs :gl:`!17583`, :gl:`!19045`)
 
   - On ghostnet where minimal block time is 4s, lowered
     ``blocks_per_cycle`` from 10800 (~12 hours) to 3600 (~4
@@ -113,12 +113,14 @@ Protocol parameters
   (that is, ~5 days with old cycle duration) to 30 cycles (~5 days
   with new cycle duration). (MR :gl:`!17583`)
 
-- Reduced blocks per commitment (``blocks_per_commitment``) to 14 to
-  keep the number of nonces per cycle to 128. (:gl:`!17583`)
+- Reduced blocks per commitment (``blocks_per_commitment``) to 18 to
+  keep the number of nonces per cycle to 128. (MRs :gl:`!17583`,
+  :gl:`!19045`)
 
 - Reduced the nonce revelation period (``nonce_revelation_threshold``)
-  from 300 blocks to 150 blocks. Reduced accordingly the VDF
-  difficulty (``vdf_difficulty``) as well. (:gl:`!17583`)
+  from 300 blocks to 200 blocks. Reduced accordingly the VDF
+  difficulty (``vdf_difficulty``) as well. (MRs :gl:`!17583`,
+  :gl:`!19045`)
 
 - Lowered the ``consensus_rights_delay`` protocol constant from 2
   cycles to 1 cycle. (MR :gl:`!18783`)
@@ -142,6 +144,76 @@ Protocol parameters
   unknown, we apply a low tolerance (e.g., after the delegate's
   registration, reactivation, or decreasing its stake below
   ``minimal_stake``). (MR :gl:`!17582`)
+
+
+6s Block Time (MR :gl:`!19045`)
+---------------------------------
+
+Block time have been reduced from 8 seconds to 6 seconds. That is, a
+block can be produced with a delay of 6 seconds with respect to the
+previous block, if both blocks have round 0. This change comes with
+updating many related protocol parameters in order to match the
+reduced block time.
+
+.. list-table:: Changes to protocol parameters
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Parameter (unit)
+     - Old (seoul) value
+     - New value
+   * - ``minimal_block_delay`` (seconds)
+     - ``8``
+     - ``6``
+   * - ``delay_increment_per_round`` (seconds)
+     - ``4``
+     - ``3``
+   * - ``blocks_per_cycle`` (blocks)
+     - ``10800``
+     - ``2400``
+   * - ``blocks_per_commitment`` (blocks)
+     - ``84``
+     - ``18``
+   * - ``nonce_revelation_threshold`` (blocks)
+     - ``300``
+     - ``200``
+   * - ``max_operations_time_to_live`` (blocks)
+     - ``450``
+     - ``600``
+   * - ``hard_gas_limit_per_block`` (gas unit)
+     - ``1386666``
+     - ``1040000``
+
+Smart rollup protocol parameters have been updated with regard to the
+reduction of block time ensuring the same duration as today. For
+example, the challenge window is two weeks.
+
+.. list-table:: Changes to smart rollup protocol parameters
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Parameter (unit)
+     - Old (seoul) value
+     - New value
+   * - ``smart_rollup_challenge_window_in_blocks``
+     - ``151200``
+     - ``201600``
+   * - ``smart_rollup_commitment_period_in_blocks``
+     - ``112``
+     - ``150``
+   * - ``smart_rollup_max_lookahead_in_blocks``
+     - ``324000``
+     - ``432000``
+   * - ``smart_rollup_timeout_period_in_blocks``
+     - ``75600``
+     - ``100800``
+
+The ``smart_rollup_max_active_outbox_levels`` has not been updated,
+and the max allowed period of withdrawal has been reduced in
+consequence to ~10 days because the current storage implementation of
+the executed outbox message in the Layer 1 does not allow to update it
+safely.
+
 
 Bug Fixes
 ---------
