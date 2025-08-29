@@ -8,7 +8,8 @@ use context::Context;
 use mir::ast::{AddressHash, Entrypoint, OperationInfo, TransferTokens};
 use mir::{
     ast::{IntoMicheline, Micheline},
-    context::Ctx,
+    context::CtxTrait,
+    gas::Gas,
     parser::Parser,
 };
 use num_bigint::{BigInt, BigUint};
@@ -171,9 +172,14 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     sender_contract: &Contract,
     sender_account: &mut TezlinkOriginatedAccount,
     parser: &'a Parser<'a>,
-    ctx: &mut Ctx<'a>,
+    source: &AddressHash,
+    gas: &mut Gas,
+    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
+    level: &BlockNumber,
+    now: &Timestamp,
+    chain_id: &ChainId,
 ) -> Result<(), ApplyOperationError> {
     let mut failed = None;
     for (index, OperationInfo { operation, counter }) in
@@ -234,9 +240,14 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                             .map_or(&Entrypoint::default(), |param| &param.entrypoint),
                         value,
                         parser,
-                        ctx,
+                        source,
+                        gas,
+                        operation_counter,
                         all_internal_receipts,
                         origination_nonce,
+                        level,
+                        now,
+                        chain_id,
                     );
                     InternalOperationSum::Transfer(InternalContentWithMetadata {
                         content,
@@ -281,7 +292,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                         result: ContentResult::Skipped,
                     })
                 } else {
-                    let source_contract = contract_from_address(ctx.source.clone())?;
+                    let source_contract = contract_from_address(source.clone())?;
                     let receipt = originate_contract(
                         host,
                         context,
@@ -345,6 +356,106 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
     Ok(())
 }
 
+struct Ctx<'a, Host, Context, Gas, OpCounter, OrigNonce> {
+    host: Host,
+    context: Context,
+    sender: AddressHash,
+    amount: i64,
+    self_address: AddressHash,
+    balance: i64,
+    level: BlockNumber,
+    now: Timestamp,
+    chain_id: ChainId,
+
+    source: AddressHash,
+    gas: Gas,
+    operation_counter: OpCounter,
+    origination_nonce: OrigNonce,
+
+    lazy_storage: mir::ast::big_map::InMemoryLazyStorage<'a>,
+}
+
+impl<'a, Host: Runtime> CtxTrait<'a>
+    for Ctx<'a, &mut Host, &Context, &mut mir::gas::Gas, &mut u128, &mut OriginationNonce>
+{
+    type BigMapStorage = mir::ast::big_map::InMemoryLazyStorage<'a>;
+
+    fn sender(&self) -> AddressHash {
+        self.sender.clone()
+    }
+
+    fn source(&self) -> AddressHash {
+        self.source.clone()
+    }
+
+    fn amount(&self) -> i64 {
+        self.amount
+    }
+
+    fn self_address(&self) -> AddressHash {
+        self.self_address.clone()
+    }
+
+    fn balance(&self) -> i64 {
+        self.balance
+    }
+
+    fn gas(&mut self) -> &mut mir::gas::Gas {
+        self.gas
+    }
+
+    fn level(&self) -> BigUint {
+        self.level.block_number.into()
+    }
+
+    fn min_block_time(&self) -> BigUint {
+        1u32.into()
+    }
+
+    fn chain_id(&self) -> mir::ast::ChainId {
+        self.chain_id.clone()
+    }
+
+    fn voting_power(&self, _: &PublicKeyHash) -> BigUint {
+        0u32.into()
+    }
+
+    fn now(&self) -> num_bigint::BigInt {
+        i64::from(self.now).into()
+    }
+
+    fn total_voting_power(&self) -> BigUint {
+        1u32.into()
+    }
+
+    fn operation_group_hash(&self) -> [u8; 32] {
+        self.origination_nonce.operation.0 .0
+    }
+
+    fn big_map_storage(&mut self) -> &mut mir::ast::big_map::InMemoryLazyStorage<'a> {
+        &mut self.lazy_storage
+    }
+
+    fn origination_counter(&mut self) -> u32 {
+        let c: &mut u32 = &mut self.origination_nonce.index;
+        *c += 1;
+        *c
+    }
+
+    fn operation_counter(&mut self) -> u128 {
+        let c: &mut u128 = self.operation_counter;
+        *c += 1;
+        *c
+    }
+
+    fn lookup_contract(
+        &self,
+        address: &AddressHash,
+    ) -> Option<std::collections::HashMap<mir::ast::Entrypoint, mir::ast::Type>> {
+        get_contract_entrypoint(self.host, self.context, address)
+    }
+}
+
 /// Handles manager transfer operations for both implicit and originated contracts but with a MIR context.
 #[allow(clippy::too_many_arguments)]
 pub fn transfer<'a, Host: Runtime>(
@@ -357,9 +468,14 @@ pub fn transfer<'a, Host: Runtime>(
     entrypoint: &Entrypoint,
     param: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut Ctx<'a>,
+    source: &AddressHash,
+    gas: &mut Gas,
+    operation_counter: &mut u128,
     all_internal_receipts: &mut Vec<InternalOperationSum>,
     origination_nonce: &mut OriginationNonce,
+    level: &BlockNumber,
+    now: &Timestamp,
+    chain_id: &ChainId,
 ) -> Result<TransferSuccess, TransferError> {
     match dest_contract {
         Contract::Implicit(pkh) => {
@@ -404,17 +520,17 @@ pub fn transfer<'a, Host: Runtime>(
                 dest_contract,
                 &mut dest_account,
             )?;
-            ctx.sender = address_from_contract(sender_contract.clone());
-            ctx.amount = amount.0.clone().try_into().map_err(
+            let sender = address_from_contract(sender_contract.clone());
+            let amount = amount.0.clone().try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
             )?;
-            ctx.self_address = address_from_contract(dest_contract.clone());
+            let self_address = address_from_contract(dest_contract.clone());
             let balance = dest_account
                 .balance(host)
                 .map_err(|_| TransferError::FailedToFetchSenderBalance)?;
-            ctx.balance = balance.0.try_into().map_err(
+            let balance = balance.0.try_into().map_err(
                 |err: num_bigint::TryFromBigIntError<num_bigint::BigUint>| {
                     TransferError::MirAmountToNarithError(err.to_string())
                 },
@@ -425,8 +541,27 @@ pub fn transfer<'a, Host: Runtime>(
             let storage = dest_account
                 .storage(host)
                 .map_err(|_| TransferError::FailedToFetchContractStorage)?;
-            let (internal_operations, new_storage) =
-                execute_smart_contract(code, storage, entrypoint, param, parser, ctx)?;
+            let mut ctx = Ctx {
+                host,
+                context,
+                gas,
+                source: source.clone(),
+                sender,
+                amount,
+                self_address,
+                balance,
+                operation_counter,
+                origination_nonce,
+                level: *level,
+                now: *now,
+                chain_id: chain_id.clone(),
+                lazy_storage: mir::ast::big_map::InMemoryLazyStorage::new(),
+            };
+            let (internal_operations, new_storage) = execute_smart_contract(
+                code, storage, entrypoint, param, parser, &mut ctx,
+            )?;
+            let host = ctx.host;
+            let gas = ctx.gas;
             dest_account
                 .set_storage(host, &new_storage)
                 .map_err(|_| TransferError::FailedToUpdateContractStorage)?;
@@ -437,9 +572,14 @@ pub fn transfer<'a, Host: Runtime>(
                 dest_contract,
                 &mut dest_account,
                 parser,
-                ctx,
+                source,
+                gas,
+                ctx.operation_counter,
                 all_internal_receipts,
-                origination_nonce,
+                ctx.origination_nonce,
+                level,
+                now,
+                chain_id,
             )
             .map_err(|err| {
                 TransferError::FailedToExecuteInternalOperation(err.to_string())
@@ -453,7 +593,7 @@ pub fn transfer<'a, Host: Runtime>(
     }
 }
 
-fn _get_contract_entrypoint(
+fn get_contract_entrypoint(
     host: &impl Runtime,
     context: &context::Context,
     address: &AddressHash,
@@ -519,13 +659,7 @@ pub fn transfer_external<Host: Runtime>(
         ),
         None => (&Entrypoint::default(), Micheline::from(())),
     };
-    let mut ctx = Ctx::default();
-    ctx.level = level.block_number.into();
-    ctx.now = i64::from(*now).into();
-    ctx.chain_id = chain_id.clone();
-    ctx.source = address_from_contract(source_contract.clone());
-    ctx.operation_group_hash = origination_nonce.operation.0 .0;
-    ctx.set_origination_counter(origination_nonce.index);
+    let source = address_from_contract(source_contract.clone());
 
     transfer(
         host,
@@ -537,9 +671,14 @@ pub fn transfer_external<Host: Runtime>(
         entrypoint,
         value,
         &parser,
-        &mut ctx,
+        &source,
+        &mut mir::gas::Gas::default(),
+        &mut 0,
         all_internal_receipts,
         origination_nonce,
+        level,
+        now,
+        chain_id,
     )
     .map(Into::into)
 }
@@ -565,7 +704,7 @@ fn originate_contract<Host: Runtime>(
 ) -> Result<OriginationSuccess, OriginationError> {
     if typecheck {
         let parser = Parser::new();
-        let mut ctx = Ctx::default();
+        let mut ctx = mir::context::Ctx::default();
         let contract_micheline = Micheline::decode_raw(&parser.arena, &script.code)
             .map_err(|e| OriginationError::MichelineDecodeError(e.to_string()))?;
         let contract_typechecked =
@@ -785,7 +924,7 @@ fn execute_smart_contract<'a>(
     entrypoint: &Entrypoint,
     value: Micheline<'a>,
     parser: &'a Parser<'a>,
-    ctx: &mut Ctx<'a>,
+    ctx: &mut impl CtxTrait<'a>,
 ) -> Result<(impl Iterator<Item = OperationInfo<'a>>, Vec<u8>), TransferError> {
     // Parse and typecheck the contract
     let contract_micheline = Micheline::decode_raw(&parser.arena, &code)?;
