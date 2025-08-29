@@ -564,7 +564,40 @@ let get_context ?level ~network_opt base_dir =
   in
   let*! protocol_hash = Store.Block.protocol_hash_exn main_chain_store block in
   let header = header.shell in
-  return (protocol_hash, context, header, store)
+  return (protocol_hash, context, header, store, block)
+
+let load_cache (module P : Sigs.PROTOCOL) context store block =
+  let open Lwt_result_syntax in
+  let open Tezos_store in
+  let predecessor_context = context in
+  let chain_store = Store.main_chain_store store in
+  let chain_id = Store.Chain.chain_id chain_store in
+  let Block_header.
+        {
+          timestamp = predecessor_timestamp;
+          level = predecessor_level;
+          fitness = predecessor_fitness;
+          _;
+        } =
+    Store.Block.shell_header block
+  in
+  let predecessor = Store.Block.hash block in
+  let timestamp = Time.System.to_protocol (Time.System.now ()) in
+  let* value_of_key =
+    P.value_of_key
+      ~chain_id
+      ~predecessor_context
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+  in
+  Tezos_protocol_environment.Context.load_cache
+    predecessor
+    predecessor_context
+    `Lazy
+    value_of_key
 
 let unexpected_protocol protocol_hash =
   if
@@ -592,6 +625,18 @@ let unexpected_protocol protocol_hash =
           Protocol_hash.pp)
       (List.map (fun (module P : Sigs.PROTOCOL) -> P.hash)
       @@ Known_protocols.get_all ())
+
+let get_context_with_loaded_cache ?level ~network_opt base_dir =
+  let open Lwt_result_syntax in
+  let* protocol_hash, context, header, store, block =
+    get_context ?level ~network_opt base_dir
+  in
+  match protocol_of_hash protocol_hash with
+  | None -> unexpected_protocol protocol_hash
+  | Some protocol ->
+      Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+      let* context = load_cache protocol context store block in
+      return (protocol, context, header, store)
 
 exception
   Done of (Signature.public_key_hash * Signature.public_key * int64) list
@@ -698,119 +743,101 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
     ?rich_accounts_over ~active_bakers_only base_dir alias_pkh_pk_list
     other_accounts_pkh =
   let open Lwt_result_syntax in
-  let* protocol_hash, context, header, store =
-    get_context ?level ~network_opt base_dir
+  let* protocol, context, header, store =
+    get_context_with_loaded_cache ?level ~network_opt base_dir
   in
-  match protocol_of_hash protocol_hash with
-  | None -> unexpected_protocol protocol_hash
-  | Some protocol ->
-      let* ( (delegates :
-               (Signature.public_key_hash
-               * Signature.public_key
-               * (Signature.public_key_hash * Signature.public_key) option
-               * int64
-               * int64
-               * int64)
-               list),
-             other_accounts ) =
-        Format.printf
-          "@[<h>Detected protocol:@;<10 0>%a@]@."
-          pp_protocol
-          protocol ;
-        get_delegates_and_accounts
-          protocol
-          context
-          header
-          active_bakers_only
-          staking_share_opt
-          other_accounts_pkh
-      in
-      let with_alias =
-        List.fold_left_i
-          (fun i
-               acc
-               (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
-             ->
-            let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-            let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-            let ck =
-              match ck with
-              | Some (cpkh, cpk) ->
-                  let cpkh =
-                    Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
-                  in
-                  let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
-                  Some (cpkh, cpk)
-              | None -> None
-            in
-            let alias =
-              List.find_map
-                (fun (alias, pkh', _) ->
-                  if String.equal pkh' pkh then Some alias else None)
-                alias_pkh_pk_list
-            in
-            let alias =
-              Option.value_f alias ~default:(fun () ->
-                  Format.asprintf "baker_%d" i)
-            in
-            let delegate_alias =
-              ( alias,
-                pkh,
-                pk,
-                ck,
-                stake,
-                frozen_deposits,
-                unstake_frozen_deposits )
-            in
-            let consensus_key_alias =
-              match ck with
-              | None -> []
-              | Some (cpkh, cpk) ->
-                  [(alias ^ "_consensus_key", cpkh, cpk, None, 0L, 0L, 0L)]
-            in
-            consensus_key_alias @ (delegate_alias :: acc))
-          []
-          delegates
-        |> List.rev
-      in
-      let* rich_accounts =
-        match rich_accounts_over with
-        | Some (count, min) ->
-            let* r =
-              get_rich_accounts
-                protocol
-                context
-                header
-                ~count
-                ~min_threshold:min
-            in
-            List.map
-              (fun (alias, pkh, pk, tez) ->
-                ( alias,
-                  Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
-                  Tezos_crypto.Signature.Public_key.to_b58check pk,
-                  tez ))
-              r
-            |> return
-        | None -> return []
-      in
-      let other_accounts =
+  let* ( (delegates :
+           (Signature.public_key_hash
+           * Signature.public_key
+           * (Signature.public_key_hash * Signature.public_key) option
+           * int64
+           * int64
+           * int64)
+           list),
+         other_accounts ) =
+    Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+    get_delegates_and_accounts
+      protocol
+      context
+      header
+      active_bakers_only
+      staking_share_opt
+      other_accounts_pkh
+  in
+  let with_alias =
+    List.fold_left_i
+      (fun i
+           acc
+           (pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+         ->
+        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+        let ck =
+          match ck with
+          | Some (cpkh, cpk) ->
+              let cpkh =
+                Tezos_crypto.Signature.Public_key_hash.to_b58check cpkh
+              in
+              let cpk = Tezos_crypto.Signature.Public_key.to_b58check cpk in
+              Some (cpkh, cpk)
+          | None -> None
+        in
+        let alias =
+          List.find_map
+            (fun (alias, pkh', _) ->
+              if String.equal pkh' pkh then Some alias else None)
+            alias_pkh_pk_list
+        in
+        let alias =
+          Option.value_f alias ~default:(fun () -> Format.asprintf "baker_%d" i)
+        in
+        let delegate_alias =
+          (alias, pkh, pk, ck, stake, frozen_deposits, unstake_frozen_deposits)
+        in
+        let consensus_key_alias =
+          match ck with
+          | None -> []
+          | Some (cpkh, cpk) ->
+              [(alias ^ "_consensus_key", cpkh, cpk, None, 0L, 0L, 0L)]
+        in
+        consensus_key_alias @ (delegate_alias :: acc))
+      []
+      delegates
+    |> List.rev
+  in
+  let* rich_accounts =
+    match rich_accounts_over with
+    | Some (count, min) ->
+        let* r =
+          get_rich_accounts protocol context header ~count ~min_threshold:min
+        in
         List.map
-          (fun (pkh, pk) ->
-            let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
-            let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
-            let alias =
-              List.find_map
-                (fun (alias, pkh', _) ->
-                  if String.equal pkh' pkh then Some alias else None)
-                alias_pkh_pk_list
-            in
-            let alias = Option.value alias ~default:pkh in
-            (alias, pkh, pk))
-          other_accounts
-      in
-      let*! () = Tezos_store.Store.close_store store in
-      return (with_alias, rich_accounts, other_accounts)
+          (fun (alias, pkh, pk, tez) ->
+            ( alias,
+              Tezos_crypto.Signature.Public_key_hash.to_b58check pkh,
+              Tezos_crypto.Signature.Public_key.to_b58check pk,
+              tez ))
+          r
+        |> return
+    | None -> return []
+  in
+  let other_accounts =
+    List.map
+      (fun (pkh, pk) ->
+        let pkh = Tezos_crypto.Signature.Public_key_hash.to_b58check pkh in
+        let pk = Tezos_crypto.Signature.Public_key.to_b58check pk in
+        let alias =
+          List.find_map
+            (fun (alias, pkh', _) ->
+              if String.equal pkh' pkh then Some alias else None)
+            alias_pkh_pk_list
+        in
+        let alias = Option.value alias ~default:pkh in
+        (alias, pkh, pk))
+      other_accounts
+  in
+  let*! () = Tezos_store.Store.close_store store in
+  return (with_alias, rich_accounts, other_accounts)
 
 (** [load_contracts ?dump_contracts ?network ?level base_dir] checkouts the block
     context at the given [base_dir] (at level [?level] or defaulting
@@ -819,18 +846,12 @@ let load_bakers_public_keys ?staking_share_opt ?(network_opt = "mainnet") ?level
 *)
 let load_contracts ?dump_contracts ?(network_opt = "mainnet") ?level base_dir =
   let open Lwt_result_syntax in
-  let* protocol_hash, context, header, store =
-    get_context ?level ~network_opt base_dir
+  let* protocol, context, header, store =
+    get_context_with_loaded_cache ?level ~network_opt base_dir
   in
   let* (contracts : contract_info list) =
-    match protocol_of_hash protocol_hash with
-    | None -> unexpected_protocol protocol_hash
-    | Some protocol ->
-        Format.printf
-          "@[<h>Detected protocol:@;<10 0>%a@]@."
-          pp_protocol
-          protocol ;
-        get_contracts ?dump_contracts protocol context header
+    Format.printf "@[<h>Detected protocol:@;<10 0>%a@]@." pp_protocol protocol ;
+    get_contracts ?dump_contracts protocol context header
   in
   let*! () = Tezos_store.Store.close_store store in
   return contracts
