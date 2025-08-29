@@ -3,6 +3,8 @@
 //
 // SPDX-License-Identifier: MIT
 
+use std::fmt::Display;
+
 use revm::{
     context::{Cfg, ContextTr, LocalContextTr},
     handler::{EthPrecompiles, PrecompileProvider},
@@ -68,6 +70,8 @@ impl EtherlinkPrecompiles {
 
         match *address {
             SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS => {
+                // Can't return kernel errors
+                // Every unexpected behavior will lead to a revert of the precompile execution
                 let result = send_outbox_message_precompile(
                     &input_bytes,
                     context,
@@ -75,10 +79,10 @@ impl EtherlinkPrecompiles {
                     inputs,
                     gas_limit,
                 );
-                let interpreter_res = result.unwrap_or_else(|e| revert(&e.to_string()));
-                Ok(Some(interpreter_res))
+                Ok(Some(result))
             }
             TABLE_PRECOMPILE_ADDRESS => {
+                // Has one kernel internal failure point from host functions
                 let result = table_precompile(
                     &input_bytes,
                     context,
@@ -131,10 +135,13 @@ where
     }
 }
 
-pub(crate) fn revert(reason: &str) -> InterpreterResult {
+pub(crate) fn revert<R>(reason: R) -> InterpreterResult
+where
+    R: Display,
+{
     InterpreterResult {
         result: InstructionResult::Revert,
         gas: Gas::new(0),
-        output: Bytes::copy_from_slice(reason.as_bytes()),
+        output: Bytes::copy_from_slice(reason.to_string().as_bytes()),
     }
 }
