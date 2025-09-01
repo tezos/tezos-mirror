@@ -371,4 +371,8 @@ impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
     pub fn store_sequencer_key_change(&mut self, upgrade: SequencerKeyChange) {
         self.layered_state.store_sequencer_key_change(upgrade)
     }
+
+    pub fn log(&mut self, log: Log) {
+        self.inner.log(log)
+    }
 }

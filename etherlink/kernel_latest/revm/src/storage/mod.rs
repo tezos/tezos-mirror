@@ -4,5 +4,5 @@
 
 pub(crate) mod block;
 pub(crate) mod code;
-pub(crate) mod sequencer_key_change;
+pub mod sequencer_key_change;
 pub mod world_state_handler;

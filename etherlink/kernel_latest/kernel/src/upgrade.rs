@@ -37,6 +37,7 @@ use tezos_storage::read_optional_rlp;
 const KERNEL_UPGRADE: RefPath = RefPath::assert_from(b"/evm/kernel_upgrade");
 pub const KERNEL_ROOT_HASH: RefPath = RefPath::assert_from(b"/evm/kernel_root_hash");
 const SEQUENCER_UPGRADE: RefPath = RefPath::assert_from(b"/evm/sequencer_upgrade");
+pub use revm_etherlink::storage::world_state_handler::SEQUENCER_KEY_CHANGE_PATH as SEQUENCER_KEY_CHANGE;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct KernelUpgrade {
@@ -226,6 +227,7 @@ fn sequencer_upgrade<Host: Runtime>(
     store_sequencer(host, sequencer)?;
     store_sequencer_pool_address(host, pool_address)?;
     delete_sequencer_upgrade(host)?;
+    delete_sequencer_key_change(host)?;
     log!(host, Info, "Sequencer has been updated.");
     Ok(())
 }
@@ -236,6 +238,47 @@ pub fn possible_sequencer_upgrade<Host: Runtime>(host: &mut Host) -> anyhow::Res
         let ipl_timestamp = storage::read_last_info_per_level_timestamp(host)?;
         if ipl_timestamp >= upgrade.activation_timestamp {
             sequencer_upgrade(host, upgrade.pool_address, &upgrade.sequencer)?;
+            blueprint_storage::clear_all_blueprints(host)?;
+        }
+    }
+    Ok(())
+}
+
+pub use revm_etherlink::storage::sequencer_key_change::SequencerKeyChange as EVMBasedSequencerKeyChange;
+
+pub fn read_sequencer_key_change<Host: Runtime>(
+    host: &Host,
+) -> anyhow::Result<Option<EVMBasedSequencerKeyChange>> {
+    let path = OwnedPath::from(SEQUENCER_KEY_CHANGE);
+    read_optional_rlp(host, &path).context("Failed to decode sequencer key change")
+}
+
+fn delete_sequencer_key_change<Host: Runtime>(host: &mut Host) -> anyhow::Result<()> {
+    host.store_delete(&SEQUENCER_KEY_CHANGE)
+        .context("Failed to delete sequencer key change")
+}
+
+fn sequencer_key_change<Host: Runtime>(
+    host: &mut Host,
+    key_change: EVMBasedSequencerKeyChange,
+) -> anyhow::Result<()> {
+    log!(host, Info, "EVM based sequencer key change initialisation.");
+
+    store_sequencer(host, key_change.sequencer_key())?;
+    delete_sequencer_key_change(host)?;
+
+    log!(host, Info, "Sequencer key has been updated.");
+    Ok(())
+}
+
+pub fn possible_sequencer_key_change<Host: Runtime>(
+    host: &mut Host,
+    evm_timestamp: Timestamp,
+) -> anyhow::Result<()> {
+    let upgrade = read_sequencer_key_change(host)?;
+    if let Some(upgrade) = upgrade {
+        if evm_timestamp >= upgrade.activation_timestamp() {
+            sequencer_key_change(host, upgrade)?;
             blueprint_storage::clear_all_blueprints(host)?;
         }
     }

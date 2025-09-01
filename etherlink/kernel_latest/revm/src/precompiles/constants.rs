@@ -55,17 +55,25 @@ pub(crate) const GLOBAL_COUNTER_PRECOMPILE_ADDRESS: Address = Address(FixedBytes
     0x00, 0x00, 0x00, 0x00, 0x00, 0x05,
 ]));
 
+pub(crate) const CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS: Address =
+    Address(FixedBytes::new([
+        0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
+    ]));
+
 #[cfg(test)]
 pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0xde, 0xad,
 ]));
 
-pub(crate) const CUSTOMS: [Address; 4] = [
+pub(crate) const CUSTOMS: [Address; 6] = [
     WITHDRAWAL_SOL_ADDR,
     FA_WITHDRAWAL_SOL_ADDR,
     SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS,
     TABLE_PRECOMPILE_ADDRESS,
+    GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
+    CHANGE_SEQUENCER_KEY_PRECOMPILE_ADDRESS,
 ];
 
 // Rationale regarding the cost:
@@ -79,6 +87,12 @@ pub(crate) const TICKET_TABLE_BASE_COST: u64 = 5000;
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
 pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 5000;
+
+// Rationale regarding the cost:
+// Covers the cost of 2 r/w access on cold keys.
+pub(crate) const UPGRADE_SEQUENCER_PRECOMPILE_BASE_COST: u64 = 5000;
+
+pub(crate) const SEQUENCER_UPGRADE_DELAY: u64 = 60 * 60 * 24; // 24 hours
 
 #[cfg(test)]
 mod test {

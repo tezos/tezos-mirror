@@ -57,6 +57,9 @@ pub trait InternalRuntime {
 // of the root directory.
 pub trait ExtendedRuntime {
     fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError>;
+    /// Read all bytes from the internal storage at the given path. (bypass all storage copies)
+    fn internal_store_read_all<T: Path>(&self, path: &T)
+        -> Result<Vec<u8>, RuntimeError>;
 }
 
 pub struct InternalHost();

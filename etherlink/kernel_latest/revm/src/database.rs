@@ -28,10 +28,10 @@ use tezos_crypto_rs::{
     hash::{ContractKt1Hash, HashTrait},
     public_key::PublicKey,
 };
-use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level::Error as LogError};
 use tezos_evm_runtime::runtime::Runtime;
+use tezos_smart_rollup_host::runtime::RuntimeError;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
     /// Runtime host
@@ -238,17 +238,28 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
     }
 
     fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
-        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
-        PublicKey::nom_read_exact(&bytes).map_err(|_| {
-            CustomPrecompileError::Revert("Failed to read sequencer key".into())
+        let bytes = self.host.internal_store_read_all(&SEQUENCER_KEY_PATH)?;
+        PublicKey::from_b58check(std::str::from_utf8(&bytes).map_err(|e| {
+            CustomPrecompileError::Revert(format!(
+                "Invalid sequencer key UTF-8 encoding: {e}"
+            ))
+        })?)
+        .map_err(|e| {
+            CustomPrecompileError::Revert(format!(
+                "Invalid sequencer key Base58Check encoding: {e}"
+            ))
         })
     }
 
     fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
-        Ok(self
+        match self
             .host
-            .store_has(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)?
-            .is_some())
+            .internal_store_read_all(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)
+        {
+            Ok(_) => Ok(true),
+            Err(RuntimeError::PathNotFound) => Ok(false),
+            Err(e) => Err(CustomPrecompileError::from(e)),
+        }
     }
 }
 

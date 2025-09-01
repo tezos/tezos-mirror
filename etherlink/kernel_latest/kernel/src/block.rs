@@ -528,6 +528,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
             included_delayed_transactions,
             block,
         }) => {
+            let timestamp = block.timestamp();
             promote_block(
                 &mut safe_host,
                 &outbox_queue,
@@ -536,6 +537,7 @@ pub fn produce<Host: Runtime, ChainConfig: ChainConfigTrait>(
                 config,
                 included_delayed_transactions,
             )?;
+            upgrade::possible_sequencer_key_change(safe_host.host, timestamp)?;
 
             if storage::evm_node_flag(safe_host.host)? {
                 Ok(ComputationResult::Finished)

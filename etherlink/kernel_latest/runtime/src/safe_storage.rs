@@ -45,6 +45,14 @@ impl<Host: Runtime> ExtendedRuntime for SafeStorage<&mut Host> {
         let path = safe_path(path)?;
         self.__internal_store_get_hash(&path)
     }
+
+    #[inline(always)]
+    fn internal_store_read_all<T: Path>(
+        &self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.host.store_read_all(path)
+    }
 }
 
 impl<Host: Runtime> SdkRuntime for SafeStorage<&mut Host> {

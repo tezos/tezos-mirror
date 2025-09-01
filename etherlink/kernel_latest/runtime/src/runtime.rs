@@ -294,6 +294,13 @@ impl<R: SdkRuntime, Host: BorrowMut<R> + Borrow<R>, Internal: InternalRuntime>
     fn store_get_hash<T: Path>(&mut self, path: &T) -> Result<Vec<u8>, RuntimeError> {
         self.__internal_store_get_hash(path)
     }
+
+    fn internal_store_read_all<T: Path>(
+        &self,
+        path: &T,
+    ) -> Result<Vec<u8>, RuntimeError> {
+        self.host.borrow().store_read_all(path)
+    }
 }
 
 impl<R: SdkRuntime, Host: Borrow<R> + BorrowMut<R>, Internal>
