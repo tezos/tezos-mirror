@@ -1414,6 +1414,14 @@ let register (module Cli : Scenarios_cli.Dal) =
     ~title:"DAL node benchmark"
     ~tags:[]
     (fun cloud ->
+      toplog "Prepare artifacts directory and export the full configuration" ;
+      Artifact_helpers.prepare_artifacts
+        ~scenario_config:
+          ( "DAL",
+            Data_encoding.Json.construct
+              Scenarios_configuration.DAL.encoding
+              Cli.config )
+        () ;
       toplog "Creating the agents" ;
       if
         (not configuration.with_dal)

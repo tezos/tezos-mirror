@@ -122,6 +122,8 @@ module type Dal = sig
   val slot_size : int option
 
   val number_of_slots : int option
+
+  val config : Scenarios_configuration.DAL.t
 end
 
 module Dal () : Dal = struct
