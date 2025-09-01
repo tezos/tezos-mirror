@@ -1064,73 +1064,23 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   Lwt.return n
 
 let register (module Cli : Scenarios_cli.Layer1) =
-  let configuration =
-    let open Scenarios_configuration.LAYER1 in
-    let stake = Cli.stake in
-    let network = Cli.network in
-    let stresstest = Cli.stresstest in
-    let dal_node_producers = Cli.dal_producers_slot_indices in
-    let maintenance_delay = Cli.maintenance_delay in
-    let snapshot = Cli.snapshot in
-    let without_dal = Cli.without_dal in
-    let migration_offset = Cli.migration_offset in
-    let ppx_profiling_verbosity = Cli.ppx_profiling_verbosity in
-    let ppx_profiling_backends = Cli.ppx_profiling_backends in
-    let signing_delay = Cli.signing_delay in
-    let fixed_random_seed = Cli.fixed_random_seed in
-    let octez_release = Cli.octez_release in
-    match Tezt_cloud_cli.scenario_specific_json with
-    | Some ("LAYER1", json) ->
-        let conf = Data_encoding.Json.destruct encoding json in
-        {
-          stake = Option.value ~default:conf.stake stake;
-          network = Option.value ~default:conf.network network;
-          snapshot = Option.value ~default:conf.snapshot snapshot;
-          without_dal = conf.without_dal || without_dal;
-          stresstest =
-            (if stresstest <> None then stresstest else conf.stresstest);
-          dal_node_producers =
-            (if dal_node_producers <> None then dal_node_producers
-             else conf.dal_node_producers);
-          maintenance_delay =
-            Option.value ~default:conf.maintenance_delay maintenance_delay;
-          migration_offset =
-            (if migration_offset <> None then migration_offset
-             else conf.migration_offset);
-          ppx_profiling_verbosity =
-            (if ppx_profiling_verbosity <> None then ppx_profiling_verbosity
-             else conf.ppx_profiling_verbosity);
-          ppx_profiling_backends =
-            (if ppx_profiling_backends <> [] then ppx_profiling_backends
-             else conf.ppx_profiling_backends);
-          signing_delay =
-            (if signing_delay <> None then signing_delay else conf.signing_delay);
-          fixed_random_seed =
-            (if fixed_random_seed <> None then fixed_random_seed
-             else conf.fixed_random_seed);
-          octez_release =
-            (if octez_release <> None then octez_release else conf.octez_release);
-        }
-    | _ ->
-        {
-          stake = Option.value ~default:(Manual [1]) stake;
-          network = Option.get network;
-          stresstest;
-          maintenance_delay =
-            Option.value ~default:Default.maintenance_delay maintenance_delay;
-          snapshot = Option.get snapshot;
-          without_dal;
-          dal_node_producers;
-          migration_offset;
-          ppx_profiling_verbosity;
-          ppx_profiling_backends;
-          signing_delay;
-          fixed_random_seed;
-          octez_release;
-        }
+  let configuration : Scenarios_configuration.LAYER1.t =
+    {
+      stake = Cli.stake;
+      network = Cli.network;
+      snapshot = Cli.snapshot;
+      stresstest = Cli.stresstest;
+      without_dal = Cli.without_dal;
+      dal_node_producers = Cli.dal_producers_slot_indices;
+      maintenance_delay = Cli.maintenance_delay;
+      migration_offset = Cli.migration_offset;
+      ppx_profiling_verbosity = Cli.ppx_profiling_verbosity;
+      ppx_profiling_backends = Cli.ppx_profiling_backends;
+      signing_delay = Cli.signing_delay;
+      fixed_random_seed = Cli.fixed_random_seed;
+      octez_release = Cli.octez_release;
+    }
   in
-  if configuration.snapshot = Snapshot_helpers.No_snapshot then
-    Test.fail "snapshot parameter cannot be empty" ;
   let with_dal_producers =
     match configuration.dal_node_producers with
     | None | Some [] -> false
