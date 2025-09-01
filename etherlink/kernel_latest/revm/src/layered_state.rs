@@ -39,6 +39,7 @@ pub enum EtherlinkEntry {
         deposit_id: U256,
     },
     PushWithdrawal,
+    IncrementGlobalCounter,
 }
 
 impl Default for LayeredState {
@@ -54,6 +55,23 @@ impl LayeredState {
             depths: vec![],
             etherlink_data: Default::default(),
         }
+    }
+
+    pub fn get_and_increment_global_counter<DB: DatabasePrecompileStateChanges>(
+        &mut self,
+        db: &DB,
+    ) -> Result<U256, Error> {
+        let returned = self
+            .etherlink_data
+            .global_counter
+            .map(Ok)
+            .unwrap_or_else(|| db.global_counter())?;
+        let counter = returned
+            .checked_add(U256::ONE)
+            .ok_or(Error::Custom("Global counter overflow".to_string()))?;
+        self.etherlink_data.global_counter = Some(counter);
+        self.entries.push(EtherlinkEntry::IncrementGlobalCounter);
+        Ok(returned)
     }
 
     pub fn ticket_balance_add<DB: DatabasePrecompileStateChanges>(
@@ -185,6 +203,11 @@ impl LayeredState {
                 EtherlinkEntry::PushWithdrawal => {
                     self.etherlink_data.withdrawals.pop();
                 }
+                EtherlinkEntry::IncrementGlobalCounter => {
+                    if let Some(counter) = self.etherlink_data.global_counter.as_mut() {
+                        *counter -= U256::ONE;
+                    }
+                }
             }
         }
     }
@@ -210,6 +233,10 @@ mod tests {
     struct DummyDB;
 
     impl DatabasePrecompileStateChanges for DummyDB {
+        fn global_counter(&self) -> Result<U256, Error> {
+            Ok(U256::ZERO)
+        }
+
         fn ticket_balance(
             &self,
             _ticket_hash: &U256,

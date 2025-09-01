@@ -50,6 +50,11 @@ pub(crate) const TABLE_PRECOMPILE_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
 ]));
 
+pub(crate) const GLOBAL_COUNTER_PRECOMPILE_ADDRESS: Address = Address(FixedBytes::new([
+    0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x05,
+]));
+
 #[cfg(test)]
 pub(crate) const PRECOMPILE_BURN_ADDRESS: Address = Address(FixedBytes::new([
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -70,6 +75,10 @@ pub(crate) const SEND_OUTBOX_MESSAGE_BASE_COST: u64 = 500;
 // Rationale regarding the cost:
 // Covers the cost of 2 r/w access on cold keys.
 pub(crate) const TICKET_TABLE_BASE_COST: u64 = 5000;
+
+// Rationale regarding the cost:
+// Covers the cost of 2 r/w access on cold keys.
+pub(crate) const GLOBAL_COUNTER_BASE_COST: u64 = 5000;
 
 #[cfg(test)]
 mod test {

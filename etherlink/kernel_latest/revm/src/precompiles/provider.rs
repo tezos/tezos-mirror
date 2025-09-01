@@ -17,8 +17,10 @@ use crate::{
     journal::Journal,
     precompiles::{
         constants::{
-            CUSTOMS, SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
+            CUSTOMS, GLOBAL_COUNTER_PRECOMPILE_ADDRESS,
+            SEND_OUTBOX_MESSAGE_PRECOMPILE_ADDRESS, TABLE_PRECOMPILE_ADDRESS,
         },
+        global_counter::global_counte_precompile,
         send_outbox_message::send_outbox_message_precompile,
         table::table_precompile,
     },
@@ -96,6 +98,18 @@ impl EtherlinkPrecompiles {
                 )?;
                 Ok(Some(result))
             }
+            GLOBAL_COUNTER_PRECOMPILE_ADDRESS => {
+                // Can't return kernel errors
+                // Every unexpected behavior will lead to a revert of the precompile execution
+                let result = global_counte_precompile(
+                    &input_bytes,
+                    context,
+                    is_static,
+                    inputs,
+                    gas_limit,
+                );
+                Ok(Some(result))
+            }
             _ => Ok(None),
         }
     }
@@ -150,3 +164,9 @@ where
         output: Bytes::copy_from_slice(reason.to_string().as_bytes()),
     }
 }
+
+pub(crate) const OOG: InterpreterResult = InterpreterResult {
+    result: InstructionResult::OutOfGas,
+    gas: Gas::new(0),
+    output: Bytes::new(),
+};
