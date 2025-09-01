@@ -233,7 +233,100 @@ let monitor_gasometer evm_node f =
     gasometer ;
   unit
 
+module MacOS = struct
+  let xtrace_re = rex "<cycle-weight id=\"(\\d+)\".*>(\\d+)</cycle-weight>"
+
+  let xtrace_ref_re = rex "<cycle-weight ref=\"(\\d+)\"/>"
+
+  let total_cycles profile_file =
+    let weights = Hashtbl.create 1111 in
+    let total = ref 0. in
+    let command =
+      ( "xcrun",
+        [|
+          "xcrun";
+          "xctrace";
+          "export";
+          "--input";
+          profile_file;
+          "--xpath";
+          "/trace-toc/run/data/table[@schema=\"cpu-profile\"]";
+        |] )
+    in
+    let* () =
+      Lwt_process.with_process_in command @@ fun p ->
+      Lwt_io.read_lines p#stdout
+      |> Lwt_stream.iter @@ fun line ->
+         let cycles =
+           match line =~** xtrace_re with
+           | Some (sid, scycles) ->
+               let cycles =
+                 try float_of_string scycles /. 1_000_000. with _ -> 0.
+               in
+               let id = int_of_string sid in
+               Hashtbl.add weights id cycles ;
+               Some cycles
+           | None -> (
+               match line =~* xtrace_ref_re with
+               | Some sid ->
+                   let id = int_of_string sid in
+                   Hashtbl.find_opt weights id
+               | None -> None)
+         in
+         match cycles with
+         | None -> ()
+         | Some cycles -> total := !total +. cycles
+    in
+    return !total
+
+  let profile evm_node =
+    let profile_file =
+      Filename.concat (Temp.dir "traces") "evm_benchmark.trace"
+    in
+    let xctrace =
+      Process.spawn
+        "xcrun"
+        [
+          "xctrace";
+          "record";
+          "--template";
+          "CPU Profiler";
+          "--no-prompt";
+          "--output";
+          profile_file;
+          "--attach";
+          Evm_node.pid evm_node |> Option.get |> string_of_int;
+        ]
+    in
+    fun () ->
+      let* _ = Process.wait xctrace in
+      let* mcycles = total_cycles profile_file in
+      Log.report ~color:Log.Color.bold "%.3f MCycles" mcycles ;
+      unit
+end
+
+module Linux = struct
+  let profile evm_node =
+    let perf =
+      Process.spawn
+        "perf"
+        ["stat"; "-p"; Evm_node.pid evm_node |> Option.get |> string_of_int]
+    in
+    fun () ->
+      Process.terminate perf ;
+      let* stat = Lwt_io.read (Process.stdout perf) in
+      Log.report ~prefix:"perf" "%s" stat ;
+      unit
+end
+
+let profile evm_node =
+  let* os = Process.run_and_read_stdout "uname" [] in
+  match String.trim os with
+  | "Darwin" -> return (MacOS.profile evm_node)
+  | _ -> return (Linux.profile evm_node)
+
 let test_erc20_capacity =
+  let profiling = Clap.flag ~set_long:"profile" false in
   let nb_accounts = 100 in
   let nb_contracts = 1 in
   let iterations = 5 in
@@ -283,6 +376,9 @@ let test_erc20_capacity =
   Log.info "%d ERC20 contracts deployed" (List.length erc20s) ;
   List.iter (Log.debug "- %s") erc20s ;
   monitor_gasometer sequencer @@ fun () ->
+  let* stop_profile =
+    if profiling then profile sequencer else return (fun () -> unit)
+  in
   let* () =
     Lwt_list.iter_s
       (step sequencer infos gas_limit erc20s accounts)
@@ -290,6 +386,7 @@ let test_erc20_capacity =
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
-  unit
+  let* () = Evm_node.terminate sequencer in
+  stop_profile ()
 
 let register () = test_erc20_capacity [Protocol.Alpha]

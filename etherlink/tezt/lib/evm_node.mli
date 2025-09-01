@@ -711,3 +711,5 @@ val switch_history_mode : t -> history_mode -> (Process.t, unit) runnable
 val switch_sequencer_to_observer : old_sequencer:t -> new_sequencer:t -> t
 
 val daemon_default_colors : Log.Color.t array
+
+val pid : t -> int option
