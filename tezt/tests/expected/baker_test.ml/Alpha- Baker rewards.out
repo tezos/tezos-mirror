@@ -126,7 +126,7 @@
             { "kind": "contract",
               "contract": "[CONTRACT_HASH]",
               "change": "666666", "origin": "subsidy" } ],
-        "consumed_milligas": "2261927", "storage_size": "4629",
+        "consumed_milligas": "2262613", "storage_size": "4629",
         "paid_storage_size_diff": "1" } ],
   "proposer_consensus_key": "[PUBLIC_KEY_HASH]",
   "baker_consensus_key": "[PUBLIC_KEY_HASH]",

@@ -67,7 +67,7 @@ Contract memorized as split_bytes.
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg 0xaabbcc
 Node is bootstrapped.
-Estimated gas: 1319.826 units (will add 100 for safety)
+Estimated gas: 1320.512 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -78,13 +78,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000403
+    Fee to the baker: ꜩ0.000404
     Expected counter: 2
-    Gas limit: 1420
+    Gas limit: 1421
     Storage limit: 38 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000403
-      payload fees(the block proposer) ....... +ꜩ0.000403
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000404
+      payload fees(the block proposer) ....... +ꜩ0.000404
     Transaction:
       Amount: ꜩ0
       From: [PUBLIC_KEY_HASH]
@@ -94,7 +94,7 @@ This sequence of operations was run:
       Updated storage: { 0xaa ; 0xbb ; 0xcc }
       Storage size: 272 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 1320.319
+      Consumed gas: 1321.349
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
@@ -105,7 +105,7 @@ This sequence of operations was run:
 
 ./octez-client --mode mockup --wait none transfer 0 from bootstrap1 to '[CONTRACT_HASH]' --burn-cap 10 --arg 0xddeeff
 Node is bootstrapped.
-Estimated gas: 1322.442 units (will add 100 for safety)
+Estimated gas: 1323.128 units (will add 100 for safety)
 Estimated storage: 18 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -118,7 +118,7 @@ This sequence of operations was run:
     From: [PUBLIC_KEY_HASH]
     Fee to the baker: ꜩ0.000404
     Expected counter: 3
-    Gas limit: 1423
+    Gas limit: 1424
     Storage limit: 38 bytes
     Balance updates:
       [PUBLIC_KEY_HASH] ... -ꜩ0.000404
@@ -132,7 +132,7 @@ This sequence of operations was run:
       Updated storage: { 0xaa ; 0xbb ; 0xcc ; 0xdd ; 0xee ; 0xff }
       Storage size: 290 bytes
       Paid storage size diff: 18 bytes
-      Consumed gas: 1322.935
+      Consumed gas: 1323.965
       Balance updates:
         [PUBLIC_KEY_HASH] ... -ꜩ0.0045
         storage fees ........................... +ꜩ0.0045
