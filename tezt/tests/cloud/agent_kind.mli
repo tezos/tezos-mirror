@@ -57,12 +57,6 @@ type daemon =
 val name_of_daemon : daemon -> string
 
 module Logs : sig
-  (** [local_path path] ensures that the path (as a list of subdirectories) is a
-      valid directory, creates it otherwise, then returns the path. If the first
-      directory starts with `/`, it will start from the root of the
-      filesystem. *)
-  val local_path : string list -> string
-
   (** [scp_logs ~destination_root ~daemon_name agent] uses scp to copy the
       `daily_logs` directory from the VM hosting the [agent]'s actor given by
       [~daemon_name] into [~destination_root/<agent-name>/~daemon_name/daily_logs].

@@ -65,15 +65,6 @@ let name_of_daemon = function
   | Etherlink_producer_node name -> Format.asprintf "etherlink-%s-node" name
 
 module Logs = struct
-  let local_path path =
-    List.fold_left
-      (fun prefix subdir ->
-        let prefix = prefix // subdir in
-        if not (Sys.file_exists prefix) then Sys.mkdir prefix 0o755 ;
-        prefix)
-      ""
-      path
-
   let scp_profiling ~destination_root ~daemon_name agent =
     let agent_name = Agent.name agent in
     (* This is not compatible with the --proxy mode as the Agent's location of
@@ -88,7 +79,8 @@ module Logs = struct
         Lwt.return_unit
     | Some _runner ->
         let runner_local_path =
-          local_path [destination_root; agent_name; daemon_name]
+          Artifact_helpers.local_path
+            [destination_root; agent_name; daemon_name]
         in
         let process =
           Agent.docker_run_command agent "ls" [tezt_root_path // daemon_name]
@@ -104,7 +96,9 @@ module Logs = struct
         in
         Lwt_list.iter_s
           (fun file ->
-            let local_path = local_path [runner_local_path; "profiling"] in
+            let local_path =
+              Artifact_helpers.local_path [runner_local_path; "profiling"]
+            in
             Lwt.catch
               (fun () ->
                 Agent.scp
@@ -134,7 +128,8 @@ module Logs = struct
         Lwt.return_unit
     | Some _runner ->
         let local_path =
-          local_path [destination_root; agent_name; daemon_name]
+          Artifact_helpers.local_path
+            [destination_root; agent_name; daemon_name]
         in
         Lwt.catch
           (fun () ->

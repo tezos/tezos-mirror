@@ -314,4 +314,43 @@ module Tezt_cloud_cli = struct
   let artifacts_dir = Cli.artifacts_dir
 
   let teztale_artifacts = Cli.teztale_artifacts
+
+  let to_json_config = Cli.to_json_config
+end
+
+module Artifact_helpers = struct
+  let parse_path path =
+    let path = String.split_on_char '/' path in
+    (* Check if the path is absolute or relative *)
+    let starts_from_root = match path with "" :: _ -> true | _ -> false in
+    (* Removes empty dir that would be the result of "//" *)
+    let path = List.filter (( <> ) "") path in
+    match path with
+    | dir :: subpath when starts_from_root -> ("/" ^ dir) :: subpath
+    | _ -> path
+
+  let local_path path =
+    List.fold_left
+      (fun prefix subdir ->
+        let prefix = prefix // subdir in
+        if not (Sys.file_exists prefix) then Sys.mkdir prefix 0o755 ;
+        prefix)
+      ""
+      path
+
+  let prepare_artifacts ?scenario_config () =
+    match Tezt_cloud_cli.artifacts_dir with
+    | None -> ()
+    | Some artifacts_dir ->
+        (* Ensures the artifact directory exists and creates it otherwise *)
+        let artifacts_dir = local_path (parse_path artifacts_dir) in
+        let full_configuration =
+          Tezt_cloud_cli.to_json_config ?scenario_config ()
+        in
+        let full_configuration_string =
+          Data_encoding.Json.to_string full_configuration
+        in
+        write_file
+          (artifacts_dir // "configuration.json")
+          ~contents:full_configuration_string
 end

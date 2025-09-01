@@ -907,3 +907,61 @@ let slack_bot_token =
 module Types = struct
   let dir_typ = dir_typ
 end
+
+let to_json_config ?scenario_config () =
+  let scenario_specific =
+    match scenario_config with
+    | None -> scenario_specific
+    | Some _ -> scenario_config
+  in
+  {
+    localhost = Some localhost;
+    ssh_host;
+    monitoring = Some monitoring;
+    destroy = Some destroy;
+    keep_alive = Some keep_alive;
+    project_id;
+    vms;
+    vm_base_port = Some vm_base_port;
+    ports_per_vm = Some ports_per_vm;
+    proxy = Some proxy;
+    os = Some os;
+    grafana = Some grafana;
+    grafana_legacy_source = Some grafana_legacy_source;
+    alert_handlers;
+    prometheus = Some prometheus;
+    prometheus_export = Some prometheus_export;
+    prometheus_port = Some prometheus_port;
+    prometheus_export_path;
+    prometheus_snapshots;
+    prometheus_scrape_interval = Some prometheus_scrape_interval;
+    process_monitoring = Some process_monitoring;
+    website = Some website;
+    machine_type = Some machine_type;
+    dockerfile_alias;
+    website_port = Some website_port;
+    max_run_duration = Some max_run_duration;
+    no_max_run_duration = Some no_max_run_duration;
+    tezt_cloud;
+    dns_domains;
+    no_dns = Some no_dns;
+    open_telemetry = Some open_telemetry;
+    macosx = Some macosx;
+    check_file_consistency = Some check_file_consistency;
+    docker_host_network = Some docker_host_network;
+    push_docker = Some push_docker;
+    auto_approve = Some auto_approve;
+    faketime;
+    binaries_path = Some binaries_path;
+    log_rotation = Some log_rotation;
+    slack_channel_id;
+    slack_bot_token;
+    retrieve_daily_logs = Some retrieve_daily_logs;
+    retrieve_ppx_profiling_traces = Some retrieve_ppx_profiling_traces;
+    scenario_specific;
+    tc_delay;
+    tc_jitter;
+    artifacts_dir;
+    teztale_artifacts = Some teztale_artifacts;
+  }
+  |> Data_encoding.Json.construct encoding
