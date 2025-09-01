@@ -14,6 +14,14 @@
   after the blueprints have been committed to disk. (!18989)
 - Remove fallback for `/evm/v2/blueprint/` and `/evm/v2/blueprints/range` making
   version 0.30 deprecated.
+- The sequencer now performs full gas limit prevalidation in line with Ethereum
+  standards.
+  Transactions are rejected if the specified gas limit is insufficient to cover:  
+    * calldata cost,
+    * potential access list cost, and
+    * authorization list cost. 
+  Previously the prevalidation was only checking if the requirement to cover the
+  minimum da fees and base intrisic gas cost were covered which was not enough. (!19149)
 
 ### Metrics changes
 
