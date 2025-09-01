@@ -18,6 +18,7 @@ type t =
   | Etherlink_producer of int
   | Echo_rollup_operator
   | Echo_rollup_dal_observer of {slot_index : int}
+  | Stresstest of int
 
 let name_of = function
   | Bootstrap -> "bootstrap"
@@ -36,6 +37,7 @@ let name_of = function
   | Echo_rollup_operator -> "echo-rollup-operator"
   | Echo_rollup_dal_observer {slot_index} ->
       Format.sprintf "echo-rollup-dal-node-%d" slot_index
+  | Stresstest i -> Format.sprintf "stresstest-%d" i
 
 type daemon =
   | Baker_l1_node of int
