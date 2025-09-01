@@ -131,5 +131,13 @@ val reports :
 
 (** [cache ~key paths] is a cache indexed [key] for [paths].
 
-    - [policy:] is [Push_pull] if [policy] is [omitted]. *)
-val cache : ?policy:cache_policy -> key:string -> string list -> cache
+    - [policy:] is [Push_pull] if [policy] is [omitted].
+    - [fallback:] is a list of fallback cache keys.
+      See https://docs.gitlab.com/ci/caching/#use-a-fallback-cache-key for details
+    *)
+val cache :
+  ?policy:cache_policy ->
+  ?fallback_keys:string list ->
+  key:string ->
+  string list ->
+  cache

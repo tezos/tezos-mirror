@@ -152,7 +152,12 @@ type default = {
     [Pull] caches only consumes them. *)
 type cache_policy = Pull_push | Push | Pull
 
-type cache = {key : string; paths : string list; policy : cache_policy}
+type cache = {
+  key : string;
+  paths : string list;
+  policy : cache_policy;
+  fallback_keys : string list option;
+}
 
 type service = {name : string}
 
