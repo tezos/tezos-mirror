@@ -26,7 +26,6 @@ override_dh_installman:
 override_dh_installdocs:
 	dh_installdocs
 	dh_installdocs -p octez-node docs/README.octez-node
-	dh_installdocs -p octez-baker docs/README.octez-baker
 	dh_installdocs -p octez-signer docs/octez-signer.service
 	dh_installdocs -p octez-signer docs/README.octez-signer
 
@@ -34,19 +33,12 @@ override_dh_installsystemd:
 	dh_installsystemd -p octez-node --no-start
 	dh_installsystemd -p octez-dal-node --no-start
 	dh_installsystemd -p octez-smart-rollup-node --no-start
-	dh_installsystemd -p octez-baker --no-start
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-accuser@
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-agnostic-baker
-	dh_installsystemd -p octez-baker --no-enable --no-start --name octez-agnostic-accuser
 
 override_dh_installlogrotate:
 	dh_installlogrotate --package=octez-node
-	dh_installlogrotate --package=octez-baker
 
 override_dh_install:
 	dh_install
-	mkdir -p debian/octez-baker/etc/default/
-	cp debian/octez-baker.octez-accuser.default debian/octez-baker/etc/default/octez-accuser
 	dh_installdebconf
 
 override_dh_fixperms:
