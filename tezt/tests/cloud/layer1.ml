@@ -373,6 +373,7 @@ type configuration = {
   ppx_profiling_backends : string list;
   signing_delay : (float * float) option;
   fixed_random_seed : int option;
+  octez_release : string option;
 }
 
 let stresstest_encoding =
@@ -398,6 +399,7 @@ let configuration_encoding =
            ppx_profiling_backends;
            signing_delay;
            fixed_random_seed;
+           octez_release;
          }
        ->
       ( ( stake,
@@ -410,7 +412,7 @@ let configuration_encoding =
           migration_offset,
           ppx_profiling_verbosity,
           ppx_profiling_backends ),
-        (signing_delay, fixed_random_seed) ))
+        (signing_delay, fixed_random_seed, octez_release) ))
     (fun ( ( stake,
              network,
              snapshot,
@@ -421,7 +423,7 @@ let configuration_encoding =
              migration_offset,
              ppx_profiling_verbosity,
              ppx_profiling_backends ),
-           (signing_delay, fixed_random_seed) )
+           (signing_delay, fixed_random_seed, octez_release) )
        ->
       {
         stake;
@@ -436,6 +438,7 @@ let configuration_encoding =
         ppx_profiling_backends;
         signing_delay;
         fixed_random_seed;
+        octez_release;
       })
     (merge_objs
        (obj10
@@ -458,9 +461,10 @@ let configuration_encoding =
              "ppx_profiling_backends"
              (list string)
              Scenarios_cli.Layer1_default.default_ppx_profiling_backends))
-       (obj2
+       (obj3
           (opt "Signing_delay" (tup2 float float))
-          (opt "fixed_random_seed" int31)))
+          (opt "fixed_random_seed" int31)
+          (opt "octez_release" string)))
 
 type bootstrap = {
   agent : Agent.t;
@@ -1217,6 +1221,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let ppx_profiling_backends = Cli.ppx_profiling_backends in
     let signing_delay = Cli.signing_delay in
     let fixed_random_seed = Cli.fixed_random_seed in
+    let octez_release = Cli.octez_release in
     match Tezt_cloud_cli.scenario_specific_json with
     | Some ("LAYER1", json) ->
         let conf = Data_encoding.Json.destruct configuration_encoding json in
@@ -1246,6 +1251,8 @@ let register (module Cli : Scenarios_cli.Layer1) =
           fixed_random_seed =
             (if fixed_random_seed <> None then fixed_random_seed
              else conf.fixed_random_seed);
+          octez_release =
+            (if octez_release <> None then octez_release else conf.octez_release);
         }
     | _ ->
         {
@@ -1264,6 +1271,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
           ppx_profiling_backends;
           signing_delay;
           fixed_random_seed;
+          octez_release;
         }
   in
   if configuration.snapshot = Snapshot_helpers.No_snapshot then
@@ -1282,7 +1290,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
   let default_docker_image =
     Option.map
       (fun tag -> Agent.Configuration.Octez_release {tag})
-      Cli.octez_release
+      configuration.octez_release
   in
   let default_vm_configuration ~name =
     Agent.Configuration.make ?docker_image:default_docker_image ~name ()
