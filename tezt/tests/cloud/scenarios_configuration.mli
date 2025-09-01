@@ -5,45 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [network_simulation_configuration] allows to configure the simulation of a
-   network, relying on the actual distribution of rights that will be found in
-   the imported data (data-dir or snapshot). It requires yes crypto to be
-   enabled.
-   The simulate option has three modes:
-     - scatter(x,y): selects the [x] biggest bakers found, and scatters their
-       baking rights, in a round robin fashion, on [y] baker daemons. This is
-       particularly useful to scatter the baking power across several baker
-       daemons,
-     - map(x,y,z): maps [y] keys from the biggest bakers found onto [y] baker
-       daemons (theses daemons are handling a single key) and scatters the
-       remaining [x-y] keys to [z] baker daemons. This is particularly useful to
-       simulate the behaviour of an actual network,
-     - disabled: no simulation, we rely on the configuration.stake parameter.
-   For example:
-     - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]
-     - map(10,2,1):[[0];[1];[2;3;4;5;6;7;8;9]]
-     - map(10,2,2):[[0];[1];[2;5;6;8];[3;5;8;9]] *)
-
-type network_simulation_config =
-  | Scatter of int * int
-  | Map of int * int * int
-  | Disabled
-
-val network_simulation_config_encoding :
-  network_simulation_config Data_encoding.t
-
-val simulate_network_to_string : network_simulation_config -> string
-
 module DAL : sig
   type t = {
     blocks_history : int option;
     producer_key : string option;
     fundraiser : string option;
     network : Network.t option;
-    simulate_network : network_simulation_config option;
+    simulate_network : Network_simulation.t option;
     snapshot : Snapshot_helpers.t option;
     bootstrap : bool option;
-    stake : Network.stake_repartition option;
+    stake : Stake_repartition.Dal.t option;
     bakers : string list;
     stake_machine_type : string list;
     dal_producers_slot_indices : int list;
@@ -78,6 +49,66 @@ module DAL : sig
     tezlink : bool option;
     slot_size : int option;
     number_of_slots : int option;
+  }
+
+  val encoding : t Data_encoding.t
+end
+
+module LAYER1 : sig
+  module Default : sig
+    val maintenance_delay : int
+
+    val ppx_profiling_backends : string list
+
+    val without_dal : bool
+  end
+
+  (** Scenario configuration
+
+    - [snapshot]: local path or URL of the snapshot to use for the experiment.
+      local path implies to [scp] the snapshot to all the vms.
+
+    - [stake]: stake repartition between baking nodes, numbers are relatives.
+
+      [Manual [2,1,1]] runs 3 bakers, aggregate delegates from the network,
+      spreading them in 3 pools representing roughly 50%, 25% and 25% of the
+      total stake of the network. The same stake repartition using the same
+      snapshot will result in the same delegate repartition.
+
+      There is a special case using a single number instead of a list, which
+      gives the number of bakers to use. Delegates will be distributed as
+      evenly as possible between these bakers.
+
+      [Auto] will spawn one baker per delegate, and the list of delegates will
+      be automatically retrieved from the provided snapshot.
+
+    - [maintenance_delay]: number of level which will be multiplied by the
+      position in the list of the bakers to define the store merge delay.
+      We want it to be the same for two runs with same parameters (not
+      random) and we want it not to occur at the same time on every baker.
+      Default value is 1.
+      Use 0 for disabling delay and have all the bakers to merge their
+      store at the beginning of cycles.
+
+    - [migration_offset]: offset that dictates after how many levels a protocol
+      upgrade will be performed via a UAU.
+
+    - [stresstest]: See the description of [stresstest_conf]
+  *)
+  type t = {
+    stake : Stake_repartition.Layer1.t;
+    network : Network.t;
+    snapshot : Snapshot_helpers.t;
+    stresstest : Stresstest.t option;
+    without_dal : bool;
+    dal_node_producers : int list option;
+    maintenance_delay : int;
+    migration_offset : int option;
+    ppx_profiling_verbosity : string option;
+    ppx_profiling_backends : string list;
+    signing_delay : (float * float) option;
+    fixed_random_seed : int option;
+    octez_release : string option;
   }
 
   val encoding : t Data_encoding.t

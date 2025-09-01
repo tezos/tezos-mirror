@@ -7,7 +7,6 @@
 (*****************************************************************************)
 
 open Agent_kind
-open Scenarios_configuration
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
@@ -55,7 +54,7 @@ let init_baker ?stake ~configuration_stake ~data_dir ~simulate_network
     (* As simulate_network and stake are mutually exclusive, the stake is used
        only when the simulation is Disabled. *)
     match simulate_network with
-    | Disabled -> (
+    | Network_simulation.Disabled -> (
         match stake with
         | None -> return (List.nth configuration_stake i)
         | Some stake -> return stake)
@@ -196,7 +195,7 @@ let init_bakers ~bakers ~stake ~data_dir ~simulate_network ~external_rpc
     (* As simulate_network and stake are mutually exclusive, the stake is used
        only when the simulation is Disabled. *)
     match simulate_network with
-    | Scatter (_, baker_count) ->
+    | Network_simulation.Scatter (_, baker_count) ->
         Lwt_list.mapi_s
           (fun i _ ->
             let name = name_of (Baker i) in

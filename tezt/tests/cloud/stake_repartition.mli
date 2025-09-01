@@ -6,13 +6,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let yes_crypto_env =
-  String_map.singleton Tezos_crypto.Helpers.yes_crypto_environment_variable "y"
+module Dal : sig
+  type t =
+    | Custom of int list
+    | Mimic of {network : Network.public; max_nb_bakers : int option}
 
-let should_enable_yes_crypto = function
-  | Network_simulation.Scatter _ | Map _ -> true
-  | Disabled -> false
+  val encoding : t Data_encoding.t
 
-let may_set_yes_crypto_env = function
-  | Network_simulation.Scatter _ | Map _ -> (Some yes_crypto_env, true)
-  | Disabled -> (None, false)
+  val typ : t Clap.typ
+
+  val parse_arg :
+    stake_arg:t -> simulation_arg:Network_simulation.t -> int list Lwt.t
+end
+
+module Layer1 : sig
+  type t = Auto | Manual of int list
+
+  val encoding : t Data_encoding.t
+
+  val typ : t Clap.typ
+end

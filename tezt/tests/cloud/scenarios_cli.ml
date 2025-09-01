@@ -20,59 +20,6 @@ module Clap = struct
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
 end
 
-let parse_network_simulation_config_from_args simulate_network_arg =
-  let is_positive_param p =
-    if p > 0 then p
-    else
-      Test.fail
-        "Unexpected value provided, [%d], from argument [%s]. Values must be \
-         positive integers.@."
-        p
-        simulate_network_arg
-  in
-  let is_arg1_sup_eq_arg2 arg1 arg2 =
-    if arg1 >= arg2 then ()
-    else
-      Test.fail
-        "Unexpected value provided for argument [%s]. %d must be greater or \
-         equal to %d."
-        simulate_network_arg
-        arg1
-        arg2
-  in
-  let re_scatter = Str.regexp "\\(scatter\\)(\\([^,]+\\),\\([^)]*\\))" in
-  let re_map = Str.regexp "\\(map\\)(\\([^,]+\\),\\([^)]*\\),\\([^)]*\\))" in
-  if Str.string_match re_scatter simulate_network_arg 0 then
-    let arg1 =
-      Str.matched_group 2 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg2 =
-      Str.matched_group 3 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let () = is_arg1_sup_eq_arg2 arg1 arg2 in
-    Some (Scenarios_configuration.Scatter (arg1, arg2))
-  else if Str.string_match re_map simulate_network_arg 0 then
-    let arg1 =
-      Str.matched_group 2 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg2 =
-      Str.matched_group 3 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg3 =
-      Str.matched_group 4 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let () = is_arg1_sup_eq_arg2 arg1 (arg2 + arg3) in
-    Some (Scenarios_configuration.Map (arg1, arg2, arg3))
-  else
-    Test.fail
-      "Unexpected network simulation config (--simulation) [%s]"
-      simulate_network_arg
-
 let network_typ : Network.t Clap.typ =
   Clap.typ
     ~name:"network"
@@ -100,16 +47,13 @@ module type Dal = sig
 
   val network : Network.t
 
-  val simulate_network_typ :
-    Scenarios_configuration.network_simulation_config Clap.typ
-
-  val simulate_network : Scenarios_configuration.network_simulation_config
+  val simulate_network : Network_simulation.t
 
   val snapshot : Snapshot_helpers.t
 
   val bootstrap : bool
 
-  val stake : Network.stake_repartition
+  val stake : Stake_repartition.Dal.t
 
   val bakers : string list
 
@@ -269,14 +213,6 @@ module Dal () : Dal = struct
       network_typ
       (Option.value ~default:`Sandbox config.network)
 
-  let simulate_network_typ :
-      Scenarios_configuration.network_simulation_config Clap.typ =
-    Clap.typ
-      ~name:"simulate_network"
-      ~dummy:Scenarios_configuration.Disabled
-      ~parse:parse_network_simulation_config_from_args
-      ~show:Scenarios_configuration.simulate_network_to_string
-
   let simulate_network =
     Clap.default
       ~section
@@ -301,7 +237,7 @@ module Dal () : Dal = struct
          For example:\n\
          - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]\n\
          - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]]"
-      simulate_network_typ
+      Network_simulation.typ
       (Option.value ~default:Disabled config.simulate_network)
 
   let snapshot =
@@ -321,43 +257,8 @@ module Dal () : Dal = struct
       (let default = match network with `Sandbox -> true | _ -> false in
        Option.value ~default config.bootstrap)
 
-  let stake_repartition_typ : Network.stake_repartition Clap.typ =
-    let open Network in
-    let parse_public_network (net : string) : public option =
-      try Option.map to_public (parse net) with _ -> None
-    in
-    Clap.typ
-      ~name:"stake_repartition"
-      ~dummy:(Custom [100])
-      ~parse:(fun str ->
-        (* If it is a list of int, then a custom repartition has been selected. *)
-        let int_list_regexp = Str.regexp {|\([0-9]+,\( ?\)\)*[0-9]+$|} in
-        if Str.string_match int_list_regexp str 0 then
-          Some
-            (Custom (str |> String.split_on_char ',' |> List.map int_of_string))
-          (* Else we expect a network name, potentially followed by how many bakers should be created. *)
-        else
-          match String.split_on_char '_' str with
-          | [network] ->
-              Option.map
-                (fun network -> Mimic {network; max_nb_bakers = None})
-                (parse_public_network network)
-          | [network; n_str] -> (
-              try
-                let n = int_of_string n_str in
-                Option.map
-                  (fun network -> Mimic {network; max_nb_bakers = Some n})
-                  (parse_public_network network)
-              with _ -> None)
-          | _ -> None)
-      ~show:(function
-        | Custom l ->
-            l |> List.map string_of_int |> String.concat (String.make 1 ',')
-        | Mimic {network; max_nb_bakers = None} -> to_string network
-        | Mimic {network; max_nb_bakers = Some n} ->
-            Format.sprintf "%s_%d" (to_string network) n)
-
   let stake =
+    let open Stake_repartition.Dal in
     Clap.default
       ~section
       ~long:"stake"
@@ -368,10 +269,10 @@ module Dal () : Dal = struct
          total stake is proportional to the sum of all shares. If a network is \
          provided share repartitions is the same as on this network (truncated \
          to the N biggest delegates if <network>_<N> is given)."
-      stake_repartition_typ
+      typ
       (let default =
-         if network = `Sandbox && simulate_network = Disabled then
-           Network.Custom [100]
+         if network = `Sandbox && simulate_network = Network_simulation.Disabled
+         then Custom [100]
          else Custom []
        in
        Option.value ~default config.stake)
@@ -779,16 +680,14 @@ module Dal () : Dal = struct
     Option.fold ~none:config.number_of_slots ~some:Option.some from_cli
 end
 
-type stake = Auto | Manual of int list
-
 module type Layer1 = sig
-  val network : Network.t option
+  val network : Network.t
 
-  val stake : stake option
+  val stake : Stake_repartition.Layer1.t
 
-  val stresstest : (int * int) option
+  val stresstest : Stresstest.t option
 
-  val maintenance_delay : int option
+  val maintenance_delay : int
 
   val migration_offset : int option
 
@@ -796,7 +695,7 @@ module type Layer1 = sig
 
   val fixed_random_seed : int option
 
-  val snapshot : Snapshot_helpers.t option
+  val snapshot : Snapshot_helpers.t
 
   val octez_release : string option
 
@@ -811,55 +710,89 @@ module type Layer1 = sig
   val ppx_profiling_backends : string list
 end
 
-module Layer1_default = struct
-  let default_maintenance_delay = 1
-
-  let default_ppx_profiling_backends = ["txt"]
-
-  let default_without_dal = false
-end
-
 module Layer1 () = struct
-  (** Keep the CLI arguments optional because they can be defined in a
-      config file. Parameters consistency will be checked in the Layer1
-      scenario. *)
+  let scenario_name = "LAYER1"
 
   let section =
     Clap.section
       ~description:
-        "All the options related to running Layer 1 scenarios onto the cloud. \
-         Note that in order to run these tests, you need to specify both \
-         [cloud] and [layer1] tags on the command line"
+        "All the options related to running Layer 1 scenarios onto the cloud."
       "LAYER1"
 
-  let network : Network.t option =
-    Clap.optional
+  let config =
+    match Tezt_cloud_cli.scenario_specific_json with
+    | None -> None
+    | Some (name, options) when name = scenario_name -> (
+        try
+          Data_encoding.Json.destruct
+            Scenarios_configuration.LAYER1.encoding
+            options
+          |> Option.some
+        with
+        | Json_encoding.Cannot_destruct (_, e) as exn ->
+            Log.error
+              "Cannot load config file: %s - %s"
+              (Printexc.to_string exn)
+              (Printexc.to_string e) ;
+            raise exn
+        | e -> raise e)
+    | Some (name, _options) ->
+        Log.error
+          "Configuration file mismatch. This config file is for scenario %s \
+           whereas the command was launched for scenario %s"
+          name
+          scenario_name ;
+        raise Scenario_mismatch
+
+  let mandatory_from_cli_or_config (type a) (typ : a Clap.typ) ?section ?last
+      ?long ?long_synonyms ?short ?short_synonyms ?placeholder ?description
+      ~from_config () =
+    (* If the config exists, then the parameter is available as it is required
+       in the config. In that case, the parameter is optional. Otherwise, it is
+       mandatory. *)
+    match Option.map from_config config with
+    | Some config_param -> (
+        let from_cli =
+          Clap.optional
+            ?section
+            ?last
+            ?long
+            ?long_synonyms
+            ?short
+            ?short_synonyms
+            ?placeholder
+            ?description
+            typ
+            ()
+        in
+        match from_cli with None -> config_param | Some p -> p)
+    | None ->
+        Clap.mandatory
+          ?section
+          ?last
+          ?long
+          ?long_synonyms
+          ?short
+          ?short_synonyms
+          ?placeholder
+          ?description
+          typ
+          ()
+
+  let network =
+    mandatory_from_cli_or_config
       ~section
       ~long:"network"
-      ~placeholder:"<ghostnet|mainnet>"
+      ~placeholder:
+        "<network> \
+         (sandbox,ghostnet,nextnet-YYYY-MM-DD,weeklynet-YYYY-MM-DD,...)"
       ~description:"Allow to specify a network to use for the scenario"
       network_typ
+      ~from_config:(fun config -> config.network)
       ()
 
-  let stake : stake option =
-    let typ =
-      let parse = function
-        | "AUTO" | "auto" -> Some Auto
-        | string -> (
-            try
-              match string |> String.split_on_char ',' with
-              | [n] -> Some (Manual (List.init (int_of_string n) (fun _ -> 1)))
-              | distribution ->
-                  Some (Manual (List.map int_of_string distribution))
-            with exn -> raise exn)
-      in
-      let show = function
-        | Auto -> "AUTO"
-        | Manual dist -> List.map string_of_int dist |> String.concat ","
-      in
-      Clap.typ ~name:"stake" ~dummy:(Manual [1]) ~parse ~show
-    in
-    Clap.optional
+  let stake =
+    mandatory_from_cli_or_config
       ~section
       ~long:"stake"
       ~placeholder:"AUTO|<nb_of_bakers>|<stake1>,<stake2>,...,<stakeN>"
@@ -871,36 +804,42 @@ module Layer1 () = struct
          a list of relative weight. Delegates will be distributed amongst \
          pools in order to (approximately) respect the given stake \
          distribution."
-      typ
+      Stake_repartition.Layer1.typ
+      ~from_config:(fun config -> config.stake)
       ()
 
   let stresstest =
-    let typ =
-      let parse string =
-        try
-          match string |> String.split_on_char '/' with
-          | [n] -> Some (int_of_string n, Random.int 1073741823 (* 2^30 -1 *))
-          | [n; seed] -> Some (int_of_string n, int_of_string seed)
-          | _ -> None
-        with exn -> raise exn
-      in
-      let show (tps, seed) = string_of_int tps ^ "/" ^ string_of_int seed in
-      Clap.typ ~name:"stresstest" ~dummy:(0, 0) ~parse ~show
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"stresstest"
+        ~placeholder:"TPS[/seed]"
+        ~description:
+          "A Public key hash and its public key are automatically retrieved \
+           from the yes wallet to fund fresh accounts for reaching TPS \
+           stresstest traffic generation. A seed for stresstest initialization \
+           can also be specified."
+        Stresstest.typ
+        ()
     in
-    Clap.optional
-      ~section
-      ~long:"stresstest"
-      ~placeholder:"TPS[/seed]"
-      ~description:
-        "A Public key hash and its public key are automatically retrieved from \
-         the yes wallet to fund fresh accounts for reaching TPS stresstest \
-         traffic generation. A seed for stresstest initialization can also be \
-         specified."
-      typ
-      ()
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.stresstest)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let maintenance_delay =
-    Clap.optional_int
+    let default_maintenance_delay =
+      Scenarios_configuration.LAYER1.Default.maintenance_delay
+    in
+    let from_config =
+      Option.map
+        (fun (c : Scenarios_configuration.LAYER1.t) -> c.maintenance_delay)
+        config
+    in
+    Clap.default_int
       ~section
       ~long:"maintenance-delay"
       ~placeholder:"N"
@@ -908,17 +847,26 @@ module Layer1 () = struct
         (sf
            "Each baker has maintenance delayed by (position in the list * N). \
             Default is %d. Use 0 for disabling mainteance delay"
-           Layer1_default.default_maintenance_delay)
-      ()
+           default_maintenance_delay)
+      (Option.value ~default:default_maintenance_delay from_config)
 
   let migration_offset =
-    Clap.optional_int
-      ~section
-      ~long:"migration-offset"
-      ~description:
-        "After how many levels we will perform a UAU to upgrade to the next \
-         protocol."
-      ()
+    let from_cli =
+      Clap.optional_int
+        ~section
+        ~long:"migration-offset"
+        ~description:
+          "After how many levels we will perform a UAU to upgrade to the next \
+           protocol."
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.migration_offset)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let signing_delay =
     let typ =
@@ -933,45 +881,74 @@ module Layer1 () = struct
       let show (min, max) = Format.sprintf "%f,%f" min max in
       Clap.typ ~name:"signing-delay" ~dummy:(0., 0.) ~parse ~show
     in
-    Clap.optional
-      ~section
-      ~long:"signing-delay"
-      ~placeholder:"<min>,<max>"
-      ~description:
-        "Introduce a random signing delay between <min> and <max> seconds. \
-         This is useful when simulating a network with multiple bakers to \
-         avoid having all bakers trying to sign at the same time. If only one \
-         value is provided, the minimum is set to 0."
-      typ
-      ()
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"signing-delay"
+        ~placeholder:"<min>,<max>"
+        ~description:
+          "Introduce a random signing delay between <min> and <max> seconds. \
+           This is useful when simulating a network with multiple bakers to \
+           avoid having all bakers trying to sign at the same time. If only \
+           one value is provided, the minimum is set to 0."
+        typ
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.signing_delay)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let fixed_random_seed =
-    Clap.optional_int
-      ~section
-      ~long:"fixed-seed"
-      ~description:
-        "Use a fixed seed for the client/baker random number generator. This \
-         can be useful for reproducing an experiment."
-      ()
+    let from_cli =
+      Clap.optional_int
+        ~section
+        ~long:"fixed-seed"
+        ~description:
+          "Use a fixed seed for the client/baker random number generator. This \
+           can be useful for reproducing an experiment."
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) ->
+          c.fixed_random_seed)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let snapshot =
-    Clap.optional
+    mandatory_from_cli_or_config
       ~section
       ~long:"snapshot"
       ~description:
-        "Either a path the a local file or url of the snapshot to use for \
-         bootstrapping the experiment"
+        "Snapshot file, which is stored locally, to initiate the scenario with \
+         some data"
       snapshot_typ
+      ~from_config:(fun c -> c.snapshot)
       ()
 
   let octez_release =
-    Clap.optional_string
-      ~section
-      ~long:"octez-release"
-      ~placeholder:"<tag>"
-      ~description:
-        "Use the octez release <tag> instead of local octez binaries."
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"octez-release"
+        ~placeholder:"<tag>"
+        ~description:
+          "Use the octez release <tag> instead of local octez binaries."
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) -> c.octez_release)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let vms_config =
     Clap.optional_string
@@ -983,35 +960,71 @@ module Layer1 () = struct
       ()
 
   let without_dal =
+    let from_config =
+      Option.map
+        (fun (c : Scenarios_configuration.LAYER1.t) -> c.without_dal)
+        config
+    in
     Clap.flag
       ~section
       ~set_long:"without-dal"
       ~description:
         "Disable running DAL nodes on bootstrap and bakers nodes. It is set to \
          `false` by default."
-      Layer1_default.default_without_dal
+      (Option.value
+         ~default:Scenarios_configuration.LAYER1.Default.without_dal
+         from_config)
 
   let dal_producers_slot_indices =
-    Clap.optional
-      ~section
-      ~long:"producer-slot-indices"
-      ~description:
-        "Specify the slot indices for DAL producers to run. The number of DAL \
-         producers run is the size of the list."
-      (Clap.list_of_int ~dummy:[] "producer_slot_indices")
-      ()
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"producer-slot-indices"
+        ~description:
+          "Specify the slot indices for DAL producers to run. The number of \
+           DAL producers run is the size of the list."
+        (Clap.list_of_int ~dummy:[] "producer_slot_indices")
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) ->
+          c.dal_node_producers)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let ppx_profiling_verbosity =
-    Clap.optional_string
-      ~section
-      ~long:"ppx-profiling-verbosity"
-      ~description:
-        "Enable PPX profiling on all components, with the given level of \
-         verbosity. "
-      ()
+    let from_cli =
+      Clap.optional_string
+        ~section
+        ~long:"ppx-profiling-verbosity"
+        ~description:
+          "Enable PPX profiling on all components, with the given level of \
+           verbosity. "
+        ()
+    in
+    let from_config =
+      Option.fold
+        ~none:None
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) ->
+          c.ppx_profiling_verbosity)
+        config
+    in
+    Option.fold ~none:from_config ~some:Option.some from_cli
 
   let ppx_profiling_backends =
-    let default = Layer1_default.default_ppx_profiling_backends in
+    let default =
+      Scenarios_configuration.LAYER1.Default.ppx_profiling_backends
+    in
+    let from_config =
+      Option.fold
+        ~none:default
+        ~some:(fun (c : Scenarios_configuration.LAYER1.t) ->
+          c.ppx_profiling_backends)
+        config
+    in
     let from_cli =
       Clap.list_string
         ~section
@@ -1024,10 +1037,7 @@ module Layer1 () = struct
              (String.concat "," default))
         ()
     in
-    Option.fold
-      ~none:default
-      ~some:Fun.id
-      (match from_cli with [] -> None | _ -> Some from_cli)
+    from_config @ from_cli
 end
 
 module type Tezlink = sig

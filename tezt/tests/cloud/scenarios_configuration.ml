@@ -5,56 +5,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type network_simulation_config =
-  | Scatter of int * int
-  | Map of int * int * int
-  | Disabled
-
-let network_simulation_config_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 1)
-        ~title:"scatter"
-        (tup2 int31 int31)
-        (function
-          | Scatter (nb_keys, nb_daemons) -> Some (nb_keys, nb_daemons)
-          | _ -> None)
-        (fun (nb_keys, nb_daemons) -> Scatter (nb_keys, nb_daemons));
-      case
-        (Tag 2)
-        ~title:"map"
-        (tup3 int31 int31 int31)
-        (function
-          | Map (nb_keys, nb_alone_bakers, nb_additional_daemons) ->
-              Some (nb_keys, nb_alone_bakers, nb_additional_daemons)
-          | _ -> None)
-        (fun (nb_keys, nb_alone_bakers, nb_additional_daemons) ->
-          Map (nb_keys, nb_alone_bakers, nb_additional_daemons));
-      case
-        (Tag 3)
-        ~title:"disabled"
-        empty
-        (function Disabled -> Some () | _ -> None)
-        (fun () -> Disabled);
-    ]
-
-let simulate_network_to_string = function
-  | Scatter (x, y) -> Format.sprintf "scatter(%d,%d)" x y
-  | Map (x, y, z) -> Format.sprintf "map(%d,%d,%d)" x y z
-  | Disabled -> Format.sprintf "disabled"
-
 module DAL = struct
   type t = {
     blocks_history : int option;
     producer_key : string option;
     fundraiser : string option;
     network : Network.t option;
-    simulate_network : network_simulation_config option;
+    simulate_network : Network_simulation.t option;
     snapshot : Snapshot_helpers.t option;
     bootstrap : bool option;
-    stake : Network.stake_repartition option;
+    stake : Stake_repartition.Dal.t option;
     bakers : string list;
     stake_machine_type : string list;
     dal_producers_slot_indices : int list;
@@ -274,10 +234,10 @@ module DAL = struct
                   (opt "producer_key" string)
                   (opt "fundraiser" string)
                   (opt "network" Network.encoding)
-                  (opt "simulate_network" network_simulation_config_encoding)
+                  (opt "simulate_network" Network_simulation.encoding)
                   (opt "snapshot" Snapshot_helpers.encoding)
                   (opt "bootstrap" bool)
-                  (opt "stake" Network.stake_repartition_encoding)
+                  (opt "stake" Stake_repartition.Dal.encoding)
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
                (obj10
@@ -315,4 +275,107 @@ module DAL = struct
                   (opt "enable_network_health_monitoring" bool)
                   (opt "tezlink" bool))))
          (obj2 (opt "slot_size" int31) (opt "number_of_slots" int31)))
+end
+
+module LAYER1 = struct
+  module Default = struct
+    let maintenance_delay = 1
+
+    let ppx_profiling_backends = ["txt"]
+
+    let without_dal = false
+  end
+
+  type t = {
+    stake : Stake_repartition.Layer1.t;
+    network : Network.t;
+    snapshot : Snapshot_helpers.t;
+    stresstest : Stresstest.t option;
+    without_dal : bool;
+    dal_node_producers : int list option;
+    maintenance_delay : int;
+    migration_offset : int option;
+    ppx_profiling_verbosity : string option;
+    ppx_profiling_backends : string list;
+    signing_delay : (float * float) option;
+    fixed_random_seed : int option;
+    octez_release : string option;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             stake;
+             network;
+             snapshot;
+             stresstest;
+             without_dal;
+             dal_node_producers;
+             maintenance_delay;
+             migration_offset;
+             ppx_profiling_verbosity;
+             ppx_profiling_backends;
+             signing_delay;
+             fixed_random_seed;
+             octez_release;
+           }
+         ->
+        ( ( stake,
+            network,
+            snapshot,
+            stresstest,
+            without_dal,
+            dal_node_producers,
+            maintenance_delay,
+            migration_offset,
+            ppx_profiling_verbosity,
+            ppx_profiling_backends ),
+          (signing_delay, fixed_random_seed, octez_release) ))
+      (fun ( ( stake,
+               network,
+               snapshot,
+               stresstest,
+               without_dal,
+               dal_node_producers,
+               maintenance_delay,
+               migration_offset,
+               ppx_profiling_verbosity,
+               ppx_profiling_backends ),
+             (signing_delay, fixed_random_seed, octez_release) )
+         ->
+        {
+          stake;
+          network;
+          snapshot;
+          stresstest;
+          without_dal;
+          dal_node_producers;
+          maintenance_delay;
+          migration_offset;
+          ppx_profiling_verbosity;
+          ppx_profiling_backends;
+          signing_delay;
+          fixed_random_seed;
+          octez_release;
+        })
+      (merge_objs
+         (obj10
+            (dft "stake" Stake_repartition.Layer1.encoding (Manual [1]))
+            (req "network" Network.encoding)
+            (req "snapshot" Snapshot_helpers.encoding)
+            (opt "stresstest" Stresstest.encoding)
+            (dft "without_dal" bool Default.without_dal)
+            (opt "dal_node_producers" (list int31))
+            (dft "maintenance_delay" int31 Default.maintenance_delay)
+            (opt "migration_offset" int31)
+            (opt "ppx_profiling_verbosity" string)
+            (dft
+               "ppx_profiling_backends"
+               (list string)
+               Default.ppx_profiling_backends))
+         (obj3
+            (opt "signing_delay" (tup2 float float))
+            (opt "fixed_random_seed" int31)
+            (opt "octez_release" string)))
 end

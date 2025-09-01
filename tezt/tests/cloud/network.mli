@@ -24,13 +24,9 @@ type t = [public | `Sandbox]
 (** ["mainnet" | "ghostnet" | "rionet" | "seoulnet" | "nextnet-%s" | "weeklynet-%s" | "sandbox"] *)
 val to_string : [< t] -> string
 
+val public_encoding : public Data_encoding.t
+
 val encoding : t Data_encoding.t
-
-type stake_repartition =
-  | Custom of int list
-  | Mimic of {network : public; max_nb_bakers : int option}
-
-val stake_repartition_encoding : stake_repartition Data_encoding.t
 
 val is_public : t -> bool
 
