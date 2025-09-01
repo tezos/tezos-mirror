@@ -4320,7 +4320,7 @@ oc.script.docker_verify_image_amd64:
 
 documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
-  stage: test
+  stage: sanity
   tags:
   - gcp
   rules:
