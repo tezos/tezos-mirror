@@ -375,7 +375,7 @@ module LAYER1 = struct
                (list string)
                Default.ppx_profiling_backends))
          (obj3
-            (opt "Signing_delay" (tup2 float float))
+            (opt "signing_delay" (tup2 float float))
             (opt "fixed_random_seed" int31)
             (opt "octez_release" string)))
 end
