@@ -26,7 +26,7 @@
         converts its yes‑wallet, and then runs an agnostic baker over that node.
     4. Stresstest nodes
       - Potentially launch one or more stresstest nodes that generate transactions at
-        the target TPS against the private network. 
+        the target TPS against the private network.
     5. Metrics & Monitoring
       - Every node (bootstrap, bakers, stresstesters) is registered as a Prometheus
         scrape target if `--prometheus` is set.
@@ -45,8 +45,7 @@
     {[
        # fetch a rolling snapshot:
        wget -O ghostnet.snapshot https://snapshots.tzinit.org/ghostnet/rolling
-
-       dune exec tezt/tests/cloud/main.exe -- cloud l1 -v --log-file /tmp/log \
+       dune exec tezt/tests/cloud/main.exe -- LAYER1 -v --log-file /tmp/log \
          --stake 1,1 \
          --network ghostnet \
          --stresstest 100/1 \
@@ -56,7 +55,7 @@
          --prometheus \
          --grafana \
          --website \
-         --snapshot ./ghostnet.snapshot
+         --snapshot file:./ghostnet.snapshot
     ]}
 
     As you can read using the help of [--help], [--stresstest] is:
