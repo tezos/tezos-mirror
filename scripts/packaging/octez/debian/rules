@@ -25,8 +25,6 @@ override_dh_installman:
 
 override_dh_installdocs:
 	dh_installdocs
-	dh_installdocs -p octez-signer docs/octez-signer.service
-	dh_installdocs -p octez-signer docs/README.octez-signer
 
 override_dh_installsystemd:
 	dh_installsystemd -p octez-smart-rollup-node --no-start
