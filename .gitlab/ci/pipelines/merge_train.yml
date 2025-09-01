@@ -2769,6 +2769,7 @@ oc.unit:non-proto-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-nonproto-unit
+    DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -2841,6 +2842,7 @@ oc.unit:etherlink-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-etherlink-unit
+    DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -2931,6 +2933,7 @@ oc.unit:other-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-other-unit
+    DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -3021,6 +3024,7 @@ oc.unit:proto-x86_64:
   variables:
     ARCH: x86_64
     MAKE_TARGETS: test-proto-unit
+    DUNE_ARGS: -j 12
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
@@ -3104,6 +3108,7 @@ oc.unit:non-proto-arm64:
   variables:
     ARCH: arm64
     MAKE_TARGETS: test-nonproto-unit test-webassembly
+    DUNE_ARGS: -j 12
     DISTRIBUTE_TESTS_TO_PARALLELS: "true"
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
