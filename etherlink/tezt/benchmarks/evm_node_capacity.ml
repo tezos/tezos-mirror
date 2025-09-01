@@ -10,6 +10,76 @@ open Test_helpers
 open Setup
 open Floodgate_lib
 
+type parameters = {
+  profiling : bool;
+  time_between_blocks : float;
+  iterations : int;
+  accounts : int;
+  contracts : int;
+}
+
+type env = {
+  params : parameters;
+  sequencer : Evm_node.t;
+  rpc_node : Evm_node.t;
+  infos : Network_info.t;
+  gas_limit : Z.t;
+  accounts : Floodgate_lib.Account.t array;
+}
+
+let get_cli_parameters () =
+  let section =
+    Clap.section
+      "EVM NODE BENCHMARK"
+      ~description:"Parameters for running benchmarks on the EVM node"
+  in
+  let profiling =
+    Clap.flag
+      ~section
+      ~set_long:"profile"
+      false
+      ~description:
+        "Report profiling information (needs perf on linux and xctrace on \
+         macos)"
+  in
+  let time_between_blocks =
+    Clap.default_float
+      ~section
+      ~long:"time_between_blocks"
+      ~short:'T'
+      ~placeholder:"seconds"
+      ~description:"Number of seconds between blocks"
+      0.5
+  in
+  let iterations =
+    Clap.default_int
+      ~section
+      ~long:"iterations"
+      ~short:'I'
+      ~placeholder:"nb"
+      ~description:"Number of iterations for the benchmark"
+      5
+  in
+  let accounts =
+    Clap.default_int
+      ~section
+      ~long:"accounts"
+      ~short:'A'
+      ~placeholder:"nb"
+      ~description:"Number of accounts that sign transactions for the benchmark"
+      100
+  in
+  let contracts =
+    Clap.default_int
+      ~section
+      ~long:"contracts"
+      ~short:'C'
+      ~placeholder:"nb"
+      ~description:"Number of ERC20 contracts for the benchmark"
+      1
+  in
+  {profiling; time_between_blocks; iterations; accounts; contracts}
+
 let ( let+? ) x f =
   match x with
   | Error e ->
@@ -25,10 +95,10 @@ let ( let*? ) x f =
   let+? x in
   f x
 
-let wait_for_application sequencer f =
+let wait_for_application ~time_between_blocks sequencer f =
   wait_for_application
     f
-    ~time_between_blocks:0.5
+    ~time_between_blocks
     ~max_blocks:5
     ~produce_block:(fun _ -> produce_block sequencer)
 
@@ -67,12 +137,20 @@ let send_deploy ~sender infos evm_node =
   | `ERC20 addr, gas_limit -> return (addr, gas_limit)
   | _ -> assert false
 
-let deploy_contracts evm_node infos sequencer accounts nb =
+let deploy_contracts
+    {
+      rpc_node;
+      infos;
+      sequencer;
+      accounts;
+      params = {time_between_blocks; contracts = nb; _};
+      _;
+    } =
   let senders = Array.sub accounts 0 nb |> Array.to_list in
   let deploys () =
-    Lwt_list.map_p (fun sender -> send_deploy ~sender infos evm_node) senders
+    Lwt_list.map_p (fun sender -> send_deploy ~sender infos rpc_node) senders
   in
-  wait_for_application sequencer deploys
+  wait_for_application ~time_between_blocks sequencer deploys
 
 let nb_refused = ref 0
 
@@ -133,7 +211,7 @@ let account_step infos gas_limit contract ~nonce (sender : Account.t) value
   in
   unit
 
-let sender_step infos gas_limit erc20s accounts iteration sender_index =
+let sender_step {infos; gas_limit; accounts; _} erc20s iteration sender_index =
   let sender = accounts.(sender_index mod Array.length accounts) in
   let dest_index =
     (sender_index + (7 * (iteration + 3))) mod Array.length accounts
@@ -146,15 +224,14 @@ let sender_step infos gas_limit erc20s accounts iteration sender_index =
       account_step infos gas_limit contract ~nonce sender iteration dest)
     erc20s
 
-let step sequencer infos gas_limit erc20s accounts iteration =
+let step ({sequencer; accounts; params = {time_between_blocks; _}; _} as env)
+    erc20s iteration =
   Log.report "Iteration %d" iteration ;
   let sender_indexes = List.init (Array.length accounts) Fun.id in
   let step_f () =
-    Lwt_list.iter_p
-      (sender_step infos gas_limit erc20s accounts iteration)
-      sender_indexes
+    Lwt_list.iter_p (sender_step env erc20s iteration) sender_indexes
   in
-  let* () = wait_for_application sequencer step_f in
+  let* () = wait_for_application ~time_between_blocks sequencer step_f in
   if !nb_dropped <> 0 then
     Log.info ~color:Log.Color.FG.red "%d operations DROPPED" !nb_dropped ;
   if !nb_refused <> 0 then
@@ -326,11 +403,8 @@ let profile evm_node =
   | _ -> return (Linux.profile evm_node)
 
 let test_erc20_capacity =
-  let profiling = Clap.flag ~set_long:"profile" false in
-  let nb_accounts = 100 in
-  let nb_contracts = 1 in
-  let iterations = 5 in
-  let accounts = Eth_account.accounts nb_accounts in
+  let params = get_cli_parameters () in
+  let accounts = Eth_account.accounts params.accounts in
   let eth_bootstrap_accounts =
     Array.to_list accounts |> List.map (fun a -> a.Eth_account.address)
   in
@@ -350,7 +424,16 @@ let test_erc20_capacity =
   let* accounts = floodgate_accounts sequencer accounts in
   let endpoint = Evm_node.endpoint sequencer |> Uri.of_string in
   let*? infos =
-    Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100.
+    Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100. in
+  let env =
+    {
+      params;
+      infos;
+      sequencer;
+      rpc_node = sequencer;
+      gas_limit = Z.zero;
+      accounts;
+    }
   in
   let*? () =
     Tx_queue.start
@@ -365,11 +448,10 @@ let test_erc20_capacity =
       ~rpc_endpoint:endpoint
   in
   let tx_queue = Tx_queue.beacon ~tick_interval:0.1 in
-  Log.report "Deploying %d ERC20 contracts" nb_contracts ;
-  let* erc20s =
-    deploy_contracts sequencer infos sequencer accounts nb_contracts
-  in
+  Log.report "Deploying %d ERC20 contracts" params.contracts ;
+  let* erc20s = deploy_contracts env in
   let _, gas_limit = List.hd erc20s in
+  let env = {env with gas_limit} in
   let erc20s =
     List.map (fun ((c : Efunc_core.Private.address), _) -> (c :> string)) erc20s
   in
@@ -377,12 +459,10 @@ let test_erc20_capacity =
   List.iter (Log.debug "- %s") erc20s ;
   monitor_gasometer sequencer @@ fun () ->
   let* stop_profile =
-    if profiling then profile sequencer else return (fun () -> unit)
+    if params.profiling then profile sequencer else return (fun () -> unit)
   in
   let* () =
-    Lwt_list.iter_s
-      (step sequencer infos gas_limit erc20s accounts)
-      (List.init iterations succ)
+    Lwt_list.iter_s (step env erc20s) (List.init params.iterations succ)
   in
   Lwt.cancel follower ;
   Lwt.cancel tx_queue ;
