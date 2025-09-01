@@ -13644,6 +13644,25 @@ let test_eip7702 =
   in
   Check.((storage_slot = Printf.sprintf "0x%064x" expected_storage_slot) string)
     ~error_msg:"Expected storage slot of %R, got %L" ;
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:whale.private_key
+         ~to_public_key:sponsored.address
+         ~value:Wei.one_eth
+         ~endpoint)
+      sequencer
+  in
+  (* EIP-7702 authorized account can also send transactions to the sequencer. *)
+  let* _ =
+    send_transaction_to_sequencer
+      (Eth_cli.transaction_send
+         ~source_private_key:sponsored.private_key
+         ~to_public_key:whale.address
+         ~value:(Wei.of_string "1125")
+         ~endpoint)
+      sequencer
+  in
   unit
 
 let test_eip2537 =
