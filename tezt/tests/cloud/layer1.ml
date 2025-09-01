@@ -322,150 +322,6 @@ module Node = struct
     Lwt.return (client, accounts)
 end
 
-(** Stresstest parameters
-    - [tps]: targeted number of transactions per second
-    - [seed]: seed used for stresstest traffic generation
- *)
-type stresstest_conf = {tps : int; seed : int}
-
-(** Scenario configuration
-
-    - [snapshot]: local path or URL of the snapshot to use for the experiment.
-      local path implies to [scp] the snapshot to all the vms.
-
-    - [stake]: stake repartition between baking nodes, numbers are relatives.
-
-      [Manual [2,1,1]] runs 3 bakers, aggregate delegates from the network,
-      spreading them in 3 pools representing roughly 50%, 25% and 25% of the
-      total stake of the network. The same stake repartition using the same
-      snapshot will result in the same delegate repartition.
-
-      There is a special case using a single number instead of a list, which
-      gives the number of bakers to use. Delegates will be distributed as
-      evenly as possible between these bakers.
-
-      [Auto] will spawn one baker per delegate, and the list of delegates will
-      be automatically retrieved from the provided snapshot.
-
-    - [maintenance_delay]: number of level which will be multiplied by the
-      position in the list of the bakers to define the store merge delay.
-      We want it to be the same for two runs with same parameters (not
-      random) and we want it not to occur at the same time on every baker.
-      Default value is 1.
-      Use 0 for disabling delay and have all the bakers to merge their
-      store at the beginning of cycles.
-
-    - [migration_offset]: offset that dictates after how many levels a protocol
-      upgrade will be performed via a UAU.
-
-    - [stresstest]: See the description of [stresstest_conf]
-  *)
-type configuration = {
-  stake : Stake_repartition.Layer1.t;
-  network : Network.t;
-  snapshot : Snapshot_helpers.t;
-  stresstest : stresstest_conf option;
-  without_dal : bool;
-  dal_node_producers : int list option;
-  maintenance_delay : int;
-  migration_offset : int option;
-  ppx_profiling_verbosity : string option;
-  ppx_profiling_backends : string list;
-  signing_delay : (float * float) option;
-  fixed_random_seed : int option;
-  octez_release : string option;
-}
-
-let stresstest_encoding =
-  let open Data_encoding in
-  conv
-    (fun {tps; seed} -> (tps, seed))
-    (fun (tps, seed) -> {tps; seed})
-    (obj2 (req "tps" int31) (req "seed" int31))
-
-let configuration_encoding =
-  let open Data_encoding in
-  conv
-    (fun {
-           stake;
-           network;
-           snapshot;
-           stresstest;
-           without_dal;
-           dal_node_producers;
-           maintenance_delay;
-           migration_offset;
-           ppx_profiling_verbosity;
-           ppx_profiling_backends;
-           signing_delay;
-           fixed_random_seed;
-           octez_release;
-         }
-       ->
-      ( ( stake,
-          network,
-          snapshot,
-          stresstest,
-          without_dal,
-          dal_node_producers,
-          maintenance_delay,
-          migration_offset,
-          ppx_profiling_verbosity,
-          ppx_profiling_backends ),
-        (signing_delay, fixed_random_seed, octez_release) ))
-    (fun ( ( stake,
-             network,
-             snapshot,
-             stresstest,
-             without_dal,
-             dal_node_producers,
-             maintenance_delay,
-             migration_offset,
-             ppx_profiling_verbosity,
-             ppx_profiling_backends ),
-           (signing_delay, fixed_random_seed, octez_release) )
-       ->
-      {
-        stake;
-        network;
-        snapshot;
-        stresstest;
-        without_dal;
-        dal_node_producers;
-        maintenance_delay;
-        migration_offset;
-        ppx_profiling_verbosity;
-        ppx_profiling_backends;
-        signing_delay;
-        fixed_random_seed;
-        octez_release;
-      })
-    (merge_objs
-       (obj10
-          (dft "stake" Stake_repartition.Layer1.encoding (Manual [1]))
-          (req "network" Network.encoding)
-          (req "snapshot" Snapshot_helpers.encoding)
-          (opt "stresstest" stresstest_encoding)
-          (dft
-             "without_dal"
-             bool
-             Scenarios_cli.Layer1_default.default_without_dal)
-          (opt "dal_node_producers" (list int31))
-          (dft
-             "maintenance_delay"
-             int31
-             Scenarios_cli.Layer1_default.default_maintenance_delay)
-          (opt "migration_offset" int31)
-          (opt "ppx_profiling_verbosity" string)
-          (dft
-             "ppx_profiling_backends"
-             (list string)
-             Scenarios_cli.Layer1_default.default_ppx_profiling_backends))
-       (obj3
-          (opt "Signing_delay" (tup2 float float))
-          (opt "fixed_random_seed" int31)
-          (opt "octez_release" string)))
-
 type bootstrap = {
   agent : Agent.t;
   node : Node.t;
@@ -491,7 +347,7 @@ type stresstester = {
 }
 
 type 'network t = {
-  configuration : configuration;
+  configuration : Scenarios_configuration.LAYER1.t;
   cloud : Cloud.t;
   bootstrap : bootstrap;
   bakers : baker list;
@@ -499,8 +355,9 @@ type 'network t = {
   stresstesters : stresstester list;
 }
 
-let init_baker_i i (configuration : configuration) cloud ~peers
-    dal_node_p2p_endpoint (accounts : baker_account list) (agent, node, name) =
+let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
+    ~peers dal_node_p2p_endpoint (accounts : baker_account list)
+    (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let* client =
     toplog "init_baker: Initialize node" ;
@@ -586,8 +443,8 @@ let init_baker_i i (configuration : configuration) cloud ~peers
   in
   Lwt.return {agent; node; dal_node; baker; accounts}
 
-let init_producer_i i (configuration : configuration) slot_index
-    (account : Account.key) cloud ~peers dal_node_p2p_endpoint
+let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
+    slot_index (account : Account.key) cloud ~peers dal_node_p2p_endpoint
     (agent, node, name) =
   let delay = i * configuration.maintenance_delay in
   let () = toplog "Initializing the DAL producer %s" name in
@@ -642,8 +499,8 @@ let fund_stresstest_accounts ~source client =
     ~initial_amount:(Tez.of_mutez_int64 1_000_000_000L)
     client
 
-let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
-    (agent, node, name) tps : stresstester Lwt.t =
+let init_stresstest_i i (configuration : Scenarios_configuration.LAYER1.t) ~pkh
+    ~pk ~peers (agent, node, name) tps : stresstester Lwt.t =
   let delay = i * configuration.maintenance_delay in
   let* client, accounts =
     toplog "init_stresstest: Initialize node" ;
@@ -662,8 +519,8 @@ let init_stresstest_i i (configuration : configuration) ~pkh ~pk ~peers
   in
   Lwt.return {agent; node; client; accounts}
 
-let init_network ~peers (configuration : configuration) cloud teztale
-    ((agent, node, _) as resources) =
+let init_network ~peers (configuration : Scenarios_configuration.LAYER1.t) cloud
+    teztale ((agent, node, _) as resources) =
   toplog "init_network: Initializing the bootstrap node" ;
   let* client, delegates, rich_account =
     Node.init_bootstrap_node
@@ -815,7 +672,8 @@ let distribute_delegates stake (baker_accounts : (baker_account * int) list) =
   |> print_list "Distribution" ;
   List.map (List.map fst) distribution
 
-let init ~(configuration : configuration) cloud =
+let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
+  let open Scenarios_configuration.LAYER1 in
   let () = toplog "Init" in
   (* First, we allocate agents and node address/port in order to have the
      peer list known when initializing. *)
@@ -912,7 +770,7 @@ let init ~(configuration : configuration) cloud =
         let slot_index = extract_agent_index agent_name_dal_producer agent in
         init_producer_i
           i
-          (configuration : configuration)
+          configuration
           slot_index
           account
           cloud
@@ -1206,11 +1064,12 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   Lwt.return n
 
 let register (module Cli : Scenarios_cli.Layer1) =
-  let configuration : configuration =
+  let configuration =
+    let open Scenarios_configuration.LAYER1 in
     let stake = Cli.stake in
     let network = Cli.network in
     let stresstest =
-      Option.map (fun (tps, seed) -> {tps; seed}) Cli.stresstest
+      Option.map (fun (tps, seed) -> Stresstest.{tps; seed}) Cli.stresstest
     in
     let dal_node_producers = Cli.dal_producers_slot_indices in
     let maintenance_delay = Cli.maintenance_delay in
@@ -1224,7 +1083,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let octez_release = Cli.octez_release in
     match Tezt_cloud_cli.scenario_specific_json with
     | Some ("LAYER1", json) ->
-        let conf = Data_encoding.Json.destruct configuration_encoding json in
+        let conf = Data_encoding.Json.destruct encoding json in
         {
           stake = Option.value ~default:conf.stake stake;
           network = Option.value ~default:conf.network network;
@@ -1260,9 +1119,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
           network = Option.get network;
           stresstest;
           maintenance_delay =
-            Option.value
-              ~default:Scenarios_cli.Layer1_default.default_maintenance_delay
-              maintenance_delay;
+            Option.value ~default:Default.maintenance_delay maintenance_delay;
           snapshot = Option.get snapshot;
           without_dal;
           dal_node_producers;

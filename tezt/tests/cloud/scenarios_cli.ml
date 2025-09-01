@@ -710,14 +710,6 @@ module type Layer1 = sig
   val ppx_profiling_backends : string list
 end
 
-module Layer1_default = struct
-  let default_maintenance_delay = 1
-
-  let default_ppx_profiling_backends = ["txt"]
-
-  let default_without_dal = false
-end
-
 module Layer1 () = struct
   (** Keep the CLI arguments optional because they can be defined in a
       config file. Parameters consistency will be checked in the Layer1
@@ -790,7 +782,7 @@ module Layer1 () = struct
         (sf
            "Each baker has maintenance delayed by (position in the list * N). \
             Default is %d. Use 0 for disabling mainteance delay"
-           Layer1_default.default_maintenance_delay)
+           Scenarios_configuration.LAYER1.Default.maintenance_delay)
       ()
 
   let migration_offset =
@@ -871,7 +863,7 @@ module Layer1 () = struct
       ~description:
         "Disable running DAL nodes on bootstrap and bakers nodes. It is set to \
          `false` by default."
-      Layer1_default.default_without_dal
+      Scenarios_configuration.LAYER1.Default.without_dal
 
   let dal_producers_slot_indices =
     Clap.optional
@@ -893,7 +885,9 @@ module Layer1 () = struct
       ()
 
   let ppx_profiling_backends =
-    let default = Layer1_default.default_ppx_profiling_backends in
+    let default =
+      Scenarios_configuration.LAYER1.Default.ppx_profiling_backends
+    in
     let from_cli =
       Clap.list_string
         ~section

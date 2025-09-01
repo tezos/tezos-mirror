@@ -276,3 +276,121 @@ module DAL = struct
                   (opt "tezlink" bool))))
          (obj2 (opt "slot_size" int31) (opt "number_of_slots" int31)))
 end
+
+module LAYER1 = struct
+  module Stresstest = struct
+    (** Stresstest parameters
+    - [tps]: targeted number of transactions per second
+    - [seed]: seed used for stresstest traffic generation
+ *)
+    type t = {tps : int; seed : int}
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun {tps; seed} -> (tps, seed))
+        (fun (tps, seed) -> {tps; seed})
+        (obj2 (req "tps" int31) (req "seed" int31))
+  end
+
+  module Default = struct
+    let maintenance_delay = 1
+
+    let ppx_profiling_backends = ["txt"]
+
+    let without_dal = false
+  end
+
+  type t = {
+    stake : Stake_repartition.Layer1.t;
+    network : Network.t;
+    snapshot : Snapshot_helpers.t;
+    stresstest : Stresstest.t option;
+    without_dal : bool;
+    dal_node_producers : int list option;
+    maintenance_delay : int;
+    migration_offset : int option;
+    ppx_profiling_verbosity : string option;
+    ppx_profiling_backends : string list;
+    signing_delay : (float * float) option;
+    fixed_random_seed : int option;
+    octez_release : string option;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             stake;
+             network;
+             snapshot;
+             stresstest;
+             without_dal;
+             dal_node_producers;
+             maintenance_delay;
+             migration_offset;
+             ppx_profiling_verbosity;
+             ppx_profiling_backends;
+             signing_delay;
+             fixed_random_seed;
+             octez_release;
+           }
+         ->
+        ( ( stake,
+            network,
+            snapshot,
+            stresstest,
+            without_dal,
+            dal_node_producers,
+            maintenance_delay,
+            migration_offset,
+            ppx_profiling_verbosity,
+            ppx_profiling_backends ),
+          (signing_delay, fixed_random_seed, octez_release) ))
+      (fun ( ( stake,
+               network,
+               snapshot,
+               stresstest,
+               without_dal,
+               dal_node_producers,
+               maintenance_delay,
+               migration_offset,
+               ppx_profiling_verbosity,
+               ppx_profiling_backends ),
+             (signing_delay, fixed_random_seed, octez_release) )
+         ->
+        {
+          stake;
+          network;
+          snapshot;
+          stresstest;
+          without_dal;
+          dal_node_producers;
+          maintenance_delay;
+          migration_offset;
+          ppx_profiling_verbosity;
+          ppx_profiling_backends;
+          signing_delay;
+          fixed_random_seed;
+          octez_release;
+        })
+      (merge_objs
+         (obj10
+            (dft "stake" Stake_repartition.Layer1.encoding (Manual [1]))
+            (req "network" Network.encoding)
+            (req "snapshot" Snapshot_helpers.encoding)
+            (opt "stresstest" Stresstest.encoding)
+            (dft "without_dal" bool Default.without_dal)
+            (opt "dal_node_producers" (list int31))
+            (dft "maintenance_delay" int31 Default.maintenance_delay)
+            (opt "migration_offset" int31)
+            (opt "ppx_profiling_verbosity" string)
+            (dft
+               "ppx_profiling_backends"
+               (list string)
+               Default.ppx_profiling_backends))
+         (obj3
+            (opt "Signing_delay" (tup2 float float))
+            (opt "fixed_random_seed" int31)
+            (opt "octez_release" string)))
+end
