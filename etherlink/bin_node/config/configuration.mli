@@ -202,6 +202,8 @@ type gcp_kms = {
   gcloud_path : string;
 }
 
+type performance_profile = Default | Performance
+
 type t = {
   public_rpc : rpc;
   private_rpc : rpc option;
@@ -222,6 +224,7 @@ type t = {
   db : db;
   opentelemetry : Octez_telemetry.Opentelemetry_config.t;
   tx_queue : tx_queue;
+  performance_profile : performance_profile;
 }
 
 (** [chain_family_from_l2_chains t] returns the chain_family in
@@ -238,6 +241,8 @@ val pp_history_mode_debug : Format.formatter -> history_mode -> unit
 val pp_history_mode_info : Format.formatter -> history_mode -> unit
 
 val native_execution_policy_encoding : native_execution_policy Data_encoding.t
+
+val performance_profile_encoding : performance_profile Data_encoding.t
 
 (** [encoding data_dir] is the encoding of {!t} based on data dir [data_dir].
 

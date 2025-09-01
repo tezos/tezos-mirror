@@ -75,7 +75,8 @@
     "max_transaction_batch_length": null,
     "max_lifespan": 4,
     "tx_per_addr_limit": "16"
-  }
+  },
+  "performance_profile": "default"
 }
 {
   "log_filter": {
@@ -154,7 +155,8 @@
     "max_transaction_batch_length": null,
     "max_lifespan": 4,
     "tx_per_addr_limit": "16"
-  }
+  },
+  "performance_profile": "default"
 }
 {
   "log_filter": {
@@ -238,5 +240,6 @@
     "max_transaction_batch_length": null,
     "max_lifespan": 4,
     "tx_per_addr_limit": "16"
-  }
+  },
+  "performance_profile": "default"
 }
