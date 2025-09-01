@@ -11,8 +11,10 @@ use crate::{
     storage::{
         block::{get_block_hash, BLOCKS_STORED},
         code::CodeStorage,
+        sequencer_key_change::store_sequencer_key_change,
         world_state_handler::{
-            StorageAccount, WorldStateHandler, WITHDRAWALS_TICKETER_PATH,
+            StorageAccount, WorldStateHandler, GOVERNANCE_SEQUENCER_UPGRADE_PATH,
+            SEQUENCER_KEY_PATH, WITHDRAWALS_TICKETER_PATH,
         },
     },
     Error,
@@ -22,7 +24,11 @@ use revm::{
     state::{Account, AccountInfo, Bytecode, EvmStorage, EvmStorageSlot},
     Database, DatabaseCommit,
 };
-use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
+use tezos_crypto_rs::{
+    hash::{ContractKt1Hash, HashTrait},
+    public_key::PublicKey,
+};
+use tezos_data_encoding::nom::NomReader;
 use tezos_ethereum::block::BlockConstants;
 use tezos_evm_logging::{log, tracing::instrument, Level::Error as LogError};
 use tezos_evm_runtime::runtime::Runtime;
@@ -87,6 +93,8 @@ pub trait DatabasePrecompileStateChanges {
         ticket_hash: &U256,
         owner: &Address,
     ) -> Result<U256, CustomPrecompileError>;
+    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError>;
+    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError>;
     fn deposit_in_queue(
         &self,
         deposit_id: &U256,
@@ -228,6 +236,20 @@ impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
         let kt1_b58 = String::from_utf8(ticketer.to_vec()).map_err(custom)?;
         Ok(ContractKt1Hash::from_b58check(&kt1_b58).map_err(custom)?)
     }
+
+    fn sequencer(&self) -> Result<PublicKey, CustomPrecompileError> {
+        let bytes = self.host.store_read_all(&SEQUENCER_KEY_PATH)?;
+        PublicKey::nom_read_exact(&bytes).map_err(|_| {
+            CustomPrecompileError::Revert("Failed to read sequencer key".into())
+        })
+    }
+
+    fn governance_sequencer_upgrade_exists(&self) -> Result<bool, CustomPrecompileError> {
+        Ok(self
+            .host
+            .store_has(&GOVERNANCE_SEQUENCER_UPGRADE_PATH)?
+            .is_some())
+    }
 }
 
 impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
@@ -296,6 +318,13 @@ impl<Host: Runtime> Database for EtherlinkVMDB<'_, Host> {
 impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, Host> {
     fn commit(&mut self, etherlink_data: PrecompileStateChanges) {
         self.withdrawals = etherlink_data.withdrawals.into_iter().collect();
+        if let Some(new_sequencer_key_change) = etherlink_data.sequencer_key_change {
+            abort_on_error!(
+                self,
+                store_sequencer_key_change(self.host, new_sequencer_key_change),
+                "DatabaseCommitPrecompileStateChanges `store_sequencer_key_change`"
+            );
+        }
         if let Some(global_counter) = etherlink_data.global_counter {
             abort_on_error!(
                 self,

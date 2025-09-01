@@ -49,6 +49,13 @@ pub(crate) const WITHDRAWALS_TICKETER_PATH: RefPath =
 pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
 
+/// Path where waiting governance sequencer upgrades are stored. (Must be read through `internal_store_read_all`)
+pub const GOVERNANCE_SEQUENCER_UPGRADE_PATH: RefPath =
+    RefPath::assert_from(b"/evm/sequencer_upgrade");
+
+/// Path where the sequencer key is stored. (Must be read through `internal_store_read_all`)
+pub(crate) const SEQUENCER_KEY_PATH: RefPath = RefPath::assert_from(b"/evm/sequencer");
+
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
 const NONCE_PATH: RefPath = RefPath::assert_from(b"/nonce");
