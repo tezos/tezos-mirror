@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2024 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2024 Functori <contact@functori.com>                        *)
+(* Copyright (c) 2024-2025 Functori <contact@functori.com>                   *)
 (*                                                                           *)
 (*****************************************************************************)
 
@@ -801,6 +801,37 @@ let test_base_gas_cost =
     ~error_msg:"The error message should be %R but got %L" ;
   unit
 
+let test_validate_calldata_cost =
+  register
+    ~da_fee_per_byte:Wei.zero
+    ~title:"Validate that gas limit validation covers calldata cost"
+    ~tags:["calldata_cost"; "gas_limit"]
+  @@ fun _kernel sequencer tx_type ->
+  let source = Eth_account.bootstrap_accounts.(0) in
+  let make_tx ~legacy =
+    Cast.craft_tx
+      ~source_private_key:source.private_key
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price:1
+      ~gas:100_000
+      ~legacy
+      ~address:"0xd77420f73b4612a7a99dba8c2afd30a1886b0344"
+      ~arguments:[String.make 100_000 '1']
+      ~value:Wei.zero
+      ()
+  in
+  let* raw_tx =
+    match tx_type with
+    | Legacy -> make_tx ~legacy:true
+    | Eip1559 | Eip2930 -> make_tx ~legacy:false
+  in
+  let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
+  Check.(err.message =~ rex " is insufficient to cover the transaction cost")
+    ~error_msg:
+      "The transaction has not enough gas to pay calldata cost, it should fail" ;
+  unit
+
 let () =
   let all_types = [Legacy; Eip1559; Eip2930] in
   test_validate_compressed_sig [Legacy] ;
@@ -816,4 +847,5 @@ let () =
   test_validate_custom_gas_limit_greater_than_maximum_gas_per_transaction
     [Legacy] ;
   test_sender_is_not_contract all_types ;
-  test_base_gas_cost all_types
+  test_base_gas_cost all_types ;
+  test_validate_calldata_cost all_types
