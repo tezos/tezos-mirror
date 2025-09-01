@@ -1183,6 +1183,14 @@ let register (module Cli : Scenarios_cli.Layer1) =
     ~title:"L1 simulation"
     ~tags:[]
   @@ fun cloud ->
+  toplog "Prepare artifacts directory and export the full configuration" ;
+  Artifact_helpers.prepare_artifacts
+    ~scenario_config:
+      ( "LAYER1",
+        Data_encoding.Json.construct
+          Scenarios_configuration.LAYER1.encoding
+          configuration )
+    () ;
   toplog "Creating the agents" ;
   let agents = Cloud.agents cloud in
   toplog "Created %d agents" (List.length agents) ;

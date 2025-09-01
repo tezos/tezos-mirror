@@ -286,6 +286,12 @@ module Artifact_helpers : sig
       directory starts with `/`, it will start from the root of the
       filesystem. *)
   val local_path : string list -> string
+
+  (** [prepate_artifacts ?scenario_config ()] ensures the
+      `Tezt_cloud_cli.artifacts_dir` is a valid dir (and creates it if needed),
+      and push the full configuration in it. *)
+  val prepare_artifacts :
+    ?scenario_config:string * Data_encoding.json -> unit -> unit
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting
