@@ -76,6 +76,8 @@ module DAL : sig
     ppx_profiling_backends : string list;
     enable_network_health_monitoring : bool option;
     tezlink : bool option;
+    slot_size : int option;
+    number_of_slots : int option;
   }
 
   val encoding : t Data_encoding.t

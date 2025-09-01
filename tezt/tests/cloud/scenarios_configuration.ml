@@ -87,6 +87,8 @@ module DAL = struct
     ppx_profiling_backends : string list;
     enable_network_health_monitoring : bool option;
     tezlink : bool option;
+    slot_size : int option;
+    number_of_slots : int option;
   }
 
   let encoding =
@@ -133,88 +135,92 @@ module DAL = struct
              ppx_profiling_backends;
              enable_network_health_monitoring;
              tezlink;
+             slot_size;
+             number_of_slots;
            }
          ->
-        ( ( ( blocks_history,
-              producer_key,
-              fundraiser,
-              network,
-              simulate_network,
-              snapshot,
-              bootstrap,
-              stake,
-              bakers,
-              stake_machine_type ),
-            ( dal_producers_slot_indices,
-              producers,
-              producers_delay,
-              producer_machine_type,
-              observer_slot_indices,
-              observer_pkhs,
-              protocol,
-              data_dir,
-              etherlink,
-              etherlink_sequencer ) ),
-          ( ( etherlink_producers,
-              etherlink_chain_id,
-              echo_rollup,
-              disconnect,
-              etherlink_dal_slots,
-              teztale,
-              octez_release,
-              memtrace,
-              bootstrap_node_identity_file,
-              bootstrap_dal_node_identity_file ),
-            ( refresh_binaries,
-              node_external_rpc_server,
-              with_dal,
-              proxy_localhost,
-              disable_shard_validation,
-              ignore_pkhs,
-              ppx_profiling_verbosity,
-              ppx_profiling_backends,
-              enable_network_health_monitoring,
-              tezlink ) ) ))
-      (fun ( ( ( blocks_history,
-                 producer_key,
-                 fundraiser,
-                 network,
-                 simulate_network,
-                 snapshot,
-                 bootstrap,
-                 stake,
-                 bakers,
-                 stake_machine_type ),
-               ( dal_producers_slot_indices,
-                 producers,
-                 producers_delay,
-                 producer_machine_type,
-                 observer_slot_indices,
-                 observer_pkhs,
-                 protocol,
-                 data_dir,
-                 etherlink,
-                 etherlink_sequencer ) ),
-             ( ( etherlink_producers,
-                 etherlink_chain_id,
-                 echo_rollup,
-                 disconnect,
-                 etherlink_dal_slots,
-                 teztale,
-                 octez_release,
-                 memtrace,
-                 bootstrap_node_identity_file,
-                 bootstrap_dal_node_identity_file ),
-               ( refresh_binaries,
-                 node_external_rpc_server,
-                 with_dal,
-                 proxy_localhost,
-                 disable_shard_validation,
-                 ignore_pkhs,
-                 ppx_profiling_verbosity,
-                 ppx_profiling_backends,
-                 enable_network_health_monitoring,
-                 tezlink ) ) )
+        ( ( ( ( blocks_history,
+                producer_key,
+                fundraiser,
+                network,
+                simulate_network,
+                snapshot,
+                bootstrap,
+                stake,
+                bakers,
+                stake_machine_type ),
+              ( dal_producers_slot_indices,
+                producers,
+                producers_delay,
+                producer_machine_type,
+                observer_slot_indices,
+                observer_pkhs,
+                protocol,
+                data_dir,
+                etherlink,
+                etherlink_sequencer ) ),
+            ( ( etherlink_producers,
+                etherlink_chain_id,
+                echo_rollup,
+                disconnect,
+                etherlink_dal_slots,
+                teztale,
+                octez_release,
+                memtrace,
+                bootstrap_node_identity_file,
+                bootstrap_dal_node_identity_file ),
+              ( refresh_binaries,
+                node_external_rpc_server,
+                with_dal,
+                proxy_localhost,
+                disable_shard_validation,
+                ignore_pkhs,
+                ppx_profiling_verbosity,
+                ppx_profiling_backends,
+                enable_network_health_monitoring,
+                tezlink ) ) ),
+          (slot_size, number_of_slots) ))
+      (fun ( ( ( ( blocks_history,
+                   producer_key,
+                   fundraiser,
+                   network,
+                   simulate_network,
+                   snapshot,
+                   bootstrap,
+                   stake,
+                   bakers,
+                   stake_machine_type ),
+                 ( dal_producers_slot_indices,
+                   producers,
+                   producers_delay,
+                   producer_machine_type,
+                   observer_slot_indices,
+                   observer_pkhs,
+                   protocol,
+                   data_dir,
+                   etherlink,
+                   etherlink_sequencer ) ),
+               ( ( etherlink_producers,
+                   etherlink_chain_id,
+                   echo_rollup,
+                   disconnect,
+                   etherlink_dal_slots,
+                   teztale,
+                   octez_release,
+                   memtrace,
+                   bootstrap_node_identity_file,
+                   bootstrap_dal_node_identity_file ),
+                 ( refresh_binaries,
+                   node_external_rpc_server,
+                   with_dal,
+                   proxy_localhost,
+                   disable_shard_validation,
+                   ignore_pkhs,
+                   ppx_profiling_verbosity,
+                   ppx_profiling_backends,
+                   enable_network_health_monitoring,
+                   tezlink ) ) ),
+             (slot_size, number_of_slots) )
          ->
         {
           blocks_history;
@@ -257,52 +263,56 @@ module DAL = struct
           ppx_profiling_backends;
           enable_network_health_monitoring;
           tezlink;
+          slot_size;
+          number_of_slots;
         })
       (merge_objs
          (merge_objs
-            (obj10
-               (opt "blocks_history" int31)
-               (opt "producer_key" string)
-               (opt "fundraiser" string)
-               (opt "network" Network.encoding)
-               (opt "simulate_network" network_simulation_config_encoding)
-               (opt "snapshot" Snapshot_helpers.encoding)
-               (opt "bootstrap" bool)
-               (opt "stake" Network.stake_repartition_encoding)
-               (dft "bakers" (list string) [])
-               (dft "stake_machine_type" (list string) []))
-            (obj10
-               (dft "dal_producers_slot_indices" (list int31) [])
-               (opt "producers" int31)
-               (opt "producers_delay" int31)
-               (opt "producer_machine_type" string)
-               (dft "observer_slot_indices" (list int31) [])
-               (dft "observer_pkhs" (list string) [])
-               (opt "protocol" Protocol.encoding)
-               (opt "data_dir" string)
-               (opt "etherlink" bool)
-               (opt "etherlink_sequencer" bool)))
-         (merge_objs
-            (obj10
-               (opt "etherlink_producers" int31)
-               (opt "etherlink_chain_id" int31)
-               (opt "echo_rollup" bool)
-               (opt "disconnect" (tup2 int31 int31))
-               (dft "etherlink_dal_slots" (list int31) [])
-               (opt "teztale" bool)
-               (opt "octez_release" string)
-               (opt "memtrace" bool)
-               (opt "bootstrap_node_identity_file" string)
-               (opt "bootstrap_dal_node_identity_file" string))
-            (obj10
-               (opt "refresh_binaries" bool)
-               (opt "node_external_rpc_server" bool)
-               (opt "with_dal" bool)
-               (opt "proxy_localhost" bool)
-               (opt "disable_shard_validation" bool)
-               (dft "ignore_pkhs" (list string) [])
-               (opt "ppx_profiling_verbosity" string)
-               (dft "ppx_profiling_backends" (list string) [])
-               (opt "enable_network_health_monitoring" bool)
-               (opt "tezlink" bool))))
+            (merge_objs
+               (obj10
+                  (opt "blocks_history" int31)
+                  (opt "producer_key" string)
+                  (opt "fundraiser" string)
+                  (opt "network" Network.encoding)
+                  (opt "simulate_network" network_simulation_config_encoding)
+                  (opt "snapshot" Snapshot_helpers.encoding)
+                  (opt "bootstrap" bool)
+                  (opt "stake" Network.stake_repartition_encoding)
+                  (dft "bakers" (list string) [])
+                  (dft "stake_machine_type" (list string) []))
+               (obj10
+                  (dft "dal_producers_slot_indices" (list int31) [])
+                  (opt "producers" int31)
+                  (opt "producers_delay" int31)
+                  (opt "producer_machine_type" string)
+                  (dft "observer_slot_indices" (list int31) [])
+                  (dft "observer_pkhs" (list string) [])
+                  (opt "protocol" Protocol.encoding)
+                  (opt "data_dir" string)
+                  (opt "etherlink" bool)
+                  (opt "etherlink_sequencer" bool)))
+            (merge_objs
+               (obj10
+                  (opt "etherlink_producers" int31)
+                  (opt "etherlink_chain_id" int31)
+                  (opt "echo_rollup" bool)
+                  (opt "disconnect" (tup2 int31 int31))
+                  (dft "etherlink_dal_slots" (list int31) [])
+                  (opt "teztale" bool)
+                  (opt "octez_release" string)
+                  (opt "memtrace" bool)
+                  (opt "bootstrap_node_identity_file" string)
+                  (opt "bootstrap_dal_node_identity_file" string))
+               (obj10
+                  (opt "refresh_binaries" bool)
+                  (opt "node_external_rpc_server" bool)
+                  (opt "with_dal" bool)
+                  (opt "proxy_localhost" bool)
+                  (opt "disable_shard_validation" bool)
+                  (dft "ignore_pkhs" (list string) [])
+                  (opt "ppx_profiling_verbosity" string)
+                  (dft "ppx_profiling_backends" (list string) [])
+                  (opt "enable_network_health_monitoring" bool)
+                  (opt "tezlink" bool))))
+         (obj2 (opt "slot_size" int31) (opt "number_of_slots" int31)))
 end

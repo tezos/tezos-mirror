@@ -174,6 +174,10 @@ module type Dal = sig
   val enable_network_health_monitoring : bool
 
   val tezlink : bool
+
+  val slot_size : int option
+
+  val number_of_slots : int option
 end
 
 module Dal () : Dal = struct
@@ -721,6 +725,58 @@ module Dal () : Dal = struct
         "If specified, the network health monitoring app.\n\
          Recommendation: enable only for public dal bootstrap node deployments"
       (Option.value ~default:false config.enable_network_health_monitoring)
+
+  let slot_size =
+    let open Scenarios_helpers in
+    let parse s =
+      match int_of_string_opt s with
+      | None -> Test.fail "Invalid --slot-size value: %s is not an integer" s
+      | Some v ->
+          if v <= 0 then
+            Test.fail "Invalid --slot-size value: %d: must be positive" v ;
+          if v mod default_page_size <> 0 then
+            Test.fail
+              "Invalid --slot-size value: %d: must be a multiple of the \
+               cryptobox page size (%d)."
+              v
+              default_page_size ;
+          Some v
+    in
+    let typ =
+      Clap.typ
+        ~name:"slot-size"
+        ~dummy:default_slot_size
+        ~parse
+        ~show:string_of_int
+    in
+    let from_cli =
+      Clap.optional
+        ~section
+        ~long:"slot-size"
+        ~description:
+          (* TODO: Make this work for network simulation in sandbox and for other networks, using UAUs. *)
+          (Format.sprintf
+             "Size in bytes of each DAL slot (must be a positive multiple of \
+              the cryptobox page size = %d). This value will be overridden in \
+              the DAL parameters only for sandbox experiments with network \
+              simulation DISABLED."
+             default_page_size)
+        typ
+        ()
+    in
+    Option.fold ~none:config.slot_size ~some:Option.some from_cli
+
+  let number_of_slots =
+    let from_cli =
+      Clap.optional_int
+        ~section
+        ~long:"number-of-slots"
+        ~description:
+          (* TODO: Make this work for network simulation in sandbox and for other networks, using UAUs. *)
+          "Number of DAL slots to use."
+        ()
+    in
+    Option.fold ~none:config.number_of_slots ~some:Option.some from_cli
 end
 
 type stake = Auto | Manual of int list

@@ -30,3 +30,7 @@ val add_prometheus_source :
 val init_explorus : Cloud.t -> Node.t -> unit Lwt.t
 
 val refutation_game_minimal_rolling_history_mode : Node.argument
+
+val default_page_size : int
+
+val default_slot_size : int

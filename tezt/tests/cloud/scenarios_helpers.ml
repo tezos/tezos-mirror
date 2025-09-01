@@ -86,3 +86,7 @@ let init_explorus cloud node =
    games. *)
 let refutation_game_minimal_rolling_history_mode =
   Node.(History_mode (Rolling (Some 79)))
+
+let default_page_size = 3967
+
+let default_slot_size = 32 * default_page_size
