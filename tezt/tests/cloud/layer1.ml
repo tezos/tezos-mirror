@@ -361,7 +361,7 @@ type stresstest_conf = {tps : int; seed : int}
     - [stresstest]: See the description of [stresstest_conf]
   *)
 type configuration = {
-  stake : Scenarios_cli.stake;
+  stake : Stake_repartition.Layer1.t;
   network : Network.t;
   snapshot : Snapshot_helpers.t;
   stresstest : stresstest_conf option;
@@ -381,24 +381,6 @@ let stresstest_encoding =
     (fun {tps; seed} -> (tps, seed))
     (fun (tps, seed) -> {tps; seed})
     (obj2 (req "tps" int31) (req "seed" int31))
-
-let stake_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"auto"
-        (constant "auto")
-        (function Scenarios_cli.Auto -> Some () | _ -> None)
-        (fun () -> Scenarios_cli.Auto);
-      case
-        (Tag 1)
-        ~title:"manual"
-        (list int31)
-        (function Scenarios_cli.Manual d -> Some d | _ -> None)
-        (fun d -> Manual d);
-    ]
 
 let configuration_encoding =
   let open Data_encoding in
@@ -457,7 +439,7 @@ let configuration_encoding =
       })
     (merge_objs
        (obj10
-          (dft "stake" stake_encoding Scenarios_cli.(Manual [1]))
+          (dft "stake" Stake_repartition.Layer1.encoding (Manual [1]))
           (req "network" Network.encoding)
           (req "snapshot" Snapshot_helpers.encoding)
           (opt "stresstest" stresstest_encoding)
@@ -1328,13 +1310,13 @@ let register (module Cli : Scenarios_cli.Layer1) =
       let init n = List.init n (fun i -> Baker i) in
       let* bakers =
         match configuration.stake with
-        | Scenarios_cli.Auto ->
+        | Stake_repartition.Layer1.Auto ->
             Lwt.map
               init
               (number_of_bakers
                  ~snapshot:configuration.snapshot
                  ~network:configuration.network)
-        | Scenarios_cli.Manual stake -> Lwt.return (init (List.length stake))
+        | Manual stake -> Lwt.return (init (List.length stake))
       in
       Lwt.return
       @@ Bootstrap

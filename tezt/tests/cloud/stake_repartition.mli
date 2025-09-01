@@ -18,3 +18,11 @@ module Dal : sig
   val parse_arg :
     stake_arg:t -> simulation_arg:Network_simulation.t -> int list Lwt.t
 end
+
+module Layer1 : sig
+  type t = Auto | Manual of int list
+
+  val encoding : t Data_encoding.t
+
+  val typ : t Clap.typ
+end

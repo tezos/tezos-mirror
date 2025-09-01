@@ -680,12 +680,10 @@ module Dal () : Dal = struct
     Option.fold ~none:config.number_of_slots ~some:Option.some from_cli
 end
 
-type stake = Auto | Manual of int list
-
 module type Layer1 = sig
   val network : Network.t option
 
-  val stake : stake option
+  val stake : Stake_repartition.Layer1.t option
 
   val stresstest : (int * int) option
 
@@ -742,24 +740,7 @@ module Layer1 () = struct
       network_typ
       ()
 
-  let stake : stake option =
-    let typ =
-      let parse = function
-        | "AUTO" | "auto" -> Some Auto
-        | string -> (
-            try
-              match string |> String.split_on_char ',' with
-              | [n] -> Some (Manual (List.init (int_of_string n) (fun _ -> 1)))
-              | distribution ->
-                  Some (Manual (List.map int_of_string distribution))
-            with exn -> raise exn)
-      in
-      let show = function
-        | Auto -> "AUTO"
-        | Manual dist -> List.map string_of_int dist |> String.concat ","
-      in
-      Clap.typ ~name:"stake" ~dummy:(Manual [1]) ~parse ~show
-    in
+  let stake : Stake_repartition.Layer1.t option =
     Clap.optional
       ~section
       ~long:"stake"
@@ -772,7 +753,7 @@ module Layer1 () = struct
          a list of relative weight. Delegates will be distributed amongst \
          pools in order to (approximately) respect the given stake \
          distribution."
-      typ
+      Stake_repartition.Layer1.typ
       ()
 
   let stresstest =

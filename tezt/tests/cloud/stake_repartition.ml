@@ -163,3 +163,42 @@ module Dal = struct
                cannot set baker stake while using baking power of bakers from \
                a simulated network.")
 end
+
+module Layer1 = struct
+  type t = Auto | Manual of int list
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"auto"
+          (constant "auto")
+          (function Auto -> Some () | _ -> None)
+          (fun () -> Auto);
+        case
+          (Tag 1)
+          ~title:"manual"
+          (list int31)
+          (function Manual d -> Some d | _ -> None)
+          (fun d -> Manual d);
+      ]
+
+  let typ =
+    let parse = function
+      | "AUTO" | "auto" -> Some Auto
+      | string -> (
+          try
+            match string |> String.split_on_char ',' with
+            | [n] -> Some (Manual (List.init (int_of_string n) (fun _ -> 1)))
+            | distribution ->
+                Some (Manual (List.map int_of_string distribution))
+          with exn -> raise exn)
+    in
+    let show = function
+      | Auto -> "AUTO"
+      | Manual dist -> List.map string_of_int dist |> String.concat ","
+    in
+    Clap.typ ~name:"stake" ~dummy:(Manual [1]) ~parse ~show
+end
