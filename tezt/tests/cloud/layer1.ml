@@ -21,6 +21,7 @@
 open Scenarios_helpers
 open Tezos
 open Yes_crypto
+open Agent_kind
 
 (** A baker account is its delegate account and its consensus key account *)
 type baker_account = {delegate : Account.key; consensus : Account.key}
@@ -43,8 +44,6 @@ let nb_stresstester network tps =
   let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
   max 1 (max n1 n2)
 
-let agent_name_bootstrap : rex = rex "bootstrap-(\\d+)"
-
 let agent_name_stresstest : rex = rex "stresstest-(\\d+)"
 
 let agent_name_baker : rex = rex "baker-(\\d+)"
@@ -58,10 +57,6 @@ let extract_agent_index (r : rex) agent =
   | Some i -> int_of_string i
 
 let match_agent_name r agent = Agent.name agent =~ r
-
-let make_agent_name =
-  let index = rex "\\(\\\\d\\+\\)" in
-  fun r i -> replace_string index ~by:(string_of_int i) (show_rex r)
 
 module Node = struct
   open Snapshot_helpers
@@ -840,9 +835,7 @@ let init ~(configuration : configuration) cloud =
      peer list known when initializing. *)
   let* ((bootstrap_agent, bootstrap_node, bootstrap_name) as bootstrap) =
     let agent =
-      List.find
-        (fun a -> match_agent_name agent_name_bootstrap a)
-        (Cloud.agents cloud)
+      List.find (fun a -> Agent.name a = name_of Bootstrap) (Cloud.agents cloud)
     in
     create_node agent cloud
   in
@@ -1332,7 +1325,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
   in
   let vms () =
     let* vms =
-      let init n = List.init n (fun i -> `Baker i) in
+      let init n = List.init n (fun i -> Baker i) in
       let* bakers =
         match configuration.stake with
         | Scenarios_cli.Auto ->
@@ -1344,40 +1337,41 @@ let register (module Cli : Scenarios_cli.Layer1) =
         | Scenarios_cli.Manual stake -> Lwt.return (init (List.length stake))
       in
       Lwt.return
-      @@ `Bootstrap
+      @@ Bootstrap
          :: (bakers
             @ (match configuration.dal_node_producers with
               | Some dal_node_producers ->
-                  List.map (fun i -> `Producer i) dal_node_producers
+                  List.map (fun i -> Producer i) dal_node_producers
               | None -> [])
             @
             match configuration.stresstest with
             | None -> []
             | Some {tps; _} ->
                 let n = nb_stresstester configuration.network tps in
-                List.init n (fun i -> `Stresstest i))
+                List.init n (fun i -> Stresstest i))
     in
     Lwt.return
     @@ List.map
          (fun kind ->
            match kind with
-           | `Bootstrap ->
-               make_vm_conf ~name:(make_agent_name agent_name_bootstrap 0)
+           | Bootstrap ->
+               make_vm_conf ~name:(name_of Bootstrap)
                @@ Option.bind vms_conf (fun {bootstrap; _} -> bootstrap)
-           | `Stresstest j ->
-               make_vm_conf ~name:(make_agent_name agent_name_stresstest j)
+           | Stresstest j ->
+               make_vm_conf ~name:(name_of (Stresstest j))
                @@ Option.bind vms_conf (fun {stresstester; _} -> stresstester)
-           | `Baker i ->
-               make_vm_conf ~name:(make_agent_name agent_name_baker i)
+           | Baker i ->
+               make_vm_conf ~name:(name_of (Baker i))
                @@ Option.bind vms_conf (function
                     | {bakers = Some bakers; _} -> List.nth_opt bakers i
                     | {bakers = None; _} -> None)
-           | `Producer i ->
-               make_vm_conf ~name:(Format.sprintf "dal-node-producer-%d" i)
+           | Producer i ->
+               make_vm_conf ~name:(name_of_daemon (Producer_dal_node i))
                @@ Option.bind vms_conf (function
                     | {producers = Some producers; _} ->
                         List.nth_opt producers i
-                    | {producers = None; _} -> None))
+                    | {producers = None; _} -> None)
+           | _ -> assert false)
          vms
   in
   Cloud.register

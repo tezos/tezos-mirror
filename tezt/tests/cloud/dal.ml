@@ -1457,7 +1457,8 @@ let register (module Cli : Scenarios_cli.Dal) =
            | Echo_rollup_operator -> default_vm_configuration ~name
            | Etherlink_operator -> default_vm_configuration ~name
            | Etherlink_producer _ -> default_vm_configuration ~name
-           | Reverse_proxy -> default_vm_configuration ~name)
+           | Reverse_proxy -> default_vm_configuration ~name
+           | Stresstest _ -> default_vm_configuration ~name)
          vms
   in
   let endpoint, resolver_endpoint = Lwt.wait () in

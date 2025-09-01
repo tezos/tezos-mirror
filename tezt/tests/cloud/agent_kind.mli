@@ -32,6 +32,7 @@ type t =
   | Echo_rollup_operator  (** The main rollup operator for the Echo rollup. *)
   | Echo_rollup_dal_observer of {slot_index : int}
       (** A DAL observer node for the Echo rollup, indexed by slot. *)
+  | Stresstest of int
 
 (** [name_of agent] returns the standard name associated with a given [agent].
     Used for consistent naming of VMs, logs and artifacts. *)
