@@ -44,6 +44,11 @@ pub const EVM_ACCOUNTS_PATH: RefPath =
 pub(crate) const WITHDRAWALS_TICKETER_PATH: RefPath =
     RefPath::assert_from(b"/evm/world_state/ticketer");
 
+/// Path where a possible waiting sequencer upgrade triggered by a precompile
+/// is store.
+pub const SEQUENCER_KEY_CHANGE_PATH: RefPath =
+    RefPath::assert_from(b"/evm/world_state/sequencer_key_change");
+
 /// Path where an account nonce is stored. This should be prefixed with the path to
 /// where the account is stored for the world state or for the current transaction.
 const NONCE_PATH: RefPath = RefPath::assert_from(b"/nonce");
