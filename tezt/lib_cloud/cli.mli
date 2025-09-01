@@ -180,3 +180,10 @@ val slack_bot_token : string option
 module Types : sig
   val dir_typ : name:string -> cli_parameter:string -> string option Clap.typ
 end
+
+(** [to_json_config ~scenario_name ?scenario_config ()] generates the full
+    configuration file encoded in JSON, each option being retrieved from the CLI
+    or default parameters. If [scenario_config] is not given, it encodes the
+    one from the CLI. *)
+val to_json_config :
+  ?scenario_config:string * Data_encoding.Json.t -> unit -> Data_encoding.Json.t

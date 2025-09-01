@@ -273,6 +273,11 @@ module Tezt_cloud_cli : sig
   val artifacts_dir : string option
 
   val teztale_artifacts : bool
+
+  val to_json_config :
+    ?scenario_config:string * Data_encoding.Json.t ->
+    unit ->
+    Data_encoding.Json.t
 end
 
 (** [register ~tags] register a set of jobs that can be used for setting

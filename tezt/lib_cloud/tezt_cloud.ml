@@ -314,4 +314,6 @@ module Tezt_cloud_cli = struct
   let artifacts_dir = Cli.artifacts_dir
 
   let teztale_artifacts = Cli.teztale_artifacts
+
+  let to_json_config = Cli.to_json_config
 end
