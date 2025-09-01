@@ -394,7 +394,7 @@ let stake_encoding =
       case
         (Tag 0)
         ~title:"auto"
-        empty
+        (constant "auto")
         (function Scenarios_cli.Auto -> Some () | _ -> None)
         (fun () -> Scenarios_cli.Auto);
       case
