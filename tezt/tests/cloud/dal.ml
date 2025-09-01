@@ -62,6 +62,8 @@ type configuration = {
   ppx_profiling_backends : string list;
   network_health_monitoring : bool;
   daily_logs_destination : string option;
+  slot_size : int option;
+  number_of_slots : int option;
 }
 
 type bootstrap = {
@@ -701,7 +703,17 @@ let init_sandbox_and_activate_protocol cloud (configuration : configuration)
            @ etherlink_batching_operator_keys
             @ Option.fold ~none:[] ~some:(fun k -> [k]) echo_rollup_key)
         in
-        let overrides = [] in
+        let overrides =
+          (match configuration.slot_size with
+          | Some slot_size ->
+              [(["dal_parametric"; "slot_size"], `Int slot_size)]
+          | None -> [])
+          @ (match configuration.number_of_slots with
+            | Some number_of_slots ->
+                [(["dal_parametric"; "number_of_slots"], `Int number_of_slots)]
+            | None -> [])
+          @ []
+        in
         Protocol.write_parameter_file
           ~bootstrap_accounts
           ~additional_bootstrap_accounts
@@ -1341,6 +1353,8 @@ let register (module Cli : Scenarios_cli.Dal) =
     let daily_logs_destination =
       Option.map (fun dir -> dir // "daily_logs") Tezt_cloud_cli.artifacts_dir
     in
+    let slot_size = Cli.slot_size in
+    let number_of_slots = Cli.number_of_slots in
     let t =
       {
         with_dal;
@@ -1374,6 +1388,8 @@ let register (module Cli : Scenarios_cli.Dal) =
         ppx_profiling_backends;
         network_health_monitoring;
         daily_logs_destination;
+        slot_size;
+        number_of_slots;
       }
     in
     (t, etherlink)
