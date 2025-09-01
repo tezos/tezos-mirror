@@ -1099,7 +1099,7 @@ module Teztale = struct
               Lwt_list.iter_s
                 (fun _archiver ->
                   let db_destination =
-                    Agent_kind.Logs.local_path
+                    Artifact_helpers.local_path
                       [dir; Filename.basename server.filenames.db_filename]
                   in
                   let* () =
@@ -1111,7 +1111,7 @@ module Teztale = struct
                       `FromRunner
                   in
                   let conf_destination =
-                    Agent_kind.Logs.local_path
+                    Artifact_helpers.local_path
                       [dir; Filename.basename server.filenames.conf_filename]
                   in
                   Agent.scp

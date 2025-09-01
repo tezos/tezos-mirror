@@ -280,6 +280,14 @@ module Tezt_cloud_cli : sig
     Data_encoding.Json.t
 end
 
+module Artifact_helpers : sig
+  (** [local_path path] ensures that the path (as a list of subdirectories) is a
+      valid directory, creates it otherwise, then returns the path. If the first
+      directory starts with `/`, it will start from the root of the
+      filesystem. *)
+  val local_path : string list -> string
+end
+
 (** [register ~tags] register a set of jobs that can be used for setting
    requirements related to cloud scenarios. Some tags can be given for all the
    registered jobs. *)

@@ -317,3 +317,14 @@ module Tezt_cloud_cli = struct
 
   let to_json_config = Cli.to_json_config
 end
+
+module Artifact_helpers = struct
+  let local_path path =
+    List.fold_left
+      (fun prefix subdir ->
+        let prefix = prefix // subdir in
+        if not (Sys.file_exists prefix) then Sys.mkdir prefix 0o755 ;
+        prefix)
+      ""
+      path
+end
