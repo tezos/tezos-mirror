@@ -240,12 +240,12 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
 
     let account = account(host, caller, evm_account_storage)?;
 
-    let (nonce, balance, code_exists): (u64, U256, bool) = match account {
-        None => (0, U256::zero(), false),
+    let (nonce, balance, code): (u64, U256, Vec<u8>) = match account {
+        None => (0, U256::zero(), vec![]),
         Some(account) => (
             account.nonce(host)?,
             account.balance(host)?,
-            account.code_exists(host)?,
+            account.code(host)?,
         ),
     };
 
@@ -266,8 +266,8 @@ fn is_valid_ethereum_transaction_common<Host: Runtime>(
         return Ok(Validity::InvalidPrePay);
     }
 
-    // The sender does not have code, see EIP3607.
-    if code_exists {
+    // The sender does not have code (EIP-3607) or isn't an EIP-7702 authorized account.
+    if !code.is_empty() && !code.starts_with(&[0xef, 0x01, 0x00]) {
         log!(host, Benchmarking, "Transaction status: ERROR_CODE.");
         return Ok(Validity::InvalidCode);
     }

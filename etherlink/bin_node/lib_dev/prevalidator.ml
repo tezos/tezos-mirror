@@ -242,7 +242,13 @@ let validate_sender_not_a_contract (type state) session caller :
       (Backend_rpc.Reader.read session.state)
       caller
   in
-  if code = "" then return (Ok ())
+  if
+    (* EOA: *)
+    code = ""
+    ||
+    (* EIP-7702 authorized account: *)
+    String.starts_with ~prefix:"ef0100" code
+  then return (Ok ())
   else return (Error "Sender is a contract which is not possible")
 
 let validate_max_fee_per_gas ~base_fee_per_gas:(Qty base_fee_per_gas)
