@@ -21,7 +21,7 @@ type t =
 
 let name_of = function
   | Bootstrap -> "bootstrap"
-  | Baker i -> Format.asprintf "attester-%d" i
+  | Baker i -> Format.asprintf "baker-%d" i
   | Producer i -> Format.asprintf "dal-producer-%d" i
   | Observer (`Index i) -> Format.asprintf "dal-observer-%d" i
   | Observer (`Pkh pkh) ->
