@@ -300,7 +300,8 @@ module For_RPC = struct
   let participation_info ctxt delegate =
     let open Lwt_result_syntax in
     let level = Level_storage.current ctxt in
-    let* stake_distribution =
+    (* We ignore the context because this function is only used for RPCs *)
+    let* _ctxt, stake_distribution =
       Stake_storage.get_selected_distribution ctxt level.cycle
     in
     match
@@ -396,7 +397,8 @@ module For_RPC = struct
   let dal_participation_info_enabled ctxt delegate =
     let open Lwt_result_syntax in
     let level = Level_storage.current ctxt in
-    let* stake_distribution =
+    (* We ignore the context because this function is only used for RPCs *)
+    let* _ctxt, stake_distribution =
       Stake_storage.get_selected_distribution ctxt level.cycle
     in
     match

@@ -1300,7 +1300,7 @@ let f_total_currently_staked ctxt =
 let info ctxt pkh =
   let open Lwt_result_syntax in
   (* General baking information *)
-  let* deactivated = Delegate.deactivated ctxt pkh in
+  let* ctxt, deactivated = Delegate.deactivated ctxt pkh in
   let is_forbidden = Delegate.is_forbidden_delegate ctxt pkh in
   let* participation = Delegate.For_RPC.participation_info ctxt pkh in
   let* dal_participation =
@@ -1314,7 +1314,7 @@ let info ctxt pkh =
       return_some dal_participation
     else return_none
   in
-  let* grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
+  let* ctxt, grace_period = Delegate.last_cycle_before_deactivation ctxt pkh in
   let* active_staking_parameters =
     Delegate.Staking_parameters.of_delegate ctxt pkh
   in
@@ -1416,11 +1416,15 @@ let register () =
         | {active = true; inactive = false; _} ->
             List.filter_es
               (fun pkh ->
-                let+ deactivated = Delegate.deactivated ctxt pkh in
+                let+ _ctxt, deactivated = Delegate.deactivated ctxt pkh in
                 not deactivated)
               delegates
         | {active = false; inactive = true; _} ->
-            List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
+            List.filter_es
+              (fun pkh ->
+                let+ _ctxt, deactivated = Delegate.deactivated ctxt pkh in
+                deactivated)
+              delegates
         | {active = false; inactive = false; _}
         (* This case is counter-intuitive, but it represents the default behavior, when no arguments are given *)
         | {active = true; inactive = true; _} ->
@@ -1456,7 +1460,8 @@ let register () =
   register1 ~chunked:false S.total_staked f_total_staked ;
   register1 ~chunked:false S.Deprecated.frozen_deposits (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.initial_frozen_deposits ctxt pkh) ;
+      let+ _ctxt, ifd = Delegate.initial_frozen_deposits ctxt pkh in
+      ifd) ;
   wrap_check_registered
     ~chunked:false
     S.Deprecated.unstaked_frozen_deposits
@@ -1492,10 +1497,12 @@ let register () =
         ~delegate:pkh) ;
   register1 ~chunked:false S.deactivated (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.deactivated ctxt pkh) ;
+      let+ _ctxt, deactivated = Delegate.deactivated ctxt pkh in
+      deactivated) ;
   register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
-      Delegate.last_cycle_before_deactivation ctxt pkh) ;
+      let+ _ctxt, lcbd = Delegate.last_cycle_before_deactivation ctxt pkh in
+      lcbd) ;
   register1 ~chunked:false S.current_voting_power (fun ctxt pkh () () ->
       let* () = check_delegate_registered ctxt pkh in
       Vote.get_current_voting_power_free ctxt pkh) ;

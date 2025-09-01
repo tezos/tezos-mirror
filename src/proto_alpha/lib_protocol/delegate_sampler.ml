@@ -56,10 +56,12 @@ module Delegate_sampler_state = struct
   let get ctxt cycle =
     let open Lwt_result_syntax in
     let id = identifier_of_cycle cycle in
-    let* v_opt = Cache.find ctxt id in
+    let* ctxt, v_opt = Cache.find ctxt id in
     match v_opt with
-    | None -> Storage.Delegate_sampler_state.get ctxt cycle
-    | Some v -> return v
+    | None ->
+        let* v = Storage.Delegate_sampler_state.get ctxt cycle in
+        return (ctxt, v)
+    | Some v -> return (ctxt, v)
 
   let remove_existing ctxt cycle =
     let open Lwt_result_syntax in
@@ -132,8 +134,8 @@ module Random = struct
     let open Lwt_result_syntax in
     let read ctxt =
       let* seed = Seed_storage.for_cycle ctxt cycle in
-      let+ state = Delegate_sampler_state.get ctxt cycle in
-      (seed, state)
+      let+ ctxt, state = Delegate_sampler_state.get ctxt cycle in
+      (ctxt, seed, state)
     in
     Raw_context.sampler_for_cycle ~read ctxt cycle
 
@@ -179,7 +181,9 @@ let stake_info_for_cycle ctxt cycle =
   let read ctxt =
     let* total_stake = Stake_storage.get_total_active_stake ctxt cycle in
     let total_stake = Stake_repr.staking_weight total_stake in
-    let* stakes_pkh = Stake_storage.get_selected_distribution ctxt cycle in
+    let* ctxt, stakes_pkh =
+      Stake_storage.get_selected_distribution ctxt cycle
+    in
     let* stakes_pk =
       List.rev_map_es
         (fun (pkh, stake) ->
@@ -189,7 +193,7 @@ let stake_info_for_cycle ctxt cycle =
           (pk, Stake_repr.staking_weight stake))
         stakes_pkh
     in
-    return (total_stake, stakes_pk)
+    return (ctxt, total_stake, stakes_pk)
   in
   Raw_context.stake_info_for_cycle ~read ctxt cycle
 

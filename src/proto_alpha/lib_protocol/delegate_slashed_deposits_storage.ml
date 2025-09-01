@@ -125,11 +125,11 @@ let get_initial_frozen_deposits_of_misbehaviour_cycle ~current_cycle
     Delegate_storage.initial_frozen_deposits
   else if Cycle_repr.equal previous_cycle misbehaviour_cycle then
     Delegate_storage.initial_frozen_deposits_of_previous_cycle
-  else fun (_ : Raw_context.t) (_ : Signature.public_key_hash) ->
+  else fun (ctxt : Raw_context.t) (_ : Signature.public_key_hash) ->
     (* Denunciation applied too late.
        We could assert false, but we can also be permissive
        while keeping the same invariants. *)
-    return Tez_repr.zero
+    return (ctxt, Tez_repr.zero)
 
 let update_block_denunciations_map_with delegate denunciations initial_block_map
     =
@@ -287,8 +287,8 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
                 new_total_slashing_percentage
                 previous_total_slashing_percentage
             in
-            let* frozen_deposits =
-              let* initial_amount =
+            let* ctxt, frozen_deposits =
+              let* ctxt, initial_amount =
                 get_initial_frozen_deposits_of_misbehaviour_cycle
                   ~current_cycle
                   ~misbehaviour_cycle
@@ -298,7 +298,7 @@ let apply_block_denunciations ctxt current_cycle block_denunciations_map =
               let* current_amount =
                 Delegate_storage.current_frozen_deposits ctxt delegate
               in
-              return Deposits_repr.{initial_amount; current_amount}
+              return (ctxt, Deposits_repr.{initial_amount; current_amount})
             in
             let punishing_amount =
               compute_punishing_amount slashing_percentage frozen_deposits
@@ -534,7 +534,8 @@ module For_RPC = struct
                 in
                 let misbehaviour_cycle = level.cycle in
                 let* frozen_deposits =
-                  let* initial_amount =
+                  (* We ignore the context because this function is only used for RPCs *)
+                  let* _ctxt, initial_amount =
                     get_initial_frozen_deposits_of_misbehaviour_cycle
                       ~current_cycle
                       ~misbehaviour_cycle

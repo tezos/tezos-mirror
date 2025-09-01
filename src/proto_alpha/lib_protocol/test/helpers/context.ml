@@ -642,7 +642,7 @@ module Delegate = struct
   let stake_for_cycle ctxt cycle pkh =
     let open Lwt_result_wrap_syntax in
     let* alpha_ctxt = get_alpha_ctxt ctxt in
-    let*@ stakes =
+    let*@ _ctxt, stakes =
       Protocol.Alpha_context.Stake_distribution.Internal_for_tests
       .get_selected_distribution
         alpha_ctxt

@@ -2093,7 +2093,7 @@ let sampler_for_cycle ~read ctxt cycle =
   match Cycle_repr.Map.find cycle map with
   | Some (seed, state) -> return (ctxt, seed, state)
   | None ->
-      let* seed, state = read ctxt in
+      let* ctxt, seed, state = read ctxt in
       let map = Cycle_repr.Map.add cycle (seed, state) map in
       let ctxt = update_sampler_state ctxt map in
       return (ctxt, seed, state)
@@ -2126,7 +2126,7 @@ let stake_info_for_cycle ~read ctxt cycle =
   match Cycle_repr.Map.find cycle map with
   | Some (total_stake, stakes_pk) -> return (ctxt, total_stake, stakes_pk)
   | None ->
-      let* total_stake, stakes_pk = read ctxt in
+      let* ctxt, total_stake, stakes_pk = read ctxt in
       let stakes_pk = sort_stakes_pk_for_stake_info stakes_pk in
       let map = Cycle_repr.Map.add cycle (total_stake, stakes_pk) map in
       let ctxt = update_stake_info ctxt map in

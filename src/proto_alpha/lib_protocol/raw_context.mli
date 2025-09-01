@@ -291,7 +291,7 @@ val init_sampler_for_cycle :
     the [read] function and then cached in [ctxt] like
     [init_sampler_for_cycle]. *)
 val sampler_for_cycle :
-  read:(t -> (Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t) ->
+  read:(t -> (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t) ->
   t ->
   Cycle_repr.t ->
   (t * Seed_repr.seed * consensus_pk Sampler.t) tzresult Lwt.t
@@ -315,7 +315,7 @@ val init_stake_info_for_cycle :
     the [read] function and then cached in [ctxt] like
     [init_stake_info_for_cycle]. *)
 val stake_info_for_cycle :
-  read:(t -> (Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
+  read:(t -> (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t) ->
   t ->
   Cycle_repr.t ->
   (t * Int64.t * (consensus_pk * int64) list) tzresult Lwt.t

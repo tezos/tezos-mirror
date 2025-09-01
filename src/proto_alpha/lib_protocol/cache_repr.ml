@@ -206,7 +206,10 @@ module type INTERFACE = sig
     (cached_value * int) option ->
     Raw_context.t tzresult
 
-  val find : Raw_context.t -> identifier -> cached_value option tzresult Lwt.t
+  val find :
+    Raw_context.t ->
+    identifier ->
+    (Raw_context.t * cached_value option) tzresult Lwt.t
 
   val list_identifiers : Raw_context.t -> (identifier * int) list
 
@@ -267,8 +270,8 @@ let register_exn (type cvalue)
       in
       let*! value_opt = Admin.find ctxt (mk ~id) in
       match value_opt with
-      | None -> return_none
-      | Some (K v) -> return_some v
+      | None -> return (ctxt, None)
+      | Some (K v) -> return (ctxt, Some v)
       | _ ->
           (* This execution path is impossible because all the keys of
              C's namespace (which is unique to C) are constructed with

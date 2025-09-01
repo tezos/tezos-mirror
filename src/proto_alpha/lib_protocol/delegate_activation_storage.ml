@@ -49,9 +49,9 @@ let tolerated_inactivity_period ctxt delegate =
   if Cycle_repr.(current_cycle = root) then
     (* There is no selected distribution at chain initialisation, so
        we give a low tolerance *)
-    return tolerance_low
+    return (ctxt, tolerance_low)
   else
-    let* delegates_stakes =
+    let* ctxt, delegates_stakes =
       Selected_distribution_storage.get_selected_distribution ctxt current_cycle
     in
     match
@@ -66,7 +66,7 @@ let tolerated_inactivity_period ctxt delegate =
            - a delegate reactivation
            - after decreasing its stake below [minimal_stake]
            so we give a low tolerance *)
-        return tolerance_low
+        return (ctxt, tolerance_low)
     | Some delegate_stake ->
         let+ total_stake =
           Selected_distribution_storage.get_total_active_stake
@@ -82,8 +82,8 @@ let tolerated_inactivity_period ctxt delegate =
               (of_int tolerance_threshold))
         in
         if Compare.Int.(compare_stake_ratio_with_threshold > 0) then
-          tolerance_low
-        else tolerance_high
+          (ctxt, tolerance_low)
+        else (ctxt, tolerance_high)
 
 let is_inactive ctxt delegate =
   let open Lwt_result_syntax in
@@ -92,42 +92,42 @@ let is_inactive ctxt delegate =
       ctxt
       (Contract_repr.Implicit delegate)
   in
-  if inactive then Lwt.return_ok inactive
+  if inactive then return (ctxt, inactive)
   else
     let* cycle_opt =
       Storage.Contract.Delegate_last_cycle_before_deactivation.find
         ctxt
         (Contract_repr.Implicit delegate)
     in
-    let+ tolerance = tolerated_inactivity_period ctxt delegate in
+    let+ ctxt, tolerance = tolerated_inactivity_period ctxt delegate in
     match cycle_opt with
     | Some last_active_cycle ->
         let ({Level_repr.cycle = current_cycle; _} : Level_repr.t) =
           Raw_context.current_level ctxt
         in
-        Cycle_repr.(add last_active_cycle tolerance < current_cycle)
+        (ctxt, Cycle_repr.(add last_active_cycle tolerance < current_cycle))
     | None ->
         (* This case is only when called from `set_active`, when creating
              a contract. *)
-        false
+        (ctxt, false)
 
 let last_cycle_before_deactivation ctxt delegate =
   let open Lwt_result_syntax in
-  let* tolerance = tolerated_inactivity_period ctxt delegate in
+  let* ctxt, tolerance = tolerated_inactivity_period ctxt delegate in
   let contract = Contract_repr.Implicit delegate in
   let+ cycle =
     Storage.Contract.Delegate_last_cycle_before_deactivation.get ctxt contract
   in
   (* we give [tolerance] cycles to the delegate after its last active
      cycle before it can be deactivated *)
-  Cycle_repr.add cycle tolerance
+  (ctxt, Cycle_repr.add cycle tolerance)
 
 let set_inactive ctxt delegate =
   Storage.Contract.Inactive_delegate.add ctxt (Contract_repr.Implicit delegate)
 
 let set_active ctxt delegate =
   let open Lwt_result_syntax in
-  let* inactive = is_inactive ctxt delegate in
+  let* ctxt, inactive = is_inactive ctxt delegate in
   let current_cycle = (Raw_context.current_level ctxt).cycle in
   let consensus_rights_delay = Constants_storage.consensus_rights_delay ctxt in
   let delegate_contract = Contract_repr.Implicit delegate in
@@ -136,18 +136,18 @@ let set_active ctxt delegate =
       ctxt
       delegate_contract
   in
-  let last_active_cycle =
+  let ctxt, last_active_cycle =
     (* if the delegate is new or inactive, we give it additionally
        [consensus_rights_delay] because the delegate needs this number
        of cycles to receive the rights *)
     match current_last_active_cycle with
-    | None -> Cycle_repr.add current_cycle consensus_rights_delay
+    | None -> (ctxt, Cycle_repr.add current_cycle consensus_rights_delay)
     | Some current_last_active_cycle ->
         let updated =
           if inactive then Cycle_repr.add current_cycle consensus_rights_delay
           else current_cycle
         in
-        Cycle_repr.max current_last_active_cycle updated
+        (ctxt, Cycle_repr.max current_last_active_cycle updated)
   in
   let*! ctxt =
     Storage.Contract.Delegate_last_cycle_before_deactivation.add
