@@ -5,53 +5,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type network_simulation_config =
-  | Scatter of int * int
-  | Map of int * int * int
-  | Disabled
-
-let network_simulation_config_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 1)
-        ~title:"scatter"
-        (tup2 int31 int31)
-        (function
-          | Scatter (nb_keys, nb_daemons) -> Some (nb_keys, nb_daemons)
-          | _ -> None)
-        (fun (nb_keys, nb_daemons) -> Scatter (nb_keys, nb_daemons));
-      case
-        (Tag 2)
-        ~title:"map"
-        (tup3 int31 int31 int31)
-        (function
-          | Map (nb_keys, nb_alone_bakers, nb_additional_daemons) ->
-              Some (nb_keys, nb_alone_bakers, nb_additional_daemons)
-          | _ -> None)
-        (fun (nb_keys, nb_alone_bakers, nb_additional_daemons) ->
-          Map (nb_keys, nb_alone_bakers, nb_additional_daemons));
-      case
-        (Tag 3)
-        ~title:"disabled"
-        empty
-        (function Disabled -> Some () | _ -> None)
-        (fun () -> Disabled);
-    ]
-
-let simulate_network_to_string = function
-  | Scatter (x, y) -> Format.sprintf "scatter(%d,%d)" x y
-  | Map (x, y, z) -> Format.sprintf "map(%d,%d,%d)" x y z
-  | Disabled -> Format.sprintf "disabled"
-
 module DAL = struct
   type t = {
     blocks_history : int option;
     producer_key : string option;
     fundraiser : string option;
     network : Network.t option;
-    simulate_network : network_simulation_config option;
+    simulate_network : Network_simulation.t option;
     snapshot : Snapshot_helpers.t option;
     bootstrap : bool option;
     stake : Network.stake_repartition option;
@@ -274,7 +234,7 @@ module DAL = struct
                   (opt "producer_key" string)
                   (opt "fundraiser" string)
                   (opt "network" Network.encoding)
-                  (opt "simulate_network" network_simulation_config_encoding)
+                  (opt "simulate_network" Network_simulation.encoding)
                   (opt "snapshot" Snapshot_helpers.encoding)
                   (opt "bootstrap" bool)
                   (opt "stake" Network.stake_repartition_encoding)

@@ -10,17 +10,15 @@
     which bypasses certain cryptographic confirmations in Octez nodes.
 *)
 
-open Scenarios_configuration
-
 val yes_crypto_env : string String_map.t
 
 (** [should_enable_yes_crypto config] returns a flag
     indicating whether "yes-crypto" mode should be enabled (for [Scatter] and [Map])
     or disabled (for [Disabled]). *)
-val should_enable_yes_crypto : network_simulation_config -> bool
+val should_enable_yes_crypto : Network_simulation.t -> bool
 
 (** [may_set_yes_crypto_env config] is similar to [should_enable_yes_crypto],
     but also returns the environment variable that needs to be set to enable
     the yes-crypto mechanism. *)
 val may_set_yes_crypto_env :
-  network_simulation_config -> string String_map.t option * bool
+  Network_simulation.t -> string String_map.t option * bool

@@ -37,7 +37,7 @@ val init_bakers :
   bakers:string list ->
   stake:int list Lwt.t ->
   data_dir:string option ->
-  simulate_network:Scenarios_configuration.network_simulation_config ->
+  simulate_network:Network_simulation.t ->
   external_rpc:bool ->
   network:Network.t ->
   snapshot:Snapshot_helpers.t ->

@@ -29,7 +29,7 @@ type configuration = {
   echo_rollup : bool;
   disconnect : (int * int) option;
   network : Network.t;
-  simulate_network : Scenarios_configuration.network_simulation_config;
+  simulate_network : Network_simulation.t;
   snapshot : Snapshot_helpers.t;
   bootstrap : bool;
   teztale : bool;
@@ -1178,7 +1178,7 @@ let yes_wallet_exe = Uses.path Constant.yes_wallet
 let parse_stake_arg ~stake_arg ~simulation_arg =
   let open Network in
   match simulation_arg with
-  | Scenarios_configuration.Disabled -> (
+  | Network_simulation.Disabled -> (
       match stake_arg with
       | Custom distrib -> return distrib
       | Mimic {network; max_nb_bakers} ->
@@ -1383,7 +1383,7 @@ let register (module Cli : Scenarios_cli.Dal) =
   toplog "Parsing CLI done" ;
   let baker_daemon_count =
     match simulate_network with
-    | Scenarios_configuration.Disabled -> 0
+    | Network_simulation.Disabled -> 0
     | Scatter (_selected_baker_count, baker_daemon_count) -> baker_daemon_count
     | Map
         ( _selected_baker_count,

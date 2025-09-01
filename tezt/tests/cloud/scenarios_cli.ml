@@ -20,59 +20,6 @@ module Clap = struct
   let list_of_int ?dummy name = list ~name ?dummy int_of_string string_of_int
 end
 
-let parse_network_simulation_config_from_args simulate_network_arg =
-  let is_positive_param p =
-    if p > 0 then p
-    else
-      Test.fail
-        "Unexpected value provided, [%d], from argument [%s]. Values must be \
-         positive integers.@."
-        p
-        simulate_network_arg
-  in
-  let is_arg1_sup_eq_arg2 arg1 arg2 =
-    if arg1 >= arg2 then ()
-    else
-      Test.fail
-        "Unexpected value provided for argument [%s]. %d must be greater or \
-         equal to %d."
-        simulate_network_arg
-        arg1
-        arg2
-  in
-  let re_scatter = Str.regexp "\\(scatter\\)(\\([^,]+\\),\\([^)]*\\))" in
-  let re_map = Str.regexp "\\(map\\)(\\([^,]+\\),\\([^)]*\\),\\([^)]*\\))" in
-  if Str.string_match re_scatter simulate_network_arg 0 then
-    let arg1 =
-      Str.matched_group 2 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg2 =
-      Str.matched_group 3 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let () = is_arg1_sup_eq_arg2 arg1 arg2 in
-    Some (Scenarios_configuration.Scatter (arg1, arg2))
-  else if Str.string_match re_map simulate_network_arg 0 then
-    let arg1 =
-      Str.matched_group 2 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg2 =
-      Str.matched_group 3 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let arg3 =
-      Str.matched_group 4 simulate_network_arg
-      |> int_of_string |> is_positive_param
-    in
-    let () = is_arg1_sup_eq_arg2 arg1 (arg2 + arg3) in
-    Some (Scenarios_configuration.Map (arg1, arg2, arg3))
-  else
-    Test.fail
-      "Unexpected network simulation config (--simulation) [%s]"
-      simulate_network_arg
-
 let network_typ : Network.t Clap.typ =
   Clap.typ
     ~name:"network"
@@ -100,10 +47,7 @@ module type Dal = sig
 
   val network : Network.t
 
-  val simulate_network_typ :
-    Scenarios_configuration.network_simulation_config Clap.typ
-
-  val simulate_network : Scenarios_configuration.network_simulation_config
+  val simulate_network : Network_simulation.t
 
   val snapshot : Snapshot_helpers.t
 
@@ -269,14 +213,6 @@ module Dal () : Dal = struct
       network_typ
       (Option.value ~default:`Sandbox config.network)
 
-  let simulate_network_typ :
-      Scenarios_configuration.network_simulation_config Clap.typ =
-    Clap.typ
-      ~name:"simulate_network"
-      ~dummy:Scenarios_configuration.Disabled
-      ~parse:parse_network_simulation_config_from_args
-      ~show:Scenarios_configuration.simulate_network_to_string
-
   let simulate_network =
     Clap.default
       ~section
@@ -301,7 +237,7 @@ module Dal () : Dal = struct
          For example:\n\
          - scatter(10,2): [[0;2;4;6;8];[1;3;5;7;9]]\n\
          - map(10,3):[[0];[1];[2;3;4;5;6;7;8;9]]"
-      simulate_network_typ
+      Network_simulation.typ
       (Option.value ~default:Disabled config.simulate_network)
 
   let snapshot =
@@ -370,8 +306,8 @@ module Dal () : Dal = struct
          to the N biggest delegates if <network>_<N> is given)."
       stake_repartition_typ
       (let default =
-         if network = `Sandbox && simulate_network = Disabled then
-           Network.Custom [100]
+         if network = `Sandbox && simulate_network = Network_simulation.Disabled
+         then Network.Custom [100]
          else Custom []
        in
        Option.value ~default config.stake)
