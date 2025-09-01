@@ -1068,9 +1068,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
     let open Scenarios_configuration.LAYER1 in
     let stake = Cli.stake in
     let network = Cli.network in
-    let stresstest =
-      Option.map (fun (tps, seed) -> Stresstest.{tps; seed}) Cli.stresstest
-    in
+    let stresstest = Cli.stresstest in
     let dal_node_producers = Cli.dal_producers_slot_indices in
     let maintenance_delay = Cli.maintenance_delay in
     let snapshot = Cli.snapshot in

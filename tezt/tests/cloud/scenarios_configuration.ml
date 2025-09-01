@@ -278,21 +278,6 @@ module DAL = struct
 end
 
 module LAYER1 = struct
-  module Stresstest = struct
-    (** Stresstest parameters
-    - [tps]: targeted number of transactions per second
-    - [seed]: seed used for stresstest traffic generation
- *)
-    type t = {tps : int; seed : int}
-
-    let encoding =
-      let open Data_encoding in
-      conv
-        (fun {tps; seed} -> (tps, seed))
-        (fun (tps, seed) -> {tps; seed})
-        (obj2 (req "tps" int31) (req "seed" int31))
-  end
-
   module Default = struct
     let maintenance_delay = 1
 

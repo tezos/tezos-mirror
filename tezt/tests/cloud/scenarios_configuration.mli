@@ -55,10 +55,6 @@ module DAL : sig
 end
 
 module LAYER1 : sig
-  module Stresstest : sig
-    type t = {tps : int; seed : int}
-  end
-
   module Default : sig
     val maintenance_delay : int
 

@@ -685,7 +685,7 @@ module type Layer1 = sig
 
   val stake : Stake_repartition.Layer1.t option
 
-  val stresstest : (int * int) option
+  val stresstest : Stresstest.t option
 
   val maintenance_delay : int option
 
@@ -749,18 +749,6 @@ module Layer1 () = struct
       ()
 
   let stresstest =
-    let typ =
-      let parse string =
-        try
-          match string |> String.split_on_char '/' with
-          | [n] -> Some (int_of_string n, Random.int 1073741823 (* 2^30 -1 *))
-          | [n; seed] -> Some (int_of_string n, int_of_string seed)
-          | _ -> None
-        with exn -> raise exn
-      in
-      let show (tps, seed) = string_of_int tps ^ "/" ^ string_of_int seed in
-      Clap.typ ~name:"stresstest" ~dummy:(0, 0) ~parse ~show
-    in
     Clap.optional
       ~section
       ~long:"stresstest"
@@ -770,7 +758,7 @@ module Layer1 () = struct
          the yes wallet to fund fresh accounts for reaching TPS stresstest \
          traffic generation. A seed for stresstest initialization can also be \
          specified."
-      typ
+      Stresstest.typ
       ()
 
   let maintenance_delay =
