@@ -53,7 +53,7 @@ module type Dal = sig
 
   val bootstrap : bool
 
-  val stake : Network.stake_repartition
+  val stake : Stake_repartition.Dal.t
 
   val bakers : string list
 
@@ -257,43 +257,8 @@ module Dal () : Dal = struct
       (let default = match network with `Sandbox -> true | _ -> false in
        Option.value ~default config.bootstrap)
 
-  let stake_repartition_typ : Network.stake_repartition Clap.typ =
-    let open Network in
-    let parse_public_network (net : string) : public option =
-      try Option.map to_public (parse net) with _ -> None
-    in
-    Clap.typ
-      ~name:"stake_repartition"
-      ~dummy:(Custom [100])
-      ~parse:(fun str ->
-        (* If it is a list of int, then a custom repartition has been selected. *)
-        let int_list_regexp = Str.regexp {|\([0-9]+,\( ?\)\)*[0-9]+$|} in
-        if Str.string_match int_list_regexp str 0 then
-          Some
-            (Custom (str |> String.split_on_char ',' |> List.map int_of_string))
-          (* Else we expect a network name, potentially followed by how many bakers should be created. *)
-        else
-          match String.split_on_char '_' str with
-          | [network] ->
-              Option.map
-                (fun network -> Mimic {network; max_nb_bakers = None})
-                (parse_public_network network)
-          | [network; n_str] -> (
-              try
-                let n = int_of_string n_str in
-                Option.map
-                  (fun network -> Mimic {network; max_nb_bakers = Some n})
-                  (parse_public_network network)
-              with _ -> None)
-          | _ -> None)
-      ~show:(function
-        | Custom l ->
-            l |> List.map string_of_int |> String.concat (String.make 1 ',')
-        | Mimic {network; max_nb_bakers = None} -> to_string network
-        | Mimic {network; max_nb_bakers = Some n} ->
-            Format.sprintf "%s_%d" (to_string network) n)
-
   let stake =
+    let open Stake_repartition.Dal in
     Clap.default
       ~section
       ~long:"stake"
@@ -304,10 +269,10 @@ module Dal () : Dal = struct
          total stake is proportional to the sum of all shares. If a network is \
          provided share repartitions is the same as on this network (truncated \
          to the N biggest delegates if <network>_<N> is given)."
-      stake_repartition_typ
+      typ
       (let default =
          if network = `Sandbox && simulate_network = Network_simulation.Disabled
-         then Network.Custom [100]
+         then Custom [100]
          else Custom []
        in
        Option.value ~default config.stake)

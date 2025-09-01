@@ -1175,101 +1175,12 @@ let rec loop t level =
 
 let yes_wallet_exe = Uses.path Constant.yes_wallet
 
-let parse_stake_arg ~stake_arg ~simulation_arg =
-  let open Network in
-  match simulation_arg with
-  | Network_simulation.Disabled -> (
-      match stake_arg with
-      | Custom distrib -> return distrib
-      | Mimic {network; max_nb_bakers} ->
-          let network_string =
-            match network with
-            | `Mainnet | `Ghostnet | `Rionet | `Seoulnet -> to_string network
-            | _ ->
-                failwith
-                  (Format.sprintf
-                     "Cannot get stake distribution for %s"
-                     (to_string network))
-          in
-          let endpoint =
-            Endpoint.make ~host:"rpc.tzkt.io" ~scheme:"https" ~port:443 ()
-          in
-          let decoder json = JSON.(json |-> "cycle" |> as_int) in
-          let rpc =
-            RPC_core.(
-              make
-                GET
-                [
-                  network_string;
-                  "chains";
-                  "main";
-                  "blocks";
-                  "head";
-                  "helpers";
-                  "current_level";
-                ]
-                decoder)
-          in
-          let* response = RPC_core.call_raw endpoint rpc in
-          let cycle =
-            RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
-          in
-          let get_stake_in_ktez stake =
-            JSON.(
-              (stake |-> "frozen" |> as_int) + (stake |-> "delegated" |> as_int))
-            / 1_000_000_000
-          in
-          let decoder json =
-            json |> JSON.as_list
-            |> List.map (fun json_account ->
-                   let active_stake = JSON.(json_account |-> "active_stake") in
-                   get_stake_in_ktez active_stake)
-          in
-          let rpc =
-            RPC_core.(
-              make
-                GET
-                [
-                  network_string;
-                  "chains";
-                  "main";
-                  "blocks";
-                  "head";
-                  "context";
-                  "raw";
-                  "json";
-                  "cycle";
-                  string_of_int cycle;
-                  "selected_stake_distribution";
-                ]
-                decoder)
-          in
-          let* response = RPC_core.call_raw endpoint rpc in
-          let distribution =
-            RPC_core.decode_raw ~origin:"Network.cycle" rpc response.body
-          in
-          let distribution =
-            match max_nb_bakers with
-            | None -> distribution
-            | Some n -> Tezos_stdlib.TzList.take_n n distribution
-          in
-          return distribution)
-  | Scatter _ | Map _ -> (
-      match stake_arg with
-      | Custom [] ->
-          (* As simulate_network and stake are mutually exclusive, only empty
-             stake option is allowed. *)
-          Lwt.return []
-      | _ ->
-          Test.fail
-            "Options --simulate and --stake are mutually exclusive. We cannot \
-             set baker stake while using baking power of bakers from a \
-             simulated network.")
-
 let register (module Cli : Scenarios_cli.Dal) =
   let simulate_network = Cli.simulate_network in
   let stake =
-    parse_stake_arg ~stake_arg:Cli.stake ~simulation_arg:simulate_network
+    Stake_repartition.Dal.parse_arg
+      ~stake_arg:Cli.stake
+      ~simulation_arg:simulate_network
   in
   let configuration, etherlink_configuration =
     let stake_machine_type = Cli.stake_machine_type in

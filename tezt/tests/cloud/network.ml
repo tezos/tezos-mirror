@@ -68,30 +68,6 @@ let encoding =
       | None -> invalid_arg ("Network.encoding: invalid network: " ^ s))
     string
 
-type stake_repartition =
-  | Custom of int list
-  | Mimic of {network : public; max_nb_bakers : int option}
-
-let stake_repartition_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 1)
-        ~title:"custom"
-        (list int31)
-        (function Custom l -> Some l | _ -> None)
-        (fun l -> Custom l);
-      case
-        (Tag 2)
-        ~title:"mimic"
-        (obj2 (req "network" public_encoding) (opt "max_nb_bakers" int31))
-        (function
-          | Mimic {network; max_nb_bakers} -> Some (network, max_nb_bakers)
-          | _ -> None)
-        (fun (network, max_nb_bakers) -> Mimic {network; max_nb_bakers});
-    ]
-
 let default_protocol : t -> Protocol.t = function
   | `Mainnet -> R022
   | `Ghostnet -> R022

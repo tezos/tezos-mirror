@@ -14,7 +14,7 @@ module DAL : sig
     simulate_network : Network_simulation.t option;
     snapshot : Snapshot_helpers.t option;
     bootstrap : bool option;
-    stake : Network.stake_repartition option;
+    stake : Stake_repartition.Dal.t option;
     bakers : string list;
     stake_machine_type : string list;
     dal_producers_slot_indices : int list;

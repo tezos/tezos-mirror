@@ -14,7 +14,7 @@ module DAL = struct
     simulate_network : Network_simulation.t option;
     snapshot : Snapshot_helpers.t option;
     bootstrap : bool option;
-    stake : Network.stake_repartition option;
+    stake : Stake_repartition.Dal.t option;
     bakers : string list;
     stake_machine_type : string list;
     dal_producers_slot_indices : int list;
@@ -237,7 +237,7 @@ module DAL = struct
                   (opt "simulate_network" Network_simulation.encoding)
                   (opt "snapshot" Snapshot_helpers.encoding)
                   (opt "bootstrap" bool)
-                  (opt "stake" Network.stake_repartition_encoding)
+                  (opt "stake" Stake_repartition.Dal.encoding)
                   (dft "bakers" (list string) [])
                   (dft "stake_machine_type" (list string) []))
                (obj10
