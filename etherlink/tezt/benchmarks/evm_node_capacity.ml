@@ -74,6 +74,12 @@ let deploy_contracts evm_node infos sequencer accounts nb =
   in
   wait_for_application sequencer deploys
 
+let nb_refused = ref 0
+
+let nb_dropped = ref 0
+
+let nb_confirmed = ref 0
+
 let call infos contract gas_limit sender ?nonce ~name abi params =
   let confirmed, waker = Lwt.task () in
   let data = Efunc_core.Evm.encode ~name abi params in
@@ -90,6 +96,13 @@ let call infos contract gas_limit sender ?nonce ~name abi params =
       ~callback:(function
       | `Accepted _ -> unit
       | (`Refused | `Dropped | `Confirmed) as status ->
+          let c =
+            match status with
+            | `Refused -> nb_refused
+            | `Dropped -> nb_dropped
+            | `Confirmed -> nb_confirmed
+          in
+          incr c ;
           Lwt.wakeup waker status ;
           unit)
   in
@@ -141,7 +154,16 @@ let step sequencer infos gas_limit erc20s accounts iteration =
       (sender_step infos gas_limit erc20s accounts iteration)
       sender_indexes
   in
-  wait_for_application sequencer step_f
+  let* () = wait_for_application sequencer step_f in
+  if !nb_dropped <> 0 then
+    Log.info ~color:Log.Color.FG.red "%d operations DROPPED" !nb_dropped ;
+  if !nb_refused <> 0 then
+    Log.info ~color:Log.Color.FG.red "%d operations REFUSED" !nb_refused ;
+  if !nb_confirmed <> 0 then Log.info "%d operations confirmed" !nb_confirmed ;
+  nb_dropped := 0 ;
+  nb_refused := 0 ;
+  nb_confirmed := 0 ;
+  unit
 
 type gasometer = {mutable gas : Z.t; mutable time : Ptime.Span.t}
 
