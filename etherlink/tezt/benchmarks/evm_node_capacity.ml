@@ -310,6 +310,29 @@ let monitor_gasometer evm_node f =
     gasometer ;
   unit
 
+let get_mem_mb pid =
+  Lwt_process.with_process_in ("ps", [|"ps"; "-p"; pid; "-o"; "rss="|])
+  @@ fun p ->
+  let* s = Lwt_io.read_line p#stdout in
+  return (float_of_string s /. 1_000.)
+
+let sample_memory evm_node =
+  let pid = Evm_node.pid evm_node |> Option.get |> string_of_int in
+  let current = ref 0. in
+  let peak = ref 0. in
+  let rec sample () =
+    let* mem = get_mem_mb pid in
+    current := mem ;
+    peak := max !peak mem ;
+    let* () = Lwt_unix.sleep 0.1 in
+    sample ()
+  in
+  let background = sample () in
+  fun () ->
+    Lwt.cancel background ;
+    Log.report ~color:Log.Color.bold "Peak memory: %.3fMB" !peak ;
+    Log.report ~color:Log.Color.bold "Memory:      %.3fMB" !current
+
 module MacOS = struct
   let xtrace_re = rex "<cycle-weight id=\"(\\d+)\".*>(\\d+)</cycle-weight>"
 
@@ -375,10 +398,12 @@ module MacOS = struct
           Evm_node.pid evm_node |> Option.get |> string_of_int;
         ]
     in
+    let report_mem = sample_memory evm_node in
     fun () ->
       let* _ = Process.wait xctrace in
       let* mcycles = total_cycles profile_file in
       Log.report ~color:Log.Color.bold "%.3f MCycles" mcycles ;
+      report_mem () ;
       unit
 end
 
@@ -389,10 +414,12 @@ module Linux = struct
         "perf"
         ["stat"; "-p"; Evm_node.pid evm_node |> Option.get |> string_of_int]
     in
+    let report_mem = sample_memory evm_node in
     fun () ->
       Process.terminate perf ;
       let* stat = Lwt_io.read (Process.stdout perf) in
       Log.report ~prefix:"perf" "%s" stat ;
+      report_mem () ;
       unit
 end
 
@@ -424,7 +451,8 @@ let test_erc20_capacity =
   let* accounts = floodgate_accounts sequencer accounts in
   let endpoint = Evm_node.endpoint sequencer |> Uri.of_string in
   let*? infos =
-    Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100. in
+    Network_info.fetch ~rpc_endpoint:endpoint ~base_fee_factor:100.
+  in
   let env =
     {
       params;
