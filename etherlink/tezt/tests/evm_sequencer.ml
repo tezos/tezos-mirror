@@ -13362,6 +13362,154 @@ let test_claim_deposit_event =
   capture_logs ~header:"Claimed deposit" receipt.logs ;
   unit
 
+let call_evm_based_sequencer_key_change ~sender ~sequencer ~sequencer_owner
+    ~new_key =
+  let new_pk = Tezos_crypto.Signature.Public_key.of_b58check_exn new_key in
+  let bytes =
+    match
+      Data_encoding.Binary.to_bytes
+        Tezos_crypto.Signature.Public_key.encoding
+        new_pk
+    with
+    | Ok bytes -> bytes
+    | Error err ->
+        failwith
+          (Format.asprintf
+             "Failed to encode public key: %a"
+             Data_encoding.Binary.pp_write_error
+             err)
+  in
+  let hex_pk = Hex.of_bytes bytes |> Hex.show in
+  let hex_signature =
+    match
+      Data_encoding.Binary.to_bytes
+        Tezos_crypto.Signature.encoding
+        (Account.sign_bytes ~signer:sequencer_owner bytes)
+    with
+    | Ok bytes -> Hex.of_bytes bytes |> Hex.show
+    | Error err ->
+        failwith
+          (Format.asprintf
+             "Failed to encode signature: %a"
+             Data_encoding.Binary.pp_write_error
+             err)
+  in
+  let* gas_price = Rpc.get_gas_price sequencer in
+  let gas_price = Int32.to_int gas_price in
+  let* raw_sequencer_upgrade =
+    Cast.craft_tx
+      ~signature:"change_sequencer_key(bytes,bytes)"
+      ~source_private_key:sender
+      ~chain_id:1337
+      ~nonce:0
+      ~gas_price
+      ~gas:100_000
+      ~value:(Wei.of_eth_int 1)
+      ~address:Solidity_contracts.Precompile.sequencer_key_change
+      ~arguments:[hex_pk; hex_signature]
+      ()
+  in
+  let*@ tx = Rpc.send_raw_transaction ~raw_tx:raw_sequencer_upgrade sequencer in
+  return tx
+
+let test_evm_based_sequencer_upgrade =
+  let sequencer_owner = Constant.bootstrap1 in
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "sequencer_upgrade"]
+    ~title:"Sequencer can update his key from EVM"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~sequencer:sequencer_owner
+  @@ fun {sequencer; _} _protocol ->
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let new_key = Constant.bootstrap2.public_key in
+  let* tx =
+    call_evm_based_sequencer_key_change
+      ~sender:whale.private_key
+      ~sequencer
+      ~sequencer_owner
+      ~new_key
+  in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{logs; status; _} =
+    Rpc.get_transaction_receipt ~tx_hash:tx sequencer
+  in
+  Check.((status = true) bool ~error_msg:"Transaction failed") ;
+  Check.((List.length logs = 1) int ~error_msg:"Expected 1 log") ;
+  let next_timestamp = Unix.gmtime (Unix.time () +. 86401.) in
+  let next_timestamp_str =
+    Format.asprintf
+      "%04d-%02d-%02dT%02d:%02d:%02dZ"
+      (next_timestamp.tm_year + 1900)
+      (next_timestamp.tm_mon + 1)
+      next_timestamp.tm_mday
+      next_timestamp.tm_hour
+      next_timestamp.tm_min
+      next_timestamp.tm_sec
+  in
+  let* _ = produce_block ~timestamp:next_timestamp_str sequencer in
+  let* _ = produce_block ~timestamp:next_timestamp_str sequencer in
+  (* Apply blueprint in node fail here because we only manage this upgrade in kernel *)
+  unit
+
+let test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists =
+  let sequencer_owner = Constant.bootstrap1 in
+  let genesis_timestamp =
+    Client.(At (Time.of_notation_exn "2020-01-01T00:00:00Z"))
+  in
+  let activation_timestamp = "2100-01-02T00:00:00Z" in
+
+  register_all
+    ~__FILE__
+    ~kernels:[Latest]
+    ~tags:["evm"; "sequencer_upgrade"]
+    ~title:"EVM change key cannot work if governance one is pending"
+    ~da_fee:Wei.zero
+    ~time_between_blocks:Nothing
+    ~genesis_timestamp
+    ~sequencer:sequencer_owner
+  @@
+  fun {sequencer; sc_rollup_address; sc_rollup_node; l1_contracts; client; _}
+      _protocol
+    ->
+  let* () =
+    sequencer_upgrade
+      ~sc_rollup_address
+      ~sequencer_admin:Constant.bootstrap2.alias
+      ~sequencer_governance_contract:l1_contracts.sequencer_governance
+      ~pool_address:Eth_account.bootstrap_accounts.(0).address
+      ~client
+      ~upgrade_to:sequencer_owner.alias
+      ~activation_timestamp
+  in
+  (* Wait for the sequencer to receive the upgrade *)
+  let waiting_sequencer_upgrade =
+    Evm_node.wait_for_pending_sequencer_upgrade sequencer
+  in
+  let* () =
+    repeat 2 (fun () ->
+        let* _ = next_rollup_node_level ~sc_rollup_node ~client in
+        unit)
+  in
+  let* _res = waiting_sequencer_upgrade in
+  let whale = Eth_account.bootstrap_accounts.(0) in
+  let new_key = Constant.bootstrap2.public_key in
+  let* tx =
+    call_evm_based_sequencer_key_change
+      ~sender:whale.private_key
+      ~sequencer
+      ~sequencer_owner
+      ~new_key
+  in
+  let* _ = produce_block sequencer in
+  let*@! Transaction.{status; _} =
+    Rpc.get_transaction_receipt ~tx_hash:tx sequencer
+  in
+  Check.((status = false) bool ~error_msg:"Transaction should have failed") ;
+  unit
+
 let test_eip2930_storage_access =
   register_all
     ~__FILE__
@@ -13858,6 +14006,8 @@ let () =
   test_durable_storage_consistency [Alpha] ;
   test_fa_deposit_can_be_claimed [Alpha] ;
   test_claim_deposit_event [Alpha] ;
+  test_evm_based_sequencer_upgrade [Alpha] ;
+  test_evm_based_sequencer_upgrade_fails_if_governance_upgrade_exists [Alpha] ;
   test_eip2930_storage_access [Alpha] ;
   test_eip7702 [Alpha] ;
   test_eip2537 [Alpha]
