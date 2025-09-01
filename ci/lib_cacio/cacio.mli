@@ -206,6 +206,7 @@ module type COMPONENT_API = sig
     ?artifacts:Gitlab_ci.Types.artifacts ->
     ?cargo_cache:bool ->
     ?sccache:sccache_config ->
+    ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
     job
@@ -227,9 +228,17 @@ module type COMPONENT_API = sig
       This does not actually register the pipeline in GitLab.
       The pipeline must manually be set up in GitLab
       to run with variable [TZ_SCHEDULE_KIND] equal to the name of the pipeline
-      (including the prefix, which is the component's name). *)
+      (including the prefix, which is the component's name).
+
+      Use [legacy_jobs] to include jobs that were not migrated to Cacio yet.
+      Cacio does not add them automatically for you even if they are dependencies
+      of Cacio jobs. *)
   val register_scheduled_pipeline :
-    description:string -> string -> (trigger * job) list -> unit
+    description:string ->
+    ?legacy_jobs:Tezos_ci.tezos_job list ->
+    string ->
+    (trigger * job) list ->
+    unit
 
   (** {2 Releases} *)
 
