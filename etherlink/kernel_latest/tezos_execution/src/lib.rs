@@ -14,7 +14,7 @@ use mir::{
 use num_bigint::{BigInt, BigUint};
 use num_traits::ops::checked::CheckedMul;
 use num_traits::ops::checked::CheckedSub;
-use tezos_crypto_rs::PublicKeyWithHash;
+use tezos_crypto_rs::{hash::ContractKt1Hash, PublicKeyWithHash};
 use tezos_data_encoding::types::Narith;
 use tezos_evm_logging::{log, Level::*, Verbosity};
 use tezos_evm_runtime::{runtime::Runtime, safe_storage::SafeStorage};
@@ -249,7 +249,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 storage,
                 code: _,
                 micheline_code,
-                address: _,
+                address,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let script = Script {
@@ -273,7 +273,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                     let receipt = originate_contract(
                         host,
                         context,
-                        origination_nonce,
+                        address,
                         sender_contract,
                         sender_account,
                         &amount,
@@ -505,7 +505,7 @@ const ORIGINATION_COST: u64 = ORIGINATION_SIZE * COST_PER_BYTES;
 fn originate_contract<Host: Runtime>(
     host: &mut Host,
     context: &Context,
-    origination_nonce: &mut OriginationNonce,
+    contract: ContractKt1Hash,
     src_contract: &Contract,
     src_account: &mut impl TezlinkAccount,
     balance: &Narith,
@@ -530,8 +530,6 @@ fn originate_contract<Host: Runtime>(
             })?;
     }
 
-    // Generate a simple KT1 address depending on the source of the operation
-    let contract = origination_nonce.generate_kt1();
     let dest_contract = Contract::Originated(contract.clone());
 
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
@@ -973,10 +971,11 @@ fn apply_operation<Host: Runtime>(
             delegate: _,
             ref script,
         }) => {
+            let address = origination_nonce.generate_kt1();
             let origination_result = originate_contract(
                 host,
                 context,
-                origination_nonce,
+                address,
                 &Contract::Implicit(source.clone()),
                 source_account,
                 balance,
