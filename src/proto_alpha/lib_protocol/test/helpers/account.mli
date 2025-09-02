@@ -74,6 +74,14 @@ val default_initial_spendable_balance : Tez.t
 val generate_accounts :
   ?algo:Signature.algo -> ?rng_state:Random.State.t -> int -> t list tzresult
 
+(** [generate_accounts_with_algo_list ?rng_state algo_list] does the same thing as
+    [generate_accounts], but each account can be given a different algorithm. The number
+    of accounts is the length of the given list, and if an algo is given as None,
+    one is chosen at random.
+*)
+val generate_accounts_with_algo_list :
+  ?rng_state:Random.State.t -> Signature.algo option list -> t list
+
 val commitment_secret : Blinded_public_key_hash.activation_code
 
 val new_commitment :
