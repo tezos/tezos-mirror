@@ -2,12 +2,15 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
 open Ethereum_types
 
-type error += Gas_limit_too_low of string | Prague_not_enabled
+type error +=
+  | Gas_limit_too_low of {gas_limit : Z.t; minimum_gas_limit_required : Z.t}
+  | Prague_not_enabled
 
 let () =
   register_error_kind
@@ -16,14 +19,26 @@ let () =
     ~title:"Gas limit too low"
     ~description:
       "Transaction with a gas limit below the set threshold is not allowed"
-    ~pp:(fun ppf gas_limit ->
+    ~pp:(fun ppf (gas_limit, minimum_gas_limit_required) ->
       Format.fprintf
         ppf
-        "Transaction with a gas limit below %s is not allowed"
-        gas_limit)
-    Data_encoding.(obj1 (req "gas_limit" string))
-    (function Gas_limit_too_low gas_limit -> Some gas_limit | _ -> None)
-    (fun gas_limit -> Gas_limit_too_low gas_limit) ;
+        "The provided gas limit (%a) is insufficient to cover the transaction \
+         cost of %a gas. Please increase the gas limit or use eth_estimateGas \
+         to get the recommended amount."
+        Z.pp_print
+        gas_limit
+        Z.pp_print
+        minimum_gas_limit_required)
+    Data_encoding.(
+      obj2
+        (req "gas_limit" Data_encoding.z)
+        (req "minimum_gas_limit_required" Data_encoding.z))
+    (function
+      | Gas_limit_too_low {gas_limit; minimum_gas_limit_required} ->
+          Some (gas_limit, minimum_gas_limit_required)
+      | _ -> None)
+    (fun (gas_limit, minimum_gas_limit_required) ->
+      Gas_limit_too_low {gas_limit; minimum_gas_limit_required}) ;
   register_error_kind
     `Permanent
     ~id:"evm_node_prague_not_enabled"
@@ -34,6 +49,37 @@ let () =
     Data_encoding.empty
     (function Prague_not_enabled -> Some () | _ -> None)
     (fun () -> Prague_not_enabled)
+
+module K = struct
+  (* Constants extracted from several EIPs. 
+     For more details see:
+     - https://eips.ethereum.org/EIPS/eip-7623
+     - https://eips.ethereum.org/EIPS/eip-3860 *)
+
+  let base_intrisic_gas_cost = 21_000
+
+  let nonzero_bytes_cost = 16
+
+  let standard_token_cost = 4
+
+  let non_zero_byte_multiplier = nonzero_bytes_cost / standard_token_cost
+
+  let total_cost_floor_per_token = 10
+
+  let base_creation_cost = 32_000
+
+  let initcode_word_cost = 2
+
+  let word_size = 32
+
+  let access_list_address = 2_400
+
+  let access_list_storage_key = 1_900
+
+  let eip7702_empty_account_cost = 25_000
+end
+
+let is_prague_enabled ~storage_version = storage_version >= 37
 
 type mode = Minimal | Full
 
@@ -283,6 +329,11 @@ let tx_data_size_limit_reached ~max_number_of_chunks ~tx_data =
          be contained within one of the chunks. *)
       (max_number_of_chunks - 1)
 
+let is_contract_creation calldata to_ authorization_list =
+  Bytes.length calldata != 0
+  && Option.is_none to_
+  && List.is_empty authorization_list
+
 let validate_tx_data_size ~max_number_of_chunks
     (transaction : Transaction.transaction) =
   let open Lwt_result_syntax in
@@ -291,25 +342,100 @@ let validate_tx_data_size ~max_number_of_chunks
     return @@ Error "Transaction data exceeded the allowed size."
   else return (Ok ())
 
+let initial_tx_gas_computation ~(transaction : Transaction.transaction)
+    ~is_prague_enabled =
+  let zero_bytes, nonzero_bytes =
+    Bytes.fold_left
+      (fun (zeros, nonzeros) c ->
+        if c = '\x00' then (zeros + 1, nonzeros) else (zeros, nonzeros + 1))
+      (0, 0)
+      transaction.data
+  in
+  let tokens_in_calldata =
+    zero_bytes + (nonzero_bytes * K.non_zero_byte_multiplier)
+  in
+  let base_calldata_cost = tokens_in_calldata * K.standard_token_cost in
+  let access_list_accounts, access_list_storages =
+    List.fold_left
+      (fun (accounts, storages) (_, storage_slots) ->
+        (accounts + 1, storages + List.length storage_slots))
+      (0, 0)
+      transaction.access_list
+  in
+  let access_list_accounts_cost =
+    access_list_accounts * K.access_list_address
+  in
+  let access_list_storages_costs =
+    access_list_storages * K.access_list_storage_key
+  in
+  let creation_cost =
+    if
+      is_contract_creation
+        transaction.data
+        transaction.to_
+        transaction.authorization_list
+    then
+      let calldata_words =
+        let calldata_size = Bytes.length transaction.data in
+        (* Ensures rounding up when `calldata_size` is not a multiple of `K.word_size`. *)
+        (calldata_size + K.word_size - 1) / K.word_size
+      in
+      K.base_creation_cost + (K.initcode_word_cost * calldata_words)
+    else 0
+  in
+  let prague_init_gas_cost, prague_floor_gas_cost =
+    if is_prague_enabled then
+      let prague_init_gas_cost =
+        List.length transaction.authorization_list
+        * K.eip7702_empty_account_cost
+      in
+      let prague_floor_gas_cost =
+        (tokens_in_calldata * K.total_cost_floor_per_token)
+        + K.base_intrisic_gas_cost
+      in
+      (prague_init_gas_cost, prague_floor_gas_cost)
+    else (0, 0)
+  in
+  let initial_gas =
+    K.base_intrisic_gas_cost + base_calldata_cost + access_list_accounts_cost
+    + access_list_storages_costs + creation_cost + prague_init_gas_cost
+  in
+  let floor_gas = prague_floor_gas_cost in
+  (initial_gas, floor_gas)
+
+(* Validation logic was taken from:
+   https://github.com/bluealloy/revm/blob/0ca6564f02004976f533cacf8821fed09d801e0a/crates/handler/src/validation.rs#L221 *)
+let validate_minimum_gas_requirement ~session
+    ~(transaction : Transaction.transaction) =
+  let open Lwt_result_syntax in
+  let is_prague_enabled =
+    is_prague_enabled ~storage_version:session.storage_version
+  in
+  let initial_gas, floor_gas =
+    initial_tx_gas_computation ~transaction ~is_prague_enabled
+  in
+  let gas_limit = transaction.gas_limit in
+  let* () =
+    let minimum_gas_limit_required = Z.of_int initial_gas in
+    (* Early exit for a transaction with a gas limit that can't cover the minimum
+       required. *)
+    when_ (gas_limit < minimum_gas_limit_required) @@ fun () ->
+    tzfail (Gas_limit_too_low {gas_limit; minimum_gas_limit_required})
+  in
+  let* () =
+    (* Check induced by EIP-7623, see https://eips.ethereum.org/EIPS/eip-7623. *)
+    let minimum_gas_limit_required = Z.of_int floor_gas in
+    when_ (is_prague_enabled && gas_limit < minimum_gas_limit_required)
+    @@ fun () ->
+    tzfail (Gas_limit_too_low {gas_limit; minimum_gas_limit_required})
+  in
+  return (Ok ())
+
 let minimal_validation ~next_nonce ~max_number_of_chunks ctxt transaction
     ~caller =
   let open Lwt_result_syntax in
   let (Session session) = ctxt.session in
-  let minimum_gas_limit =
-    let base_intrisic_gas_cost = Z.of_int 21_000 in
-    let da_inclusion_fees =
-      Fees.da_fees_gas_limit_overhead
-        ~da_fee_per_byte:(Qty session.da_fee_per_bytes)
-        ~minimum_base_fee_per_gas:session.minimum_base_fee_per_gas
-        transaction.Transaction.data
-    in
-    Z.add da_inclusion_fees base_intrisic_gas_cost
-  in
-  let* () =
-    (* Early exit: transaction with a gas limit below `minimum_gas_limit` is not allowed. *)
-    when_ (transaction.Transaction.gas_limit < minimum_gas_limit) @@ fun () ->
-    fail [Gas_limit_too_low (Z.to_string minimum_gas_limit)]
-  in
+  let** () = validate_minimum_gas_requirement ~session ~transaction in
   let** () = validate_chain_id ctxt transaction in
   let** () = validate_nonce ~next_nonce transaction in
   let** () = validate_sender_not_a_contract session caller in
@@ -424,7 +550,7 @@ module Handlers = struct
     let* () =
       when_
         (txn.transaction_type = Transaction.Eip7702
-        && session.storage_version < 37)
+        && not (is_prague_enabled ~storage_version:session.storage_version))
       @@ fun () -> tzfail Prague_not_enabled
     in
     valid_transaction_object ctxt session ctxt.mode hash txn
