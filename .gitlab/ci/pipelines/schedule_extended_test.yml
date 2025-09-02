@@ -188,14 +188,16 @@ docker:hadolint:
   - hadolint Dockerfile
 
 oc.ocaml_fmt:
-  image: ${ci_image_name_protected}/build:amd64--master
+  image: ${ci_image_name}/build:${ci_image_tag}
   stage: sanity
   tags:
   - gcp
   rules:
   - when: always
-  needs: []
-  dependencies: []
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
   timeout: 60 minutes
   cache:
     key: dune_cache-$CI_JOB_NAME_SLUG

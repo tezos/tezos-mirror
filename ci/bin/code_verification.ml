@@ -423,7 +423,7 @@ let jobs pipeline_type =
       job
         ~__POS__
         ~name:"oc.ocaml_fmt"
-        ~image:Images.CI.build_master
+        ~image:Images.CI.build
         ~stage
         ~dependencies
         ~rules:(make_rules ~changes:changeset_ocaml_fmt_files ())
