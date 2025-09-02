@@ -62,7 +62,7 @@ When it comes to installing software, especially for critical
 applications like Tezos/Octez, it’s crucial to ensure a secure and
 stable environment. While compiling from source can provide
 customization options, it often introduces complexities and risks.
-Instead, opting for binary packages sucha as Deb or RPM packages from a trusted source simplifies
+Instead, opting for binary packages such as Deb or RPM packages from a trusted source simplifies
 installation and enhances security.
 
 Deb or RPM packages compiled for a specific platform should be always preferred
