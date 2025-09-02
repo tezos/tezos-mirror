@@ -355,12 +355,13 @@ let wait_for_transaction_receipt ?websocket ?(count = 3) ~evm_node
   in
   loop count
 
-let wait_for_application ~produce_block apply =
+let wait_for_application ?(time_between_blocks = 5.) ?(max_blocks = 10)
+    ~produce_block apply =
   let open Rpc.Syntax in
-  let max_iteration = 10 in
+  let max_iteration = max_blocks in
   let application_result = apply () in
   let rec loop current_iteration =
-    let* () = Lwt_unix.sleep 5. in
+    let* () = Lwt_unix.sleep time_between_blocks in
     let*@ _ = produce_block () in
     if max_iteration < current_iteration then
       Test.fail

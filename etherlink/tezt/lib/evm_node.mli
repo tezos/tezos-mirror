@@ -29,6 +29,9 @@
 (** EVM node server state. *)
 type t
 
+(** Same as [Daemon.event] *)
+type event = {name : string; value : JSON.t; timestamp : float}
+
 type tez_contract = {address : string; path : string; initial_storage : string}
 
 type l2_setup = {
@@ -384,6 +387,9 @@ val resolve_or_timeout :
 
 (** The same exact behavior as {!Sc_rollup_node.wait_for} but for the EVM node. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
+
+(** Install a events handler. *)
+val on_event : t -> (event -> unit) -> unit
 
 type delayed_transaction_kind = Deposit | Transaction | FaDeposit
 

@@ -212,9 +212,13 @@ val wait_for_transaction_receipt :
   unit ->
   Transaction.transaction_receipt Lwt.t
 
-(** [wait_for_application ~produce_block apply] returns only when the `apply`
-    yields, or fails when 10 blocks (produced with [produce_block] have passed. *)
+(** [wait_for_application ?time_between_blocks ~produce_block apply] returns
+    only when the `apply` yields, or fails when [max_blocks] blocks (10 by
+    default, produced with [produce_block], every [time_between_blocks] -- 5s by
+    default, have passed. *)
 val wait_for_application :
+  ?time_between_blocks:float ->
+  ?max_blocks:int ->
   produce_block:(unit -> ('a, Rpc.error) result Lwt.t) ->
   (unit -> 'b Lwt.t) ->
   'b Lwt.t
