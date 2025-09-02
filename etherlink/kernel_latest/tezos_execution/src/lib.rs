@@ -1151,6 +1151,39 @@ mod tests {
         )
     }
 
+    /// Call CREATE_CONTRACT three times:
+    /// Result of first call is dropped, result of other calls are swapped.
+    fn make_script_emitting_two_internal_originations(
+        create_block_1: &str,
+        create_block_2: &str,
+        create_block_3: &str,
+    ) -> String {
+        format!(
+            r#"
+            parameter unit;
+            storage (option (pair address address address));
+            code {{
+                DROP;
+                UNIT;                   # starting storage for contract
+                PUSH mutez 0;           # starting balance for the child
+                NONE key_hash;          # delegate is always None
+                CREATE_CONTRACT {{ {create_block_1} }}; DROP;
+
+                PUSH nat 1;             # starting storage for contract
+                PUSH mutez 0;           # starting balance for the child
+                NONE key_hash;          # delegate is always None
+                CREATE_CONTRACT {{ {create_block_2} }};
+                DIP {{ PAIR ; NIL operation }} ; CONS ;
+
+                PUSH bytes 0x;          # starting storage for contract
+                PUSH mutez 0;           # starting balance for the child
+                NONE key_hash;          # delegate is always None
+                CREATE_CONTRACT {{ {create_block_3} }};
+                DIP {{ SWAP; DIP {{ PAIR ; SOME }} }} ; CONS ; PAIR
+            }}"#
+        )
+    }
+
     fn make_operation(
         fee: u64,
         first_counter: u64,
@@ -3416,6 +3449,213 @@ mod tests {
                 }),
                 sender: Contract::Originated(contract_chapo_hash),
                 nonce: 1
+            }),
+            "Internal origination should match the expected structure"
+        );
+    }
+
+    /// In this test, the CREATE_CONTRACT instruction is called three
+    /// times.  The result of the first call is dropped.  The results
+    /// of the two other calls are swapped.  The point is to check
+    /// that the addresses of the originated contracts are not mixed
+    /// up.
+    #[test]
+    fn test_internal_originations_generated_addresses() {
+        let mut host = MockKernelHost::default();
+        let parser = mir::parser::Parser::new();
+        let src = bootstrap1();
+        init_account(&mut host, &src.pkh, 50);
+        reveal_account(&mut host, &src);
+        let context = context::Context::init_context();
+
+        let originated_code = "CDR;
+                        NIL operation;
+                        PAIR;";
+        let originated_script_1 =
+            make_create_contract_block("unit", "unit", originated_code);
+        let originated_script_2 =
+            make_create_contract_block("nat", "nat", originated_code);
+        let parsed_script_2 = parser
+            .parse_top_level(&originated_script_2)
+            .expect("Should have parsed the script");
+        let originated_script_3 =
+            make_create_contract_block("bytes", "bytes", originated_code);
+        let parsed_script_3 = parser
+            .parse_top_level(&originated_script_3)
+            .expect("Should have parsed the script");
+        let init_script = make_script_emitting_two_internal_originations(
+            &originated_script_1,
+            &originated_script_2,
+            &originated_script_3,
+        );
+
+        // Create a script that emits internal operations to multiple targets
+        let contract_chapo_hash = ContractKt1Hash::from_base58_check(CONTRACT_1)
+            .expect("ContractKt1Hash b58 conversion should have succeed");
+        init_contract(
+            &mut host,
+            &contract_chapo_hash,
+            &init_script,
+            &Micheline::prim0(mir::lexer::Prim::None),
+            &1000000_u64.into(),
+        );
+
+        let operation = make_operation(
+            10,
+            1,
+            0,
+            0,
+            src.clone(),
+            vec![OperationContent::Transfer(TransferContent {
+                amount: 0.into(),
+                destination: Contract::Originated(contract_chapo_hash.clone()),
+                parameters: Some(Parameter {
+                    entrypoint: mir::ast::entrypoint::Entrypoint::default(),
+                    value: Micheline::from(()).encode(),
+                }),
+            })],
+        );
+        let receipts = validate_and_apply_operation(
+            &mut host,
+            &context,
+            OperationHash(H256::zero()),
+            operation,
+        )
+        .expect(
+            "validate_and_apply_operation should not have failed with a kernel error",
+        );
+        assert_eq!(
+            receipts.len(),
+            1,
+            "There should be one receipt for the transfer operation"
+        );
+        assert!(
+            matches!(
+                &receipts[0],
+                OperationResultSum::Transfer(OperationResult {
+                    result: ContentResult::Applied(_),
+                    ..
+                })
+            ),
+            "First receipt should be an Applied Transfer but is {:?}",
+            receipts[0]
+        );
+        let internal_receipts = get_internal_receipts(&receipts[0]);
+
+        assert_eq!(
+            internal_receipts.len(),
+            2,
+            "There should be two internal operations"
+        );
+        let (_expected_address_1, expected_address_2, expected_address_3) = {
+            let mut nonce = OriginationNonce::initial(OperationHash(H256::zero()));
+            let expected_address_1 = nonce.generate_kt1();
+            let expected_address_2 = nonce.generate_kt1();
+            let expected_address_3 = nonce.generate_kt1();
+            (expected_address_1, expected_address_2, expected_address_3)
+        };
+
+        assert_eq!(
+            internal_receipts[0],
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                content: OriginationContent {
+                    balance: 0.into(),
+                    delegate: None,
+                    script: Script {
+                        code: parsed_script_3.encode(),
+                        storage: Micheline::from(vec![]).encode(),
+                    },
+                },
+                result: ContentResult::Applied(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -8250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 8250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_address_3,
+                    },],
+                    consumed_gas: 0_u64.into(),
+                    storage_size: 33_u64.into(),
+                    paid_storage_size_diff: 33_u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                sender: Contract::Originated(contract_chapo_hash.clone()),
+                nonce: 3
+            }),
+            "Internal origination should match the expected structure"
+        );
+
+        assert_eq!(
+            internal_receipts[1],
+            InternalOperationSum::Origination(InternalContentWithMetadata {
+                content: OriginationContent {
+                    balance: 0.into(),
+                    delegate: None,
+                    script: Script {
+                        code: parsed_script_2.encode(),
+                        storage: Micheline::from(num_bigint::BigUint::from(1u32))
+                            .encode(),
+                    },
+                },
+                result: ContentResult::Applied(OriginationSuccess {
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 7500,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(Contract::Originated(
+                                contract_chapo_hash.clone()
+                            )),
+                            changes: -64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::StorageFees,
+                            changes: 64250,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    originated_contracts: vec![Originated {
+                        contract: expected_address_2,
+                    }],
+                    consumed_gas: 0_u64.into(),
+                    storage_size: 30_u64.into(),
+                    paid_storage_size_diff: 30_u64.into(),
+                    lazy_storage_diff: None,
+                }),
+                sender: Contract::Originated(contract_chapo_hash),
+                nonce: 2
             }),
             "Internal origination should match the expected structure"
         );
