@@ -20,6 +20,10 @@ module Runner = Runner
     [~name] and the stem is equivalent. *)
 val name_of_tezos_job : tezos_job -> string
 
+(** Modifies the {!cache_policy} of a {!tezos_job} with the value given as first argument.  *)
+val set_tezos_job_cache_policy :
+  Gitlab_ci.Types.cache_policy -> tezos_job -> tezos_job
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
