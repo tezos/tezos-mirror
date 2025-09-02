@@ -87,7 +87,20 @@ Ubuntu and Debian packages
   sudo apt update
   sudo apt upgrade octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
 
-If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+.. note::
+
+  Because the PGP keys have been rotated, users updating packages need to overwrite the previously installed octez.gpg key.
+  For example, in order to update to v23.1 from a pre-existing Ubuntu Noble deployment, a user should first update the keys with::
+
+      curl -s "https://packages.nomadic-labs.com/ubuntu/octez.asc" |
+          sudo gpg --yes --dearmor -o /etc/apt/keyrings/octez.gpg
+ 
+  Then, they should be able to continue upgrading as usual, e.g. by::
+
+      sudo apt-get update
+      sudo apt-get upgrade octez-baker
+
+See the :ref:`install instructions for Ubuntu and Debian packages <installing_deb>` for details, or if you are installing Ubuntu and Debian packages from scratch.
 
 .. warning::
 
