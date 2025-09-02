@@ -223,8 +223,6 @@ fresh-cache.docker:hadolint:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - Dockerfile
     - build.Dockerfile
@@ -249,8 +247,6 @@ fresh-cache.oc.ocaml_fmt:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.ml'
     - '**/*.mli'
@@ -293,8 +289,6 @@ fresh-cache.oc.semgrep:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -325,8 +319,6 @@ fresh-cache.oc.misc_checks:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -368,8 +360,6 @@ fresh-cache.check_jsonnet:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - '**/*.jsonnet'
     when: on_success
@@ -396,8 +386,6 @@ fresh-cache.check_rust_fmt:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - '**/*.rs'
     - .gitlab-ci.yml
@@ -423,8 +411,6 @@ fresh-cache.nix:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.nix'
     - flake.lock
@@ -479,8 +465,6 @@ fresh-cache.oc.build_arm64-released:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
   - when: manual
@@ -538,8 +522,6 @@ fresh-cache.oc.build_arm64-extra-dev:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
   - when: manual
@@ -604,8 +586,6 @@ fresh-cache.oc.build_arm64-extra-exp:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
     when: on_success
   - when: manual
@@ -670,8 +650,6 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   tags:
   - gcp_very_high_cpu_ramfs
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -750,8 +728,6 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -831,8 +807,6 @@ fresh-cache.oc.build_x86_64-released:
   tags:
   - gcp_very_high_cpu_ramfs
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
@@ -930,8 +904,6 @@ fresh-cache.oc.build_amd64-extra-dev:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
@@ -1045,8 +1017,6 @@ fresh-cache.oc.build_amd64-extra-exp:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
@@ -1160,8 +1130,6 @@ fresh-cache.wasm-runtime-check:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1208,8 +1176,6 @@ fresh-cache.oc.build_kernels:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
@@ -1302,8 +1268,6 @@ fresh-cache.oc.build_dsn_node:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - '**/*.rst'
     - .gitlab-ci.yml
@@ -1390,8 +1354,6 @@ fresh-cache.oc.tezt:fetch-records:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1451,8 +1413,6 @@ fresh-cache.build_octez_source:
   tags:
   - gcp_very_high_cpu_ramfs
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   dependencies:
@@ -1499,8 +1459,6 @@ fresh-cache.etherlink.build:static-x86_64:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1561,8 +1519,6 @@ fresh-cache.etherlink.build:static-arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1623,8 +1579,6 @@ fresh-cache.build-layer1-profiling:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1701,8 +1655,6 @@ fresh-cache.select_tezts:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1758,8 +1710,6 @@ trigger:debian_repository_partial_auto:
     PIPELINE_TYPE: merge_train-debian_repository_partial_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     - debian-deps-build.Dockerfile
@@ -1787,8 +1737,6 @@ trigger:rpm_repository_partial_auto:
     PIPELINE_TYPE: merge_train-rpm_repository_partial_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
     - manifest/**/*.ml*
@@ -1814,8 +1762,6 @@ trigger:homebrew_auto:
     PIPELINE_TYPE: merge_train-homebrew_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab/ci/pipelines/homebrew_auto.yml
     - manifest/**/*.ml*
@@ -1838,8 +1784,6 @@ fresh-cache.kaitai_checks:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   needs:
@@ -1888,8 +1832,6 @@ fresh-cache.kaitai_e2e_checks:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   needs:
@@ -1918,8 +1860,6 @@ fresh-cache.oc.check_lift_limits_patch:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -1969,8 +1909,6 @@ fresh-cache.oc.python_check:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.py'
     - .gitlab-ci.yml
@@ -2004,8 +1942,6 @@ fresh-cache.oc.integration:compiler-rejections:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2074,8 +2010,6 @@ fresh-cache.oc.script:test-gen-genesis:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2126,8 +2060,6 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2192,8 +2124,6 @@ fresh-cache.oc.script:test_octez_release_versions:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2248,8 +2178,6 @@ fresh-cache.oc.script:b58_prefix:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2283,8 +2211,6 @@ fresh-cache.oc.test-liquidity-baking-scripts:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2343,8 +2269,6 @@ fresh-cache.mir_unit:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2381,8 +2305,6 @@ fresh-cache.mir_tzt:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2420,8 +2342,6 @@ fresh-cache.test_sdk_rust:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2470,8 +2390,6 @@ fresh-cache.test_sdk_bindings:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2522,8 +2440,6 @@ fresh-cache.test_kernels:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2577,8 +2493,6 @@ fresh-cache.test_etherlink_kernel:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2632,8 +2546,6 @@ fresh-cache.test_etherlink_firehose:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2684,8 +2596,6 @@ fresh-cache.audit_riscv_deps:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2730,8 +2640,6 @@ fresh-cache.check_riscv_kernels:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2783,8 +2691,6 @@ fresh-cache.test_evm_compatibility:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2840,8 +2746,6 @@ fresh-cache.ocaml-check:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - '**/*.ml'
     - '**/*.mli'
@@ -2888,8 +2792,6 @@ fresh-cache.oc.unit:non-proto-x86_64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -2983,8 +2885,6 @@ fresh-cache.oc.unit:etherlink-x86_64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3060,8 +2960,6 @@ fresh-cache.oc.unit:other-x86_64:
   tags:
   - gcp_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3155,8 +3053,6 @@ fresh-cache.oc.unit:proto-x86_64:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3250,8 +3146,6 @@ fresh-cache.oc.unit:non-proto-arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3334,8 +3228,6 @@ fresh-cache.oc.unit:webassembly-x86_64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3389,8 +3281,6 @@ fresh-cache.oc.unit:protocol_compiles:
   tags:
   - gcp_very_high_cpu
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3459,8 +3349,6 @@ fresh-cache.de.unit:x86_64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3492,8 +3380,6 @@ fresh-cache.de.unit:arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3525,8 +3411,6 @@ fresh-cache.resto.unit:x86_64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3558,8 +3442,6 @@ fresh-cache.resto.unit:arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3591,8 +3473,6 @@ fresh-cache.oc.install_opam_noble:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   needs:
@@ -3618,8 +3498,6 @@ fresh-cache.oc.compile_sources_doc_master:
   tags:
   - gcp_very_high_cpu_ramfs
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - docs/introduction/compile-sources.sh
     when: on_success
@@ -3653,8 +3531,6 @@ fresh-cache.tezt:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3756,8 +3632,6 @@ fresh-cache.tezt-time-sensitive:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3858,8 +3732,6 @@ fresh-cache.tezt-slow:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -3958,8 +3830,6 @@ fresh-cache.tezt-extra:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -4058,8 +3928,6 @@ fresh-cache.tezt-flaky:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -4162,8 +4030,6 @@ fresh-cache.tezt:static-binaries:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -4256,8 +4122,6 @@ fresh-cache.tezt-riscv-slow-sequential:
   tags:
   - gcp_tezt
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: on_success
   - changes:
     - .gitlab-ci.yml
     - .gitlab/ci/pipelines/before_merging.yml
@@ -4352,8 +4216,6 @@ fresh-cache.oc.unified_coverage:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
       /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
     when: never
@@ -4428,8 +4290,6 @@ fresh-cache.oc.docker:amd64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - Dockerfile
     - build.Dockerfile
@@ -4468,8 +4328,6 @@ fresh-cache.oc.docker:arm64:
   tags:
   - gcp_arm64
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - changes:
     - Dockerfile
     - build.Dockerfile
@@ -4506,8 +4364,6 @@ fresh-cache.oc.script.docker_verify_image_arm64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   needs:
@@ -4536,8 +4392,6 @@ fresh-cache.oc.script.docker_verify_image_amd64:
   tags:
   - gcp
   rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
   - when: manual
     allow_failure: true
   needs:

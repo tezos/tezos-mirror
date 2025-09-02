@@ -283,16 +283,9 @@ let jobs pipeline_type =
            not [job_start] defined below), in the pipeline. *)
         [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging | Merge_train -> (
-        (* Always run jobs in [schedule_merge_train_cache_refresh] pipeline. *)
-        [
-          job_rule
-            ~if_:Rules.schedule_merge_train_cache_refresh
-            ~when_:(if dependent then On_success else Always)
-            ();
-        ]
-        @ (if final_pipeline_disable then
-             [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
-           else [])
+        (if final_pipeline_disable then
+           [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
+         else [])
         (* MR labels can be used to force tests to run. *)
         @ (match label with
           | Some label ->
