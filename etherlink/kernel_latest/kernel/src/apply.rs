@@ -30,7 +30,7 @@ use tezos_ethereum::tx_common::{
     signed_authorization, AuthorizationList, EthereumTransactionCommon,
 };
 use tezos_ethereum::tx_signature::TxSignature;
-use tezos_evm_logging::{log, Level::*};
+use tezos_evm_logging::{log, tracing::instrument, Level::*};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup::outbox::{OutboxMessage, OutboxQueue};
 use tezos_smart_rollup_host::path::{Path, RefPath};
@@ -204,6 +204,7 @@ pub enum Validity {
 // TODO: https://gitlab.com/tezos/tezos/-/issues/6812
 //       arguably, effective_gas_price should be set on EthereumTransactionCommon
 //       directly - initialised when constructed.
+#[instrument(skip_all)]
 fn is_valid_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     evm_account_storage: &mut EthereumAccountStorage,
@@ -317,6 +318,7 @@ fn config_to_revm_specid(config: &Config) -> revm::primitives::hardfork::SpecId 
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn revm_run_transaction<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -495,16 +497,16 @@ pub fn revm_run_transaction<Host: Runtime>(
                         evm_execution::handler::ExecutionResult::Error(evm::ExitError::InvalidCode(Opcode(0xef)))
                     },
                     revm::context::result::HaltReason::CreateInitCodeSizeLimit => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CreateInitCodeSizeLimit")))  
+                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CreateInitCodeSizeLimit")))
                     },
                     revm::context::result::HaltReason::OverflowPayment => {
                         evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("OverflowPayment")))
                     },
                     revm::context::result::HaltReason::StateChangeDuringStaticCall => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("StateChangeDuringStaticCall"))) 
+                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("StateChangeDuringStaticCall")))
                     },
                     revm::context::result::HaltReason::CallNotAllowedInsideStatic => {
-                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CallNotAllowedInsideStatic"))) 
+                        evm_execution::handler::ExecutionResult::Error(evm::ExitError::Other(Cow::from("CallNotAllowedInsideStatic")))
                     },
                     revm::context::result::HaltReason::OutOfFunds => {
                         evm_execution::handler::ExecutionResult::Error(evm::ExitError::OutOfFund)
@@ -547,6 +549,7 @@ pub fn revm_run_transaction<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 fn apply_ethereum_transaction_common<Host: Runtime>(
     host: &mut Host,
     block_constants: &BlockConstants,
@@ -765,6 +768,7 @@ impl<T> From<Option<T>> for ExecutionResult<T> {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn handle_transaction_result<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,
@@ -835,6 +839,7 @@ pub fn handle_transaction_result<Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn apply_transaction<Host: Runtime>(
     host: &mut Host,
     outbox_queue: &OutboxQueue<'_, impl Path>,

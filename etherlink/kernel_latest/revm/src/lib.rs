@@ -28,6 +28,7 @@ use revm::{
 };
 use storage::world_state_handler::{account_path, WorldStateHandler};
 use tezos_ethereum::block::BlockConstants;
+use tezos_evm_logging::{trace, tracing::instrument};
 use tezos_evm_runtime::runtime::Runtime;
 use tezos_smart_rollup_host::runtime::RuntimeError;
 use thiserror::Error;
@@ -94,6 +95,7 @@ fn block_env(block_constants: &BlockConstants) -> Result<BlockEnv, Error> {
     })
 }
 
+#[instrument(skip_all)]
 #[allow(clippy::too_many_arguments)]
 fn tx_env<'a, Host: Runtime>(
     host: &'a mut Host,
@@ -142,6 +144,7 @@ fn tx_env<'a, Host: Runtime>(
     Ok(tx_env)
 }
 
+#[instrument(skip_all)]
 fn get_inspector_from(
     tracer_input: TracerInput,
     precompiles: EtherlinkPrecompiles,
@@ -184,6 +187,7 @@ type EvmContext<'a, Host> = Evm<
     EthFrame<EthInterpreter>,
 >;
 
+#[instrument(skip_all)]
 fn evm_inspect<'a, Host: Runtime>(
     db: EtherlinkVMDB<'a, Host>,
     block: &'a BlockEnv,
@@ -209,6 +213,7 @@ fn evm_inspect<'a, Host: Runtime>(
     .with_precompiles(precompiles)
 }
 
+#[instrument(skip_all)]
 fn evm<'a, Host: Runtime>(
     db: EtherlinkVMDB<'a, Host>,
     block: &'a BlockEnv,
@@ -234,6 +239,7 @@ fn evm<'a, Host: Runtime>(
 }
 
 #[allow(clippy::too_many_arguments)]
+#[instrument(skip_all)]
 pub fn run_transaction<'a, Host: Runtime>(
     host: &'a mut Host,
     spec_id: SpecId,
@@ -308,7 +314,8 @@ pub fn run_transaction<'a, Host: Runtime>(
             spec_id,
         );
 
-        let execution_result = evm.transact_commit(&tx)?;
+        let execution_result = trace!("evm.transact_commit", evm.transact_commit(&tx))?;
+
         let withdrawals = evm.db_mut().take_withdrawals();
 
         if !evm.db_mut().commit_status() {

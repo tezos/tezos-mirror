@@ -23,7 +23,7 @@ use revm::{
 };
 use tezos_crypto_rs::hash::{ContractKt1Hash, HashTrait};
 use tezos_ethereum::block::BlockConstants;
-use tezos_evm_logging::{log, Level::Error as LogError};
+use tezos_evm_logging::{log, tracing::instrument, Level::Error as LogError};
 use tezos_evm_runtime::runtime::Runtime;
 
 pub struct EtherlinkVMDB<'a, Host: Runtime> {
@@ -53,6 +53,7 @@ enum AccountState {
 }
 
 impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
+    #[instrument(skip_all)]
     pub fn new(
         host: &'a mut Host,
         block: &'a BlockConstants,
@@ -94,22 +95,26 @@ macro_rules! abort_on_error {
 }
 
 impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
+    #[instrument(skip_all)]
     pub fn commit_status(&self) -> bool {
         self.commit_status
     }
 
+    #[instrument(skip_all)]
     pub fn initialize_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .begin_transaction(self.host)
             .map_err(|err| Error::Custom(err.to_string()))
     }
 
+    #[instrument(skip_all)]
     pub fn commit_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .commit_transaction(self.host)
             .map_err(|err| Error::Custom(err.to_string()))
     }
 
+    #[instrument(skip_all)]
     pub fn drop_storage(&mut self) -> Result<(), Error> {
         self.world_state_handler
             .rollback_transaction(self.host)
