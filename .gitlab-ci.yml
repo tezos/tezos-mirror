@@ -134,8 +134,6 @@ workflow:
     variables:
       PIPELINE_TYPE: schedule_merge_train_cache_refresh
     when: always
-    auto_cancel:
-      on_job_failure: all
   - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "EXTENDED_RPC_TESTS"
     variables:
       PIPELINE_TYPE: schedule_extended_rpc_test
