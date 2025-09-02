@@ -140,29 +140,6 @@ concurrently and selects the best one based on its fitness (see
    of negative lag time, and in not being able to inject new blocks in case of
    positive lag time.
 
-Node Identity
-~~~~~~~~~~~~~
-
-First, we need to generate a new identity for the node to
-connect to the network::
-
-    octez-node identity generate
-
-.. note::
-
-    If the node prompts you to install the Zcash parameter file, follow
-    the :ref:`corresponding instructions <setup_zcash_params>`.
-
-The identity comprises a pair of cryptographic
-keys that nodes use to encrypt messages sent to each other, and an
-antispam proof-of-work stamp proving that enough computing power has been
-dedicated to creating this identity.
-Note that this is merely a network identity and it is not related in
-any way to a Tezos address on the blockchain.
-
-If you wish to run your node on a test network, now is also a good time
-to configure your node for it (see :doc:`../user/multinetwork`).
-
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -205,6 +182,13 @@ means that your node will take some time to resync the chain.
 If removing this directory, please note that if it took you a long time to
 compute your node identity, keep the ``identity.json`` file and instead only
 remove its child ``store``, ``context`` and ``protocol`` (if any) sub-directories.
+
+This identity comprises a pair of cryptographic
+keys that nodes use to encrypt messages sent to each other, and an
+antispam proof-of-work stamp proving that enough computing power has been
+dedicated to creating this identity.
+Note that this is merely a network identity and it is not related in
+any way to a Tezos address on the blockchain.
 
 If you are also running a baker, make sure that it is configured to access the
 data directory of the node (see :ref:`how to run a baker <baker_run>`).
@@ -262,6 +246,11 @@ Putting together all the above instructions, you may want to quickly start a nod
     octez-node snapshot import rolling
     # Run the node:
     octez-node run
+
+.. note::
+
+    If the node prompts you to install the Zcash parameter file, follow
+    the :ref:`corresponding instructions <setup_zcash_params>`.
 
 .. _howtouse_tezos_client:
 
