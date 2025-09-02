@@ -1780,6 +1780,7 @@ fn interpret_one<'a>(
                     storage,
                     code: cs.clone(), // This clone is cheap since it is an Rc.
                     micheline_code: micheline,
+                    address,
                 }),
                 counter,
             ))
@@ -6554,6 +6555,7 @@ mod interpreter_tests {
         let mut ctx = Ctx::default();
         ctx.set_operation_counter(100);
         let cs = cs_mich.typecheck_script(&mut ctx).unwrap();
+        let expected_addr = "KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K";
         let expected_op = TypedValue::new_operation(
             Operation::CreateContract(super::CreateContract {
                 delegate: None,
@@ -6561,11 +6563,9 @@ mod interpreter_tests {
                 storage: TypedValue::Unit,
                 code: Rc::new(cs.clone()),
                 micheline_code: &cs_mich,
+                address: ContractKt1Hash::try_from(expected_addr).unwrap(),
             }),
             101,
-        );
-        let expected_addr = TypedValue::Address(
-            addr::Address::try_from("KT1D5WSrhAnvHDrcNg8AtDoQCFaeikYjim6K").unwrap(),
         );
         let mut stack = stk![
             TypedValue::Unit,
@@ -6581,7 +6581,13 @@ mod interpreter_tests {
             ),
             Ok(())
         );
-        assert_eq!(stack, stk![expected_addr, expected_op]);
+        assert_eq!(
+            stack,
+            stk![
+                TypedValue::Address(addr::Address::try_from(expected_addr).unwrap()),
+                expected_op
+            ]
+        );
         assert_eq!(
             start_milligas - ctx.gas.milligas(),
             interpret_cost::CREATE_CONTRACT + interpret_cost::INTERPRET_RET

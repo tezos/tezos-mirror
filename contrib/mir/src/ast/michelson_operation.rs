@@ -10,7 +10,7 @@
 use std::rc::Rc;
 
 use super::{Address, ContractScript, FieldAnnotation, Micheline, Or, Type, TypedValue};
-use tezos_crypto_rs::public_key_hash::PublicKeyHash;
+use tezos_crypto_rs::{hash::ContractKt1Hash, public_key_hash::PublicKeyHash};
 
 /// Representation of token transfer operation, created by `TRANSFER_TOKENS`
 /// instruction.
@@ -64,6 +64,8 @@ pub struct CreateContract<'a> {
     /// encoding must survive round-trip via `PACK`/`UNPACK`, so raw code has to
     /// be stored.
     pub micheline_code: &'a Micheline<'a>,
+    /// The address at which the contract must be originated.
+    pub address: ContractKt1Hash,
 }
 
 /// Enum corresponding to values of the `operation` Michelson type.

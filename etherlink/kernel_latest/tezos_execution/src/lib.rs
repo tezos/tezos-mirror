@@ -249,6 +249,7 @@ pub fn execute_internal_operations<'a, Host: Runtime>(
                 storage,
                 code: _,
                 micheline_code,
+                address: _,
             }) => {
                 let amount = Narith(amount.try_into().unwrap_or(BigUint::ZERO));
                 let script = Script {
