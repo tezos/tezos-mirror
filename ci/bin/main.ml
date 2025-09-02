@@ -363,6 +363,21 @@ let () =
        the MR. This \"safety net\"-pipeline ensures that all jobs run at least \
        daily." ;
   register
+    "schedule_merge_train_cache_refresh"
+    schedule_merge_train_cache_refresh
+    ~auto_cancel:{on_job_failure = true; on_new_commit = false}
+    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
+    ~description:
+      "Scheduled pipelines that mimics a full version of 'merge_train'.\n\n\
+       It starts automatically, and unlike real merge_train pipelines, is not \
+       canceled if a job fails. Another important change is that job-specific \
+       caches have now a `push-only` policy instead of a `pull-push` policy. \
+       This allows for these caches to be refreshed, to avoid OOMs or just job \
+       slow-downs. This pipeline should be executed regularly in a fresh clone \
+       of the `master` branch. This needs to be a clone because running it on \
+       master would refresh protected caches, which are not used on merge \
+       request pipelines." ;
+  register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
     ~jobs:
