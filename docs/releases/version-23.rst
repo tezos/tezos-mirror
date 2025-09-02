@@ -1,4 +1,4 @@
-Version 23.0
+Version 23.1
 ============
 
 Changes
@@ -12,6 +12,8 @@ Version 23 introduces the following changes or new features:
   (2) Release of the **octez-baker** executable (See :ref:`the octez-baker executable section <octez_baker_v23>`)
   (3) BLS support (See :ref:`the BLS support section <bls_v23>`)
   (4) New snapshot version (See :ref:`the snapshot version section <snapshot_v23>`)
+
+Octez v23.1 addresses an issue with Ubuntu and Debian packages distribution, where an expired PGP key prevented users from updating to v23.0 using apt.
 
 .. _protocol_support_v23:
 
@@ -83,9 +85,22 @@ Ubuntu and Debian packages
 .. code-block:: shell
 
   sudo apt update
-  sudo apt update octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
+  sudo apt upgrade octez-node octez-client octez-baker octez-dal-node octez-smart-rollup-node
 
-If you are installing Ubuntu and Debian packages from scratch, follow :ref:`their install instructions <installing_deb>`
+.. note::
+
+  Because the PGP keys have been rotated, users updating packages need to overwrite the previously installed octez.gpg key.
+  For example, in order to update to v23.1 from a pre-existing Ubuntu Noble deployment, a user should first update the keys with::
+
+      curl -s "https://packages.nomadic-labs.com/ubuntu/octez.asc" |
+          sudo gpg --yes --dearmor -o /etc/apt/keyrings/octez.gpg
+ 
+  Then, they should be able to continue upgrading as usual, e.g. by::
+
+      sudo apt-get update
+      sudo apt-get upgrade octez-baker
+
+See the :ref:`install instructions for Ubuntu and Debian packages <installing_deb>` for details, or if you are installing Ubuntu and Debian packages from scratch.
 
 .. warning::
 
@@ -106,18 +121,19 @@ From sources
 .. code-block:: shell
 
   git fetch
-  git checkout octez-v23.0
+  git checkout octez-v23.1
   make clean
   opam switch remove . # To be used if the next step fails
   make build-deps
   eval $(opam env)
   make
 
-If you are using Docker instead, use the ``octez-v23.0`` Docker images of Octez.
+If you are using Docker instead, use the ``octez-v23.1`` Docker images of Octez.
 
 Changelog
 ---------
 
+- `Version 23.1 <../CHANGES.html#version-23-1>`_
 - `Version 23.0 <../CHANGES.html#version-23-0>`_
 - `Version 23.0~rc2 <../CHANGES.html#version-23-0-rc2>`_
 - `Version 23.0~rc1 <../CHANGES.html#version-23-0-rc1>`_
