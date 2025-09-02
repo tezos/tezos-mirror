@@ -122,6 +122,73 @@ type tezos_job = {
   image_builders : tezos_job list;
 }
 
+let set_tezos_job_cache_policy policy job =
+  let generic_job = job.job in
+  let new_generic_job =
+    match generic_job with
+    | Trigger_job _ -> generic_job
+    | Job job ->
+        let open Gitlab_ci.Types in
+        let new_job =
+          let set_policy old_policy =
+            match old_policy with
+            | Pull_push -> policy
+            | Pull -> Pull
+            | Push -> Push
+          in
+          let new_cache =
+            match job.cache with
+            | None -> job.cache
+            | Some cache_list ->
+                Some
+                  (cache_list
+                  |> List.map (fun cache ->
+                         {cache with policy = set_policy cache.policy}))
+          in
+          {job with cache = new_cache}
+        in
+        Job new_job
+  in
+  {job with job = new_generic_job}
+
+let no_rules job =
+  let generic_job = job.job in
+  let new_generic_job =
+    let open Gitlab_ci.Types in
+    match generic_job with
+    | Trigger_job trigger_job -> Trigger_job {trigger_job with rules = None}
+    | Job job -> Job {job with rules = None}
+  in
+  {job with job = new_generic_job}
+
+let when_always job =
+  let generic_job = job.job in
+  let new_generic_job =
+    let open Gitlab_ci.Types in
+    match generic_job with
+    | Trigger_job trigger_job ->
+        Trigger_job {trigger_job with when_ = Some Always}
+    | Job job -> Job {job with when_ = Some Always}
+  in
+  {job with job = new_generic_job}
+
+let has_cache job =
+  match job.job with
+  | Trigger_job _ -> false
+  | Job job -> (
+      match job.cache with None | Some [] -> false | Some (_ :: _) -> true)
+
+let has_stage target_stage job =
+  let stage_opt =
+    match job.job with Trigger_job job -> job.stage | Job job -> job.stage
+  in
+  match stage_opt with
+  | None -> false
+  | Some stage -> String.equal stage target_stage
+
+let has_cache_or_start_images_stages job =
+  has_cache job || has_stage "start" job || has_stage "images" job
+
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;
