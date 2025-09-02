@@ -366,7 +366,9 @@ let () =
     "schedule_merge_train_cache_refresh"
     schedule_merge_train_cache_refresh
     ~auto_cancel:{on_job_failure = true; on_new_commit = false}
-    ~jobs:(Code_verification.jobs Merge_train @ !Hooks.before_merging)
+    ~jobs:
+      (Code_verification.jobs Merge_train @ !Hooks.before_merging
+      |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push))
     ~description:
       "Scheduled pipelines that mimics a full version of 'merge_train'.\n\n\
        It starts automatically, and unlike real merge_train pipelines, is not \

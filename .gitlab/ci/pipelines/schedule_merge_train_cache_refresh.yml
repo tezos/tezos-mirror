@@ -242,7 +242,7 @@ fresh-cache.oc.ocaml_fmt:
     key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -393,7 +393,7 @@ fresh-cache.nix:
     key: nix-store
     paths:
     - /nix/store
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - mkdir -p ~/.config/nix
@@ -442,15 +442,15 @@ fresh-cache.oc.build_arm64-released:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -497,15 +497,15 @@ fresh-cache.oc.build_arm64-extra-dev:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -559,15 +559,15 @@ fresh-cache.oc.build_arm64-extra-exp:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -647,15 +647,15 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -724,15 +724,15 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -813,15 +813,15 @@ fresh-cache.oc.build_x86_64-released:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -908,15 +908,15 @@ fresh-cache.oc.build_amd64-extra-dev:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1019,15 +1019,15 @@ fresh-cache.oc.build_amd64-extra-exp:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -1096,11 +1096,11 @@ fresh-cache.wasm-runtime-check:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1175,11 +1175,11 @@ fresh-cache.oc.build_kernels:
   - key: kernels-sccache
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1265,11 +1265,11 @@ fresh-cache.oc.build_dsn_node:
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1364,11 +1364,11 @@ fresh-cache.build_octez_source:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1416,15 +1416,15 @@ fresh-cache.etherlink.build:static-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1474,15 +1474,15 @@ fresh-cache.etherlink.build:static-arm64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: rust-targets-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_target
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1549,11 +1549,11 @@ fresh-cache.build-layer1-profiling:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1728,11 +1728,11 @@ fresh-cache.kaitai_checks:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1805,11 +1805,11 @@ fresh-cache.oc.check_lift_limits_patch:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1905,11 +1905,11 @@ fresh-cache.oc.integration:compiler-rejections:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2005,11 +2005,11 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2196,7 +2196,7 @@ fresh-cache.mir_unit:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2231,7 +2231,7 @@ fresh-cache.mir_tzt:
     key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2268,11 +2268,11 @@ fresh-cache.test_sdk_rust:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2315,11 +2315,11 @@ fresh-cache.test_sdk_bindings:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
@@ -2365,11 +2365,11 @@ fresh-cache.test_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2416,11 +2416,11 @@ fresh-cache.test_etherlink_kernel:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2465,11 +2465,11 @@ fresh-cache.test_etherlink_firehose:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2507,11 +2507,11 @@ fresh-cache.audit_riscv_deps:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2555,11 +2555,11 @@ fresh-cache.check_riscv_kernels:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2605,11 +2605,11 @@ fresh-cache.test_evm_compatibility:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2656,7 +2656,7 @@ fresh-cache.ocaml-check:
     key: dune_cache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_dune_cache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -2719,11 +2719,11 @@ fresh-cache.oc.unit:non-proto-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2792,11 +2792,11 @@ fresh-cache.oc.unit:etherlink-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2883,11 +2883,11 @@ fresh-cache.oc.unit:other-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -2974,11 +2974,11 @@ fresh-cache.oc.unit:proto-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   - key: dune-build-cache-$CI_PIPELINE_ID
     paths:
     - $CI_PROJECT_DIR/_dune_cache
@@ -3065,11 +3065,11 @@ fresh-cache.oc.unit:non-proto-arm64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -3196,11 +3196,11 @@ fresh-cache.oc.unit:protocol_compiles:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -4309,11 +4309,11 @@ fresh-cache.documentation.docgen:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -4432,11 +4432,11 @@ fresh-cache.documentation.odoc:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -4619,11 +4619,11 @@ fresh-cache.teztale.build-arm64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
@@ -4670,11 +4670,11 @@ fresh-cache.teztale.build-x86_64:
   - key: cargo-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
+    policy: push
   - key: sccache-$CI_JOB_NAME_SLUG
     paths:
     - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
+    policy: push
   interruptible: true
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
