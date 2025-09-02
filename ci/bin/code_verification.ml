@@ -542,17 +542,6 @@ let jobs pipeline_type =
         ~rules:(make_rules ~dependent:true ~changes:changeset_rust_fmt_files ())
         ["scripts/check-format-rust.sh"]
     in
-    let job_check_rst =
-      job
-        ~__POS__
-        ~name:"documentation:rst-check"
-        ~image:Images.CI.test_master
-        ~dependencies
-        ~stage
-        ~rules:(make_rules ~changes:changeset_octez_docs_rst ())
-        ~before_script:(before_script ~init_python_venv:true [])
-        ["make --silent -C docs sphinx-check"]
-    in
     let job_commit_titles : tezos_job =
       let allow_failure : allow_failure_job =
         match pipeline_type with Merge_train -> No | _ -> With_exit_codes [65]
@@ -590,7 +579,6 @@ let jobs pipeline_type =
       job_oc_misc_checks;
       job_check_jsonnet;
       job_check_rust_fmt;
-      job_check_rst;
     ]
     @ mr_only_jobs
   in
@@ -1968,132 +1956,6 @@ let jobs pipeline_type =
     | Schedule_extended_test -> []
   in
 
-  (* Doc jobs *)
-  let doc =
-    let jobs_install_python =
-      (* Creates a job that tests installation of the python environment in [image] *)
-      let job_install_python ~__POS__ ~name ~image ~project ~branch =
-        job
-          ~__POS__
-          ~name
-          ~image
-          ~stage:Stages.test
-          ~dependencies:dependencies_needs_start
-          ~rules:
-            (make_rules
-               ~changes:
-                 (Changeset.make
-                    [
-                      "docs/developer/install-python-debian-ubuntu.sh";
-                      "pyproject.toml";
-                      "poetry.lock";
-                    ])
-               ~manual:Yes
-               ~label:"ci--docs"
-               ())
-          [
-            sf
-              "./docs/developer/install-python-debian-ubuntu.sh %s %s"
-              project
-              branch;
-          ]
-      in
-      (* The set of python installation test jobs. Since python is
-         today less used, we do the bulk of the tests in scheduled pipelines
-         and we only test debian_bookworm in a merge pipeline *)
-      match pipeline_type with
-      | Schedule_extended_test ->
-          [
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_noble"
-              ~image:Images.ubuntu_noble
-              ~project:"tezos/tezos"
-              ~branch:"master";
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_jammy"
-              ~image:Images.ubuntu_jammy
-              ~project:"tezos/tezos"
-              ~branch:"master";
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_bookworm"
-              ~image:Images.debian_bookworm
-              ~project:"tezos/tezos"
-              ~branch:"master";
-          ]
-      | Before_merging | Merge_train ->
-          [
-            job_install_python
-              ~__POS__
-              ~name:"documentation:install_python_bookworm"
-              ~image:Images.debian_bookworm
-              ~project:"${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}"
-              ~branch:"${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}";
-          ]
-    in
-    let jobs_documentation : tezos_job list =
-      let rules =
-        make_rules ~changes:changeset_octez_docs ~label:"ci--docs" ()
-      in
-      let dependencies = dependencies_needs_start in
-      let job_odoc =
-        Documentation.job_odoc ~rules ~dependencies ~lite:true ()
-      in
-      let job_manuals =
-        Documentation.job_manuals
-          ~rules
-          ~use_static_executables:false
-          ~dependencies:
-            (Dependent
-               [
-                 Artifacts job_build_x86_64_release;
-                 Artifacts job_build_x86_64_extra_dev;
-                 Artifacts job_build_x86_64_extra_exp;
-                 Artifacts job_build_kernels;
-                 Artifacts job_build_dsn_node;
-               ])
-          ()
-      in
-      let job_docgen = Documentation.job_docgen ~rules ~dependencies () in
-      let job_build_all =
-        Documentation.job_build_all
-          ~job_odoc
-          ~job_manuals
-          ~job_docgen
-          ~rules:
-            (make_rules
-               ~dependent:true
-               ~changes:changeset_octez_docs
-               ~label:"ci--docs"
-               ())
-          ()
-      in
-      let job_documentation_linkcheck : tezos_job =
-        Documentation.job_linkcheck
-          ~job_manuals
-          ~job_docgen
-          ~job_build_all
-          ~rules:
-            (make_rules
-               ~dependent:true
-               ~label:"ci--docs"
-               ~manual:(On_changes changeset_octez_docs)
-               ())
-          ()
-      in
-      [
-        job_odoc;
-        job_manuals;
-        job_docgen;
-        job_build_all;
-        job_documentation_linkcheck;
-      ]
-    in
-    jobs_install_python @ jobs_documentation
-  in
-
   (* Manual jobs *)
   let manual =
     (* On scheduled pipelines we build and test the full packages test matrix.
@@ -2219,4 +2081,4 @@ let jobs pipeline_type =
     (* No manual jobs on the scheduled pipeline *)
     | Schedule_extended_test -> []
   in
-  start_stage @ sanity @ build @ packaging @ test @ coverage @ doc @ manual
+  start_stage @ sanity @ build @ packaging @ test @ coverage @ manual

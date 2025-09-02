@@ -284,11 +284,16 @@ let fix_graph (graph : job_graph) : fixed_job_graph =
     graph ;
   !result
 
-let convert_stage (stage : stage) : Tezos_ci.Stage.t =
-  match stage with
-  | Build -> Tezos_ci.Stages.build
-  | Test -> Tezos_ci.Stages.test
-  | Publish -> Tezos_ci.Stages.publish
+let convert_stage (trigger : trigger) (stage : stage) : Tezos_ci.Stage.t =
+  match (stage, trigger) with
+  | Build, _ -> Tezos_ci.Stages.build
+  | Test, Immediate ->
+      (* In the future, we plan to remove the sanity stage.
+         Hence why we do not expose a [Sanity] constructor in type [stage].
+         But for now, immediate test jobs are still supposed to be in the sanity stage. *)
+      Tezos_ci.Stages.sanity
+  | Test, _ -> Tezos_ci.Stages.test
+  | Publish, _ -> Tezos_ci.Stages.publish
 
 type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 
@@ -414,7 +419,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
-                ~stage:(convert_stage stage)
+                ~stage:(convert_stage trigger stage)
                 ~description
                 ~dev_infra
                 ?arch

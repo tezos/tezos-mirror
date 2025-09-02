@@ -41,24 +41,6 @@ let job_static_x86_64 =
     ~rules:rules_always
     ()
 
-let jobs_documentation : tezos_job list =
-  let dependencies = Dependent [] in
-  let job_odoc = Documentation.job_odoc ~dependencies () in
-  let job_manuals =
-    Documentation.job_manuals
-      ~dependencies:(Dependent [Artifacts job_static_x86_64])
-      ~use_static_executables:true
-      ()
-  in
-  let job_docgen = Documentation.job_docgen ~dependencies () in
-  let job_build_all =
-    Documentation.job_build_all ~job_odoc ~job_manuals ~job_docgen ()
-  in
-  let job_publish_documentation : tezos_job =
-    Documentation.job_publish_documentation ~job_build_all ()
-  in
-  [job_odoc; job_manuals; job_docgen; job_build_all; job_publish_documentation]
-
 (* Defines the jobs of the [schedule_docker_build_pipeline] pipeline.
 
     This pipeline runs scheduled on the [master] branch. The goal

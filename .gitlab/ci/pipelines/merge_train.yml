@@ -375,30 +375,6 @@ check_rust_fmt:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
-documentation:rst-check:
-  image: ${ci_image_name_protected}/test:amd64--master
-  stage: sanity
-  tags:
-  - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
-  needs: []
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make --silent -C docs sphinx-check
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 nix:
   image: nixos/nix:2.22.1
   stage: sanity
@@ -4154,342 +4130,6 @@ oc.unified_coverage:
     expose_as: Coverage report
   coverage: '/Coverage: ([^%]+%)/'
 
-documentation:install_python_bookworm:
-  image: debian:bookworm
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - docs/developer/install-python-debian-ubuntu.sh
-    - poetry.lock
-    - pyproject.toml
-    when: on_success
-  - when: manual
-    allow_failure: true
-  needs:
-  - trigger
-  dependencies: []
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
-    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
-documentation:odoc:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - export OPAMFETCH='wget'
-  - opam remote add default https://opam.ocaml.org/
-  - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
-  - opam update
-  - opam install --yes odoc.2.4.4
-  - make -C docs odoc-lite
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    expire_in: 4 hours
-    paths:
-    - docs/_build/api/odoc/
-    - docs/odoc.log
-    when: always
-
-documentation:manuals:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
-  dependencies:
-  - oc.docker:ci:amd64
-  - oc.build_x86_64-released
-  - oc.build_amd64-extra-dev
-  - oc.build_amd64-extra-exp
-  - oc.build_kernels
-  - oc.build_dsn_node
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j octez-gen
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - docs/*/octez-*.html
-    - docs/api/octez-*.txt
-    - docs/developer/metrics.csv
-    - docs/developer/rollup_metrics.csv
-    - docs/user/node-config.json
-
-documentation:docgen:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - trigger
-  dependencies:
-  - oc.docker:ci:amd64
-  timeout: 60 minutes
-  cache:
-  - key: cargo-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/.cargo/registry/cache
-    policy: pull-push
-  - key: sccache-$CI_JOB_NAME_SLUG
-    paths:
-    - $CI_PROJECT_DIR/_sccache
-    policy: pull-push
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  - . ./scripts/ci/sccache-start.sh
-  script:
-  - make -C docs -j docexes-gen
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  - ./scripts/ci/sccache-stop.sh
-  variables:
-    CARGO_NET_OFFLINE: "false"
-    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
-    SCCACHE_CACHE_SIZE: 5G
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - docs/alpha/rpc.rst
-    - docs/shell/rpc.rst
-    - docs/user/default-acl.json
-    - docs/api/errors.rst
-    - docs/shell/p2p_api.rst
-
-documentation:build_all:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: build
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
-  needs:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
-  dependencies:
-  - oc.docker:ci:amd64
-  - documentation:odoc
-  - documentation:manuals
-  - documentation:docgen
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs -j sphinx
-  - make -C docs -j _build/octezdoc.txt
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-  artifacts:
-    expire_in: 1 week
-    paths:
-    - docs/_build/
-    expose_as: Documentation - excluding old protocols
-
-documentation:linkcheck:
-  image: ${ci_image_name}/test:${ci_image_tag}
-  stage: test
-  tags:
-  - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: manual
-    allow_failure: true
-  needs:
-  - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
-  - documentation:build_all
-  dependencies:
-  - oc.docker:ci:amd64
-  - documentation:manuals
-  - documentation:docgen
-  - documentation:build_all
-  allow_failure: true
-  timeout: 60 minutes
-  before_script:
-  - . ./scripts/ci/datadog_send_job_info.sh
-  - . ./scripts/version.sh
-  - eval $(opam env)
-  - . $HOME/.venv/bin/activate
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
-  script:
-  - make -C docs redirectcheck
-  - make -C docs linkcheck
-  after_script:
-  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
-
 oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
   stage: manual
@@ -4611,6 +4251,354 @@ oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
+
+documentation.rst-check:
+  image: ${ci_image_name_protected}/test:amd64--master
+  stage: sanity
+  tags:
+  - gcp
+  rules:
+  - changes:
+    - '**/*.rst'
+    when: on_success
+  needs: []
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . $HOME/.venv/bin/activate
+  - make --silent -C docs sphinx-check
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.docgen:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - eval $(opam env)
+  - make -C docs -j docexes-gen
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/alpha/rpc.rst
+    - docs/shell/rpc.rst
+    - docs/user/default-acl.json
+    - docs/api/errors.rst
+    - docs/shell/p2p_api.rst
+
+documentation.manuals:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
+  - oc.build_kernels
+  - oc.build_dsn_node
+  dependencies:
+  - oc.docker:ci:amd64
+  - oc.build_x86_64-released
+  - oc.build_amd64-extra-dev
+  - oc.build_amd64-extra-exp
+  - oc.build_kernels
+  - oc.build_dsn_node
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - make -C docs -j octez-gen
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/*/octez-*.html
+    - docs/api/octez-*.txt
+    - docs/developer/metrics.csv
+    - docs/developer/rollup_metrics.csv
+    - docs/user/node-config.json
+
+documentation.odoc:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  dependencies:
+  - oc.docker:ci:amd64
+  timeout: 60 minutes
+  cache:
+  - key: cargo-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/.cargo/registry/cache
+    policy: pull-push
+  - key: sccache-$CI_JOB_NAME_SLUG
+    paths:
+    - $CI_PROJECT_DIR/_sccache
+    policy: pull-push
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  - . ./scripts/ci/sccache-start.sh
+  script:
+  - eval $(opam env)
+  - export OPAMFETCH='wget'
+  - opam remote add default https://opam.ocaml.org/
+  - opam repo add archive git+https://github.com/ocaml/opam-repository-archive
+  - opam update
+  - opam install --yes odoc.2.4.4
+  - make -C docs odoc-lite
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  - ./scripts/ci/sccache-stop.sh
+  variables:
+    CARGO_NET_OFFLINE: "false"
+    SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
+    SCCACHE_CACHE_SIZE: 5G
+  artifacts:
+    expire_in: 4 hours
+    paths:
+    - docs/_build/api/odoc/
+    - docs/odoc.log
+    when: always
+
+documentation.build_all:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: build
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: on_success
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.odoc
+  - documentation.manuals
+  - documentation.docgen
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs -j sphinx
+  - make -C docs -j _build/octezdoc.txt
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  artifacts:
+    expire_in: 1 week
+    paths:
+    - docs/_build/
+    expose_as: Documentation - excluding old protocols
+
+documentation.linkcheck:
+  image: ${ci_image_name}/test:${ci_image_tag}
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: manual
+    allow_failure: true
+  - changes:
+    - '**/*.rst'
+    - brassaia/**/*.ml*
+    - client-libs/**/*.ml*
+    - data-encoding/**/*.ml*
+    - docs/**/*
+    - dune
+    - dune-project
+    - dune-workspace
+    - etherlink/**/*.ml*
+    - grafazos/doc/**/*
+    - irmin/**/*.ml*
+    - script-inputs/**/*/
+    - scripts/**/*/
+    - src/**/*.ml*
+    - tezt/**/*.ml*
+    - vendors/**/*.ml*
+    when: manual
+    allow_failure: true
+  needs:
+  - oc.docker:ci:amd64
+  - trigger
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  dependencies:
+  - oc.docker:ci:amd64
+  - documentation.manuals
+  - documentation.docgen
+  - documentation.build_all
+  allow_failure: true
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - . ./scripts/version.sh
+  - eval $(opam env)
+  - . $HOME/.venv/bin/activate
+  - make -C docs redirectcheck
+  - make -C docs linkcheck
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+
+documentation.install_python_bookworm:
+  image: debian:bookworm
+  stage: test
+  tags:
+  - gcp
+  rules:
+  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
+    when: on_success
+  - changes:
+    - docs/developer/install-python-debian-ubuntu.sh
+    - poetry.lock
+    - pyproject.toml
+    when: on_success
+  needs:
+  - trigger
+  dependencies: []
+  timeout: 60 minutes
+  interruptible: true
+  before_script:
+  - . ./scripts/ci/datadog_send_job_info.sh
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
+  script:
+  - ./docs/developer/install-python-debian-ubuntu.sh ${CI_MERGE_REQUEST_SOURCE_PROJECT_PATH:-tezos/tezos}
+    ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
+  after_script:
+  - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
 teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
