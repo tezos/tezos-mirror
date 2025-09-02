@@ -1,6 +1,6 @@
 # Grafazos dependencies
 
-FROM debian:stable
+FROM debian:trixie
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
@@ -21,8 +21,9 @@ RUN apt-get update && \
 ENV PATH=/root/go/bin:$PATH
 
 # Install go-jsonnet
+# hadolint ignore=DL3008
 RUN apt-get update && \
-    apt-get install --no-install-recommends -y golang-go=2:1.19~1 && \
+    apt-get install --no-install-recommends -y golang-go && \
     # The source commit of v0.6.0 is pinned
     # https://github.com/jsonnet-bundler/jsonnet-bundler/tree/v0.6.0
     go install -a github.com/jsonnet-bundler/jsonnet-bundler/cmd/jb@ddded59 && \
