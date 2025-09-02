@@ -113,6 +113,11 @@ module Set = struct
 
   let dal dal (c : t) = {c with dal}
 
+  module Dal = struct
+    let number_of_slots number_of_slots (c : t) =
+      dal {c.dal with number_of_slots} c
+  end
+
   let sc_rollup sc_rollup (c : t) = {c with sc_rollup}
 
   let zk_rollup zk_rollup (c : t) = {c with zk_rollup}
