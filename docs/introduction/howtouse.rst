@@ -170,10 +170,12 @@ default in :doc:`sandbox mode <../user/sandbox>` and in the various test
 suites.
 
 
-Storage
-~~~~~~~
+Data directory
+~~~~~~~~~~~~~~
 
-All blockchain data is stored by the node under a data directory, which by default is ``$HOME/.tezos-node/``.
+The node stores data in a data directory, which by default is ``$HOME/.tezos-node/``.
+The ``--data-dir`` argument, available on many node commands, sets the location of this directory.
+One exception is the configuration file, which is stored in the data directory by default but can be stored in a different location with the ``--config-file`` argument.
 
 If for some reason your node is misbehaving or there has been an
 upgrade of the network, it is safe to remove this directory, it just
