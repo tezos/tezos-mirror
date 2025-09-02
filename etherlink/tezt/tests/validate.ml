@@ -700,7 +700,7 @@ let test_validate_gas_limit =
   let*@? err =
     Rpc.send_raw_transaction ~raw_tx:not_enough_gas_limit sequencer
   in
-  Check.(err.message =~ rex "Transaction with a gas limit below")
+  Check.(err.message =~ rex "Not enough gas for inclusion fees.")
     ~error_msg:
       "The transaction has not enough gas to pay da_fees, it should fail" ;
   (* This tx is the same as the valid_transaction in eip2930 but with some random entry for access_list *)
@@ -797,7 +797,7 @@ let test_base_gas_cost =
     | Eip2930 | Eip1559 -> make_raw_tx ~legacy:false
   in
   let*@? err = Rpc.send_raw_transaction ~raw_tx sequencer in
-  Check.(err.message =~ rex "Transaction with a gas limit below")
+  Check.(err.message =~ rex "The provided gas limit")
     ~error_msg:"The error message should be %R but got %L" ;
   unit
 
