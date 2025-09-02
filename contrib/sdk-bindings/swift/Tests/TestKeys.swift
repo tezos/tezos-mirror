@@ -67,7 +67,7 @@ class TestKeys: XCTestCase {
         let msg = "a"
         let pk = try! PublicKeyP256.fromB58check(data: b58Pk)
         let sig = try! P256Signature.fromB58check(data: b58Sig)
-        let rawMsg = try! forgeMessage(msg: msg)
+        let rawMsg = forgeMessage(msg: msg)
         XCTAssert(try! pk.verifySignature(signature: sig, msg: rawMsg))
     }
 
@@ -79,7 +79,7 @@ class TestKeys: XCTestCase {
         let msg = "a"
         let pk = try! PublicKey.fromB58check(data: b58Pk)
         let sig = try! Signature.fromB58check(data: b58Sig)
-        let rawMsg = try! forgeMessage(msg: msg)
+        let rawMsg = forgeMessage(msg: msg)
         XCTAssert(try! pk.verifySignature(signature: sig, msg: rawMsg))
     }
 
@@ -92,7 +92,7 @@ class TestKeys: XCTestCase {
         let msg = "a"
         let pk = try! PublicKey.fromB58check(data: b58Pk)
         let sig = try! Signature.fromB58check(data: b58Sig)
-        let rawMsg = try! forgeMessage(msg: msg)
+        let rawMsg = forgeMessage(msg: msg)
         XCTAssertFalse(try! pk.verifySignature(signature: sig, msg: rawMsg))
     }
 }
