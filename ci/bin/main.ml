@@ -346,6 +346,29 @@ let () =
        daily." ;
   let custom_extended_test_jobs = Custom_extended_test_pipeline.jobs () in
   register
+    "schedule_cache_refresh"
+    schedule_cache_refresh
+    ~jobs:
+      (Code_verification.jobs Merge_train
+       @ !Hooks.before_merging
+       @ Debian_repository.jobs Full
+       @ Rpm_repository.jobs Full
+      |> List.filter Tezos_ci.has_cache_or_start_images_stages
+      |> List.map (Tezos_ci.set_tezos_job_cache_policy Gitlab_ci.Types.Push)
+      |> List.map Tezos_ci.no_rules
+      |> List.map Tezos_ci.when_always
+      |> List.map (with_interruptible false))
+    ~description:
+      "Scheduled pipelines that mimics a full version of 'merge_train'.\n\n\
+       It starts automatically, and unlike real merge_train pipelines, is not \
+       canceled if a job fails. Another important change is that job-specific \
+       caches have now a `push-only` policy instead of a `pull-push` policy. \
+       This allows for these caches to be refreshed, to avoid OOMs or just job \
+       slow-downs. This pipeline should be executed regularly in a fresh clone \
+       of the `master` branch. This needs to be a clone because running it on \
+       master would refresh protected caches, which are not used on merge \
+       request pipelines." ;
+  register
     "schedule_extended_rpc_test"
     schedule_extended_rpc_tests
     ~jobs:(custom_extended_test_jobs |> List.map (with_interruptible false))

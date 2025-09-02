@@ -443,12 +443,13 @@ let job_build_arm64_extra_exp ?rules () : tezos_job =
     ~sccache_size:"2G"
     "script-inputs/experimental-executables"
 
-let job_build_kernels ?rules () : tezos_job =
+let job_build_kernels ?dependencies ?rules () : tezos_job =
   job
     ~__POS__
     ~name:"oc.build_kernels"
     ~image:Images.rust_toolchain
     ~stage:Stages.build
+    ?dependencies
     ?rules
     ["make -f kernels.mk build"; "make -f etherlink.mk evm_kernel.wasm"]
     ~artifacts:

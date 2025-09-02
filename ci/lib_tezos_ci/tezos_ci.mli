@@ -20,6 +20,24 @@ module Runner = Runner
     [~name] and the stem is equivalent. *)
 val name_of_tezos_job : tezos_job -> string
 
+(** Modifies the {!cache_policy} of a {!tezos_job} with the value given as first argument.  *)
+val set_tezos_job_cache_policy :
+  Gitlab_ci.Types.cache_policy -> tezos_job -> tezos_job
+
+(** Removes any rules in jobs. Used in
+    [schedule_cache_refresh] pipeline. *)
+val no_rules : tezos_job -> tezos_job
+
+(** Make jobs always start. Used in
+    [schedule_cache_refresh] pipeline.
+    NB: needed because some jobs have no [needs]. They will only start if all jobs of previous stages either succeed or are allowed to fail. Also make [no_rules] less useful, apart from simplifying the yaml.
+    The absence [needs] in some jobs should be fixed, which would then make [when_always] not needed.
+ *)
+val when_always : tezos_job -> tezos_job
+
+(** temp *)
+val has_cache_or_start_images_stages : tezos_job -> bool
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
