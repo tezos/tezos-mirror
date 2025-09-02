@@ -151,8 +151,6 @@ pub enum OriginationError {
     FailedToComputeBalanceUpdate,
     #[error("Failed to applied balance update")]
     FailedToApplyBalanceUpdate,
-    #[error("Fail to generate KT1 hash: {0}")]
-    FailToGenerateKT1(String),
     #[error("Can't initialize smart contract")]
     CantInitContract,
     #[error("Can't originate an empty smart contract")]

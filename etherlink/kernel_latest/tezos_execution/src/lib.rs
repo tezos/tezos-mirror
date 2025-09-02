@@ -530,7 +530,7 @@ fn originate_contract<Host: Runtime>(
     }
 
     // Generate a simple KT1 address depending on the source of the operation
-    let contract = origination_nonce.generate_kt1()?;
+    let contract = origination_nonce.generate_kt1();
     let dest_contract = Contract::Originated(contract.clone());
 
     // TODO: Handle lazy_storage diff, a lot of the origination is concerned
@@ -2775,9 +2775,7 @@ mod tests {
 
         let mut origination_nonce =
             OriginationNonce::initial(OperationHash(H256::zero()));
-        let expected_kt1 = origination_nonce
-            .generate_kt1()
-            .expect("Should have succeeded to generate a KT1");
+        let expected_kt1 = origination_nonce.generate_kt1();
 
         let expected_receipt = OperationResultSum::Origination(OperationResult {
             balance_updates: vec![
@@ -3367,9 +3365,8 @@ mod tests {
             1,
             "There should be one internal operation"
         );
-        let expected_address = OriginationNonce::initial(OperationHash(H256::zero()))
-            .generate_kt1()
-            .expect("Should have succeeded to generate a KT1");
+        let expected_address =
+            OriginationNonce::initial(OperationHash(H256::zero())).generate_kt1();
 
         assert_eq!(
             internal_receipts[0],
@@ -3496,12 +3493,8 @@ mod tests {
         .unwrap();
 
         let mut orignation_nonce = OriginationNonce::initial(OperationHash(H256::zero()));
-        let expected_kt1_1 = orignation_nonce
-            .generate_kt1()
-            .expect("Should have succeeded to generate a KT1");
-        let expected_kt1_2 = orignation_nonce
-            .generate_kt1()
-            .expect("Should have succeeded to generate a KT1");
+        let expected_kt1_1 = orignation_nonce.generate_kt1();
+        let expected_kt1_2 = orignation_nonce.generate_kt1();
         let expected_receipts = vec![
             OperationResultSum::Reveal(OperationResult {
                 balance_updates: vec![
