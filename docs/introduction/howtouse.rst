@@ -138,7 +138,9 @@ concurrently and selects the best one based on its fitness (see
    <https://en.wikipedia.org/wiki/Network_Time_Protocol>`__ to avoid clock
    drift. Clock drift may result in not being able to get recent blocks in case
    of negative lag time, and in not being able to inject new blocks in case of
-   positive lag time.
+   positive lag time. Refer to your operating system's documentation for
+   instructions on setting a "time server" or "time service" to sync your
+   computer's time with an NTP server.
 
 Node Synchronization
 ~~~~~~~~~~~~~~~~~~~~
