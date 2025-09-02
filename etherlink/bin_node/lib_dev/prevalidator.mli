@@ -2,10 +2,13 @@
 (*                                                                           *)
 (* SPDX-License-Identifier: MIT                                              *)
 (* Copyright (c) 2025 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2025 Functori <contact@functori.com>                        *)
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += Gas_limit_too_low of string | Prague_not_enabled
+type error +=
+  | Gas_limit_too_low of {gas_limit : Z.t; minimum_gas_limit_required : Z.t}
+  | Prague_not_enabled
 
 type mode =
   | Minimal
