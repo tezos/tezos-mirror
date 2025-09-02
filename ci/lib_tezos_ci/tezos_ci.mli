@@ -24,6 +24,10 @@ val name_of_tezos_job : tezos_job -> string
 val set_tezos_job_cache_policy :
   Gitlab_ci.Types.cache_policy -> tezos_job -> tezos_job
 
+(** Removes any rules in jobs. Used in
+    [schedule_merge_train_cache_refresh] pipeline. *)
+val no_rules : tezos_job -> tezos_job
+
 (** A string that should be prepended to all generated files.
 
     Warns not to modify the generated files, and refers to the generator. *)
