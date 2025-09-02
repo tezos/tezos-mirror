@@ -217,6 +217,7 @@ Many options of the node can be configured when running the node:
 
 - RPC parameters (e.g. the port number for listening to RPC requests using option ``--rpc-addr``)
 - The directory where the node stores local data (using option ``--data-dir``)
+- Location of the configuration file (using option ``--config-file``)
 - Network parameters (e.g. the network to connect to, using option ``--network``, the number of connections to peers, using option ``--connections``)
 - Validator and mempool parameters
 - :ref:`Logging options <configure_node_logging>`.
