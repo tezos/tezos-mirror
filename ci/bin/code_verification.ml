@@ -283,10 +283,10 @@ let jobs pipeline_type =
            not [job_start] defined below), in the pipeline. *)
         [job_rule ~when_:(if dependent then On_success else Always) ()]
     | Before_merging | Merge_train -> (
-        (* MR labels can be used to force tests to run. *)
         (if final_pipeline_disable then
            [job_rule ~if_:Rules.is_final_pipeline ~when_:Never ()]
          else [])
+        (* MR labels can be used to force tests to run. *)
         @ (match label with
           | Some label ->
               [job_rule ~if_:Rules.(has_mr_label label) ~when_:On_success ()]
