@@ -309,9 +309,18 @@ module Unix = struct
     let is_darwin =
       lazy
         (try
-           match Unix.open_process_in "uname" |> input_line with
-           | "Darwin" -> true
-           | _ -> false
+           let inc = Unix.open_process_in "uname" in
+           let res =
+             match input_line inc with
+             | "Darwin" -> true
+             | _ -> false
+             | exception End_of_file ->
+                 (* Something went wrong but we still need to wait for the child
+                  process *)
+                 false
+           in
+           ignore (Unix.close_process_in inc) ;
+           res
          with Unix.Unix_error _ -> false)
 
     let get_wtime () =
