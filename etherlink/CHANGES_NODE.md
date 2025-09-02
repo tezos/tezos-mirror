@@ -8,6 +8,42 @@
 
 ### RPCs changes
 
+### Metrics changes
+
+### Command-line interface changes
+
+### Execution changes
+
+### Storage changes
+
+### Documentation changes
+
+### Experimental features changes
+
+*No guarantees are provided regarding backward compatibility of experimental
+features. They can be modified or removed without any deprecation notices. If
+you start using them, you probably want to use `octez-evm-node check config
+--config-file PATH` to assert your configuration file is still valid.*
+
+## Version 0.39 (2025-09-02)
+
+This release of the EVM nodes introduces a new prevalidator which improves
+performances of the `eth_sendRawTransaction` RPC. It also offers a new
+configuration option to improve performance at the cost of memory consumption
+and removes the tx pool which has been replaced by the tx queue since version
+0.21.
+
+This release will not apply any migration to the node's store (version
+22), meaning it is possible to downgrade to the previous version.
+
+### Configuration changes
+
+- New field `"performance_profile"` which, when set to `"performance"`, changes
+  the GC parameters of the node to improve responsiveness and latency of the
+  node at the cost of a slight increase in memory consumption. (!19025)
+
+### RPCs changes
+
 - Improves performances of the `eth_sendRawTransaction` RPC, dividing the
   average time to process these requests by up to 5 times. (!18989)
 - Delays broadcasting blueprints through the `/evm/messages` streamed RPC until
@@ -26,7 +62,7 @@
 ### Metrics changes
 
 - Fixes the metrics related to the tx pool. Now
-  if you activate tx_queue it show the size of the tx_queue. (!18996)
+  if you activate `tx_queue` it show the size of the `tx_queue`. (!18996)
 - The EVM node now exports its logs to Opentelemetry when enabled in the
   configuration file or with `--profiling true`. (!18910)
 
@@ -35,12 +71,6 @@
 - Deprecates the fields `tx_pool_timeout_limit`, `tx_pool_addr_limit` and
   `tx_pool_tx_per_addr_limit` in favor of a top-level `tx_pool`
   top-level field. (!18994)
-
-### Execution changes
-
-### Storage changes
-
-### Documentation changes
 
 ### Experimental features changes
 
