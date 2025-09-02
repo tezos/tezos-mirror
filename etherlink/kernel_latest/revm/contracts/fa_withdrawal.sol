@@ -10,7 +10,6 @@ import "./internal_forwarder.sol";
 import "./reentrancy_safe.sol";
 
 contract FAWithdrawal is ReentrancySafe {
-    uint256 public withdrawalCounter;
     bool private locked;
 
     event Withdrawal(
@@ -129,9 +128,8 @@ contract FAWithdrawal is ReentrancySafe {
             keccak256(abi.encodePacked(ticketer, content))
         );
 
-        // Save current value and increment ID counter
-        uint256 currentCounter = withdrawalCounter;
-        withdrawalCounter++;
+        // Get and increment global counter
+        uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
 
         // Call ticketTable.ticket_balance_remove
         bytes memory ticketData = abi.encodeCall(
@@ -169,7 +167,7 @@ contract FAWithdrawal is ReentrancySafe {
             decoded.target,
             decoded.proxy,
             amount,
-            currentCounter
+            counter
         );
 
         // Call proxy
@@ -206,9 +204,8 @@ contract FAWithdrawal is ReentrancySafe {
             keccak256(abi.encodePacked(ticketer, content))
         );
 
-        // Save current value and increment ID counter
-        uint256 currentCounter = withdrawalCounter;
-        withdrawalCounter++;
+        // Get and increment global counter
+        uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
 
         // Call ticketTable.ticket_balance_remove
         bytes memory ticketData = abi.encodeCall(
@@ -231,7 +228,7 @@ contract FAWithdrawal is ReentrancySafe {
                 content,
                 fastWithdrawalContract,
                 payload,
-                currentCounter
+                counter
             )
         );
         (bool outboxSuccess, bytes memory encoded) = Constants
@@ -254,7 +251,7 @@ contract FAWithdrawal is ReentrancySafe {
             decoded.target,
             decoded.proxy,
             amount,
-            currentCounter,
+            counter,
             block.timestamp,
             payload
         );

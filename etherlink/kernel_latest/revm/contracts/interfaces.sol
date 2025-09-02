@@ -68,6 +68,10 @@ interface ITable {
     }
 }
 
+interface ICounter {
+    function get_and_increment() external returns (uint256);
+}
+
 interface IProxy {
     function deposit(
         address target,
