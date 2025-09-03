@@ -36,6 +36,7 @@ pub struct PrecompileStateChanges {
     pub ticket_balances: HashMap<TicketBalanceKey, U256>,
     pub removed_deposits: HashSet<U256>,
     pub withdrawals: Vec<Withdrawal>,
+    pub global_counter: Option<U256>,
 }
 
 /// A journal of state changes internal to the EVM
@@ -307,6 +308,11 @@ impl<DB> JournalExt for Journal<DB> {
 }
 
 impl<DB: DatabasePrecompileStateChanges> Journal<DB> {
+    pub fn get_and_increment_global_counter(&mut self) -> Result<U256, Error> {
+        self.layered_state
+            .get_and_increment_global_counter(&self.database)
+    }
+
     pub fn ticket_balance_add(
         &mut self,
         ticket_hash: U256,

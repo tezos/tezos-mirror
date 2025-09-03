@@ -72,6 +72,7 @@ impl<'a, Host: Runtime> EtherlinkVMDB<'a, Host> {
 }
 
 pub trait DatabasePrecompileStateChanges {
+    fn global_counter(&self) -> Result<U256, Error>;
     fn ticketer(&self) -> Result<ContractKt1Hash, Error>;
     fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error>;
     fn deposit_in_queue(
@@ -186,6 +187,15 @@ impl<Host: Runtime> EtherlinkVMDB<'_, Host> {
 }
 
 impl<Host: Runtime> DatabasePrecompileStateChanges for EtherlinkVMDB<'_, Host> {
+    fn global_counter(&self) -> Result<U256, Error> {
+        let account_zero = StorageAccount::get_or_create_account(
+            self.host,
+            self.world_state_handler,
+            Address::ZERO,
+        )?;
+        account_zero.read_global_counter(self.host)
+    }
+
     fn ticket_balance(&self, ticket_hash: &U256, owner: &Address) -> Result<U256, Error> {
         let account_zero = StorageAccount::get_or_create_account(
             self.host,
@@ -291,6 +301,13 @@ impl<Host: Runtime> DatabaseCommitPrecompileStateChanges for EtherlinkVMDB<'_, H
             self.abort();
             return;
         };
+        if let Some(global_counter) = etherlink_data.global_counter {
+            abort_on_error!(
+                self,
+                address_zero.write_global_counter(self.host, global_counter),
+                "DatabaseCommitPrecompileStateChanges `write_global_counter`"
+            );
+        }
         for ((owner, ticket_hash), amount) in etherlink_data.ticket_balances {
             abort_on_error!(
                 self,

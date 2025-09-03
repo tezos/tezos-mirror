@@ -69,6 +69,9 @@ const CODE_PATH: RefPath = RefPath::assert_from(b"/code");
 /// such 256 bit integer value in storage.
 const STORAGE_ROOT_PATH: RefPath = RefPath::assert_from(b"/storage");
 
+/// Path where global counter is stored.
+const GLOBAL_COUNTER_PATH: RefPath = RefPath::assert_from(b"/withdrawal_counter");
+
 /// Path where global ticket table is stored.
 const TICKET_STORAGE_PATH: RefPath = RefPath::assert_from(b"/ticket_table");
 
@@ -393,6 +396,20 @@ impl StorageAccount {
             host.store_delete(&path)?
         }
         Ok(())
+    }
+
+    pub(crate) fn read_global_counter(&self, host: &impl Runtime) -> Result<U256, Error> {
+        let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
+        Ok(read_u256_le_default(host, &path, U256::ZERO)?)
+    }
+
+    pub(crate) fn write_global_counter(
+        &self,
+        host: &mut impl Runtime,
+        value: U256,
+    ) -> Result<(), Error> {
+        let path = concat(&self.path, &GLOBAL_COUNTER_PATH)?;
+        Ok(write_u256_le(host, &path, value)?)
     }
 
     pub(crate) fn read_ticket_balance(

@@ -9,7 +9,6 @@ import "./interfaces.sol";
 import "./reentrancy_safe.sol";
 
 contract XTZWithdrawal is ReentrancySafe {
-    uint256 public withdrawalCounter;
     bool private locked;
 
     event Withdrawal(
@@ -50,6 +49,9 @@ contract XTZWithdrawal is ReentrancySafe {
         uint256 weiAmount = msg.value;
         uint256 mutezAmount = mutez_from_wei(weiAmount);
 
+        // Get and increment global counter
+        uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
+
         // Call push_withdrawal_to_outbox
         bytes memory outboxData = abi.encodeCall(
             IOutbox.push_withdrawal_to_outbox,
@@ -65,15 +67,7 @@ contract XTZWithdrawal is ReentrancySafe {
         require(sent, "Failed to burn");
 
         // Emit withdrawal event
-        emit Withdrawal(
-            weiAmount,
-            msg.sender,
-            bytes22(receiver),
-            withdrawalCounter
-        );
-
-        // Increment ID counter
-        withdrawalCounter++;
+        emit Withdrawal(weiAmount, msg.sender, bytes22(receiver), counter);
     }
 
     /// @notice Perform a fast XTZ withdrawal using a Base58-encoded target and contract.
@@ -89,16 +83,13 @@ contract XTZWithdrawal is ReentrancySafe {
         uint256 weiAmount = msg.value;
         uint256 mutezAmount = mutez_from_wei(weiAmount);
 
+        // Get and increment global counter
+        uint256 counter = ICounter(Constants.globalCounter).get_and_increment();
+
         // Call push_fast_withdrawal_to_outbox
         bytes memory outboxData = abi.encodeCall(
             IOutbox.push_fast_withdrawal_to_outbox,
-            (
-                target,
-                fastWithdrawalContract,
-                payload,
-                mutezAmount,
-                withdrawalCounter
-            )
+            (target, fastWithdrawalContract, payload, mutezAmount, counter)
         );
         (bool outboxSuccess, bytes memory receiver) = Constants
             .outboxSender
@@ -112,14 +103,11 @@ contract XTZWithdrawal is ReentrancySafe {
         // Emit fast withdrawal event
         emit FastWithdrawal(
             bytes22(receiver),
-            withdrawalCounter,
+            counter,
             weiAmount,
             block.timestamp,
             payload,
             msg.sender
         );
-
-        // Increment ID counter
-        withdrawalCounter++;
     }
 }
