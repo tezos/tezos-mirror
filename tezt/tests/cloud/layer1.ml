@@ -880,39 +880,6 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
   in
   Lwt.return {cloud; configuration; bootstrap; bakers; producers; stresstesters}
 
-let on_new_level =
-  let push_level t level =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"level"
-      (float_of_int level)
-  in
-  let push_nb_ops t nb =
-    Cloud.push_metric
-      t.cloud
-      ~help:"Level of (HEAD - 1)"
-      ~typ:`Counter
-      ~name:"nb_ops"
-      (float_of_int nb)
-  in
-  fun t level ->
-    let* _ = Node.wait_for_level t.bootstrap.node level in
-    let level = level - 2 in
-    toplog "Processing metrics for level %d" level ;
-    let* json =
-      Client.(rpc GET)
-        ["chains"; "main"; "blocks"; string_of_int level]
-        t.bootstrap.client
-    in
-    let level = JSON.(json |-> "header" |-> "level" |> as_int) in
-    let nops = JSON.(json |-> "operations" |> as_list |> List.length) in
-    push_level t level ;
-    push_nb_ops t nops ;
-    toplog "Done processing metrics for level %d" level ;
-    Lwt.return_unit
-
 type docker_image = Agent.Configuration.docker_image =
   | Gcp of {alias : string}
   | Octez_release of {tag : string}
@@ -1268,7 +1235,6 @@ let register (module Cli : Scenarios_cli.Layer1) =
     (let rec loop level =
        let level = succ level in
        let* () = produce_slot t level in
-       let* () = on_new_level t level in
        loop level
      in
      loop)
