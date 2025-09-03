@@ -203,6 +203,39 @@ pub enum OperationError {
     RuntimeError(#[from] RuntimeError),
 }
 
+#[allow(dead_code)]
+fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
+    // As per the BSON specification (https://bsonspec.org/spec.html), the BSON
+    // document is made of the concatenation of the following values:
+    //   * its full size encoded on 4 little-endian bytes, including
+    //     the size itself;
+    //   * its concatenated fields (the contents of the document);
+    //   * the byte 0.
+
+    let mut document = vec![];
+    let mut contents = vec![];
+    for (key, value) in elts {
+        // Tag 2 for a field of type string.
+        contents.push(0x02);
+        // The key does not require a size prefix.
+        contents.extend_from_slice(key);
+        // The 0 byte terminates the key.
+        contents.push(0x00);
+        // The value is also suffixed by the 0 byte and contrary to the key it is
+        // prefixed by its size (including the 0 byte, hence the + 1).
+        contents.extend_from_slice(&(value.len() as u32 + 1).to_le_bytes());
+        contents.extend_from_slice(value);
+        contents.push(0x00);
+    }
+
+    // The size here is the size of the whole document, including the trailing 0
+    // byte and the 4 bytes used to represent the size itself (hence the + 5).
+    document.extend_from_slice(&(contents.len() as u32 + 5).to_le_bytes());
+    document.extend_from_slice(&contents);
+    document.push(0x00);
+    document
+}
+
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
 // we cannot use the rust binary json crate to produce compatible bson data because
 // this crate uses Float pointer instructions (which is incompatible with the PVM).
