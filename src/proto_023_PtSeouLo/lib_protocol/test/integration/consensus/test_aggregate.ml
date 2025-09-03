@@ -241,15 +241,12 @@ let check_preattestations_aggregate_validation_and_application ~loc ~attesters
 let check_attestations_aggregate_validation_and_application ~loc ~attesters
     ?attesting_slots ~attested_block ?error () =
   let open Lwt_result_syntax in
-  let attesting_slots =
+  (* It would be nice to test with various DAL contents, but this
+       would require setting up delegates with companion keys. *)
+  let committee =
     match attesting_slots with
     | Some v -> v
     | None -> List.map Op.attesting_slot_of_attester attesters
-  in
-  let committee =
-    (* It would be nice to test with various DAL contents, but this
-       would require setting up delegates with companion keys. *)
-    List.map (fun attesting_slot -> (attesting_slot, None)) attesting_slots
   in
   let* operation = Op.attestations_aggregate ~committee attested_block in
   let check_after_block_mode =
@@ -654,7 +651,7 @@ let test_attestations_aggregate_dal_without_companion_key () =
     (fun dal_content ->
       let* op =
         Op.attestations_aggregate
-          ~committee:[(attesting_slot, dal_content)]
+          ~committee_with_dal:[(attesting_slot, dal_content)]
           attested_block
       in
       Op.check_validation_and_application_all_modes_different_outcomes
@@ -677,7 +674,9 @@ let test_multiple_aggregates_per_block_forbidden () =
   let* aggregates =
     List.map_es
       (fun attesting_slot ->
-        Op.attestations_aggregate ~committee:[(attesting_slot, None)] block)
+        Op.attestations_aggregate
+          ~committee_with_dal:[(attesting_slot, None)]
+          block)
       committee
   in
   (* Bake a block containing the multiple aggregates and expect an error *)
@@ -835,13 +834,10 @@ let test_metadata_committee_is_correctly_ordered () =
   in
   (* Craft an attestations_aggregate including at least 3 delegates *)
   let* attestations, attestation_committee =
-    let* attesting_slots = Op.default_committee ~attested_block:block in
-    let committee =
-      List.map (fun attesting_slot -> (attesting_slot, None)) attesting_slots
-    in
+    let* committee = Op.default_committee ~attested_block:block in
     assert (List.length committee > 2) ;
     let* aggregate = Op.attestations_aggregate ~committee block in
-    return (aggregate, attesting_slots)
+    return (aggregate, committee)
   in
   (* Craft a preattestations_aggregate including at least 3 delegates *)
   let* preattestations, preattestation_committee =

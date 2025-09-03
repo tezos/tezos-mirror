@@ -199,12 +199,12 @@ end) : sig
     __LOC__:string -> 'a tzresult -> 'b -> unit tzresult Lwt.t
 end
 
-(** Builds a {!Alpha_context.type-dal_content} from its integer
+(** Builds a {!Alpha_context.type-dal_content} from its {!Z.t}
     representation, that is, the sum of powers of two of the indexes
     of attested slots.
 
     Raises an exception when the given argument is negative. *)
-val dal_content_of_int : loc:string -> int -> Alpha_context.dal_content
+val dal_content_of_z : Z.t -> Alpha_context.dal_content tzresult Lwt.t
 
 (** Builds a {!Alpha_context.type-dal_content} from a list of attested
     slots.

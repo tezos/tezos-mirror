@@ -312,13 +312,12 @@ struct
             produce proofs are supposed to be in the skip list.")
 end
 
-let dal_content_of_int ~loc n =
-  let attestation =
-    WithExceptions.Result.get_ok
-      ~loc
-      (Alpha_context.Dal.Attestation.Internal_for_tests.of_z (Z.of_int n))
+let dal_content_of_z z =
+  let open Lwt_result_wrap_syntax in
+  let*?@ attestation =
+    Alpha_context.Dal.Attestation.Internal_for_tests.of_z z
   in
-  Alpha_context.{attestation}
+  return Alpha_context.{attestation}
 
 let dal_content_of_int_list
     ?(number_of_slots = Default_parameters.constants_test.dal.number_of_slots)

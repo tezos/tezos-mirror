@@ -301,13 +301,16 @@ let attestation ?attesting_slot ?manager_pkh ?level ?round ?block_payload_hash
   in
   return (Operation.pack op)
 
-let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
-    ?branch attested_block =
+let raw_attestations_aggregate ?committee ?committee_with_dal ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* committee =
-    match committee with
-    | Some committee -> return committee
-    | None ->
+    match (committee, committee_with_dal) with
+    | None, Some committee_with_dal -> return committee_with_dal
+    | Some committee, None -> return @@ List.map (fun x -> (x, None)) committee
+    | Some committee, Some committee_with_dal ->
+        return @@ committee_with_dal @ List.map (fun x -> (x, None)) committee
+    | None, None ->
         let* attesting_slots = default_committee ~attested_block in
         return
           (List.map
@@ -331,12 +334,13 @@ let raw_attestations_aggregate ?committee ?level ?round ?block_payload_hash
   | Some aggregate_attestation -> return aggregate_attestation
   | None -> failwith "no Bls delegate found"
 
-let attestations_aggregate ?committee ?level ?round ?block_payload_hash ?branch
-    attested_block =
+let attestations_aggregate ?committee ?committee_with_dal ?level ?round
+    ?block_payload_hash ?branch attested_block =
   let open Lwt_result_syntax in
   let* op =
     raw_attestations_aggregate
       ?committee
+      ?committee_with_dal
       ?level
       ?round
       ?block_payload_hash
