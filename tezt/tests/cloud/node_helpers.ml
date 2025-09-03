@@ -30,7 +30,7 @@ let isolated_config ~peers ~network ~delay =
   Node.
     [
       No_bootstrap_peers;
-      Connections (List.length peers);
+      Connections (min 100 (List.length peers));
       Synchronisation_threshold (if List.length peers < 2 then 1 else 2);
       Network Network.(to_octez_network_options network);
       Expected_pow 0;
