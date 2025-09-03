@@ -107,12 +107,14 @@ let on_finalized_levels ~rollup_node_tracking ~l1_level ~start_l2_level
 
 let install_finalizer_observer ~rollup_node_tracking
     ~(tx_container : _ Services_backend_sig.tx_container)
-    finalizer_public_server finalizer_private_server finalizer_rpc_process =
+    finalizer_public_server finalizer_private_server finalizer_rpc_process
+    telemetry_cleanup =
   let open Lwt_syntax in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
   in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  telemetry_cleanup () ;
   let* () = Events.shutdown_node ~exit_status in
   let* () = finalizer_public_server () in
   let* () = finalizer_private_server () in
@@ -127,7 +129,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
     ~init_from_snapshot () =
   let open Lwt_result_syntax in
   let open Configuration in
-  let* () =
+  let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
       ~service_namespace:"evm_node"
@@ -293,6 +295,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
+      telemetry_cleanup
       ~tx_container
   in
 

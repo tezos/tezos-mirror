@@ -22,12 +22,14 @@ type sandbox_config = {
 }
 
 let install_finalizer_seq ~(tx_container : _ Services_backend_sig.tx_container)
-    server_public_finalizer server_private_finalizer finalizer_rpc_process =
+    server_public_finalizer server_private_finalizer finalizer_rpc_process
+    telemetry_cleanup =
   let open Lwt_syntax in
   let (module Tx_container) =
     Services_backend_sig.tx_container_module tx_container
   in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  telemetry_cleanup () ;
   let* () = Events.shutdown_node ~exit_status in
   let* () = server_public_finalizer () in
   let* () = server_private_finalizer () in
@@ -177,7 +179,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
     ~(configuration : Configuration.t) ?kernel ?sandbox_config () =
   let open Lwt_result_syntax in
   let open Configuration in
-  let* () =
+  let* telemetry_cleanup =
     Octez_telemetry.Opentelemetry_setup.setup
       ~data_dir
       ~service_namespace:"evm_node"
@@ -521,6 +523,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       finalizer_public_server
       finalizer_private_server
       finalizer_rpc_process
+      telemetry_cleanup
       ~tx_container
   in
   let* () =
