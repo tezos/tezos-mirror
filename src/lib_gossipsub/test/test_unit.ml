@@ -602,14 +602,16 @@ let test_receiving_message rng limits parameters =
   let message_id = 0 in
   (* Receive a message for a joined topic. *)
   let state, output =
-    GS.handle_receive_message {sender; topic; message_id; message} state
+    GS.handle_receive_message_sequentially
+      {sender; topic; message_id; message}
+      state
   in
   let peers_to_route =
     match output with
     | Already_received | Not_subscribed | Invalid_message | Unknown_validity
     | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
-    | Route_message {to_route} -> to_route
+    | Route_message {to_route} | To_include_in_batch (_, to_route) -> to_route
   in
   (* Should return [degree_optimal] peers to route the message to. *)
   Check.(
@@ -690,19 +692,23 @@ let test_message_duplicate_score_bug rng _limits parameters =
   let state, _ = GS.handle_graft {peer = sender; topic} state in
   (* Receive a message for a joined topic. *)
   let state, output =
-    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+    GS.handle_receive_message_sequentially
+      {sender; topic; message_id = 0; message}
+      state
   in
   let () =
     match output with
     | Already_received | Not_subscribed | Invalid_message | Unknown_validity
     | Outdated ->
         Test.fail ~__LOC__ "Handling of received message should succeed."
-    | Route_message _ -> ()
+    | Route_message _ | To_include_in_batch _ -> ()
   in
   (* Send one more message so that [sender]'s P2 score is greater than its P3
      score. In this way its score is positive, and [sender] is not pruned. *)
   let state, _ =
-    GS.handle_receive_message {sender; topic; message_id = 1; message} state
+    GS.handle_receive_message_sequentially
+      {sender; topic; message_id = 1; message}
+      state
   in
   (* Send the first message again. *)
   let per_topic_score_limits =
@@ -716,13 +722,15 @@ let test_message_duplicate_score_bug rng _limits parameters =
   let state, _ = GS.heartbeat state in
   assert_mesh_inclusion ~__LOC__ ~topic ~peer:sender ~is_included:true state ;
   let state, output =
-    GS.handle_receive_message {sender; topic; message_id = 0; message} state
+    GS.handle_receive_message_sequentially
+      {sender; topic; message_id = 0; message}
+      state
   in
   let () =
     match output with
     | Already_received -> ()
     | Not_subscribed | Invalid_message | Unknown_validity | Outdated
-    | Route_message _ ->
+    | Route_message _ | To_include_in_batch _ ->
         Test.fail ~__LOC__ "Handling should fail with Already_received."
   in
   let expected_score =
@@ -775,11 +783,13 @@ let test_receiving_message_for_unsusbcribed_topic rng limits parameters =
   let message = "some data" in
   let message_id = 0 in
   let _state, output =
-    GS.handle_receive_message {sender; topic; message_id; message} state
+    GS.handle_receive_message_sequentially
+      {sender; topic; message_id; message}
+      state
   in
   match output with
   | Already_received | Route_message _ | Invalid_message | Unknown_validity
-  | Outdated ->
+  | Outdated | To_include_in_batch _ ->
       Test.fail
         ~__LOC__
         "Handling of received message should fail with [Not_subscribed]."
@@ -2152,7 +2162,7 @@ let test_scoring_p2 rng _limits parameters =
   let peers = Array.of_list peers in
   let receive_message ~__LOC__ peer message_id message state =
     let state, output =
-      GS.handle_receive_message
+      GS.handle_receive_message_sequentially
         {sender = peer; topic; message_id; message}
         state
     in
@@ -2275,7 +2285,7 @@ let test_scoring_p4 rng _limits parameters =
          (fun state () ->
            let message_id, message = gen_message () in
            let state, _ =
-             GS.handle_receive_message
+             GS.handle_receive_message_sequentially
                {sender = peer; topic; message_id; message}
                state
            in

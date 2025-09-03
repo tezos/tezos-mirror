@@ -259,7 +259,7 @@ struct
     | Iwant m -> GS.handle_iwant m state
     | Graft m -> GS.handle_graft m state
     | Prune m -> GS.handle_prune m state
-    | Receive_message m -> GS.handle_receive_message m state
+    | Receive_message m -> GS.handle_receive_message_sequentially m state
     | Publish_message m -> GS.publish_message m state
     | Heartbeat -> GS.heartbeat state
     | Join m -> GS.join m state
