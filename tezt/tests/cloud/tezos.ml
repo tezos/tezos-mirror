@@ -637,14 +637,18 @@ module Dal_node = struct
       Lwt.return node
 
     let create ?net_port ?path ~name ?disable_shard_validation ?ignore_pkhs
-        ~node agent =
+        ~node cloud agent =
       create_from_endpoint
         ?net_port
         ?path
         ~name
         ?disable_shard_validation
         ?ignore_pkhs
-        ~l1_node_endpoint:(Node.as_rpc_endpoint node)
+        ~l1_node_endpoint:
+          (Node.as_rpc_endpoint
+             ~local:(Node.runner node = Agent.runner agent)
+             node)
+        cloud
         agent
 
     let run ?prometheus ?otel ?(memtrace = false) ?event_level
