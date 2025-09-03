@@ -32,13 +32,10 @@ for file in /usr/bin/octez-baker-P*; do
     fi
 
   elif [ "$1" = "stop" ]; then
-    if [ "$AGNOSTIC_BAKER" = "true" ]; then
-      systemctl stop "octez-agnostic-baker"
-      systemctl stop "octez-agnostic-accuser"
-    else
-      systemctl stop "octez-baker@$proto"
-      systemctl stop "octez-accuser@$proto"
-    fi
+    systemctl stop "octez-baker@$proto" || true
+    systemctl stop "octez-accuser@$proto" || true
+    systemctl stop "octez-agnostic-baker" || true
+    systemctl stop "octez-agnostic-accuser" || true
     if grep -q "\-\-dal-node" /etc/default/octez-baker; then
       systemctl stop octez-dal-node
     fi
