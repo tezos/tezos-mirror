@@ -85,13 +85,22 @@ let check_attestation_metadata ?(check_not_found = false) ~kind delegate_pkh
   then return_unit
   else
     failwith
-      "%s: %s for %a (consensus key : %a)"
+      "%s: %s for %a (consensus key : %a)@.Full metadata:@.%s"
       error_prefix
       (string_of_kind kind)
       Signature.Public_key_hash.pp
       delegate_pkh
       Signature.Public_key_hash.pp
       consensus_key_pkh
+      (List.fold_left
+         (fun acc op_metadata ->
+           let s =
+             Data_encoding.Json.(
+               construct operation_receipt_encoding op_metadata |> to_string)
+           in
+           acc ^ "\n" ^ s)
+         ""
+         op_metadata)
 
 let check_attestation_aggregate_metadata ?(check_not_found = false) ~kind
     ?(expect_same_order = true) committee_expect :
