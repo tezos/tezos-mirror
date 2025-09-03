@@ -224,6 +224,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     | P2P_input of p2p_input
     | App_input of app_input
     | Check_unknown_messages
+    | Process_batch of (GS.receive_message * Peer.Set.t) list
 
   module Bounded_message_map = struct
     (* We maintain the invariant that:
@@ -269,6 +270,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           Some (value, t)
   end
 
+  type message_treatment =
+    | Sequentially
+    | In_batches of {time_interval : float (* In seconds *)}
+
   (** The worker's state is made of the gossipsub automaton's state,
       and a stream of events to process. It also has two output streams to
       communicate with the application and P2P layers. *)
@@ -285,6 +290,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
     unknown_validity_messages : Bounded_message_map.t;
     unreachable_points : int64 Point.Map.t;
         (* For each point, stores the next heartbeat tick when we can try to recontact this point again. *)
+    message_handling : message_treatment;
   }
 
   (** A worker instance is made of its status and state. *)
@@ -364,7 +370,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
 
       Note that it's the responsability of the automaton modules to filter out
       peers based on various criteria (bad score, connection expired, ...). *)
-  let handle_receive_message received_message = function
+  let handle_receive_message (received_message : GS.receive_message) :
+      worker_state * [`Receive_message] GS.output -> worker_state = function
     | state, GS.Route_message {to_route} ->
         Introspection.update_count_recv_valid_app_messages state.stats `Incr ;
         let ({sender = _; topic; message_id; message} : GS.receive_message) =
@@ -376,7 +383,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         let has_joined = View.(has_joined topic @@ view state.gossip_state) in
         if has_joined then emit_app_output state message_with_header ;
         state
-    | state, GS.Already_received | state, GS.Not_subscribed -> state
+    | state, GS.Already_received
+    | state, GS.Not_subscribed
+    | state, GS.Included_in_batch ->
+        state
     | state, GS.Unknown_validity ->
         Introspection.update_count_recv_unknown_validity_app_messages
           state.stats
@@ -741,18 +751,39 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         GS.leave {topic} gossip_state
         |> update_gossip_state state |> handle_leave topic
 
+  let handle_batch (state, GS.Batch_result batch) =
+    List.fold_left
+      (fun state (msg, out) -> handle_receive_message msg (state, out))
+      state
+      batch
+
+  let apply_batch_event ({gossip_state; _} as state) batch =
+    GS.apply_batch batch gossip_state
+    |> update_gossip_state state |> handle_batch
+
   (** Handling messages received from the P2P network. *)
   let apply_p2p_message ~self ({gossip_state; _} as state) from_peer = function
-    | Message_with_header {message; topic; message_id} ->
-        let receive_message =
-          {GS.sender = from_peer; topic; message_id; message}
-        in
-        (GS.handle_receive_message receive_message gossip_state
-        |> update_gossip_state state
-        |> handle_receive_message receive_message)
+    | Message_with_header {message; topic; message_id} -> (
+        (let receive_message =
+           {GS.sender = from_peer; topic; message_id; message}
+         in
+         match state.message_handling with
+         | Sequentially ->
+             GS.handle_receive_message_sequentially receive_message gossip_state
+             |> update_gossip_state state
+             |> handle_receive_message receive_message
+         | In_batches {time_interval} ->
+             GS.handle_receive_message_batch
+               ~callback:(fun batch ->
+                 Stream.push (Batch_to_treat batch) state.events_stream)
+               ~time_interval
+               receive_message
+               gossip_state
+             |> update_gossip_state state
+             |> handle_receive_message receive_message)
         [@profiler.span_f
           {verbosity = Notice}
-            ["apply_event"; "P2P_input"; "In_message"; "Message_with_header"]]
+            ["apply_event"; "P2P_input"; "In_message"; "Message_with_header"]])
     | Graft {topic} ->
         let graft : GS.graft = {peer = from_peer; topic} in
         (GS.handle_graft graft gossip_state
@@ -857,7 +888,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         match GS.Message_id.valid message.message_id with
         | `Valid | `Invalid ->
             let state = {state with unknown_validity_messages} in
-            GS.handle_receive_message message state.gossip_state
+            GS.handle_receive_message_sequentially message state.gossip_state
             |> update_gossip_state state
             |> handle_receive_message message
             |>
@@ -899,6 +930,7 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           state
         [@profiler.span_f
           {verbosity = Notice} ["apply_event"; "Check_unknown_messages"]]
+    | Process_batch batch -> apply_batch_event state batch
 
   (** A helper function that pushes events in the state *)
   let push e {status = _; state; self = _} = Stream.push e state.events_stream
@@ -997,7 +1029,8 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
         event_loop_promise
 
   let make ?(events_logging = fun _event -> Monad.return ())
-      ?(initial_points = fun () -> []) ~self rng limits parameters =
+      ?(initial_points = fun () -> []) ?batching_interval ~self rng limits
+      parameters =
     {
       self;
       status = Starting;
@@ -1014,6 +1047,10 @@ module Make (C : Gossipsub_intf.WORKER_CONFIGURATION) :
           events_logging;
           unknown_validity_messages = Bounded_message_map.make ~capacity:10_000;
           unreachable_points = Point.Map.empty;
+          message_handling =
+            (match batching_interval with
+            | None -> Sequentially
+            | Some time_interval -> In_batches {time_interval});
         };
     }
 
