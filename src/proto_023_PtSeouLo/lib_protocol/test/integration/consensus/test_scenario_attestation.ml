@@ -348,6 +348,51 @@ let test_attestations_keep_activation_status =
           let* b = Context.Delegate.deactivated (B block) src.pkh in
           Assert.is_true ~loc:__LOC__ (not b))
 
+(* === Consensus threshold tests === *)
+
+let test_consensus_threshold =
+  let req_attestations = 999 in
+  init_constants ()
+  (* All slots need to be attested : not a single attester must be missing *)
+  --> set S.consensus_committee_size 1000
+  --> set S.consensus_threshold_size req_attestations
+  --> begin_test
+        ~delegates_with_algo:[("delegate_1", Bls); ("delegate_2", Bls)]
+        ["delegate_3"]
+  (* Genesis cannot be attested *)
+  --> next_block
+  (* If everyone attests, the next block is valid *)
+  --> attest_aggreg_with ["delegate_1"; "delegate_2"]
+  --> attest_with "delegate_3" --> next_block
+  (* If the non_tz4 address is missing, the block is invalid *)
+  --> attest_aggreg_with ["delegate_1"; "delegate_2"]
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ errs ->
+          Assert.expect_error ~loc:__LOC__ errs (function
+            | [
+                Protocol.Validate_errors.Block.Not_enough_attestations
+                  {required; provided = _};
+              ] ->
+                required = req_attestations
+            | _ -> false))
+        next_block
+  --> attest_with "delegate_3" --> next_block
+  (* If a tz4 address is missing, the block is also invalid *)
+  --> attest_aggreg_with ["delegate_1"]
+  --> attest_with "delegate_3"
+  --> assert_failure
+        ~loc:__LOC__
+        ~expected_error:(fun _ errs ->
+          Assert.expect_error ~loc:__LOC__ errs (function
+            | [
+                Protocol.Validate_errors.Block.Not_enough_attestations
+                  {required; provided = _};
+              ] ->
+                required = req_attestations
+            | _ -> false))
+        next_block
+
 let tests =
   tests_of_scenarios
   @@ [
@@ -369,6 +414,7 @@ let tests =
        );
        ( "Test (pre)attestations keep delegate active",
          test_attestations_keep_activation_status );
+       ("Test consensus threshold", test_consensus_threshold);
      ]
 
 let () =
