@@ -136,7 +136,7 @@ module Node = struct
         ~migration_offset
         ~network
     in
-    let arguments = Node_helpers.isolated_args peers in
+    let arguments = Node_helpers.isolated_args ~private_mode:false peers in
     let* () =
       Node.Agent.run
         ~env:yes_crypto_env
@@ -176,7 +176,7 @@ module Node = struct
     let* () =
       import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
     in
-    let arguments = Node_helpers.isolated_args peers in
+    let arguments = Node_helpers.isolated_args ~private_mode:false peers in
     let synchronisation_waiter =
       Node.wait_for_synchronisation ~statuses:["synced"; "stuck"] node
     in
@@ -1108,7 +1108,7 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
          ~delay:0)
   in
   let* () = Node.snapshot_import ~no_check:true node snapshot in
-  let* () = Node.run node (Node_helpers.isolated_args []) in
+  let* () = Node.run node (Node_helpers.isolated_args ~private_mode:false []) in
   let* () = Node.wait_for_ready node in
   let* n =
     RPC.get_chain_block_context_delegates ~query_string:[("active", "true")] ()
