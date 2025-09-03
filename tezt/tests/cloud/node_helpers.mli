@@ -19,7 +19,11 @@
 val yes_wallet : Agent.t -> Yes_wallet.t Lwt.t
 
 val isolated_config :
-  peers:string list -> network:Network.t -> delay:int -> Node.argument list
+  no_bootstrap_peers:bool ->
+  peers:string list ->
+  network:Network.t ->
+  delay:int ->
+  Node.argument list
 
 val isolated_args : string list -> Node.argument list
 

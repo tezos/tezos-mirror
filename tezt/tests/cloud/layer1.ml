@@ -85,7 +85,13 @@ module Node = struct
     let* () =
       let* version = get_snapshot_info_version node snapshot in
       if version >= 9 then
-        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let config =
+          Node_helpers.isolated_config
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
         let* () = Node.config_init node config in
         let* () =
           import_snapshot ~env:yes_crypto_env ~no_check:true ~name node snapshot
@@ -113,7 +119,13 @@ module Node = struct
         let* _new_level = wait_next_level ~offset:2 node in
         let* () = terminate node in
         toplog "Reset node config for private a yes-crypto network" ;
-        let config = Node_helpers.isolated_config ~peers ~network ~delay:0 in
+        let config =
+          Node_helpers.isolated_config
+            ~no_bootstrap_peers:true
+            ~peers
+            ~network
+            ~delay:0
+        in
         let* () = Node.config_reset node config in
         Lwt.return_unit
     in
@@ -146,7 +158,13 @@ module Node = struct
     let* snapshot =
       ensure_snapshot ~agent ~name ~network:(Network.to_public network) snapshot
     in
-    let config = Node_helpers.isolated_config ~peers ~network ~delay in
+    let config =
+      Node_helpers.isolated_config
+        ~no_bootstrap_peers:true
+        ~peers
+        ~network
+        ~delay
+    in
     let* () = Node.config_init node config in
     let* () =
       Node_helpers.may_add_migration_offset_to_config
@@ -1083,7 +1101,11 @@ let number_of_bakers ~snapshot ~(network : Network.t) =
   let* () =
     Node.config_init
       node
-      (Node_helpers.isolated_config ~peers:[] ~network ~delay:0)
+      (Node_helpers.isolated_config
+         ~no_bootstrap_peers:true
+         ~peers:[]
+         ~network
+         ~delay:0)
   in
   let* () = Node.snapshot_import ~no_check:true node snapshot in
   let* () = Node.run node (Node_helpers.isolated_args []) in
