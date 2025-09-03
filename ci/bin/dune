@@ -10,7 +10,8 @@
   grafazos
   teztale
   rollup_node
-  sdk_bindings_ci)
+  sdk_bindings_ci
+  etherlink)
  (flags
   (:standard)
   -open Gitlab_ci.Base
