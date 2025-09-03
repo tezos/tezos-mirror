@@ -38,11 +38,29 @@ let job_build_evm_node_static =
       "make evm-node-static";
     ]
 
+let job_lint_wasm_runtime =
+  CI.job
+    "lint_wasm_runtime"
+    ~__POS__
+    ~stage:Test
+    ~description:"Run the linter on lib_wasm_runtime."
+    ~image:Tezos_ci.Images.CI.build
+    ~only_if_changed:["src/lib_wasm_runtime/**/*.rs"]
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    [
+      "./scripts/ci/take_ownership.sh";
+      ". ./scripts/version.sh";
+      "eval $(opam env)";
+      "etherlink/lib_wasm_runtime/lint.sh";
+    ]
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Manual, job_build_evm_node_static Amd64);
       (Manual, job_build_evm_node_static Arm64);
+      (Auto, job_lint_wasm_runtime);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -50,5 +68,6 @@ let register () =
     [
       (Auto, job_build_evm_node_static Amd64);
       (Auto, job_build_evm_node_static Arm64);
+      (Auto, job_lint_wasm_runtime);
     ] ;
   ()
