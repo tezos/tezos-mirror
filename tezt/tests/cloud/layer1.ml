@@ -264,9 +264,9 @@ module Node = struct
       create the associated client,
       create the yes-wallet.
     *)
-  let init_baker_node ?(delay = 0) ~accounts ~peers ~ppx_profiling_verbosity
-      ~ppx_profiling_backends ~snapshot ~network ~migration_offset
-      (agent, node, name) =
+  let init_node_with_wallet ?(delay = 0) ~accounts ~peers
+      ~ppx_profiling_verbosity ~ppx_profiling_backends ~snapshot ~network
+      ~migration_offset (agent, node, name) =
     toplog "Initializing an L1 node (public network): %s" name ;
     let* () =
       init_node_from_snapshot
@@ -362,7 +362,7 @@ let init_baker_i i (configuration : Scenarios_configuration.LAYER1.t) cloud
   let* client =
     toplog "init_baker: Initialize node" ;
     let name = name ^ "-node" in
-    Node.init_baker_node
+    Node.init_node_with_wallet
       ~accounts
       ~delay
       ~peers
@@ -450,7 +450,7 @@ let init_producer_i i (configuration : Scenarios_configuration.LAYER1.t)
   let () = toplog "Initializing the DAL producer %s" name in
   let* client =
     let name = name ^ "-node" in
-    Node.init_baker_node
+    Node.init_node_with_wallet
       ~accounts:[]
       ~delay
       ~peers
