@@ -51,7 +51,7 @@ type sccache_config
 
 (** Make an sccache configuration.
 
-    See {!Tezos_ci.enable_sccache}. *)
+    See {!Tezos_ci.Cache.enable_sccache}. *)
 val sccache :
   ?key:string ->
   ?error_log:string ->
@@ -183,13 +183,13 @@ module type COMPONENT_API = sig
       contrary to [needs] jobs.
 
       If [cargo_cache] is [true], the resulting job is modified with
-      {!Tezos_ci.enable_cargo_cache}. Default is [false].
+      {!Tezos_ci.Cache.enable_cargo_cache}. Default is [false].
 
       If [cargo_target_caches] is [true], the resulting job is modified with
-      {!Tezos_ci.enable_cargo_target_caches}. Default is [false].
+      {!Tezos_ci.Cache.enable_cargo_target_caches}. Default is [false].
 
       If [sccache] is specified, the resulting job is modified with
-      {!Tezos_ci.enable_sccache}.
+      {!Tezos_ci.Cache.enable_sccache}.
 
       See {!Tezos_ci.job} for information about other arguments. *)
   val job :
