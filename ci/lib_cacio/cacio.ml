@@ -300,10 +300,18 @@ type tezos_job_graph = Tezos_ci.tezos_job UID_map.t
 (* Convert jobs to [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS above (step 4).
 
+   By default, [Publish] jobs are non-interruptible and other jobs are interruptible.
+   Setting [interruptible_pipeline] to [false] makes all jobs non-interruptible.
+
+   [Publish] jobs use non-interruptible runners.
+   Other jobs may use any runner (interruptible or not).
+   [interruptible_pipeline] has no impact on the choice of runners.
+
    If [with_condition] is [true], the job [rules] will include its conditions.
    If it is [false], its conditions are ignored.
    Conditions are typically only used in merge request pipelines such as [before_merging]. *)
-let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
+let convert_graph ?(interruptible_pipeline = true) ~with_condition
+    (graph : fixed_job_graph) : tezos_job_graph =
   (* To build the graph, we take all jobs from [graph], convert them,
      and add them to [result].
      But before we convert a job, we need the converted version of its dependencies.
@@ -403,7 +411,7 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                   | Auto | Immediate -> None
                   | Manual -> Some [Gitlab_ci.Util.job_rule ~when_:Manual ()]
               in
-              let interruptible =
+              let interruptible_stage =
                 match stage with Build | Test -> true | Publish -> false
               in
               let retry : Gitlab_ci.Types.retry option =
@@ -428,9 +436,10 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
                 ~image
                 ~dependencies:(Dependent dependencies)
                 ?rules
-                ~interruptible
+                ~interruptible:(interruptible_stage && interruptible_pipeline)
                 ?interruptible_runner:
-                  (if interruptible then (* Can be interruptible, or not. *)
+                  (if interruptible_stage then
+                     (* Can be interruptible, or not. *)
                      None
                    else (* Cannot be interruptible. *)
                      Some false)
@@ -466,10 +475,10 @@ let convert_graph ~with_condition (graph : fixed_job_graph) : tezos_job_graph =
 
 (* Convert user-specified jobs into [Tezos_ci] jobs.
    See GRAPH TRANSFORMATIONS. *)
-let convert_jobs ~with_condition (jobs : (trigger * job) list) :
-    Tezos_ci.tezos_job list =
+let convert_jobs ?interruptible_pipeline ~with_condition
+    (jobs : (trigger * job) list) : Tezos_ci.tezos_job list =
   jobs |> make_graph |> fix_graph
-  |> convert_graph ~with_condition
+  |> convert_graph ?interruptible_pipeline ~with_condition
   |> UID_map.bindings |> List.map snd
 
 let parameterize make =
@@ -633,10 +642,16 @@ module Make (Component : COMPONENT) : COMPONENT_API = struct
       rules
 
   let register_scheduled_pipeline ~description ?(legacy_jobs = []) name jobs =
+    (* Scheduled pipelines are non-interruptible:
+       we don't want them to be canceled just because
+       a new commit was merged into master. *)
     register_pipeline
       name
       ~description
-      ~jobs:(legacy_jobs @ convert_jobs ~with_condition:false jobs)
+      ~jobs:
+        (legacy_jobs
+        @ convert_jobs ~interruptible_pipeline:false ~with_condition:false jobs
+        )
       Tezos_ci.Rules.(
         Gitlab_ci.If.(
           scheduled && var "TZ_SCHEDULE_KIND" == str (full_pipeline_name name)))

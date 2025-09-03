@@ -802,9 +802,13 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       | None -> "(unspecified)"
       | Some x -> show_fun x
     in
+    let provider_string = Runner.Provider.show provider in
     let arch_string = show Runner.Arch.show_uniform arch in
     let cpu_string = show Runner.CPU.show cpu in
     let storage_string = show Runner.Storage.show storage in
+    let interruptible_runner_string =
+      show string_of_bool interruptible_runner
+    in
     match tag with
     | None -> (
         match
@@ -818,12 +822,14 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
         with
         | None ->
             failwith
-              "job %S: no suitable runner tag found for arch = %s, cpu = %s, \
-               storage = %s"
+              "job %S: no suitable runner tag found for provider = %s, arch = \
+               %s, cpu = %s, storage = %s, interruptible_runner = %s"
               name
+              provider_string
               arch_string
               cpu_string
               storage_string
+              interruptible_runner_string
         | Some tag -> tag)
     | Some Dynamic ->
         (* Cannot check, assume the user knows what they are doing. *)
@@ -840,13 +846,15 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
                tag)
         then
           failwith
-            "job %S: requested tag %s is not compatible with arch = %s, cpu = \
-             %s, storage = %s"
+            "job %S: requested tag %s is not compatible with provider = %s, \
+             arch = %s, cpu = %s, storage = %s, interruptible_runner = %s"
             name
             (Runner.Tag.show tag)
+            provider_string
             arch_string
             cpu_string
-            storage_string ;
+            storage_string
+            interruptible_runner_string ;
         tag
   in
   (* Check [rules]. *)

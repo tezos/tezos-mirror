@@ -58,7 +58,7 @@ grafazos.build:
   dependencies:
   - oc.docker:jsonnet:amd64
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'

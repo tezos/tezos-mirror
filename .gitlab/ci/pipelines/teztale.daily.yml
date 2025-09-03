@@ -95,7 +95,7 @@ teztale.build-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -141,7 +141,7 @@ teztale.build-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
