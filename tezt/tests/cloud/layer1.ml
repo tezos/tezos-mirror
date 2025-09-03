@@ -48,7 +48,7 @@ let agent_name_stresstest : rex = rex "stresstest-(\\d+)"
 
 let agent_name_baker : rex = rex "baker-(\\d+)"
 
-let agent_name_dal_producer : rex = rex "dal-node-producer-(\\d+)"
+let agent_name_dal_producer : rex = rex "dal-producer-(\\d+)"
 
 let extract_agent_index (r : rex) agent =
   match Agent.name agent =~* r with
@@ -1144,7 +1144,7 @@ let register (module Cli : Scenarios_cli.Layer1) =
                     | {bakers = Some bakers; _} -> List.nth_opt bakers i
                     | {bakers = None; _} -> None)
            | Producer i ->
-               make_vm_conf ~name:(name_of_daemon (Producer_dal_node i))
+               make_vm_conf ~name:(name_of (Producer i))
                @@ Option.bind vms_conf (function
                     | {producers = Some producers; _} ->
                         List.nth_opt producers i
