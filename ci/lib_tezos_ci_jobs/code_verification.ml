@@ -674,61 +674,6 @@ let jobs pipeline_type =
       ()
   in
 
-  (* EVM static binaires *)
-  let job_evm_static_x86_64_experimental =
-    job
-      ~__POS__
-      ~arch:Amd64
-      ~name:
-        ("etherlink.build:static-" ^ Runner.Arch.show_easy_to_distinguish Amd64)
-      ~image:Images.CI.build
-      ~stage:Stages.build
-      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
-      ~artifacts:
-        (artifacts
-           ~name:"evm-binaries"
-           ~when_:On_success
-           ["octez-evm-*"; "etherlink-*"])
-      ~cpu:Very_high
-      ~before_script:
-        [
-          "./scripts/ci/take_ownership.sh";
-          ". ./scripts/version.sh";
-          "eval $(opam env)";
-        ]
-      ["make evm-node-static"]
-    |> enable_cargo_cache
-    |> enable_sccache ~cache_size:"2G"
-    |> enable_cargo_target_caches
-  in
-
-  let job_evm_static_arm64_experimental =
-    job
-      ~__POS__
-      ~arch:Arm64
-      ~storage:Ramfs
-      ~name:
-        ("etherlink.build:static-" ^ Runner.Arch.show_easy_to_distinguish Arm64)
-      ~image:Images.CI.build
-      ~stage:Stages.build
-      ~rules:(make_rules ~manual:(On_changes changeset_etherlink) ())
-      ~artifacts:
-        (artifacts
-           ~name:"evm-binaries"
-           ~when_:On_success
-           ["octez-evm-*"; "etherlink-*"])
-      ~before_script:
-        [
-          "./scripts/ci/take_ownership.sh";
-          ". ./scripts/version.sh";
-          "eval $(opam env)";
-        ]
-      ["make evm-node-static"]
-    |> enable_cargo_cache
-    |> enable_sccache ~cache_size:"2G"
-    |> enable_cargo_target_caches
-  in
-
   (* Build jobs *)
   let build =
     let stage = Stages.build in
@@ -804,8 +749,6 @@ let jobs pipeline_type =
       job_build_kernels;
       job_tezt_fetch_records;
       build_octez_source;
-      job_evm_static_x86_64_experimental;
-      job_evm_static_arm64_experimental;
       job_build_layer1_profiling
         ~rules:(make_rules ~changes:changeset_octez ())
         ();
