@@ -119,6 +119,49 @@ module Imported_protocol = struct
     {contents; signature}
 end
 
+type error +=
+  | Deserialize_operation of string * string * string
+  | Deserialize_operations_header of string
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.deserialize_operation"
+    ~title:"Failed to deserialize operation informations"
+    ~description:
+      "Failed to deserialize an operation informations (operation and receipt)."
+    ~pp:(fun ppf (op, error, raw_receipt) ->
+      Format.fprintf
+        ppf
+        "Failed to deserialize the information of operation %s with error %s \
+         (raw data: [0x%s])"
+        op
+        error
+        raw_receipt)
+    Data_encoding.(
+      obj3 (req "op" string) (req "error_msg" string) (req "raw_receipt" string))
+    (function
+      | Deserialize_operation (op, error, raw_receipt) ->
+          Some (op, error, raw_receipt)
+      | _ -> None)
+    (fun (op, error, raw_receipt) ->
+      Deserialize_operation (op, error, raw_receipt))
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"evm_node.dev.tezlink.deserialize_operations_header"
+    ~title:"Failed to deserialize the headers of operations"
+    ~description:"Failed to deserialize the headers of a set of operations."
+    ~pp:(fun ppf error ->
+      Format.fprintf
+        ppf
+        "Failed to deserialize the headers of a set of operations: %s"
+        error)
+    Data_encoding.(obj1 (req "error_msg" string))
+    (function Deserialize_operations_header error -> Some error | _ -> None)
+    (fun error -> Deserialize_operations_header error)
+
 module Make_block_service
     (Proto : Tezos_shell_services.Block_services.PROTO)
     (Next_proto : Tezos_shell_services.Block_services.PROTO) =
@@ -130,8 +173,8 @@ struct
     let operations =
       Data_encoding.Binary.to_bytes_exn Data_encoding.bytes bytes
     in
-    let operations =
-      Data_encoding.Binary.of_bytes_exn
+    let* operations =
+      Data_encoding.Binary.of_bytes
         Data_encoding.(
           list
             (tup3
@@ -139,18 +182,32 @@ struct
                Tezos_base.Operation.shell_header_encoding
                bytes))
         operations
+      |> Result.map_error_e (fun read_error ->
+             tzfail
+             @@ Deserialize_operations_header
+                  (Format.asprintf
+                     "%a"
+                     Data_encoding.Binary.pp_read_error
+                     read_error))
     in
-    let operations =
-      List.map
-        (fun ( hash,
-               (shell_header : Tezos_base.Operation.shell_header),
-               op_receipt )
-           ->
-          let protocol_data, receipt =
-            Data_encoding.Binary.of_bytes_exn
-              Proto.operation_data_and_receipt_encoding
-              op_receipt
-          in
+    List.map_e
+      (fun (hash, (shell_header : Tezos_base.Operation.shell_header), op_receipt)
+         ->
+        let* protocol_data, receipt =
+          Data_encoding.Binary.of_bytes
+            Proto.operation_data_and_receipt_encoding
+            op_receipt
+          |> Result.map_error_e (fun read_error ->
+                 tzfail
+                 @@ Deserialize_operation
+                      ( Operation_hash.to_b58check hash,
+                        Format.asprintf
+                          "%a"
+                          Data_encoding.Binary.pp_read_error
+                          read_error,
+                        Hex.show (Hex.of_bytes op_receipt) ))
+        in
+        return
           ({
              chain_id;
              hash;
@@ -159,9 +216,7 @@ struct
              receipt = Receipt receipt;
            }
             : operation))
-        operations
-    in
-    return operations
+      operations
 end
 
 module Current_block_services = struct
