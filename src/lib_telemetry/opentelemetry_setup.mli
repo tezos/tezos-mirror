@@ -13,6 +13,7 @@ val setup :
   data_dir:string ->
   service_namespace:string ->
   service_name:string ->
+  version:string ->
   ?level:Internal_event.level ->
   ?sections:(Internal_event.Section.t * Internal_event.level) list ->
   Opentelemetry_config.t ->

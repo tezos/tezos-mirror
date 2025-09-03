@@ -38,7 +38,7 @@ end
 
 let instance_id_filename = "telemetry_id"
 
-let setup ~data_dir ~service_namespace ~service_name ?level ?sections
+let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
     {Opentelemetry_config.enable; instance_id; config} =
   let open Lwt_result_syntax in
   if enable then (
@@ -59,6 +59,9 @@ let setup ~data_dir ~service_namespace ~service_name ?level ?sections
     Globals.service_name := service_name ;
     Globals.service_namespace := Some service_namespace ;
     Globals.service_instance_id := Some instance_id ;
+    (* For datadog integration: see
+       https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging *)
+    Globals.add_global_attribute "service.version" (`String version) ;
     Opentelemetry_ambient_context.set_storage_provider
       (Opentelemetry_ambient_context_lwt.storage ()) ;
     Opentelemetry_client_cohttp_lwt.setup ~enable ~config () ;

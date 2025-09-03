@@ -182,6 +182,7 @@ let main ~data_dir ~cctxt ?signer ?(genesis_timestamp = Misc.now ())
       ~data_dir
       ~service_namespace:"evm_node"
       ~service_name:"sequencer"
+      ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
       configuration.opentelemetry
   in
   let is_sandbox = Option.is_some sandbox_config in
