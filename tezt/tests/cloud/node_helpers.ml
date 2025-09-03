@@ -43,13 +43,13 @@ let isolated_config ~no_bootstrap_peers ~peers ~network ~delay =
     before being disconnected.
     For the other node, it's an extra security but their ip/identity should
     not be advertised to the external world anyway. *)
-let isolated_args peers =
+let isolated_args ~private_mode peers =
   Node.(
-    Private_mode
-    :: List.fold_left
-         (fun acc peer -> Peer peer :: acc)
-         [Allow_yes_crypto; Force_history_mode_switch]
-         peers)
+    List.fold_left
+      (fun acc peer -> Peer peer :: acc)
+      ([Allow_yes_crypto; Force_history_mode_switch]
+      @ if private_mode then [Private_mode] else [])
+      peers)
 
 let may_add_migration_offset_to_config node snapshot ~migration_offset ~network
     =

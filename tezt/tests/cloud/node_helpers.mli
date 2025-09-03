@@ -25,7 +25,7 @@ val isolated_config :
   delay:int ->
   Node.argument list
 
-val isolated_args : string list -> Node.argument list
+val isolated_args : private_mode:bool -> string list -> Node.argument list
 
 (** Initialize an L1 node for the given configuration.
 
