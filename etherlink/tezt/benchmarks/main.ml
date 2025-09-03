@@ -6,6 +6,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let () = Evm_node_capacity.register ()
+let () =
+  Evm_node_capacity.register () ;
+  Snailtracer.register ()
 
 let () = Test.run ()

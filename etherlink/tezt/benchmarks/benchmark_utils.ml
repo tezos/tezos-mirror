@@ -16,6 +16,7 @@ type parameters = {
   accounts : int option;
   contracts : int option;
   timeout : float;
+  spp : int;
 }
 
 let parameters =
@@ -79,7 +80,25 @@ let parameters =
          dropped"
       2.0
   in
-  {profiling; time_between_blocks; iterations; accounts; contracts; timeout}
+  let spp =
+    Clap.default_int
+      ~section
+      ~long:"spp"
+      ~placeholder:"nb"
+      ~description:
+        "Samples Per Pixel for SnailTracer benchmark. Higher values will use \
+         more gas."
+      2
+  in
+  {
+    profiling;
+    time_between_blocks;
+    iterations;
+    accounts;
+    contracts;
+    timeout;
+    spp;
+  }
 
 let ( let+? ) x f =
   match x with
