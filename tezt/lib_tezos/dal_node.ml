@@ -379,6 +379,9 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?(rpc_host = Constant.default_host) ?rpc_port ?listen_addr ?public_addr
     ?metrics_addr ?disable_shard_validation ?disable_amplification ?ignore_pkhs
     ~node () =
+  let l1_node_endpoint =
+    Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
+  in
   create_from_endpoint
     ?runner
     ?path
@@ -394,7 +397,7 @@ let create ?runner ?path ?name ?color ?data_dir ?event_pipe
     ?disable_shard_validation
     ?disable_amplification
     ?ignore_pkhs
-    ~l1_node_endpoint:(Node.as_rpc_endpoint node)
+    ~l1_node_endpoint
     ()
 
 let make_arguments node =

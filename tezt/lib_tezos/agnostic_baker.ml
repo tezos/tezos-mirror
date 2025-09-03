@@ -145,6 +145,9 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
     ?dal_node_timeout_percentage ?(state_recorder = false)
     ?(node_version_check_bypass = false) ?node_version_allowed ?keep_alive
     ?allow_fixed_random_seed ?allow_signing_delay node client =
+  let node_rpc_endpoint =
+    Node.as_rpc_endpoint ~local:(Node.runner node = runner) node
+  in
   let agnostic_baker =
     create_from_uris
       ?runner
@@ -165,7 +168,7 @@ let create ?runner ?path ?name ?color ?event_pipe ?(delegates = []) ?votefile
       ?node_version_allowed
       ~base_dir:(Client.base_dir client)
       ~node_data_dir:(Node.data_dir node)
-      ~node_rpc_endpoint:(Node.as_rpc_endpoint node)
+      ~node_rpc_endpoint
       ?keep_alive
       ?allow_fixed_random_seed
       ?allow_signing_delay
