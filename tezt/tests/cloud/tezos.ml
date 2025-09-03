@@ -638,16 +638,16 @@ module Dal_node = struct
 
     let create ?net_port ?path ~name ?disable_shard_validation ?ignore_pkhs
         ~node cloud agent =
+      let l1_node_endpoint =
+        Node.as_rpc_endpoint ~local:(Node.runner node = Agent.runner agent) node
+      in
       create_from_endpoint
         ?net_port
         ?path
         ~name
         ?disable_shard_validation
         ?ignore_pkhs
-        ~l1_node_endpoint:
-          (Node.as_rpc_endpoint
-             ~local:(Node.runner node = Agent.runner agent)
-             node)
+        ~l1_node_endpoint
         cloud
         agent
 

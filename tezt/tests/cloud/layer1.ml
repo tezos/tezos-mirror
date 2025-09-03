@@ -180,9 +180,13 @@ module Node = struct
        your bakers start to bake. *)
     synchronisation_waiter
 
-  let client ~node agent =
+  let client ~local ~node agent =
     let name = Tezt_cloud.Agent.name agent ^ "-client" in
-    Client.Agent.create ~name ~endpoint:(Client.Node node) agent
+    let endpoint =
+      if local then Client.Foreign_endpoint (Node.as_rpc_endpoint ~local node)
+      else Client.Node node
+    in
+    Client.Agent.create ~name ~endpoint agent
 
   (** Initialize the node,
       create the associated client,
@@ -202,7 +206,7 @@ module Node = struct
         network
         migration_offset
     in
-    let* client = client ~node agent in
+    let* client = client ~local:true ~node agent in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* _filename =
       Yes_wallet.create_from_context
@@ -279,7 +283,10 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
-    let* client = client ~node agent in
+    let* client =
+      (* [~local] is set to false since the client might be called from the localhost/orchestrator *)
+      client ~local:false ~node agent
+    in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () =
       Lwt_list.iter_s
@@ -308,7 +315,7 @@ module Node = struct
         ~migration_offset
         (agent, node, name)
     in
-    let* client = client ~node agent in
+    let* client = client ~local:true ~node agent in
     let* yes_wallet = Node_helpers.yes_wallet agent in
     let* () = Client.forget_all_keys client in
     let* () = Client.import_public_key ~alias:pkh ~public_key:pk client in
