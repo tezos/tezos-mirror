@@ -168,28 +168,30 @@ module Make_block_service
 struct
   include Tezos_shell_services.Block_services.Make (Proto) (Next_proto)
 
-  let deserialize_operations ~chain_id bytes =
+  let deserialize_operations_header bytes =
     let open Result_syntax in
     let operations =
       Data_encoding.Binary.to_bytes_exn Data_encoding.bytes bytes
     in
-    let* operations =
-      Data_encoding.Binary.of_bytes
-        Data_encoding.(
-          list
-            (tup3
-               Operation_hash.encoding
-               Tezos_base.Operation.shell_header_encoding
-               bytes))
-        operations
-      |> Result.map_error_e (fun read_error ->
-             tzfail
-             @@ Deserialize_operations_header
-                  (Format.asprintf
-                     "%a"
-                     Data_encoding.Binary.pp_read_error
-                     read_error))
-    in
+    Data_encoding.Binary.of_bytes
+      Data_encoding.(
+        list
+          (tup3
+             Operation_hash.encoding
+             Tezos_base.Operation.shell_header_encoding
+             bytes))
+      operations
+    |> Result.map_error_e (fun read_error ->
+           tzfail
+           @@ Deserialize_operations_header
+                (Format.asprintf
+                   "%a"
+                   Data_encoding.Binary.pp_read_error
+                   read_error))
+
+  let deserialize_operations ~chain_id bytes =
+    let open Result_syntax in
+    let* operations = deserialize_operations_header bytes in
     List.map_e
       (fun (hash, (shell_header : Tezos_base.Operation.shell_header), op_receipt)
          ->

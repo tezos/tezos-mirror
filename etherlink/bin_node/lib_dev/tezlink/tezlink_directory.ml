@@ -415,7 +415,6 @@ let build_block_static_directory ~l2_chain_id
        ~service:Tezos_services.operation_hashes
        ~impl:(fun {chain; block} () () ->
          let*? chain = check_chain chain in
-         let*? chain_id = tezlink_to_tezos_chain_id ~l2_chain_id chain in
          let*? block = check_block block in
          let consensus_operation_hashes = [] in
          let voting_operation_hashes = [] in
@@ -423,15 +422,11 @@ let build_block_static_directory ~l2_chain_id
          let* manager_operation_hashes =
            let* block = Backend.block chain block in
            let*? operations =
-             Tezos_services.Current_block_services.deserialize_operations
-               ~chain_id
+             Tezos_services.Current_block_services.deserialize_operations_header
                block.operations
            in
            return
-           @@ List.map
-                (fun (op : Tezos_services.Current_block_services.operation) ->
-                  op.hash)
-                operations
+           @@ List.map (fun (hash, _header, _op_and_receipt) -> hash) operations
          in
          return
            [
