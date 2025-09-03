@@ -335,8 +335,8 @@ pub fn run_transaction<'a, Host: Runtime>(
 
 #[cfg(test)]
 mod test {
-    use alloy_sol_types::SolCall;
     use alloy_sol_types::{ContractError, Revert, RevertReason, SolInterface};
+    use alloy_sol_types::{SolCall, SolError};
     use nom::AsBytes;
     use primitive_types::H256;
     use revm::{
@@ -353,6 +353,11 @@ mod test {
         block_constants_with_fees, block_constants_with_no_fees, DEFAULT_SPEC_ID,
     };
 
+    use crate::storage::code::EVM_CODES_PATH;
+    use crate::test::utilities::CreateAndRevert::{
+        createAndRevertCall, CreateAndRevertCalls,
+    };
+    use crate::test::utilities::RevertCreate;
     use crate::{
         helpers::legacy::FaDepositWithProxy,
         precompiles::{
@@ -414,6 +419,21 @@ mod test {
                     (bool success, bytes memory data) = target.call(callArgs);
                     require(success, "Call failed");
                     revert("Reverting");
+                }
+            }
+
+            error RevertCreate(address addr);
+
+            contract CreateAndRevert {
+                function createAndRevert(bytes memory bytecode) public {
+                    address child;
+                    assembly{
+                        mstore(0x0, bytecode)
+                        child := create(0,0xa0, calldatasize())
+                    }
+                    revert RevertCreate({
+                        addr: child
+                    });
                 }
             }
 
@@ -954,6 +974,99 @@ mod test {
                 .unwrap()
                 .balance,
             default_ticket_balance
+        );
+    }
+
+    #[test]
+    fn test_revert_delete_created_bytecode() {
+        let mut host = MockKernelHost::default();
+        let mut world_state_handler = new_world_state_handler().unwrap();
+        world_state_handler.begin_transaction(&mut host).unwrap();
+        let block_constants = block_constants_with_no_fees();
+        let deploy_create_and_revert_bytecode = Bytes::from_hex("0x6080604052348015600e575f5ffd5b506102b38061001c5f395ff3fe608060405234801561000f575f5ffd5b5060043610610029575f3560e01c80634f8c2d0e1461002d575b5f5ffd5b610047600480360381019061004291906101de565b610049565b005b5f815f523660a05ff09050806040517f9f8aa6e50000000000000000000000000000000000000000000000000000000081526004016100889190610264565b60405180910390fd5b5f604051905090565b5f5ffd5b5f5ffd5b5f5ffd5b5f5ffd5b5f601f19601f8301169050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b6100f0826100aa565b810181811067ffffffffffffffff8211171561010f5761010e6100ba565b5b80604052505050565b5f610121610091565b905061012d82826100e7565b919050565b5f67ffffffffffffffff82111561014c5761014b6100ba565b5b610155826100aa565b9050602081019050919050565b828183375f83830152505050565b5f61018261017d84610132565b610118565b90508281526020810184848401111561019e5761019d6100a6565b5b6101a9848285610162565b509392505050565b5f82601f8301126101c5576101c46100a2565b5b81356101d5848260208601610170565b91505092915050565b5f602082840312156101f3576101f261009a565b5b5f82013567ffffffffffffffff8111156102105761020f61009e565b5b61021c848285016101b1565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61024e82610225565b9050919050565b61025e81610244565b82525050565b5f6020820190506102775f830184610255565b9291505056fea264697066735822122053059908becc543c4f8d8f401652f4888f3e356e7d1c6567a4f53fcdf0ea6ea364736f6c634300081e0033").unwrap();
+        init_precompile_bytecodes(&mut host, &mut world_state_handler).unwrap();
+
+        let caller =
+            Address::from_hex("1111111111111111111111111111111111111111").unwrap();
+        // Deploy the CreateAndRevert contract
+        let result_create = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            None,
+            deploy_create_and_revert_bytecode,
+            30_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            vec![],
+            None,
+        );
+        world_state_handler.commit_transaction(&mut host).unwrap();
+
+        let revert_contract_address = match result_create {
+            Ok(ExecutionOutcome {
+                result:
+                    ExecutionResult::Success {
+                        output: Output::Create(_, Some(address)),
+                        ..
+                    },
+                ..
+            }) => address,
+            other => panic!("ERROR: ended up in {other:?}"),
+        };
+
+        let create_and_revert_call =
+            CreateAndRevertCalls::createAndRevert(createAndRevertCall {
+                bytecode: Bytes::from_hex("0x6080604052348015600e575f5ffd5b50606a80601a5f395ff3fe6080604052348015600e575f5ffd5b50600436106026575f3560e01c80636b59084d14602a575b5f5ffd5b60306032565b005b56fea2646970667358221220e7c453431baacca104fa0d26c8d9fb06266545148b18a79c3ed740ce52d16a0a64736f6c634300081e0033").unwrap()
+            });
+
+        let nb_contract_before_deploy =
+            host.store_count_subkeys(&EVM_CODES_PATH).unwrap();
+
+        // Call the CallAndRevert contract with the calldata for FAWithdrawal
+        let ExecutionOutcome {
+            result,
+            withdrawals: _,
+        } = run_transaction(
+            &mut host,
+            DEFAULT_SPEC_ID,
+            &block_constants,
+            &mut world_state_handler,
+            EtherlinkPrecompiles::new(),
+            caller,
+            Some(revert_contract_address),
+            Bytes::from(create_and_revert_call.abi_encode()),
+            10_000_000,
+            0,
+            U256::ZERO,
+            AccessList(vec![]),
+            vec![],
+            None,
+        )
+        .unwrap();
+
+        // Get the address where the bytecode should have been deployed
+        let addr_deployed_bytecode = match result {
+            ExecutionResult::Revert { output, .. } => {
+                RevertCreate::abi_decode(&output).unwrap().addr
+            }
+            other => panic!("ERROR: ended up in {other:?}"),
+        };
+
+        assert!(StorageAccount::get_account(
+            &host,
+            &mut world_state_handler,
+            addr_deployed_bytecode
+        )
+        .unwrap()
+        .is_none());
+        assert!(
+            nb_contract_before_deploy
+                == host.store_count_subkeys(&EVM_CODES_PATH).unwrap()
         );
     }
 
