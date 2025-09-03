@@ -104,7 +104,7 @@ documentation.rst-check:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -133,7 +133,7 @@ documentation.docgen:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -169,7 +169,7 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -206,7 +206,7 @@ documentation.odoc:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -249,7 +249,7 @@ documentation.build_all:
   - documentation.manuals
   - documentation.docgen
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -283,7 +283,7 @@ documentation.linkcheck:
   - documentation.build_all
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -304,7 +304,7 @@ documentation.install_python_bookworm:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -321,7 +321,7 @@ documentation.install_python_jammy:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -338,7 +338,7 @@ documentation.install_python_noble:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'

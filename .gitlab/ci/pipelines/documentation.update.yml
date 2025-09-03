@@ -115,7 +115,7 @@ documentation.docgen:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -151,7 +151,7 @@ documentation.manuals:
   - oc.docker:ci:amd64
   - oc.build:static-x86_64-linux-binaries
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -188,7 +188,7 @@ documentation.odoc:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -231,7 +231,7 @@ documentation.build_all:
   - documentation.manuals
   - documentation.docgen
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
