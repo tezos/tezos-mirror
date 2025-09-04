@@ -117,6 +117,7 @@ type mode =
       tx_queue_max_lifespan : int option;
       tx_queue_max_size : int option;
       tx_queue_tx_per_addr_limit : int option;
+      verbose : bool;
     }
   | Proxy
   | Rpc of mode

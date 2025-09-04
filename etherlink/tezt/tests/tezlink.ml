@@ -1237,6 +1237,7 @@ let test_tezlink_sandbox () =
         tx_queue_max_lifespan = None;
         tx_queue_max_size = None;
         tx_queue_tx_per_addr_limit = None;
+        verbose = false;
       }
   in
 
