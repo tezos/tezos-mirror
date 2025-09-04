@@ -1009,4 +1009,91 @@ mod tests {
         let operation_and_receipt_bytes = "0100006b82198cb179e8306c1bedd08f12dc863f3288860000c0843d01b752c7f3de31759bce246416a6823e86b9756c6c0000000000000000400000006b82198cb179e8306c1bedd08f12dc863f328886fffffffffff0bdc0000001b752c7f3de31759bce246416a6823e86b9756c6c0000000000000f4240000000000000000000a08d0600000000";
         assert_eq!(hex::encode(output), operation_and_receipt_bytes);
     }
+
+    /*
+    ./octez-codec encode 023-PtSeouLo.operation.internal_and_metadata from '{
+      "kind": "transaction",
+      "source": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+      "nonce": 0,
+      "amount": "1000000",
+      "destination": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+      "result": {
+        "status": "backtracked",
+        "storage": {"string":"hello" },
+        "consumed_milligas": "100000",
+        "storage_size": "0",
+        "paid_storage_size_diff": "0",
+        "balance_updates": [
+          {
+            "kind": "contract",
+            "contract": "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+            "change": "-1000000",
+            "origin": "block"
+          },
+          {
+            "kind": "contract",
+            "contract": "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+            "change": "1000000",
+            "origin": "block"
+          }
+        ]
+      }
+    }'
+      */
+    #[test]
+    fn test_backtracked_encoding() {
+        let operation = InternalOperationSum::Transfer(InternalContentWithMetadata {
+            content: TransferContent {
+                amount: 1000000.into(),
+                destination: Contract::from_b58check(
+                    "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+                )
+                .unwrap(),
+                parameters: None,
+            },
+            sender: Contract::from_b58check("tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb")
+                .unwrap(),
+            nonce: 0,
+            result: ContentResult::BackTracked(BacktrackedResult {
+                errors: None,
+                result: TransferTarget::ToContrat(TransferSuccess {
+                    storage: Some(hex::decode("010000000568656c6c6f").unwrap()),
+                    lazy_storage_diff: None,
+                    balance_updates: vec![
+                        BalanceUpdate {
+                            balance: Balance::Account(
+                                Contract::from_b58check(
+                                    "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb",
+                                )
+                                .unwrap(),
+                            ),
+                            changes: -1000000,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                        BalanceUpdate {
+                            balance: Balance::Account(
+                                Contract::from_b58check(
+                                    "KT1RJ6PbjHpwc3M5rw5s2Nbmefwbuwbdxton",
+                                )
+                                .unwrap(),
+                            ),
+                            changes: 1000000,
+                            update_origin: UpdateOrigin::BlockApplication,
+                        },
+                    ],
+                    ticket_receipt: vec![],
+                    originated_contracts: vec![],
+                    consumed_gas: 100000.into(),
+                    storage_size: 0.into(),
+                    paid_storage_size_diff: 0.into(),
+                    allocated_destination_contract: false,
+                }),
+            }),
+        });
+        let output = operation
+            .to_bytes()
+            .expect("Internal operation with metadata should be encodable");
+        let operation_and_receipt_bytes = "0100006b82198cb179e8306c1bedd08f12dc863f3288860000c0843d01b752c7f3de31759bce246416a6823e86b9756c6c0000030000ff010000000568656c6c6f000000400000006b82198cb179e8306c1bedd08f12dc863f328886fffffffffff0bdc0000001b752c7f3de31759bce246416a6823e86b9756c6c0000000000000f4240000000000000000000a08d0600000000";
+        assert_eq!(hex::encode(output), operation_and_receipt_bytes);
+    }
 }
