@@ -163,6 +163,7 @@ fresh-cache.trigger:
   - gcp
   dependencies: []
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -182,6 +183,7 @@ fresh-cache.sanity_ci:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -201,6 +203,7 @@ fresh-cache.docker:hadolint:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -223,6 +226,7 @@ fresh-cache.oc.ocaml_fmt:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -249,6 +253,7 @@ fresh-cache.oc.semgrep:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -267,6 +272,7 @@ fresh-cache.oc.misc_checks:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -292,6 +298,7 @@ fresh-cache.check_jsonnet:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - cd grafazos/
@@ -312,6 +319,7 @@ fresh-cache.check_rust_fmt:
   needs: []
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -333,6 +341,7 @@ fresh-cache.nix:
     paths:
     - /nix/store
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - mkdir -p ~/.config/nix
@@ -356,6 +365,7 @@ fresh-cache.commit_titles:
   dependencies: []
   allow_failure: false
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -385,6 +395,7 @@ fresh-cache.oc.build_arm64-released:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -435,6 +446,7 @@ fresh-cache.oc.build_arm64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -492,6 +504,7 @@ fresh-cache.oc.build_arm64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -552,6 +565,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -600,6 +614,7 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -648,6 +663,7 @@ fresh-cache.oc.build_x86_64-released:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -706,6 +722,7 @@ fresh-cache.oc.build_amd64-extra-dev:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -776,6 +793,7 @@ fresh-cache.oc.build_amd64-extra-exp:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -838,6 +856,7 @@ fresh-cache.wasm-runtime-check:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -872,6 +891,7 @@ fresh-cache.oc.build_kernels:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -917,6 +937,7 @@ fresh-cache.oc.build_dsn_node:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -948,6 +969,7 @@ fresh-cache.oc.tezt:fetch-records:
   - fresh-cache.oc.docker:ci:amd64
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -985,6 +1007,7 @@ fresh-cache.build_octez_source:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1030,6 +1053,7 @@ fresh-cache.etherlink.build:static-x86_64:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1077,6 +1101,7 @@ fresh-cache.etherlink.build:static-arm64:
     paths:
     - $CI_PROJECT_DIR/_target
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1120,6 +1145,7 @@ fresh-cache.build-layer1-profiling:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1159,6 +1185,7 @@ fresh-cache.select_tezts:
   allow_failure:
     exit_codes: 17
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1227,6 +1254,7 @@ fresh-cache.kaitai_checks:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1262,6 +1290,7 @@ fresh-cache.kaitai_e2e_checks:
   - fresh-cache.oc.docker:client-libs-dependencies
   - fresh-cache.kaitai_checks
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1293,6 +1322,7 @@ fresh-cache.oc.check_lift_limits_patch:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1323,6 +1353,7 @@ fresh-cache.oc.python_check:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1356,6 +1387,7 @@ fresh-cache.oc.integration:compiler-rejections:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1383,6 +1415,7 @@ fresh-cache.oc.script:test-gen-genesis:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -1422,6 +1455,7 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1457,6 +1491,7 @@ fresh-cache.oc.script:test_octez_release_versions:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1479,6 +1514,7 @@ fresh-cache.oc.script:b58_prefix:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1507,6 +1543,7 @@ fresh-cache.oc.test-liquidity-baking-scripts:
   - fresh-cache.oc.build_amd64-extra-exp
   - fresh-cache.oc.build_amd64-extra-dev
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -1528,6 +1565,7 @@ fresh-cache.oc:scripts:release_script_values:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1552,6 +1590,7 @@ fresh-cache.mir_unit:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1578,6 +1617,7 @@ fresh-cache.mir_tzt:
     paths:
     - $CI_PROJECT_DIR/.cargo/registry/cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1608,6 +1648,7 @@ fresh-cache.test_sdk_rust:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1643,6 +1684,7 @@ fresh-cache.test_sdk_bindings:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . $HOME/.venv/bin/activate
@@ -1679,6 +1721,7 @@ fresh-cache.test_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1716,6 +1759,7 @@ fresh-cache.test_etherlink_kernel:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1753,6 +1797,7 @@ fresh-cache.test_etherlink_firehose:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1786,6 +1831,7 @@ fresh-cache.audit_riscv_deps:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1821,6 +1867,7 @@ fresh-cache.check_riscv_kernels:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1858,6 +1905,7 @@ fresh-cache.test_evm_compatibility:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -1894,6 +1942,7 @@ fresh-cache.ocaml-check:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
@@ -1937,6 +1986,7 @@ fresh-cache.oc.unit:non-proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2000,6 +2050,7 @@ fresh-cache.oc.unit:etherlink-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2063,6 +2114,7 @@ fresh-cache.oc.unit:other-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2126,6 +2178,7 @@ fresh-cache.oc.unit:proto-x86_64:
     paths:
     - $CI_PROJECT_DIR/_dune_cache
     policy: pull
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2185,6 +2238,7 @@ fresh-cache.oc.unit:non-proto-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2228,6 +2282,7 @@ fresh-cache.oc.unit:webassembly-x86_64:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 20 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2260,6 +2315,7 @@ fresh-cache.oc.unit:protocol_compiles:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2289,6 +2345,7 @@ fresh-cache.de.unit:x86_64:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -2311,6 +2368,7 @@ fresh-cache.de.unit:arm64:
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -2333,6 +2391,7 @@ fresh-cache.resto.unit:x86_64:
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -2355,6 +2414,7 @@ fresh-cache.resto.unit:arm64:
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 10 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - eval $(opam env)
@@ -2374,6 +2434,7 @@ fresh-cache.oc.install_opam_noble:
   dependencies: []
   allow_failure: true
   timeout: 2 hours
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2393,6 +2454,7 @@ fresh-cache.oc.compile_sources_doc_master:
   - fresh-cache.trigger
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2433,6 +2495,7 @@ fresh-cache.tezt:
   - fresh-cache.oc.build_dsn_node
   - fresh-cache.oc.tezt:fetch-records
   timeout: 40 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2504,6 +2567,7 @@ fresh-cache.tezt-time-sensitive:
   - fresh-cache.oc.build_dsn_node
   - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2574,6 +2638,7 @@ fresh-cache.tezt-slow:
   - fresh-cache.oc.build_dsn_node
   - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2641,6 +2706,7 @@ fresh-cache.tezt-extra:
   - fresh-cache.oc.build_dsn_node
   - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2709,6 +2775,7 @@ fresh-cache.tezt-flaky:
   - fresh-cache.oc.tezt:fetch-records
   allow_failure: true
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2775,6 +2842,7 @@ fresh-cache.tezt:static-binaries:
   - fresh-cache.oc.build:static-x86_64-linux-binaries
   - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - mv octez-binaries/x86_64/octez-* .
@@ -2839,6 +2907,7 @@ fresh-cache.tezt-riscv-slow-sequential:
   - fresh-cache.oc.build_dsn_node
   - fresh-cache.oc.tezt:fetch-records
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
@@ -2897,6 +2966,7 @@ fresh-cache.oc.unified_coverage:
   allow_failure:
     exit_codes: 64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -2933,6 +3003,7 @@ fresh-cache.oc.docker:amd64:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
@@ -2960,6 +3031,7 @@ fresh-cache.oc.docker:arm64:
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
@@ -2986,6 +3058,7 @@ fresh-cache.oc.script.docker_verify_image_arm64:
   - fresh-cache.oc.docker:arm64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
@@ -3009,6 +3082,7 @@ fresh-cache.oc.script.docker_verify_image_amd64:
   - fresh-cache.oc.docker:amd64
   dependencies: []
   timeout: 60 minutes
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
@@ -3031,7 +3105,7 @@ fresh-cache.documentation.rst-check:
   needs: []
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3060,7 +3134,7 @@ fresh-cache.documentation.docgen:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3104,7 +3178,7 @@ fresh-cache.documentation.manuals:
   - fresh-cache.oc.build_kernels
   - fresh-cache.oc.build_dsn_node
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3141,7 +3215,7 @@ fresh-cache.documentation.odoc:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3185,7 +3259,7 @@ fresh-cache.documentation.build_all:
   - fresh-cache.documentation.manuals
   - fresh-cache.documentation.docgen
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3220,7 +3294,7 @@ fresh-cache.documentation.linkcheck:
   - fresh-cache.documentation.build_all
   allow_failure: true
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3242,7 +3316,7 @@ fresh-cache.documentation.install_python_bookworm:
   - fresh-cache.trigger
   dependencies: []
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3272,7 +3346,7 @@ fresh-cache.teztale.build-arm64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3319,7 +3393,7 @@ fresh-cache.teztale.build-x86_64:
     paths:
     - $CI_PROJECT_DIR/_sccache
     policy: push
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
@@ -3357,7 +3431,7 @@ fresh-cache.grafazos.build:
   dependencies:
   - fresh-cache.oc.docker:jsonnet:amd64
   timeout: 60 minutes
-  interruptible: true
+  interruptible: false
   before_script:
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
