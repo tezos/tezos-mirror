@@ -44,12 +44,6 @@ let nb_stresstester network tps =
   let n2 = tps * Network.block_time network / stresstest_max_pkh_pre_node in
   max 1 (max n1 n2)
 
-let agent_name_stresstest : rex = rex "stresstest-(\\d+)"
-
-let agent_name_baker : rex = rex "baker-(\\d+)"
-
-let agent_name_dal_producer : rex = rex "dal-producer-(\\d+)"
-
 let extract_agent_index (r : rex) agent =
   match Agent.name agent =~* r with
   | None ->
@@ -698,9 +692,9 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
         else Lwt.return_none)
       (Cloud.agents cloud)
   in
-  let* stresstest_agents = create_nodes agent_name_stresstest in
-  let* baker_agents = create_nodes agent_name_baker in
-  let* producers_agents = create_nodes agent_name_dal_producer in
+  let* stresstest_agents = create_nodes Agent_kind.rex_stresstest_index in
+  let* baker_agents = create_nodes Agent_kind.rex_baker_index in
+  let* producers_agents = create_nodes Agent_kind.rex_producer_index in
   let* teztale = init_teztale cloud bootstrap_agent in
   let* () = init_explorus cloud bootstrap_node in
   let peers : string list =
@@ -774,7 +768,9 @@ let init ~(configuration : Scenarios_configuration.LAYER1.t) cloud =
   let* producers =
     Lwt_list.mapi_p
       (fun i (((agent, _, _) as producer_info), account) ->
-        let slot_index = extract_agent_index agent_name_dal_producer agent in
+        let slot_index =
+          extract_agent_index Agent_kind.rex_producer_index agent
+        in
         init_producer_i
           i
           configuration

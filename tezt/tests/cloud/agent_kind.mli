@@ -34,8 +34,41 @@ type t =
       (** A DAL observer node for the Echo rollup, indexed by slot. *)
   | Stresstest of int
 
-(** [name_of agent] returns the standard name associated with a given [agent].
-    Used for consistent naming of VMs, logs and artifacts. *)
+val rex_bootstrap : rex
+
+val rex_baker_index : rex
+
+val rex_producer_index : rex
+
+val rex_observer_index : rex
+
+val rex_observer_pkh : rex
+
+val rex_reverse_proxy : rex
+
+val rex_etherlink_operator : rex
+
+val rex_etherlink_dal_operator : rex
+
+val rex_etherlink_dal_observer_index : rex
+
+val rex_etherlink_producer_index : rex
+
+val rex_echo_rollup_operator : rex
+
+val rex_echo_rollup_dal_observer_index : rex
+
+val rex_stresstest_index : rex
+
+(** [name_of t] returns the standard name associated with a given [t].
+    Used for consistent naming of VMs, logs and artifacts.
+
+    The name matches the regular expressions defined above, where:
+    - if [rex] ends with [_index]: [(\\d+)] has been replaced with
+      the integer payload of the [t] value.
+    - if [rex] ends with [_pkh]: [([a-zA-Z0-9]+)] has been replaced with
+      the first 8 bytes of the pkh payload of the [t] value.
+    - else: this is a constant string. *)
 val name_of : t -> string
 
 (** [daemon] stands for a binary that is running onto an agent. A [daemon] is
