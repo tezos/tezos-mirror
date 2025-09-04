@@ -161,14 +161,6 @@ fresh-cache.trigger:
   stage: start
   tags:
   - gcp
-  rules:
-  - if: $CI_PIPELINE_SOURCE == "schedule" && $TZ_SCHEDULE_KIND == "CACHE_REFRESH"
-    when: always
-  - if: $GITLAB_USER_LOGIN != "nomadic-margebot" && $CI_MERGE_REQUEST_ASSIGNEES !~
-      /nomadic-margebot/ && $CI_MERGE_REQUEST_EVENT_TYPE != "merge_train"
-    when: manual
-    allow_failure: false
-  - when: always
   dependencies: []
   timeout: 10 minutes
   before_script:
@@ -206,11 +198,6 @@ fresh-cache.docker:hadolint:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - Dockerfile
-    - build.Dockerfile
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -228,15 +215,6 @@ fresh-cache.oc.ocaml_fmt:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.ml'
-    - '**/*.mli'
-    - '**/.ocamlformat'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -268,16 +246,6 @@ fresh-cache.oc.semgrep:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - devtools/**/*
-    - scripts/semgrep/**/*
-    - src/**/*
-    - tezt/**/*
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -296,20 +264,6 @@ fresh-cache.oc.misc_checks:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - client-libs/**/*
-    - contrib/**/*
-    - devtools/**/*
-    - docs/**/*
-    - etherlink/**/*
-    - scripts/**/*
-    - src/**/*
-    - tezt/**/*
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -335,10 +289,6 @@ fresh-cache.check_jsonnet:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.jsonnet'
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -359,13 +309,6 @@ fresh-cache.check_rust_fmt:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.rs'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -382,12 +325,6 @@ fresh-cache.nix:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.nix'
-    - flake.lock
-    - scripts/version.sh
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -432,11 +369,6 @@ fresh-cache.oc.build_arm64-released:
   stage: build
   tags:
   - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
@@ -487,11 +419,6 @@ fresh-cache.oc.build_arm64-extra-dev:
   stage: build
   tags:
   - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
@@ -549,11 +476,6 @@ fresh-cache.oc.build_arm64-extra-exp:
   stage: build
   tags:
   - gcp_arm64
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--arm64(?:$|,)/
-    when: on_success
-  - when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
@@ -611,34 +533,6 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -687,35 +581,6 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
   stage: build
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:arm64
   - fresh-cache.trigger
@@ -764,47 +629,6 @@ fresh-cache.oc.build_x86_64-released:
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -859,47 +683,6 @@ fresh-cache.oc.build_amd64-extra-dev:
   stage: build
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -970,47 +753,6 @@ fresh-cache.oc.build_amd64-extra-exp:
   stage: build
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1081,13 +823,6 @@ fresh-cache.wasm-runtime-check:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - src/lib_wasm_runtime/**/*.rs
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1125,51 +860,6 @@ fresh-cache.oc.build_kernels:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink.mk
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - images/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - kernels.mk
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - scripts/ci/**/*
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1215,51 +905,6 @@ fresh-cache.oc.build_dsn_node:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink.mk
-    - etherlink/**/*
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - images/**/*
-    - irmin/**/*
-    - irmin/**/*.ml*
-    - kernels.mk
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - script-inputs/**/*/
-    - scripts/**/*
-    - scripts/**/*/
-    - scripts/ci/**/*
-    - sdk/**/*
-    - src/**/*
-    - src/**/*.ml*
-    - tezt/**/*
-    - tezt/**/*.ml*
-    - tzt_reference_test_suite/**/*
-    - vendors/**/*.ml*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   timeout: 60 minutes
@@ -1299,34 +944,6 @@ fresh-cache.oc.tezt:fetch-records:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   allow_failure: true
@@ -1356,9 +973,6 @@ fresh-cache.build_octez_source:
   stage: build
   tags:
   - gcp_very_high_cpu_ramfs
-  rules:
-  - when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1400,17 +1014,6 @@ fresh-cache.etherlink.build:static-x86_64:
   stage: build
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - etherlink/**/*
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1458,17 +1061,6 @@ fresh-cache.etherlink.build:static-arm64:
   stage: build
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - etherlink/**/*
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    when: manual
-    allow_failure: true
   dependencies:
   - fresh-cache.oc.docker:ci:arm64
   timeout: 60 minutes
@@ -1516,34 +1108,6 @@ fresh-cache.build-layer1-profiling:
   stage: build
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   timeout: 60 minutes
@@ -1590,34 +1154,6 @@ fresh-cache.select_tezts:
   stage: build
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   allow_failure:
@@ -1643,22 +1179,6 @@ trigger:debian_repository_partial_auto:
   variables:
     PIPELINE_TYPE: merge_train-debian_repository_partial_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/debian_repository_partial_auto.yml
-    - debian-deps-build.Dockerfile
-    - docs/introduction/install-bin-deb.sh
-    - manifest/**/*.ml*
-    - scripts/ci/build-debian-packages.sh
-    - scripts/ci/build-debian-packages_current.sh
-    - scripts/ci/build-packages-dependencies.sh
-    - scripts/ci/create_debian_repo.sh
-    - scripts/ci/prepare-apt-repo.sh
-    - scripts/packaging/Release.conf
-    - scripts/packaging/build-deb-local.sh
-    - scripts/packaging/octez/debian/*
-    - scripts/version.sh
-    when: on_success
   needs:
   - fresh-cache.trigger
   trigger:
@@ -1670,20 +1190,6 @@ trigger:rpm_repository_partial_auto:
   variables:
     PIPELINE_TYPE: merge_train-rpm_repository_partial_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
-    - manifest/**/*.ml*
-    - rpm-deps-build.Dockerfile
-    - scripts/ci/build-packages-dependencies.sh
-    - scripts/ci/build-rpm-packages.sh
-    - scripts/ci/create_rpm_repo.sh
-    - scripts/ci/prepare-apt-rpm-repo.sh
-    - scripts/packaging/build-rpm-local.sh
-    - scripts/packaging/octez/rpm/*
-    - scripts/packaging/tests/rpm/*
-    - scripts/version.sh
-    when: on_success
   needs:
   - fresh-cache.trigger
   trigger:
@@ -1695,17 +1201,6 @@ trigger:homebrew_auto:
   variables:
     PIPELINE_TYPE: merge_train-homebrew_auto
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
-  rules:
-  - changes:
-    - .gitlab/ci/pipelines/homebrew_auto.yml
-    - manifest/**/*.ml*
-    - scripts/ci/install-gsutil.sh
-    - scripts/packaging/Formula/*
-    - scripts/packaging/homebrew_install.sh
-    - scripts/packaging/homebrew_release.sh
-    - scripts/packaging/test_homebrew_install.sh
-    - scripts/version.sh
-    when: on_success
   needs:
   - fresh-cache.trigger
   trigger:
@@ -1717,9 +1212,6 @@ fresh-cache.kaitai_checks:
   stage: test
   tags:
   - gcp
-  rules:
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1763,9 +1255,6 @@ fresh-cache.kaitai_e2e_checks:
   stage: test
   tags:
   - gcp
-  rules:
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:client-libs-dependencies
   - fresh-cache.kaitai_checks
@@ -1789,14 +1278,6 @@ fresh-cache.oc.check_lift_limits_patch:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - src/bin_tps_evaluation/lift_limits.patch
-    - src/proto_alpha/lib_protocol/main.ml
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1836,15 +1317,6 @@ fresh-cache.oc.python_check:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.py'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - poetry.lock
-    - pyproject.toml
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1867,34 +1339,6 @@ fresh-cache.oc.integration:compiler-rejections:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -1933,34 +1377,6 @@ fresh-cache.oc.script:test-gen-genesis:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -1981,16 +1397,6 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
   stage: test
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - scripts/snapshot_alpha.sh
-    - scripts/snapshot_alpha_and_link.sh
-    - scripts/user_activated_upgrade.sh
-    - src/proto_alpha/**/*
-    when: on_success
   needs:
   - job: fresh-cache.oc.docker:ci:amd64
   - job: fresh-cache.trigger
@@ -2043,34 +1449,6 @@ fresh-cache.oc.script:test_octez_release_versions:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -2095,14 +1473,6 @@ fresh-cache.oc.script:b58_prefix:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - scripts/b58_prefix/b58_prefix.py
-    - scripts/b58_prefix/test_b58_prefix.py
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -2126,15 +1496,6 @@ fresh-cache.oc.test-liquidity-baking-scripts:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - scripts/check-liquidity-baking-scripts.sh
-    - scripts/ci/test_liquidity_baking_scripts.sh
-    - src/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -2180,14 +1541,6 @@ fresh-cache.mir_unit:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/mir/**/*
-    - images/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -2214,15 +1567,6 @@ fresh-cache.mir_tzt:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/mir/**/*
-    - images/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -2249,17 +1593,6 @@ fresh-cache.test_sdk_rust:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    - sdk/rust/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.trigger
@@ -2295,18 +1628,6 @@ fresh-cache.test_sdk_bindings:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - contrib/sdk-bindings
-    - images/create_image.sh
-    - images/rust-sdk-bindings/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    - sdk/rust/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-sdk-bindings:amd64
   - fresh-cache.trigger
@@ -2343,20 +1664,6 @@ fresh-cache.test_kernels:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - kernels.mk
-    - scripts/version.sh
-    - sdk/rust/**/*
-    - src/kernel_*/**/*
-    - src/riscv/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.build_kernels
@@ -2394,20 +1701,6 @@ fresh-cache.test_etherlink_kernel:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - etherlink.mk
-    - etherlink/**/*.rs
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.build_kernels
@@ -2445,18 +1738,6 @@ fresh-cache.test_etherlink_firehose:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - etherlink/firehose/**/*
-    - etherlink/tezt/tests/evm_kernel_inputs/erc20tok.*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.build_kernels
@@ -2493,15 +1774,6 @@ fresh-cache.audit_riscv_deps:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    - src/riscv/**/*
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -2535,19 +1807,6 @@ fresh-cache.check_riscv_kernels:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    - src/riscv/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   dependencies:
@@ -2584,19 +1843,6 @@ fresh-cache.test_evm_compatibility:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - etherlink.mk
-    - etherlink/kernel_latest/evm_evaluation/**/*
-    - etherlink/kernel_latest/evm_execution/**/*
-    - images/create_image.sh
-    - images/rust-toolchain/**/*
-    - images/scripts/install_datadog_static.sh
-    - scripts/version.sh
-    when: on_success
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.build_kernels
@@ -2637,17 +1883,6 @@ fresh-cache.ocaml-check:
   stage: test
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - '**/*.ml'
-    - '**/*.mli'
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - devtools/**/*
-    - src/**/*
-    - tezt/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -2681,34 +1916,6 @@ fresh-cache.oc.unit:non-proto-x86_64:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -2772,16 +1979,6 @@ fresh-cache.oc.unit:etherlink-x86_64:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - etherlink/**/*
-    - sdk/rust/**/*
-    - src/kernel_sdk/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -2845,34 +2042,6 @@ fresh-cache.oc.unit:other-x86_64:
   stage: test
   tags:
   - gcp_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -2936,34 +2105,6 @@ fresh-cache.oc.unit:proto-x86_64:
   stage: test
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -3027,34 +2168,6 @@ fresh-cache.oc.unit:non-proto-arm64:
   stage: test
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:arm64
   - fresh-cache.oc.build_arm64-released
@@ -3107,34 +2220,6 @@ fresh-cache.oc.unit:webassembly-x86_64:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -3158,34 +2243,6 @@ fresh-cache.oc.unit:protocol_compiles:
   stage: test
   tags:
   - gcp_very_high_cpu
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -3224,13 +2281,6 @@ fresh-cache.de.unit:x86_64:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - data-encoding/**
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -3253,13 +2303,6 @@ fresh-cache.de.unit:arm64:
   stage: test
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - data-encoding/**
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:arm64
   - fresh-cache.oc.build_arm64-released
@@ -3282,13 +2325,6 @@ fresh-cache.resto.unit:x86_64:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - resto/**
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -3311,13 +2347,6 @@ fresh-cache.resto.unit:arm64:
   stage: test
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - resto/**
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:arm64
   - fresh-cache.oc.build_arm64-released
@@ -3340,9 +2369,6 @@ fresh-cache.oc.install_opam_noble:
   stage: test
   tags:
   - gcp
-  rules:
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.trigger
   dependencies: []
@@ -3363,12 +2389,6 @@ fresh-cache.oc.compile_sources_doc_master:
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - docs/introduction/compile-sources.sh
-    when: on_success
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.trigger
   dependencies: []
@@ -3394,34 +2414,6 @@ fresh-cache.tezt:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3493,34 +2485,6 @@ fresh-cache.tezt-time-sensitive:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3591,35 +2555,6 @@ fresh-cache.tezt-slow:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3687,35 +2622,6 @@ fresh-cache.tezt-extra:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3783,35 +2689,6 @@ fresh-cache.tezt-flaky:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3883,34 +2760,6 @@ fresh-cache.tezt:static-binaries:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.select_tezts
@@ -3973,35 +2822,6 @@ fresh-cache.tezt-riscv-slow-sequential:
   stage: test
   tags:
   - gcp_tezt
-  rules:
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -4065,37 +2885,6 @@ fresh-cache.oc.unified_coverage:
   stage: test_coverage
   tags:
   - gcp
-  rules:
-  - if: $GITLAB_USER_LOGIN == "nomadic-margebot" || $CI_MERGE_REQUEST_ASSIGNEES =~
-      /nomadic-margebot/ || $CI_MERGE_REQUEST_EVENT_TYPE == "merge_train"
-    when: never
-  - changes:
-    - .gitlab-ci.yml
-    - .gitlab/ci/pipelines/before_merging.yml
-    - .gitlab/ci/pipelines/merge_train.yml
-    - Makefile
-    - brassaia-eio/**/*
-    - brassaia/**/*
-    - cohttp/**/*
-    - data-encoding/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*
-    - irmin/**/*
-    - michelson_test_scripts/**/*
-    - opam/**/*
-    - opentelemetry/**/*
-    - prometheus/**/*
-    - resto/**/*
-    - rust-toolchain
-    - script-inputs/**/*
-    - scripts/**/*
-    - sdk/**/*
-    - src/**/*
-    - tezt/**/*
-    - tzt_reference_test_suite/**/*
-    when: on_success
   dependencies:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.unit:non-proto-x86_64
@@ -4137,13 +2926,6 @@ fresh-cache.oc.docker:amd64:
   stage: manual
   tags:
   - gcp
-  rules:
-  - changes:
-    - Dockerfile
-    - build.Dockerfile
-    when: on_success
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:rust-toolchain:amd64
   - fresh-cache.oc.docker:ci:amd64
@@ -4173,13 +2955,6 @@ fresh-cache.oc.docker:arm64:
   stage: manual
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - Dockerfile
-    - build.Dockerfile
-    when: on_success
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:arm64
   dependencies:
@@ -4207,9 +2982,6 @@ fresh-cache.oc.script.docker_verify_image_arm64:
   stage: manual
   tags:
   - gcp
-  rules:
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:arm64
   dependencies: []
@@ -4233,9 +3005,6 @@ fresh-cache.oc.script.docker_verify_image_amd64:
   stage: manual
   tags:
   - gcp
-  rules:
-  - when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:amd64
   dependencies: []
@@ -4259,10 +3028,6 @@ fresh-cache.documentation.rst-check:
   stage: sanity
   tags:
   - gcp
-  rules:
-  - changes:
-    - '**/*.rst'
-    when: on_success
   needs: []
   dependencies: []
   timeout: 60 minutes
@@ -4281,27 +3046,6 @@ fresh-cache.documentation.docgen:
   stage: build
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   dependencies:
@@ -4345,27 +3089,6 @@ fresh-cache.documentation.manuals:
   stage: build
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.oc.build_x86_64-released
@@ -4404,27 +3127,6 @@ fresh-cache.documentation.odoc:
   stage: build
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   dependencies:
@@ -4471,27 +3173,6 @@ fresh-cache.documentation.build_all:
   stage: build
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - '**/*.rst'
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -4526,29 +3207,6 @@ fresh-cache.documentation.linkcheck:
   stage: test
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: manual
-    allow_failure: true
-  - changes:
-    - '**/*.rst'
-    - brassaia/**/*.ml*
-    - client-libs/**/*.ml*
-    - data-encoding/**/*.ml*
-    - docs/**/*
-    - dune
-    - dune-project
-    - dune-workspace
-    - etherlink/**/*.ml*
-    - grafazos/doc/**/*
-    - irmin/**/*.ml*
-    - script-inputs/**/*/
-    - scripts/**/*/
-    - src/**/*.ml*
-    - tezt/**/*.ml*
-    - vendors/**/*.ml*
-    when: manual
-    allow_failure: true
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -4580,14 +3238,6 @@ fresh-cache.documentation.install_python_bookworm:
   stage: test
   tags:
   - gcp
-  rules:
-  - if: $CI_MERGE_REQUEST_LABELS =~ /(?:^|,)ci--docs(?:$|,)/
-    when: on_success
-  - changes:
-    - docs/developer/install-python-debian-ubuntu.sh
-    - poetry.lock
-    - pyproject.toml
-    when: on_success
   needs:
   - fresh-cache.trigger
   dependencies: []
@@ -4607,10 +3257,6 @@ fresh-cache.teztale.build-arm64:
   stage: test
   tags:
   - gcp_arm64
-  rules:
-  - changes:
-    - teztale/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:arm64
   - fresh-cache.trigger
@@ -4658,10 +3304,6 @@ fresh-cache.teztale.build-x86_64:
   stage: test
   tags:
   - gcp_very_high_cpu_ramfs
-  rules:
-  - changes:
-    - teztale/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:ci:amd64
   - fresh-cache.trigger
@@ -4709,10 +3351,6 @@ fresh-cache.grafazos.build:
   stage: test
   tags:
   - gcp
-  rules:
-  - changes:
-    - grafazos/**/*
-    when: on_success
   needs:
   - fresh-cache.oc.docker:jsonnet:amd64
   - fresh-cache.trigger

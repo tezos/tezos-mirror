@@ -151,6 +151,16 @@ let set_tezos_job_cache_policy policy job =
   in
   {job with job = new_generic_job}
 
+let no_rules job =
+  let generic_job = job.job in
+  let new_generic_job =
+    let open Gitlab_ci.Types in
+    match generic_job with
+    | Trigger_job trigger_job -> Trigger_job {trigger_job with rules = None}
+    | Job job -> Job {job with rules = None}
+  in
+  {job with job = new_generic_job}
+
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;
