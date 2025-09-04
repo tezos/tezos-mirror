@@ -358,7 +358,7 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                   };
                 trigger;
                 only_if;
-              } -> (
+              } ->
               (* Convert dependencies recursively. *)
               let dependencies =
                 let needs =
@@ -426,6 +426,28 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 | None | Some GCP | Some AWS -> false
                 | Some GCP_dev -> true
               in
+              let maybe_enable_cargo_cache job =
+                if cargo_cache then Tezos_ci.Cache.enable_cargo_cache job
+                else job
+              in
+              let maybe_enable_cargo_target_caches job =
+                if cargo_target_caches then
+                  Tezos_ci.Cache.enable_cargo_target_caches job
+                else job
+              in
+              let maybe_enable_sccache job =
+                match sccache with
+                | None -> job
+                | Some {key; error_log; idle_timeout; log; path; cache_size} ->
+                    Tezos_ci.Cache.enable_sccache
+                      ?key
+                      ?error_log
+                      ?idle_timeout
+                      ?log
+                      ?path
+                      ?cache_size
+                      job
+              in
               Tezos_ci.job
                 ~__POS__:source_location
                 ~name
@@ -450,22 +472,8 @@ let convert_graph ?(interruptible_pipeline = true) ~with_condition
                 ?artifacts
                 ?allow_failure
                 script
-              |> (if cargo_cache then Tezos_ci.Cache.enable_cargo_cache
-                  else Fun.id)
-              |> (if cargo_target_caches then
-                    Tezos_ci.Cache.enable_cargo_target_caches ?key:None
-                  else Fun.id)
-              |>
-              match sccache with
-              | None -> Fun.id
-              | Some {key; error_log; idle_timeout; log; path; cache_size} ->
-                  Tezos_ci.Cache.enable_sccache
-                    ?key
-                    ?error_log
-                    ?idle_timeout
-                    ?log
-                    ?path
-                    ?cache_size)
+              |> maybe_enable_cargo_cache |> maybe_enable_cargo_target_caches
+              |> maybe_enable_sccache
         in
         result := UID_map.add uid result_node !result ;
         result_node
