@@ -22,13 +22,12 @@ val run :
   elapsed_time_between_report:float ->
   unit tzresult Lwt.t
 
-val prepare_scenario :
+val deploy :
   rpc_endpoint:Uri.t ->
-  scenario:[`ERC20 | `XTZ] ->
+  scenario:[< `Custom of string | `ERC20] ->
   Network_info.t ->
-  Z.t ->
   Account.t ->
-  ([`ERC20 of Efunc_core.Private.address | `Native] * Z.t) tzresult Lwt.t
+  string tzresult Lwt.t
 
 val start_new_head_monitor : ws_uri:Uri.t -> unit tzresult Lwt.t
 
