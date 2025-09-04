@@ -986,7 +986,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
       before_script =
         Some
           (if datadog then
-             (". ./scripts/ci/datadog_send_job_info.sh" :: before_script)
+             "SCRIPT_STEP_BEGIN=$(date +%s)"
+             :: ". ./scripts/ci/datadog_send_job_info.sh" :: before_script
              @ [". ./scripts/ci/datadog_send_job_cache_info.sh 'before'"]
            else before_script);
       cache;
@@ -1000,7 +1001,8 @@ let job ?(arch : Runner.Arch.t option) ?(after_script = []) ?allow_failure
          fetch all the dependencies of the preceding jobs. *)
       dependencies = Some dependencies;
       rules;
-      script;
+      script =
+        script @ [". ./scripts/ci/datadog_send_job_script_step_time.sh || true"];
       services;
       stage = Some (Stage.name stage);
       variables;

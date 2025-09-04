@@ -15,10 +15,12 @@ oc.docker:ci:amd64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -40,12 +42,14 @@ datadog_pipeline_trace:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -73,6 +77,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -80,6 +85,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -106,11 +112,13 @@ documentation.rst-check:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - . $HOME/.venv/bin/activate
   - make --silent -C docs sphinx-check
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -135,12 +143,14 @@ documentation.docgen:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - eval $(opam env)
   - make -C docs -j docexes-gen
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -171,11 +181,13 @@ documentation.manuals:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - eval $(opam env)
   - scripts/ci/documentation:manuals_static.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
@@ -208,6 +220,7 @@ documentation.odoc:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -219,6 +232,7 @@ documentation.odoc:
   - opam update
   - opam install --yes odoc.2.4.4
   - make -C docs odoc-lite
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -251,6 +265,7 @@ documentation.build_all:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -258,6 +273,7 @@ documentation.build_all:
   - . $HOME/.venv/bin/activate
   - make -C docs -j sphinx
   - make -C docs -j _build/octezdoc.txt
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
@@ -285,6 +301,7 @@ documentation.linkcheck:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -293,6 +310,7 @@ documentation.linkcheck:
   - . $HOME/.venv/bin/activate
   - make -C docs redirectcheck
   - make -C docs linkcheck
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -306,10 +324,12 @@ documentation.install_python_bookworm:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -323,10 +343,12 @@ documentation.install_python_jammy:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -340,9 +362,11 @@ documentation.install_python_noble:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./docs/developer/install-python-debian-ubuntu.sh tezos/tezos master
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'

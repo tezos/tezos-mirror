@@ -17,10 +17,12 @@ oc.docker:ci:amd64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -41,10 +43,12 @@ oc.docker:rust-toolchain:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_rust_toolchain_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -64,10 +68,12 @@ oc.docker:ci:arm64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -108,6 +114,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -115,6 +122,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -155,6 +163,7 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -162,6 +171,7 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -203,6 +213,7 @@ oc.build_arm64-released:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -211,6 +222,7 @@ oc.build_arm64-released:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -256,6 +268,7 @@ oc.build_arm64-extra-dev:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -264,6 +277,7 @@ oc.build_arm64-extra-dev:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -316,6 +330,7 @@ oc.build_arm64-extra-exp:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - . ./scripts/version.sh
@@ -324,6 +339,7 @@ oc.build_arm64-extra-exp:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_full_unreleased.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -360,12 +376,14 @@ datadog_pipeline_trace:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -381,6 +399,7 @@ oc.unified_coverage:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - eval $(opam env)
@@ -390,6 +409,7 @@ oc.unified_coverage:
   - dune exec scripts/ci/download_coverage/download.exe -- --from last-merged-pipeline
     --info --log-file _coverage_report/download_coverage.log
   - ./scripts/ci/report_coverage.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -422,11 +442,13 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -449,11 +471,13 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -476,11 +500,13 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -512,12 +538,14 @@ publish_kernel_sdk:
     policy: pull-push
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - make -f kernels.mk publish-sdk-deps
   - SSL_CERT_DIR=/etc/ssl/certs CC=clang make -f kernels.mk publish-sdk
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh

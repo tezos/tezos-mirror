@@ -15,10 +15,12 @@ oc.docker:ci:amd64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -39,11 +41,13 @@ oc.docker:jsonnet:amd64:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_jsonnet_build.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -63,10 +67,12 @@ oc.docker:ci:arm64:
   dependencies: []
   timeout: 90 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./images/ci_create_ci_images.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -92,12 +98,14 @@ datadog_pipeline_trace:
   allow_failure: true
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - CI_MERGE_REQUEST_IID=${CI_MERGE_REQUEST_IID:-none}
   - DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags pipeline_type:$PIPELINE_TYPE
     --tags mr_number:$CI_MERGE_REQUEST_IID
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
 
@@ -125,6 +133,7 @@ oc.build:static-x86_64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -132,6 +141,7 @@ oc.build:static-x86_64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -173,6 +183,7 @@ oc.build:static-arm64-linux-binaries:
     - $CI_PROJECT_DIR/_target
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/take_ownership.sh
   - eval $(opam env)
@@ -180,6 +191,7 @@ oc.build:static-arm64-linux-binaries:
   - . ./scripts/ci/sccache-start.sh
   script:
   - ./scripts/ci/build_static_binaries.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -208,11 +220,13 @@ oc.docker:amd64:
   - oc.docker:ci:amd64
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -235,11 +249,13 @@ oc.docker:arm64:
   - oc.docker:ci:arm64
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -260,6 +276,7 @@ oc.install-release-homebrew:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
@@ -268,6 +285,7 @@ oc.install-release-homebrew:
   - ./scripts/packaging/homebrew_install.sh
   - eval $(/home/linuxbrew/.linuxbrew/bin/brew shellenv)
   - ./scripts/packaging/homebrew_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
@@ -288,11 +306,13 @@ docker:merge_manifests:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/docker_merge_manifests.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -319,11 +339,13 @@ gitlab:release:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/restrict_export_to_octez_source.sh
   - ./scripts/ci/gitlab-release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   id_tokens:
@@ -354,11 +376,13 @@ oc.docker-build-debian-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -394,12 +418,14 @@ oc.build-debian:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -433,11 +459,13 @@ oc.build-data_packages:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -464,6 +492,7 @@ apt_repo_debian:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
@@ -471,6 +500,7 @@ apt_repo_debian:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh debian bookworm
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -490,11 +520,13 @@ oc.docker-build-ubuntu-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/debian-deps-build.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -530,12 +562,14 @@ oc.build-ubuntu:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-debian-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -572,6 +606,7 @@ apt_repo_ubuntu:
   - oc.build-data_packages
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/install-gsutil.sh
@@ -579,6 +614,7 @@ apt_repo_ubuntu:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_debian_repo.sh ubuntu noble jammy
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -598,11 +634,13 @@ oc.docker-build-rockylinux-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -630,11 +668,13 @@ oc.docker-systemd-tests-rpm-rockylinux:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -669,12 +709,14 @@ oc.build-rockylinux:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -716,12 +758,14 @@ oc.build-rockylinux-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -761,12 +805,14 @@ rpm_repo_rockylinux:
   - oc.build-rockylinux-data
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh rockylinux 9.3
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -786,11 +832,13 @@ oc.docker-build-fedora-dependencies:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-deps-build.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -819,11 +867,13 @@ oc.docker-systemd-tests-rpm-fedora:
   dependencies: []
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - ./scripts/ci/docker_initialize.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/build-packages-dependencies.sh images/packages/rpm-systemd-tests.Dockerfile
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   services:
@@ -859,12 +909,14 @@ oc.build-fedora:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh binaries
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -907,12 +959,14 @@ oc.build-fedora-data:
     - $CI_PROJECT_DIR/_sccache
     policy: pull-push
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
   script:
   - export CARGO_NET_OFFLINE=false
   - ./scripts/ci/build-rpm-packages.sh zcash
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -953,12 +1007,14 @@ rpm_repo_fedora:
   - oc.build-fedora-data
   timeout: 60 minutes
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/version.sh
   - ./scripts/ci/prepare-rpm-repo.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./scripts/ci/create_rpm_repo.sh fedora 39 42
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -991,6 +1047,7 @@ teztale.build-arm64:
     policy: pull-push
   interruptible: true
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -1001,6 +1058,7 @@ teztale.build-arm64:
   - make teztale
   - mkdir -p ./teztale-binaries/arm64
   - mv octez-teztale-* ./teztale-binaries/arm64/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1037,6 +1095,7 @@ teztale.build-x86_64:
     policy: pull-push
   interruptible: true
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   - . ./scripts/ci/sccache-start.sh
@@ -1047,6 +1106,7 @@ teztale.build-x86_64:
   - make teztale
   - mkdir -p ./teztale-binaries/x86_64
   - mv octez-teztale-* ./teztale-binaries/x86_64/
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   - ./scripts/ci/sccache-stop.sh
@@ -1076,10 +1136,12 @@ teztale.gitlab_release:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./teztale/scripts/releases/create_gitlab_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
@@ -1101,10 +1163,12 @@ teztale.release_page:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./teztale/scripts/releases/publish_release_page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
@@ -1130,12 +1194,14 @@ grafazos.build:
   timeout: 60 minutes
   interruptible: true
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - cd grafazos/
   - jb install github.com/grafana/grafonnet/gen/grafonnet-v11.1.0@1ce5aec
   - make
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   artifacts:
@@ -1157,10 +1223,12 @@ grafazos.gitlab_release:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/create_gitlab_release.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   retry: 0
@@ -1180,10 +1248,12 @@ grafazos.release_page:
   timeout: 60 minutes
   interruptible: false
   before_script:
+  - SCRIPT_STEP_BEGIN=$(date +%s)
   - . ./scripts/ci/datadog_send_job_info.sh
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'before'
   script:
   - ./grafazos/scripts/releases/publish_release_page.sh
+  - . ./scripts/ci/datadog_send_job_script_step_time.sh || true
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
