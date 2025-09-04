@@ -442,6 +442,12 @@ module Config_file : sig
   val set_ghostnet_network :
     ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
 
+  (** Set the network config to a Shadownet network.
+
+      [user_activated_upgrades] can be given to add user-activated upgrades. *)
+  val set_shadownet_network :
+    ?user_activated_upgrades:(int * Protocol.t) list -> unit -> JSON.t -> JSON.t
+
   (** Set the network config to a sandbox with the same chain_id than Ghostnet.
 
       [user_activated_upgrades] can be given to add user-activated upgrades. *)
