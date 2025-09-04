@@ -172,16 +172,6 @@ let when_always job =
   in
   {job with job = new_generic_job}
 
-let no_retry job =
-  let generic_job = job.job in
-  let new_generic_job =
-    let open Gitlab_ci.Types in
-    match generic_job with
-    | Trigger_job _ -> generic_job
-    | Job job -> Job {job with retry = Some {max = 0; when_ = []}}
-  in
-  {job with job = new_generic_job}
-
 type tezos_image =
   | Internal of {
       image : Gitlab_ci.Types.image;
