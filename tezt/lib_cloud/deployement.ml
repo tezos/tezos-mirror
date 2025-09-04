@@ -495,7 +495,7 @@ module Ssh_host = struct
         ~publish_ports
         ~name
         docker_image
-        ["-D"; "-p"; guest_port]
+        ["-D"; "-p"; guest_port; "--ulimit"; "nofile=65535:65535"]
       |> Process.check
     in
     let agent =
