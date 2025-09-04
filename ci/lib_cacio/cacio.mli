@@ -209,7 +209,11 @@ module type COMPONENT_API = sig
       If [dune_cache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_dune_cache}.
 
-      See {!Tezos_ci.job} for information about other arguments. *)
+      See {!Tezos_ci.job} for information about other arguments.
+
+      The default number of retries is 0 for [Publish] jobs.
+      Other jobs use the value defined in [.gitlab-ci.yml].
+      You can force a specific value with [~retry]. *)
   val job :
     __POS__:string * int * int * int ->
     stage:stage ->
@@ -230,6 +234,7 @@ module type COMPONENT_API = sig
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
+    ?retry:Gitlab_ci.Types.retry ->
     string ->
     string list ->
     job
