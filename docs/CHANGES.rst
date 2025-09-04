@@ -8,7 +8,10 @@ Version 23.1
 
 General
 -------
-- Fixed a potential resource leak ensuring that the child process spawned to execute the uname command is properly waited for. This prevents the creation of zombie processes. (MR :gl:`!19122`)
+
+- Fixed a potential resource leak ensuring that the child process spawned to
+  execute the uname command is properly waited for. This prevents the creation
+  of zombie processes. (MR :gl:`!19122`)
 
 Version 23.0
 ============
