@@ -183,7 +183,7 @@ let init_tzkt ~tzkt_api_port ~agent ~tezlink_sandbox_endpoint =
   unit
 
 let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
-    (rpc_port : int option) agent =
+    (rpc_port : int option) (verbose : bool) agent =
   let chain_id = 1 in
   let () = toplog "Initializing the tezlink scenario" in
   let tezlink_config = Temp.file "l2-tezlink-config.yaml" in
@@ -227,7 +227,7 @@ let init_tezlink_sequencer (cloud : Cloud.t) (name : string)
         tx_queue_max_lifespan = None;
         tx_queue_max_size = None;
         tx_queue_tx_per_addr_limit = None;
-        verbose = false;
+        verbose;
       }
   in
   let () = toplog "Launching the sandbox L2 node" in
@@ -315,6 +315,7 @@ let register (module Cli : Scenarios_cli.Tezlink) =
           cloud
           name
           Cli.public_rpc_port
+          Cli.verbose
           tezlink_sequencer_agent
       in
       let* () =
