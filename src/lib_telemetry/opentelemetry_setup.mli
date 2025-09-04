@@ -8,7 +8,9 @@
 
 (** Set Opentelemetry global options and registers the Lwt compatible ambient
     context. [?level] and [?sections] are used to specify which events are
-    exported by Opentelemetry as logs. *)
+    exported by Opentelemetry as logs. It returns a cleanup function, that
+    should be called before exiting, which ensures pending telemetry data is
+    exported by the collector. *)
 val setup :
   data_dir:string ->
   service_namespace:string ->
@@ -17,4 +19,4 @@ val setup :
   ?level:Internal_event.level ->
   ?sections:(Internal_event.Section.t * Internal_event.level) list ->
   Opentelemetry_config.t ->
-  unit tzresult Lwt.t
+  (unit -> unit) tzresult Lwt.t

@@ -454,10 +454,11 @@ let rec refutation_daemon ?(restart = false) state =
   in
   dont_wait (loop ~restart) on_error (fun e -> on_error [Exn e])
 
-let install_finalizer state =
+let install_finalizer state ~telemetry_cleanup =
   let open Lwt_syntax in
   Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
   let message = state.node_ctxt.Node_context.cctxt#message in
+  telemetry_cleanup () ;
   let* () = message "Shutting down RPC server@." in
   let* () = Rpc_server.shutdown state.rpc_server in
   let* () = message "Shutting down Injector@." in
@@ -863,7 +864,7 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
           operator_list)
       (Purpose.operators_bindings configuration.operators)
   in
-  let* () = setup_opentelemetry ~data_dir configuration in
+  let* telemetry_cleanup = setup_opentelemetry ~data_dir configuration in
   let* l1_ctxt =
     Layer1.start
       ~name:"sc_rollup_node"
@@ -946,7 +947,9 @@ let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)
   let state = {node_ctxt; rpc_server; configuration; plugin} in
   let* () = check_operator_balance state in
   let* () = Node_context.save_protocols_from_l1 node_ctxt in
-  let (_ : Lwt_exit.clean_up_callback_id) = install_finalizer state in
+  let (_ : Lwt_exit.clean_up_callback_id) =
+    install_finalizer state ~telemetry_cleanup
+  in
   run state
 
 module Replay = struct
@@ -1040,20 +1043,27 @@ module Replay = struct
         ~profiling
         ~force_etherlink:false
     in
-    let* () = setup_opentelemetry ~data_dir configuration in
-    Node_context_loader.init
-      cctxt
-      ~data_dir
-      ~irmin_cache_size:10
-      ~store_access:Read_only
-      ~context_access:Read_only
-      l1_ctxt
-      metadata.genesis_info
-      ~lcc:{commitment = Commitment.Hash.zero; level = 0l}
-      ~lpc:None
-      metadata.kind
-      {hash = protocol.protocol; proto_level = protocol.proto_level; constants}
-      configuration
+    let* cleanup = setup_opentelemetry ~data_dir configuration in
+    let* node_ctxt =
+      Node_context_loader.init
+        cctxt
+        ~data_dir
+        ~irmin_cache_size:10
+        ~store_access:Read_only
+        ~context_access:Read_only
+        l1_ctxt
+        metadata.genesis_info
+        ~lcc:{commitment = Commitment.Hash.zero; level = 0l}
+        ~lpc:None
+        metadata.kind
+        {
+          hash = protocol.protocol;
+          proto_level = protocol.proto_level;
+          constants;
+        }
+        configuration
+    in
+    return (node_ctxt, cleanup)
 
   let process_time_treshold =
     Ptime.Span.of_float_s 0.5 |> WithExceptions.Option.get ~loc:__LOC__
@@ -1212,24 +1222,29 @@ module Replay = struct
 
   let replay_block ~data_dir ?profiling cctxt block =
     let open Lwt_result_syntax in
-    let* node_ctxt = mk_node_ctxt ~profiling ~data_dir cctxt block in
-    replay_block_aux ~preload:true ~verbose:true node_ctxt block
+    let* node_ctxt, cleanup = mk_node_ctxt ~profiling ~data_dir cctxt block in
+    Lwt.finalize
+      (fun () -> replay_block_aux ~preload:true ~verbose:true node_ctxt block)
+      (Lwt.wrap1 cleanup)
 
   let replay_blocks ~data_dir ?profiling cctxt start_level end_level =
     let open Lwt_result_syntax in
-    let* node_ctxt =
+    let* node_ctxt, cleanup =
       mk_node_ctxt ~profiling ~data_dir cctxt (`Level start_level)
     in
-    let levels =
-      Stdlib.List.init
-        (Int32.sub end_level start_level |> Int32.to_int |> succ)
-        (fun x -> Int32.add (Int32.of_int x) start_level)
-    in
-    let first = ref true in
-    List.iter_es
-      (fun l ->
-        let preload = !first in
-        first := false ;
-        replay_block_aux ~preload node_ctxt (`Level l))
-      levels
+    Lwt.finalize
+      (fun () ->
+        let levels =
+          Stdlib.List.init
+            (Int32.sub end_level start_level |> Int32.to_int |> succ)
+            (fun x -> Int32.add (Int32.of_int x) start_level)
+        in
+        let first = ref true in
+        List.iter_es
+          (fun l ->
+            let preload = !first in
+            first := false ;
+            replay_block_aux ~preload node_ctxt (`Level l))
+          levels)
+      (Lwt.wrap1 cleanup)
 end

@@ -41,6 +41,7 @@ let instance_id_filename = "telemetry_id"
 let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
     {Opentelemetry_config.enable; instance_id; environment; config} =
   let open Lwt_result_syntax in
+  let no_clean_up = return (fun () -> ()) in
   if enable then (
     let*! instance_id =
       match instance_id with
@@ -69,9 +70,10 @@ let setup ~data_dir ~service_namespace ~service_name ~version ?level ?sections
     Opentelemetry_ambient_context.set_storage_provider
       (Opentelemetry_ambient_context_lwt.storage ()) ;
     Opentelemetry_client_cohttp_lwt.setup ~enable ~config () ;
-    if Opentelemetry.Collector.has_backend () then
-      let* () = Events.activate ?level ?sections () in
-      let*! () = Event.(emit enabled) (service_namespace, instance_id) in
-      return_unit
-    else return_unit)
-  else return_unit
+    match Opentelemetry.Collector.get_backend () with
+    | None -> no_clean_up
+    | Some (module Backend) ->
+        let* () = Events.activate ?level ?sections () in
+        let*! () = Event.(emit enabled) (service_namespace, instance_id) in
+        return Backend.cleanup)
+  else no_clean_up
