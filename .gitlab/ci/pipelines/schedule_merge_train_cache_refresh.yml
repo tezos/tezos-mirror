@@ -174,6 +174,7 @@ fresh-cache.trigger:
     --tags mr_number:$CI_MERGE_REQUEST_IID
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.sanity_ci:
   image: ${ci_image_name_protected}/build:amd64--master
@@ -194,6 +195,7 @@ fresh-cache.sanity_ci:
   - make --silent -C ci check
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.docker:hadolint:
   image: hadolint/hadolint:2.12.0-alpine
@@ -212,6 +214,7 @@ fresh-cache.docker:hadolint:
   - hadolint Dockerfile
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.ocaml_fmt:
   image: ${ci_image_name_protected}/build:amd64--master
@@ -244,6 +247,7 @@ fresh-cache.oc.ocaml_fmt:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  when: always
 
 fresh-cache.oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
@@ -263,6 +267,7 @@ fresh-cache.oc.semgrep:
   - sh ./scripts/semgrep/lint-all-ocaml-sources.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
@@ -289,6 +294,7 @@ fresh-cache.oc.misc_checks:
   - ./scripts/ci/lint_check_licenses.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.check_jsonnet:
   image: ${jsonnet_image_name_protected}:master
@@ -310,6 +316,7 @@ fresh-cache.check_jsonnet:
   - scripts/lint.sh --check-jsonnet-lint
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.check_rust_fmt:
   image: ${rust_toolchain_image_name_protected}:master
@@ -327,6 +334,7 @@ fresh-cache.check_rust_fmt:
   - scripts/check-format-rust.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.nix:
   image: nixos/nix:2.22.1
@@ -355,6 +363,7 @@ fresh-cache.nix:
     paths:
     - flake.lock
     when: on_failure
+  when: always
 
 fresh-cache.commit_titles:
   image: ${ci_image_name_protected}/prebuild:amd64--master
@@ -373,6 +382,7 @@ fresh-cache.commit_titles:
   - ./scripts/ci/check_commit_messages.sh || exit $?
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -424,6 +434,7 @@ fresh-cache.oc.build_arm64-released:
     - octez-*
     - src/proto_*/parameters/*.json
     when: on_success
+  when: always
 
 fresh-cache.oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -482,6 +493,7 @@ fresh-cache.oc.build_arm64-extra-dev:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  when: always
 
 fresh-cache.oc.build_arm64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -540,6 +552,7 @@ fresh-cache.oc.build_arm64-extra-exp:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  when: always
 
 fresh-cache.oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -589,6 +602,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
+  when: always
 
 fresh-cache.oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -638,6 +652,7 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
   artifacts:
     paths:
     - octez-binaries/$ARCH/*
+  when: always
 
 fresh-cache.oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -693,6 +708,7 @@ fresh-cache.oc.build_x86_64-released:
     - octez-*
     - src/proto_*/parameters/*.json
     when: on_success
+  when: always
 
 fresh-cache.oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -764,6 +780,7 @@ fresh-cache.oc.build_amd64-extra-dev:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  when: always
 
 fresh-cache.oc.build_amd64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -835,6 +852,7 @@ fresh-cache.oc.build_amd64-extra-exp:
     - _build/default/contrib/octez_injector_server/octez_injector_server.exe
     - etherlink-governance-observer
     when: on_success
+  when: always
 
 fresh-cache.wasm-runtime-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -873,6 +891,7 @@ fresh-cache.wasm-runtime-check:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -919,6 +938,7 @@ fresh-cache.oc.build_kernels:
     - tx_kernel_dal.wasm
     - dal_echo_kernel.wasm
     when: on_success
+  when: always
 
 fresh-cache.oc.build_dsn_node:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -959,6 +979,7 @@ fresh-cache.oc.build_dsn_node:
     paths:
     - octez-dsn-node
     when: on_success
+  when: always
 
 fresh-cache.oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -989,6 +1010,7 @@ fresh-cache.oc.tezt:fetch-records:
     - tezt/records/*.json
     - tezt/records/*.json.broken
     when: always
+  when: always
 
 fresh-cache.build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1031,6 +1053,7 @@ fresh-cache.build_octez_source:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
+  when: always
 
 fresh-cache.etherlink.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1079,6 +1102,7 @@ fresh-cache.etherlink.build:static-x86_64:
     - octez-evm-*
     - etherlink-*
     when: on_success
+  when: always
 
 fresh-cache.etherlink.build:static-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1127,6 +1151,7 @@ fresh-cache.etherlink.build:static-arm64:
     - octez-evm-*
     - etherlink-*
     when: on_success
+  when: always
 
 fresh-cache.build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1174,6 +1199,7 @@ fresh-cache.build-layer1-profiling:
     paths:
     - ./octez-binaries/x86_64/octez-node
     - ./octez-binaries/x86_64/octez-client
+  when: always
 
 fresh-cache.select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1200,6 +1226,7 @@ fresh-cache.select_tezts:
     paths:
     - selected_tezts.tsl
     when: always
+  when: always
 
 trigger:debian_repository_partial_auto:
   stage: test
@@ -1208,6 +1235,7 @@ trigger:debian_repository_partial_auto:
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   needs:
   - fresh-cache.trigger
+  when: always
   trigger:
     include: .gitlab/ci/pipelines/debian_repository_partial_auto.yml
     strategy: depend
@@ -1219,6 +1247,7 @@ trigger:rpm_repository_partial_auto:
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   needs:
   - fresh-cache.trigger
+  when: always
   trigger:
     include: .gitlab/ci/pipelines/rpm_repository_partial_auto.yml
     strategy: depend
@@ -1230,6 +1259,7 @@ trigger:homebrew_auto:
     DOCKER_FORCE_BUILD: $DOCKER_FORCE_BUILD
   needs:
   - fresh-cache.trigger
+  when: always
   trigger:
     include: .gitlab/ci/pipelines/homebrew_auto.yml
     strategy: depend
@@ -1277,6 +1307,7 @@ fresh-cache.kaitai_checks:
     paths:
     - _build/default/client-libs/bin_codec_kaitai/codec.exe
     when: on_success
+  when: always
 
 fresh-cache.kaitai_e2e_checks:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
@@ -1301,6 +1332,7 @@ fresh-cache.kaitai_e2e_checks:
     2>/dev/null
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1341,6 +1373,7 @@ fresh-cache.oc.check_lift_limits_patch:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1364,6 +1397,7 @@ fresh-cache.oc.python_check:
   - ./scripts/ci/lint_misc_python_check.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1403,6 +1437,7 @@ fresh-cache.oc.integration:compiler-rejections:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1424,6 +1459,7 @@ fresh-cache.oc.script:test-gen-genesis:
   - dune build scripts/gen-genesis/gen_genesis.exe
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1477,6 +1513,7 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  when: always
 
 fresh-cache.oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1502,6 +1539,7 @@ fresh-cache.oc.script:test_octez_release_versions:
   - ./scripts/test_octez_release_version.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1526,6 +1564,7 @@ fresh-cache.oc.script:b58_prefix:
   - poetry run pytest scripts/b58_prefix/test_b58_prefix.py
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1553,6 +1592,7 @@ fresh-cache.oc.test-liquidity-baking-scripts:
   - ./scripts/ci/test_liquidity_baking_scripts.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1573,6 +1613,7 @@ fresh-cache.oc:scripts:release_script_values:
   - scripts/ci/test_release_values.sh
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1600,6 +1641,7 @@ fresh-cache.mir_unit:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     CARGO_NET_OFFLINE: "false"
+  when: always
 
 fresh-cache.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1627,6 +1669,7 @@ fresh-cache.mir_tzt:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     CARGO_NET_OFFLINE: "false"
+  when: always
 
 fresh-cache.test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1663,6 +1706,7 @@ fresh-cache.test_sdk_rust:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
@@ -1700,6 +1744,7 @@ fresh-cache.test_sdk_bindings:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1738,6 +1783,7 @@ fresh-cache.test_kernels:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1776,6 +1822,7 @@ fresh-cache.test_etherlink_kernel:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1813,6 +1860,7 @@ fresh-cache.test_etherlink_firehose:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
@@ -1847,6 +1895,7 @@ fresh-cache.audit_riscv_deps:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1884,6 +1933,7 @@ fresh-cache.check_riscv_kernels:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1925,6 +1975,7 @@ fresh-cache.test_evm_compatibility:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1959,6 +2010,7 @@ fresh-cache.ocaml-check:
     DUNE_CACHE: enabled
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
+  when: always
 
 fresh-cache.oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2022,6 +2074,7 @@ fresh-cache.oc.unit:non-proto-x86_64:
     reports:
       junit: test_results/*.xml
     when: always
+  when: always
   retry: 2
 
 fresh-cache.oc.unit:etherlink-x86_64:
@@ -2086,6 +2139,7 @@ fresh-cache.oc.unit:etherlink-x86_64:
     reports:
       junit: test_results/*.xml
     when: always
+  when: always
   retry: 2
 
 fresh-cache.oc.unit:other-x86_64:
@@ -2150,6 +2204,7 @@ fresh-cache.oc.unit:other-x86_64:
     reports:
       junit: test_results/*.xml
     when: always
+  when: always
   retry: 2
 
 fresh-cache.oc.unit:proto-x86_64:
@@ -2214,6 +2269,7 @@ fresh-cache.oc.unit:proto-x86_64:
     reports:
       junit: test_results/*.xml
     when: always
+  when: always
   retry: 2
 
 fresh-cache.oc.unit:non-proto-arm64:
@@ -2266,6 +2322,7 @@ fresh-cache.oc.unit:non-proto-arm64:
     reports:
       junit: test_results/*.xml
     when: always
+  when: always
   retry: 2
   parallel: 2
 
@@ -2292,6 +2349,7 @@ fresh-cache.oc.unit:webassembly-x86_64:
   - make test-webassembly
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2331,6 +2389,7 @@ fresh-cache.oc.unit:protocol_compiles:
     CARGO_NET_OFFLINE: "false"
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
+  when: always
 
 fresh-cache.de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2354,6 +2413,7 @@ fresh-cache.de.unit:x86_64:
   - dune runtest data-encoding
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2377,6 +2437,7 @@ fresh-cache.de.unit:arm64:
   - dune runtest data-encoding
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.resto.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2400,6 +2461,7 @@ fresh-cache.resto.unit:x86_64:
   - dune runtest resto
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.resto.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2423,6 +2485,7 @@ fresh-cache.resto.unit:arm64:
   - dune runtest resto
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.oc.install_opam_noble:
   image: ocaml/opam:ubuntu-24.04
@@ -2444,6 +2507,7 @@ fresh-cache.oc.install_opam_noble:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   variables:
     OPAMJOBS: "4"
+  when: always
 
 fresh-cache.oc.compile_sources_doc_master:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
@@ -2466,6 +2530,7 @@ fresh-cache.oc.compile_sources_doc_master:
   variables:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
+  when: always
   parallel:
     matrix:
     - IMAGE:
@@ -2540,6 +2605,7 @@ fresh-cache.tezt:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
   parallel: 50
 
@@ -2612,6 +2678,7 @@ fresh-cache.tezt-time-sensitive:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
 
 fresh-cache.tezt-slow:
@@ -2679,6 +2746,7 @@ fresh-cache.tezt-slow:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
   parallel: 20
 
@@ -2747,6 +2815,7 @@ fresh-cache.tezt-extra:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
   parallel: 10
 
@@ -2820,6 +2889,7 @@ fresh-cache.tezt-flaky:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
 
 fresh-cache.tezt:static-binaries:
@@ -2884,6 +2954,7 @@ fresh-cache.tezt:static-binaries:
     reports:
       junit: $JUNIT
     when: always
+  when: always
 
 fresh-cache.tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2947,6 +3018,7 @@ fresh-cache.tezt-riscv-slow-sequential:
     reports:
       junit: $JUNIT
     when: always
+  when: always
   retry: 2
 
 fresh-cache.oc.unified_coverage:
@@ -2989,6 +3061,7 @@ fresh-cache.oc.unified_coverage:
         path: _coverage_report/cobertura.xml
     when: always
     expose_as: Coverage report
+  when: always
   coverage: '/Coverage: ([^%]+%)/'
 
 fresh-cache.oc.docker:amd64:
@@ -3020,6 +3093,7 @@ fresh-cache.oc.docker:amd64:
     DOCKER_BUILD_TARGET: with-evm-artifacts
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  when: always
 
 fresh-cache.oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3048,6 +3122,7 @@ fresh-cache.oc.docker:arm64:
     DOCKER_BUILD_TARGET: without-evm-artifacts
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
+  when: always
 
 fresh-cache.oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3072,6 +3147,7 @@ fresh-cache.oc.script.docker_verify_image_arm64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: arm64_
+  when: always
 
 fresh-cache.oc.script.docker_verify_image_amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3096,6 +3172,7 @@ fresh-cache.oc.script.docker_verify_image_amd64:
   variables:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
+  when: always
 
 fresh-cache.documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
@@ -3114,6 +3191,7 @@ fresh-cache.documentation.rst-check:
   - make --silent -C docs sphinx-check
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3157,6 +3235,7 @@ fresh-cache.documentation.docgen:
     - docs/user/default-acl.json
     - docs/api/errors.rst
     - docs/shell/p2p_api.rst
+  when: always
 
 fresh-cache.documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3195,6 +3274,7 @@ fresh-cache.documentation.manuals:
     - docs/developer/metrics.csv
     - docs/developer/rollup_metrics.csv
     - docs/user/node-config.json
+  when: always
 
 fresh-cache.documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3241,6 +3321,7 @@ fresh-cache.documentation.odoc:
     - docs/_build/api/odoc/
     - docs/odoc.log
     when: always
+  when: always
 
 fresh-cache.documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3275,6 +3356,7 @@ fresh-cache.documentation.build_all:
     paths:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
+  when: always
 
 fresh-cache.documentation.linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3306,6 +3388,7 @@ fresh-cache.documentation.linkcheck:
   - make -C docs linkcheck
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.documentation.install_python_bookworm:
   image: debian:bookworm
@@ -3325,6 +3408,7 @@ fresh-cache.documentation.install_python_bookworm:
     ${CI_MERGE_REQUEST_SOURCE_BRANCH_NAME:-master}
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
+  when: always
 
 fresh-cache.teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -3372,6 +3456,7 @@ fresh-cache.teztale.build-arm64:
     paths:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
+  when: always
 
 fresh-cache.teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -3419,6 +3504,7 @@ fresh-cache.teztale.build-x86_64:
     paths:
     - teztale-binaries/x86_64/octez-teztale-*
     when: on_success
+  when: always
 
 fresh-cache.grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
@@ -3447,3 +3533,4 @@ fresh-cache.grafazos.build:
     paths:
     - grafazos/output/**/*.json
     when: on_success
+  when: always
