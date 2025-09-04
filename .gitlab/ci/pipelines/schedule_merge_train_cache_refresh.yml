@@ -175,6 +175,7 @@ fresh-cache.trigger:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.sanity_ci:
   image: ${ci_image_name_protected}/build:amd64--master
@@ -196,6 +197,7 @@ fresh-cache.sanity_ci:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.docker:hadolint:
   image: hadolint/hadolint:2.12.0-alpine
@@ -215,6 +217,7 @@ fresh-cache.docker:hadolint:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.ocaml_fmt:
   image: ${ci_image_name_protected}/build:amd64--master
@@ -248,6 +251,7 @@ fresh-cache.oc.ocaml_fmt:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
   when: always
+  retry: 0
 
 fresh-cache.oc.semgrep:
   image: returntocorp/semgrep-agent:sha-c6cd7cf
@@ -268,6 +272,7 @@ fresh-cache.oc.semgrep:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.misc_checks:
   image: ${ci_image_name_protected}/test:amd64--master
@@ -295,6 +300,7 @@ fresh-cache.oc.misc_checks:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.check_jsonnet:
   image: ${jsonnet_image_name_protected}:master
@@ -317,6 +323,7 @@ fresh-cache.check_jsonnet:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.check_rust_fmt:
   image: ${rust_toolchain_image_name_protected}:master
@@ -335,6 +342,7 @@ fresh-cache.check_rust_fmt:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.nix:
   image: nixos/nix:2.22.1
@@ -364,6 +372,7 @@ fresh-cache.nix:
     - flake.lock
     when: on_failure
   when: always
+  retry: 0
 
 fresh-cache.commit_titles:
   image: ${ci_image_name_protected}/prebuild:amd64--master
@@ -383,6 +392,7 @@ fresh-cache.commit_titles:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.build_arm64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -435,6 +445,7 @@ fresh-cache.oc.build_arm64-released:
     - src/proto_*/parameters/*.json
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build_arm64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -494,6 +505,7 @@ fresh-cache.oc.build_arm64-extra-dev:
     - etherlink-governance-observer
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build_arm64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -553,6 +565,7 @@ fresh-cache.oc.build_arm64-extra-exp:
     - etherlink-governance-observer
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build:static-x86_64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -603,6 +616,7 @@ fresh-cache.oc.build:static-x86_64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
   when: always
+  retry: 0
 
 fresh-cache.oc.build:static-arm64-linux-binaries:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -653,6 +667,7 @@ fresh-cache.oc.build:static-arm64-linux-binaries:
     paths:
     - octez-binaries/$ARCH/*
   when: always
+  retry: 0
 
 fresh-cache.oc.build_x86_64-released:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -709,6 +724,7 @@ fresh-cache.oc.build_x86_64-released:
     - src/proto_*/parameters/*.json
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build_amd64-extra-dev:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -781,6 +797,7 @@ fresh-cache.oc.build_amd64-extra-dev:
     - etherlink-governance-observer
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build_amd64-extra-exp:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -853,6 +870,7 @@ fresh-cache.oc.build_amd64-extra-exp:
     - etherlink-governance-observer
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.wasm-runtime-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -892,6 +910,7 @@ fresh-cache.wasm-runtime-check:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.oc.build_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -939,6 +958,7 @@ fresh-cache.oc.build_kernels:
     - dal_echo_kernel.wasm
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.build_dsn_node:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -980,6 +1000,7 @@ fresh-cache.oc.build_dsn_node:
     - octez-dsn-node
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.oc.tezt:fetch-records:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1011,6 +1032,7 @@ fresh-cache.oc.tezt:fetch-records:
     - tezt/records/*.json.broken
     when: always
   when: always
+  retry: 0
 
 fresh-cache.build_octez_source:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1054,6 +1076,7 @@ fresh-cache.build_octez_source:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 2G
   when: always
+  retry: 0
 
 fresh-cache.etherlink.build:static-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1103,6 +1126,7 @@ fresh-cache.etherlink.build:static-x86_64:
     - etherlink-*
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.etherlink.build:static-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1152,6 +1176,7 @@ fresh-cache.etherlink.build:static-arm64:
     - etherlink-*
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.build-layer1-profiling:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1200,6 +1225,7 @@ fresh-cache.build-layer1-profiling:
     - ./octez-binaries/x86_64/octez-node
     - ./octez-binaries/x86_64/octez-client
   when: always
+  retry: 0
 
 fresh-cache.select_tezts:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1227,6 +1253,7 @@ fresh-cache.select_tezts:
     - selected_tezts.tsl
     when: always
   when: always
+  retry: 0
 
 trigger:debian_repository_partial_auto:
   stage: test
@@ -1308,6 +1335,7 @@ fresh-cache.kaitai_checks:
     - _build/default/client-libs/bin_codec_kaitai/codec.exe
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.kaitai_e2e_checks:
   image: ${client_libs_dependencies_image_name}:${client_libs_dependencies_image_tag}
@@ -1333,6 +1361,7 @@ fresh-cache.kaitai_e2e_checks:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.check_lift_limits_patch:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1374,6 +1403,7 @@ fresh-cache.oc.check_lift_limits_patch:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.oc.python_check:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1398,6 +1428,7 @@ fresh-cache.oc.python_check:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.integration:compiler-rejections:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1438,6 +1469,7 @@ fresh-cache.oc.integration:compiler-rejections:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.oc.script:test-gen-genesis:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1460,6 +1492,7 @@ fresh-cache.oc.script:test-gen-genesis:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.script:snapshot_alpha_and_link:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1514,6 +1547,7 @@ fresh-cache.oc.script:snapshot_alpha_and_link:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
   when: always
+  retry: 0
 
 fresh-cache.oc.script:test_octez_release_versions:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1540,6 +1574,7 @@ fresh-cache.oc.script:test_octez_release_versions:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.script:b58_prefix:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1565,6 +1600,7 @@ fresh-cache.oc.script:b58_prefix:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.test-liquidity-baking-scripts:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -1593,6 +1629,7 @@ fresh-cache.oc.test-liquidity-baking-scripts:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc:scripts:release_script_values:
   image: ${ci_image_name}/prebuild:${ci_image_tag}
@@ -1614,6 +1651,7 @@ fresh-cache.oc:scripts:release_script_values:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.mir_unit:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1642,6 +1680,7 @@ fresh-cache.mir_unit:
   variables:
     CARGO_NET_OFFLINE: "false"
   when: always
+  retry: 0
 
 fresh-cache.mir_tzt:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -1670,6 +1709,7 @@ fresh-cache.mir_tzt:
   variables:
     CARGO_NET_OFFLINE: "false"
   when: always
+  retry: 0
 
 fresh-cache.test_sdk_rust:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1707,6 +1747,7 @@ fresh-cache.test_sdk_rust:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.test_sdk_bindings:
   image: ${rust_sdk_bindings_image_name}:${rust_sdk_bindings_image_tag}
@@ -1745,6 +1786,7 @@ fresh-cache.test_sdk_bindings:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.test_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1784,6 +1826,7 @@ fresh-cache.test_kernels:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.test_etherlink_kernel:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1823,6 +1866,7 @@ fresh-cache.test_etherlink_kernel:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.test_etherlink_firehose:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1861,6 +1905,7 @@ fresh-cache.test_etherlink_firehose:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.audit_riscv_deps:
   image: ${rust_toolchain_image_name_protected}:master
@@ -1896,6 +1941,7 @@ fresh-cache.audit_riscv_deps:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.check_riscv_kernels:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1934,6 +1980,7 @@ fresh-cache.check_riscv_kernels:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.test_evm_compatibility:
   image: ${rust_toolchain_image_name}:${rust_toolchain_image_tag}
@@ -1976,6 +2023,7 @@ fresh-cache.test_evm_compatibility:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.ocaml-check:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2011,6 +2059,7 @@ fresh-cache.ocaml-check:
     DUNE_CACHE_STORAGE_MODE: hardlink
     DUNE_CACHE_ROOT: $CI_PROJECT_DIR/_dune_cache
   when: always
+  retry: 0
 
 fresh-cache.oc.unit:non-proto-x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2075,7 +2124,7 @@ fresh-cache.oc.unit:non-proto-x86_64:
       junit: test_results/*.xml
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.oc.unit:etherlink-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2140,7 +2189,7 @@ fresh-cache.oc.unit:etherlink-x86_64:
       junit: test_results/*.xml
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.oc.unit:other-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2205,7 +2254,7 @@ fresh-cache.oc.unit:other-x86_64:
       junit: test_results/*.xml
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.oc.unit:proto-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2270,7 +2319,7 @@ fresh-cache.oc.unit:proto-x86_64:
       junit: test_results/*.xml
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.oc.unit:non-proto-arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2323,7 +2372,7 @@ fresh-cache.oc.unit:non-proto-arm64:
       junit: test_results/*.xml
     when: always
   when: always
-  retry: 2
+  retry: 0
   parallel: 2
 
 fresh-cache.oc.unit:webassembly-x86_64:
@@ -2350,6 +2399,7 @@ fresh-cache.oc.unit:webassembly-x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.unit:protocol_compiles:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -2390,6 +2440,7 @@ fresh-cache.oc.unit:protocol_compiles:
     SCCACHE_DIR: $CI_PROJECT_DIR/_sccache
     SCCACHE_CACHE_SIZE: 5G
   when: always
+  retry: 0
 
 fresh-cache.de.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2414,6 +2465,7 @@ fresh-cache.de.unit:x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.de.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2438,6 +2490,7 @@ fresh-cache.de.unit:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.resto.unit:x86_64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2462,6 +2515,7 @@ fresh-cache.resto.unit:x86_64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.resto.unit:arm64:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -2486,6 +2540,7 @@ fresh-cache.resto.unit:arm64:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.oc.install_opam_noble:
   image: ocaml/opam:ubuntu-24.04
@@ -2508,6 +2563,7 @@ fresh-cache.oc.install_opam_noble:
   variables:
     OPAMJOBS: "4"
   when: always
+  retry: 0
 
 fresh-cache.oc.compile_sources_doc_master:
   image: ${GCP_PROTECTED_REGISTRY}/${CI_PROJECT_NAMESPACE}/tezos/$IMAGE
@@ -2531,6 +2587,7 @@ fresh-cache.oc.compile_sources_doc_master:
     CARGO_HOME: /home/opam/.cargo
     CARGO_NET_OFFLINE: "false"
   when: always
+  retry: 0
   parallel:
     matrix:
     - IMAGE:
@@ -2606,7 +2663,7 @@ fresh-cache.tezt:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
   parallel: 50
 
 fresh-cache.tezt-time-sensitive:
@@ -2679,7 +2736,7 @@ fresh-cache.tezt-time-sensitive:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.tezt-slow:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2747,7 +2804,7 @@ fresh-cache.tezt-slow:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
   parallel: 20
 
 fresh-cache.tezt-extra:
@@ -2816,7 +2873,7 @@ fresh-cache.tezt-extra:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
   parallel: 10
 
 fresh-cache.tezt-flaky:
@@ -2890,7 +2947,7 @@ fresh-cache.tezt-flaky:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.tezt:static-binaries:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -2955,6 +3012,7 @@ fresh-cache.tezt:static-binaries:
       junit: $JUNIT
     when: always
   when: always
+  retry: 0
 
 fresh-cache.tezt-riscv-slow-sequential:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3019,7 +3077,7 @@ fresh-cache.tezt-riscv-slow-sequential:
       junit: $JUNIT
     when: always
   when: always
-  retry: 2
+  retry: 0
 
 fresh-cache.oc.unified_coverage:
   image: ${ci_image_name}/e2etest:${ci_image_tag}
@@ -3063,6 +3121,7 @@ fresh-cache.oc.unified_coverage:
     expose_as: Coverage report
   when: always
   coverage: '/Coverage: ([^%]+%)/'
+  retry: 0
 
 fresh-cache.oc.docker:amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3094,6 +3153,7 @@ fresh-cache.oc.docker:amd64:
     IMAGE_ARCH_PREFIX: amd64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
   when: always
+  retry: 0
 
 fresh-cache.oc.docker:arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3123,6 +3183,7 @@ fresh-cache.oc.docker:arm64:
     IMAGE_ARCH_PREFIX: arm64_
     EXECUTABLE_FILES: script-inputs/released-executables script-inputs/experimental-executables
   when: always
+  retry: 0
 
 fresh-cache.oc.script.docker_verify_image_arm64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3148,6 +3209,7 @@ fresh-cache.oc.script.docker_verify_image_arm64:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: arm64_
   when: always
+  retry: 0
 
 fresh-cache.oc.script.docker_verify_image_amd64:
   image: ${GCP_REGISTRY}/tezos/docker-images/ci-docker:v1.13.0
@@ -3173,6 +3235,7 @@ fresh-cache.oc.script.docker_verify_image_amd64:
     DOCKER_VERSION: 24.0.7
     IMAGE_ARCH_PREFIX: amd64_
   when: always
+  retry: 0
 
 fresh-cache.documentation.rst-check:
   image: ${ci_image_name_protected}/test:amd64--master
@@ -3192,6 +3255,7 @@ fresh-cache.documentation.rst-check:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.documentation.docgen:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3236,6 +3300,7 @@ fresh-cache.documentation.docgen:
     - docs/api/errors.rst
     - docs/shell/p2p_api.rst
   when: always
+  retry: 0
 
 fresh-cache.documentation.manuals:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3275,6 +3340,7 @@ fresh-cache.documentation.manuals:
     - docs/developer/rollup_metrics.csv
     - docs/user/node-config.json
   when: always
+  retry: 0
 
 fresh-cache.documentation.odoc:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3322,6 +3388,7 @@ fresh-cache.documentation.odoc:
     - docs/odoc.log
     when: always
   when: always
+  retry: 0
 
 fresh-cache.documentation.build_all:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3357,6 +3424,7 @@ fresh-cache.documentation.build_all:
     - docs/_build/
     expose_as: Documentation - excluding old protocols
   when: always
+  retry: 0
 
 fresh-cache.documentation.linkcheck:
   image: ${ci_image_name}/test:${ci_image_tag}
@@ -3389,6 +3457,7 @@ fresh-cache.documentation.linkcheck:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.documentation.install_python_bookworm:
   image: debian:bookworm
@@ -3409,6 +3478,7 @@ fresh-cache.documentation.install_python_bookworm:
   after_script:
   - . ./scripts/ci/datadog_send_job_cache_info.sh 'after'
   when: always
+  retry: 0
 
 fresh-cache.teztale.build-arm64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -3457,6 +3527,7 @@ fresh-cache.teztale.build-arm64:
     - teztale-binaries/arm64/octez-teztale-*
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.teztale.build-x86_64:
   image: ${ci_image_name}/build:${ci_image_tag}
@@ -3505,6 +3576,7 @@ fresh-cache.teztale.build-x86_64:
     - teztale-binaries/x86_64/octez-teztale-*
     when: on_success
   when: always
+  retry: 0
 
 fresh-cache.grafazos.build:
   image: ${jsonnet_image_name}:${jsonnet_image_tag}
@@ -3534,3 +3606,4 @@ fresh-cache.grafazos.build:
     - grafazos/output/**/*.json
     when: on_success
   when: always
+  retry: 0
