@@ -830,6 +830,8 @@ let setup_opentelemetry ~data_dir config =
     ~data_dir
     ~service_namespace:"rollup_node"
     ~service_name:"rollup_node"
+    ~version:
+      Tezos_version_value.Bin_version.octez_smart_rollup_node_version_string
     config.Configuration.opentelemetry
 
 let run ~data_dir ~irmin_cache_size (configuration : Configuration.t)

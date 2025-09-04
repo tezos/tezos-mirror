@@ -9,6 +9,7 @@
 type t = {
   enable : bool;
   instance_id : string option;
+  environment : string option;
   config : Opentelemetry_client_cohttp_lwt.Config.t;
 }
 
@@ -16,6 +17,7 @@ let default =
   {
     enable = false;
     instance_id = None;
+    environment = Sys.getenv_opt "DD_ENV";
     config = Opentelemetry_client_cohttp_lwt.Config.make ();
   }
 
@@ -26,6 +28,7 @@ let detailed_encoding =
     (fun {
            enable;
            instance_id;
+           environment;
            config =
              {
                debug;
@@ -41,6 +44,7 @@ let detailed_encoding =
        ->
       ( enable,
         instance_id,
+        environment,
         Some debug,
         Some url_traces,
         Some url_logs,
@@ -50,6 +54,7 @@ let detailed_encoding =
         Some batch_timeout_ms ))
     (fun ( enable,
            instance_id,
+           environment,
            debug,
            url_traces,
            url_logs,
@@ -69,8 +74,8 @@ let detailed_encoding =
           ?batch_timeout_ms
           ()
       in
-      {enable; instance_id; config})
-  @@ obj9
+      {enable; instance_id; environment; config})
+  @@ obj10
        (dft "enable" ~description:"Enable opentelemetry profiling" bool true)
        (opt
           "instance_id"
@@ -78,6 +83,14 @@ let detailed_encoding =
             "Instance id to identify the node in Opentelemetry traces. Takes \
              precedence over <data_dir>/telemetry_id."
           string)
+       (dft
+          "environment"
+          ~description:
+            "Deployment environment, used for Datadog tagging, will be \
+             extracted from env variable DD_ENV if null. See \
+             https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging."
+          (option string)
+          default.environment)
        (opt "debug" ~description:"Enable debug mode" bool)
        (opt "url_traces" ~description:"URL to send traces" string)
        (opt "url_logs" ~description:"URL to send logs" string)

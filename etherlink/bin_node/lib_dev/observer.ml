@@ -132,6 +132,7 @@ let main ?network ?kernel_path ~data_dir ~(config : Configuration.t) ~no_sync
       ~data_dir
       ~service_namespace:"evm_node"
       ~service_name:"observer"
+      ~version:Tezos_version_value.Bin_version.octez_evm_node_version_string
       config.opentelemetry
   in
   let*? {evm_node_endpoint; rollup_node_tracking} =

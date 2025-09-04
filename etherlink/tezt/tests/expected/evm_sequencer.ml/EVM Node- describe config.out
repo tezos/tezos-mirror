@@ -336,6 +336,11 @@
         $unistring
         /* Instance id to identify the node in Opentelemetry traces. Takes
            precedence over <data_dir>/telemetry_id. */,
+      "environment"?:
+        /* Deployment environment, used for Datadog tagging, will be
+           extracted from env variable DD_ENV if null. See
+           https://docs.datadoghq.com/getting_started/tagging/unified_service_tagging. */
+        $unistring /* Some */ || null /* None */,
       "debug"?: boolean /* Enable debug mode */,
       "url_traces"?: $unistring /* URL to send traces */,
       "url_logs"?: $unistring /* URL to send logs */,

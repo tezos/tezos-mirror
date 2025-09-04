@@ -12,6 +12,8 @@ type t = {
       (** When this is false, opentelemetry should not be enabled. *)
   instance_id : string option;
       (** User provided instance identifier for opentelemetry traces. *)
+  environment : string option;
+      (** Deployment environment used for Datadog tagging.  *)
   config : Opentelemetry_client_cohttp_lwt.Config.t;
       (** The actual configuration to use for opentelemetry when [enable = true]. *)
 }
