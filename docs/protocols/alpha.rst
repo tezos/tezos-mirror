@@ -146,6 +146,12 @@ Protocol parameters
 Bug Fixes
 ---------
 
+- Updated cache functions to include the context when
+  needed. Previously backtracked gas costs for some cache calls are
+  now properly accounted for, increasing by at most 2 units of gas per
+  function call. Notably, **the ``set delegate`` operation now has a
+  slightly higher gas cost.** (MR :gl:`!19134`)
+
 Minor Changes
 -------------
 
