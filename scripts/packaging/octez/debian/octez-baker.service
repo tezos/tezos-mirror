@@ -1,13 +1,11 @@
 [Unit]
-Description=Octez baker service
-After=network.target
+Description=Octez baker umbrella service
+After=network.target octez-node.service
 
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-Restart=on-failure
-TimeoutStartSec=300
-TimeoutStopSec=300
+
 
 EnvironmentFile=-/etc/default/octez-node
 EnvironmentFile=-/etc/default/octez-baker

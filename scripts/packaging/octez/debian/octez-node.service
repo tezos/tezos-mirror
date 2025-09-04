@@ -4,15 +4,18 @@ Documentation=https://tezos.gitlab.io/
 After=network.target
 
 [Service]
-TimeoutSec=600s
 EnvironmentFile=-/etc/default/octez-node
+User=tezos
 WorkingDirectory=~
 Restart=on-failure
+RestartSec=10s
+KillMode=control-group
 TimeoutStartSec=infinity
-TimeoutSec=1500
-User=tezos
+TimeoutStopSec=300s
+
 ExecStartPre=/usr/share/octez-node/octez-node-prestart.sh
 ExecStart=/usr/bin/octez-node run --data-dir $DATADIR --log-output /var/log/tezos/node.log $RUNTIME_OPTS
+Slice=octez.slice
 
 [Install]
 WantedBy=multi-user.target
