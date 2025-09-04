@@ -62,6 +62,21 @@ val sccache :
   unit ->
   sccache_config
 
+(** Configuration of Dune's cache. *)
+type dune_cache_config
+
+(** Make a configuration for Dune's cache.
+
+    See {!Tezos_ci.Cache.enable_dune_cache}. *)
+val dune_cache :
+  ?key:string ->
+  ?path:string ->
+  ?cache_size:string ->
+  ?copy_mode:bool ->
+  ?policy:Gitlab_ci.Types.cache_policy ->
+  unit ->
+  dune_cache_config
+
 (** Pipeline jobs.
 
     Jobs are basically code to run in a given pipeline stage. *)
@@ -191,6 +206,9 @@ module type COMPONENT_API = sig
       If [sccache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_sccache}.
 
+      If [dune_cache] is specified, the resulting job is modified with
+      {!Tezos_ci.Cache.enable_dune_cache}.
+
       See {!Tezos_ci.job} for information about other arguments. *)
   val job :
     __POS__:string * int * int * int ->
@@ -210,6 +228,7 @@ module type COMPONENT_API = sig
     ?cargo_cache:bool ->
     ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
+    ?dune_cache:dune_cache_config ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     string ->
     string list ->
