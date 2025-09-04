@@ -33,6 +33,29 @@ configuration option to improve performance at the cost of memory consumption
 and removes the tx pool which has been replaced by the tx queue since version
 0.21.
 
+**There is a breaking change in the configuration file**, and node providers
+who have configured the tx queue using the field
+`experimental_features.enable_tx_queue` need to update their configuration.
+
+Here is an example of a configuration change to address the breaking change.
+
+```diff
+-  "tx_pool_timeout_limit": "10",
+-  "tx_pool_addr_limit": "10",
+-  "tx_pool_tx_per_addr_limit": "10",
+-  "experimental_features": {
+-    "enable_tx_queue": {
+-      "max_size": 100000,
+-      "max_lifespan": 10,
+-      "tx_per_addr_limit": "10000"
+-    }
++  "tx_pool": {
++    "max_size": 100000,
++    "max_lifespan": 10,
++    "tx_per_addr_limit": "10000"
+   },
+```
+
 This release will not apply any migration to the node's store (version
 22), meaning it is possible to downgrade to the previous version.
 
