@@ -209,6 +209,10 @@ module type COMPONENT_API = sig
       If [dune_cache] is specified, the resulting job is modified with
       {!Tezos_ci.Cache.enable_dune_cache}.
 
+      If [test_coverage] is specified, the resulting job is modified with
+      {!Tezos_ci.Coverage.enable_instrumentation} and
+      {!Tezos_ci.Coverage.enable_output_artifact}.
+
       See {!Tezos_ci.job} for information about other arguments.
 
       The default number of retries is 0 for [Publish] jobs.
@@ -233,6 +237,7 @@ module type COMPONENT_API = sig
     ?cargo_target_caches:bool ->
     ?sccache:sccache_config ->
     ?dune_cache:dune_cache_config ->
+    ?test_coverage:bool ->
     ?allow_failure:Gitlab_ci.Types.allow_failure_job ->
     ?retry:Gitlab_ci.Types.retry ->
     string ->
