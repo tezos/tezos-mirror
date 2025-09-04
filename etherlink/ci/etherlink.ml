@@ -55,12 +55,45 @@ let job_lint_wasm_runtime =
       "etherlink/lib_wasm_runtime/lint.sh";
     ]
 
+let job_unit_tests =
+  CI.job
+    "unit_tests"
+    ~__POS__
+    ~stage:Test
+    ~description:"Etherlink unit tests."
+    ~image:Tezos_ci.Images.CI.build
+    ~artifacts:
+      ((* Note: the [~name] is actually overridden by the one computed
+           by [Tezos_ci.Coverage.enable_output_artifact].
+           We set it anyway for consistency with how the job
+           was previously declared using [job_unit_test] in [code_verification.ml]. *)
+       Gitlab_ci.Util.artifacts
+         ~name:"$CI_JOB_NAME-$CI_COMMIT_SHA-x86_64"
+         ["test_results"]
+         ~reports:(Gitlab_ci.Util.reports ~junit:"test_results/*.xml" ())
+         ~expire_in:(Duration (Days 1))
+         ~when_:Always)
+    ~cargo_cache:true
+    ~sccache:(Cacio.sccache ())
+    ~dune_cache:
+      (Cacio.dune_cache
+         ~key:
+           ("dune-build-cache-"
+           ^ Gitlab_ci.Predefined_vars.(show ci_pipeline_id))
+         ~policy:Pull
+         ())
+    ~test_coverage:true
+    ~variables:[("DUNE_ARGS", "-j 12")]
+    ~retry:{max = 2; when_ = []}
+    [". ./scripts/version.sh"; "eval $(opam env)"; "make test-etherlink-unit"]
+
 let register () =
   CI.register_before_merging_jobs
     [
       (Manual, job_build_evm_node_static Amd64);
       (Manual, job_build_evm_node_static Arm64);
       (Auto, job_lint_wasm_runtime);
+      (Auto, job_unit_tests);
     ] ;
   CI.register_scheduled_pipeline
     "daily"
@@ -69,5 +102,6 @@ let register () =
       (Auto, job_build_evm_node_static Amd64);
       (Auto, job_build_evm_node_static Arm64);
       (Auto, job_lint_wasm_runtime);
+      (Auto, job_unit_tests);
     ] ;
   ()
