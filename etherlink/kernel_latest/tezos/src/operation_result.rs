@@ -203,7 +203,6 @@ pub enum OperationError {
     RuntimeError(#[from] RuntimeError),
 }
 
-#[allow(dead_code)]
 fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
     // As per the BSON specification (https://bsonspec.org/spec.html), the BSON
     // document is made of the concatenation of the following values:
@@ -239,52 +238,25 @@ fn elements_to_bson(elts: &[(&[u8], &[u8])]) -> Vec<u8> {
 // In Tezos data encoding, errors are encoded as bson (binary json). Unfortunately,
 // we cannot use the rust binary json crate to produce compatible bson data because
 // this crate uses Float pointer instructions (which is incompatible with the PVM).
-// To avoid reimplementing full bson support, we convert errors to strings and
-// manually encode them in bson. This gives us error which can be decoded using
-// Tezos data encoding but with less structure than what Tezos L1 produces.
+// To avoid reimplementing full bson support, we restrict the encoding of errors
+// to a single bson structure. This gives us error which can be decoded using
+// Tezos data encoding but with less possibilities than what Tezos L1 produces.
+// For compatibility with the TzKT indexer, we need to produce a BSON object with
+// an "id" field (see https://github.com/baking-bad/tzkt/blob/master/Tzkt.Sync/Protocols/Helpers/OperationErrors.cs).
+// We use the following structure:
+// { "kind": "permanent", "id": "tezlink_error", "error_message": "<error>" }
+// This is a temporary solution while waiting for better error support.
+// TODO https://linear.app/tezos/issue/L2-363/l1tzkt-compatible-errors
 impl BinWriter for ApplyOperationError {
     fn bin_write(&self, output: &mut Vec<u8>) -> tezos_enc::BinResult {
         tezos_enc::dynamic(|error, out: &mut Vec<u8>| {
-            // Convert the error to a String
-            let error = format!("{error:?}");
-            let encoded_error = error.as_bytes();
-            let size_of_string: u32 = encoded_error
-                .len()
-                .try_into()
-                .map_err(|err| tezos_enc::BinError::custom(format!("{err}")))?;
-            // Tag for a BSON string is 0x82 (1 byte)
-            let bson_tag_size = 1;
-            // Size of a BSON object is encoded on 4 bytes
-            let bson_size = 4;
-            // Size of a BSON string is encoded on 4 bytes
-            let bson_string_size = 4;
-            // Tag for BSON string termination is on 1 byte
-            let bson_string_end_tag_size = 1;
-            // Tag for BSON termination is on 1 byte
-            let bson_end_tag_size = 1;
-            // A BSON object starts with its size
-            let mut bson = (bson_tag_size
-                + bson_size
-                + bson_string_size
-                + size_of_string
-                + bson_string_end_tag_size
-                + bson_end_tag_size)
-                .to_le_bytes()
-                .to_vec();
-            // In BSON, 0x82 is the tag for a String
-            bson.push(0x82_u8);
-            // In BSON, a String is encoded with its size on 4 bytes.
-            // But also an end bytes (byte 0), this is why we encode
-            // size + 1
-            bson.extend_from_slice(
-                &(size_of_string + bson_string_end_tag_size).to_le_bytes(),
-            );
-            bson.extend_from_slice(encoded_error);
-            bson.push(0x00);
-            // This is a little hack, but an OperationError will always be encoded in a list of OperationError.
-            // This zero byte represent the end of an item. Doing this prevent to rewrite multiple BinWriter
-            // implementation.
-            bson.push(0x00);
+            let str_error = format!("{error:?}");
+            let encoded_str_error = str_error.as_bytes();
+            let bson = elements_to_bson(&[
+                (b"kind", b"permanent"),
+                (b"id", b"tezlink_error"),
+                (b"error_message", encoded_str_error),
+            ]);
             tezos_enc::bytes(bson, out)?;
             Ok(())
         })(self, output)
