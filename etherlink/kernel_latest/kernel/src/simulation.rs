@@ -16,7 +16,8 @@ use crate::chains::{ChainFamily, ETHERLINK_SAFE_STORAGE_ROOT_PATH};
 use crate::fees::simulation_add_gas_for_fees;
 use crate::l2block::L2Block;
 use crate::storage::{
-    read_last_info_per_level_timestamp, read_sequencer_pool_address, read_tracer_input,
+    read_last_info_per_level_timestamp, read_or_set_maximum_gas_per_transaction,
+    read_sequencer_pool_address, read_tracer_input,
 };
 use crate::tick_model::constants::MAXIMUM_GAS_LIMIT;
 use crate::{error::Error, storage};
@@ -463,9 +464,11 @@ impl Evaluation {
                     err.to_string(),
                 )))
             })?;
+        let max_gas_limit =
+            read_or_set_maximum_gas_per_transaction(host).unwrap_or(MAXIMUM_GAS_LIMIT);
         let gas = self
             .gas
-            .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT));
+            .map_or(max_gas_limit, |gas| u64::min(gas, max_gas_limit));
         let max_gas_to_pay = constants.base_fee_per_gas() * gas;
 
         // If the simulation is performed with the zero address and has a non
@@ -517,8 +520,7 @@ impl Evaluation {
             from,
             self.to,
             self.value.unwrap_or_default(),
-            self.gas
-                .map_or(MAXIMUM_GAS_LIMIT, |gas| u64::min(gas, MAXIMUM_GAS_LIMIT)),
+            gas,
             self.data.clone(),
             gas_price,
             // TODO: Replace this by the decoded access lists if any.
