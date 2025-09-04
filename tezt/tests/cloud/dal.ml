@@ -1398,6 +1398,7 @@ let register (module Cli : Scenarios_cli.Dal) =
              ["octez-teztale-archiver"; "octez-teztale-server"]
            else []
          else [])
+      @ (if Cli.echo_rollup then ["dal_echo_kernel_bandwidth.wasm"] else [])
       @ Option.fold
           ~none:[]
           ~some:(fun x -> [x])
