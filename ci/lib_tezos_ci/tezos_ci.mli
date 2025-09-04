@@ -775,4 +775,31 @@ module Coverage : sig
 
       This is meant to be used in [unified_coverage] jobs. *)
   val enable_report : tezos_job -> tezos_job
+
+  (** Declare that a job produces coverage traces.
+
+      This has the following effects:
+      - add the coverage trace artifact;
+      - append [merge_coverage.sh];
+      - applies {!enable_location};
+      - registers the job so that it is used by {!close}.
+
+      This function should be applied to test jobs that produce coverage traces. *)
+  val enable_output_artifact :
+    ?expire_in:Gitlab_ci.Types.expiration -> tezos_job -> tezos_job
+
+  (** Generate the [unified_coverage] job.
+
+      After this, {!enable_output_artifact} cannot be called anymore,
+      except on jobs with the same name as a job on which {!enable_output_artifact}
+      was already applied.
+
+      The first time this is called, this creates the job
+      and generates [script-inputs/ci-coverage-producing-jobs].
+      After that, [close] just returns the already-computed [unified_coverage] job.
+
+      The argument is the changeset to use to trigger the [unified_coverage] job.
+      It is supposed to be [changeset_octez], which is unfortunately not defined
+      in [Tezos_ci] but in [ci/bin]. *)
+  val close : Changeset.t -> tezos_job
 end

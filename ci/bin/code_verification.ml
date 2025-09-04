@@ -306,24 +306,6 @@ let jobs pipeline_type =
         | On_changes changes ->
             [job_rule ~when_:Manual ~changes:(Changeset.encode changes) ()])
   in
-  (* Collect coverage trace producing jobs *)
-  let jobs_with_coverage_output = ref [] in
-  (* Add variables for bisect_ppx output and store the traces as an
-     artifact.
-
-     This function should be applied to test jobs that produce coverage. *)
-  let enable_coverage_output_artifact ?(expire_in = Duration (Days 1)) tezos_job
-      : tezos_job =
-    jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output ;
-    tezos_job |> Coverage.enable_location
-    |> append_script ["./scripts/ci/merge_coverage.sh"]
-    |> add_artifacts
-         ~expire_in
-         ~name:"coverage-files-$CI_JOB_ID"
-         ~when_:On_success
-         (* Store merged .coverage files or [.corrupt.json] files. *)
-         ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
-  in
 
   (* Stages *)
   let start_stage, make_dependencies =
@@ -1141,7 +1123,7 @@ let jobs pipeline_type =
           ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"]
           ()
-        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_etherlink_x86_64 =
         job_unit_test
@@ -1151,7 +1133,7 @@ let jobs pipeline_type =
           ~rules:(make_rules ~changes:changeset_etherlink ~dependent:true ())
           ~make_targets:["test-etherlink-unit"]
           ()
-        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
@@ -1162,7 +1144,7 @@ let jobs pipeline_type =
           ~cpu:High
           ~make_targets:["test-other-unit"]
           ()
-        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_proto_x86_64 =
         (* Runs unit tests for protocol. *)
@@ -1173,7 +1155,7 @@ let jobs pipeline_type =
           ~cpu:Very_high
           ~make_targets:["test-proto-unit"]
           ()
-        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> Coverage.enable_output_artifact
       in
       let oc_unit_non_proto_arm64 =
         (* No coverage for arm64 jobs -- the code they test is a
@@ -1582,7 +1564,7 @@ let jobs pipeline_type =
           ~keep_going
           ?job_select_tezts
           ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+        |> Coverage.enable_output_artifact ~expire_in:coverage_expiry
       in
       let tezt_time_sensitive : tezos_job =
         (* the following tests are executed with [~tezt_parallel:1] to ensure
@@ -1600,7 +1582,7 @@ let jobs pipeline_type =
           ?job_select_tezts
           ~rules
           ()
-        |> enable_coverage_output_artifact ~expire_in:coverage_expiry
+        |> Coverage.enable_output_artifact ~expire_in:coverage_expiry
       in
       let tezt_riscv_slow_sequential : tezos_job =
         Tezt.job
@@ -1683,7 +1665,7 @@ let jobs pipeline_type =
           ~rules:rules_manual
           ~allow_failure:Yes
           ()
-        |> enable_coverage_output_artifact
+        |> Coverage.enable_output_artifact
       in
       let tezt_static_binaries : tezos_job =
         Tezt.job
@@ -1897,52 +1879,10 @@ let jobs pipeline_type =
     @ jobs_unit @ jobs_install_octez @ jobs_tezt
   in
 
-  (*Coverage jobs *)
+  (* Coverage jobs *)
   let coverage =
     match pipeline_type with
-    | Before_merging | Merge_train ->
-        (* Write the name of each job that produces coverage as input for other scripts.
-           Only includes the stem of the name: parallel jobs only appear once.
-           E.g. as [tezt], not [tezt X/Y]. *)
-        Base.write_file
-          "script-inputs/ci-coverage-producing-jobs"
-          ~contents:
-            (String.concat
-               "\n"
-               (List.map Tezos_ci.name_of_tezos_job !jobs_with_coverage_output)
-            ^ "\n") ;
-        (* This job fetches coverage files by precedent test stage. It creates
-           the html, summary and cobertura reports. It also provide a coverage %
-           for the merge request. *)
-        let job_unified_coverage : tezos_job =
-          let dependencies = List.rev !jobs_with_coverage_output in
-          job
-            ~__POS__
-            ~image:Images.CI.e2etest
-            ~name:"oc.unified_coverage"
-            ~stage:Stages.test_coverage
-            ~coverage:"/Coverage: ([^%]+%)/"
-            ~rules:
-              (make_rules
-                 ~final_pipeline_disable:true
-                 ~changes:changeset_octez
-                 ())
-            ~variables:
-              [
-                (* This inhibits the Makefile's opam version check, which
-                   this job's opam-less image
-                   ([e2etest]) cannot pass. *)
-                ("TEZOS_WITHOUT_OPAM", "true");
-              ]
-            ~dependencies:(Staged dependencies)
-            (* On the development branches, we compute coverage.
-               TODO: https://gitlab.com/tezos/tezos/-/issues/6173
-               We propagate the exit code to temporarily allow corrupted coverage files. *)
-            (script_propagate_exit_code "./scripts/ci/report_coverage.sh")
-            ~allow_failure:(With_exit_codes [64])
-          |> Coverage.enable_location |> Coverage.enable_report
-        in
-        [job_unified_coverage]
+    | Before_merging | Merge_train -> [Coverage.close changeset_octez]
     | Schedule_extended_test -> []
   in
 

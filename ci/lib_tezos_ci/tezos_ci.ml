@@ -1820,4 +1820,84 @@ module Coverage = struct
          ~when_:Always
          ["_coverage_report/"; "$BISECT_FILE"]
     |> append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
+
+  let unified_coverage_job : tezos_job option ref = ref None
+
+  (* Collect coverage trace-producing jobs. *)
+  let jobs_with_coverage_output = ref []
+
+  let enable_output_artifact ?(expire_in = Gitlab_ci.Types.Duration (Days 1))
+      tezos_job : tezos_job =
+    (* If another job with the same name was already registered:
+       - don't register it again;
+       - allow to apply this function even after [close].
+       This is a hack to allow both [Before_merging] and [Merge_train]
+       in [code_verification.ml] to register the jobs and then call [close]. *)
+    if
+      Fun.flip List.for_all !jobs_with_coverage_output @@ fun previous_job ->
+      name_of_tezos_job previous_job <> name_of_tezos_job tezos_job
+    then (
+      if !unified_coverage_job <> None then
+        failwith
+          "it is too late to apply enable_output_artifact to job %s because \
+           Coverage.close was already called"
+          (name_of_tezos_job tezos_job) ;
+      jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output) ;
+    tezos_job |> enable_location
+    |> append_script ["./scripts/ci/merge_coverage.sh"]
+    |> add_artifacts
+         ~expire_in
+         ~name:"coverage-files-$CI_JOB_ID"
+         ~when_:On_success
+         (* Store merged .coverage files or [.corrupt.json] files. *)
+         ["$BISECT_FILE/$CI_JOB_NAME_SLUG.*"]
+
+  let close changeset =
+    match !unified_coverage_job with
+    | Some job -> job
+    | None ->
+        (* Write the name of each job that produces coverage as input for other scripts.
+           Only includes the stem of the name: parallel jobs only appear once.
+           E.g. as [tezt], not [tezt X/Y]. *)
+        write_file
+          "script-inputs/ci-coverage-producing-jobs"
+          ~contents:
+            (String.concat
+               "\n"
+               (List.map name_of_tezos_job !jobs_with_coverage_output)
+            ^ "\n") ;
+        (* This job fetches coverage files by precedent test stage. It creates
+           the html, summary and cobertura reports. It also provide a coverage %
+           for the merge request. *)
+        let dependencies = List.rev !jobs_with_coverage_output in
+        let job =
+          job
+            ~__POS__
+            ~image:Images.CI.e2etest
+            ~name:"oc.unified_coverage"
+            ~stage:Stages.test_coverage
+            ~coverage:"/Coverage: ([^%]+%)/"
+            ~rules:
+              [
+                job_rule ~if_:Rules.is_final_pipeline ~when_:Never ();
+                job_rule
+                  ~changes:(Changeset.encode changeset)
+                  ~when_:On_success
+                  ();
+              ]
+            ~variables:
+              [
+                (* This inhibits the Makefile's opam version check, which
+                 this job's opam-less image ([e2etest]) cannot pass. *)
+                ("TEZOS_WITHOUT_OPAM", "true");
+              ]
+            ~dependencies:(Staged dependencies)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/6173
+             We propagate the exit code to temporarily allow corrupted coverage files. *)
+            ["./scripts/ci/report_coverage.sh || exit $?"]
+            ~allow_failure:(With_exit_codes [64])
+          |> enable_location |> enable_report
+        in
+        unified_coverage_job := Some job ;
+        job
 end
