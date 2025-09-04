@@ -1794,3 +1794,28 @@ let job_datadog_pipeline_trace : tezos_job =
       "DATADOG_SITE=datadoghq.eu datadog-ci tag --level pipeline --tags \
        pipeline_type:$PIPELINE_TYPE --tags mr_number:$CI_MERGE_REQUEST_IID";
     ]
+
+module Coverage = struct
+  let enable_instrumentation : tezos_job -> tezos_job =
+    append_variables [("COVERAGE_OPTIONS", "--instrument-with bisect_ppx")]
+
+  let enable_location : tezos_job -> tezos_job =
+    append_variables [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
+
+  let enable_report job : tezos_job =
+    job
+    |> add_artifacts
+         ~expose_as:"Coverage report"
+         ~reports:
+           (reports
+              ~coverage_report:
+                {
+                  coverage_format = Cobertura;
+                  path = "_coverage_report/cobertura.xml";
+                }
+              ())
+         ~expire_in:(Duration (Days 15))
+         ~when_:Always
+         ["_coverage_report/"; "$BISECT_FILE"]
+    |> append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
+end

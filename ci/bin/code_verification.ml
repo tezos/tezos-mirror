@@ -315,7 +315,7 @@ let jobs pipeline_type =
   let enable_coverage_output_artifact ?(expire_in = Duration (Days 1)) tezos_job
       : tezos_job =
     jobs_with_coverage_output := tezos_job :: !jobs_with_coverage_output ;
-    tezos_job |> enable_coverage_location
+    tezos_job |> Coverage.enable_location
     |> append_script ["./scripts/ci/merge_coverage.sh"]
     |> add_artifacts
          ~expire_in
@@ -1141,7 +1141,7 @@ let jobs pipeline_type =
           ~image:Images.CI.test
           ~make_targets:["test-nonproto-unit"]
           ()
-        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_etherlink_x86_64 =
         job_unit_test
@@ -1151,7 +1151,7 @@ let jobs pipeline_type =
           ~rules:(make_rules ~changes:changeset_etherlink ~dependent:true ())
           ~make_targets:["test-etherlink-unit"]
           ()
-        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_other_x86_64 =
         (* Runs unit tests for contrib. *)
@@ -1162,7 +1162,7 @@ let jobs pipeline_type =
           ~cpu:High
           ~make_targets:["test-other-unit"]
           ()
-        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_proto_x86_64 =
         (* Runs unit tests for protocol. *)
@@ -1173,7 +1173,7 @@ let jobs pipeline_type =
           ~cpu:Very_high
           ~make_targets:["test-proto-unit"]
           ()
-        |> enable_coverage_instrumentation |> enable_coverage_output_artifact
+        |> Coverage.enable_instrumentation |> enable_coverage_output_artifact
       in
       let oc_unit_non_proto_arm64 =
         (* No coverage for arm64 jobs -- the code they test is a
@@ -1940,7 +1940,7 @@ let jobs pipeline_type =
                We propagate the exit code to temporarily allow corrupted coverage files. *)
             (script_propagate_exit_code "./scripts/ci/report_coverage.sh")
             ~allow_failure:(With_exit_codes [64])
-          |> enable_coverage_location |> enable_coverage_report
+          |> Coverage.enable_location |> Coverage.enable_report
         in
         [job_unified_coverage]
     | Schedule_extended_test -> []

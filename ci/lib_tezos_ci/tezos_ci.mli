@@ -735,3 +735,30 @@ module Hooks : sig
 end
 
 val job_datadog_pipeline_trace : tezos_job
+
+module Coverage : sig
+  (** Coverage-related helpers. *)
+
+  (** Add the [COVERAGE_OPTIONS] variable to enable [bisect_ppx].
+
+      This function should be applied in jobs that build executables such that:
+      - at least part of the code is in OCaml;
+      - at least one of these executables is used in test jobs;
+      - we want coverage reports for those tests.
+
+      Note that this includes not only build jobs but also some test jobs
+      in which we both build and run tests. *)
+  val enable_instrumentation : tezos_job -> tezos_job
+
+  (** Add the [BISECT_FILE] variable to specify the location of the coverage trace.
+
+      This function should be applied to jobs that produce or consume coverage traces.
+      This includes test jobs and jobs like [unified_coverage].
+      This also enables coverage trace output for instrumented executables. *)
+  val enable_location : tezos_job -> tezos_job
+
+  (** Add the coverage report artifact and the [SLACK_COVERAGE_CHANNEL] variable.
+
+      This is meant to be used in [unified_coverage] jobs. *)
+  val enable_report : tezos_job -> tezos_job
+end

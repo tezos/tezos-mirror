@@ -100,45 +100,6 @@ let script_propagate_exit_code script = [script ^ " || exit $?"]
 
 let opt_var name f = function Some value -> [(name, f value)] | None -> []
 
-(** Add variable for bisect_ppx instrumentation.
-
-    This template should be extended by jobs that build OCaml targets
-    that should be instrumented for coverage output. This set of job
-    includes build jobs (like [oc.build_x86_64_*]). It also includes
-    OCaml unit test jobs like [oc.unit:*-x86_64] as they build the test
-    runners before their execution. *)
-let enable_coverage_instrumentation : tezos_job -> tezos_job =
-  Tezos_ci.append_variables
-    [("COVERAGE_OPTIONS", "--instrument-with bisect_ppx")]
-
-(** Add variable specifying coverage trace storage.
-
-    This function should be applied to jobs that either produce (like
-    test jobs) or consume (like the [unified_coverage] job) coverage
-    traces. In addition to specifying the location of traces, setting
-    this variable also _enables_ coverage trace output for
-    instrumented binaries. *)
-let enable_coverage_location : tezos_job -> tezos_job =
-  Tezos_ci.append_variables
-    [("BISECT_FILE", "$CI_PROJECT_DIR/_coverage_output/")]
-
-let enable_coverage_report job : tezos_job =
-  job
-  |> Tezos_ci.add_artifacts
-       ~expose_as:"Coverage report"
-       ~reports:
-         (reports
-            ~coverage_report:
-              {
-                coverage_format = Cobertura;
-                path = "_coverage_report/cobertura.xml";
-              }
-            ())
-       ~expire_in:(Duration (Days 15))
-       ~when_:Always
-       ["_coverage_report/"; "$BISECT_FILE"]
-  |> Tezos_ci.append_variables [("SLACK_COVERAGE_CHANNEL", "C02PHBE7W73")]
-
 (** Add common variables used by jobs compiling kernels *)
 let enable_kernels =
   Tezos_ci.append_variables
@@ -798,7 +759,7 @@ let job_build_released_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
     |> enable_cargo_target_caches
   in
   (* Disable coverage for arm64 *)
-  if arch = Amd64 then enable_coverage_instrumentation job else job
+  if arch = Amd64 then Coverage.enable_instrumentation job else job
 
 let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
     ?dependencies ?(sccache_size = "5G") ~name executable_files =
@@ -864,7 +825,7 @@ let job_build_dynamic_binaries ?rules ~__POS__ ~arch ?retry ?cpu ?storage
     |> enable_cargo_target_caches
   in
   (* Disable coverage for arm64 *)
-  if arch = Amd64 then enable_coverage_instrumentation job else job
+  if arch = Amd64 then Coverage.enable_instrumentation job else job
 
 (** {2 Shared jobs} *)
 
